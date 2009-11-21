@@ -2,6 +2,8 @@ Testing if Hg is working and configured properly. Playing around a bit.
 
 Using the tutorial here, loosely: http://bitbucket.org/help/getting-started
  
+Testing more things.
+
 Sincerely,
 
 Mike
