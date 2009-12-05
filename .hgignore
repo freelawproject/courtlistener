@@ -3,7 +3,14 @@
 # Seperated into two sections, glob, and regexp
 # Globs are shell-style regular expressions, as distinct from perl-style
 
+
 # Beginning with the globs
 syntax: glob
+
+# no compiled files!
 *.class
-*[P|p][R|r][I|i][V|v][A|a][T|t][E|e]* #ignore stuff that has private in the name
+*.pyc
+
+# no private files!
+*[P|p][R|r][I|i][V|v][A|a][T|t][E|e]*
+
