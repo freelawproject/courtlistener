@@ -1,0 +1,4 @@
+This software and any associated files are Copyright 2010, Brian Carver,
+Michael Lissner, and Longhao Wang.
+
+For licensing, please see the LICENSE.txt file.
