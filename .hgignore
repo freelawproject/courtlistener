@@ -14,3 +14,5 @@ syntax: glob
 # no private files!
 *[P|p][R|r][I|i][V|v][A|a][T|t][E|e]*
 
+# ignore the django directory
+django
