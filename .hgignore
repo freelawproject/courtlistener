@@ -10,6 +10,7 @@ syntax: glob
 # no compiled files!
 *.class
 *.pyc
+*~
 
 # no private files!
 *[P|p][R|r][I|i][V|v][A|a][T|t][E|e]*
