@@ -43,6 +43,9 @@ class Court(models.Model):
         choices=PACER_CODES)
     courtURL = models.URLField("the homepage for each court")
     
+    class Meta:
+        db_table = "Court"
+    
 
 
 # A class to represent each party that is extracted from a document
@@ -52,6 +55,7 @@ class Party(models.Model):
     
     class Meta:
         verbose_name_plural = "parties"
+        db_table = "Party"
 
 
 
@@ -62,7 +66,10 @@ class Judge(models.Model):
     canonicalName = models.CharField("the official name of the judge: fname, mname, lname", 
         max_length=150)
     startDate = models.DateField("the start date that the judge is on the bench")
-    endDate = models.DateField("the end date that the judge is on the bench")        
+    endDate = models.DateField("the end date that the judge is on the bench")
+    
+    class Meta:
+        db_table = "Judge"    
 
         
 # A class to hold the various aliases that a judge may have, such as M. Lissner, 
@@ -75,13 +82,16 @@ class JudgeAlias (models.Model):
     class Meta:
         verbose_name = "judge alias"
         verbose_name_plural = "judge aliases"
+        db_table = "JudgeAlias"
         
         
 
 # A class which holds the bulk of the information regarding documents. This must 
 # go last, since it references the above classes
 class Document(models.Model):
-    documentSHA1 = models.CharField("unique ID for the document, as generated via sha1 on the PDF", max_length=40, primary_key=True)
+    documentSHA1 = models.CharField("unique ID for the document, as generated via sha1 on the PDF", 
+        max_length=40, 
+        primary_key=True)
     dateFiled = models.DateField("the date filed by the court")
     court = models.ForeignKey(Court, verbose_name="the court where the document was filed")
     judge = models.ManyToManyField(Judge, verbose_name="the judges that heard the case")
@@ -96,6 +106,9 @@ class Document(models.Model):
     documentPlainText = models.TextField("plain text of the document after extraction from the PDF")
     documentType = models.CharField("the type of document, as described by document_types.txt", 
         max_length=50)
+        
+    class Meta:
+        db_table = "Document"
 
 
 # A class, which uses multi-table inheritance to extend the Document model
@@ -107,6 +120,9 @@ class Citation(Document):
     officialCitationWest = models.CharField("the citation number, as described by WestLaw",
         max_length=50)
     officialCitationLexis = models.CharField("the citation number, as described by LexisNexis", max_length=50)
+    
+    class Meta:
+        db_table = "Citation"
 
 
 # A class, which uses multi-table inheritance to extend the Document model
@@ -117,3 +133,4 @@ class ExcerptSummary(Document):
     class Meta:
         verbose_name = "excerpt summary"
         verbose_name_plural = "excerpt summaries"
+        db_table = "ExcerptSummary"
