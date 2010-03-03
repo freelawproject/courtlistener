@@ -1,4 +1,4 @@
-# This software and any associated files are copyright 2010 Brian Carver and 
+# This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
 # 
 # This program is free software: you can redistribute it and/or modify
@@ -15,20 +15,26 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from django.conf.urls.defaults import *
+"""
+This file demonstrates two different styles of tests (one doctest and one
+unittest). These will both pass when you run "manage.py test".
 
-# Uncomment the next two lines to enable the admin:
-from django.contrib import admin
-admin.autodiscover()
+Replace these with more appropriate tests for your application.
+"""
 
-urlpatterns = patterns('',
-    # Example:
-    # (r'^alert/', include('alert.foo.urls')),
+from django.test import TestCase
 
-    # Uncomment the admin/doc line below and add 'django.contrib.admindocs' 
-    # to INSTALLED_APPS to enable admin documentation:
-     (r'^admin/doc/', include('django.contrib.admindocs.urls')),
+class SimpleTest(TestCase):
+    def test_basic_addition(self):
+        """
+        Tests that 1 + 1 always equals 2.
+        """
+        self.failUnlessEqual(1 + 1, 2)
 
-    # Uncomment the next line to enable the admin:
-     (r'^admin/', include(admin.site.urls)),
-)
+__test__ = {"doctest": """
+Another way to test that 1 + 1 is equal to 2.
+
+>>> 1 + 1 == 2
+True
+"""}
+
