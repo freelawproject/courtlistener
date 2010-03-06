@@ -16,6 +16,7 @@
 
 
 from django.conf.urls.defaults import *
+from alert.alertSystem.views import *
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
@@ -27,8 +28,11 @@ urlpatterns = patterns('',
 
     # Uncomment the admin/doc line below and add 'django.contrib.admindocs' 
     # to INSTALLED_APPS to enable admin documentation:
-     (r'^admin/doc/', include('django.contrib.admindocs.urls')),
+    (r'^admin/doc/', include('django.contrib.admindocs.urls')),
 
     # Uncomment the next line to enable the admin:
-     (r'^admin/', include(admin.site.urls)),
+    (r'^admin/', include(admin.site.urls)),
+     
+    # The scraper URL 
+    (r'^scrape/(\d{1,13})/', scrape)
 )
