@@ -19,8 +19,29 @@ from BeautifulSoup import BeautifulSoup
 from alert.alertSystem.models import *
 from django.http import HttpResponse, Http404
 
- 
+def downloadPDF(LinkToPdf, url):
+    """Receive a URL as an argument, then download the PDF that's in it, and 
+    place it intelligently into the database. Can accept either relative or
+    absolute URLs
+    
+    returns None
+    """ 
+    
+    # checks if it is a relative URL, and reassembles it, if necessary.
+    if "http" not in LinkToPdf:
+        LinkToPdf = url.split('/')[0] + "//" + url.split('/')[2] + LinkToPdf
 
+    print "downloading from " + LinkToPdf + "..."
+
+    webFile = urllib2.urlopen(LinkToPdf)
+
+    #uses the original filename. Will clobber existing file of the same name
+    localFile = open(url.split('/')[-1], 'wb')
+    localFile.write(webFile.read())
+
+    #cleanup
+    webFile.close()
+    localFile.close()
 
 def scrape(request, courtID):
     """
@@ -30,8 +51,6 @@ def scrape(request, courtID):
 
     returns None
     """
-
-
 
     # First, we are going to scrape the appropriate page, then we are going to
     # hand that page off to the appropriate parsing code.
@@ -67,25 +86,13 @@ def scrape(request, courtID):
     #print pdfs
 
     for pdf in pdfs:
-        linktext = str(pdf.contents[0])
+        linkToPdf = str(pdf.contents[0])
         #print linktext
 
-        linkURL = str(pdf.get("href"))
-
-        # reassembles the URL, if a relative link is used
-        if "http" not in linkURL:
-            linkURL = url.split('/')[0] + "//" + url.split('/')[2] + linkURL
-
-        print "downloading from " + linkURL + "..."
-
-        webFile = urllib2.urlopen(linkURL)
-
-        #uses the original filename. Will clobber existing file of the same name
-        localFile = open(url.split('/')[-1], 'wb')
-        localFile.write(webFile.read())
-
-        #cleanup
-        webFile.close()
-        localFile.close()
+        linkToPdf = str(pdf.get("href"))
+        
+        downloadPDF(linkToPdf, url)
+        
+ 
 
     return HttpResponse("it worked")
