@@ -1,0 +1,10 @@
+Install instructions for the alert project
+
+1. Install dependencies:
+ - python
+ - python-beautifulsoup
+ - python-docutils
+ - django (devel version)
+ - apache2
+ - 
+ 
