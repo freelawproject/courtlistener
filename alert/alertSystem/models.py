@@ -101,44 +101,18 @@ class JudgeAlias (models.Model):
         verbose_name_plural = "judge aliases"
         db_table = "JudgeAlias"
         ordering = ["alias"]
-        
-        
-
-# A class which holds the bulk of the information regarding documents. This must 
-# go last, since it references the above classes
-class Document(models.Model):
-    documentSHA1 = models.CharField("unique ID for the document, as generated via sha1 on the PDF", 
-        max_length=40, 
-        primary_key=True)
-    dateFiled = models.DateField("the date filed by the court")
-    court = models.ForeignKey(Court, verbose_name="the court where the document was filed")
-    judge = models.ManyToManyField(Judge, verbose_name="the judges that heard the case")
-    party = models.ManyToManyField(Party, verbose_name="the parties that were in the case")
-    download_URL = models.URLField("the URL on the court website where the document was originally scraped", 
-        verify_exists=False)
-    time_retrieved = models.DateTimeField("the exact date and time stamp that the document was placed into our database", 
-        auto_now_add=True, 
-        editable=False)
-    local_path = models.FileField("the location, relative to MEDIA_ROOT, where the files are stored",
-        upload_to='/pdf/%Y/%m/%d')
-    documentPlainText = models.TextField("plain text of the document after extraction from the PDF")
-    documentType = models.CharField("the type of document, as described by document_types.txt", 
-        max_length=50)
-        
-    def __unicode__(self):
-        return self.caseNameShort
-        
-    class Meta:
-        db_table = "Document"
-        ordering = ["-time_retrieved"]
 
 
-# A class, which uses multi-table inheritance to extend the Document model
-class Citation(Document):
+
+class Citation(models.Model):
+    citationUUID = models.AutoField("a unique ID for each citation", primary_key=True)
     caseNameShort = models.CharField("short name, as it is usually found on the court website", 
         max_length=100,
         unique=True)
     caseNameFull =  models.TextField("full name of the case, as found on the first page of the PDF")
+    caseNumber = models.CharField("the case number", 
+        blank=True,
+        max_length=50)
     officialCitationWest = models.CharField("the citation number, as described by WestLaw",
         max_length=50)
     officialCitationLexis = models.CharField("the citation number, as described by LexisNexis", max_length=50)
@@ -148,18 +122,61 @@ class Citation(Document):
     
     class Meta:
         db_table = "Citation"
-        ordering = ["caseNameFull"]
+        ordering = ["caseNameFull"]        
 
 
-# A class, which uses multi-table inheritance to extend the Document model
-class ExcerptSummary(Document):
+
+class ExcerptSummary(models.Model):
+    excerptUUID = models.AutoField("a unique ID for each excerpt", primary_key=True)
     autoExcerpt = models.TextField("the first 100 words of the PDF file")
     courtSummary = models.TextField("a summary of the document, as provided by the court itself")
 
     def __unicode__(self):
-        return self.caseNameShort
-
+        return self.excerpt_UUID
+    
     class Meta:
         verbose_name = "excerpt summary"
         verbose_name_plural = "excerpt summaries"
-        db_table = "ExcerptSummary"
+        db_table = "ExcerptSummary"       
+
+
+
+# A class which holds the bulk of the information regarding documents. This must 
+# go last, since it references the above classes
+class Document(models.Model):
+    documentSHA1 = models.CharField("unique ID for the document, as generated via sha1 on the PDF", 
+        max_length=40, 
+        primary_key=True)
+    dateFiled = models.DateField("the date filed by the court")
+    court = models.ForeignKey(Court, 
+        verbose_name="the court where the document was filed")
+    judge = models.ManyToManyField(Judge, 
+        verbose_name="the judges that heard the case", 
+        blank=True)
+    party = models.ManyToManyField(Party, 
+        verbose_name="the parties that were in the case", 
+        blank=True)
+    citation = models.ForeignKey(Citation, 
+        verbose_name="the citation information for the document")
+    excerptSummary = models.ForeignKey(ExcerptSummary,
+        verbose_name="the excerpt information for the document")
+    download_URL = models.URLField("the URL on the court website where the document was originally scraped", 
+        verify_exists=False)
+    time_retrieved = models.DateTimeField("the exact date and time stamp that the document was placed into our database", 
+        auto_now_add=True, 
+        editable=False)
+    local_path = models.FileField("the location, relative to MEDIA_ROOT, where the files are stored",
+        upload_to='/pdf/%Y/%m/%d',
+        blank=True)
+    documentPlainText = models.TextField("plain text of the document after extraction from the PDF",
+        blank=True)
+    documentType = models.CharField("the type of document, as described by document_types.txt", 
+        max_length=50,
+        blank=True)
+        
+    def __unicode__(self):
+        return self.caseNameShort
+        
+    class Meta:
+        db_table = "Document"
+        ordering = ["-time_retrieved"]
