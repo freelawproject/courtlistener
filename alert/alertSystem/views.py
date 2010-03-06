@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import urllib2, re
+import datetime, re, urllib2
 from BeautifulSoup import BeautifulSoup
 from alert.alertSystem.models import *
 from django.http import HttpResponse, Http404
@@ -43,38 +43,15 @@ def downloadPDF(LinkToPdf, url):
     webFile.close()
     localFile.close()
 
-def scrape(request, courtID):
-    """
-    a function that is given a court number to scrape, and which scrapes that
-    page. It's going to get ugly, so bear with me. Scraping ain't always
-    pretty.
 
+
+def makeSoupAndGetPDFs(url):
+    """This function takes the URL, finds the PDFs in the HTML, and then hands
+    those off to the downloadPDF function.
+    
     returns None
     """
-
-    # First, we are going to scrape the appropriate page, then we are going to
-    # hand that page off to the appropriate parsing code.
-    try:
-        courtID = int(courtID)
-    except:
-        raise Http404()
     
-    if (courtID == 1):
-        # first circuit
-        url = "http://www.ca1.uscourts.gov/cgi-bin/newopn.pl"
-    elif (courtID == 2):
-        # second circuit
-        url = "http://www.ca2.uscourts.gov/decisions"
-    elif (courtID == 3):
-        url = "http://michaeljaylissner.com"
-    """
-
-    ...etc for each
-
-    """
-
-    print "url = " + url
-
     html = urllib2.urlopen(url)
     soup = BeautifulSoup(html)
     #print soup
@@ -86,12 +63,97 @@ def scrape(request, courtID):
     #print pdfs
 
     for pdf in pdfs:
-        linkToPdf = str(pdf.contents[0])
+        linkText = str(pdf.contents[0])
         #print linktext
 
         linkToPdf = str(pdf.get("href"))
         
         downloadPDF(linkToPdf, url)
+
+
+
+def scrape(request, courtID):
+    """
+    The master function. This will receive a court ID, determine the correct 
+    action to take (scrape for PDFs, download content, etc.), then hand it off 
+    to another function that will handle the nitty-gritty crud. 
+
+    returns None
+    """
+
+    # some data validation, for good measure
+    try:
+        courtID = int(courtID)
+    except:
+        raise Http404()
+    
+    # next, we attack the court requested.
+    if (courtID == 1):
+        """
+        first circuit doesn't actually do PDFs. They do links to HTML content.
+        From what I can tell, this content is generated with pdftohtml. The 
+        process for this court is therefore as follows:
+        1. visit the site
+        2. follow the links on the site
+        3. download the html, parsing it for text. 
+        """
+        url = "http://www.ca1.uscourts.gov/cgi-bin/newopn.pl"
+        scrapedTimeRetrieved = datetime.datetime.now()
+        
+        html = urllib2.urlopen(url)
+        soup = BeautifulSoup(html)
+        
+        # find the <a> tags that link to PACER, since those have the case number
+        aTags = soup.findAll('a', attrs={"href": "pacer"})
+        
+        # for each of them, follow the link, and place the text in our DB
+        for a in aTags:
+            scrapedCaseNumber = str(a.contents[0])
+            
+            
+            
+
+        excerptSummary = ExcerptSummary(
+            autoExcerpt = ,
+            courtSummary = ,
+        )
+
+        citation = Citation(
+            caseNameShort = ,
+            caseNameFull =  ,
+            caseNumber = scrapedCaseNumber,
+        )
+            
+        document = Document(
+            documentSHA1 = ,
+            dateFiled = ,
+            court = ,
+            judge = ,
+            party = ,
+            citation = , 
+            excerptSummary = ,
+            download_URL = ,
+            time_retrieved = scrapedTimeRetrieved,
+            local_path = ,
+            documentPlainText = ,
+            documentType = ,
+            
+        )    
+        
+    elif (courtID == 2):
+        # second circuit
+        url = "http://www.ca2.uscourts.gov/decisions"
+    elif (courtID == 3):
+        url = "http://michaeljaylissner.com"
+    """
+
+    ...etc for each
+
+    """
+    
+    print "url = " + url
+
+
         
  
 
