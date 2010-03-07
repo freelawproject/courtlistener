@@ -71,7 +71,7 @@ class Party(models.Model):
 # A class to represent each judge that is extracted from a document
 class Judge(models.Model):
     judgeUUID = models.AutoField("a unique ID for each judge", primary_key=True)
-    court = models.ForeignKey(Court, verbose_name="the court where the judge served")
+    court = models.ForeignKey(Court, verbose_name="the court where the judge served during this time period")
     canonicalName = models.CharField("the official name of the judge: fname, mname, lname", 
         max_length=150)
     startDate = models.DateField("the start date that the judge is on the bench")
@@ -105,20 +105,29 @@ class JudgeAlias (models.Model):
 
 
 class Citation(models.Model):
-    citationUUID = models.AutoField("a unique ID for each citation", primary_key=True)
+    citationUUID = models.AutoField("a unique ID for each citation", 
+        primary_key=True)
     caseNameShort = models.CharField("short name, as it is usually found on the court website", 
         max_length=100,
-        unique=True)
-    caseNameFull =  models.TextField("full name of the case, as found on the first page of the PDF")
+        unique=True,
+        blank=True)
+    caseNameFull =  models.TextField("full name of the case, as found on the first page of the PDF",
+        blank=True)
     caseNumber = models.CharField("the case number", 
         blank=True,
         max_length=50)
     officialCitationWest = models.CharField("the citation number, as described by WestLaw",
-        max_length=50)
-    officialCitationLexis = models.CharField("the citation number, as described by LexisNexis", max_length=50)
+        max_length=50,
+        blank=True)
+    officialCitationLexis = models.CharField("the citation number, as described by LexisNexis", 
+        max_length=50,
+        blank=True)
     
     def __unicode__(self):
-        return self.caseNameShort
+        if self.caseNameShort:
+            return self.caseNameShort
+        else:
+            return self.citationUUID
     
     class Meta:
         db_table = "Citation"
@@ -127,12 +136,15 @@ class Citation(models.Model):
 
 
 class ExcerptSummary(models.Model):
-    excerptUUID = models.AutoField("a unique ID for each excerpt", primary_key=True)
-    autoExcerpt = models.TextField("the first 100 words of the PDF file")
-    courtSummary = models.TextField("a summary of the document, as provided by the court itself")
+    excerptUUID = models.AutoField("a unique ID for each excerpt", 
+        primary_key=True)
+    autoExcerpt = models.TextField("the first 100 words of the PDF file",
+        blank=True)
+    courtSummary = models.TextField("a summary of the document, as provided by the court itself",
+        blank=True)
 
     def __unicode__(self):
-        return self.excerpt_UUID
+        return self.excerptUUID
     
     class Meta:
         verbose_name = "excerpt summary"
@@ -147,19 +159,27 @@ class Document(models.Model):
     documentSHA1 = models.CharField("unique ID for the document, as generated via sha1 on the PDF", 
         max_length=40, 
         primary_key=True)
-    dateFiled = models.DateField("the date filed by the court")
+    dateFiled = models.DateField("the date filed by the court",
+        blank=True, 
+        null=True)
     court = models.ForeignKey(Court, 
         verbose_name="the court where the document was filed")
     judge = models.ManyToManyField(Judge, 
         verbose_name="the judges that heard the case", 
-        blank=True)
+        blank=True, 
+        null=True)
     party = models.ManyToManyField(Party, 
         verbose_name="the parties that were in the case", 
-        blank=True)
+        blank=True,
+        null=True)
     citation = models.ForeignKey(Citation, 
-        verbose_name="the citation information for the document")
+        verbose_name="the citation information for the document",
+        blank=True,
+        null=True)
     excerptSummary = models.ForeignKey(ExcerptSummary,
-        verbose_name="the excerpt information for the document")
+        verbose_name="the excerpt information for the document",
+        blank=True,
+        null=True)
     download_URL = models.URLField("the URL on the court website where the document was originally scraped", 
         verify_exists=False)
     time_retrieved = models.DateTimeField("the exact date and time stamp that the document was placed into our database", 
@@ -175,7 +195,10 @@ class Document(models.Model):
         blank=True)
         
     def __unicode__(self):
-        return self.caseNameShort
+        if self.citation.caseNameShort:
+            return self.citation.caseNameShort
+        else:
+            documentSHA1
         
     class Meta:
         db_table = "Document"

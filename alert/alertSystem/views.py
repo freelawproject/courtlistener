@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import datetime, re, urllib2
+import datetime, hashlib, re, urllib2
 from BeautifulSoup import BeautifulSoup
 from alert.alertSystem.models import *
 from django.http import HttpResponse, Http404
@@ -81,7 +81,7 @@ def scrape(request, courtID):
     returns None
     """
 
-    # some data validation, for good measure
+    # some data validation, for good measure - this should already be done via our url regex
     try:
         courtID = int(courtID)
     except:
@@ -98,47 +98,64 @@ def scrape(request, courtID):
         3. download the html, parsing it for text. 
         """
         url = "http://www.ca1.uscourts.gov/cgi-bin/newopn.pl"
-        scrapedTimeRetrieved = datetime.datetime.now()
         
         html = urllib2.urlopen(url)
         soup = BeautifulSoup(html)
         
-        # find the <a> tags that link to PACER, since those have the case number
-        aTags = soup.findAll('a', attrs={"href": "pacer"})
+        tdTags = soup.findAll('td')
         
-        # for each of them, follow the link, and place the text in our DB
-        for a in aTags:
-            scrapedCaseNumber = str(a.contents[0])
+        ct = Court.objects.get(courtUUID='ca1')
+        
+        i = 0
+        while i < len(tdTags)-4:
+            caseDate = tdTags[i+1].contents[0].strip().strip('&nbsp;')
+            caseLink = tdTags[i+2].contents[0].get('href')
+            caseNumber = tdTags[i+3].contents[1].contents[0].strip().strip('&nbsp;')
+            caseNameShort = tdTags[i+4].contents[0].strip().strip('&nbsp;')
             
+#            print "This was debated on: " + str(caseDate) 
+#            print "The case number was: " + str(caseNumber)
+#            print "The case name was: " + str(caseNameShort)
+#            print "The link to the case is: " + str(caseLink)
+                
+            # increment i by the number of columns in the table
+            i = i + 4
             
+            doc = Document()
             
+            # great, now we do some parsing and building, beginning with the caseDate 
+            splitDate = caseDate.split('/')
+            caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),int(splitDate[1]))
+            doc.dateFiled = caseDate
+            
+            # next up is the caseLink
+            if "http" not in caseLink:
+                caseLink = url.split('/')[0] + "//" + url.split('/')[2] + caseLink
+            
+            doc.download_URL = caseLink
+            
+            # using caseLink, we can download the cases
+            fileHandle = urllib2.urlopen(caseLink)
+            html = fileHandle.read()
+            doc.documentPlainText = html
+            fileHandle.close()
+            
+            # and using the case text, we can generate our sha1 hash
+            sha1Hash = hashlib.sha1(html).hexdigest()
+            doc.documentSHA1 = sha1Hash
+            
+            # next, we do caseNumber and caseNameShort
+            cite = Citation()
+            cite.caseNumber = caseNumber
+            cite.caseNameShort = caseNameShort
 
-        excerptSummary = ExcerptSummary(
-            autoExcerpt = ,
-            courtSummary = ,
-        )
-
-        citation = Citation(
-            caseNameShort = ,
-            caseNameFull =  ,
-            caseNumber = scrapedCaseNumber,
-        )
+            # and finally, we link up the foreign keys
+            doc.court = ct
             
-        document = Document(
-            documentSHA1 = ,
-            dateFiled = ,
-            court = ,
-            judge = ,
-            party = ,
-            citation = , 
-            excerptSummary = ,
-            download_URL = ,
-            time_retrieved = scrapedTimeRetrieved,
-            local_path = ,
-            documentPlainText = ,
-            documentType = ,
-            
-        )    
+            cite.save()
+            doc.citation = cite
+            doc.save()
+  
         
     elif (courtID == 2):
         # second circuit
