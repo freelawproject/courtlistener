@@ -109,7 +109,6 @@ class Citation(models.Model):
         primary_key=True)
     caseNameShort = models.CharField("short name, as it is usually found on the court website", 
         max_length=100,
-        unique=True,
         blank=True)
     caseNameFull =  models.TextField("full name of the case, as found on the first page of the PDF",
         blank=True)
