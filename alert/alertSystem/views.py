@@ -20,13 +20,13 @@ from alert.alertSystem.models import *
 from django.http import HttpResponse, Http404
 
 def downloadPDF(LinkToPdf, url):
-    """Receive a URL as an argument, then download the PDF that's in it, and 
+    """Receive a URL as an argument, then download the PDF that's in it, and
     place it intelligently into the database. Can accept either relative or
     absolute URLs
-    
+
     returns None
-    """ 
-    
+    """
+
     # checks if it is a relative URL, and reassembles it, if necessary.
     if "http" not in LinkToPdf:
         LinkToPdf = url.split('/')[0] + "//" + url.split('/')[2] + LinkToPdf
@@ -48,10 +48,10 @@ def downloadPDF(LinkToPdf, url):
 def makeSoupAndGetPDFs(url):
     """This function takes the URL, finds the PDFs in the HTML, and then hands
     those off to the downloadPDF function.
-    
+
     returns None
     """
-    
+
     html = urllib2.urlopen(url)
     soup = BeautifulSoup(html)
     #print soup
@@ -67,16 +67,16 @@ def makeSoupAndGetPDFs(url):
         #print linktext
 
         linkToPdf = str(pdf.get("href"))
-        
+
         downloadPDF(linkToPdf, url)
 
 
 
 def scrape(request, courtID):
     """
-    The master function. This will receive a court ID, determine the correct 
-    action to take (scrape for PDFs, download content, etc.), then hand it off 
-    to another function that will handle the nitty-gritty crud. 
+    The master function. This will receive a court ID, determine the correct
+    action to take (scrape for PDFs, download content, etc.), then hand it off
+    to another function that will handle the nitty-gritty crud.
 
     returns None
     """
@@ -86,80 +86,90 @@ def scrape(request, courtID):
         courtID = int(courtID)
     except:
         raise Http404()
-    
+
     # next, we attack the court requested.
     if (courtID == 1):
         """
         first circuit doesn't actually do PDFs. They do links to HTML content.
-        From what I can tell, this content is generated with pdftohtml. The 
+        From what I can tell, this content is generated with pdftohtml. The
         process for this court is therefore as follows:
         1. visit the site
         2. follow the links on the site
-        3. download the html, parsing it for text. 
+        3. download the html, parsing it for text.
         """
         url = "http://www.ca1.uscourts.gov/cgi-bin/newopn.pl"
-        
+
         html = urllib2.urlopen(url)
         soup = BeautifulSoup(html)
-        
+
         tdTags = soup.findAll('td')
-        
+
         ct = Court.objects.get(courtUUID='ca1')
-        
+
         i = 0
         while i < len(tdTags)-4:
+            # some beautiful soup work here...
             caseDate = tdTags[i+1].contents[0].strip().strip('&nbsp;')
             caseLink = tdTags[i+2].contents[0].get('href')
             caseNumber = tdTags[i+3].contents[1].contents[0].strip().strip('&nbsp;')
             caseNameShort = tdTags[i+4].contents[0].strip().strip('&nbsp;')
-            
-#            print "This was debated on: " + str(caseDate) 
-#            print "The case number was: " + str(caseNumber)
-#            print "The case name was: " + str(caseNameShort)
-#            print "The link to the case is: " + str(caseLink)
-                
-            # increment i by the number of columns in the table
+
+            # increment our while loop counter, i, by the number of columns in the table
             i = i + 4
-            
+
             doc = Document()
-            
-            # great, now we do some parsing and building, beginning with the caseDate 
-            splitDate = caseDate.split('/')
-            caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),int(splitDate[1]))
-            doc.dateFiled = caseDate
-            
-            # next up is the caseLink
+
+            # great, now we do some parsing and building, beginning with the caseLink
             if "http" not in caseLink:
                 caseLink = url.split('/')[0] + "//" + url.split('/')[2] + caseLink
-            
+
             doc.download_URL = caseLink
-            
+
             # using caseLink, we can download the cases
             fileHandle = urllib2.urlopen(caseLink)
             html = fileHandle.read()
             doc.documentPlainText = html
             fileHandle.close()
-            
+
             # and using the case text, we can generate our sha1 hash
             sha1Hash = hashlib.sha1(html).hexdigest()
             doc.documentSHA1 = sha1Hash
-            
+
+
+            # next up is the caseDate
+            splitDate = caseDate.split('/')
+            caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),int(splitDate[1]))
+            doc.dateFiled = caseDate
+
+
             # next, we do caseNumber and caseNameShort
             cite = Citation()
             cite.caseNumber = caseNumber
             cite.caseNameShort = caseNameShort
 
-            # and finally, we link up the foreign keys
+            try:
+                # if this raises an exception, we haven't scraped this yet, so we should. 
+                # Otherwise, we have scraped it, and we should continue.
+                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
+                #print "duplicate found!"
+                continue
+            except:
+                # it's not a duplicate, move on to the saving stage
+                pass
+
+            # and finally, we link up the foreign keys and save the data
             doc.court = ct
-            
             cite.save()
             doc.citation = cite
             doc.save()
-  
-        
+
+
+
     elif (courtID == 2):
         # second circuit
         url = "http://www.ca2.uscourts.gov/decisions"
+
+
     elif (courtID == 3):
         url = "http://michaeljaylissner.com"
     """
@@ -167,11 +177,6 @@ def scrape(request, courtID):
     ...etc for each
 
     """
-    
-    print "url = " + url
 
-
-        
- 
 
     return HttpResponse("it worked")
