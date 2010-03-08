@@ -14,12 +14,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import datetime, hashlib, re, urllib2
-from BeautifulSoup import BeautifulSoup
 from alert.alertSystem.models import *
 from django.http import HttpResponse, Http404
+from django.core.files import File
+import datetime, hashlib, re, urllib2
+from BeautifulSoup import BeautifulSoup
 
-def downloadPDF(LinkToPdf, url):
+
+
+def downloadPDF(LinkToPdf):
     """Receive a URL as an argument, then download the PDF that's in it, and
     place it intelligently into the database. Can accept either relative or
     absolute URLs
@@ -27,9 +30,6 @@ def downloadPDF(LinkToPdf, url):
     returns None
     """
 
-    # checks if it is a relative URL, and reassembles it, if necessary.
-    if "http" not in LinkToPdf:
-        LinkToPdf = url.split('/')[0] + "//" + url.split('/')[2] + LinkToPdf
 
     print "downloading from " + LinkToPdf + "..."
 
@@ -148,7 +148,7 @@ def scrape(request, courtID):
             cite.caseNameShort = caseNameShort
 
             try:
-                # if this raises an exception, we haven't scraped this yet, so we should. 
+                # if this raises an exception, we haven't scraped this yet, so we should.
                 # Otherwise, we have scraped it, and we should continue.
                 Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
                 #print "duplicate found!"
@@ -168,10 +168,115 @@ def scrape(request, courtID):
     elif (courtID == 2):
         # second circuit
         url = "http://www.ca2.uscourts.gov/decisions"
+        ct = Court.objects.get(courtUUID='ca2')
 
+        """
+        queries can be made on their system via HTTP POST, but I can't figure out
+        how to URL hack it. I've made a request for help (2010-03-06)
+        http://www.ca2.uscourts.gov/decisions?IW_DATABASE=OPN&IW_FIELD_TEXT=OPN&IW_SORT=-Date&IW_BATCHSIZE=25
+        """
 
     elif (courtID == 3):
-        url = "http://michaeljaylissner.com"
+        """
+        This URL provides the latest 25 cases, so I need to pick out the new
+        ones and only get those. I can do this efficiently by trying to do each,
+        and then giving up once I hit one that I've done before. This will work
+        because they are in reverse chronological order.
+        """
+
+        url = "http://www.ca3.uscourts.gov/recentop/week/recprec.htm"
+        ct = Court.objects.get(courtUUID='ca3')
+
+        html = urllib2.urlopen(url)
+        soup = BeautifulSoup(html)
+
+
+        # all links ending in pdf, case insensitive
+        regex = re.compile("pdf$", re.IGNORECASE)
+        aTags = soup.findAll(attrs={"href": regex})
+
+        # we will use these vars in our while loop, better not to compile them each time
+        regexII = re.compile('\d{2}/\d{2}/\d{2}')
+        regexIII = re.compile('\d{2}-\d{4}')
+        i = 0
+
+        while i < len(aTags):
+            caseLink = aTags[i].get('href')
+            print caseLink
+            caseNameShort = aTags[i].contents[0].strip().strip('&npsp;')
+
+            junk = aTags[i].previous.previous.previous
+
+            try:
+                # this error seems to happen upon dups...not sure why yet
+                caseDate = regexII.search(junk).group(0)
+                caseNumber = regexIII.search(junk).group(0)
+            except:
+                i = i+1
+                continue
+
+            # these will hold our final document and citation
+            doc = Document()
+            cite = Citation()
+
+            # next, we do caseNumber and caseNameShort
+            cite.caseNumber = caseNumber
+            cite.caseNameShort = caseNameShort
+
+            try:
+                """if this raises an exception, we haven't scraped this yet, so
+                we should. Otherwise, we have scraped it, and we should break
+                from the remainder of the loop. This works because the cases are
+                in chronological order"""
+                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
+                print "duplicate found!"
+                break
+            except:
+                # it's not a duplicate, move on to the saving stage
+                pass
+
+            cite.save()
+            doc.citation = cite
+
+            # next up is the caseDate
+            splitDate = caseDate.split('/')
+            caseDate = datetime.date(int("20" + splitDate[2]),int(splitDate[0]),
+                int(splitDate[1]))
+            doc.dateFiled = caseDate
+
+            # the download URL for the PDF
+            if "http" not in caseLink:
+                # in case it's a relative URL
+                caseLink = url.split('/')[0] + "//" + url.split('/')[2] + caseLink
+
+            doc.download_URL = caseLink
+            
+            # using caseLink, we can download the case
+            #webFile = urllib2.urlopen(caseLink)
+            #localFile = open(caseNameShort, 'wb')
+            #localFile.write(webFile.read())
+
+            #webFile.close()
+            
+            
+            #pdf = File(localFile)
+            doc.local_path = File(open("/tmp/test.txt"))
+
+            # and using the case text, we can generate our sha1 hash
+            sha1Hash = hashlib.sha1("webFile" + str(i)).hexdigest()
+            doc.documentSHA1 = sha1Hash
+
+
+            # link the foreign keys, save and iterate
+            doc.court = ct
+            doc.save()
+
+            i = i+1
+
+
+
+
+
     """
 
     ...etc for each
