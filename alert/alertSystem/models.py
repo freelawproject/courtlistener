@@ -74,6 +74,9 @@ class Judge(models.Model):
     court = models.ForeignKey(Court, verbose_name="the court where the judge served during this time period")
     canonicalName = models.CharField("the official name of the judge: fname, mname, lname", 
         max_length=150)
+    judgeAvatar = models.ImageField("the judge's face", 
+        upload_to="avatars/judges/%Y/%m/%d",
+        blank=True)
     startDate = models.DateField("the start date that the judge is on the bench")
     endDate = models.DateField("the end date that the judge is on the bench")
     
@@ -185,7 +188,7 @@ class Document(models.Model):
         auto_now_add=True, 
         editable=False)
     local_path = models.FileField("the location, relative to MEDIA_ROOT, where the files are stored",
-        upload_to='/pdf/%Y/%m/%d',
+        upload_to='pdf/%Y/%m/%d',
         blank=True)
     documentPlainText = models.TextField("plain text of the document after extraction from the PDF",
         blank=True)
