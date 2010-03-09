@@ -23,12 +23,12 @@ from BeautifulSoup import BeautifulSoup
 
 
 
-def downloadPDF(LinkToPdf, caseNameShort, doc):
-    """Receive a URL and a casename as an argument, then downloads the PDF 
-    that's in it, and places it intelligently into the database. Can accept 
+def downloadPDF(LinkToPdf, caseNameShort):
+    """Receive a URL and a casename as an argument, then downloads the PDF
+    that's in it, and places it intelligently into the database. Can accept
     either relative or absolute URLs
 
-    returns None
+    returns a StringIO that is the PDF, I think
     """
 
 
@@ -39,7 +39,9 @@ def downloadPDF(LinkToPdf, caseNameShort, doc):
 
     myFile = ContentFile(stringThing.getvalue())
 
-    doc.local_path.save(caseNameShort + ".pdf", myFile)
+    webFile.close()
+    return myFile
+
 
 
 
@@ -173,7 +175,6 @@ def scrape(request, courtID):
 
         while i < len(aTags):
             caseLink = aTags[i].get('href')
-            print caseLink
             caseNameShort = aTags[i].contents[0].strip().strip('&npsp;')
 
             junk = aTags[i].previous.previous.previous
@@ -189,7 +190,7 @@ def scrape(request, courtID):
             # these will hold our final document and citation
             doc = Document()
             cite = Citation()
-            
+
             # link the court early - it helps later
             doc.court = ct
 
@@ -225,52 +226,19 @@ def scrape(request, courtID):
 
             doc.download_URL = caseLink
 
-            """PROBLEM: SHA1 is FAKED!!!!"""
-            # and using the case text, we can generate our sha1 hash
-            sha1Hash = hashlib.sha1("webFile" + str(i)).hexdigest()
+            # save the file to the db and hard drive
+            myFile = downloadPDF(caseLink, caseNameShort)
+            doc.local_path.save(caseNameShort + ".pdf", myFile)
+
+            # and using the PDF we just downloaded, we can generate our sha1 hash
+            data = doc.local_path.read()
+            sha1Hash = hashlib.sha1(data).hexdigest()
             doc.documentSHA1 = sha1Hash
-            
-            
-            downloadPDF(caseLink, caseNameShort, doc)
-#            # next, we download, save, delete and do a bunch of other stuff.
-#            webFile = urllib2.urlopen(caseLink)
 
-#            stringThing = StringIO.StringIO()
-#            stringThing.write(webFile.read())
+            # finalize everything
+            doc.save()
 
-#            myFile = ContentFile(stringThing.getvalue())
-
-#            doc.local_path.save(caseNameShort + ".pdf", myFile)
-
-
-
-
-
-
-            """PROBLEM: THE STUFF BELOW IS LIKELY CRUD THAT NEEDS CLEANING"""
-            #Chart.objects.create(xml=default_storage.save(f.name, myfile))
-
-            # using caseLink, we can download the case
-
-            #localFile = open(caseNameShort, 'wb')
-            #localFile.write(webFile.read())
-
-            #webFile.close()
-
-
-            #pdf = File(localFile)
-            #doc.local_path = File(open("/tmp/test.txt")) # this works!
-
-
-
-
-
-            """PROBLEM: NOT SURE IF THIS IS NECESSARY!"""
-            #doc.save()
-
-            i = i+1
-
-
+            i += 1
 
 
 
