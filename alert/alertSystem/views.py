@@ -17,58 +17,29 @@
 from alert.alertSystem.models import *
 from django.http import HttpResponse, Http404
 from django.core.files import File
+from django.core.files.base import ContentFile
 import datetime, hashlib, re, StringIO, urllib2
 from BeautifulSoup import BeautifulSoup
 
 
 
-def downloadPDF(LinkToPdf):
-    """Receive a URL as an argument, then download the PDF that's in it, and
-    place it intelligently into the database. Can accept either relative or
-    absolute URLs
+def downloadPDF(LinkToPdf, caseNameShort, doc):
+    """Receive a URL and a casename as an argument, then downloads the PDF 
+    that's in it, and places it intelligently into the database. Can accept 
+    either relative or absolute URLs
 
     returns None
     """
 
-
-    print "downloading from " + LinkToPdf + "..."
 
     webFile = urllib2.urlopen(LinkToPdf)
 
-    #uses the original filename. Will clobber existing file of the same name
-    localFile = open(url.split('/')[-1], 'wb')
-    localFile.write(webFile.read())
+    stringThing = StringIO.StringIO()
+    stringThing.write(webFile.read())
 
-    #cleanup
-    webFile.close()
-    localFile.close()
+    myFile = ContentFile(stringThing.getvalue())
 
-
-
-def makeSoupAndGetPDFs(url):
-    """This function takes the URL, finds the PDFs in the HTML, and then hands
-    those off to the downloadPDF function.
-
-    returns None
-    """
-
-    html = urllib2.urlopen(url)
-    soup = BeautifulSoup(html)
-    #print soup
-
-    # all links ending in pdf, case insensitive
-    regex = re.compile("pdf$", re.IGNORECASE)
-    pdfs = soup.findAll(attrs={"href": regex})
-
-    #print pdfs
-
-    for pdf in pdfs:
-        linkText = str(pdf.contents[0])
-        #print linktext
-
-        linkToPdf = str(pdf.get("href"))
-
-        downloadPDF(linkToPdf, url)
+    doc.local_path.save(caseNameShort + ".pdf", myFile)
 
 
 
@@ -218,22 +189,25 @@ def scrape(request, courtID):
             # these will hold our final document and citation
             doc = Document()
             cite = Citation()
+            
+            # link the court early - it helps later
+            doc.court = ct
 
             # next, we do caseNumber and caseNameShort
             cite.caseNumber = caseNumber
             cite.caseNameShort = caseNameShort
 
-#            try:
-#                """if this raises an exception, we haven't scraped this yet, so
-#                we should. Otherwise, we have scraped it, and we should break
-#                from the remainder of the loop. This works because the cases are
-#                in chronological order"""
-#                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
-#                print "duplicate found!"
-#                break
-#            except:
-#                # it's not a duplicate, move on to the saving stage
-#                pass
+            try:
+                """if this raises an exception, we haven't scraped this yet, so
+                we should. Otherwise, we have scraped it, and we should break
+                from the remainder of the loop. This works because the cases are
+                in chronological order"""
+                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
+                print "duplicate found!"
+                break
+            except:
+                # it's not a duplicate, move on to the saving stage
+                pass
 
             cite.save()
             doc.citation = cite
@@ -256,32 +230,34 @@ def scrape(request, courtID):
             sha1Hash = hashlib.sha1("webFile" + str(i)).hexdigest()
             doc.documentSHA1 = sha1Hash
             
-            # link the foreign keys, save and iterate
-            doc.court = ct
             
-            # next, we download, save, delete and do a bunch of other stuff.            
-            webFile = urllib2.urlopen(caseLink)
-            localFile = open("/tmp/pdf.pdf", 'wb')
-            localFile.write(webFile.read())
-            localFile.close()
-            localFile = open("/tmp/pdf.pdf", 'r')
-            myFile = File(localFile)
-            #myFile.name = "blarg"
-            doc.local_path.save(caseNameShort + "pdf", myFile)
-            
-            
-            
+            downloadPDF(caseLink, caseNameShort, doc)
+#            # next, we download, save, delete and do a bunch of other stuff.
+#            webFile = urllib2.urlopen(caseLink)
+
+#            stringThing = StringIO.StringIO()
+#            stringThing.write(webFile.read())
+
+#            myFile = ContentFile(stringThing.getvalue())
+
+#            doc.local_path.save(caseNameShort + ".pdf", myFile)
+
+
+
+
+
+
             """PROBLEM: THE STUFF BELOW IS LIKELY CRUD THAT NEEDS CLEANING"""
-            #Chart.objects.create(xml=default_storage.save(f.name, myfile)) 
-            
+            #Chart.objects.create(xml=default_storage.save(f.name, myfile))
+
             # using caseLink, we can download the case
 
             #localFile = open(caseNameShort, 'wb')
             #localFile.write(webFile.read())
 
             #webFile.close()
-            
-            
+
+
             #pdf = File(localFile)
             #doc.local_path = File(open("/tmp/test.txt")) # this works!
 
@@ -290,7 +266,7 @@ def scrape(request, courtID):
 
 
             """PROBLEM: NOT SURE IF THIS IS NECESSARY!"""
-            doc.save()
+            #doc.save()
 
             i = i+1
 
