@@ -261,14 +261,12 @@ def scrape(request, courtID):
             
             # next, we download, save, delete and do a bunch of other stuff.            
             webFile = urllib2.urlopen(caseLink)
-            webFile.name = "blarg2"
             localFile = open("/tmp/pdf.pdf", 'wb')
             localFile.write(webFile.read())
-            #localFile.name = "blarg3"
             localFile.close()
             localFile = open("/tmp/pdf.pdf", 'r')
             myFile = File(localFile)
-            myFile.name = "blarg"
+            #myFile.name = "blarg"
             doc.local_path.save(caseNameShort + "pdf", myFile)
             
             
