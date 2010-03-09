@@ -17,7 +17,7 @@
 from alert.alertSystem.models import *
 from django.http import HttpResponse, Http404
 from django.core.files import File
-import datetime, hashlib, re, urllib2
+import datetime, hashlib, re, StringIO, urllib2
 from BeautifulSoup import BeautifulSoup
 
 
@@ -120,7 +120,7 @@ def scrape(request, courtID):
             doc = Document()
 
             # great, now we do some parsing and building, beginning with the caseLink
-            if "http" not in caseLink:
+            if "http:" not in caseLink:
                 caseLink = url.split('/')[0] + "//" + url.split('/')[2] + caseLink
 
             doc.download_URL = caseLink
@@ -223,17 +223,17 @@ def scrape(request, courtID):
             cite.caseNumber = caseNumber
             cite.caseNameShort = caseNameShort
 
-            try:
-                """if this raises an exception, we haven't scraped this yet, so
-                we should. Otherwise, we have scraped it, and we should break
-                from the remainder of the loop. This works because the cases are
-                in chronological order"""
-                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
-                print "duplicate found!"
-                break
-            except:
-                # it's not a duplicate, move on to the saving stage
-                pass
+#            try:
+#                """if this raises an exception, we haven't scraped this yet, so
+#                we should. Otherwise, we have scraped it, and we should break
+#                from the remainder of the loop. This works because the cases are
+#                in chronological order"""
+#                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
+#                print "duplicate found!"
+#                break
+#            except:
+#                # it's not a duplicate, move on to the saving stage
+#                pass
 
             cite.save()
             doc.citation = cite
@@ -245,14 +245,39 @@ def scrape(request, courtID):
             doc.dateFiled = caseDate
 
             # the download URL for the PDF
-            if "http" not in caseLink:
+            if "http:" not in caseLink:
                 # in case it's a relative URL
                 caseLink = url.split('/')[0] + "//" + url.split('/')[2] + caseLink
 
             doc.download_URL = caseLink
+
+            """PROBLEM: SHA1 is FAKED!!!!"""
+            # and using the case text, we can generate our sha1 hash
+            sha1Hash = hashlib.sha1("webFile" + str(i)).hexdigest()
+            doc.documentSHA1 = sha1Hash
+            
+            # link the foreign keys, save and iterate
+            doc.court = ct
+            
+            # next, we download, save, delete and do a bunch of other stuff.            
+            webFile = urllib2.urlopen(caseLink)
+            webFile.name = "blarg2"
+            localFile = open("/tmp/pdf.pdf", 'wb')
+            localFile.write(webFile.read())
+            #localFile.name = "blarg3"
+            localFile.close()
+            localFile = open("/tmp/pdf.pdf", 'r')
+            myFile = File(localFile)
+            myFile.name = "blarg"
+            doc.local_path.save(caseNameShort + "pdf", myFile)
+            
+            
+            
+            """PROBLEM: THE STUFF BELOW IS LIKELY CRUD THAT NEEDS CLEANING"""
+            #Chart.objects.create(xml=default_storage.save(f.name, myfile)) 
             
             # using caseLink, we can download the case
-            #webFile = urllib2.urlopen(caseLink)
+
             #localFile = open(caseNameShort, 'wb')
             #localFile.write(webFile.read())
 
@@ -260,15 +285,13 @@ def scrape(request, courtID):
             
             
             #pdf = File(localFile)
-            doc.local_path = File(open("/tmp/test.txt"))
-
-            # and using the case text, we can generate our sha1 hash
-            sha1Hash = hashlib.sha1("webFile" + str(i)).hexdigest()
-            doc.documentSHA1 = sha1Hash
+            #doc.local_path = File(open("/tmp/test.txt")) # this works!
 
 
-            # link the foreign keys, save and iterate
-            doc.court = ct
+
+
+
+            """PROBLEM: NOT SURE IF THIS IS NECESSARY!"""
             doc.save()
 
             i = i+1
