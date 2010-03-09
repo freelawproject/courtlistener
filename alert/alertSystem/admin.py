@@ -18,10 +18,18 @@
 from django.contrib import admin
 from alert.alertSystem.models import *
 
+class CitationAdmin(admin.ModelAdmin):
+    list_display = ('caseNameShort',)
+    
+class DocumentAdmin(admin.ModelAdmin):
+    list_display = ('citation', 'court',)
+    ordering = ('citation',)
+
+
 admin.site.register(Court)
 admin.site.register(Party)
 admin.site.register(Judge)
 admin.site.register(JudgeAlias)
-admin.site.register(Document)
-admin.site.register(Citation)
+admin.site.register(Document, DocumentAdmin)
+admin.site.register(Citation, CitationAdmin)
 admin.site.register(ExcerptSummary)

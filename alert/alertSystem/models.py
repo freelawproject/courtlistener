@@ -158,9 +158,10 @@ class ExcerptSummary(models.Model):
 # A class which holds the bulk of the information regarding documents. This must 
 # go last, since it references the above classes
 class Document(models.Model):
-    documentSHA1 = models.CharField("unique ID for the document, as generated via sha1 on the PDF", 
-        max_length=40, 
+    documentUUID = models.AutoField("a unique ID for each document",
         primary_key=True)
+    documentSHA1 = models.CharField("unique ID for the document, as generated via sha1 on the PDF", 
+        max_length=40)
     dateFiled = models.DateField("the date filed by the court",
         blank=True, 
         null=True)
