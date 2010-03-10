@@ -487,9 +487,6 @@ def scrape(request, courtID):
             # we begin with the caseLink field
             caseLink = aTags[i].get('href')
 
-            # we begin with the caseLink field
-            caseLink = aTags[i].get('href')
-
             if "http:" not in caseLink:
                 # in case it's a relative URL
                 caseLink = url.split('/')[0] + "//" + url.split('/')[2] + "/" + caseLink
@@ -555,7 +552,101 @@ def scrape(request, courtID):
             # next
             i += 1
 
+    
+    if (courtID == 7):
+        """another court where we need to do a post. This will be a good 
+        starting place for getting the judge field, when we're ready for that"""
+        
+        url = "http://www.ca7.uscourts.gov/fdocs/docs.fwx"
+        ct = Court.objects.get(courtUUID = 'ca7')
+        
+        data = "yr=&num=&Submit=Today&dtype=Opinion&scrid=Select+a+Case"
+        req = urllib2.Request(url, data)
+        response = urllib2.urlopen(req)
+        html = response.read()
+        
+        soup = BeautifulSoup(html)
+        
+        aTagsRegex = re.compile('pdf$', re.IGNORECASE)
+        aTags = soup.findAll(attrs={'href' : aTagsRegex})
+        
+        i = 0
+        while i < len(aTags):
+            # these will hold our final document and citation
+            doc = Document()
+            cite = Citation ()
+            
+            # link the court early - it helps later
+            doc.court = ct
+            
+            # we begin with the caseLink field
+            caseLink = aTags[i].get("href")
+            
+            if "http:" not in caseLink:
+                # in case it's a relative URL
+                caseLink = url.split('/')[0] + "//" + url.split('/')[2] + "/" + caseLink
+                
+            doc.download_URL = caseLink
+            
+            # using caseLink, we can get the caseNumber and documentType
+            caseNumber = aTags[i].previous.previous.previous.previous.previous\
+                .previous.previous.previous.previous.previous.strip()
+            cite.caseNumber = caseNumber
+            
+            # next up: caseDate            
+            caseDate = aTags[i].previous.previous.previous.contents[0].strip()
+            splitDate = caseDate.split('/')
+            caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]), 
+                int(splitDate[1]))
+            doc.dateField = caseDate
+            
+            # next up: caseNameShort
+            caseNameShort = aTags[i].previous.previous.previous.previous.previous\
+                .previous.previous.strip()
+            cite.caseNameShort = caseNameShort
+            
+            # now that we have the caseNumber and caseNameShort, we can dup check
+            try:
+                """if this raises an exception, we haven't scraped this yet, so
+                we should. Otherwise, we have scraped it, and we should move to
+                the next case"""
+                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
+                print "duplicate found!"
+                i += 1
+                continue
+            except:
+                # it's not a duplicate, move on to the saving stage
+                pass
+                
+            # if that goes well, we save to the DB
+            cite.save()
+            doc.citation = cite
+            
+            # finally, we can download the PDFs and save them locally
+            # finally, we should download the PDF and save it locally.
+            myFile = downloadPDF(caseLink, caseNameShort)
+            doc.local_path.save(caseNameShort + ".pdf", myFile)
 
+            # and using the PDF we just downloaded, we can generate our sha1 hash
+            data = doc.local_path.read()
+            sha1Hash = hashlib.sha1(data).hexdigest()
+            doc.documentSHA1 = sha1Hash
+
+            # finalize everything
+            doc.save()
+            
+            i += 1
+    
+    if (courtID == 8):
+        url = "http://www.ca8.uscourts.gov/cgi-bin/new/today2.pl"
+        ct = Court.objects.get(courtUUID = 'ca8')
+        
+        html = urllib2.urlopen(url)
+        soup = BeautifulSoup(html)
+        
+        print soup        
+            
+    
     """
 
     ...etc for each
