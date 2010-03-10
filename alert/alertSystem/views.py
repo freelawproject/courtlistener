@@ -18,7 +18,7 @@ from alert.alertSystem.models import *
 from django.http import HttpResponse, Http404
 from django.core.files import File
 from django.core.files.base import ContentFile
-import datetime, hashlib, re, StringIO, urllib2
+import datetime, hashlib, re, StringIO, urllib, urllib2
 from BeautifulSoup import BeautifulSoup
 
 
@@ -343,21 +343,21 @@ def scrape(request, courtID):
     if (courtID == 5):
         """Fifth circuit scraper. Similar process as to elsewhere, as you might
         expect at this point"""
-        
+
         url = "http://www.ca5.uscourts.gov/Opinions.aspx"
         ct = Court.objects.get(courtUUID='ca5')
-        
+
         html = urllib2.urlopen(url)
         soup = BeautifulSoup(html)
-        
-        
+
+
         #all links ending in pdf, case insensitive
         aTagRegex = re.compile("pdf$", re.IGNORECASE)
         aTags = soup.findAll(attrs={"href": aTagRegex})
-        
+
         opinionRegex = re.compile(r"\opinions.*pub")
         unpubRegex = re.compile(r"\opinions\unpub")
-        
+
         i = 0
         while i < len(aTags):
             # this page has PDFs that aren't cases, we must filter them out
@@ -365,35 +365,35 @@ def scrape(request, courtID):
                 # it's not an opinion, increment and punt
                 i += 1
                 continue
-                
+
             # these will hold our final document and citation
             doc = Document()
             cite = Citation()
-            
+
             # link the court early - it helps later
             doc.court = ct
-            
+
             # we begin with the caseLink field
             caseLink = aTags[i].get('href')
-            
+
             if "http:" not in caseLink:
                 # in case it's a relative URL
                 caseLink = url.split('/')[0] + "//" + url.split('/')[2] + "/" + caseLink
 
             doc.download_URL = caseLink
-            
+
             # using caseLink, we can get the caseNumber and documentType
             caseNumber = aTags[i].contents[0]
             cite.caseNumber = caseNumber
-            
+
             if unpubRegex.search(str(aTags[i])) == None:
                 # it's published, else it's unpublished
                 documentType = "P"
             else:
                 documentType = "U"
-            
+
             doc.documentType = documentType
-            
+
             # next, we do the caseDate
             caseDate = aTags[i].next.next.contents[0].contents[0]
 
@@ -402,12 +402,12 @@ def scrape(request, courtID):
             caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
                 int(splitDate[1]))
             doc.dateFiled = caseDate
-            
+
             # next, we do the caseNameShort
             caseNameShort = aTags[i].next.next.next.next.next.contents[0]\
                 .contents[0].strip().strip('&nbsp;')
             cite.caseNameShort = caseNameShort
-            
+
             # now that we have the caseNumber and caseNameShort, we can dup check
             try:
                 """if this raises an exception, we haven't scraped this yet, so
@@ -420,11 +420,11 @@ def scrape(request, courtID):
             except:
                 # it's not a duplicate, move on to the saving stage
                 pass
-            
+
             # if that goes well, we save to the DB
             cite.save()
             doc.citation = cite
-            
+
             # finally, we can download the PDFs and save them locally
             # finally, we should download the PDF and save it locally.
             myFile = downloadPDF(caseLink, caseNameShort)
@@ -437,45 +437,124 @@ def scrape(request, courtID):
 
             # finalize everything
             doc.save()
-            
-            
-            # next 
+
+
+            # next
             i += 1
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+
+
+    if (courtID == 6):
+        """This one is a pain because their results form doesn't tell you the
+        date things were posted. However, if we perform a search by doing a
+        POST, we can get a format that has the results. Frustrating, yes, but
+        the only other option is parsing the PDFs.
+
+        I called to harass them about this. It didn't help."""
+
+        url = "http://www.ca6.uscourts.gov/cgi-bin/opinions.pl"
+        ct = Court.objects.get(courtUUID = 'ca6')
+
+        today = datetime.date.today()
+        formattedToday = str(today.month) + '/' + str(today.day) + '/' + str(today.year)
+
+        postValues = {
+            'CASENUM' : '',
+            'TITLE' : '',
+            'FROMDATE' : formattedToday,
+            'TODATE' : formattedToday,
+            'OPINNUM' : ''
+            }
+
+        data = urllib.urlencode(postValues)
+        req = urllib2.Request(url, data)
+        response = urllib2.urlopen(req)
+        html = response.read()
+
+        soup = BeautifulSoup(html)
+
+        aTagsRegex = re.compile('pdf$', re.IGNORECASE)
+        aTags = soup.findAll(attrs={'href' : aTagsRegex})
+
+        i = 0
+        while i < len(aTags):
+            # these will hold our final document and citation
+            doc = Document()
+            cite = Citation()
+
+            # link the court early - it helps later
+            doc.court = ct
+
+            # we begin with the caseLink field
+            caseLink = aTags[i].get('href')
+
+            # we begin with the caseLink field
+            caseLink = aTags[i].get('href')
+
+            if "http:" not in caseLink:
+                # in case it's a relative URL
+                caseLink = url.split('/')[0] + "//" + url.split('/')[2] + "/" + caseLink
+
+            doc.download_URL = caseLink
+
+            # using caseLink, we can get the caseNumber and documentType
+            caseNumber = aTags[i].contents[0]
+            cite.caseNumber = caseNumber
+
+            if 'n' in caseNumber:
+                # it's unpublished
+                documentType = "U"
+            elif 'p' in caseNumber:
+                documentType = "P"
+            doc.documentType = documentType
+
+            # next, we can do the caseDate
+            caseDate = aTags[i].next.next.next.next.next.next.next.next\
+                .contents[0].strip().strip('&nbsp;')
+
+            # some caseDate cleanup
+            splitDate = caseDate.split('/')
+            caseDate = datetime.date(int(splitDate[0]),int(splitDate[1]),
+                int(splitDate[2]))
+            doc.dateFiled = caseDate
+
+            # next, the caseNameShort (there's probably a better way to do this...
+            caseNameShort = aTags[i].next.next.next.next.next.next.next.next\
+                .next.next.next.strip().strip('&nbsp;')
+            cite.caseNameShort = caseNameShort
+
+            # now that we have the caseNumber and caseNameShort, we can dup check
+            try:
+                """if this raises an exception, we haven't scraped this yet, so
+                we should. Otherwise, we have scraped it, and we should move to
+                the next case"""
+                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
+                print "duplicate found!"
+                i += 1
+                continue
+            except:
+                # it's not a duplicate, move on to the saving stage
+                pass
+
+            # if that goes well, we save to the DB
+            cite.save()
+            doc.citation = cite
+
+            # finally, we can download the PDFs and save them locally
+            # finally, we should download the PDF and save it locally.
+            myFile = downloadPDF(caseLink, caseNameShort)
+            doc.local_path.save(caseNameShort + ".pdf", myFile)
+
+            # and using the PDF we just downloaded, we can generate our sha1 hash
+            data = doc.local_path.read()
+            sha1Hash = hashlib.sha1(data).hexdigest()
+            doc.documentSHA1 = sha1Hash
+
+            # finalize everything
+            doc.save()
+
+            # next
+            i += 1
+
 
     """
 
