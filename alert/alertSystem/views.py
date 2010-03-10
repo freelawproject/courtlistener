@@ -240,7 +240,105 @@ def scrape(request, courtID):
 
             i += 1
 
+    elif (courtID == 4):
+        """Fourth circuit everybody, fourth circuit! Off we go."""
+        
+        url = "http://pacer.ca4.uscourts.gov/opinions_today.htm"
+        ct = Court.objects.get(courtUUID='ca4')
 
+        html = urllib2.urlopen(url).read()
+        
+        # sadly, beautifulsoup chokes on the lines lines of this file because 
+        # the HTML is so bad. Stop laughing - the HTML IS awful, but it's not
+        # funny. Anyway, to make this thing work, we must pull out the target
+        # attributes. And so we do.
+        regex = re.compile("target.*>", re.IGNORECASE)
+        html = re.sub(regex, ">", html)
+
+
+        soup = BeautifulSoup(html)
+        
+        # all links ending in pdf, case insensitive
+        regex = re.compile("pdf$", re.IGNORECASE)
+        aTags = soup.findAll(attrs={"href": regex})
+        
+        i = 0
+        regexII = re.compile('\d{2}/\d{2}/\d{4}')
+        regexIII = re.compile('\d{4}(.*)')
+        
+        while i < len(aTags):
+            # these will hold our final document and citation
+            doc = Document()
+            cite = Citation()
+
+            # link the court early - it helps later
+            doc.court = ct
+            
+            # next, we'll sort out the caseLink field, and save it
+            caseLink = aTags[i].get('href')
+
+            if "http:" not in caseLink:
+                # in case it's a relative URL
+                caseLink = url.split('/')[0] + "//" + url.split('/')[2] + "/" + caseLink
+            
+            doc.download_URL = caseLink
+
+            # using caselink, we can get the caseNumber and documentType
+            fileName = caseLink.split('/')[-1]
+            caseNumber, documentType = fileName.split('.')[0:2]
+            
+            # next, we do the caseDate and caseNameShort, so we can quit before
+            # we get too far along.
+            junk = aTags[i].contents[0].strip().strip('&nbsp;')
+            try:
+                # this error seems to happen upon dups...not sure why yet
+                caseDate = regexII.search(junk).group(0).strip()
+                caseNameShort = regexIII.search(junk).group(1).strip()
+            except:
+                i += 1
+                continue
+            
+            # some caseDate cleanup
+            splitDate = caseDate.split('/')
+            caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
+                int(splitDate[1]))
+            doc.dateFiled = caseDate
+            
+            doc.documentType = documentType
+            cite.caseNumber = caseNumber
+            cite.caseNameShort = caseNameShort
+            
+            # let's check for duplicates before we proceed
+            try:
+                """if this raises an exception, we haven't scraped this yet, so
+                we should. Otherwise, we have scraped it, and we should move to 
+                the next case"""
+                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
+                print "duplicate found!"
+                i += 1
+                continue
+            except:
+                # it's not a duplicate, move on to the saving stage
+                pass
+            
+            # if that goes well, we can save.
+            cite.save()
+            doc.citation = cite
+            
+            # finally, we should download the PDF, and save it locally.
+            myFile = downloadPDF(caseLink, caseNameShort)
+            doc.local_path.save(caseNameShort + ".pdf", myFile)
+
+            # and using the PDF we just downloaded, we can generate our sha1 hash
+            data = doc.local_path.read()
+            sha1Hash = hashlib.sha1(data).hexdigest()
+            doc.documentSHA1 = sha1Hash
+
+            # finalize everything
+            doc.save()
+
+            i += 1            
+            
 
     """
 
