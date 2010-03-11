@@ -15,11 +15,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert.alertSystem.models import *
+from alert.alertSystem.titlecase import titlecase
 from django.http import HttpResponse, Http404
 from django.core.files import File
 from django.core.files.base import ContentFile
 import datetime, hashlib, re, StringIO, urllib, urllib2
 from BeautifulSoup import BeautifulSoup
+from lxml.html import fromstring
+
 
 
 
@@ -43,6 +46,31 @@ def downloadPDF(LinkToPdf, caseNameShort):
     return myFile
 
 
+def make_url_absolute(url, rel_url):
+    """give it a URL and a URL you suspect to be a relative one. It'll strip the
+    domain name out of the first URL, and, if needed, attach it to the suspected
+    rel_url.
+    
+    returns an absolute version of rel_url
+    """
+    if 'http:' not in rel_url:
+        #it's a relative url, fix it.
+        absolute_url = url.split('/')[0] + "//" + url.split('/')[2] + rel_url
+    return absolute_url
+
+
+def hasDuplicate(caseNumber, caseNameShort)
+    """give it a caseNumber and a caseNameShort, and it'll tell you if that is
+    already in the DB"""
+    
+    try:
+        Citation.objects.get(caseNumber = caseNumber, caseNameShort = 
+            caseNameShort)
+        print "duplicate found!"
+        hasDup = True
+    except:
+        hasDup = False
+    return hasDup        
 
 
 def scrape(request, courtID):
@@ -92,10 +120,9 @@ def scrape(request, courtID):
 
             doc = Document()
 
-            # great, now we do some parsing and building, beginning with the caseLink
-            if "http:" not in caseLink:
-                caseLink = url.split('/')[0] + "//" + url.split('/')[2] + "/" + caseLink
-
+            # great, now we do some parsing and building, beginning with the
+            # caseLink
+            caseLink = make_url_absolute(url, caseLink)
             doc.download_URL = caseLink
 
             # using caseLink, we can download the cases
@@ -120,15 +147,10 @@ def scrape(request, courtID):
             cite.caseNumber = caseNumber
             cite.caseNameShort = caseNameShort
 
-            try:
-                # if this raises an exception, we haven't scraped this yet, so we should.
-                # Otherwise, we have scraped it, and we should continue.
-                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
-                #print "duplicate found!"
+            dup = hasDuplicate(caseNumber, caseNameShort)
+            if dup:
+                i += 1
                 continue
-            except:
-                # it's not a duplicate, move on to the saving stage
-                pass
 
             # and finally, we link up the foreign keys and save the data
             doc.court = ct
@@ -197,18 +219,12 @@ def scrape(request, courtID):
             # next, we do caseNumber and caseNameShort
             cite.caseNumber = caseNumber
             cite.caseNameShort = caseNameShort
-
-            try:
-                """if this raises an exception, we haven't scraped this yet, so
-                we should. Otherwise, we have scraped it, and we should break
-                from the remainder of the loop. This works because the cases are
-                in chronological order"""
-                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
-                print "duplicate found!"
+            
+            # next, we check for a dup. If there is one, we can break from the
+            # loop, since this court posts in alphabetical order.
+            dup = hasDuplicate(caseNumber, caseNameShort)
+            if dup:
                 break
-            except:
-                # it's not a duplicate, move on to the saving stage
-                pass
 
             cite.save()
             doc.citation = cite
@@ -220,9 +236,7 @@ def scrape(request, courtID):
             doc.dateFiled = caseDate
 
             # the download URL for the PDF
-            if "http:" not in caseLink:
-                # in case it's a relative URL
-                caseLink = url.split('/')[0] + "//" + url.split('/')[2] + "/" + caseLink
+            caseLink = make_url_absolute(url, caseLink)
 
             doc.download_URL = caseLink
 
@@ -276,11 +290,7 @@ def scrape(request, courtID):
 
             # next, we'll sort out the caseLink field, and save it
             caseLink = aTags[i].get('href')
-
-            if "http:" not in caseLink:
-                # in case it's a relative URL
-                caseLink = url.split('/')[0] + "//" + url.split('/')[2] + "/" + caseLink
-
+            caseLink = make_url_absolute(url, caseLink)
             doc.download_URL = caseLink
 
             # using caselink, we can get the caseNumber and documentType
@@ -309,17 +319,10 @@ def scrape(request, courtID):
             cite.caseNameShort = caseNameShort
 
             # let's check for duplicates before we proceed
-            try:
-                """if this raises an exception, we haven't scraped this yet, so
-                we should. Otherwise, we have scraped it, and we should move to
-                the next case"""
-                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
-                print "duplicate found!"
+            dup = hasDuplicate(caseNumber, caseNameShort)
+            if dup:
                 i += 1
                 continue
-            except:
-                # it's not a duplicate, move on to the saving stage
-                pass
 
             # if that goes well, we can save.
             cite.save()
@@ -375,11 +378,7 @@ def scrape(request, courtID):
 
             # we begin with the caseLink field
             caseLink = aTags[i].get('href')
-
-            if "http:" not in caseLink:
-                # in case it's a relative URL
-                caseLink = url.split('/')[0] + "//" + url.split('/')[2] + "/" + caseLink
-
+            caseLink = make_url_absolute(url, caseLink)
             doc.download_URL = caseLink
 
             # using caseLink, we can get the caseNumber and documentType
@@ -409,17 +408,10 @@ def scrape(request, courtID):
             cite.caseNameShort = caseNameShort
 
             # now that we have the caseNumber and caseNameShort, we can dup check
-            try:
-                """if this raises an exception, we haven't scraped this yet, so
-                we should. Otherwise, we have scraped it, and we should move to
-                the next case"""
-                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
-                print "duplicate found!"
+            dup = hasDuplicate(caseNumber, caseNameShort)
+            if dup:
                 i += 1
                 continue
-            except:
-                # it's not a duplicate, move on to the saving stage
-                pass
 
             # if that goes well, we save to the DB
             cite.save()
@@ -486,11 +478,7 @@ def scrape(request, courtID):
 
             # we begin with the caseLink field
             caseLink = aTags[i].get('href')
-
-            if "http:" not in caseLink:
-                # in case it's a relative URL
-                caseLink = url.split('/')[0] + "//" + url.split('/')[2] + "/" + caseLink
-
+            caseLink = make_url_absolute(url, caseLink)
             doc.download_URL = caseLink
 
             # using caseLink, we can get the caseNumber and documentType
@@ -520,17 +508,10 @@ def scrape(request, courtID):
             cite.caseNameShort = caseNameShort
 
             # now that we have the caseNumber and caseNameShort, we can dup check
-            try:
-                """if this raises an exception, we haven't scraped this yet, so
-                we should. Otherwise, we have scraped it, and we should move to
-                the next case"""
-                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
-                print "duplicate found!"
+            dup = hasDuplicate(caseNumber, caseNameShort)
+            if dup:
                 i += 1
                 continue
-            except:
-                # it's not a duplicate, move on to the saving stage
-                pass
 
             # if that goes well, we save to the DB
             cite.save()
@@ -581,11 +562,7 @@ def scrape(request, courtID):
 
             # we begin with the caseLink field
             caseLink = aTags[i].get("href")
-
-            if "http:" not in caseLink:
-                # in case it's a relative URL
-                caseLink = url.split('/')[0] + "//" + url.split('/')[2] + "/" + caseLink
-
+            caseLink = make_url_absolute(url, caseLink)
             doc.download_URL = caseLink
 
             # using caseLink, we can get the caseNumber and documentType
@@ -606,17 +583,10 @@ def scrape(request, courtID):
             cite.caseNameShort = caseNameShort
 
             # now that we have the caseNumber and caseNameShort, we can dup check
-            try:
-                """if this raises an exception, we haven't scraped this yet, so
-                we should. Otherwise, we have scraped it, and we should move to
-                the next case"""
-                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
-                print "duplicate found!"
+            dup = hasDuplicate(caseNumber, caseNameShort)
+            if dup:
                 i += 1
                 continue
-            except:
-                # it's not a duplicate, move on to the saving stage
-                pass
 
             # if that goes well, we save to the DB
             cite.save()
@@ -660,10 +630,7 @@ def scrape(request, courtID):
 
             # we begin with the caseLink field
             caseLink = aTags[i].get('href')
-
-            if 'http:' not in caseLink:
-                # in case it's a relative URL
-                caseLink = url.split('/')[0] + "//" + url.split('/')[2] + "/" + caseLink
+            caseLink = make_url_absolute(url, caseLink)
             doc.download_URL = caseLink
 
             # using caseLink, we can get the caseNumber and documentType
@@ -690,17 +657,10 @@ def scrape(request, courtID):
             doc.dateFiled = caseDate
 
             # now that we have the caseNumber and caseNameShort, we can dup check
-            try:
-                """if this raises an exception, we haven't scraped this yet, so
-                we should. Otherwise, we have scraped it, and we should move to
-                the next case"""
-                Citation.objects.get(caseNumber = caseNumber, caseNameShort = caseNameShort)
-                print "duplicate found!"
+            dup = hasDuplicate(caseNumber, caseNameShort)
+            if dup:
                 i += 1
                 continue
-            except:
-                # it's not a duplicate, move on to the saving stage
-                pass
 
             # if that goes well, we save to the DB
             cite.save()
@@ -720,7 +680,84 @@ def scrape(request, courtID):
             doc.save()
 
             i += 1
+            
+    if (courtID == 9):
+        """This court, by virtue of having a javascript laden website, was very
+        hard to parse properly. BeautifulSoup couldn't handle it at all, so lxml
+        has to be used. lxml seems pretty useful, but it was a pain to learn."""
+        
+        url = "http://www.ca9.uscourts.gov/opinions/?o_mode=view" +\
+              "&amp;o_sort_field=24&amp;o_sort_field_by=19&amp;o_sort_type=asc&" +\
+              "o_page_size=10"
+        
+        ct = Court.objects.get(courtUUID = 'ca9')
+        
+        req = urllib2.urlopen(url).read()
+        tree = fromstring(req)
+        
+        caseLinks = tree.xpath('//table[3]/tbody/tr/td/a')
+        caseNumbers = tree.xpath('//table[3]/tbody/tr/td[2]/label')
+        caseDates = tree.xpath('//table[3]/tbody/tr/td[6]/label')
+        
+        i = 0
+        while i < len(caseLinks):
+            # these will hold our final document and citation
+            doc = Document()
+            cite = Citation ()
 
+            # link the court early - it helps later
+            doc.court = ct
+            
+            # we begin with the caseLink field
+            caseLink = caseLinks[i].get('href')
+            caseLink = make_url_absolute(url, caseLink)
+            doc.download_URL = caseLink
+            
+            # next, we'll do the caseNumber
+            caseNumber = caseNumbers[i].text
+            cite.caseNumber = caseNumber
+            
+            # next up: document type (static for now)
+            doc.documentType = "P"
+            
+            # next up: caseDate
+            splitDate = caseDates[i].text.split('/')
+            caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
+                int(splitDate[1]))
+            doc.dateFiled = caseDate
+            
+            #next up: caseNameShort
+            caseNameShort = titlecase(caseLinks[i].text.lower())
+            cite.caseNameShort = caseNameShort
+            
+            # now that we have the caseNumber and caseNameShort, we can dup check
+            dup = hasDuplicate(caseNumber, caseNameShort)
+            if dup:
+                i += 1
+                continue
+
+
+            # if that goes well, we save to the DB
+            cite.save()
+            doc.citation = cite
+
+            # finally, we can download the PDFs and save them locally
+            # finally, we should download the PDF and save it locally.
+            myFile = downloadPDF(caseLink, caseNameShort)
+            doc.local_path.save(caseNameShort + ".pdf", myFile)
+
+            # and using the PDF we just downloaded, we can generate our sha1 hash
+            data = doc.local_path.read()
+            sha1Hash = hashlib.sha1(data).hexdigest()
+            doc.documentSHA1 = sha1Hash
+
+            # finalize everything
+            doc.save()
+            
+            i += 1
+    
+    
+    
     """
 
     ...etc for each
