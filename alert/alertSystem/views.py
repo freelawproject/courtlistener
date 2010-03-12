@@ -932,7 +932,74 @@ def scrape(request, courtID):
             doc.save()
 
             i += 1
+    
+    if (courtID == 12):
+        url = "http://www.cadc.uscourts.gov/bin/opinions/allopinions.asp"
+        ct = Court.objects.get(courtUUID = 'cadc')
+        
+        html = urllib2.urlopen(url)
+        soup = BeautifulSoup(html)
+        
+        aTagsRegex = re.compile('pdf$', re.IGNORECASE)
+        aTags = soup.findAll(attrs={'href' : aTagsRegex})
+        
+        caseNumRegex = re.compile("(\d{2}-\d{4})") 
+        
 
+        i = 0
+        while i < len(aTags):
+            # these will hold our final document and citation
+            doc = Document()
+            cite = Citation ()
+
+            # link the court early - it helps later
+            doc.court = ct
+
+            # we begin with the caseLink field
+            caseLink = aTags[i].get('href')
+            caseLink = make_url_absolute(url, caseLink)
+            doc.download_URL = caseLink
+
+            # using caseLink, we can get the caseNumber and documentType
+            caseNumber =  caseNumRegex.search(caseLink).group(1)
+            cite.caseNumber = caseNumber
+            
+            # we can hard-code this b/c the D.C. Court paywalls all
+            # unpublished opinions.
+            doc.documentType = "P"
+
+            # caseDate is next on the block
+            caseDate = datetime.date.today()
+            doc.dateFiled = caseDate
+            
+            caseNameShort = aTags[i].next.next.next.strip().strip('&nbsp;')
+            cite.caseNameShort = caseNameShort
+
+            # now that we have the caseNumber and caseNameShort, we can dup check
+            dup = hasDuplicate(caseNumber, caseNameShort)
+            if dup:
+                i += 1
+                continue
+
+            # if that goes well, we save to the DB
+            cite.save()
+            doc.citation = cite
+
+            # finally, we can download the PDFs and save them locally
+            # finally, we should download the PDF and save it locally.
+            myFile = downloadPDF(caseLink, caseNameShort)
+            doc.local_path.save(caseNameShort + ".pdf", myFile)
+
+            # and using the PDF we just downloaded, we can generate our sha1 hash
+            data = doc.local_path.read()
+            sha1Hash = hashlib.sha1(data).hexdigest()
+            doc.documentSHA1 = sha1Hash
+
+            # finalize everything
+            doc.save()
+            
+            i += 1        
+        
         
     """
 

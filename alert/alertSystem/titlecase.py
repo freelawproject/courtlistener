@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
 # 
@@ -15,8 +19,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 """
 titlecase.py v0.2
