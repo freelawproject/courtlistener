@@ -67,10 +67,10 @@ def hasDuplicate(caseNumber, caseNameShort):
     try:
         Citation.objects.get(caseNumber = caseNumber, caseNameShort =
             caseNameShort)
+        hasDup = False
+    except:
         print "duplicate found!"
         hasDup = True
-    except:
-        hasDup = False
     return hasDup
 
 
@@ -349,7 +349,7 @@ def scrape(request, courtID):
             i += 1
 
 
-    if (courtID == 5):
+    elif (courtID == 5):
         """Fifth circuit scraper. Similar process as to elsewhere, as you might
         expect at this point"""
 
@@ -441,7 +441,7 @@ def scrape(request, courtID):
             i += 1
 
 
-    if (courtID == 6):
+    elif (courtID == 6):
         """This one is a pain because their results form doesn't tell you the
         date things were posted. However, if we perform a search by doing a
         POST, we can get a format that has the results. Frustrating, yes, but
@@ -541,7 +541,7 @@ def scrape(request, courtID):
             i += 1
 
 
-    if (courtID == 7):
+    elif (courtID == 7):
         """another court where we need to do a post. This will be a good
         starting place for getting the judge field, when we're ready for that"""
 
@@ -614,7 +614,7 @@ def scrape(request, courtID):
 
             i += 1
 
-    if (courtID == 8):
+    elif (courtID == 8):
         url = "http://www.ca8.uscourts.gov/cgi-bin/new/today2.pl"
         ct = Court.objects.get(courtUUID = 'ca8')
 
@@ -688,7 +688,7 @@ def scrape(request, courtID):
 
             i += 1
 
-    if (courtID == 9):
+    elif (courtID == 9):
         """This court, by virtue of having a javascript laden website, was very
         hard to parse properly. BeautifulSoup couldn't handle it at all, so lxml
         has to be used. lxml seems pretty useful, but it was a pain to learn."""
@@ -933,7 +933,7 @@ def scrape(request, courtID):
 
             i += 1
     
-    if (courtID == 12):
+    elif (courtID == 12):
         url = "http://www.cadc.uscourts.gov/bin/opinions/allopinions.asp"
         ct = Court.objects.get(courtUUID = 'cadc')
         
@@ -960,7 +960,7 @@ def scrape(request, courtID):
             caseLink = make_url_absolute(url, caseLink)
             doc.download_URL = caseLink
 
-            # using caseLink, we can get the caseNumber and documentType
+            # using caseLink, we can get the caseNumber
             caseNumber =  caseNumRegex.search(caseLink).group(1)
             cite.caseNumber = caseNumber
             
@@ -999,13 +999,87 @@ def scrape(request, courtID):
             doc.save()
             
             i += 1        
+            
+            
+    elif (courtID == 13):
+        url = "http://www.cafc.uscourts.gov/dailylog.html"
+        ct = Court.objects.get(courtUUID = "cafc")
         
+        html = urllib2.urlopen(url)
+        soup = BeautifulSoup(html)
         
-    """
+        aTagsRegex = re.compile('pdf$', re.IGNORECASE)
+        trTags = soup.findAll('tr')
+        
+        i = 0 
+        while i <= 20:
+            # these will hold our final document and citation
+            doc = Document()
+            cite = Citation ()
 
-    ...etc for each
+            # link the court early - it helps later
+            doc.court = ct
+            
+            try:
+                caseLink = trTags[i].td.nextSibling.nextSibling.nextSibling\
+                    .nextSibling.nextSibling.nextSibling.a.get('href').strip('.')
+                caseLink = make_url_absolute(url, caseLink)
+                if 'opinion' not in caseLink:
+                    # we have a non-case PDF. punt
+                    i += 1
+                    continue
+            except:
+                # the above fails when things get funky, in that case, we punt
+                i += 1
+                continue
+            doc.download_URL = caseLink
+            
+            # next: caseNumber
+            caseNumber = trTags[i].td.nextSibling.nextSibling.contents[0]\
+                .strip('.pdf')
+            cite.caseNumber = caseNumber
+            
+            # next: dateFiled
+            dateFiled = trTags[i].td.contents
+            splitDate = dateFiled[0].split("/")
+            dateFiled = datetime.date(int(splitDate[0]), int(splitDate[1]),
+                int(splitDate[2]))
+            doc.dateFiled = dateFiled
+            
+            # next: caseNameShort
+            caseNameShort = trTags[i].td.nextSibling.nextSibling.nextSibling\
+                .nextSibling.nextSibling.nextSibling.a.contents[0]
+            cite.caseNameShort = caseNameShort
+            
+            # next: documentType
+            documentType = trTags[i].td.nextSibling.nextSibling.nextSibling\
+                .nextSibling.nextSibling.nextSibling.nextSibling.nextSibling\
+                .contents[0].contents[0]
+            doc.documentType = documentType
 
-    """
+            # now that we have the caseNumber and caseNameShort, we can dup check
+            dup = hasDuplicate(caseNumber, caseNameShort)
+            if dup:
+                break
+
+            # if that goes well, we save to the DB
+            cite.save()
+            doc.citation = cite
+
+            # finally, we can download the PDFs and save them locally
+            # finally, we should download the PDF and save it locally.
+            myFile = downloadPDF(caseLink, caseNameShort)
+            doc.local_path.save(caseNameShort + ".pdf", myFile)
+
+            # and using the PDF we just downloaded, we can generate our sha1 hash
+            data = doc.local_path.read()
+            sha1Hash = hashlib.sha1(data).hexdigest()
+            doc.documentSHA1 = sha1Hash
+
+            # finalize everything
+            doc.save()
+            
+            i += 1        
 
 
     return HttpResponse("it worked")
