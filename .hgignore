@@ -17,3 +17,4 @@ syntax: glob
 
 # ignore the django directory
 django
+alert/pdf

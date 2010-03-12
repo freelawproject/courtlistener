@@ -24,9 +24,6 @@ from BeautifulSoup import BeautifulSoup
 from lxml.html import fromstring
 from lxml import etree
 
-
-
-
 def downloadPDF(LinkToPdf, caseNameShort):
     """Receive a URL and a casename as an argument, then downloads the PDF
     that's in it, and places it intelligently into the database. Can accept
@@ -60,18 +57,16 @@ def make_url_absolute(url, rel_url):
     return rel_url
 
 
-def hasDuplicate(caseNumber, caseNameShort):
-    """give it a caseNumber and a caseNameShort, and it'll tell you if that is
-    already in the DB"""
-
-    try:
-        Citation.objects.get(caseNumber = caseNumber, caseNameShort =
-            caseNameShort)
-        hasDup = False
-    except:
-        print "duplicate found!"
-        hasDup = True
-    return hasDup
+def hasDuplicate(caseNum, caseName):
+    """takes a caseName and a caseNum, and checks if the object exists in the
+    DB. If it doesn't, then it puts it in. If it does, it returns it.
+    """
+    
+    # check for duplicates, make the object in their absence
+    cite, created = Citation.objects.get_or_create(
+        caseNameShort = caseName, caseNumber = caseNum)
+    return cite, created
+    
 
 
 def scrape(request, courtID):
@@ -82,7 +77,11 @@ def scrape(request, courtID):
 
     returns None
     """
-
+    
+    
+    # we show this string to users if things go smoothly
+    result = "It worked<br>"
+    
     # some data validation, for good measure - this should already be done via
     # our url regex
     try:
@@ -135,27 +134,21 @@ def scrape(request, courtID):
             sha1Hash = hashlib.sha1(html).hexdigest()
             doc.documentSHA1 = sha1Hash
 
-
             # next up is the caseDate
             splitDate = caseDate.split('/')
             caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]), 
                 int(splitDate[1]))
             doc.dateFiled = caseDate
-
-
-            # next, we do caseNumber and caseNameShort
-            cite = Citation()
-            cite.caseNumber = caseNumber
-            cite.caseNameShort = caseNameShort
-
-            dup = hasDuplicate(caseNumber, caseNameShort)
-            if dup:
+            
+            # check for dups, make the object if necessary
+            cite, created = hasDuplicate(caseNumber, caseNameShort)
+            if not created:
+                result = result + "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
             # and finally, we link up the foreign keys and save the data
             doc.court = ct
-            cite.save()
             doc.citation = cite
             doc.save()
 
@@ -163,19 +156,95 @@ def scrape(request, courtID):
             # the table
             i = i + 4
 
-
-
     elif (courtID == 2):
+        """
+        queries can be made on their system via HTTP POST. 
+        """
+        
         # second circuit
         url = "http://www.ca2.uscourts.gov/decisions"
         ct = Court.objects.get(courtUUID='ca2')
+        
+        today = datetime.date.today()
+        formattedToday = str(today.year) + str(today.month) + str(today.day)
+        
+        data = "IW_DATABASE=OPN&IW_FIELD_TEXT=*&IW_FILTER_DATE_AFTER=" +\
+            formattedToday + "&IW_FILTER_DATE_BEFORE=&IW_BATCHSIZE=20&" +\
+            "IW_SORT=-DATE"
+        
+        req = urllib2.Request(url, data)
+        response = urllib2.urlopen(req)
+        html = response.read()
+        soup = BeautifulSoup(html)
 
-        """
-        queries can be made on their system via HTTP POST, but I can't figure out
-        how to URL hack it. I've made a request for help (2010-03-06)
-        http://www.ca2.uscourts.gov/decisions?IW_DATABASE=OPN&IW_FIELD_TEXT=OPN&IW_SORT=-Date&IW_BATCHSIZE=25
-        """
+        aTagsRegex = re.compile('(.*?.pdf).*?', re.IGNORECASE)
+        aTags = soup.findAll(attrs={'href' : aTagsRegex})
+        
+        caseNumRegex = re.compile('.*/(.*?)_(.*?).pdf')
 
+        i = 0
+        while i < len(aTags):
+            # these will hold our final document and citation
+            doc = Document()
+            doc.court = ct
+
+            # we begin with the caseLink field
+            caseLink = aTags[i].get('href')
+            caseLink = aTagsRegex.search(caseLink).group(1)
+            caseLink = make_url_absolute(url, caseLink)
+            doc.download_URL = caseLink
+            
+            # using caseLink, we can get the caseNumber and documentType
+            caseNum = caseNumRegex.search(caseLink).group(1)
+            
+            # and the docType
+            documentType = caseNumRegex.search(caseLink).group(2)
+            if 'opn' in caseNum:
+                # it's unpublished
+                documentType = "P"
+            elif 'so' in caseNum:
+                documentType = "U"
+            doc.documentType = documentType
+
+            # next, the caseNameShort (there's probably a better way to do this.
+            caseName = aTags[i].parent.parent.nextSibling.nextSibling\
+                .nextSibling.nextSibling.contents[0].strip().strip('nbsp;')
+
+            # next, we can do the caseDate
+            caseDate = aTags[i].parent.parent.nextSibling.nextSibling\
+                .nextSibling.nextSibling.nextSibling.nextSibling.contents[0]\
+                .strip().strip('nbsp;') 
+
+            # some caseDate cleanup
+            splitDate = caseDate.split('-')
+            caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
+                int(splitDate[1]))
+            doc.dateFiled = caseDate
+            
+            # check for duplicates, make the object in their absence
+            cite, created = hasDuplicate(caseNum, caseName)
+            if not created:
+                result = result + "duplicate found at: " + str(i) + "<br>"
+                i += 1
+                continue
+
+            # finally, we should download the PDF and save it locally.
+            myFile = downloadPDF(caseLink, caseName)
+            doc.local_path.save(caseName + ".pdf", myFile)
+
+            # and using the PDF we just downloaded, we can generate our sha1 hash
+            data = doc.local_path.read()
+            sha1Hash = hashlib.sha1(data).hexdigest()
+            doc.documentSHA1 = sha1Hash
+            
+            doc.citation = cite
+
+            # finalize everything
+            doc.save()
+
+            # next
+            i += 1
+            
     elif (courtID == 3):
         """
         This URL provides the latest 25 cases, so I need to pick out the new
@@ -217,22 +286,15 @@ def scrape(request, courtID):
 
             # these will hold our final document and citation
             doc = Document()
-            cite = Citation()
-
-            # link the court early - it helps later
             doc.court = ct
-
-            # next, we do caseNumber and caseNameShort
-            cite.caseNumber = caseNumber
-            cite.caseNameShort = caseNameShort
 
             # next, we check for a dup. If there is one, we can break from the
             # loop, since this court posts in alphabetical order.
-            dup = hasDuplicate(caseNumber, caseNameShort)
-            if dup:
+            cite, created = hasDuplicate(caseNumber, caseNameShort)
+            if not created:
+                result = result + "duplicate found at: " + str(i) + "<br>"
                 break
 
-            cite.save()
             doc.citation = cite
 
             # next up is the caseDate
@@ -261,7 +323,10 @@ def scrape(request, courtID):
             i += 1
 
     elif (courtID == 4):
-        """Fourth circuit everybody, fourth circuit! Off we go."""
+        """Fourth circuit everybody, fourth circuit! Off we go.
+        
+        BROKEN
+        """
 
         url = "http://pacer.ca4.uscourts.gov/opinions_today.htm"
         ct = Court.objects.get(courtUUID='ca4')
@@ -274,7 +339,6 @@ def scrape(request, courtID):
         # attributes. And so we do.
         regex = re.compile("target.*>", re.IGNORECASE)
         html = re.sub(regex, ">", html)
-
 
         soup = BeautifulSoup(html)
 
@@ -289,9 +353,6 @@ def scrape(request, courtID):
         while i < len(aTags):
             # these will hold our final document and citation
             doc = Document()
-            cite = Citation()
-
-            # link the court early - it helps later
             doc.court = ct
 
             # next, we'll sort out the caseLink field, and save it
@@ -321,17 +382,16 @@ def scrape(request, courtID):
             doc.dateFiled = caseDate
 
             doc.documentType = documentType
-            cite.caseNumber = caseNumber
-            cite.caseNameShort = caseNameShort
+
 
             # let's check for duplicates before we proceed
-            dup = hasDuplicate(caseNumber, caseNameShort)
-            if dup:
+            cite, created = hasDuplicate(caseNumber, caseNameShort)
+            if not created:
+                result = result + "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
             # if that goes well, we can save.
-            cite.save()
             doc.citation = cite
 
             # finally, we should download the PDF and save it locally.
@@ -377,9 +437,6 @@ def scrape(request, courtID):
 
             # these will hold our final document and citation
             doc = Document()
-            cite = Citation()
-
-            # link the court early - it helps later
             doc.court = ct
 
             # we begin with the caseLink field
@@ -389,7 +446,6 @@ def scrape(request, courtID):
 
             # using caseLink, we can get the caseNumber and documentType
             caseNumber = aTags[i].contents[0]
-            cite.caseNumber = caseNumber
 
             if unpubRegex.search(str(aTags[i])) == None:
                 # it's published, else it's unpublished
@@ -411,19 +467,17 @@ def scrape(request, courtID):
             # next, we do the caseNameShort
             caseNameShort = aTags[i].next.next.next.next.next.contents[0]\
                 .contents[0].strip().strip('&nbsp;')
-            cite.caseNameShort = caseNameShort
 
             # now that we have the caseNumber and caseNameShort, we can dup check
-            dup = hasDuplicate(caseNumber, caseNameShort)
-            if dup:
+            cite, created = hasDuplicate(caseNumber, caseNameShort)
+            if not created:
+                result = result + "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
             # if that goes well, we save to the DB
-            cite.save()
             doc.citation = cite
 
-            # finally, we can download the PDFs and save them locally
             # finally, we should download the PDF and save it locally.
             myFile = downloadPDF(caseLink, caseNameShort)
             doc.local_path.save(caseNameShort + ".pdf", myFile)
@@ -478,9 +532,6 @@ def scrape(request, courtID):
         while i < len(aTags):
             # these will hold our final document and citation
             doc = Document()
-            cite = Citation()
-
-            # link the court early - it helps later
             doc.court = ct
 
             # we begin with the caseLink field
@@ -490,7 +541,6 @@ def scrape(request, courtID):
 
             # using caseLink, we can get the caseNumber and documentType
             caseNumber = aTags[i].contents[0]
-            cite.caseNumber = caseNumber
 
             if 'n' in caseNumber:
                 # it's unpublished
@@ -512,19 +562,17 @@ def scrape(request, courtID):
             # next, the caseNameShort (there's probably a better way to do this.
             caseNameShort = aTags[i].next.next.next.next.next.next.next.next\
                 .next.next.next.strip().strip('&nbsp;')
-            cite.caseNameShort = caseNameShort
 
             # now that we have the caseNumber and caseNameShort, we can dup check
-            dup = hasDuplicate(caseNumber, caseNameShort)
-            if dup:
+            cite, created = hasDuplicate(caseNumber, caseNameShort)
+            if not created:
+                result = result + "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
             # if that goes well, we save to the DB
-            cite.save()
             doc.citation = cite
 
-            # finally, we can download the PDFs and save them locally
             # finally, we should download the PDF and save it locally.
             myFile = downloadPDF(caseLink, caseNameShort)
             doc.local_path.save(caseNameShort + ".pdf", myFile)
@@ -562,9 +610,6 @@ def scrape(request, courtID):
         while i < len(aTags):
             # these will hold our final document and citation
             doc = Document()
-            cite = Citation ()
-
-            # link the court early - it helps later
             doc.court = ct
 
             # we begin with the caseLink field
@@ -575,7 +620,6 @@ def scrape(request, courtID):
             # using caseLink, we can get the caseNumber and documentType
             caseNumber = aTags[i].previous.previous.previous.previous.previous\
                 .previous.previous.previous.previous.previous.strip()
-            cite.caseNumber = caseNumber
 
             # next up: caseDate
             caseDate = aTags[i].previous.previous.previous.contents[0].strip()
@@ -587,19 +631,17 @@ def scrape(request, courtID):
             # next up: caseNameShort
             caseNameShort = aTags[i].previous.previous.previous.previous\
                 .previous.previous.previous.strip()
-            cite.caseNameShort = caseNameShort
 
             # now that we have the caseNumber and caseNameShort, we can dup check
-            dup = hasDuplicate(caseNumber, caseNameShort)
-            if dup:
+            cite, created = hasDuplicate(caseNumber, caseNameShort)
+            if not created:
+                result = result + "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
             # if that goes well, we save to the DB
-            cite.save()
             doc.citation = cite
 
-            # finally, we can download the PDFs and save them locally
             # finally, we should download the PDF and save it locally.
             myFile = downloadPDF(caseLink, caseNameShort)
             doc.local_path.save(caseNameShort + ".pdf", myFile)
@@ -630,9 +672,6 @@ def scrape(request, courtID):
         while i < len(aTags):
             # these will hold our final document and citation
             doc = Document()
-            cite = Citation ()
-
-            # link the court early - it helps later
             doc.court = ct
 
             # we begin with the caseLink field
@@ -646,7 +685,6 @@ def scrape(request, courtID):
                 caseNumRegex.search(junk).group(2)
             documentType = caseNumRegex.search(junk).group(3).upper()
 
-            cite.caseNumber = caseNumber
             doc.documentType = documentType
 
             # caseDate is next on the block
@@ -655,7 +693,6 @@ def scrape(request, courtID):
                 .strip().strip('&nbsp;')
             caseNameShort = caseDateRegex.search(junk).group(2)\
                 .strip().strip('&nbsp;')
-            cite.caseNameShort = caseNameShort
 
             # some caseDate cleanup
             splitDate = caseDate.split('/')
@@ -664,16 +701,15 @@ def scrape(request, courtID):
             doc.dateFiled = caseDate
 
             # now that we have the caseNumber and caseNameShort, we can dup check
-            dup = hasDuplicate(caseNumber, caseNameShort)
-            if dup:
+            cite, created = hasDuplicate(caseNumber, caseNameShort)
+            if not created:
+                result = result + "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
             # if that goes well, we save to the DB
-            cite.save()
             doc.citation = cite
 
-            # finally, we can download the PDFs and save them locally
             # finally, we should download the PDF and save it locally.
             myFile = downloadPDF(caseLink, caseNameShort)
             doc.local_path.save(caseNameShort + ".pdf", myFile)
@@ -710,9 +746,6 @@ def scrape(request, courtID):
         while i < len(caseLinks):
             # these will hold our final document and citation
             doc = Document()
-            cite = Citation ()
-
-            # link the court early - it helps later
             doc.court = ct
 
             # we begin with the caseLink field
@@ -722,7 +755,6 @@ def scrape(request, courtID):
 
             # next, we'll do the caseNumber
             caseNumber = caseNumbers[i].text
-            cite.caseNumber = caseNumber
 
             # next up: document type (static for now)
             doc.documentType = "P"
@@ -735,20 +767,18 @@ def scrape(request, courtID):
 
             #next up: caseNameShort
             caseNameShort = titlecase(caseLinks[i].text.lower())
-            cite.caseNameShort = caseNameShort
 
             # now that we have the caseNumber and caseNameShort, we can dup check
-            dup = hasDuplicate(caseNumber, caseNameShort)
-            if dup:
+            cite, created = hasDuplicate(caseNumber, caseNameShort)
+            if not created:
+                result = result + "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
 
             # if that goes well, we save to the DB
-            cite.save()
             doc.citation = cite
 
-            # finally, we can download the PDFs and save them locally
             # finally, we should download the PDF and save it locally.
             myFile = downloadPDF(caseLink, caseNameShort)
             doc.local_path.save(caseNameShort + ".pdf", myFile)
@@ -788,9 +818,6 @@ def scrape(request, courtID):
         while i < len(aTags):
             # these will hold our final document and citation
             doc = Document()
-            cite = Citation()
-
-            # link the court early - it helps later
             doc.court = ct
 
             # we begin with the caseLink field
@@ -803,7 +830,6 @@ def scrape(request, courtID):
             # using caseLink, we can get the caseNumber
             caseNumber = caseNumRegex.search(caseLink).group(0)\
                 .strip().strip('&nbsp;')
-            cite.caseNumber = caseNumber
             print caseNumber
 
             # next up: caseDate. dateFiled == today because of the query we
@@ -821,19 +847,17 @@ def scrape(request, courtID):
                 i += 1
                 continue
 
-            cite.caseNameShort = caseNameShort
 
             # now that we have the caseNumber and caseNameShort, we can dup check
-            dup = hasDuplicate(caseNumber, caseNameShort)
-            if dup:
+            cite, created = hasDuplicate(caseNumber, caseNameShort)
+            if not created:
+                result = result + "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
             # if that goes well, we save to the DB
-            cite.save()
             doc.citation = cite
 
-            # finally, we can download the PDFs and save them locally
             # finally, we should download the PDF and save it locally.
             myFile = downloadPDF(caseLink, caseNameShort)
             doc.local_path.save(caseNameShort + ".pdf", myFile)
@@ -879,9 +903,6 @@ def scrape(request, courtID):
         while i < len(caseLinks):
             # these will hold our final document and citation
             doc = Document()
-            cite = Citation ()
-
-            # link the court early - it helps later
             doc.court = ct
 
             # we begin with the caseLink field
@@ -894,7 +915,6 @@ def scrape(request, courtID):
             
             # next, we'll do the caseNumber
             caseNumber = caseNumRegex.search(description[i].text).group(1)
-            cite.caseNumber = caseNumber
             
             # next up: caseDate
             caseDate = caseDateRegex.search(description[i].text).group(1)
@@ -905,20 +925,18 @@ def scrape(request, courtID):
 
             #next up: caseNameShort
             caseNameShort = caseNames[i].text.strip().strip('&nbsp;')
-            cite.caseNameShort = caseNameShort
 
             # now that we have the caseNumber and caseNameShort, we can dup check
-            dup = hasDuplicate(caseNumber, caseNameShort)
-            if dup:
+            cite, created = hasDuplicate(caseNumber, caseNameShort)
+            if not created:
+                result = result + "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
 
             # if that goes well, we save to the DB
-            cite.save()
             doc.citation = cite
 
-            # finally, we can download the PDFs and save them locally
             # finally, we should download the PDF and save it locally.
             myFile = downloadPDF(caseLink, caseNameShort)
             doc.local_path.save(caseNameShort + ".pdf", myFile)
@@ -950,9 +968,6 @@ def scrape(request, courtID):
         while i < len(aTags):
             # these will hold our final document and citation
             doc = Document()
-            cite = Citation ()
-
-            # link the court early - it helps later
             doc.court = ct
 
             # we begin with the caseLink field
@@ -962,7 +977,6 @@ def scrape(request, courtID):
 
             # using caseLink, we can get the caseNumber
             caseNumber =  caseNumRegex.search(caseLink).group(1)
-            cite.caseNumber = caseNumber
             
             # we can hard-code this b/c the D.C. Court paywalls all
             # unpublished opinions.
@@ -973,19 +987,17 @@ def scrape(request, courtID):
             doc.dateFiled = caseDate
             
             caseNameShort = aTags[i].next.next.next.strip().strip('&nbsp;')
-            cite.caseNameShort = caseNameShort
 
             # now that we have the caseNumber and caseNameShort, we can dup check
-            dup = hasDuplicate(caseNumber, caseNameShort)
-            if dup:
+            cite, created = hasDuplicate(caseNumber, caseNameShort)
+            if not created:
+                result = result + "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
             # if that goes well, we save to the DB
-            cite.save()
             doc.citation = cite
 
-            # finally, we can download the PDFs and save them locally
             # finally, we should download the PDF and save it locally.
             myFile = downloadPDF(caseLink, caseNameShort)
             doc.local_path.save(caseNameShort + ".pdf", myFile)
@@ -1002,6 +1014,7 @@ def scrape(request, courtID):
             
             
     elif (courtID == 13):
+        """Might be BROKEN right now...unsure why."""
         url = "http://www.cafc.uscourts.gov/dailylog.html"
         ct = Court.objects.get(courtUUID = "cafc")
         
@@ -1015,9 +1028,6 @@ def scrape(request, courtID):
         while i <= 20:
             # these will hold our final document and citation
             doc = Document()
-            cite = Citation ()
-
-            # link the court early - it helps later
             doc.court = ct
             
             try:
@@ -1037,7 +1047,6 @@ def scrape(request, courtID):
             # next: caseNumber
             caseNumber = trTags[i].td.nextSibling.nextSibling.contents[0]\
                 .strip('.pdf')
-            cite.caseNumber = caseNumber
             
             # next: dateFiled
             dateFiled = trTags[i].td.contents
@@ -1049,7 +1058,6 @@ def scrape(request, courtID):
             # next: caseNameShort
             caseNameShort = trTags[i].td.nextSibling.nextSibling.nextSibling\
                 .nextSibling.nextSibling.nextSibling.a.contents[0]
-            cite.caseNameShort = caseNameShort
             
             # next: documentType
             documentType = trTags[i].td.nextSibling.nextSibling.nextSibling\
@@ -1058,15 +1066,14 @@ def scrape(request, courtID):
             doc.documentType = documentType
 
             # now that we have the caseNumber and caseNameShort, we can dup check
-            dup = hasDuplicate(caseNumber, caseNameShort)
-            if dup:
+            cite, created = hasDuplicate(caseNumber, caseNameShort)
+            if not created:
+                result = result + "duplicate found at: " + str(i) + "<br>"
                 break
 
             # if that goes well, we save to the DB
-            cite.save()
             doc.citation = cite
 
-            # finally, we can download the PDFs and save them locally
             # finally, we should download the PDF and save it locally.
             myFile = downloadPDF(caseLink, caseNameShort)
             doc.local_path.save(caseNameShort + ".pdf", myFile)
@@ -1082,4 +1089,4 @@ def scrape(request, courtID):
             i += 1        
 
 
-    return HttpResponse("it worked")
+    return HttpResponse(result)
