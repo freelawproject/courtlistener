@@ -64,7 +64,7 @@ def hasDuplicate(caseNum, caseName):
     
     # check for duplicates, make the object in their absence
     cite, created = Citation.objects.get_or_create(
-        caseNameShort = caseName, caseNumber = caseNum)
+        caseNameShort = str(caseName), caseNumber = str(caseNum))
     return cite, created
     
 
@@ -92,69 +92,81 @@ def scrape(request, courtID):
     # next, we attack the court requested.
     if (courtID == 1):
         """
-        first circuit doesn't actually do PDFs. They do links to HTML content.
-        From what I can tell, this content is generated with pdftohtml. The
-        process for this court is therefore as follows:
-        1. visit the site
-        2. follow the links on the site
-        3. download the html, parsing it for text.
+        PDFs are available from the first circuit if you go to their RSS feed. 
+        So we shall.
         """
-        url = "http://www.ca1.uscourts.gov/cgi-bin/newopn.pl"
-
-        html = urllib2.urlopen(url)
-        soup = BeautifulSoup(html)
-
-        tdTags = soup.findAll('td')
-
+        url = "http://www.ca1.uscourts.gov/opinions/opinionrss.php"
         ct = Court.objects.get(courtUUID='ca1')
+        
+        req = urllib2.urlopen(url)
+        tree = etree.parse(req)
+        
+        caseLinks = tree.xpath("//item/link")
+        descriptions = tree.xpath("//item/description")
+        docTypes = tree.xpath("//item/category")
+        caseNamesAndNumbers = tree.xpath("//item/title")
+        
+        caseDateRegex = re.compile("(\d{2}/\d{2}/\d{4})",
+            re.VERBOSE | re.DOTALL)
+        caseNumberRegex = re.compile("(\d{2}-.*?\W)(.*)$")
+        
 
         i = 0
-        while i < len(tdTags)-4:
-            # some beautiful soup work here...
-            caseDate = tdTags[i+1].contents[0].strip().strip('&nbsp;')
-            caseLink = tdTags[i+2].contents[0].get('href')
-            caseNumber = tdTags[i+3].contents[1].contents[0].strip()\
-                .strip('&nbsp;')
-            caseNameShort = tdTags[i+4].contents[0].strip().strip('&nbsp;')
-
+        while i < len(caseLinks):
+            # these will hold our final document and citation
             doc = Document()
-
-            # great, now we do some parsing and building, beginning with the
-            # caseLink
+            doc.court = ct
+            
+            # we begin with the caseLink field
+            caseLink = caseLinks[i].text
             caseLink = make_url_absolute(url, caseLink)
-            doc.download_URL = caseLink
-
-            # using caseLink, we can download the cases
-            fileHandle = urllib2.urlopen(caseLink)
-            html = fileHandle.read()
-            doc.documentPlainText = html
-            fileHandle.close()
-
-            # and using the case text, we can generate our sha1 hash
-            sha1Hash = hashlib.sha1(html).hexdigest()
-            doc.documentSHA1 = sha1Hash
-
-            # next up is the caseDate
+            doc.downloadURL = caseLink
+            
+            # next: docType
+            docType = docTypes[i].text.strip()
+            if "Errata" in docType:
+                i += 1
+                continue
+            doc.documentType = docType
+            
+            # next: caseDate
+            caseDate = caseDateRegex.search(descriptions[i].text).group(1)
             splitDate = caseDate.split('/')
-            caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]), 
+            caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                 int(splitDate[1]))
             doc.dateFiled = caseDate
             
-            # check for dups, make the object if necessary
+            # next: caseNumber
+            caseNumber = caseNumberRegex.search(caseNamesAndNumbers[i].text)\
+                .group(1)
+            
+            # next: caseNameShort
+            caseNameShort = caseNumberRegex.search(caseNamesAndNumbers[i].text)\
+                .group(2)
+            
+            # check for dups, make the object if necessary, otherwise, get it
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
                 result = result + "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
-
-            # and finally, we link up the foreign keys and save the data
-            doc.court = ct
+                
+            # if that goes well, save to the DB
             doc.citation = cite
+            
+            # finally, we should download the PDF and save it locally.
+            myFile = downloadPDF(caseLink, caseNameShort)
+            doc.local_path.save(caseNameShort + ".pdf", myFile)
+
+            # and using the PDF we just downloaded, we can generate our sha1 hash
+            data = doc.local_path.read()
+            sha1Hash = hashlib.sha1(data).hexdigest()
+            doc.documentSHA1 = sha1Hash
+
+            # finalize everything
             doc.save()
 
-            # increment our while loop counter, i, by the number of columns in
-            # the table
-            i = i + 4
+            i += 1
 
     elif (courtID == 2):
         """
@@ -268,8 +280,8 @@ def scrape(request, courtID):
         # each time
         regexII = re.compile('\d{2}/\d{2}/\d{2}')
         regexIII = re.compile('\d{2}-\d{4}')
+        
         i = 0
-
         while i < len(aTags):
             caseLink = aTags[i].get('href')
             caseNameShort = aTags[i].contents[0].strip().strip('&npsp;')
@@ -359,7 +371,7 @@ def scrape(request, courtID):
             caseLink = aTags[i].get('href')
             caseLink = make_url_absolute(url, caseLink)
             doc.download_URL = caseLink
-
+            
             # using caselink, we can get the caseNumber and documentType
             fileName = caseLink.split('/')[-1]
             caseNumber, documentType = fileName.split('.')[0:2]
@@ -374,7 +386,7 @@ def scrape(request, courtID):
             except:
                 i += 1
                 continue
-
+            
             # some caseDate cleanup
             splitDate = caseDate.split('/')
             caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
@@ -390,22 +402,22 @@ def scrape(request, courtID):
                 result = result + "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
-
+            
             # if that goes well, we can save.
             doc.citation = cite
-
+            
             # finally, we should download the PDF and save it locally.
             myFile = downloadPDF(caseLink, caseNameShort)
             doc.local_path.save(caseNameShort + ".pdf", myFile)
-
+            
             # and using the PDF we just downloaded, we can generate our sha1 hash
             data = doc.local_path.read()
             sha1Hash = hashlib.sha1(data).hexdigest()
             doc.documentSHA1 = sha1Hash
-
+            
             # finalize everything
             doc.save()
-
+            
             i += 1
 
 
@@ -438,7 +450,7 @@ def scrape(request, courtID):
             # these will hold our final document and citation
             doc = Document()
             doc.court = ct
-
+            
             # we begin with the caseLink field
             caseLink = aTags[i].get('href')
             caseLink = make_url_absolute(url, caseLink)
@@ -467,7 +479,7 @@ def scrape(request, courtID):
             # next, we do the caseNameShort
             caseNameShort = aTags[i].next.next.next.next.next.contents[0]\
                 .contents[0].strip().strip('&nbsp;')
-
+            
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
@@ -481,16 +493,16 @@ def scrape(request, courtID):
             # finally, we should download the PDF and save it locally.
             myFile = downloadPDF(caseLink, caseNameShort)
             doc.local_path.save(caseNameShort + ".pdf", myFile)
-
+            
             # and using the PDF we just downloaded, we can generate our sha1 hash
             data = doc.local_path.read()
             sha1Hash = hashlib.sha1(data).hexdigest()
             doc.documentSHA1 = sha1Hash
-
+            
             # finalize everything
             doc.save()
 
-
+            
             # next
             i += 1
 
@@ -876,7 +888,6 @@ def scrape(request, courtID):
     elif (courtID == 11):
         """Trying out an RSS feed this time, since the feed looks good."""
         url = "http://www.ca11.uscourts.gov/rss/pubopnsfeed.php"
-        
         ct = Court.objects.get(courtUUID = 'ca11')
 
         req = urllib2.urlopen(url)
@@ -932,7 +943,6 @@ def scrape(request, courtID):
                 result = result + "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
-
 
             # if that goes well, we save to the DB
             doc.citation = cite
@@ -1014,7 +1024,6 @@ def scrape(request, courtID):
             
             
     elif (courtID == 13):
-        """Might be BROKEN right now...unsure why."""
         url = "http://www.cafc.uscourts.gov/dailylog.html"
         ct = Court.objects.get(courtUUID = "cafc")
         
@@ -1024,7 +1033,7 @@ def scrape(request, courtID):
         aTagsRegex = re.compile('pdf$', re.IGNORECASE)
         trTags = soup.findAll('tr')
         
-        i = 0 
+        i = 4 
         while i <= 20:
             # these will hold our final document and citation
             doc = Document()
@@ -1036,12 +1045,15 @@ def scrape(request, courtID):
                 caseLink = make_url_absolute(url, caseLink)
                 if 'opinion' not in caseLink:
                     # we have a non-case PDF. punt
+                    print str(i) + "opinion not in"
                     i += 1
                     continue
             except:
                 # the above fails when things get funky, in that case, we punt
                 i += 1
+                print str(i) + "except"
                 continue
+                
             doc.download_URL = caseLink
             
             # next: caseNumber
@@ -1064,13 +1076,15 @@ def scrape(request, courtID):
                 .nextSibling.nextSibling.nextSibling.nextSibling.nextSibling\
                 .contents[0].contents[0]
             doc.documentType = documentType
-
+            
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
                 result = result + "duplicate found at: " + str(i) + "<br>"
+                print str(i) + "not created"
+                i =+ 1
                 break
-
+            
             # if that goes well, we save to the DB
             doc.citation = cite
 
