@@ -34,5 +34,5 @@ urlpatterns = patterns('',
     (r'^admin/', include(admin.site.urls)),
      
     # The scraper URL 
-    (r'^scrape/(\d{1,2})/', scrape)
+    (r'^scrape/(\d{1,2})/$', scrape)
 )

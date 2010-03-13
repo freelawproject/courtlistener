@@ -120,14 +120,17 @@ def scrape(request, courtID):
             # we begin with the caseLink field
             caseLink = caseLinks[i].text
             caseLink = make_url_absolute(url, caseLink)
-            doc.downloadURL = caseLink
+            doc.download_URL = caseLink
             
             # next: docType
             docType = docTypes[i].text.strip()
             if "Errata" in docType:
                 i += 1
                 continue
-            doc.documentType = docType
+            elif "Published" in docType:
+                doc.documentType = "P"
+            elif "unpublished" in docType:
+                doc.documentType = "U"
             
             # next: caseDate
             caseDate = caseDateRegex.search(descriptions[i].text).group(1)
