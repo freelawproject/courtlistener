@@ -51,6 +51,12 @@ def make_url_absolute(url, rel_url):
 
     returns an absolute version of rel_url
     """
+    
+    # for the relative URLs that don't start with a slash, we need this check
+    startingSlash = re.compile('^(/)|(htt)')
+    if not startingSlash.search(rel_url):
+        rel_url = "/" + rel_url
+    
     if 'http:' not in rel_url:
         #it's a relative url, fix it.
         rel_url = url.split('/')[0] + "//" + url.split('/')[2] + rel_url
@@ -93,7 +99,7 @@ def scrape(request, courtID):
     if (courtID == 1):
         """
         PDFs are available from the first circuit if you go to their RSS feed. 
-        So we shall.
+        So go to their RSS feed we shall.
         """
         url = "http://www.ca1.uscourts.gov/opinions/opinionrss.php"
         ct = Court.objects.get(courtUUID='ca1')
@@ -124,13 +130,14 @@ def scrape(request, courtID):
             
             # next: docType
             docType = docTypes[i].text.strip()
-            if "errata" in docType.lower():
-                i += 1
-                continue
+            if "unpublished" in docType.lower():
+                doc.documentType = "U"
             elif "published" in docType.lower():
                 doc.documentType = "P"
-            elif "unpublished" in docType.lower():
-                doc.documentType = "U"
+            else:
+                # it's an errata, or something else we don't care about
+                i += 1
+                continue
             
             # next: caseDate
             caseDate = caseDateRegex.search(descriptions[i].text).group(1)
@@ -214,10 +221,10 @@ def scrape(request, courtID):
             
             # and the docType
             documentType = caseNumRegex.search(caseLink).group(2)
-            if 'opn' in caseNum.lower():
+            if 'opn' in documentType:
                 # it's unpublished
                 doc.documentType = "P"
-            elif 'so' in caseNum.lower():
+            elif 'so' in documentType:
                 doc.documentType = "U"
 
 
@@ -341,10 +348,9 @@ def scrape(request, courtID):
             i += 1
 
     elif (courtID == 4):
-        """Fourth circuit everybody, fourth circuit! Off we go.
-        
-        BROKEN
-        """
+        """The fourth circuit is THE worst form of HTML I've ever seen. It's 
+        going to break a lot, but I've done my best to clean it up, and make it
+        reliable."""
 
         url = "http://pacer.ca4.uscourts.gov/opinions_today.htm"
         ct = Court.objects.get(courtUUID='ca4')
@@ -514,12 +520,8 @@ def scrape(request, courtID):
 
 
     elif (courtID == 6):
-        """This one is a pain because their results form doesn't tell you the
-        date things were posted. However, if we perform a search by doing a
-        POST, we can get a format that has the results. Frustrating, yes, but
-        the only other option is parsing the PDFs.
-
-        I called to harass them about this. It didn't help."""
+        """Results are available without an HTML POST, but those results lack a
+        date field. Hence, we must do an HTML POST."""
 
         url = "http://www.ca6.uscourts.gov/cgi-bin/opinions.pl"
         ct = Court.objects.get(courtUUID = 'ca6')
@@ -812,70 +814,67 @@ def scrape(request, courtID):
             i += 1
 
     elif (courtID == 10):
-        url = "http://www.ck10.uscourts.gov/searchbydateresults.php"
+        url = "http://www.ck10.uscourts.gov/opinions/new/daily_decisions.rss"
         ct = Court.objects.get(courtUUID = 'ca10')
-
-        today = datetime.date.today()
-        formattedToday = str(today.month) + "%2F" + str(today.day) + "%2F" +\
-            str(today.year)
-        data = "begin=" + formattedToday + "&end=" + formattedToday +\
-            "&Date=Search"
-
-        req = urllib2.Request(url, data)
-        response = urllib2.urlopen(req)
-        html = response.read()
-
-        soup = BeautifulSoup(html)
-        print soup
-        aTagsRegex = re.compile('\d{3}.pdf$', re.IGNORECASE)
-        aTags = soup.findAll(attrs={'href' : aTagsRegex})
-
-        caseNumRegex = re.compile('\d{2}-\d{4}', re.IGNORECASE)
-
+        
+        req = urllib2.urlopen(url)
+        tree = etree.parse(req)
+        
+        caseLinks = tree.xpath("//item/link")
+        descriptions = tree.xpath("//item/description")
+        docTypes = tree.xpath("//item/category")
+        caseNames = tree.xpath("//item/title")
+        
+        caseDateRegex = re.compile("(\d{2}/\d{2}/\d{4})",
+            re.VERBOSE | re.DOTALL)
+        caseNumberRegex = re.compile("(\d{2}-\d{4})(.*)$")
+        
         i = 0
-        while i < len(aTags):
+        while i < len(caseLinks):
             # these will hold our final document and citation
             doc = Document()
             doc.court = ct
-
+            
             # we begin with the caseLink field
-            caseLink = aTags[i].get('href')
+            caseLink = caseLinks[i].text
             caseLink = make_url_absolute(url, caseLink)
             doc.download_URL = caseLink
-            print caseLink
-
-
-            # using caseLink, we can get the caseNumber
-            caseNumber = caseNumRegex.search(caseLink).group(0)\
-                .strip().strip('&nbsp;')
-            print caseNumber
-
-            # next up: caseDate. dateFiled == today because of the query we
-            # began with.
-            caseDate = datetime.date.today()
-            doc.dateFiled = caseDate
-
-            # next, the caseNameShort
-            try:
-                # this is in a try block because occasionally, there are pdfs
-                # that we don't want. Those will throw errors here, and we'll
-                # move on in that case.
-                caseNameShort = aTags[i].next.next.next.strip().strip('&nbsp;')
-            except:
+            
+            # next: docType
+            docType = docTypes[i].text.strip()
+            if "unpublished" in docType.lower():
+                doc.documentType = "U"
+            elif "published" in docType.lower():
+                doc.documentType = "P"
+            else:
+                # it's an errata, or something else we don't care about
                 i += 1
                 continue
-
-
-            # now that we have the caseNumber and caseNameShort, we can dup check
+            
+            # next: caseDate
+            caseDate = caseDateRegex.search(descriptions[i].text).group(1)
+            splitDate = caseDate.split('/')
+            caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
+                int(splitDate[1]))
+            doc.dateFiled = caseDate
+            
+            # next: caseNumber
+            caseNumber = caseNumberRegex.search(descriptions[i].text)\
+                .group(1)
+            
+            # next: caseNameShort
+            caseNameShort = caseNames[i].text.strip().strip('&nbsp')
+            
+            # check for dups, make the object if necessary, otherwise, get it
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
                 result = result + "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
-
-            # if that goes well, we save to the DB
+                
+            # if that goes well, save to the DB
             doc.citation = cite
-
+            
             # finally, we should download the PDF and save it locally.
             myFile = downloadPDF(caseLink, caseNameShort)
             doc.local_path.save(caseNameShort + ".pdf", myFile)
@@ -888,8 +887,8 @@ def scrape(request, courtID):
             # finalize everything
             doc.save()
 
-            # next
             i += 1
+
             
     elif (courtID == 11):
         """Trying out an RSS feed this time, since the feed looks good."""
