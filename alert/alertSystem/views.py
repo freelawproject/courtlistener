@@ -124,12 +124,12 @@ def scrape(request, courtID):
             
             # next: docType
             docType = docTypes[i].text.strip()
-            if "Errata" in docType:
+            if "errata" in docType.lower():
                 i += 1
                 continue
-            elif "Published" in docType:
+            elif "published" in docType.lower():
                 doc.documentType = "P"
-            elif "unpublished" in docType:
+            elif "unpublished" in docType.lower():
                 doc.documentType = "U"
             
             # next: caseDate
@@ -214,12 +214,12 @@ def scrape(request, courtID):
             
             # and the docType
             documentType = caseNumRegex.search(caseLink).group(2)
-            if 'opn' in caseNum:
+            if 'opn' in caseNum.lower():
                 # it's unpublished
-                documentType = "P"
-            elif 'so' in caseNum:
-                documentType = "U"
-            doc.documentType = documentType
+                doc.documentType = "P"
+            elif 'so' in caseNum.lower():
+                doc.documentType = "U"
+
 
             # next, the caseNameShort (there's probably a better way to do this.
             caseName = aTags[i].parent.parent.nextSibling.nextSibling\
@@ -274,7 +274,6 @@ def scrape(request, courtID):
         html = urllib2.urlopen(url)
         soup = BeautifulSoup(html)
 
-
         # all links ending in pdf, case insensitive
         regex = re.compile("pdf$", re.IGNORECASE)
         aTags = soup.findAll(attrs={"href": regex})
@@ -286,11 +285,16 @@ def scrape(request, courtID):
         
         i = 0
         while i < len(aTags):
+            # these will hold our final document and citation
+            doc = Document()
+            doc.court = ct
+            
+            # caseLink and caseNameShort
             caseLink = aTags[i].get('href')
             caseNameShort = aTags[i].contents[0].strip().strip('&npsp;')
 
+            # caseDate and caseNumber
             junk = aTags[i].previous.previous.previous
-
             try:
                 # this error seems to happen upon dups...not sure why yet
                 caseDate = regexII.search(junk).group(0)
@@ -298,11 +302,10 @@ def scrape(request, courtID):
             except:
                 i = i+1
                 continue
-
-            # these will hold our final document and citation
-            doc = Document()
-            doc.court = ct
-
+            
+            # all are precedential
+            doc.documentType = "P"
+            
             # next, we check for a dup. If there is one, we can break from the
             # loop, since this court posts in alphabetical order.
             cite, created = hasDuplicate(caseNumber, caseNameShort)
