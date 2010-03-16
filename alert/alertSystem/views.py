@@ -1050,13 +1050,11 @@ def scrape(request, courtID):
                 caseLink = make_url_absolute(url, caseLink)
                 if 'opinion' not in caseLink:
                     # we have a non-case PDF. punt
-                    print str(i) + "opinion not in"
                     i += 1
                     continue
             except:
                 # the above fails when things get funky, in that case, we punt
                 i += 1
-                print str(i) + "except"
                 continue
                 
             doc.download_URL = caseLink
@@ -1086,7 +1084,6 @@ def scrape(request, courtID):
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
                 result = result + "duplicate found at: " + str(i) + "<br>"
-                print str(i) + "not created"
                 i =+ 1
                 break
             
