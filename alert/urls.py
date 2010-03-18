@@ -37,5 +37,5 @@ urlpatterns = patterns('',
     (r'^scrape/(\d{1,2})/$', scrape),
     
     # The parser URL
-    (r'^parse/$', parse),
+    (r'^parse/(\d{1,2})/$', parse),
 )
