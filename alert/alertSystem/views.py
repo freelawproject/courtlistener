@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert.alertSystem.models import *
+from alert import settings
 from alert.alertSystem.titlecase import titlecase
 from django.http import HttpResponse, Http404
 from django.core.files import File
@@ -74,28 +75,7 @@ def hasDuplicate(caseNum, caseName):
     return cite, created
     
 
-
-def scrape(request, courtID):
-    """
-    The master function. This will receive a court ID, determine the correct
-    action to take (scrape for PDFs, download content, etc.), then hand it off
-    to another function that will handle the nitty-gritty crud.
-
-    returns None
-    """
-    
-    
-    # we show this string to users if things go smoothly
-    result = "It worked<br>"
-    
-    # some data validation, for good measure - this should already be done via
-    # our url regex
-    try:
-        courtID = int(courtID)
-    except:
-        raise Http404()
-
-    # next, we attack the court requested.
+def scrapeCourt(courtID, result):
     if (courtID == 1):
         """
         PDFs are available from the first circuit if you go to their RSS feed. 
@@ -157,7 +137,7 @@ def scrape(request, courtID):
             # check for dups, make the object if necessary, otherwise, get it
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
-                result = result + "duplicate found at: " + str(i) + "<br>"
+                result += "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
                 
@@ -177,6 +157,8 @@ def scrape(request, courtID):
             doc.save()
 
             i += 1
+        
+        return result
 
     elif (courtID == 2):
         """
@@ -246,7 +228,7 @@ def scrape(request, courtID):
             # check for duplicates, make the object in their absence
             cite, created = hasDuplicate(caseNum, caseName)
             if not created:
-                result = result + "duplicate found at: " + str(i) + "<br>"
+                result += "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
@@ -266,6 +248,8 @@ def scrape(request, courtID):
 
             # next
             i += 1
+            
+        return result
             
     elif (courtID == 3):
         """
@@ -317,7 +301,7 @@ def scrape(request, courtID):
             # loop, since this court posts in alphabetical order.
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
-                result = result + "duplicate found at: " + str(i) + "<br>"
+                result += "duplicate found at: " + str(i) + "<br>"
                 break
 
             doc.citation = cite
@@ -346,6 +330,8 @@ def scrape(request, courtID):
             doc.save()
 
             i += 1
+        
+        return result
 
     elif (courtID == 4):
         """The fourth circuit is THE worst form of HTML I've ever seen. It's 
@@ -411,7 +397,7 @@ def scrape(request, courtID):
             # let's check for duplicates before we proceed
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
-                result = result + "duplicate found at: " + str(i) + "<br>"
+                result += "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
             
@@ -431,6 +417,8 @@ def scrape(request, courtID):
             doc.save()
             
             i += 1
+            
+        return result
 
 
     elif (courtID == 5):
@@ -495,7 +483,7 @@ def scrape(request, courtID):
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
-                result = result + "duplicate found at: " + str(i) + "<br>"
+                result += "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
@@ -517,6 +505,8 @@ def scrape(request, courtID):
             
             # next
             i += 1
+            
+        return result
 
 
     elif (courtID == 6):
@@ -586,7 +576,7 @@ def scrape(request, courtID):
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
-                result = result + "duplicate found at: " + str(i) + "<br>"
+                result += "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
@@ -607,6 +597,8 @@ def scrape(request, courtID):
 
             # next
             i += 1
+            
+        return result
 
 
     elif (courtID == 7):
@@ -655,7 +647,7 @@ def scrape(request, courtID):
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
-                result = result + "duplicate found at: " + str(i) + "<br>"
+                result += "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
@@ -675,6 +667,9 @@ def scrape(request, courtID):
             doc.save()
 
             i += 1
+            
+        return result
+    
 
     elif (courtID == 8):
         url = "http://www.ca8.uscourts.gov/cgi-bin/new/today2.pl"
@@ -723,7 +718,7 @@ def scrape(request, courtID):
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
-                result = result + "duplicate found at: " + str(i) + "<br>"
+                result += "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
@@ -743,6 +738,9 @@ def scrape(request, courtID):
             doc.save()
 
             i += 1
+            
+        return result
+    
 
     elif (courtID == 9):
         """This court, by virtue of having a javascript laden website, was very
@@ -791,7 +789,7 @@ def scrape(request, courtID):
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
-                result = result + "duplicate found at: " + str(i) + "<br>"
+                result += "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
@@ -812,6 +810,9 @@ def scrape(request, courtID):
             doc.save()
 
             i += 1
+            
+        return result
+    
 
     elif (courtID == 10):
         url = "http://www.ck10.uscourts.gov/opinions/new/daily_decisions.rss"
@@ -868,7 +869,7 @@ def scrape(request, courtID):
             # check for dups, make the object if necessary, otherwise, get it
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
-                result = result + "duplicate found at: " + str(i) + "<br>"
+                result += "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
                 
@@ -888,6 +889,8 @@ def scrape(request, courtID):
             doc.save()
 
             i += 1
+        
+        return result
 
             
     elif (courtID == 11):
@@ -945,7 +948,7 @@ def scrape(request, courtID):
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
-                result = result + "duplicate found at: " + str(i) + "<br>"
+                result += "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
@@ -965,6 +968,9 @@ def scrape(request, courtID):
             doc.save()
 
             i += 1
+        
+        return result
+    
     
     elif (courtID == 12):
         url = "http://www.cadc.uscourts.gov/bin/opinions/allopinions.asp"
@@ -1006,7 +1012,7 @@ def scrape(request, courtID):
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
-                result = result + "duplicate found at: " + str(i) + "<br>"
+                result += "duplicate found at: " + str(i) + "<br>"
                 i += 1
                 continue
 
@@ -1025,7 +1031,9 @@ def scrape(request, courtID):
             # finalize everything
             doc.save()
             
-            i += 1        
+            i += 1     
+            
+        return result   
             
             
     elif (courtID == 13):
@@ -1083,7 +1091,7 @@ def scrape(request, courtID):
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
-                result = result + "duplicate found at: " + str(i) + "<br>"
+                result += "duplicate found at: " + str(i) + "<br>"
                 i =+ 1
                 break
             
@@ -1102,7 +1110,58 @@ def scrape(request, courtID):
             # finalize everything
             doc.save()
             
-            i += 1        
+            i += 1
+            
+        return result
 
 
+def scrape(request, courtID):
+    """
+    The master function. This will receive a court ID, determine the correct
+    action to take, then hand it off to another function that will handle the 
+    nitty-gritty crud.
+    
+    If the courtID is 0, then we scrape all courts, one after the next.
+
+    returns HttpResponse containing the result
+    """
+    
+    
+    # we show this string to users if things go smoothly
+    result = "It worked<br>"
+    scrapeResult = ""
+    
+    # some data validation, for good measure - this should already be done via
+    # our url regex
+    try:
+        courtID = int(courtID)
+    except:
+        raise Http404()
+
+    # next, we attack the court requested.
+    if (courtID == 0):
+        # we do ALL of the courts (useful for testing)
+        i = 1
+        while i <= 13:
+            result += "NOW SCRAPING COURT: " + str(i) + "<br>"
+            result = scrapeCourt(i, result) + "<br><br>"           
+            i += 1
+    
+    else:
+        result = str(scrapeCourt(courtID, result))
+
+    return HttpResponse(result)
+
+
+def parse(request):
+    """Open a PDF, pull out the contents, parse them, and put them in intresting
+    places in the DB
+    
+    returns HttpResponse of the result"""
+    
+    if settings.DEBUG:
+        # we make a shortcut for this variable
+        debug = settings.DEBUG
+    
+    
     return HttpResponse(result)
