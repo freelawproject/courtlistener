@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}CourtListener.com | Parse{% endblock %}
+
+{% block content %}
+<div class="span-24 last">
+    <h2>Parsing courts...</h2>
+    <ul>
+    {% for r in result %}
+        <li>{{r}}</li>
+    {% endfor %}
+    </ul>
+</div>
+{% endblock %}
+

@@ -17,5 +17,9 @@ syntax: glob
 
 # ignore the django directory
 django
-alert/pdf
+
+
+# the desktop config
 alert/media/pdf
+# laptop and server config
+alert/assets/media/pdf
