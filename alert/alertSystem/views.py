@@ -20,6 +20,7 @@ from alert.alertSystem.titlecase import titlecase
 from django.http import HttpResponse, Http404
 from django.core.files import File
 from django.core.files.base import ContentFile
+from django.shortcuts import render_to_response
 import datetime, hashlib, re, StringIO, subprocess, urllib, urllib2
 from BeautifulSoup import BeautifulSoup
 from lxml.html import fromstring
@@ -1166,7 +1167,7 @@ def parseCourt(courtID, result):
 
     for doc in selectedDocuments:
         # for each of these documents, open it, parse it.
-        result += "Parsed: " + doc.citation.caseNameShort + "<br>"
+        result.append("Parsed: " + doc.citation.caseNameShort)
 
         relURL = str(doc.local_path)
         relURL = settings.MEDIA_ROOT + relURL
@@ -1225,7 +1226,7 @@ def parse(request, courtID):
 
     returns HttpResponse of the result"""
 
-    result = "It worked<br>"
+    result = ["It worked"]
 
     # some data validation, for good measure - this should already be done via
     # our url regex
@@ -1238,15 +1239,15 @@ def parse(request, courtID):
         # we parse the documents from all jurisdictions
         i = 1
         while i <= 13:
-            result += "NOW PARSING COURT: " + str(i) + "<br>"
-            result = parseCourt(i, result) + "<br><br>"
+            result.append("NOW PARSING COURT: " + str(i))
+            result = (parseCourt(i, result))
             i += 1
 
     else:
-        result = parseCourt(courtID, result)
+        result = (parseCourt(courtID, result))
 
     if not settings.DEBUG:
         # if debug is not set to True, we don't display useful stuff.
-        result = "Done."
+        result = ["Done."]
 
-    return HttpResponse(result)
+    return render_to_response('parse.html', {'result': result})

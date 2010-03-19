@@ -17,6 +17,7 @@
 
 from django.conf.urls.defaults import *
 from alert.alertSystem.views import *
+from alert import settings
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
@@ -38,4 +39,11 @@ urlpatterns = patterns('',
     
     # The parser URL
     (r'^parse/(\d{1,2})/$', parse),
+)
+
+# if it's not the production site, serve the static files this way.
+if settings.DEVELOPMENT:
+    urlpatterns += patterns('',
+    (r'^media/(?P<path>.*)$', 'django.views.static.serve',
+        {'document_root': '/home/mlissner/Documents/Cal/Final Project/alert/assets/media', 'show_indexes': True}),
 )
