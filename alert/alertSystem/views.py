@@ -234,7 +234,7 @@ def scrapeCourt(courtID, result):
                 continue
 
             # finally, we should download the PDF and save it locally.
-            myFile = downloadPDF(caseLink, caseName)
+            myFile = downloadPDF(caseLink)
             doc.local_path.save(caseName + ".pdf", myFile)
 
             # and using the PDF we just downloaded, we can generate our sha1 hash
