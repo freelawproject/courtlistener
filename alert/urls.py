@@ -45,5 +45,10 @@ urlpatterns = patterns('',
 if settings.DEVELOPMENT:
     urlpatterns += patterns('',
     (r'^media/(?P<path>.*)$', 'django.views.static.serve',
-        {'document_root': '/home/mlissner/Documents/Cal/Final Project/alert/assets/media', 'show_indexes': True}),
+        {'document_root': '/home/mlissner/Documents/Cal/Final Project/alert/assets/media', 
+        'show_indexes': True}),
+    (r'^500/$', 'django.views.generic.simple.direct_to_template', 
+        {'template': '500.html'}),
+    (r'^404/$', 'django.views.generic.simple.direct_to_template', 
+        {'template': '404.html'}),
 )
