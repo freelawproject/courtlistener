@@ -1,10 +1,21 @@
 Install instructions for the alert project
 
+Please note that these instructions are quite poor at the moment. They are
+intended as a starting point in terms of dependancies, but keeping them up to 
+date hasn't been a priority thus far. 
+
+If you take the time to install this system, please help update these docs.
+
 1. Install dependencies:
  - python
  - python-beautifulsoup
  - python-docutils
  - django (devel version)
  - apache2
- - 
+ - poppler-utils
  
+2. Configure django
+
+3. Debug
+
+4. Contribute!
