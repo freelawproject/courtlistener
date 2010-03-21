@@ -5,22 +5,31 @@
         <title>{% block title %}{% endblock %}</title>
         <link rel="stylesheet" href="/media/css/blueprint/screen.css" type="text/css" media="screen, projection">
         <link rel="stylesheet" href="/media/css/blueprint/print.css" type="text/css" media="print">
-        <link rel="stylesheet" href="/media/css/blueprint/plugins/fancy-type/screen.css" type="text/css" media="print">	
+        <link rel="stylesheet" href="/media/css/blueprint/plugins/fancy-type/screen.css" type="text/css" media="print">
+        <link rel="stylesheet" href="/media/css/blueprint/override.css" type="text/css" media="screen, projection">
         <!--[if lt IE 8]><link rel="stylesheet" href="/media/css/blueprint/ie.css" type="text/css" media="screen, projection"><![endif]-->
     </head>
 
     <body>
         <div class="container">
             {% block header %}
-                <div class="span-18" id="header">
+                <div class="span-15" id="header">
                     <h1>CourtListener</h1>                
                 </div>
             {% endblock %}            
 
 
             {% block headerLinks %}            
-                <div class="span-6 last">
-                    <p>test</p>
+                <div class="span-9 last">
+                    <div class="navigation box round-bottom">
+                        <ul>
+                            <li><a href="/search/">Search</a></li>
+                            <li><a href="/opinions">Opinions</a></li>
+                            <li><a href="/profile/alerts/">Alerts</a></li>
+                            <li><a href="/profile/settings/">Settings</a></li>
+                            <li><a href="/sign-out/">Sign out</a></li>
+                        </ul>
+                    </div>
                 </div>
             {% endblock %}
             
@@ -39,23 +48,23 @@
                     <div class="span-24">
                         <hr>
                     </div>
-                    <div class="span-3 prepend-3">
-                        <a href="/about">About</a>
+                    <div class="span-2">
+                        <a href="/about/">About</a>
                     </div>
-                    <div class="span-3">
-                        <a href="/privacy">Privacy</a>
+                    <div class="span-2">
+                        <a href="/privacy/">Privacy</a>
                     </div>
-                    <div class="span-3">
-                        <a href="/license">License</a>
+                    <div class="span-2">
+                        <a href="/license/">License</a>
                     </div>
-                    <div class="span-3">
-                        <a href="/sitemap">Sitemap</a>
+                    <div class="span-2">
+                        <a href="/sitemap/">Sitemap</a>
                     </div>
-                    <div class="span-3">
-                        <a href="/contribute">Contribute</a>
+                    <div class="span-2">
+                        <a href="/contribute/">Contribute</a>
                     </div>
-                    <div class="span-3 last">
-                        <a href="/contact">Contact</a>
+                    <div class="span-2 last">
+                        <a href="/contact/">Contact</a>
                     </div>
                 </div>
             {% endblock %}
