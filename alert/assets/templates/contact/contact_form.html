@@ -1,0 +1,56 @@
+{% extends "base.html" %} 
+
+{% block content %}
+    <div class="span-18 colborder" id="content">
+        <h2>Contact Us</h2>
+        
+        {% if form.errors %}
+            <div class="span-18">
+                <div class="span-10 error">
+                    <p class="bottom">There were errors with your submission.</p>
+                </div>
+                <div class="span-7 last">&nbsp;</div>
+            </div>
+        {% endif %}
+
+        <form action"" method="post">
+            <p>
+                <label for="id_name">Name</label>
+                {% if form.name.errors %}
+                    <span class="errortext">
+                        {% for error in form.name.errors %}
+                            {{ error|escape }}  
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.name }}
+            </p>
+            
+            
+            <p>
+                <label for="id_email">Email</label>
+                {% if form.email.errors %}
+                    <span class="errortext">
+                        {% for error in form.name.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.email }}
+            </p>
+            
+            <p>
+                <label for="id_message">Message</label>
+                {% if form.message.errors %}
+                    <span class="errortext">
+                        {% for error in form.message.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.message }}
+            </p>
+          <button type="submit" class="button">Send message</button>
+        </form>
+    </div>
+{% endblock %}

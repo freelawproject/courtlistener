@@ -14,9 +14,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from alert import settings
 from alert.alertSystem.views import *
 from alert.alertSystem.sitemap import DocumentSitemap
-from alert import settings
+from alert.contact.views import *
 from django.conf.urls.defaults import *
 
 # for the flatfiles in the sitemap
@@ -61,6 +62,10 @@ urlpatterns = patterns('',
     # Display a case
     url(r'^(ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc)/(.*)/$', 
         viewCases, name="viewCases"),
+        
+    # Contact us pages
+    (r'^contact/$', contact),
+    (r'^contact/thanks/$', thanks),
 
 )
 
