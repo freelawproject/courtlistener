@@ -131,6 +131,11 @@ class Citation(models.Model):
         else:
             return self.citationUUID
     
+    """STUB"""
+    @models.permalink
+    def get_absolute_url(self):
+        return citationUUID
+    
     class Meta:
         db_table = "Citation"
         ordering = ["caseNameFull"]        
@@ -202,6 +207,11 @@ class Document(models.Model):
             return self.citation.caseNameShort
         else:
             documentSHA1
+    
+    """STUB"""        
+    @models.permalink
+    def get_absolute_url(self):
+        return download_URL
         
     class Meta:
         db_table = "Document"

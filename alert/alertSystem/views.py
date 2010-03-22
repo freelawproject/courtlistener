@@ -1251,3 +1251,41 @@ def parse(request, courtID):
         result = ["Done."]
 
     return render_to_response('parse.html', {'result': result})
+
+def viewCases(request, court, case):
+    """Take a court and a caseNameShort, and display what we know about that 
+    case.
+    """
+    
+
+    # get the court and citation information
+    ct = Court.objects.get(courtUUID = court)
+    
+    # try looking it up by casename. Failing that, try the caseNumber.
+    try: 
+        cites = Citation.objects.filter(caseNameShort = case)
+        if len(cites) == 0:
+            # if we can't find it by case name, try by case number
+            cites = Citation.objects.filter(caseNumber = case)
+    except:
+        pass
+    
+    
+    docs = []
+    if len(cites) > 0:
+        # get any documents with that citation at that court. If there is more
+        # than one citation, we only need the first, so we slice to that one.
+        for cite in cites:
+            docs.append(Document.objects.get(court = ct, citation = cite))
+
+        for doc in docs:
+            print doc
+        
+        
+        return render_to_response('display_cases.html', {'title': case, 
+            'docs': docs, 'court': ct})
+
+    else:
+        # we have no hits, punt
+        return render_to_response('display_cases.html', {'title': case, 
+            'court': ct})

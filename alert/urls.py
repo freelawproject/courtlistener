@@ -39,6 +39,13 @@ urlpatterns = patterns('',
     
     # The parser URL
     (r'^parse/(\d{1,2})/$', parse),
+    
+    # Sitemap generator
+    #(r'^sitemap\.xml$', 'django.contrib.sitemaps.views.sitemap', {'sitemaps': sitemaps}),
+    
+    # Display a case
+    (r'^(ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc)/(.*)/$', viewCases),
+
 )
 
 # if it's not the production site, serve the static files this way.

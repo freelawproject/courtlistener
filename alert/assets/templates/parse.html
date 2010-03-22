@@ -6,9 +6,7 @@
 <div class="span-24 last">
     <h2>Parsing courts...</h2>
     <ul>
-    {% for r in result %}
-        <li>{{r}}</li>
-    {% endfor %}
+        {{ result|unordered_list }}
     </ul>
 </div>
 {% endblock %}
