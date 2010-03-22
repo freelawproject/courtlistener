@@ -16,6 +16,8 @@
 
 
 from django.db import models
+import alert
+#from alert.alertSystem import views
 
 # a tuple, which we'll pass to the choices argument in various places
 PACER_CODES = (
@@ -131,11 +133,6 @@ class Citation(models.Model):
         else:
             return self.citationUUID
     
-    """STUB"""
-    @models.permalink
-    def get_absolute_url(self):
-        return citationUUID
-    
     class Meta:
         db_table = "Citation"
         ordering = ["caseNameFull"]        
@@ -207,11 +204,10 @@ class Document(models.Model):
             return self.citation.caseNameShort
         else:
             documentSHA1
-    
-    """STUB"""        
+            
     @models.permalink
     def get_absolute_url(self):
-        return download_URL
+        return ('viewCases', [str(self.court.courtUUID), str(self.citation.caseNameShort)])
         
     class Meta:
         db_table = "Document"
