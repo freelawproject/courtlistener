@@ -51,10 +51,16 @@ urlpatterns = patterns('',
     (r'^parse/(\d{1,2})/$', parse),
     
     # Sitemap generator
-    (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.sitemap', {'sitemaps': sitemaps}),
+    (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.sitemap',
+        {'sitemaps': sitemaps}),
+    
+    # Court listing pages
+    (r'^opinions/(ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc|all)/$', 
+        viewDocumentListByCourt),
     
     # Display a case
-    url(r'^(ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc)/(.*)/$', viewCases, name="viewCases"),
+    url(r'^(ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc)/(.*)/$', 
+        viewCases, name="viewCases"),
 
 )
 

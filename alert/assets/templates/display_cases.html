@@ -3,54 +3,47 @@
 {% block title %}CourtListener.com / Browse / {{ title }}{% endblock %}
 
 {% block content %}
-<div class="span-24 last">
-    {% if docs %}
-        {# if we have hits, display what we know #}
-        {% for doc in docs %}
-            <h2>{{ doc.citation.caseNameShort }}, {{ doc.citation.caseNumber }}</h2>
-            <h3>{{court}}</h3>
-            <h3 class="alt"> {{doc.dateFiled|date:"l, F jS, Y"}}</h3>
-            {# Print the whether the document is precedential #}
-            {% ifequal doc.documentType "U" %}
-                <p><strong>Status:</strong> This document is <strong>not</strong> precedential.<br>
-            {% endifequal %}
-            {% ifequal doc.documentType "P" %}
-                <p><strong>Status:</strong> This document <strong>is</strong> precedential.<br>
-            {% endifequal %}            
+    <div class="span-18 colborder">
+        {% if docs %}
+            {# if we have hits, display what we know #}
+            {% for doc in docs %}
+                <h2>{{ doc.citation.caseNameShort }}, {{ doc.citation.caseNumber }}</h2>
+                <h3>{{court}}</h3>
+                <h3 class="alt"> {{doc.dateFiled|date:"l, F jS, Y"}}</h3>
+                {# Print the whether the document is precedential #}
+                {% ifequal doc.documentType "U" %}
+                    <p><strong>Status:</strong> Non-precedential.<br>
+                {% endifequal %}
+                {% ifequal doc.documentType "P" %}
+                    <p><strong>Status:</strong> Precedential.<br>
+                {% endifequal %}            
 
-            <strong>Download:</strong> <a href="http://courtlistener.com/{{doc.local_path}}">From our server</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="{{ doc.download_URL }}">From the court</a><br>
-            <strong>SHA1:</strong> {{doc.documentSHA1}}</p>
-            <br>
-            <h4>Document text</h4>
-            <pre>{{doc.documentPlainText}}</pre>
-        {% endfor %}
+                <strong>Download:</strong> <a href="http://courtlistener.com/{{doc.local_path}}">From our server</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="{{ doc.download_URL }}">From the court</a><br>
+                <strong>SHA1:</strong> {{doc.documentSHA1}}</p>
+                <br>
+                <h4>Document text</h4>
+                <pre>{{doc.documentPlainText}}</pre>
+            {% endfor %}
+                
+                
+                
+                
+        {% else %}
+            {# No documents found, tell the user, apologize. #}
+            <h2>No documents found</h2>
             
+            <p>We looked in the <strong>{{ court }}</strong>, but were unable to find anything that 
+            had the case name or number of <strong>{{ title }}</strong>.</p>
             
-            
-            
-    {% else %}
-        {# No documents found, tell the user, apologize. #}
-        <h2>No documents found</h2>
+            <p class="bottom">Sorry about that. Would you like to try a different approach:</p>
+            <ul>
+                <li>You can try a <a href="/search">search</a> for what you're looking for.</li>
+                <li>You can <a href="/contact">let us know</a> that something is wrong or missing.</li>
+                <li>If you think you have found a bug, you can <a href="contribute#bugs">file a bug</a>.</li>
+            </ul>
+            <p>Sorry about this. If you continue having problems, do let us know.</p>
         
-        <p>We looked in the <strong>{{ court }}</strong>, but were unable to find anything that 
-        had the case name or number of <strong>{{ title }}</strong>.</p>
-        
-        <p class="bottom">Sorry about that. Would you like to try a different approach:</p>
-        <ul>
-            <li>You can try a <a href="/search">search</a> for what you're looking for.</li>
-            <li>You can <a href="/contact">let us know</a> that something is wrong or missing.</li>
-            <li>If you think you have found a bug, you can <a href="contribute#bugs">file a bug</a>.</li>
-        </ul>
-        <p>Sorry about this. If you continue having problems, do let us know.</p>
-    
-    {% endif %}
-
-    <h2></h2>
-    <ul>
-    {% for r in result %}
-        <li>{{r}}</li>
-    {% endfor %}
-    </ul>
-</div>
+        {% endif %}
+    </div>
 {% endblock %}
 

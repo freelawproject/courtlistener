@@ -21,19 +21,19 @@ import alert
 
 # a tuple, which we'll pass to the choices argument in various places
 PACER_CODES = (
-    ('ca1',  'United States Court of Appeals for the First Circuit'),
-    ('ca2',  'United States Court of Appeals for the Second Circuit'),
-    ('ca3',  'United States Court of Appeals for the Third Circuit'),
-    ('ca4',  'United States Court of Appeals for the Fourth Circuit'),
-    ('ca5',  'United States Court of Appeals for the Fifth Circuit'),
-    ('ca6',  'United States Court of Appeals for the Sixth Circuit'),
-    ('ca7',  'United States Court of Appeals for the Seventh Circuit'),
-    ('ca8',  'United States Court of Appeals for the Eighth Circuit'),
-    ('ca9',  'United States Court of Appeals for the Ninth Circuit'),
-    ('ca10', 'United States Court of Appeals for the Tenth Circuit'),
-    ('ca11', 'United States Court of Appeals for the Eleventh Circuit'),
-    ('cadc', 'United States Court of Appeals for the D.C. Circuit'),
-    ('cafc', 'United States Court of Appeals for the Federal Circuit'),
+    ('ca1',  'Court of Appeals for the First Circuit'),
+    ('ca2',  'Court of Appeals for the Second Circuit'),
+    ('ca3',  'Court of Appeals for the Third Circuit'),
+    ('ca4',  'Court of Appeals for the Fourth Circuit'),
+    ('ca5',  'Court of Appeals for the Fifth Circuit'),
+    ('ca6',  'Court of Appeals for the Sixth Circuit'),
+    ('ca7',  'Court of Appeals for the Seventh Circuit'),
+    ('ca8',  'Court of Appeals for the Eighth Circuit'),
+    ('ca9',  'Court of Appeals for the Ninth Circuit'),
+    ('ca10', 'Court of Appeals for the Tenth Circuit'),
+    ('ca11', 'Court of Appeals for the Eleventh Circuit'),
+    ('cadc', 'Court of Appeals for the D.C. Circuit'),
+    ('cafc', 'Court of Appeals for the Federal Circuit'),
 )
 
 
