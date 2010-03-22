@@ -1138,7 +1138,7 @@ def getPDFContentWithPython(path):
 
 def getPDFContent(path):
     """Get the contents of a PDF file, and put them in a variable"""
-    
+
     process = subprocess.Popen(
         ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"], shell=False,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -1159,7 +1159,7 @@ def parseCourt(courtID, result):
     courts = ('ca1','ca2','ca3','ca4','ca5','ca6','ca7','ca8','ca9','ca10',
         'ca11','cadc','cafc')
 
-    # select all documents from this jurisdiction that lack plainText (this 
+    # select all documents from this jurisdiction that lack plainText (this
     # achieves duplicate checking.
     selectedDocuments = Document.objects.filter(documentPlainText = "",
         court__courtUUID = courts[courtID-1])
@@ -1253,24 +1253,24 @@ def parse(request, courtID):
     return render_to_response('parse.html', {'result': result})
 
 def viewCases(request, court, case):
-    """Take a court and a caseNameShort, and display what we know about that 
+    """Take a court and a caseNameShort, and display what we know about that
     case.
     """
-    
+
 
     # get the court and citation information
     ct = Court.objects.get(courtUUID = court)
-    
+
     # try looking it up by casename. Failing that, try the caseNumber.
-    try: 
+    try:
         cites = Citation.objects.filter(caseNameShort = case)
         if len(cites) == 0:
             # if we can't find it by case name, try by case number
             cites = Citation.objects.filter(caseNumber = case)
     except:
         pass
-    
-    
+
+
     docs = []
     if len(cites) > 0:
         # get any documents with that citation at that court. If there is more
@@ -1278,14 +1278,10 @@ def viewCases(request, court, case):
         for cite in cites:
             docs.append(Document.objects.get(court = ct, citation = cite))
 
-        for doc in docs:
-            print doc
-        
-        
-        return render_to_response('display_cases.html', {'title': case, 
+        return render_to_response('display_cases.html', {'title': case,
             'docs': docs, 'court': ct})
 
     else:
         # we have no hits, punt
-        return render_to_response('display_cases.html', {'title': case, 
+        return render_to_response('display_cases.html', {'title': case,
             'court': ct})
