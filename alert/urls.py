@@ -14,14 +14,24 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
-from django.conf.urls.defaults import *
 from alert.alertSystem.views import *
+from alert.alertSystem.sitemap import DocumentSitemap
 from alert import settings
+from django.conf.urls.defaults import *
+
+# for the flatfiles in the sitemap
+from django.contrib.sitemaps import FlatPageSitemap
+
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
 admin.autodiscover()
+
+sitemaps = {
+    "Opinion": DocumentSitemap,
+    "Flatfiles": FlatPageSitemap,
+
+}
 
 urlpatterns = patterns('',
     # Example:
@@ -41,10 +51,10 @@ urlpatterns = patterns('',
     (r'^parse/(\d{1,2})/$', parse),
     
     # Sitemap generator
-    #(r'^sitemap\.xml$', 'django.contrib.sitemaps.views.sitemap', {'sitemaps': sitemaps}),
+    (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.sitemap', {'sitemaps': sitemaps}),
     
     # Display a case
-    (r'^(ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc)/(.*)/$', viewCases),
+    url(r'^(ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc)/(.*)/$', viewCases, name="viewCases"),
 
 )
 
