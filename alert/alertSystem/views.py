@@ -1268,6 +1268,7 @@ def viewCases(request, court, case):
             # if we can't find it by case name, try by case number
             cites = Citation.objects.filter(caseNumber = case)
     except:
+        # this is caught in the template, so no worries.
         pass
 
 
@@ -1285,3 +1286,32 @@ def viewCases(request, court, case):
         # we have no hits, punt
         return render_to_response('display_cases.html', {'title': case,
             'court': ct})
+
+def viewDocumentListByCourt(request, court):
+    """Show documents for a court, ten at a time"""
+    from django.core.paginator import Paginator, InvalidPage, EmptyPage
+    if court == "all":
+        # we get all records, sorted by dateFiled.
+        docs = Document.objects.order_by("-dateFiled")
+        ct = "All courts"
+    else:
+        ct = Court.objects.get(courtUUID = court)
+        docs = Document.objects.filter(court = ct).order_by("-dateFiled")
+
+    # we will show ten docs/page
+    paginator = Paginator(docs, 10)
+    
+    # Make sure page request is an int. If not, deliver first page.
+    try:
+        page = int(request.GET.get('page', '1'))
+    except ValueError:
+        page = 1
+    
+    # If page request is out of range, deliver last page of results.
+    try:
+        documents = paginator.page(page)
+    except (EmptyPage, InvalidPage):
+        documents = paginator.page(paginator.num_pages)
+
+    return render_to_response('view_documents_by_court.html', {'title': ct,
+        "documents": documents})
