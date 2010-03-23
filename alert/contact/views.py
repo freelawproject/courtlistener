@@ -19,19 +19,27 @@ from django.core.mail import send_mail
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from alert.contact.forms import ContactForm
+from alert import settings
 
 def contact(request):
     if request.method == 'POST':
         form = ContactForm(request.POST)
-#        return HttpResponseRedirect('/contact/thanks/')
         if form.is_valid():
             cd = form.cleaned_data
+            
+            # pull the email addresses out of the MANAGERS tuple
+            i = 0
+            emailAddys = []
+            while i < len(settings.MANAGERS):
+                emailAddys.append(settings.MANAGERS[i][1])
+                i += 1
+            
+            # send the email to the MANAGERS
             send_mail(
-                "Message from " + cd['name'] + " at dead.org",
+                "Message from " + cd['name'] + " at CourtListener.com",
                 cd['message'],
                 cd.get('email', 'noreply@example.com'),
-                ['mjlissner@gmail.com'],
-            )
+                emailAddys,)
             return HttpResponseRedirect('/contact/thanks/')
     else:
         form = ContactForm()
