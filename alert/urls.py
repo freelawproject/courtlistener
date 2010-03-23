@@ -18,10 +18,13 @@ from alert import settings
 from alert.alertSystem.views import *
 from alert.alertSystem.sitemap import DocumentSitemap
 from alert.contact.views import *
+from alert.userHandling.views import *
 from django.conf.urls.defaults import *
+
 
 # for the flatfiles in the sitemap
 from django.contrib.sitemaps import FlatPageSitemap
+from django.contrib.auth.views import login as signIn
 
 
 # Uncomment the next two lines to enable the admin:
@@ -65,6 +68,10 @@ urlpatterns = patterns('',
     # Contact us pages
     (r'^contact/$', contact),
     (r'^contact/thanks/$', thanks),
+    
+    # Various sign in/out etc. functions
+    (r'^sign-out/$', signOut),
+    (r'^sign-in/$', signIn), # this uses the built in function that is imported above.
 
 )
 

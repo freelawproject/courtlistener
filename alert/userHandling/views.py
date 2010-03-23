@@ -15,4 +15,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-# Create your views here.
+from django.contrib import auth
+from django.shortcuts import HttpResponseRedirect
+
+def signOut(request):
+    """Sign out a user, redirect them to the homepage, and inform them of the 
+    success."""
+    auth.logout(request)
+    '''TODO: add a message here informing of success.'''
+    return HttpResponseRedirect("/")
+
