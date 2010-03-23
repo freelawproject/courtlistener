@@ -31,7 +31,6 @@ admin.autodiscover()
 sitemaps = {
     "Opinion": DocumentSitemap,
     "Flatfiles": FlatPageSitemap,
-
 }
 
 urlpatterns = patterns('',

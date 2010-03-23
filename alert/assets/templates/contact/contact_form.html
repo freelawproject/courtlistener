@@ -31,7 +31,7 @@
                 <label for="id_email">Email</label>
                 {% if form.email.errors %}
                     <span class="errortext">
-                        {% for error in form.name.errors %}
+                        {% for error in form.email.errors %}
                             {{ error|escape }}
                         {% endfor %}
                     </span>

@@ -12,10 +12,10 @@
                 <h3 class="alt"> {{doc.dateFiled|date:"l, F jS, Y"}}</h3>
                 {# Print the whether the document is precedential #}
                 {% ifequal doc.documentType "U" %}
-                    <p><strong>Status:</strong> Non-precedential.<br>
+                    <p><strong>Status:</strong> Non-precedential/Unpublished.<br>
                 {% endifequal %}
                 {% ifequal doc.documentType "P" %}
-                    <p><strong>Status:</strong> Precedential.<br>
+                    <p><strong>Status:</strong> Precedential/Published.<br>
                 {% endifequal %}            
 
                 <strong>Download:</strong> <a href="http://courtlistener.com/{{doc.local_path}}">From our server</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="{{ doc.download_URL }}">From the court</a><br>
