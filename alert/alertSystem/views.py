@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+
+"""TODO: place these imports intelligently throughout the functions"""
 from alert.alertSystem.models import *
 from alert import settings
 from alert.alertSystem.titlecase import titlecase
@@ -21,6 +23,7 @@ from django.http import HttpResponse, Http404
 from django.core.files import File
 from django.core.files.base import ContentFile
 from django.shortcuts import render_to_response
+from django.template import RequestContext
 import datetime, hashlib, re, StringIO, subprocess, urllib, urllib2
 from BeautifulSoup import BeautifulSoup
 from lxml.html import fromstring
@@ -1114,26 +1117,7 @@ def scrapeCourt(courtID, result):
             i += 1
 
         return result
-
-
-"""
-def getPDFContentWithPython(path):
-    #This function is currrently unused, but I'm keeping it around until we
-    #know that it's not the way to do it. I am switching to pdftotext because it
-    #produces cleaner results
-
-    import pyPdf
-    content = ""
-    # Load PDF into pyPDF
-    pdf = pyPdf.PdfFileReader(file(path, "rb"))
-    # Iterate pages
-    for i in range(0, pdf.getNumPages()):
-        # Extract text from page and add to content
-        content += pdf.getPage(i).extractText() + "\n"
-    # Collapse whitespace
-    content = " ".join(content.replace(u"\xa0", " ").strip().split())
-    return content
-"""
+    
 
 
 def getPDFContent(path):
@@ -1250,7 +1234,7 @@ def parse(request, courtID):
         # if debug is not set to True, we don't display useful stuff.
         result = ["Done."]
 
-    return render_to_response('parse.html', {'result': result})
+    return render_to_response('parse.html', {'result': result}, RequestContext(request))
 
 def viewCases(request, court, case):
     """Take a court and a caseNameShort, and display what we know about that
@@ -1280,12 +1264,12 @@ def viewCases(request, court, case):
             docs.append(Document.objects.get(court = ct, citation = cite))
 
         return render_to_response('display_cases.html', {'title': case,
-            'docs': docs, 'court': ct})
+            'docs': docs, 'court': ct}, RequestContext(request))
 
     else:
         # we have no hits, punt
         return render_to_response('display_cases.html', {'title': case,
-            'court': ct})
+            'court': ct}, RequestContext(request))
 
 def viewDocumentListByCourt(request, court):
     """Show documents for a court, ten at a time"""
@@ -1314,4 +1298,8 @@ def viewDocumentListByCourt(request, court):
         documents = paginator.page(paginator.num_pages)
 
     return render_to_response('view_documents_by_court.html', {'title': ct,
-        "documents": documents})
+        "documents": documents}, RequestContext(request))
+
+def home(request):
+    """Show the homepage"""
+    return render_to_response('home_page.html', {}, RequestContext(request))

@@ -14,14 +14,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render_to_response
+from django.template import RequestContext
 
-from django.contrib import auth
-from django.shortcuts import HttpResponseRedirect
-
-def signOut(request):
-    """Sign out a user, redirect them to the homepage, and inform them of the 
-    success."""
-    auth.logout(request)
-    '''TODO: add a message here informing of success.'''
-    return HttpResponseRedirect("/")
+@login_required
+def viewAlerts(request):
+    return render_to_response('profile/alerts.html', {}, 
+        RequestContext(request))
 

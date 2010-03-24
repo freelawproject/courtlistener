@@ -30,6 +30,7 @@ FREQUENCY = (
 # a class where alerts are held/handled.
 class Alert(models.Model):
     alertUUID = models.AutoField("a unique ID for each alert", primary_key=True)
+    alertName = models.CharField("a name for the alert", max_length=75)
     alertText = models.CharField("the text of an alert created by a user",
         max_length=200)
     alertFrequency = models.CharField("the rate chosen by the user for the alert",
@@ -41,8 +42,7 @@ class Alert(models.Model):
         default=False)
     lastHitDate = models.DateTimeField("the exact date and time stamp that the alert last sent an email",
         blank=True,
-        null=True,
-        editable=False)
+        null=True)
 
     def __unicode__(self):
         return "Alert " + str(self.alertUUID) + ": " + self.alertText

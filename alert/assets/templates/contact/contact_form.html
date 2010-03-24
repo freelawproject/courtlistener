@@ -13,7 +13,7 @@
             </div>
         {% endif %}
 
-        <form action"" method="post">
+        <form action"" method="post">{% csrf_token %}
             <p>
                 <label for="id_name">Name</label>
                 {% if form.name.errors %}

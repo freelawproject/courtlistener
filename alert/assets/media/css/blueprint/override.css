@@ -51,4 +51,13 @@ a:hover, a:focus {
     color: #8a1f11;
 }
 
+.header > h1 > a {
+    text-decoration: none;
+    color: black;
+}
+
+.header > h3 > a {
+    color: black;
+}
+
 
