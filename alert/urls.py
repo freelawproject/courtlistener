@@ -24,7 +24,7 @@ from django.conf.urls.defaults import *
 
 # for the flatfiles in the sitemap
 from django.contrib.sitemaps import FlatPageSitemap
-from django.contrib.auth.views import login as signIn
+from django.contrib.auth.views import login as signIn, logout as signOut
 
 
 # Uncomment the next two lines to enable the admin:
@@ -69,9 +69,17 @@ urlpatterns = patterns('',
     (r'^contact/$', contact),
     (r'^contact/thanks/$', thanks),
     
-    # Various sign in/out etc. functions
+    # Various sign in/out etc. functions as provided by django
     (r'^sign-out/$', signOut),
-    (r'^sign-in/$', signIn), # this uses the built in function that is imported above.
+    (r'^sign-in/$', signIn),
+    
+    # Homepage!
+    (r'^$', home),
+    
+    # Settings pages
+#    (r'^profile/settings/$', viewSettings),
+    (r'^profile/alerts/$', viewAlerts),
+#    (r'^profile/password/change/$', changePassword),
 
 )
 

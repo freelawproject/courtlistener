@@ -14,24 +14,38 @@
     <body>
         <div class="container">            
             {% block header %}
-                <div class="span-15" id="header">
-                    <h1>CourtListener</h1>                
+                <div class="span-15 header" id="header">
+                    <h1><a href="/">CourtListener</a></h1>                
                 </div>
             {% endblock %}            
 
 
             {% block headerLinks %}            
-                <div class="span-9 last">
-                    <div class="navigation box round-bottom">
-                        <ul>
-                            <li><a href="/search/">Search</a></li>
-                            <li><a href="/opinions/all/">Opinions</a></li>
-                            <li><a href="/profile/alerts/">Alerts</a></li>
-                            <li><a href="/profile/settings/">Settings</a></li>
-                            <li><a href="/sign-out/">Sign out</a></li>
-                        </ul>
+                {% if user.is_authenticated %}
+                    <div class="span-9 last">
+                        <div class="navigation box round-bottom">
+                            <ul>
+                                <li><a href="/search/">Search</a></li>
+                                <li><a href="/opinions/all/">Opinions</a></li>
+                                <li><a href="/profile/alerts/">Alerts</a></li>
+                                <li><a href="/profile/settings/">Settings</a></li>
+                                <li><a href="/sign-out/">Sign out</a></li>
+                            </ul>
+                        </div>
                     </div>
-                </div>
+                {% else %}
+                    <div class="span-9 last">
+                        <div class="navigation box round-bottom">
+                            <ul>
+                                <li><a href="/about/">About</a><li>
+                                <li><a href="/search/">Search</a></li>
+                                <li><a href="/opinions/all">Opinions</a></li>
+                                <li><a href="/register/">Register</a></li>
+                                <li><a href="/sign-in/">Sign in</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                {% endif %}
             {% endblock %}
             
             <hr>
