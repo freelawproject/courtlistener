@@ -6,27 +6,23 @@
     <div class="span-18 colborder">
         <h2>Create alerts. Search for opinions. Browse our corpus.</h2>
         <h3 class="alt">We follow the courts so you don't have to.</h3><br><br>
-        <form>
+        {% if form.errors %}
+            {# there is only one possible error #}
+            <div class="span-8">
+                <div class="error">
+                    <p class="bottom">Please be sure to make a query</p>
+                </div>
+            </div>
+            <div class="span-10 last">&nbsp;</div>
+        {% endif %}
+        <div class="span-17">
             <h4 class="bottom">Search our corpus of circuit court opinions:</h4>
-                {% if form.errors %}
-                    {# there are two possible errors:
-                        - no input
-                        - input greater than 200 characters #}
-                    <div class="span-10">
-                        <div class="error">
-                            <p class="bottom">There were errors with your submission.</p>
-                            {% form.errors %}
-                        </div>
-                        <div class="span-14 last">&nbsp;</div>
-                    </div>
-                {% endif %}
-                <form action="" method="get">{% csrf_token %}
-                    <input class="title" name="search" id="search">&nbsp;&nbsp;
-                    <button type="submit" class="button title" name="search">Search</button>
-                    <button type="submit" class="button title" name="alert">Create alert</button>
-                </form>
-                <a href="/search/advanced-techniques/" class="bottom">Advanced</a><p></p>
-            </p>
-        </form>
+            <form action="" method="get">
+                <input class="title" name="q" id="search">&nbsp;&nbsp;
+                <button type="submit" class="button title" name="search">Search</button>
+                <button type="submit" class="button title" name="alert">Preview alert</button>
+            </form>
+            <a href="/search/advanced-techniques/" class="bottom">Advanced</a><p></p>
+        </div>
     </div>
 {% endblock %}

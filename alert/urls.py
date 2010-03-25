@@ -90,9 +90,9 @@ urlpatterns = patterns('',
 
     # Alert/search pages
     #(r'^(search|alert)/advanced-techniques/$'), ???)
-    #(r'^alert/preview/$', ???)
+    (r'^(alert/preview)/$', showResults),
     #(r'^alert/edit/(\d{1,6})/$', ???)
-    #(r'^search/results/$', ???)
+    (r'^(search/results)/$', showResults),
     
 )
 
