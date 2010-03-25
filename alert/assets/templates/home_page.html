@@ -8,10 +8,23 @@
         <h3 class="alt">We follow the courts so you don't have to.</h3><br><br>
         <form>
             <h4 class="bottom">Search our corpus of circuit court opinions:</h4>
-                <input class="title" name="search" id="search">&nbsp;&nbsp;
-                <button type="submit" class="button title" name="search">Search</button>
-                <button type="submit" class="button title" name="alert">Create alert</button>
-                <br>
+                {% if form.errors %}
+                    {# there are two possible errors:
+                        - no input
+                        - input greater than 200 characters #}
+                    <div class="span-10">
+                        <div class="error">
+                            <p class="bottom">There were errors with your submission.</p>
+                            {% form.errors %}
+                        </div>
+                        <div class="span-14 last">&nbsp;</div>
+                    </div>
+                {% endif %}
+                <form action="" method="get">{% csrf_token %}
+                    <input class="title" name="search" id="search">&nbsp;&nbsp;
+                    <button type="submit" class="button title" name="search">Search</button>
+                    <button type="submit" class="button title" name="alert">Create alert</button>
+                </form>
                 <a href="/search/advanced-techniques/" class="bottom">Advanced</a><p></p>
             </p>
         </form>

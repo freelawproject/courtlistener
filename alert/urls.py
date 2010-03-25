@@ -14,13 +14,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# imports of local settings and views
 from alert import settings
 from alert.alertSystem.views import *
 from alert.alertSystem.sitemap import DocumentSitemap
 from alert.contact.views import *
+from alert.search.views import *
 from alert.userHandling.views import *
-from django.conf.urls.defaults import *
 
+# needed to make urls work
+from django.conf.urls.defaults import *
 
 # for the flatfiles in the sitemap
 from django.contrib.sitemaps import FlatPageSitemap

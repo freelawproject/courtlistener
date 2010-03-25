@@ -68,19 +68,10 @@ def viewSettings(request):
         
         try:
             userProfile = request.user.get_profile()
-            employer = userProfile.employer
-            bar_memberships = userProfile.barmembership.all()
-            location = userProfile.location
-            plaintextPreferred = userProfile.plaintextPreferred
-            wantsNewsletter = userProfile.wantsNewsletter
-            profileForm = ProfileForm(
-            initial = {'employer': employer, 'barmembership' : bar_memberships,
-                'location': location, 'plaintextPreferred': plaintextPreferred,
-                'wantsNewsletter': wantsNewsletter}
-           )
+            profileForm = ProfileForm(instance = userProfile)
         except:
             # if no userProfile exists yet (cause the user hasn't created one) do this
-            profileForm = ProfileForm()
+            profileForm = ProfileForm(instance = request.user)
 
 
     return render_to_response('profile/settings.html', {'profileForm': profileForm, 

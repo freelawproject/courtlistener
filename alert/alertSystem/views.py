@@ -1299,7 +1299,3 @@ def viewDocumentListByCourt(request, court):
 
     return render_to_response('view_documents_by_court.html', {'title': ct,
         "documents": documents}, RequestContext(request))
-
-def home(request):
-    """Show the homepage"""
-    return render_to_response('home_page.html', {}, RequestContext(request))
