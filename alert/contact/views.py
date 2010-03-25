@@ -46,10 +46,15 @@ def contact(request):
             return HttpResponseRedirect('/contact/thanks/')
     else:
         # the form is loading for the first time
-        email_addy = request.user.email
-        full_name = request.user.get_full_name()
-        form = ContactForm(
-            initial = {'name': full_name, 'email': email_addy})
+        try:
+            email_addy = request.user.email
+            full_name = request.user.get_full_name()
+            form = ContactForm(
+                initial = {'name': full_name, 'email': email_addy})
+        except:
+            # for anonymous users, who lack full_names, and emails
+            form = ContactForm()
+            
     return render_to_response('contact/contact_form.html', {'form': form}, RequestContext(request))
 
 
