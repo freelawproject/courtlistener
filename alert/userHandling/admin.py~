@@ -15,11 +15,22 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from django import forms
+from django.contrib import admin
+from django.contrib.auth.models import User
+from alert.userHandling.models import *
+admin.autodiscover()
 
-class ContactForm(forms.Form):
-    name = forms.CharField()
-    email = forms.EmailField(required=False)
-    subject = forms.CharField(max_length=150)
-    message = forms.CharField(widget=forms.Textarea, min_length=20)
+class UserProfileInline(admin.TabularInline):
+    model = UserProfile
 
+
+class UserAdmin(admin.ModelAdmin):
+    inlines = [UserProfileInline, ]
+
+
+admin.site.register(Alert)
+admin.site.register(BarMembership)
+#admin.site.register(UserProfile)
+# Unregister the built in user admin and register the custom User admin with UserProfile
+admin.site.unregister(User)
+admin.site.register(User, UserAdmin)

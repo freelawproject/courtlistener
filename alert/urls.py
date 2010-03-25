@@ -24,7 +24,8 @@ from django.conf.urls.defaults import *
 
 # for the flatfiles in the sitemap
 from django.contrib.sitemaps import FlatPageSitemap
-from django.contrib.auth.views import login as signIn, logout as signOut
+from django.contrib.auth.views import login as signIn, logout as signOut, \
+    password_change, password_change_done
 
 
 # Uncomment the next two lines to enable the admin:
@@ -77,10 +78,18 @@ urlpatterns = patterns('',
     (r'^$', home),
     
     # Settings pages
-#    (r'^profile/settings/$', viewSettings),
+    (r'^profile/settings/$', viewSettings),
     (r'^profile/alerts/$', viewAlerts),
 #    (r'^profile/password/change/$', changePassword),
+    (r'^profile/password/change/$', password_change, {'template_name': 'profile/password_form.html'}),
+    (r'^profile/password/change/$', password_change_done, {'template_name': 'profile/password_form.html'})
 
+    # Alert/search pages
+    #(r'^(search|alert)/advanced-techniques/$'), ???)
+    #(r'^alert/preview/$', ???)
+    #(r'^alert/edit/(\d{1,6})/$', ???)
+    #(r'^search/results/$', ???)
+    
 )
 
 # if it's not the production site, serve the static files this way.
