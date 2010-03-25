@@ -72,102 +72,83 @@
     </div>
 {% endblock %}
 
-<!--{% block sidebared %}-->
-<!--    <div class="span-5 last" id="sidebar">-->
-<!--        <h3>Browse other courts</h3>-->
-<!--        <p>-->
-<!--            <a href="/opinions/all/">All opinions</a><br>-->
-<!--            <a href="/opinions/ca1/">First circuit</a><br>-->
-<!--            <a href="/opinions/ca2/">Second circuit</a><br>-->
-<!--            <a href="/opinions/ca3/">Third circuit</a><br>-->
-<!--            <a href="/opinions/ca4/">Fourth circuit</a><br>-->
-<!--            <a href="/opinions/ca5/">Fifth circuit</a><br>-->
-<!--            <a href="/opinions/ca6/">Sixth circuit</a><br>-->
-<!--            <a href="/opinions/ca7/">Seventh circuit</a><br>-->
-<!--            <a href="/opinions/ca8/">Eighth circuit</a><br>-->
-<!--            <a href="/opinions/ca9/">Ninth circuit</a><br>-->
-<!--            <a href="/opinions/ca10/">Tenth circuit</a><br>-->
-<!--            <a href="/opinions/ca11/">Eleventh circuit</a><br>-->
-<!--            <a href="/opinions/cadc/">D.C. circuit</a><br>-->
-<!--            <a href="/opinions/cafc/">Federal circuit</a>-->
-<!--        </p>-->
-<!--    </div>-->
-<!--{% endblock %}-->
 
-
-<!--{% block contented %}-->
-<!--    <div class="span-18 colborder" id="content">-->
-<!--        <h2>CourtListener.com / Results</h2>-->
-<!--        -->
-<!--        {% if form.errors %}-->
-<!--            <div class="span-18">-->
-<!--                <div class="span-10 error">-->
-<!--                    <p class="bottom">There were errors with your submission.</p>-->
-<!--                </div>-->
-<!--                <div class="span-7 last">&nbsp;</div>-->
-<!--            </div>-->
-<!--        {% endif %}-->
-
-<!--        <form action"" method="post">{% csrf_token %}-->
-<!--            <p>-->
-<!--                <label for="id_name">Name</label>-->
-<!--                {% if form.name.errors %}-->
-<!--                    <span class="errortext">-->
-<!--                        {% for error in form.name.errors %}-->
-<!--                            {{ error|escape }}  -->
-<!--                        {% endfor %}-->
-<!--                    </span>-->
-<!--                {% endif %}<br>-->
-<!--                {{ form.name }}-->
-<!--            </p>-->
-<!--            -->
-<!--            -->
-<!--            <p>-->
-<!--                <label for="id_email">Email (optional)</label>-->
-<!--                {% if form.email.errors %}-->
-<!--                    <span class="errortext">-->
-<!--                        {% for error in form.email.errors %}-->
-<!--                            {{ error|escape }}-->
-<!--                        {% endfor %}-->
-<!--                    </span>-->
-<!--                {% endif %}<br>-->
-<!--                {{ form.email }}-->
-<!--            </p>-->
-<!--            -->
-<!--            -->
-<!--            <p>-->
-<!--                <label for="id_subject">Subject</label>-->
-<!--                {% if form.subject.errors %}-->
-<!--                    <span class="errortext">-->
-<!--                        {% for error in form.subject.errors %}-->
-<!--                            {{ error|escape }}-->
-<!--                        {% endfor %}-->
-<!--                    </span>-->
-<!--                {% endif %}<br>-->
-<!--                {{ form.subject }}-->
-<!--            </p>-->
-<!--            -->
-<!--            -->
-<!--            <p>-->
-<!--                <label for="id_message">Message</label>-->
-<!--                {% if form.message.errors %}-->
-<!--                    <span class="errortext">-->
-<!--                        {% for error in form.message.errors %}-->
-<!--                            {{ error|escape }}-->
-<!--                        {% endfor %}-->
-<!--                    </span>-->
-<!--                {% endif %}<br>-->
-<!--                {{ form.message }}-->
-<!--            </p>-->
-<!--          <button type="submit" class="button">Send message</button>-->
-<!--        </form>-->
-<!--    </div>-->
-<!--{% endblock %}-->
-
-{% if queryType == "alert" %}
-    {% block sidebar %}
+{% block sidebar %}
+    {% if queryType == "alert" and user.is_authenticated %}
         {# the form that will appear if somebody clicked "create alert" rather than "search". #}
+        <h3>Save this alert</h3>
+        {% if alertForm.errors %}
+            <div class="span-4 error">
+                <p class="bottom">Please fix the errors below.</p>
+            </div>
+        {% endif %}
         
-        
-    {% endblock %}
-{% endif %}
+        <form action="" method="post">{% csrf_token %}
+            <p>
+                <label for="id_alertText">Alert query</label>
+                {% if alertForm.alertText.errors %}
+                    <br><span class="errortext">
+                        {% for error in alertForm.alertText.errors %}
+                            {{ error|escape }}  
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ alertForm.alertText }}
+            </p>
+
+            <p>
+                <label for="id_alertName">Give the alert a name</label>
+                {% if alertForm.alertName.errors %}
+                    <br><span class="errortext">
+                        {% for error in alertForm.alertName.errors %}
+                            {{ error|escape }}  
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ alertForm.alertName }}
+            </p>
+
+            <p>
+                <label for="id_alertFrequency">How often should we notify you</label>
+                {% if alertForm.alertFrequency.errors %}
+                    <br><span class="errortext">
+                        {% for error in alertForm.alertFrequency.errors %}
+                            {{ error|escape }}  
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ alertForm.alertFrequency }}
+            </p>
+            <p>
+                {{ alertForm.alertPrivacy }}
+                <label for="id_alertPrivacy">This alert is private</label>
+                {% if alertForm.alertPrivacy.errors %}
+                    <span class="errortext">
+                        {% for error in alertForm.alertPrivacy.errors %}
+                            {{ error|escape }}  
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+
+            </p>
+            <p>
+                {{ alertForm.sendNegativeAlert }}
+                <label for="id_alertName">Send me alerts even when there are no hits</label>
+                {% if alertForm.sendNegativeAlert.errors %}
+                    <span class="errortext">
+                        {% for error in alertForm.sendNegativeAlert.errors %}
+                            {{ error|escape }}  
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+            </p>
+            <button type="submit" class="button title" name="alertSave">Save alert</button>
+        </form>   
+    {% endif %}
+    {% if not user.is_authenticated %}
+        <h3>Save this alert</h3>
+        <p>To save this alert, you need to <a href="/sign-in/">sign in</a> or 
+            <a href="/register/">register</a> as a new user.</p>
+    {% endif %}
+{% endblock %}
+

@@ -56,6 +56,7 @@ def viewSettings(request):
             return HttpResponseRedirect('/profile/settings/')
         
     else:
+        # TODO: This could be made neater with the instance variable.
         # the form is loading for the first time
         # first, we get the stuff from the user form
         user = request.user
