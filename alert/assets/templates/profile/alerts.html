@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}CourtListener.com / Profile / Alerts{% endblock %}
+
+{% block content %}
+    <div class="span-24 last">
+        <h2>Settings / Alerts</h2>
+        <div class="span-6 box round header">
+            <h3 class="bottom">
+                <a href="/profile/settings/">Account</a>&nbsp;&nbsp;&nbsp;<a href="/profile/alerts/"><strong>Alerts</strong></a>&nbsp;&nbsp;&nbsp;<a href="/profile/password/change">Password</a>
+            </h3>
+        </div>
+    </div>
+    <div class="span-24 last" id="content">
+        {% if user.get_profile.alert.all %}
+            <table>
+                <tr>
+                    <th>Query name</th>
+                    <th>Query</th>
+                    <th>Frequency</th>
+                    <th>Last hit</th>
+                    <th>Private</th>
+                </tr>
+                {% for alert in user.get_profile.alert.all %}
+                <tr>
+                    <td>{{ alert.alertName|capfirst|truncatewords:"6" }}</td>
+                    <td>{{ alert.alertText|truncatewords:"14" }}</td>
+                    <td>{{ alert.get_alertFrequency_display }}</td>
+                    <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"None" }}</td>
+                    <td>{{ alert.alertPrivacy|yesno:"Yes,No" }}</td>
+                    <td><a href="/alert/edit/{{ alert.alertUUID }}/">Edit</a></td>
+                </tr>
+                {% endfor %}
+            </table>
+            <form action="/" method="post">{% csrf_token %}
+            <button type="submit" class="button">Make new alert</button>
+        {% else %}
+            <h3>You haven't made any alerts.</h3>
+            <form action="/" method="post">{% csrf_token %}
+            <button type="submit" class="button">Make new alert</button>
+        {% endif %}
+    </div>
+{% endblock %}

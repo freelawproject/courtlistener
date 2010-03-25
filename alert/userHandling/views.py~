@@ -97,8 +97,7 @@ def changePassword(request):
         if form.is_valid():
             cd = form.cleaned_data
             
-            
-            
+            #do stuff...
             return HttpResponseRedirect('/profile/password/change')
     else:
         # the form is loading for the first time

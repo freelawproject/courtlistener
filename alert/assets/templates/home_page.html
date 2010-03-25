@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}CourtListener.com / Home{% endblock %}
+
+{% block content %}
+    <div class="span-18 colborder">
+        <h2>Create alerts. Search for opinions. Browse our corpus.</h2>
+        <h3 class="alt">We follow the courts so you don't have to.</h3><br><br>
+        <form>
+            <h4 class="bottom">Search our corpus of circuit court opinions:</h4>
+                <input class="title" name="search" id="search">&nbsp;&nbsp;
+                <button type="submit" class="button title" name="search">Search</button>
+                <button type="submit" class="button title" name="alert">Create alert</button>
+                <br>
+                <a href="/search/advanced-techniques/" class="bottom">Advanced</a><p></p>
+            </p>
+        </form>
+    </div>
+{% endblock %}

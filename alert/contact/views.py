@@ -21,6 +21,7 @@ from django.shortcuts import render_to_response
 from django.template import RequestContext
 from alert.contact.forms import ContactForm
 from alert import settings
+from django.contrib import auth
 
 def contact(request):
     if request.method == 'POST':
@@ -41,9 +42,14 @@ def contact(request):
                 cd['message'],
                 cd.get('email', 'noreply@example.com'),
                 emailAddys,)
+            # we must redirect after success to avoid problems with people using the refresh button.
             return HttpResponseRedirect('/contact/thanks/')
     else:
-        form = ContactForm()
+        # the form is loading for the first time
+        email_addy = request.user.email
+        full_name = request.user.get_full_name()
+        form = ContactForm(
+            initial = {'name': full_name, 'email': email_addy})
     return render_to_response('contact/contact_form.html', {'form': form}, RequestContext(request))
 
 

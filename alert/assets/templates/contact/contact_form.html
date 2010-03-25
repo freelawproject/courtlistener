@@ -1,5 +1,7 @@
 {% extends "base.html" %} 
 
+{% block title %} CourtListener.com / Contact {% endblock %}
+
 {% block content %}
     <div class="span-18 colborder" id="content">
         <h2>Contact Us</h2>
@@ -28,7 +30,7 @@
             
             
             <p>
-                <label for="id_email">Email</label>
+                <label for="id_email">Email (optional)</label>
                 {% if form.email.errors %}
                     <span class="errortext">
                         {% for error in form.email.errors %}
@@ -38,6 +40,20 @@
                 {% endif %}<br>
                 {{ form.email }}
             </p>
+            
+            
+            <p>
+                <label for="id_subject">Subject</label>
+                {% if form.subject.errors %}
+                    <span class="errortext">
+                        {% for error in form.subject.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.subject }}
+            </p>
+            
             
             <p>
                 <label for="id_message">Message</label>

@@ -16,10 +16,24 @@
 
 
 from django import forms
+from django.forms import ModelForm
+from django.contrib.auth.models import User
+from alert.userHandling.models import UserProfile
 
-class ContactForm(forms.Form):
-    name = forms.CharField()
-    email = forms.EmailField(required=False)
-    subject = forms.CharField(max_length=150)
-    message = forms.CharField(widget=forms.Textarea, min_length=20)
+class ProfileForm(ModelForm):
+    class Meta:
+        model = UserProfile
+        exclude = ('user',)
 
+        
+class UserForm(ModelForm):
+    email = forms.EmailField(required=True)
+    class Meta:
+        model = User
+        # If these aren't excluded, they throw errors or get reset to default. 
+        # Either is BAD, BAD, BAD
+        exclude = ('username', 'password', 'last_login', 'date_joined',
+            'is_staff', 'is_active', 'is_superuser', 'groups', 'user_permissions',)
+            
+class pwdChangeForm(forms.Form):
+    pwd = forms.
