@@ -60,7 +60,7 @@ class BarMembership(models.Model):
     barMembership = USStateField("the two letter state abbreviation of a bar membership")
 
     def __unicode__(self):
-        return str(self.barMembershipUUID)
+        return self.get_barMembership_display()
 
     class Meta:
         verbose_name = "bar membership"
