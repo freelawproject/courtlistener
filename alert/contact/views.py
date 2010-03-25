@@ -60,4 +60,3 @@ def contact(request):
 
 def thanks(request):
     return render_to_response('contact/contact_thanks.html', {}, RequestContext(request))
-

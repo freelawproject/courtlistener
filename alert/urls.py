@@ -80,9 +80,10 @@ urlpatterns = patterns('',
     # Settings pages
     (r'^profile/settings/$', viewSettings),
     (r'^profile/alerts/$', viewAlerts),
-#    (r'^profile/password/change/$', changePassword),
     (r'^profile/password/change/$', password_change, {'template_name': 'profile/password_form.html'}),
-    (r'^profile/password/change/$', password_change_done, {'template_name': 'profile/password_form.html'})
+    (r'^profile/password/change/$', password_change_done, {'template_name': 'profile/password_form.html'}),
+    (r'^profile/delete/$', deleteProfile),
+    (r'^profile/delete/done/$', deleteProfileDone),
 
     # Alert/search pages
     #(r'^(search|alert)/advanced-techniques/$'), ???)

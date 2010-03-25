@@ -86,21 +86,30 @@ def viewSettings(request):
     return render_to_response('profile/settings.html', {'profileForm': profileForm, 
         'userForm': userForm}, RequestContext(request))
 
-     
+
 @login_required
-def changePassword(request):
-    # import the change from from auth (thanks django)
-    from django.contrib.auth.forms import PasswordChangeForm
+def deleteProfile(request):
     if request.method == 'POST':
-        form = PasswordChangeForm(request.POST)
-        if form.is_valid():
-            cd = form.cleaned_data
-            
-            
-            
-            return HttpResponseRedirect('/profile/password/change')
-    else:
-        # the form is loading for the first time
-        form = PasswordChangeForm(request.user)
-    return render_to_response('profile/password_form.html', {'form': form},
-        RequestContext(request))
+        # Gather their foreign keys, delete those, then delete their profile and user info
+        try:
+            # they may not have a userProfile
+            userProfile = request.user.get_profile()    
+
+            alerts = userProfile.alert.all()
+            for alert in alerts:
+                alert.delete()
+                
+            userProfile.delete()
+        except:
+            pass
+        
+        request.user.delete()
+        
+        return HttpResponseRedirect('/profile/delete/done')
+    
+    
+    return render_to_response('profile/delete.html', {}, RequestContext(request))
+        
+
+def deleteProfileDone(request):
+    return render_to_response('profile/deleted.html', {}, RequestContext(request))
