@@ -111,9 +111,9 @@ def editAlert(request, alertID):
     except:
         return HttpResponseRedirect('/')
     
-    # check if the user can edit this, or if they are urlhacking...
+    # check if the user can edit this, or if they are url hacking...
     for alert in user.alert.all():
-        if int(alertID) == alert.alertUUID:
+        if alertID == alert.alertUUID:
             # they can edit it
             canEdit = True
             # pull it from the DB
@@ -126,7 +126,7 @@ def editAlert(request, alertID):
         # we just send them home, they can continue playing
         return HttpResponseRedirect('/')
     
-    elif canEdit == True:
+    elif canEdit:
         # they can edit the item, therefore, we load the form.
         if request.method == 'POST':
             form = CreateAlertForm(request.POST)
@@ -144,4 +144,33 @@ def editAlert(request, alertID):
             # the form is loading for the first time
             form = CreateAlertForm(instance = alert)
         
-        return render_to_response('profile/edit_alert.html', {'form': form}, RequestContext(request))
+        return render_to_response('profile/edit_alert.html', {'form': form, 'alertID': alertID}, RequestContext(request))
+
+@login_required
+def deleteAlert(request, alertID):
+    user = request.user.get_profile()
+    
+    try:
+        alertID = int(alertID)
+    except:
+        return HttpResponseRedirect('/')
+    
+    # check if the user can edit this, or if they are url hacking...
+    for alert in user.alert.all():
+        if alertID == alert.alertUUID:
+            # they can edit it
+            canEdit = True
+            # pull it from the DB
+            alert = Alert.objects.get(alertUUID = alertID)
+            break
+        else:
+            canEdit = False
+    
+    if canEdit == False:
+        # we send them home
+        return HttpResponseRedirect('/')
+    
+    elif canEdit:
+        # Then we delete it, and redirect them.
+        alert.delete()
+        return HttpResponseRedirect('/profile/alerts/')

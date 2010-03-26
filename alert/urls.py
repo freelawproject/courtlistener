@@ -91,9 +91,9 @@ urlpatterns = patterns('',
     # Alert/search pages
     #(r'^(search|alert)/advanced-techniques/$'), ???)
     (r'^(alert/preview)/$', showResults),
-    (r'^alert/edit/(\d{1,6})/$', editAlert),
     (r'^(search/results)/$', showResults),
-    
+    (r'^alert/edit/(\d{1,6})/$', editAlert),
+    (r'^alert/delete/(\d{1,6})/$', deleteAlert),    
 )
 
 # if it's not the production site, serve the static files this way.
