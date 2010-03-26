@@ -87,6 +87,9 @@ urlpatterns = patterns('',
     (r'^profile/password/change/$', password_change_done, {'template_name': 'profile/password_form.html'}),
     (r'^profile/delete/$', deleteProfile),
     (r'^profile/delete/done/$', deleteProfileDone),
+    (r'^register/$', register),
+    (r'^register/success/$', registerSuccess),
+#    (r'^register/success/$', signIn, {'template_name': 'profile/register_success.html'}), # this uses django's built in template
 
     # Alert/search pages
     #(r'^(search|alert)/advanced-techniques/$'), ???)

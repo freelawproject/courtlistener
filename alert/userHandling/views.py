@@ -86,7 +86,7 @@ def deleteProfile(request):
         try:
             # they may not have a userProfile
             userProfile = request.user.get_profile()    
-
+            
             alerts = userProfile.alert.all()
             for alert in alerts:
                 alert.delete()
@@ -105,3 +105,31 @@ def deleteProfile(request):
 
 def deleteProfileDone(request):
     return render_to_response('profile/deleted.html', {}, RequestContext(request))
+    
+def register(request):
+    """allow an anonymous user to register"""
+    from django.contrib.auth.forms import UserCreationForm
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            cd = form.cleaned_data
+            
+            new_user = form.save()
+            username = str(cd['username'])
+            print "username is: " + username
+            password = str(cd['password1'])
+            print "password is: " + password
+#            return HttpResponseRedirect('/register/success/')
+            return render_to_response("profile/register_success.html", 
+                {'form': form, 'username': username, 'password': password}, 
+                RequestContext(request))
+            
+    else:
+        form = UserCreationForm()
+    return render_to_response("profile/register.html", {'form': form}, RequestContext(request))
+
+def registerSuccess(request):
+    """provide the new user with a pre-completed form they can click to sign in"""
+#    if request.method == 'POST':
+#        form = authentication_form(data=request.POST)
+    return render_to_response('profile/register_success.html', {}, RequestContext(request))

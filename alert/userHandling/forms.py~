@@ -35,5 +35,3 @@ class UserForm(ModelForm):
         exclude = ('username', 'password', 'last_login', 'date_joined',
             'is_staff', 'is_active', 'is_superuser', 'groups', 'user_permissions',)
             
-class pwdChangeForm(forms.Form):
-    pwd = forms.

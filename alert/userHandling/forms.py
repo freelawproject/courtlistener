@@ -34,4 +34,4 @@ class UserForm(ModelForm):
         # Either is BAD, BAD, BAD
         exclude = ('username', 'password', 'last_login', 'date_joined',
             'is_staff', 'is_active', 'is_superuser', 'groups', 'user_permissions',)
-            
+
