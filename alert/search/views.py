@@ -24,7 +24,6 @@ from alert.userHandling.models import Alert
 
 def home(request):
     """Show the homepage"""
-    print request.GET
     if "q" in request.GET:
         # using get because that way users can email queries (a good thing)
         form = SearchForm(request.GET)
@@ -115,14 +114,12 @@ def editAlert(request, alertID):
     # check if the user can edit this, or if they are urlhacking...
     for alert in user.alert.all():
         if int(alertID) == alert.alertUUID:
-            print str(alertID) + " is equal to " + str(alert.alertUUID)
             # they can edit it
             canEdit = True
             # pull it from the DB
             alert = Alert.objects.get(alertUUID = alertID)
             break
         else:
-            print str(alertID) + " is not equal to " + str(alert.alertUUID)
             canEdit = False
             
     if canEdit == False:
