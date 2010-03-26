@@ -126,10 +126,5 @@ def register(request):
             
     else:
         form = UserCreationForm()
-    return render_to_response("profile/register.html", {'form': form}, RequestContext(request))
-
-def registerSuccess(request):
-    """provide the new user with a pre-completed form they can click to sign in"""
-#    if request.method == 'POST':
-#        form = authentication_form(data=request.POST)
-    return render_to_response('profile/register_success.html', {}, RequestContext(request))
+    return render_to_response("profile/register.html", {'form': form}, 
+        RequestContext(request))
