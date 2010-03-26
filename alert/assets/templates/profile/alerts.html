@@ -35,7 +35,7 @@
             <form action="/" method="post">{% csrf_token %}
             <button type="submit" class="button">Make new alert</button>
         {% else %}
-            <h3>You haven't made any alerts.</h3>
+            <h3>You do not have any alerts.</h3>
             <form action="/" method="post">{% csrf_token %}
             <button type="submit" class="button">Make new alert</button>
         {% endif %}
