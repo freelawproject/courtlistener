@@ -20,6 +20,7 @@ from django.shortcuts import render_to_response, HttpResponseRedirect
 from django.template import RequestContext
 from alert.search.forms import SearchForm, CreateAlertForm
 from alert.alertSystem.models import Document
+from alert.userHandling.models import Alert
 
 def home(request):
     """Show the homepage"""
@@ -100,4 +101,50 @@ def showResults(request, queryType):
     return render_to_response('search/results.html',
         {'results': results, 'queryType': queryType, 'query': query,
         'alertForm': alertForm}, RequestContext(request))
+        
 
+@login_required
+def editAlert(request, alertID):
+    user = request.user.get_profile()
+    
+    try:
+        alertID = int(alertID)
+    except:
+        return HttpResponseRedirect('/')
+    
+    # check if the user can edit this, or if they are urlhacking...
+    for alert in user.alert.all():
+        if int(alertID) == alert.alertUUID:
+            print str(alertID) + " is equal to " + str(alert.alertUUID)
+            # they can edit it
+            canEdit = True
+            # pull it from the DB
+            alert = Alert.objects.get(alertUUID = alertID)
+            break
+        else:
+            print str(alertID) + " is not equal to " + str(alert.alertUUID)
+            canEdit = False
+            
+    if canEdit == False:
+        # we just send them home, they can continue playing
+        return HttpResponseRedirect('/')
+    
+    elif canEdit == True:
+        # they can edit the item, therefore, we load the form.
+        if request.method == 'POST':
+            form = CreateAlertForm(request.POST)
+            if form.is_valid():
+                cd = form.cleaned_data
+                
+                # save the changes
+                a = CreateAlertForm(cd, instance=alert)
+                a.save() # this method saves it and returns it
+                
+                # redirect to the alerts page
+                return HttpResponseRedirect('/profile/alerts/')
+                
+        else:
+            # the form is loading for the first time
+            form = CreateAlertForm(instance = alert)
+        
+        return render_to_response('profile/edit_alert.html', {'form': form}, RequestContext(request))
