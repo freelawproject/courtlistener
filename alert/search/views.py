@@ -184,6 +184,5 @@ def deleteAlert(request, alertID):
     
     elif canEdit:
         # Then we delete it, and redirect them.
-        # TODO: The account is still associated with this alert though maybe. That's bad. In addition to deleting the alert, we need to disassociate the account from the alert.
         alert.delete()
         return HttpResponseRedirect('/profile/alerts/')
