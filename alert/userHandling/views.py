@@ -128,3 +128,6 @@ def register(request):
         form = UserCreationForm()
     return render_to_response("profile/register.html", {'form': form}, 
         RequestContext(request))
+        
+def registerSuccess(request):
+    return HttpResponseRedirect('/register/success')
