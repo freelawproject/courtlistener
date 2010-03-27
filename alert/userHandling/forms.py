@@ -23,7 +23,9 @@ from alert.userHandling.models import UserProfile
 class ProfileForm(ModelForm):
     class Meta:
         model = UserProfile
-        exclude = ('user',)
+        # things MUST be excluded, or they get deleted. Creates confusing
+        # deletions. 
+        exclude = ('user','alert', 'avatar',)
 
         
 class UserForm(ModelForm):
