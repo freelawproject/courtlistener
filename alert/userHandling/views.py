@@ -36,16 +36,8 @@ def viewSettings(request):
             # Save things to the profile (this should be done with cleaned_data, 
             # but I can't get past an error with the barmemberships field...it's
             # strange and frustrating.
-                
-            # this is needed, since users won't have a userProfile at first
-            try: 
-                up = request.user.get_profile()
-                profileForm = ProfileForm(request.POST, instance = up)
-            except:
-                # if they don't have a userProfile, we make them one, even if it's empty
-                up = UserProfile()
-                up.user = request.user
-                profileForm = ProfileForm(request.POST, instance = up)
+            up = request.user.get_profile()
+            profileForm = ProfileForm(request.POST, instance = up)
             profileForm.save()
             
           
@@ -56,16 +48,8 @@ def viewSettings(request):
             return HttpResponseRedirect('/profile/settings/')
         
     else:
-        # TODO: This could be made neater with the instance variable.
         # the form is loading for the first time
-        # first, we get the stuff from the user form
-        user = request.user
-        fname = user.first_name
-        lname = user.last_name
-        email = user.email
-        userForm = UserForm(
-            initial = {'first_name': fname, 'last_name':lname, 'email': email}
-        )
+        userForm = UserForm(instance = request.user)
         
         try:
             userProfile = request.user.get_profile()
@@ -114,9 +98,19 @@ def register(request):
         if form.is_valid():
             cd = form.cleaned_data
             
+            # make a new user, and then a new UserProfile associated with it.
+            # this makes it so every time we call get_profile(), we can be sure
+            # there is a profile waiting for us (a good thing).
             new_user = form.save()
+            up = UserProfile()
+            up.user = new_user
+            up.save()
+            
+            # make these into strings so we can pass them off to the template
             username = str(cd['username'])
             password = str(cd['password1'])
+            
+            
 #            return HttpResponseRedirect('/register/success/')
             return render_to_response("profile/register_success.html", 
                 {'form': form, 'username': username, 'password': password}, 

@@ -20,7 +20,7 @@ from django.shortcuts import render_to_response, HttpResponseRedirect
 from django.template import RequestContext
 from alert.search.forms import SearchForm, CreateAlertForm
 from alert.alertSystem.models import Document
-from alert.userHandling.models import Alert
+from alert.userHandling.models import Alert, UserProfile
 
 def home(request):
     """Show the homepage"""
@@ -68,8 +68,20 @@ def showResults(request, queryType):
             alert = a.save() # this method saves it and returns it
             
             # associate the user with the alert
-            u = request.user.get_profile()
-            u.alert.add(alert)
+            try:
+                # This works...but only if they already have an account.
+                up = request.user.get_profile()
+            except:
+                # if the user doesn't have a profile yet, we make them one, and
+                # associate it with their username.
+                u = request.user
+                up = UserProfile()
+                up.user = u
+                up.save()
+            up.alert.add(alert)
+                
+                
+                
             
             # and redirect to the alerts page
             return HttpResponseRedirect('/profile/alerts/')
@@ -172,5 +184,6 @@ def deleteAlert(request, alertID):
     
     elif canEdit:
         # Then we delete it, and redirect them.
+        # TODO: The account is still associated with this alert though maybe. That's bad. In addition to deleting the alert, we need to disassociate the account from the alert.
         alert.delete()
         return HttpResponseRedirect('/profile/alerts/')
