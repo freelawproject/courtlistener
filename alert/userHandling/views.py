@@ -116,9 +116,7 @@ def register(request):
             
             new_user = form.save()
             username = str(cd['username'])
-            print "username is: " + username
             password = str(cd['password1'])
-            print "password is: " + password
 #            return HttpResponseRedirect('/register/success/')
             return render_to_response("profile/register_success.html", 
                 {'form': form, 'username': username, 'password': password}, 
