@@ -74,76 +74,78 @@
 
 
 {% block sidebar %}
-    {% if queryType == "alert" and user.is_authenticated %}
-        {# the form that will appear if somebody clicked "create alert" rather than "search". #}
-        <h3>Save this alert</h3>
-        {% if alertForm.errors %}
-            <div class="span-4 error">
-                <p class="bottom">Please fix the errors below.</p>
-            </div>
-        {% endif %}
-        
-        <form action="" method="post">{% csrf_token %}
-            <p>
-                <label for="id_alertText">Alert query</label>
-                {% if alertForm.alertText.errors %}
-                    <br><span class="errortext">
-                        {% for error in alertForm.alertText.errors %}
-                            {{ error|escape }}  
-                        {% endfor %}
-                    </span>
-                {% endif %}<br>
-                {{ alertForm.alertText }}
-            </p>
+    <div class="span-5 last">
+        {% if queryType == "alert" and user.is_authenticated %}
+            {# the form that will appear if somebody clicked "create alert" rather than "search". #}
+            <h3>Save this alert</h3>
+            {% if alertForm.errors %}
+                <div class="span-4 error">
+                    <p class="bottom">Please fix the errors below.</p>
+                </div>
+            {% endif %}
+            
+            <form action="" method="post">{% csrf_token %}
+                <p>
+                    <label for="id_alertText">Alert query</label>
+                    {% if alertForm.alertText.errors %}
+                        <br><span class="errortext">
+                            {% for error in alertForm.alertText.errors %}
+                                {{ error|escape }}  
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                    {{ alertForm.alertText }}
+                </p>
 
-            <p>
-                <label for="id_alertName">Give the alert a name</label>
-                {% if alertForm.alertName.errors %}
-                    <br><span class="errortext">
-                        {% for error in alertForm.alertName.errors %}
-                            {{ error|escape }}  
-                        {% endfor %}
-                    </span>
-                {% endif %}<br>
-                {{ alertForm.alertName }}
-            </p>
+                <p>
+                    <label for="id_alertName">Give the alert a name</label>
+                    {% if alertForm.alertName.errors %}
+                        <br><span class="errortext">
+                            {% for error in alertForm.alertName.errors %}
+                                {{ error|escape }}  
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                    {{ alertForm.alertName }}
+                </p>
 
-            <p>
-                <label for="id_alertFrequency">How often should we notify you</label>
-                {% if alertForm.alertFrequency.errors %}
-                    <br><span class="errortext">
-                        {% for error in alertForm.alertFrequency.errors %}
-                            {{ error|escape }}  
-                        {% endfor %}
-                    </span>
-                {% endif %}<br>
-                {{ alertForm.alertFrequency }}
-            </p>
-            <p>
-                {{ alertForm.alertPrivacy }}
-                <label for="id_alertPrivacy">This alert is private</label>
-                {% if alertForm.alertPrivacy.errors %}
-                    <span class="errortext">
-                        {% for error in alertForm.alertPrivacy.errors %}
-                            {{ error|escape }}  
-                        {% endfor %}
-                    </span>
-                {% endif %}<br>
+                <p>
+                    <label for="id_alertFrequency">How often should we notify you</label>
+                    {% if alertForm.alertFrequency.errors %}
+                        <br><span class="errortext">
+                            {% for error in alertForm.alertFrequency.errors %}
+                                {{ error|escape }}  
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                    {{ alertForm.alertFrequency }}
+                </p>
+                <p>
+                    {{ alertForm.alertPrivacy }}
+                    <label for="id_alertPrivacy">This alert is private</label>
+                    {% if alertForm.alertPrivacy.errors %}
+                        <span class="errortext">
+                            {% for error in alertForm.alertPrivacy.errors %}
+                                {{ error|escape }}  
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
 
-            </p>
-            <p>
-                {{ alertForm.sendNegativeAlert }}
-                <label for="id_alertName">Send me alerts even when there are no hits</label>
-                {% if alertForm.sendNegativeAlert.errors %}
-                    <span class="errortext">
-                        {% for error in alertForm.sendNegativeAlert.errors %}
-                            {{ error|escape }}  
-                        {% endfor %}
-                    </span>
-                {% endif %}<br>
-            </p>
-            <button type="submit" class="button title" name="alertSave">Save alert</button>
-        </form>   
+                </p>
+                <p>
+                    {{ alertForm.sendNegativeAlert }}
+                    <label for="id_alertName">Send me alerts even when there are no hits</label>
+                    {% if alertForm.sendNegativeAlert.errors %}
+                        <span class="errortext">
+                            {% for error in alertForm.sendNegativeAlert.errors %}
+                                {{ error|escape }}  
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                </p>
+                <button type="submit" class="button title" name="alertSave">Save alert</button>
+            </form>
+        </div>   
     {% endif %}
     {% if not user.is_authenticated %}
         <h3>Save this alert</h3>
