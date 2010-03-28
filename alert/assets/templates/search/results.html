@@ -137,9 +137,9 @@
                     {% endif %}<br>
                 </p>
                 <button type="submit" class="button title" name="alertSave">Save alert</button>
-            </form>
-        </div>   
-    {% endif %}
+            </form>   
+        {% endif %}
+    </div>
     {% if not user.is_authenticated %}
         <h3>Save this alert</h3>
         <p>To save this alert, you need to <a href="/sign-in/">sign in</a> or 
