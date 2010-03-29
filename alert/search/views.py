@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
 from django.shortcuts import render_to_response, HttpResponseRedirect
 from django.template import RequestContext
@@ -79,10 +80,9 @@ def showResults(request, queryType):
                 up.user = u
                 up.save()
             up.alert.add(alert)
+            messages.add_message(request, messages.SUCCESS, 
+                    'Your alert was created successfully.')
                 
-                
-                
-            
             # and redirect to the alerts page
             return HttpResponseRedirect('/profile/alerts/')
     else:
@@ -148,6 +148,9 @@ def editAlert(request, alertID):
                 # save the changes
                 a = CreateAlertForm(cd, instance=alert)
                 a.save() # this method saves it and returns it
+                messages.add_message(request, messages.SUCCESS, 
+                    'Your alert was saved successfully.')
+
                 
                 # redirect to the alerts page
                 return HttpResponseRedirect('/profile/alerts/')
@@ -185,4 +188,6 @@ def deleteAlert(request, alertID):
     elif canEdit:
         # Then we delete it, and redirect them.
         alert.delete()
+        messages.add_message(request, messages.SUCCESS, 
+            'Your alert was deleted successfully.')
         return HttpResponseRedirect('/profile/alerts/')

@@ -16,6 +16,7 @@
 
 from alert.userHandling.forms import *
 from alert.userHandling.models import BarMembership
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render_to_response
 from django.template import RequestContext
@@ -40,11 +41,12 @@ def viewSettings(request):
             profileForm = ProfileForm(request.POST, instance = up)
             profileForm.save()
             
-          
             #change things to the user
             cd = userForm.cleaned_data
             userForm = UserForm(cd, instance = request.user)
             userForm.save()
+            messages.add_message(request, messages.SUCCESS, 
+                'Your settings were saved successfully.')
             return HttpResponseRedirect('/profile/settings/')
         
     else:
@@ -110,8 +112,6 @@ def register(request):
             username = str(cd['username'])
             password = str(cd['password1'])
             
-            
-#            return HttpResponseRedirect('/register/success/')
             return render_to_response("profile/register_success.html", 
                 {'form': form, 'username': username, 'password': password}, 
                 RequestContext(request))
