@@ -17,6 +17,7 @@
 from alert.userHandling.forms import *
 from alert.userHandling.models import BarMembership
 from django.contrib import messages
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render_to_response
 from django.template import RequestContext
@@ -123,3 +124,17 @@ def register(request):
         
 def registerSuccess(request):
     return HttpResponseRedirect('/register/success')
+
+@login_required
+def password_change(request):
+    if request.method == "POST":
+        form = PasswordChangeForm(user=request.user, data=request.POST)
+        if form.is_valid():
+            form.save()
+            messages.add_message(request, messages.SUCCESS, 
+                'Your password was changed successfully.')
+            return HttpResponseRedirect('/profile/password/change')
+    else:
+        form = PasswordChangeForm(user=request.user)
+    return render_to_response('profile/password_form.html', {'form': form},
+        RequestContext(request))
