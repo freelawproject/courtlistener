@@ -11,7 +11,7 @@
             </h3>
         </div>
     </div>
-    <div class="span-24 last" id="content">
+    <div class="span-24 last">
         {% if userForm.errors or profileForm.errors %}
             <div class="span-18">
                 <div class="span-10 error">
@@ -20,9 +20,19 @@
                 <div class="span-7 last">&nbsp;</div>
             </div>
         {% endif %}
+        {% if messages %}    
+            <div class="span-10">
+                {% for message in messages %}
+                    <p class="bottom {{message.tags}}">{{message}}</p>
+                {% endfor %}
+            </div>
+            <div class="span-7 last">&nbsp;</div>
+        {% endif %}
     </div>
+    
+    
             
-    <div class="span-24 last">
+    <div class="span-24 last content">
         <form action="" method="post">{% csrf_token %}
             <p>
                 <label for="id_first_name">First name</label>
