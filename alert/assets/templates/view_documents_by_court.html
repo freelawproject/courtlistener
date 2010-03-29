@@ -16,8 +16,7 @@
                 {% ifequal doc.documentType "P" %}
                     <strong>Status:</strong> Precedential/Published.<br>
                 {% endifequal %}            
-
-                <strong>Download:</strong> <a href="http://courtlistener.com/{{doc.local_path}}">From our server</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="{{ doc.download_URL }}">From the court</a></p><br>
+                <strong>Download PDF: </strong><a href="{{ doc.download_URL }}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="http://courtlistener.com/{{doc.local_path}}">Our backup</a></p><br>
         {% endfor %}
         
         <h3>
