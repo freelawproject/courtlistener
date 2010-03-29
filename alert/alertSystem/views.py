@@ -384,6 +384,8 @@ def scrapeCourt(courtID, result):
             # using caselink, we can get the caseNumber and documentType
             fileName = caseLink.split('/')[-1]
             caseNumber, documentType = fileName.split('.')[0:2]
+            # the caseNumber needs a hyphen inserted after the second digit
+            caseNumber = caseNumber[0:2] + "-" + caseNumber[2:]
 
             # next, we do the caseDate and caseNameShort, so we can quit before
             # we get too far along.
