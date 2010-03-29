@@ -561,14 +561,16 @@ def scrapeCourt(courtID, result):
             doc.download_URL = caseLink
 
             # using caseLink, we can get the caseNumber and documentType
-            caseNumber = aTags[i].contents[0]
-
-            if 'n' in caseNumber:
+            caseNumber = aTags[i].next.next.next.next.next.contents[0].strip()\
+                .strip('&nbsp;')
+            
+            # using the filename, we can determine the documentType...
+            fileName = aTags[i].contents[0]
+            if 'n' in fileName:
                 # it's unpublished
-                documentType = "U"
-            elif 'p' in caseNumber:
-                documentType = "P"
-            doc.documentType = documentType
+                doc.documentType = "U"
+            elif 'p' in fileName:
+                doc.documentType = "P"
 
             # next, we can do the caseDate
             caseDate = aTags[i].next.next.next.next.next.next.next.next\
