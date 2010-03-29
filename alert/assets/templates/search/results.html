@@ -53,7 +53,7 @@
                     <strong>Status:</strong> Precedential/Published.<br>
                 {% endifequal %}            
 
-                <strong>Download:</strong> <a href="http://courtlistener.com/{{result.local_path}}">From our server</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="{{ result.download_URL }}">From the court</a></p><br>
+                <strong>Download PDF: </strong><a href="{{ result.download_URL }}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="http://courtlistener.com/{{result.local_path}}">Our backup</a></p><br>
         {% endfor %}
         
         <h3>

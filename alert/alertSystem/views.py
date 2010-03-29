@@ -262,78 +262,85 @@ def scrapeCourt(courtID, result):
         and then giving up once I hit one that I've done before. This will work
         because they are in reverse chronological order.
         """
-
-        url = "http://www.ca3.uscourts.gov/recentop/week/recprec.htm"
+        
+        # if these URLs change, the docType identification (below) will need 
+        # to be updated. It's lazy, but effective.
+        urls = ("http://www.ca3.uscourts.gov/recentop/week/recprec.htm", 
+            "http://www.ca3.uscourts.gov/recentop/week/recnon2day.htm",)
         ct = Court.objects.get(courtUUID='ca3')
+        
+        for url in urls:
+            html = urllib2.urlopen(url)
+            soup = BeautifulSoup(html)
 
-        html = urllib2.urlopen(url)
-        soup = BeautifulSoup(html)
+            # all links ending in pdf, case insensitive
+            regex = re.compile("pdf$", re.IGNORECASE)
+            aTags = soup.findAll(attrs={"href": regex})
 
-        # all links ending in pdf, case insensitive
-        regex = re.compile("pdf$", re.IGNORECASE)
-        aTags = soup.findAll(attrs={"href": regex})
+            # we will use these vars in our while loop, better not to compile them
+            # each time
+            regexII = re.compile('\d{2}/\d{2}/\d{2}')
+            regexIII = re.compile('\d{2}-\d{4}')
 
-        # we will use these vars in our while loop, better not to compile them
-        # each time
-        regexII = re.compile('\d{2}/\d{2}/\d{2}')
-        regexIII = re.compile('\d{2}-\d{4}')
+            i = 0
+            while i < len(aTags):
+                # these will hold our final document and citation
+                doc = Document()
+                doc.court = ct
 
-        i = 0
-        while i < len(aTags):
-            # these will hold our final document and citation
-            doc = Document()
-            doc.court = ct
+                # caseLink and caseNameShort
+                caseLink = aTags[i].get('href')
+                caseNameShort = aTags[i].contents[0].strip().strip('&npsp;')
 
-            # caseLink and caseNameShort
-            caseLink = aTags[i].get('href')
-            caseNameShort = aTags[i].contents[0].strip().strip('&npsp;')
+                # caseDate and caseNumber
+                junk = aTags[i].previous.previous.previous
+                try:
+                    # this error seems to happen upon dups...not sure why yet
+                    caseDate = regexII.search(junk).group(0)
+                    caseNumber = regexIII.search(junk).group(0)
+                except:
+                    i = i+1
+                    continue
 
-            # caseDate and caseNumber
-            junk = aTags[i].previous.previous.previous
-            try:
-                # this error seems to happen upon dups...not sure why yet
-                caseDate = regexII.search(junk).group(0)
-                caseNumber = regexIII.search(junk).group(0)
-            except:
-                i = i+1
-                continue
+                # Make a decision about the docType.
+                if "recprec.htm" in str(url):
+                    doc.documentType = "P"
+                elif "recnon2day.htm" in str(url):
+                    doc.documentType = "U"
 
-            # all are precedential
-            doc.documentType = "P"
+                # next, we check for a dup. If there is one, we can break from the
+                # loop, since this court posts in alphabetical order.
+                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                if not created:
+                    result += "duplicate found at: " + str(i) + "<br>"
+                    break
 
-            # next, we check for a dup. If there is one, we can break from the
-            # loop, since this court posts in alphabetical order.
-            cite, created = hasDuplicate(caseNumber, caseNameShort)
-            if not created:
-                result += "duplicate found at: " + str(i) + "<br>"
-                break
+                doc.citation = cite
 
-            doc.citation = cite
+                # next up is the caseDate
+                splitDate = caseDate.split('/')
+                caseDate = datetime.date(int("20" + splitDate[2]),int(splitDate[0]),
+                    int(splitDate[1]))
+                doc.dateFiled = caseDate
 
-            # next up is the caseDate
-            splitDate = caseDate.split('/')
-            caseDate = datetime.date(int("20" + splitDate[2]),int(splitDate[0]),
-                int(splitDate[1]))
-            doc.dateFiled = caseDate
+                # the download URL for the PDF
+                caseLink = make_url_absolute(url, caseLink)
 
-            # the download URL for the PDF
-            caseLink = make_url_absolute(url, caseLink)
+                doc.download_URL = caseLink
 
-            doc.download_URL = caseLink
+                # save the file to the db and hard drive
+                myFile = downloadPDF(caseLink)
+                doc.local_path.save(caseNameShort + ".pdf", myFile)
 
-            # save the file to the db and hard drive
-            myFile = downloadPDF(caseLink)
-            doc.local_path.save(caseNameShort + ".pdf", myFile)
+                # and using the PDF we just downloaded, we can generate our sha1 hash
+                data = doc.local_path.read()
+                sha1Hash = hashlib.sha1(data).hexdigest()
+                doc.documentSHA1 = sha1Hash
 
-            # and using the PDF we just downloaded, we can generate our sha1 hash
-            data = doc.local_path.read()
-            sha1Hash = hashlib.sha1(data).hexdigest()
-            doc.documentSHA1 = sha1Hash
+                # finalize everything
+                doc.save()
 
-            # finalize everything
-            doc.save()
-
-            i += 1
+                i += 1
 
         return result
 
