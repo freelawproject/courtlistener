@@ -2,6 +2,17 @@
 
 {% block title %}CourtListener.com / Home{% endblock %}
 
+{% block javascript %}
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+    <script type="text/javascript" src="/media/js/collapsible.js"></script>
+    <script type="text/javascript"> 
+	    $(document).ready(function() {
+		    $("fieldset.collapsible").collapse();
+		    $("fieldset.collapsed").collapse( { closed: true } );
+	    });
+     </script>
+{% endblock %}
+
 {% block content %}
     <div class="span-18 colborder">
         <h2>Create alerts. Search for opinions. Browse our corpus.</h2>
@@ -15,18 +26,57 @@
             </div>
             <div class="span-10 last">&nbsp;</div>
         {% endif %}
-        <div class="span-17">
+        <div class="span-17 last">
             <h4 class="bottom">Search our corpus of circuit court opinions:</h4>
             <form action="" method="get">
                 <input class="title" name="q" id="search">&nbsp;&nbsp;
                 <button type="submit" class="button title" name="search">Search</button>
                 <button type="submit" class="button title" name="alert">Preview alert</button>
             </form>
-            <NOTES>: I need to implement the html fieldset that I want to view so that it can be 
-            hidden when the page is loaded. Then, I'll set jQuery up to show this when the link is clicked.
-            Tutorial here comes very close, except animation would be nice: http://docs.jquery.com/Tutorials:jQuery_For_Designers#</NOTES>
-            
-            <a href="/search/advanced-techniques/" class="bottom">More details</a><p></p>
+        </div>
+        <div class="span-10 last">
+            <fieldset class="collapsed">
+                <legend>Advanced</legend>
+                <table>
+                    <tr>
+                        <td>-</td>
+                        <td>Excludes words</td>
+                    </tr>
+                    <tr>
+                        <td>|</td>
+                        <td>Searches either word</td>
+                    </tr>
+                    <tr>
+                        <td>( )</td>
+                        <td>Can be used to group queries</td>
+                    </tr>
+                    <tr>
+                        <td>@court</td>
+                        <td>Filters to a certain court</td>
+                    </tr>
+                    <tr>
+                        <td>" "</td>
+                        <td>Creates a phrase to search</td>
+                    </tr>
+                    <tr>
+                        <td>~10</td>
+                        <td>Limits distance to 10 words</td>
+                    </tr>
+                    <tr>
+                        <td>/10</td>
+                        <td>Creates a quorum</td>
+                    <tr>
+                        <td><<</td>
+                        <td>Defines an order</td>
+                    </tr>
+                    <tr>
+                        <td>=</td>
+                        <td>Defines an exact form of a word</td>
+                    </tr>
+                </table>
+                <a href="/search/advanced-techniques/" class="bottom">More details</a>
+            </fieldset>
+            <p></p>
         </div>
     </div>
 {% endblock %}
