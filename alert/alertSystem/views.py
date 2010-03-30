@@ -1060,8 +1060,10 @@ def scrapeCourt(courtID, result):
 
         aTagsRegex = re.compile('pdf$', re.IGNORECASE)
         trTags = soup.findAll('tr')
-
-        i = 4
+        
+        # start on the first row, since the first is headers.
+        i = 1
+        # stop after 20, because it gets out of control otherwise.
         while i <= 20:
             # these will hold our final document and citation
             doc = Document()
