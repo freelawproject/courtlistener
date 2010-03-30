@@ -1,4 +1,4 @@
-{% extends "base.html" %} 
+{% extends "base.html" %}
 
 {# this could mirror the titles of yahoo, google and bing more closely, if we want. #}
 {% block title %} CourtListener.com / Results / {{ query }} / Page / {{ results.number }}{% endblock %}
@@ -6,7 +6,7 @@
 {% block javascript %}
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
     <script type="text/javascript" src="/media/js/collapsible.js"></script>
-    <script type="text/javascript"> 
+    <script type="text/javascript">
 	    $(document).ready(function() {
 		    $("fieldset.collapsible").collapse();
 		    $("fieldset.collapsed").collapse( { closed: true } );
@@ -87,7 +87,7 @@
             </div>
         </div>
 
-        
+
         {% if not results.object_list %}
             <h3 class="alt">Your {{ queryType }} yielded no results.</h3>
             <ul>
@@ -96,7 +96,7 @@
                 <li>Remove quotes where possible</li>
             </ul>
         {% endif %}
-            
+
         {% for result in results.object_list %}
             <h3 class="alt bottom"><a href="{{result.get_absolute_url}}">{{ result.citation.caseNameShort }}, {{result.citation.caseNumber}}</a></h3>
             <p> {{result.dateFiled|date:"l, F jS, Y"}}<br>
@@ -106,11 +106,11 @@
                 {% endifequal %}
                 {% ifequal result.documentType "P" %}
                     <strong>Status:</strong> Precedential/Published.<br>
-                {% endifequal %}            
+                {% endifequal %}
 
                 <strong>Download PDF: </strong><a href="{{ result.download_URL }}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="http://courtlistener.com/{{result.local_path}}">Our backup</a></p><br>
         {% endfor %}
-        
+
         <h3>
             {% if results.object_list %}
                 {% if results.has_previous %}
@@ -138,14 +138,14 @@
                     <p class="bottom">Please fix the errors below.</p>
                 </div>
             {% endif %}
-            
+
             <form action="" method="post">{% csrf_token %}
                 <p>
                     <label for="id_alertText">Alert query</label>
                     {% if alertForm.alertText.errors %}
                         <br><span class="errortext">
                             {% for error in alertForm.alertText.errors %}
-                                {{ error|escape }}  
+                                {{ error|escape }}
                             {% endfor %}
                         </span>
                     {% endif %}<br>
@@ -162,7 +162,7 @@
                     {% if alertForm.alertFrequency.errors %}
                         <br><span class="errortext">
                             {% for error in alertForm.alertFrequency.errors %}
-                                {{ error|escape }}  
+                                {{ error|escape }}
                             {% endfor %}
                         </span>
                     {% endif %}<br>
@@ -174,7 +174,7 @@
                     {% if alertForm.alertPrivacy.errors %}
                         <span class="errortext">
                             {% for error in alertForm.alertPrivacy.errors %}
-                                {{ error|escape }}  
+                                {{ error|escape }}
                             {% endfor %}
                         </span>
                     {% endif %}<br>
@@ -186,18 +186,18 @@
                     {% if alertForm.sendNegativeAlert.errors %}
                         <span class="errortext">
                             {% for error in alertForm.sendNegativeAlert.errors %}
-                                {{ error|escape }}  
+                                {{ error|escape }}
                             {% endfor %}
                         </span>
                     {% endif %}<br>
                 </p>
                 <button type="submit" class="button title" name="alertSave">Save alert</button>
-            </form>   
+            </form>
         {% endif %}
     </div>
     {% if not user.is_authenticated %}
         <h3>Save this alert</h3>
-        <p>To save this alert, you need to <a href="/sign-in/">sign in</a> or 
+        <p>To save this alert, you need to <a href="/sign-in/">sign in</a> or
             <a href="/register/">register</a> as a new user.</p>
     {% endif %}
 {% endblock %}
