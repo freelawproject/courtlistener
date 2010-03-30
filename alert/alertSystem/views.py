@@ -1109,7 +1109,6 @@ def scrapeCourt(courtID, result):
             cite, created = hasDuplicate(caseNumber, caseNameShort)
             if not created:
                 result += "duplicate found at: " + str(i) + "<br>"
-                i =+ 1
                 break
 
             # if that goes well, we save to the DB
