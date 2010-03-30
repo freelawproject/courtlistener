@@ -3,6 +3,17 @@
 {# this could mirror the titles of yahoo, google and bing more closely, if we want. #}
 {% block title %} CourtListener.com / Results / {{ query }} / Page / {{ results.number }}{% endblock %}
 
+{% block javascript %}
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+    <script type="text/javascript" src="/media/js/collapsible.js"></script>
+    <script type="text/javascript"> 
+	    $(document).ready(function() {
+		    $("fieldset.collapsible").collapse();
+		    $("fieldset.collapsed").collapse( { closed: true } );
+	    });
+     </script>
+{% endblock %}
+
 {% block content %}
     <div class="span-18 colborder">
 
@@ -20,7 +31,7 @@
             </div>
             <div class="span-10 last">&nbsp;</div>
         {% endif %}
-        <div class="span-18">
+        <div class="span-18 last">
             <form action="" method="get">
                 <input class="title" name="q" id="search" value="{{query}}">&nbsp;&nbsp;
                 {% if queryType == "search" %}
@@ -30,8 +41,52 @@
                     <button type="submit" class="button title" name="alert">Refine alert</button>
                 {% endif %}
             </form>
-            <a href="/search/advanced-techniques/" class="bottom">Advanced</a><p></p>
+            <div class="span-10 last">
+                <fieldset class="collapsed">
+                    <legend>Advanced</legend>
+                    <table>
+                        <tr>
+                            <td>-</td>
+                            <td>Excludes words</td>
+                        </tr>
+                        <tr>
+                            <td>|</td>
+                            <td>Searches either word</td>
+                        </tr>
+                        <tr>
+                            <td>( )</td>
+                            <td>Can be used to group queries</td>
+                        </tr>
+                        <tr>
+                            <td>@court</td>
+                            <td>Filters to a certain court</td>
+                        </tr>
+                        <tr>
+                            <td>" "</td>
+                            <td>Creates a phrase to search</td>
+                        </tr>
+                        <tr>
+                            <td>~10</td>
+                            <td>Limits distance to 10 words</td>
+                        </tr>
+                        <tr>
+                            <td>/10</td>
+                            <td>Creates a quorum</td>
+                        <tr>
+                            <td><<</td>
+                            <td>Defines an order</td>
+                        </tr>
+                        <tr>
+                            <td>=</td>
+                            <td>Defines an exact form of a word</td>
+                        </tr>
+                    </table>
+                    <a href="/search/advanced-techniques/" class="bottom">More details</a>
+                </fieldset>
+                <p></p>
+            </div>
         </div>
+
         
         {% if not results.object_list %}
             <h3 class="alt">Your {{ queryType }} yielded no results.</h3>
