@@ -895,7 +895,7 @@ def scrapeCourt(courtID, result):
                 .group(1)
 
             # next: caseNameShort
-            caseNameShort = caseNames[i].text.strip().strip('&nbsp')
+            caseNameShort = caseNames[i].text
 
             # check for dups, make the object if necessary, otherwise, get it
             cite, created = hasDuplicate(caseNumber, caseNameShort)
@@ -982,7 +982,7 @@ def scrapeCourt(courtID, result):
             doc.dateFiled = caseDate
 
             #next up: caseNameShort
-            caseNameShort = caseNames[i].text.strip().strip('&nbsp;')
+            caseNameShort = caseNames[i].text
 
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
