@@ -4,6 +4,7 @@ Sets up all the overrides or additional CSS that the site will use.
 
 ------------------------------------------------------------------------------*/
 
+
 .navigation {
     padding: 0.75em 0em .75em 1.5em;
 }
@@ -20,11 +21,10 @@ Sets up all the overrides or additional CSS that the site will use.
 
 .navigation > ul > li {
     list-style: none outside none;
-    padding: 0em 0em 0em 1.4em;
+    padding: 0em 0.7em 0em 0.7em;
     white-space: nowrap;
     text-align: center;
 }
-
 
 .round {
     -moz-border-radius: 6px 6px 6px 6px;
