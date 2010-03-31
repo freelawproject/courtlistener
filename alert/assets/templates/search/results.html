@@ -154,6 +154,13 @@
 
                 <p>
                     <label for="id_alertName">Give the alert a name</label>
+                    {% if alertForm.alertName.errors %}
+                        <br><span class="errortext">
+                            {% for error in alertForm.alertName.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </span>
+                    {% endif %}
                     {{ alertForm.alertName }}
                 </p>
 
