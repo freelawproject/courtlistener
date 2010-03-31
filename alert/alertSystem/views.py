@@ -224,12 +224,12 @@ def scrapeCourt(courtID, result):
 
             # next, the caseNameShort (there's probably a better way to do this.
             caseName = aTags[i].parent.parent.nextSibling.nextSibling\
-                .nextSibling.nextSibling.contents[0].strip().strip('nbsp;')
+                .nextSibling.nextSibling.contents[0].replace('&nbsp;', ' ').strip()
 
             # next, we can do the caseDate
             caseDate = aTags[i].parent.parent.nextSibling.nextSibling\
                 .nextSibling.nextSibling.nextSibling.nextSibling.contents[0]\
-                .strip().strip('nbsp;')
+                .replace('&nbsp;', ' ').strip()
 
             # some caseDate cleanup
             splitDate = caseDate.split('-')
@@ -298,7 +298,7 @@ def scrapeCourt(courtID, result):
 
                 # caseLink and caseNameShort
                 caseLink = aTags[i].get('href')
-                caseNameShort = aTags[i].contents[0].strip().strip('&npsp;')
+                caseNameShort = aTags[i].contents[0].replace('&nbsp;', ' ').strip()
 
                 # caseDate and caseNumber
                 junk = aTags[i].previous.previous.previous
@@ -397,7 +397,7 @@ def scrapeCourt(courtID, result):
 
             # next, we do the caseDate and caseNameShort, so we can quit before
             # we get too far along.
-            junk = aTags[i].contents[0].strip().strip('&nbsp;')
+            junk = aTags[i].contents[0].replace('&nbsp;', ' ').strip()
             try:
                 # this error seems to happen upon dups...not sure why yet
                 caseDate = regexII.search(junk).group(0).strip()
@@ -499,7 +499,7 @@ def scrapeCourt(courtID, result):
 
             # next, we do the caseNameShort
             caseNameShort = aTags[i].next.next.next.next.next.contents[0]\
-                .contents[0].strip().strip('&nbsp;')
+                .contents[0].replace('&nbsp;', ' ').strip()
 
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
@@ -572,7 +572,7 @@ def scrapeCourt(courtID, result):
 
             # using caseLink, we can get the caseNumber and documentType
             caseNumber = aTags[i].next.next.next.next.next.contents[0].strip()\
-                .strip('&nbsp;')
+                .replace('&nbsp;','')
             
             # using the filename, we can determine the documentType...
             fileName = aTags[i].contents[0]
@@ -584,7 +584,7 @@ def scrapeCourt(courtID, result):
 
             # next, we can do the caseDate
             caseDate = aTags[i].next.next.next.next.next.next.next.next\
-                .contents[0].strip().strip('&nbsp;')
+                .contents[0].replace('&nbsp;', ' ').strip()
 
             # some caseDate cleanup
             splitDate = caseDate.split('/')
@@ -594,7 +594,7 @@ def scrapeCourt(courtID, result):
 
             # next, the caseNameShort (there's probably a better way to do this.
             caseNameShort = aTags[i].next.next.next.next.next.next.next.next\
-                .next.next.next.strip().strip('&nbsp;')
+                .next.next.next.replace('&nbsp;', ' ').strip()
 
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
@@ -728,9 +728,9 @@ def scrapeCourt(courtID, result):
             # caseDate is next on the block
             junk = str(aTags[i].next.next.next)
             caseDate = caseDateRegex.search(junk).group(1)\
-                .strip().strip('&nbsp;')
+                .replace('&nbsp;', ' ').strip()
             caseNameShort = caseDateRegex.search(junk).group(2)\
-                .strip().strip('&nbsp;')
+                .replace('&nbsp;', ' ').strip()
 
             # some caseDate cleanup
             splitDate = caseDate.split('/')
@@ -895,7 +895,8 @@ def scrapeCourt(courtID, result):
                 .group(1)
 
             # next: caseNameShort
-            caseNameShort = caseNames[i].text
+            caseNameShort = caseNames[i].text.strip()
+            print caseNameShort
 
             # check for dups, make the object if necessary, otherwise, get it
             cite, created = hasDuplicate(caseNumber, caseNameShort)
@@ -1046,7 +1047,7 @@ def scrapeCourt(courtID, result):
             caseDate = datetime.date.today()
             doc.dateFiled = caseDate
 
-            caseNameShort = aTags[i].next.next.next.strip().strip('&nbsp;')
+            caseNameShort = aTags[i].next.next.next.replace('&nbsp;', ' ').strip()
 
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
