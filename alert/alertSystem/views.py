@@ -89,7 +89,15 @@ def scrapeCourt(courtID, result):
         ct = Court.objects.get(courtUUID='ca1')
 
         req = urllib2.urlopen(url)
-        tree = etree.parse(req)
+        
+        # this code gets rid of errant ampersands - they throw big errors.
+        contents = req.read()
+        if '&' in contents:
+            punctuationRegex = re.compile(" & ")
+            contents = re.sub(punctuationRegex, " &amp; ", contents)        
+            tree = etree.fromstring(contents)
+        else:
+            tree = etree.fromstring(contents)
 
         caseLinks = tree.xpath("//item/link")
         descriptions = tree.xpath("//item/description")
@@ -832,15 +840,23 @@ def scrapeCourt(courtID, result):
     elif (courtID == 10):
         url = "http://www.ck10.uscourts.gov/opinions/new/daily_decisions.rss"
         ct = Court.objects.get(courtUUID = 'ca10')
-
+        
         req = urllib2.urlopen(url)
-        tree = etree.parse(req)
+        
+        # this code gets rid of errant ampersands - they throw big errors.
+        contents = req.read()
+        if '&' in contents:
+            punctuationRegex = re.compile(" & ")
+            contents = re.sub(punctuationRegex, " &amp; ", contents)        
+            tree = etree.fromstring(contents)
+        else:
+            tree = etree.fromstring(contents)
 
         caseLinks = tree.xpath("//item/link")
         descriptions = tree.xpath("//item/description")
         docTypes = tree.xpath("//item/category")
         caseNames = tree.xpath("//item/title")
-
+        
         caseDateRegex = re.compile("(\d{2}/\d{2}/\d{4})",
             re.VERBOSE | re.DOTALL)
         caseNumberRegex = re.compile("(\d{2}-\d{4})(.*)$")
@@ -914,7 +930,15 @@ def scrapeCourt(courtID, result):
         ct = Court.objects.get(courtUUID = 'ca11')
 
         req = urllib2.urlopen(url)
-        tree = etree.parse(req)
+        
+        # this code gets rid of errant ampersands - they throw big errors.
+        contents = req.read()
+        if '&' in contents:
+            punctuationRegex = re.compile(" & ")
+            contents = re.sub(punctuationRegex, " &amp; ", contents)        
+            tree = etree.fromstring(contents)
+        else:
+            tree = etree.fromstring(contents)
 
         caseLinks = tree.xpath('//item/link')
         description = tree.xpath('//item/description')
