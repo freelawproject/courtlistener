@@ -896,7 +896,6 @@ def scrapeCourt(courtID, result):
 
             # next: caseNameShort
             caseNameShort = caseNames[i].text.strip()
-            print caseNameShort
 
             # check for dups, make the object if necessary, otherwise, get it
             cite, created = hasDuplicate(caseNumber, caseNameShort)
