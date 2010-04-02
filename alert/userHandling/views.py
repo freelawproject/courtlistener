@@ -94,7 +94,7 @@ def deleteProfileDone(request):
     return render_to_response('profile/deleted.html', {}, RequestContext(request))
     
 def register(request):
-    """allow an anonymous user to register"""
+    """allow only an anonymous user to register"""
     if request.user.is_anonymous():
         from django.contrib.auth.forms import UserCreationForm
         if request.method == 'POST':
