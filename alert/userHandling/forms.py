@@ -16,8 +16,9 @@
 
 
 from django import forms
-from django.forms import ModelForm
+from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from django.forms import ModelForm
 from alert.userHandling.models import UserProfile
 
 class ProfileForm(ModelForm):
@@ -36,4 +37,14 @@ class UserForm(ModelForm):
         # Either is BAD, BAD, BAD
         exclude = ('username', 'password', 'last_login', 'date_joined',
             'is_staff', 'is_active', 'is_superuser', 'groups', 'user_permissions',)
+            
 
+class UserCreationFormExtended(UserCreationForm):
+
+    def __init__(self, *args, **kwargs):
+        super(UserCreationFormExtended, self).__init__(*args, **kwargs)
+        self.fields['email'].required = True
+
+    class Meta:
+        model = User
+        fields = ('username', 'email', 'first_name', 'last_name') 

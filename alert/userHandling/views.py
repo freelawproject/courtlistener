@@ -94,33 +94,38 @@ def deleteProfileDone(request):
     return render_to_response('profile/deleted.html', {}, RequestContext(request))
     
 def register(request):
-    """allow an anonymous user to register"""
-    from django.contrib.auth.forms import UserCreationForm
-    if request.method == 'POST':
-        form = UserCreationForm(request.POST)
-        if form.is_valid():
-            cd = form.cleaned_data
-            
-            # make a new user, and then a new UserProfile associated with it.
-            # this makes it so every time we call get_profile(), we can be sure
-            # there is a profile waiting for us (a good thing).
-            new_user = form.save()
-            up = UserProfile()
-            up.user = new_user
-            up.save()
-            
-            # make these into strings so we can pass them off to the template
-            username = str(cd['username'])
-            password = str(cd['password1'])
-            
-            return render_to_response("profile/register_success.html", 
-                {'form': form, 'username': username, 'password': password}, 
-                RequestContext(request))
-            
+    """allow only an anonymous user to register"""
+    if request.user.is_anonymous():
+        from django.contrib.auth.forms import UserCreationForm
+        if request.method == 'POST':
+            form = UserCreationFormExtended(request.POST)
+            if form.is_valid():
+                cd = form.cleaned_data
+                
+                # make a new user, and then a new UserProfile associated with it.
+                # this makes it so every time we call get_profile(), we can be sure
+                # there is a profile waiting for us (a good thing).
+                new_user = form.save()
+                up = UserProfile()
+                up.user = new_user
+                up.save()
+                
+                # make these into strings so we can pass them off to the template
+                username = str(cd['username'])
+                password = str(cd['password1'])
+                
+                return render_to_response("profile/register_success.html", 
+                    {'form': form, 'username': username, 'password': password}, 
+                    RequestContext(request))
+                
+        else:
+            form = UserCreationFormExtended()
+        return render_to_response("profile/register.html", {'form': form}, 
+            RequestContext(request))
     else:
-        form = UserCreationForm()
-    return render_to_response("profile/register.html", {'form': form}, 
-        RequestContext(request))
+        # the user is already logged in, direct them to their settings page as a
+        # logical fallback
+        return HttpResponseRedirect('/profile/settings/')
         
 def registerSuccess(request):
     return HttpResponseRedirect('/register/success')

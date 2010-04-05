@@ -23,3 +23,6 @@ alert/media/pdf
 
 # the server and laptop config
 alert/assets/media/pdf
+
+# the resource.org data
+Resource.org/
