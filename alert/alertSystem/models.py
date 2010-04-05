@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+from djangosphinx import SphinxSearch
 from django.db import models
 import alert
 
@@ -160,6 +160,7 @@ class ExcerptSummary(models.Model):
 # A class which holds the bulk of the information regarding documents. This must
 # go last, since it references the above classes
 class Document(models.Model):
+    search = SphinxSearch()
     documentUUID = models.AutoField("a unique ID for each document",
         primary_key=True)
     documentSHA1 = models.CharField("unique ID for the document, as generated via sha1 on the PDF",

@@ -1,0 +1,33 @@
+Dependancies for sphinx and django-sphinx:
+ - libmysqlclient15-dev, build-essential, python-setuptools, git-core
+
+##########
+Sphinx install notes
+##########
+Process:
+ - install dependencies
+ - Download & unpack sphinx.
+ - ./configure --prefix=/usr/local/sphinx --with-mysql=/usr/
+ - sudo make
+ - sudo make install
+
+###########
+django-sphinx install notes
+###########
+Notes:
+ - Don't use the SVN repo on google code. It's outdated. Instead, use github:
+
+Process:
+ - install dependencies
+ - git clone git://github.com/dcramer/django-sphinx.git
+ - sudo python setup.py install
+    - This installs django from some python repo, which is lame, so we have to delete that:
+        - sudo rm -r /usr/local/lib/python2.6/dist-packages/Django-1.1.1-py2.6.egg
+    - It also kills our django-admin.py reference, so that has to be recreated:
+        - sudo mv /usr/local/bin/django-admin.py /usr/local/bin/django-admin.py.bak
+        - sudo ln -s /home/mlissner/Documents/Final\ Project/django/django/bin/django-admin.py /usr/local/bin
+    - It also adds some random line in a file that we need to delete:
+        - sudo vi /usr/local/lib/python2.6/dist-packages/easy-install.pth
+        - Delete the line referencing the egg we just deleted.
+ - add djangosphinx to INSTALLED_APPS
+ - add this to settings.py: SPHINX_API_VERSION = 0x116
