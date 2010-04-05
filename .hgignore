@@ -26,3 +26,6 @@ alert/assets/media/pdf
 
 # the resource.org data
 Resource.org/
+
+# the django-sphinx code
+django-sphinx
