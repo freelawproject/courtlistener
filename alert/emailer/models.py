@@ -14,7 +14,23 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
 from django.db import models
 
-# Create your models here.
+class alertsToSend(models.Model):
+    alertUUID = models.AutoField("a unique ID for each alert", primary_key=True)
+    user = models.ForeignKey(User,
+        verbose_name="the user this model extends",
+        unique=True)
+    emailSubject = models.CharField("the subject of the email",
+        max_length=200,
+        blank=True)
+    emailText = models.CharField("the text of the email",
+        blank=True)
+    
+    def __unicode__(self):
+        return self.emailSubject
+    
+    class Meta:
+        verbose_name = "alert to send"
+        verbose_name_plural = "Alerts to send"
+        db_table = "AlertsToSend"

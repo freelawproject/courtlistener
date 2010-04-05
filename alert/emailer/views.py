@@ -30,7 +30,9 @@
  3. A better method is needed that only iterates over the daily/weekly/monthly alerts on a given day/week/month.
     - So, for a daily/weekly/monthly URL, we begin by querying all the daily/weekly/monthly alerts
         - For each alert, we see if there are any new hits
-                - If there is a hit, we pull the user associated with the alert, and generate an email""" 
+            - If there is a hit, we pull the user associated with the alert, and make an entry in the database
+                - This entry must be sensitive to the user's choice of plaintext.
+        - Once all the alerts have been run, we pull each record in the database, and 
         
         
 def emailer(request, rate):

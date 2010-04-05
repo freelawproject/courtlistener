@@ -1,0 +1,43 @@
+These are ideas for making this project solvent. Current costs are low, but they
+will grow with every query and alert that is in the system. The goal here isn't 
+to make a fortune - It's to not lose money. This file exists to keep track of 
+ideas until they can be tried out, considered in more detail, etc.
+
+Order of ideas lacks relevancy.
+
+1. Service to send PDFs along with alerts as attachments
+   + nice feature
+   + easy to implement
+   + makes people's lives easier
+   + subscription model
+   - bandwidth cost (maybe)
+   - less traffic on site (maybe)
+   
+2. Curated alerts people can buy. For example, for a buck we could sell
+hand-crafted alerts for various areas of the law.
+    + useful feature
+    + helps attorneys that need to do due diligence staying up to date ("I used 
+        a special alert system to stay up to date!")
+    + could be cheap, like a buck or so per alert
+    + no added CPU/bandwidth costs
+    + could be subscription or one-off model
+    - work and expertise required to create/update/maintain alerts
+    - might be a better community-based thing
+    
+3. Sell our data to people that want it.
+    + almost effortless
+    + contributes to more data being in the world
+    + one off or subscription probably possible
+    - enables competition
+    - not nice to sell it, should probably give it away (as in resource.org)
+    
+4. Advertising
+    + very easy to implement
+    + powers much of the Internet
+    + could have high-value eyes
+    - lameness of site goes up...a lot.
+    
+5. More alert options, such as the day to run weekly or monthly alerts
+    + Not too hard to implement
+    - CPU intensive b/c requires running the weekly/monthly emailers every day.
+    - Requires changes to the alert models.
