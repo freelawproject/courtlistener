@@ -19,6 +19,7 @@ from alert import settings
 from alert.alertSystem.views import *
 from alert.alertSystem.sitemap import DocumentSitemap
 from alert.contact.views import *
+from alert.emailer.views import *
 from alert.search.views import *
 from alert.userHandling.views import *
 
@@ -28,7 +29,6 @@ from django.conf.urls.defaults import *
 # for the flatfiles in the sitemap
 from django.contrib.sitemaps import FlatPageSitemap
 from django.contrib.auth.views import login as signIn, logout as signOut
-
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
@@ -40,21 +40,14 @@ sitemaps = {
 }
 
 urlpatterns = patterns('',
-    # Example:
-    # (r'^alert/', include('alert.foo.urls')),
-
-    # Uncomment the admin/doc line below and add 'django.contrib.admindocs'
-    # to INSTALLED_APPS to enable admin documentation:
+    # Admin docs and site
     (r'^admin/doc/', include('django.contrib.admindocs.urls')),
-
-    # Uncomment the next line to enable the admin:
     (r'^admin/', include(admin.site.urls)),
 
-    # The scraper URL
+    # The scraper, parser and emailer URLs
     (r'^scrape/(\d{1,2})/$', scrape),
-
-    # The parser URL
     (r'^parse/(\d{1,2})/$', parse),
+    (r'^email/(daily|weekly|monthly)/$', emailer),
 
     # Sitemap generator
     (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.sitemap',
@@ -89,7 +82,6 @@ urlpatterns = patterns('',
     (r'^register/success/$', registerSuccess),
 
     # Alert/search pages
-    #(r'^(search|alert)/advanced-techniques/$'), ???)
     (r'^(alert/preview)/$', showResults),
     (r'^(search/results)/$', showResults),
     (r'^alert/edit/(\d{1,6})/$', editAlert),

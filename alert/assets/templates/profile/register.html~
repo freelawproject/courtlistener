@@ -17,8 +17,8 @@
         <form action"" method="post">{% csrf_token %}
             <p>
                 <label for="id_username">Username</label>
-                <br>{% if form.username.errors %}
-                    <span class="errortext">
+                {% if form.username.errors %}
+                    <br><span class="errortext">
                         {% for error in form.username.errors %}
                             {{ error|escape }}  
                         {% endfor %}
@@ -28,9 +28,9 @@
             </p>
             
             <p>
-                <label for="id_password1">Enter password:</label>
-                <br>{% if form.password1.errors %}
-                    <span class="errortext">
+                <label for="id_password1">Enter password</label>
+                {% if form.password1.errors %}
+                    <br><span class="errortext">
                         {% for error in form.password1.errors %}
                             {{ error|escape }}  
                         {% endfor %}
@@ -41,8 +41,8 @@
             
             <p>
                 <label for="id_password2">Re-enter password</label>
-                <br>{% if form.password2.errors %}
-                    <span class="errortext">
+                {% if form.password2.errors %}
+                    <br><span class="errortext">
                         {% for error in form.password2.errors %}
                             {{ error|escape }}  
                         {% endfor %}
@@ -50,6 +50,42 @@
                 {% endif %}<br>
                 {{ form.password2 }}
             </p>
+            
+            <p>
+                <label for="id_first_name">First name</label>
+                {% if form.first_name.errors %}
+                    <br><span class="errortext">
+                        {% for error in form.first_name.errors %}
+                            {{ error|escape }}  
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.first_name }}
+            </p>
+            
+            <p>
+                <label for="id_last_name">Last name</label>
+                {% if form.last_name.errors %}
+                    <br><span class="errortext">
+                        {% for error in form.last_name.errors %}
+                            {{ error|escape }}  
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.last_name }}
+            </p>
+            
+            <p>
+                <label for="id_email">Email address</label>
+                {% if form.email.errors %}
+                    <br><span class="errortext">
+                        {% for error in form.email.errors %}
+                            {{ error|escape }}  
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.email }}
+            </p>            
             <button type="submit" class="button">Register</button>
         </form>
     </div>
