@@ -6,10 +6,11 @@ Sphinx install notes
 ##########
 Process:
  - install dependencies
- - Download & unpack sphinx.
+ - Download & unpack sphinx to a directory without spaces
  - ./configure --prefix=/usr/local/sphinx --with-mysql=/usr/
  - sudo make
  - sudo make install
+ - test by running /usr/local/sphinx/bin/search
 
 ###########
 django-sphinx install notes
@@ -19,15 +20,19 @@ Notes:
 
 Process:
  - install dependencies
- - git clone git://github.com/dcramer/django-sphinx.git
+ - cd Final\ Project
+ - git clone git://github.com/dcramer/django-sphinx.git; cd django-sphinx
  - sudo python setup.py install
-    - This installs django from some python repo, which is lame, so we have to delete that:
-        - sudo rm -r /usr/local/lib/python2.6/dist-packages/Django-1.1.1-py2.6.egg
-    - It also kills our django-admin.py reference, so that has to be recreated:
-        - sudo mv /usr/local/bin/django-admin.py /usr/local/bin/django-admin.py.bak
-        - sudo ln -s /home/mlissner/Documents/Final\ Project/django/django/bin/django-admin.py /usr/local/bin
-    - It also adds some random line in a file that we need to delete:
-        - sudo vi /usr/local/lib/python2.6/dist-packages/easy-install.pth
-        - Delete the line referencing the egg we just deleted.
+    - This installs django from some python repo, which is lame.
+        - We can either remove the requires line in setup.py (which fixes the below)
+        - Or, after the fact, we can fix it by:
+            - Remove new django install: 
+                - sudo rm -r /usr/local/lib/python2.6/dist-packages/Django-1.1.1-py2.6.egg
+            - Recreated our django-admin.py reference:
+                - sudo mv /usr/local/bin/django-admin.py /usr/local/bin/django-admin.py.bak
+                - sudo ln -s /home/mlissner/Documents/Cal/Final\ Project/django/django/bin/django-admin.py /usr/local/bin
+            - Fix the python local repo:
+                - sudo vi /usr/local/lib/python2.6/dist-packages/easy-install.pth
+                - Delete the line referencing the egg we just deleted.
  - add djangosphinx to INSTALLED_APPS
  - add this to settings.py: SPHINX_API_VERSION = 0x116
