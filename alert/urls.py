@@ -28,7 +28,8 @@ from django.conf.urls.defaults import *
 
 # for the flatfiles in the sitemap
 from django.contrib.sitemaps import FlatPageSitemap
-from django.contrib.auth.views import login as signIn, logout as signOut
+from django.contrib.auth.views import login as signIn, logout as signOut,\
+    password_reset, password_reset_done
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
@@ -80,6 +81,8 @@ urlpatterns = patterns('',
     (r'^profile/delete/done/$', deleteProfileDone),
     (r'^register/$', register),
     (r'^register/success/$', registerSuccess),
+    (r'^reset-password/$', password_reset),
+    (r'^reset-password/done/$', password_reset_done),
 
     # Alert/search pages
     (r'^(alert/preview)/$', showResults),
