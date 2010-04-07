@@ -17,22 +17,7 @@
 
 
 
-"""The emailer essentially has to do a couple of things:
- 1. It should be triggerable via a URL at /email/daily/, /email/weekly/, and /email/monthly/
-    1.1. These URLs will be hit on everyday, Sundays, and the 1st of each month via cron. 
- 2. After being triggered, it should do the following:
-    - for each user, build an email.
-        - for their daily alerts, do a search for that alert, checking for new cases within the last day.
-        - for their weekly alert, do a search for that alert, checking for new cases within the last week.
-        - for their monthly alert, do a search for that alert, checking for new cases within the last month.
-            - if there is a hit for that alert/user add it to a queue
-        - Once all of their alerts have been checked, send the email, and proceed to the next user.
- 3. A better method is needed that only iterates over the daily/weekly/monthly alerts on a given day/week/month.
-    - So, for a daily/weekly/monthly URL, we begin by querying all the daily/weekly/monthly alerts
-        - For each alert, we see if there are any new hits
-            - If there is a hit, we pull the user associated with the alert, and make an entry in the database
-                - This entry must be sensitive to the user's choice of plaintext.
-        - Once all the alerts have been run, we pull each record in the database, and 
+
         
         
 def emailer(request, rate):
