@@ -68,8 +68,8 @@ urlpatterns = patterns('',
     (r'^contact/thanks/$', thanks),
     
     # Various sign in/out etc. functions as provided by django
-    (r'^sign-out/$', signOut),
     (r'^sign-in/$', signIn),
+    (r'^sign-out/$', signOut),
     
     # Homepage!
     (r'^$', home),
@@ -86,8 +86,8 @@ urlpatterns = patterns('',
     #Reset password pages
     (r'^reset-password/$', password_reset),
     (r'^reset-password/instructions-sent/$', password_reset_done),
-    (r'^confirm-password/(?P<uidb36>.*)/(?P<token>.*)/$', password_reset_confirm),
-    (r'^reset-password/complete/$', password_reset_complete),
+    (r'^confirm-password/(?P<uidb36>.*)/(?P<token>.*)/$', password_reset_confirm, {'post_reset_redirect': '/reset-password/complete/'}),
+    (r'^reset-password/complete/$', signIn, {'template_name': 'registration/password_reset_complete.html'}),
 
     # Alert/search pages
     (r'^(alert/preview)/$', showResults),
