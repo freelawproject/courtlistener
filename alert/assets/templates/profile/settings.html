@@ -16,16 +16,7 @@
             <div class="span-18">
                 <div class="span-10 error">
                     <p class="bottom">There were errors with your submission.</p>
-                </div>
-                <ul>
-                {% for error in userForm.errors %}
-                    <li>{{ error }}</li>
-                {%endfor%}
-                {% for error in userForm.username.errors %}
-                    {{ error }}
-                {% endfor %}
-                </ul>
-                
+                </div>                
                 <div class="span-7 last">&nbsp;</div>
             </div>
         {% endif %}
@@ -53,17 +44,6 @@
                     </span>
                 {% endif %}<br>
                 {{ userForm.first_name }}
-            </p>
-            <p>
-                <label for="id_username">Username</label>
-                {% if userForm.username.errors %}
-                    <span class="errortext">
-                        {% for error in userForm.username.errors %}
-                            {{ error|escape }}  
-                        {% endfor %}
-                    </span>
-                {% endif %}<br>
-                {{ userForm.username }}
             </p>
             <p>
                 <label for="id_last_name">Last name</label>
