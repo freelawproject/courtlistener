@@ -28,47 +28,18 @@ from django.http import HttpResponseRedirect
 def viewAlerts(request):
     return render_to_response('profile/alerts.html', {}, 
         RequestContext(request))
-   
-@login_required    
-def viewSettings(request):
-    if request.method == 'POST':
-        userForm = UserForm(request.POST)
-        profileForm = ProfileForm(request.POST)
-        if profileForm.is_valid() and userForm.is_valid():
-            # Save things to the profile (this should be done with cleaned_data, 
-            # but I can't get past an error with the barmemberships field...it's
-            # strange and frustrating.
-            up = request.user.get_profile()
-            profileForm = ProfileForm(request.POST, instance = up)
-            profileForm.save()
-            
-            #change things to the user
-            cd = userForm.cleaned_data
-            userForm = UserForm(cd, instance = request.user)
-            userForm.save()
-            messages.add_message(request, messages.SUCCESS, 
-                'Your settings were saved successfully.')
-            return HttpResponseRedirect('/profile/settings/')
-        
-    else:
-        # the form is loading for the first time
-        userForm = UserForm(instance = request.user)
-        profileForm = ProfileForm(instance = request.user)
 
-
-    return render_to_response('profile/settings.html', {'profileForm': profileForm, 
-        'userForm': userForm}, RequestContext(request))
 
 @login_required    
 def viewSettings(request):
-        user_form = UserForm(request.POST or None, prefix='user', instance=request.user)
-        profile_form = ProfileForm(request.POST or None, prefix='profile', instance=request.user.get_profile())
-        if all([profile_form.is_valid(), user_form.is_valid()]):
-            profile_form.save()
-            user_form.save()
-            messages.add_message(request, messages.SUCCESS, 
-                'Your settings were saved successfully.')
-            return HttpResponseRedirect('/profile/settings/')
+    userForm = UserForm(request.POST or None, instance=request.user)
+    profileForm = ProfileForm(request.POST or None, instance=request.user.get_profile())
+    if profileForm.is_valid() and userForm.is_valid():
+        profileForm.save()
+        userForm.save()
+        messages.add_message(request, messages.SUCCESS, 
+            'Your settings were saved successfully.')
+        return HttpResponseRedirect('/profile/settings/')
     return render_to_response('profile/settings.html', {'profileForm': profileForm, 
         'userForm': userForm}, RequestContext(request))
 
