@@ -73,7 +73,8 @@ def hasDuplicate(caseNum, caseName):
     DB. If it doesn't, then it puts it in. If it does, it returns it.
     """
     
-    caseName = caseName.replace('&nbsp;', ' ').strip()
+    caseName = caseName.replace('&nbsp;', ' ').replace('%20', ' ').strip()
+    caseNum = caseNum.replace('&nbsp;', ' ').replace('%20', ' ').strip()
     
     # check for duplicates, make the object in their absence
     cite, created = Citation.objects.get_or_create(
@@ -184,7 +185,8 @@ def scrapeCourt(courtID, result):
         ct = Court.objects.get(courtUUID='ca2')
 
         today = datetime.date.today()
-        formattedToday = str(today.year) + str(today.month) + str(today.day)
+        #formattedToday = str(today.year) + str(today.month) + str(today.day)
+        formattedToday = str(today.year) + str(today.month) + '07'
 
         data = "IW_DATABASE=OPN&IW_FIELD_TEXT=*&IW_FILTER_DATE_AFTER=" +\
             formattedToday + "&IW_FILTER_DATE_BEFORE=&IW_BATCHSIZE=20&" +\
