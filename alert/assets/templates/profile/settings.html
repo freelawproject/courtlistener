@@ -17,6 +17,15 @@
                 <div class="span-10 error">
                     <p class="bottom">There were errors with your submission.</p>
                 </div>
+                <ul>
+                {% for error in userForm.errors %}
+                    <li>{{ error }}</li>
+                {%endfor%}
+                {% for error in userForm.username.errors %}
+                    {{ error }}
+                {% endfor %}
+                </ul>
+                
                 <div class="span-7 last">&nbsp;</div>
             </div>
         {% endif %}
@@ -44,6 +53,17 @@
                     </span>
                 {% endif %}<br>
                 {{ userForm.first_name }}
+            </p>
+            <p>
+                <label for="id_username">Username</label>
+                {% if userForm.username.errors %}
+                    <span class="errortext">
+                        {% for error in userForm.username.errors %}
+                            {{ error|escape }}  
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ userForm.username }}
             </p>
             <p>
                 <label for="id_last_name">Last name</label>
@@ -123,8 +143,11 @@
                     </span>
                 {% endif %}
             </p>
-          <button type="submit" class="button">Save</button>
-          <a href="/profile/delete">Delete my account</a>
-        </profileForm>
+            <input type="hidden" value="{{user.username}}" name="user" id="id_user">
+            <button type="submit" class="button">Save</button>
+            <a href="/profile/delete">Delete my account</a> {# part of the form so that it lines up nicely. #}
+        </form>
+
+
     </div>
 {% endblock %}

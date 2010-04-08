@@ -53,17 +53,25 @@ def viewSettings(request):
     else:
         # the form is loading for the first time
         userForm = UserForm(instance = request.user)
-        
-        try:
-            userProfile = request.user.get_profile()
-            profileForm = ProfileForm(instance = userProfile)
-        except:
-            # if no userProfile exists yet (cause the user hasn't created one) do this
-            profileForm = ProfileForm(instance = request.user)
+        profileForm = ProfileForm(instance = request.user)
 
 
     return render_to_response('profile/settings.html', {'profileForm': profileForm, 
         'userForm': userForm}, RequestContext(request))
+
+@login_required    
+def viewSettings(request):
+        user_form = UserForm(request.POST or None, prefix='user', instance=request.user)
+        profile_form = ProfileForm(request.POST or None, prefix='profile', instance=request.user.get_profile())
+        if all([profile_form.is_valid(), user_form.is_valid()]):
+            profile_form.save()
+            user_form.save()
+            messages.add_message(request, messages.SUCCESS, 
+                'Your settings were saved successfully.')
+            return HttpResponseRedirect('/profile/settings/')
+    return render_to_response('profile/settings.html', {'profileForm': profileForm, 
+        'userForm': userForm}, RequestContext(request))
+
 
 
 @login_required

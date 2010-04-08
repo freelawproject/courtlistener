@@ -4,7 +4,7 @@
 
 {% block content %}
     <div class="span-18 colborder" id="content">
-        <h2>Sign in</h2>
+        {% block h2 %}<h2>Sign in</h2>{% endblock %}
             
         {% if form.errors %}
             <div class="span-18">
@@ -29,6 +29,7 @@
             <input type="hidden" name="next" value="{{ next|escape }}">
             <button type="submit" class="button">Sign in</button>
         </form>
-        <p><a href="/reset-password/">Forgot password?</a></p>
+        <p class="bottom"><a href="/reset-password/">Forgot password?</a></p>
+        <p><a href="/register/">Need to register?</a></p>
     </div>
 {% endblock %}
