@@ -85,7 +85,7 @@ urlpatterns = patterns('',
     
     #Reset password pages
     (r'^reset-password/$', password_reset),
-    (r'^reset-password/done/$', password_reset_done),
+    (r'^reset-password/instructions-sent/$', password_reset_done),
     (r'^confirm-password/(?P<uidb36>.*)/(?P<token>.*)/$', password_reset_confirm),
     (r'^reset-password/complete/$', password_reset_complete),
 

@@ -31,12 +31,23 @@ class ProfileForm(ModelForm):
         
 class UserForm(ModelForm):
     email = forms.EmailField(required=True)
+    
+    # ensure that emails are always unique.
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        username = self.instance.username
+        print username
+        
+        if email and (User.objects.filter(email=email).exclude(username=self.instance.username).count() > 0):
+            raise forms.ValidationError(u'That email address is already in use.')
+        return email
+    
     class Meta:
         model = User
-        # If these aren't excluded, they throw errors or get reset to default. 
+        # If these aren't excluded, they throw errors or get deleted. 
         # Either is BAD, BAD, BAD
-        exclude = ('username', 'password', 'last_login', 'date_joined',
-            'is_staff', 'is_active', 'is_superuser', 'groups', 'user_permissions',)
+        exclude = ('password', 'last_login', 'date_joined', 'is_staff', 
+            'is_active', 'is_superuser', 'groups', 'user_permissions',)
             
 
 class UserCreationFormExtended(UserCreationForm):
@@ -44,6 +55,13 @@ class UserCreationFormExtended(UserCreationForm):
     def __init__(self, *args, **kwargs):
         super(UserCreationFormExtended, self).__init__(*args, **kwargs)
         self.fields['email'].required = True
+
+    # ensure that emails are always unique.
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if email and User.objects.filter(email=email).count():
+            raise forms.ValidationError(u'That email address is already in use.')
+        return email
 
     class Meta:
         model = User
