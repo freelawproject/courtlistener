@@ -110,6 +110,7 @@ class JudgeAlias (models.Model):
 
 
 class Citation(models.Model):
+    search = SphinxSearch()
     citationUUID = models.AutoField("a unique ID for each citation",
         primary_key=True)
     caseNameShort = models.CharField("short name, as it is usually found on the court website",
