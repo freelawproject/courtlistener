@@ -20,10 +20,12 @@ from alert.alertSystem.models import *
 
 class CitationAdmin(admin.ModelAdmin):
     list_display = ('caseNameShort',)
+    search_fields = ['caseNameShort', 'caseNameFull', 'caseNumber']
     
 class DocumentAdmin(admin.ModelAdmin):
     list_display = ('citation', 'court',)
     ordering = ('citation',)
+    search_fields = ['@documentPlainText']
 
 
 admin.site.register(Court)
