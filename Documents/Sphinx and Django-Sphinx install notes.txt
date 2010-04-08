@@ -36,3 +36,11 @@ Process:
                 - Delete the line referencing the egg we just deleted.
  - add djangosphinx to INSTALLED_APPS
  - add this to settings.py: SPHINX_API_VERSION = 0x116
+ 
+##########
+Sphinx configure notes
+##########
+Got the config set up by using the generate_sphinx_config line, and the notes on this page:
+http://pkarl.com/articles/guide-django-full-text-search-sphinx-and-django-sp/
+
+
