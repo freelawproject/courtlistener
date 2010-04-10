@@ -37,7 +37,6 @@ def downloadPDF(LinkToPdf):
     returns a StringIO that is the PDF, I think
     """
 
-
     webFile = urllib2.urlopen(LinkToPdf)
 
     stringThing = StringIO.StringIO()
@@ -72,10 +71,10 @@ def hasDuplicate(caseNum, caseName):
     """takes a caseName and a caseNum, and checks if the object exists in the
     DB. If it doesn't, then it puts it in. If it does, it returns it.
     """
-    
+
     caseName = caseName.replace('&nbsp;', ' ').replace('%20', ' ').strip()
     caseNum = caseNum.replace('&nbsp;', ' ').replace('%20', ' ').strip()
-    
+
     # check for duplicates, make the object in their absence
     cite, created = Citation.objects.get_or_create(
         caseNameShort = str(caseName), caseNumber = str(caseNum))
@@ -92,12 +91,12 @@ def scrapeCourt(courtID, result):
         ct = Court.objects.get(courtUUID='ca1')
 
         req = urllib2.urlopen(url)
-        
+
         # this code gets rid of errant ampersands - they throw big errors.
         contents = req.read()
         if '&' in contents:
             punctuationRegex = re.compile(" & ")
-            contents = re.sub(punctuationRegex, " &amp; ", contents)        
+            contents = re.sub(punctuationRegex, " &amp; ", contents)
             tree = etree.fromstring(contents)
         else:
             tree = etree.fromstring(contents)
@@ -110,7 +109,6 @@ def scrapeCourt(courtID, result):
         caseDateRegex = re.compile("(\d{2}/\d{2}/\d{4})",
             re.VERBOSE | re.DOTALL)
         caseNumberRegex = re.compile("(\d{2}-.*?\W)(.*)$")
-
 
         i = 0
         while i < len(caseLinks):
@@ -274,13 +272,13 @@ def scrapeCourt(courtID, result):
         and then giving up once I hit one that I've done before. This will work
         because they are in reverse chronological order.
         """
-        
-        # if these URLs change, the docType identification (below) will need 
+
+        # if these URLs change, the docType identification (below) will need
         # to be updated. It's lazy, but effective.
-        urls = ("http://www.ca3.uscourts.gov/recentop/week/recprec.htm", 
+        urls = ("http://www.ca3.uscourts.gov/recentop/week/recprec.htm",
             "http://www.ca3.uscourts.gov/recentop/week/recnon2day.htm",)
         ct = Court.objects.get(courtUUID='ca3')
-        
+
         for url in urls:
             html = urllib2.urlopen(url)
             soup = BeautifulSoup(html)
@@ -577,7 +575,7 @@ def scrapeCourt(courtID, result):
             # using caseLink, we can get the caseNumber and documentType
             caseNumber = aTags[i].next.next.next.next.next.contents[0].strip()\
                 .replace('&nbsp;','')
-            
+
             # using the filename, we can determine the documentType...
             fileName = aTags[i].contents[0]
             if 'n' in fileName:
@@ -734,7 +732,7 @@ def scrapeCourt(courtID, result):
             caseDate = caseDateRegex.search(junk).group(1)\
                 .replace('&nbsp;', ' ').strip()
             caseNameShort = caseDateRegex.search(junk).group(2)
-                
+
 
             # some caseDate cleanup
             splitDate = caseDate.split('/')
@@ -844,14 +842,14 @@ def scrapeCourt(courtID, result):
     elif (courtID == 10):
         url = "http://www.ck10.uscourts.gov/opinions/new/daily_decisions.rss"
         ct = Court.objects.get(courtUUID = 'ca10')
-        
+
         req = urllib2.urlopen(url)
-        
+
         # this code gets rid of errant ampersands - they throw big errors.
         contents = req.read()
         if '&' in contents:
             punctuationRegex = re.compile(" & ")
-            contents = re.sub(punctuationRegex, " &amp; ", contents)        
+            contents = re.sub(punctuationRegex, " &amp; ", contents)
             tree = etree.fromstring(contents)
         else:
             tree = etree.fromstring(contents)
@@ -860,7 +858,7 @@ def scrapeCourt(courtID, result):
         descriptions = tree.xpath("//item/description")
         docTypes = tree.xpath("//item/category")
         caseNames = tree.xpath("//item/title")
-        
+
         caseDateRegex = re.compile("(\d{2}/\d{2}/\d{4})",
             re.VERBOSE | re.DOTALL)
         caseNumberRegex = re.compile("(\d{2}-\d{4})(.*)$")
@@ -934,12 +932,12 @@ def scrapeCourt(courtID, result):
         ct = Court.objects.get(courtUUID = 'ca11')
 
         req = urllib2.urlopen(url)
-        
+
         # this code gets rid of errant ampersands - they throw big errors.
         contents = req.read()
         if '&' in contents:
             punctuationRegex = re.compile(" & ")
-            contents = re.sub(punctuationRegex, " &amp; ", contents)        
+            contents = re.sub(punctuationRegex, " &amp; ", contents)
             tree = etree.fromstring(contents)
         else:
             tree = etree.fromstring(contents)
@@ -1088,7 +1086,7 @@ def scrapeCourt(courtID, result):
 
         aTagsRegex = re.compile('pdf$', re.IGNORECASE)
         trTags = soup.findAll('tr')
-        
+
         # start on the first row, since the first is headers.
         i = 1
         # stop after 20, because it gets out of control otherwise.
@@ -1157,7 +1155,6 @@ def scrapeCourt(courtID, result):
             i += 1
 
         return result
-    
 
 
 def getPDFContent(path):
@@ -1168,7 +1165,6 @@ def getPDFContent(path):
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     content, err = process.communicate()
     return content, err
-
 
 
 def parseCourt(courtID, result):
@@ -1201,7 +1197,6 @@ def parseCourt(courtID, result):
     return result
 
 
-
 def scrape(request, courtID):
     """
     The master function. This will receive a court ID, determine the correct
@@ -1212,7 +1207,6 @@ def scrape(request, courtID):
 
     returns HttpResponse containing the result
     """
-
 
     # we show this string to users if things go smoothly
     result = "It worked<br>"
@@ -1276,11 +1270,11 @@ def parse(request, courtID):
 
     return render_to_response('parse.html', {'result': result}, RequestContext(request))
 
+
 def viewCases(request, court, case):
     """Take a court and a caseNameShort, and display what we know about that
     case.
     """
-
 
     # get the court and citation information
     ct = Court.objects.get(courtUUID = court)
@@ -1311,6 +1305,7 @@ def viewCases(request, court, case):
         return render_to_response('display_cases.html', {'title': case,
             'court': ct}, RequestContext(request))
 
+
 def viewDocumentListByCourt(request, court):
     """Show documents for a court, ten at a time"""
     from django.core.paginator import Paginator, InvalidPage, EmptyPage
@@ -1324,13 +1319,13 @@ def viewDocumentListByCourt(request, court):
 
     # we will show ten docs/page
     paginator = Paginator(docs, 10)
-    
+
     # Make sure page request is an int. If not, deliver first page.
     try:
         page = int(request.GET.get('page', '1'))
     except ValueError:
         page = 1
-    
+
     # If page request is out of range, deliver last page of results.
     try:
         documents = paginator.page(page)

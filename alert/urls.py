@@ -90,8 +90,9 @@ urlpatterns = patterns('',
     (r'^reset-password/complete/$', signIn, {'template_name': 'registration/password_reset_complete.html'}),
 
     # Alert/search pages
-    (r'^(alert/preview)/$', showResults),
-    (r'^(search/results)/$', showResults),
+    # These URLs support either GET requests or things like /alert/preview/searchterm.
+    (r'^(alert/preview)/(.*)/?$', showResults),
+    (r'^(search/results)/(.*)/?$', showResults),
     (r'^alert/edit/(\d{1,6})/$', editAlert),
     (r'^alert/delete/(\d{1,6})/$', deleteAlert),    
 )
