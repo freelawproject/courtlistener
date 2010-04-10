@@ -1,16 +1,16 @@
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -48,26 +48,31 @@ def home(request):
     return render_to_response('home_page.html', {'form': form},
         RequestContext(request))
 
-def showResults(request, queryType):
+
+def showResults(request, queryType, query):
     """Show the results for a query as either an alert or a search"""
     if queryType == "alert/preview":
         queryType = "alert"
     elif queryType == "search/results":
         queryType = "search"
-
-    query = request.GET['q']
     
+    # if they don't provide something like /?q=searchterms, we support URL 
+    # hacking like /search/results/searchterms. Note the default is via GET.
+    if query == '':
+        query = request.GET['q']
+
+    # this handles the alert creation form.
     if request.method == 'POST':
         from alert.userHandling.models import Alert
         # an alert has been created
         alertForm = CreateAlertForm(request.POST)
         if alertForm.is_valid():
             cd = alertForm.cleaned_data
-            
+
             # save the alert
             a = CreateAlertForm(cd)
             alert = a.save() # this method saves it and returns it
-            
+
             # associate the user with the alert
             try:
                 # This works...but only if they already have an account.
@@ -80,9 +85,9 @@ def showResults(request, queryType):
                 up.user = u
                 up.save()
             up.alert.add(alert)
-            messages.add_message(request, messages.SUCCESS, 
+            messages.add_message(request, messages.SUCCESS,
                     'Your alert was created successfully.')
-                
+
             # and redirect to the alerts page
             return HttpResponseRedirect('/profile/alerts/')
     else:
@@ -92,7 +97,20 @@ def showResults(request, queryType):
 
     # very unsophisticated search technique. Slow, cludgy, and MySQL
     # intensive. But functional, kinda. Sphinx code WILL go here.
-    results = Document.objects.filter(documentPlainText__icontains=query).order_by("-dateFiled")
+    # results = Document.objects.filter(documentPlainText__icontains=query).order_by("-dateFiled")
+    
+    # Sphinx search
+    """Known problems:
+        - punctuation in a phrase search may break it.
+        - length of phrase searches may be limited.
+        - date fields don't work
+        - error when doing @docStatus u"""
+    try:
+        queryset = Document.search.query(query)
+        results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
+            .order_by('-dateFiled')
+    except:
+        results = []
 
     # next, we paginate we will show ten results/page
     paginator = Paginator(results, 10)
@@ -108,21 +126,23 @@ def showResults(request, queryType):
         results = paginator.page(page)
     except (EmptyPage, InvalidPage):
         results = paginator.page(paginator.num_pages)
-        
+    except:
+        results = []
+
     return render_to_response('search/results.html',
         {'results': results, 'queryType': queryType, 'query': query,
         'alertForm': alertForm}, RequestContext(request))
-        
+
 
 @login_required
 def editAlert(request, alertID):
     user = request.user.get_profile()
-    
+
     try:
         alertID = int(alertID)
     except:
         return HttpResponseRedirect('/')
-    
+
     # check if the user can edit this, or if they are url hacking...
     for alert in user.alert.all():
         if alertID == alert.alertUUID:
@@ -133,43 +153,44 @@ def editAlert(request, alertID):
             break
         else:
             canEdit = False
-            
+
     if canEdit == False:
         # we just send them home, they can continue playing
         return HttpResponseRedirect('/')
-    
+
     elif canEdit:
         # they can edit the item, therefore, we load the form.
         if request.method == 'POST':
             form = CreateAlertForm(request.POST)
             if form.is_valid():
                 cd = form.cleaned_data
-                
+
                 # save the changes
                 a = CreateAlertForm(cd, instance=alert)
                 a.save() # this method saves it and returns it
-                messages.add_message(request, messages.SUCCESS, 
+                messages.add_message(request, messages.SUCCESS,
                     'Your alert was saved successfully.')
 
-                
+
                 # redirect to the alerts page
                 return HttpResponseRedirect('/profile/alerts/')
-                
+
         else:
             # the form is loading for the first time
             form = CreateAlertForm(instance = alert)
-        
+
         return render_to_response('profile/edit_alert.html', {'form': form, 'alertID': alertID}, RequestContext(request))
+
 
 @login_required
 def deleteAlert(request, alertID):
     user = request.user.get_profile()
-    
+
     try:
         alertID = int(alertID)
     except:
         return HttpResponseRedirect('/')
-    
+
     # check if the user can edit this, or if they are url hacking...
     for alert in user.alert.all():
         if alertID == alert.alertUUID:
@@ -180,14 +201,14 @@ def deleteAlert(request, alertID):
             break
         else:
             canEdit = False
-    
+
     if canEdit == False:
         # we send them home
         return HttpResponseRedirect('/')
-    
+
     elif canEdit:
         # Then we delete it, and redirect them.
         alert.delete()
-        messages.add_message(request, messages.SUCCESS, 
+        messages.add_message(request, messages.SUCCESS,
             'Your alert was deleted successfully.')
         return HttpResponseRedirect('/profile/alerts/')
