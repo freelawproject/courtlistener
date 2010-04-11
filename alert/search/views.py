@@ -220,3 +220,6 @@ def deleteAlert(request, alertID):
         messages.add_message(request, messages.SUCCESS,
             'Your alert was deleted successfully.')
         return HttpResponseRedirect('/profile/alerts/')
+    
+def toolsPage(request):
+    return render_to_response('search/tools.html', {}, RequestContext(request))
