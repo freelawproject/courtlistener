@@ -42,7 +42,7 @@
                         <td>{{ alert.get_alertFrequency_display }}</td>
                         <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"None" }}</td>
                         <td>{{ alert.alertPrivacy|yesno:"Yes,No" }}</td>
-                        <td><a href="/alert/edit/{{ alert.alertUUID }}/">Edit/delete</a></td>
+                        <td><a href="/alert/edit/{{ alert.alertUUID }}/">edit/delete</a></td>
                     </tr>
                     {% endfor %}
                 </table>
