@@ -1,5 +1,7 @@
 unpublished > u
 unprecedential > u
+non-precedential > u
+nonprecedential > u
 published > p
 precedential > p
 0 > 0
