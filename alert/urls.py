@@ -71,8 +71,9 @@ urlpatterns = patterns('',
     (r'^sign-in/$', signIn),
     (r'^sign-out/$', signOut),
     
-    # Homepage!
+    # Homepage and favicon
     (r'^$', home),
+    (r'^favicon\.ico$', 'django.views.generic.simple.redirect_to', {'url': '/media/images/ico/favicon.ico'}),
     
     # Settings pages
     (r'^profile/settings/$', viewSettings),
