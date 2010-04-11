@@ -114,8 +114,7 @@ def showResults(request, queryType):
     """Known problems:
         - punctuation in a phrase search may break it.
         - date fields don't work
-        - need to investigate star syntax and enable_star
-        - @docStatus non-precedential doesn't work"""
+        - need to investigate star syntax and enable_star"""
     try:
         queryset = Document.search.query(query)
         results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
