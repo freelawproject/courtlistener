@@ -34,11 +34,11 @@ Sets up all the overrides or additional CSS that the site will use.
 .round-bottom {
     -moz-border-radius-bottomright: 6px;
     -moz-border-radius-bottomleft: 6px;
-    -webkit-border-radius-bottomright: 6px;
-    -webkit-border-radius-bottomleft: 6px;
+    -webkit-border-bottom-right-radius: 6px;
+    -webkit-border-bottom-left-radius: 6px;
 }
 
-a, a:visited {
+a:link, a:visited {
     text-decoration: none;
 }
 
