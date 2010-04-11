@@ -23,7 +23,8 @@ class CitationAdmin(admin.ModelAdmin):
     search_fields = ['caseNameShort', 'caseNameFull', 'caseNumber']
     
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ('citation', 'court',)
+    list_display = ('citation',)
+    list_filter = ('court',)
     ordering = ('citation',)
     search_fields = ['@documentPlainText']
 
