@@ -4,7 +4,7 @@
   <ShortName>Court Listener</ShortName>
   <Description>Search the CourtListener.com database</Description>
   <Url type="text/html" method="get" template="http://courtlistener.com/search/results/?q={searchTerms}&amp;search="/>
-  <Image width="16" height="16">http://courtlistener.com/media/images/ico/courtlistener_search.ico</Image>
+  <Image width="16" height="16">http://courtlistener.com/media/images/ico/favicon.ico</Image>
   <Developer>Court Listener</Developer>
 
   <InputEncoding>UTF-8</InputEncoding>
