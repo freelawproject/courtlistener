@@ -49,17 +49,14 @@ def home(request):
         RequestContext(request))
 
 
-def showResults(request, queryType, query):
+def showResults(request, queryType):
     """Show the results for a query as either an alert or a search"""
     if queryType == "alert/preview":
         queryType = "alert"
     elif queryType == "search/results":
         queryType = "search"
     
-    # if they don't provide something like /?q=searchterms, we support URL 
-    # hacking like /search/results/searchterms. Note the default is via GET.
-    if query == '':
-        query = request.GET['q']
+    query = request.GET['q']
 
     # this handles the alert creation form.
     if request.method == 'POST':
@@ -95,8 +92,7 @@ def showResults(request, queryType, query):
         # of the page!
         alertForm = CreateAlertForm(initial = {'alertText': query})
 
-    # very unsophisticated search technique. Slow, cludgy, and MySQL
-    # intensive. But functional, kinda. Sphinx code WILL go here.
+    # OLD SEARCH METHOD
     # results = Document.objects.filter(documentPlainText__icontains=query).order_by("-dateFiled")
     
     # Sphinx search
@@ -104,7 +100,8 @@ def showResults(request, queryType, query):
         - punctuation in a phrase search may break it.
         - length of phrase searches may be limited.
         - date fields don't work
-        - error when doing @docStatus u"""
+        - error when doing @docStatus u
+        - searching for tests and test yields different results."""
     try:
         queryset = Document.search.query(query)
         results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
