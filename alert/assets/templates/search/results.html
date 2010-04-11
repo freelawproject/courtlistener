@@ -3,7 +3,7 @@
 {# this could mirror the titles of yahoo, google and bing more closely, if we want. #}
 {% block title %} CourtListener.com / Results / {{ query }} / Page / {{ results.number }}{% endblock %}
 
-{% block javascript %}
+{% block headers %}
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
     <script type="text/javascript" src="/media/js/collapsible.js"></script>
     <script type="text/javascript">
@@ -12,6 +12,7 @@
 		    $("fieldset.collapsed").collapse( { closed: true } );
 	    });
      </script>
+     <link rel="search" type="application/opensearchdescription+xml" title="Court Listener" href="/media/xml/opensearch.xml">
 {% endblock %}
 
 {% block content %}

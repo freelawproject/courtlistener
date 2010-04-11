@@ -112,9 +112,7 @@ def showResults(request, queryType):
     
     # Sphinx search
     """Known problems:
-        - punctuation in a phrase search may break it.
-        - date fields don't work
-        - need to investigate star syntax and enable_star"""
+        - date fields don't work"""
     try:
         queryset = Document.search.query(query)
         results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
