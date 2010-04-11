@@ -1,3 +1,7 @@
+unpublished > u
+unprecedential > u
+published > p
+precedential > p
 0 > 0
 0s > 0s
 0th > 0th

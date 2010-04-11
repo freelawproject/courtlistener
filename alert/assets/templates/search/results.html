@@ -31,6 +31,18 @@
             </div>
             <div class="span-10 last">&nbsp;</div>
         {% endif %}
+        
+        {% if messages %}
+            <div class="span-24 last">
+                <div class="span-8">
+                {% for message in messages %}
+                        <p class="bottom {{message.tags}}">{{message}}</p>
+                {% endfor %}
+                </div>
+                <div class="span-16 last">&nbsp;</div>
+            </div>
+        {% endif %}
+        
         <div class="span-18 last">
             <form action="" method="get">
                 <input class="title" name="q" id="search" value="{{query}}">&nbsp;&nbsp;

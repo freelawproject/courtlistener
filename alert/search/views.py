@@ -56,7 +56,22 @@ def showResults(request, queryType):
     elif queryType == "search/results":
         queryType = "search"
     
-    query = request.GET['q']
+    try:
+        query = request.GET['q']
+    except:
+        # if somebody is URL hacking at /search/results/ or alert/preview/
+        query = ""
+#    
+#    if '@docStatus precedential' in query or '@docStatus published' in query:
+#        query = query.replace('@docStatus precedential', '@docStatus P')
+#        query = query.replace('@docStatus published', '@docStatus P')
+#        messages.add_message(request, messages.INFO,
+#            'Your query has been changed to read @docStatus P')
+#    if '@docStatus unpublished' in query or '@docStatus unprecedential' in query:
+#        query = query.replace('@docStatus unpublished', '@docStatus U')
+#        query = query.replace('@docStatus unprecedential', '@docStatus U')
+#        messages.add_message(request, messages.INFO,
+#            'Your query has been changed to read @docStatus U')
 
     # this handles the alert creation form.
     if request.method == 'POST':
