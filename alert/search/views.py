@@ -115,8 +115,8 @@ def showResults(request, queryType):
         - punctuation in a phrase search may break it.
         - length of phrase searches may be limited.
         - date fields don't work
-        - error when doing @docStatus u
-        - searching for tests and test yields different results."""
+        - need to investigate star syntax and enable_star
+        - @docStatus non-precedential doesn't work"""
     try:
         queryset = Document.search.query(query)
         results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
