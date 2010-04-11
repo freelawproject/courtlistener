@@ -114,10 +114,10 @@
             <p> {{result.dateFiled|date:"l, F jS, Y"}}<br>
                 {# Print the whether the document is precedential #}
                 {% ifequal result.documentType "U" %}
-                    <strong>Status:</strong> Non-precedential/Unpublished.<br>
+                    <strong>Status:</strong> Non-precedential/Unpublished<br>
                 {% endifequal %}
                 {% ifequal result.documentType "P" %}
-                    <strong>Status:</strong> Precedential/Published.<br>
+                    <strong>Status:</strong> Precedential/Published<br>
                 {% endifequal %}
 
                 <strong>Download PDF: </strong><a href="{{ result.download_URL }}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="http://courtlistener.com/{{result.local_path}}">Our backup</a></p><br>

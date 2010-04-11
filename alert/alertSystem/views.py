@@ -632,66 +632,76 @@ def scrapeCourt(courtID, result):
 
         url = "http://www.ca7.uscourts.gov/fdocs/docs.fwx"
         ct = Court.objects.get(courtUUID = 'ca7')
+        
+        # if these strings change, check that documentType still gets set correctly.
+        dataStrings = ("yr=&num=&Submit=Today&dtype=Opinion&scrid=Select+a+Case",
+            "yr=&num=&Submit=Past+Month&dtype=Nonprecedential+Disposition&scrid=Select+a+Case")
+        
+        for dataString in dataStrings:    
+            req = urllib2.Request(url, dataString)
+            response = urllib2.urlopen(req)
+            html = response.read()
 
-        data = "yr=&num=&Submit=Today&dtype=Opinion&scrid=Select+a+Case"
-        req = urllib2.Request(url, data)
-        response = urllib2.urlopen(req)
-        html = response.read()
+            soup = BeautifulSoup(html)
 
-        soup = BeautifulSoup(html)
+            aTagsRegex = re.compile('pdf$', re.IGNORECASE)
+            aTags = soup.findAll(attrs={'href' : aTagsRegex})
 
-        aTagsRegex = re.compile('pdf$', re.IGNORECASE)
-        aTags = soup.findAll(attrs={'href' : aTagsRegex})
+            i = 0
+            while i < len(aTags):
+                # these will hold our final document and citation
+                doc = Document()
+                doc.court = ct
 
-        i = 0
-        while i < len(aTags):
-            # these will hold our final document and citation
-            doc = Document()
-            doc.court = ct
+                # we begin with the caseLink field
+                caseLink = aTags[i].get("href")
+                caseLink = make_url_absolute(url, caseLink)
+                doc.download_URL = caseLink
 
-            # we begin with the caseLink field
-            caseLink = aTags[i].get("href")
-            caseLink = make_url_absolute(url, caseLink)
-            doc.download_URL = caseLink
+                # using caseLink, we can get the caseNumber and documentType
+                caseNumber = aTags[i].previous.previous.previous.previous.previous\
+                    .previous.previous.previous.previous.previous.strip()
 
-            # using caseLink, we can get the caseNumber and documentType
-            caseNumber = aTags[i].previous.previous.previous.previous.previous\
-                .previous.previous.previous.previous.previous.strip()
+                # next up: caseDate
+                caseDate = aTags[i].previous.previous.previous.contents[0].strip()
+                splitDate = caseDate.split('/')
+                caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
+                    int(splitDate[1]))
+                doc.dateFiled = caseDate
 
-            # next up: caseDate
-            caseDate = aTags[i].previous.previous.previous.contents[0].strip()
-            splitDate = caseDate.split('/')
-            caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
-                int(splitDate[1]))
-            doc.dateFiled = caseDate
+                # next up: caseNameShort
+                caseNameShort = aTags[i].previous.previous.previous.previous\
+                    .previous.previous.previous
+                                
+                # now that we have the caseNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                if not created:
+                    result += "duplicate found at: " + str(i) + "<br>"
+                    i += 1
+                    continue
 
-            # next up: caseNameShort
-            caseNameShort = aTags[i].previous.previous.previous.previous\
-                .previous.previous.previous
+                # if that goes well, we save to the DB
+                doc.citation = cite
+                
+                # next up: docStatus
+                if "type=Opinion" in dataString:
+                    doc.documentType = 'P'
+                elif "type=Nonprecedential+Disposition" in dataString:
+                    doc.documentType = 'U'
 
-            # now that we have the caseNumber and caseNameShort, we can dup check
-            cite, created = hasDuplicate(caseNumber, caseNameShort)
-            if not created:
-                result += "duplicate found at: " + str(i) + "<br>"
+                # finally, we should download the PDF and save it locally.
+                myFile = downloadPDF(caseLink)
+                doc.local_path.save(caseNameShort + ".pdf", myFile)
+
+                # and using the PDF we just downloaded, we can generate our sha1 hash
+                data = doc.local_path.read()
+                sha1Hash = hashlib.sha1(data).hexdigest()
+                doc.documentSHA1 = sha1Hash
+
+                # finalize everything
+                doc.save()
+
                 i += 1
-                continue
-
-            # if that goes well, we save to the DB
-            doc.citation = cite
-
-            # finally, we should download the PDF and save it locally.
-            myFile = downloadPDF(caseLink)
-            doc.local_path.save(caseNameShort + ".pdf", myFile)
-
-            # and using the PDF we just downloaded, we can generate our sha1 hash
-            data = doc.local_path.read()
-            sha1Hash = hashlib.sha1(data).hexdigest()
-            doc.documentSHA1 = sha1Hash
-
-            # finalize everything
-            doc.save()
-
-            i += 1
 
         return result
 
