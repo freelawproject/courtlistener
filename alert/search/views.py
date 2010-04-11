@@ -113,7 +113,6 @@ def showResults(request, queryType):
     # Sphinx search
     """Known problems:
         - punctuation in a phrase search may break it.
-        - length of phrase searches may be limited.
         - date fields don't work
         - need to investigate star syntax and enable_star
         - @docStatus non-precedential doesn't work"""

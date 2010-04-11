@@ -632,12 +632,12 @@ def scrapeCourt(courtID, result):
 
         url = "http://www.ca7.uscourts.gov/fdocs/docs.fwx"
         ct = Court.objects.get(courtUUID = 'ca7')
-        
+
         # if these strings change, check that documentType still gets set correctly.
         dataStrings = ("yr=&num=&Submit=Today&dtype=Opinion&scrid=Select+a+Case",
-            "yr=&num=&Submit=Past+Month&dtype=Nonprecedential+Disposition&scrid=Select+a+Case")
-        
-        for dataString in dataStrings:    
+            "yr=&num=&Submit=Today&dtype=Nonprecedential+Disposition&scrid=Select+a+Case")
+
+        for dataString in dataStrings:
             req = urllib2.Request(url, dataString)
             response = urllib2.urlopen(req)
             html = response.read()
@@ -672,7 +672,7 @@ def scrapeCourt(courtID, result):
                 # next up: caseNameShort
                 caseNameShort = aTags[i].previous.previous.previous.previous\
                     .previous.previous.previous
-                                
+
                 # now that we have the caseNumber and caseNameShort, we can dup check
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
                 if not created:
@@ -682,7 +682,7 @@ def scrapeCourt(courtID, result):
 
                 # if that goes well, we save to the DB
                 doc.citation = cite
-                
+
                 # next up: docStatus
                 if "type=Opinion" in dataString:
                     doc.documentType = 'P'
@@ -1139,6 +1139,9 @@ def scrapeCourt(courtID, result):
             documentType = trTags[i].td.nextSibling.nextSibling.nextSibling\
                 .nextSibling.nextSibling.nextSibling.nextSibling.nextSibling\
                 .contents[0].contents[0]
+            # normalize the result for our internal purposes...
+            if documentType == 'N':
+                documentType = 'U'
             doc.documentType = documentType
 
             # now that we have the caseNumber and caseNameShort, we can dup check
