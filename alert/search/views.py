@@ -220,6 +220,15 @@ def deleteAlert(request, alertID):
         messages.add_message(request, messages.SUCCESS,
             'Your alert was deleted successfully.')
         return HttpResponseRedirect('/profile/alerts/')
+
+@login_required
+def deleteAlertConfirm(request, alertID):
+    try:
+        alertID = int(alertID)
+    except:
+        return HttpResponseRedirect('/')
+    return render_to_response('profile/delete_confirm.html', {'alertID': alertID}, RequestContext(request))
+    
     
 def toolsPage(request):
     return render_to_response('search/tools.html', {}, RequestContext(request))

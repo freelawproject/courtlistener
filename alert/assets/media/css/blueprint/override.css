@@ -4,6 +4,9 @@ Sets up all the overrides or additional CSS that the site will use.
 
 ------------------------------------------------------------------------------*/
 
+.inline {
+    display: inline;
+}
 
 .navigation {
     padding: 0.75em 0em .75em 1.5em;

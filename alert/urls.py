@@ -96,6 +96,7 @@ urlpatterns = patterns('',
     (r'^(search/results)/$', showResults),
     (r'^alert/edit/(\d{1,6})/$', editAlert),
     (r'^alert/delete/(\d{1,6})/$', deleteAlert),
+    (r'^alert/delete/confirm/(\d{1,6})/$', deleteAlertConfirm),
     (r'^tools/$', toolsPage),
 )
 
