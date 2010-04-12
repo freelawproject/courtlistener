@@ -24,6 +24,7 @@ FREQUENCY = (
     ("dly", "Daily"),
     ("wly", "Weekly"),
     ("mly", "Monthly"),
+    ("off", "Off"),
 )
 
 
