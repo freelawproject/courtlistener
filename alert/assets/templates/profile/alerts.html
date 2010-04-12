@@ -34,6 +34,7 @@
                         <th>Frequency</th>
                         <th>Last hit</th>
                         <th>Private</th>
+                        <th>Subscribe</th>
                     </tr>
                     {% for alert in user.get_profile.alert.all %}
                     <tr>
@@ -42,6 +43,7 @@
                         <td>{{ alert.get_alertFrequency_display }}</td>
                         <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"None" }}</td>
                         <td>{{ alert.alertPrivacy|yesno:"Yes,No" }}</td>
+                        <td><a href="/feed/search/?q={{alert.alertText}}"><img src="/media/images/png/atom-feed.png"></a>
                         <td><a href="/alert/edit/{{ alert.alertUUID }}/">edit/delete</a></td>
                     </tr>
                     {% endfor %}
