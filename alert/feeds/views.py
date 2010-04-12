@@ -39,10 +39,10 @@ class searchFeed(Feed):
     
     # get the court info from the URL
     def get_object(self, request, query):
-#        try:
-        query = request.GET['q']
-#        except:
-#            query = ''
+        try:
+            query = request.GET['q']
+        except:
+            query = ''
         return query
     
     def title(self, obj):
@@ -56,9 +56,9 @@ class searchFeed(Feed):
     
     def items(self, obj):
         # Do a Sphinx query here. Return the first 20 results
-        queryset = Document.search.query(str(obj))
+        queryset = Document.search.query(obj)
         results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
-            .order_by('-dateFiled')
+            .order_by('-dateFiled')[:20]
         return results
     
     def item_author_name(self, item):
