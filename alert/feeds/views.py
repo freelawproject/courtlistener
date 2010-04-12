@@ -36,20 +36,13 @@ class searchFeed(Feed):
     """This feed returns the results of a search feed. It lacks a second
     argument in the method b/c it gets its search query from a GET request."""
     feed_type = Atom1Feed
-##    try:
-#    query = Feed[request].GET['q']
-#    print query
-##    except:
-##        query = ""
-###        print "2" + query
-##    print query
     
     # get the court info from the URL
     def get_object(self, request, query):
-        try:
-            query = request.GET['q']
-        except:
-            query = ''
+#        try:
+        query = request.GET['q']
+#        except:
+#            query = ''
         return query
     
     def title(self, obj):
@@ -63,12 +56,9 @@ class searchFeed(Feed):
     
     def items(self, obj):
         # Do a Sphinx query here. Return the first 20 results
-        try:
-            queryset = Document.search.query(obj)
-            results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
-                .order_by('-dateFiled')[:20]
-        except:
-            results = []
+        queryset = Document.search.query(str(obj))
+        results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
+            .order_by('-dateFiled')
         return results
     
     def item_author_name(self, item):
