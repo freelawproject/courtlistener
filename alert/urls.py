@@ -20,6 +20,7 @@ from alert.alertSystem.views import *
 from alert.alertSystem.sitemap import DocumentSitemap
 from alert.contact.views import *
 from alert.emailer.views import *
+from alert.feeds.views import *
 from alert.search.views import *
 from alert.userHandling.views import *
 
@@ -94,10 +95,17 @@ urlpatterns = patterns('',
     # These URLs support either GET requests or things like /alert/preview/searchterm.
     (r'^(alert/preview)/$', showResults),
     (r'^(search/results)/$', showResults),
+    (r'^search/$', showResults), #for the URL hackers in the crowd
     (r'^alert/edit/(\d{1,6})/$', editAlert),
     (r'^alert/delete/(\d{1,6})/$', deleteAlert),
     (r'^alert/delete/confirm/(\d{1,6})/$', deleteAlertConfirm),
     (r'^tools/$', toolsPage),
+
+    
+    # Feeds
+    (r'^feed/(search)/$', searchFeed()), #lacks URL capturing b/c it will use GET queries.
+    (r'^feed/court/all/$', allCourtsFeed()),
+    (r'^feed/court/(?P<court>ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc)/$', courtFeed()),
 )
 
 # if it's not the production site, serve the static files this way.

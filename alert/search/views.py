@@ -49,7 +49,7 @@ def home(request):
         RequestContext(request))
 
 
-def showResults(request, queryType):
+def showResults(request, queryType="search"):
     """Show the results for a query as either an alert or a search"""
     if queryType == "alert/preview":
         queryType = "alert"
@@ -61,17 +61,6 @@ def showResults(request, queryType):
     except:
         # if somebody is URL hacking at /search/results/ or alert/preview/
         query = ""
-#    
-#    if '@docStatus precedential' in query or '@docStatus published' in query:
-#        query = query.replace('@docStatus precedential', '@docStatus P')
-#        query = query.replace('@docStatus published', '@docStatus P')
-#        messages.add_message(request, messages.INFO,
-#            'Your query has been changed to read @docStatus P')
-#    if '@docStatus unpublished' in query or '@docStatus unprecedential' in query:
-#        query = query.replace('@docStatus unpublished', '@docStatus U')
-#        query = query.replace('@docStatus unprecedential', '@docStatus U')
-#        messages.add_message(request, messages.INFO,
-#            'Your query has been changed to read @docStatus U')
 
     # this handles the alert creation form.
     if request.method == 'POST':

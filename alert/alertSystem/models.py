@@ -36,6 +36,11 @@ PACER_CODES = (
     ('cafc', 'Court of Appeals for the Federal Circuit'),
 )
 
+DOCUMENT_STATUSES = (
+    ('P', 'Published'),
+    ('U', 'Unpublished'),
+)
+
 
 # A class to represent some information about each court, can be extended as needed.
 class Court(models.Model):
@@ -199,7 +204,8 @@ class Document(models.Model):
         blank=True)
     documentType = models.CharField("the type of document, as described by document_types.txt",
         max_length=50,
-        blank=True)
+        blank=True,
+        choices=DOCUMENT_STATUSES)
 
     def __unicode__(self):
         if self.citation.caseNameShort:
