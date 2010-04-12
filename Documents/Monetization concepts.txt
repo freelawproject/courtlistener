@@ -5,7 +5,7 @@ ideas until they can be tried out, considered in more detail, etc.
 
 Order of ideas lacks relevancy.
 
-1. Service to send PDFs along with alerts as attachments
+1. Service to send PDFs along with alerts as attachments or as part of the RSS feed
    + nice feature
    + easy to implement
    + makes people's lives easier
