@@ -58,7 +58,7 @@ class searchFeed(Feed):
         # Do a Sphinx query here. Return the first 20 results
         queryset = Document.search.query(obj)
         results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
-            .order_by('-dateFiled')[:20]
+            .order_by('-dateFiled')
         return results
     
     def item_author_name(self, item):
