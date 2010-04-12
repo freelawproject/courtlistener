@@ -22,6 +22,7 @@ from django.template import RequestContext
 from alert.search.forms import SearchForm, CreateAlertForm
 from alert.alertSystem.models import Document
 from alert.userHandling.models import Alert, UserProfile
+import re
 
 def home(request):
     """Show the homepage"""
@@ -102,6 +103,16 @@ def showResults(request, queryType="search"):
     # Sphinx search
     """Known problems:
         - date fields don't work"""
+    
+    # before searching, check that all attributes are valid. Create message if not.
+    attributeRegex = re.compile('(@.*)')
+    attributes = re.findall('@.*\W', query)
+    for attribute in attributes:
+        if attribute.lower() not in "@court @casename @docstatus @doctext":
+            messages.add_message(request, messages.INFO,
+                'We ran your search, but found invalid attributes.<br> \
+                Valid attributes are @court, @caseName, @docStatus and @docText')
+    
     try:
         queryset = Document.search.query(query)
         results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
