@@ -66,7 +66,7 @@ class searchFeed(Feed):
         try:
             queryset = Document.search.query(obj)
             results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
-                .order_by('-dateFiled')
+                .order_by('-dateFiled')[:20]
         except:
             results = []
         return results
