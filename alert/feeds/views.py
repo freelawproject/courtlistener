@@ -64,7 +64,6 @@ class searchFeed(Feed):
     def items(self, obj):
         # Do a Sphinx query here. Return the first 20 results
         try:
-            print obj
             queryset = Document.search.query(obj)
             results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
                 .order_by('-dateFiled')
