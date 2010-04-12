@@ -99,8 +99,7 @@ class courtFeed(Feed):
     def items(self, obj):
         return Document.objects.filter(court = obj.courtUUID).order_by("-dateFiled")[:20]
     
-    def item_author_name(self, item):
-        return item.court
+    item_author_name = "CourtListener.com"
     
     def item_author_link(self, item):
         return item.court.courtURL
@@ -132,8 +131,7 @@ class allCourtsFeed(Feed):
     def items(self, obj):
         return Document.objects.all().order_by("-dateFiled")[:20]
     
-    def item_author_name(self, item):
-        return item.court
+    item_author_name = "CourtListener.com"
     
     def item_author_link(self, item):
         return item.court.courtURL
