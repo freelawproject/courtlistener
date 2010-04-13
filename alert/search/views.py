@@ -68,7 +68,7 @@ def showResults(request, queryType="search"):
         queryType = "alert"
     elif queryType == "search/results":
         queryType = "search"
-    
+
     try:
         query = request.GET['q']
     except:
@@ -111,30 +111,31 @@ def showResults(request, queryType="search"):
 
     # OLD SEARCH METHOD
     # results = Document.objects.filter(documentPlainText__icontains=query).order_by("-dateFiled")
-    
+
     # Sphinx search
     """Known problems:
         - date fields don't work"""
-    
+
     # before searching, check that all attributes are valid. Create message if not.
     attributes = re.findall('@\w*', query)
+    validRegex = re.compile(r'(@court |@casename |@docstatus |@doctext )')
     badAttrs = []
     for attribute in attributes:
-        if attribute.lower() != ("@court" or "@casename" or "@docstatus" or "@doctext"):
+        if validRegex.search(attribute.lower()) == None:
             badAttrs.append(attribute)
-        
+
     # pluralization is a pain, but we must do it...
     if len(badAttrs) == 1:
         messageText = 'We completed your search, but <strong>' + \
         oxford_comma(badAttrs) + '</strong> is not a valid attribute.<br>\
         Valid attributes are @court, @caseName, @docStatus and @docText.'
-    else:
+        messages.add_message(request, messages.INFO, messageText)
+    elif len(badAttrs) > 1:
         messageText = 'We completed your search, but <strong>' + \
         oxford_comma(badAttrs) + '</strong> are not valid attributes.<br>\
         Valid attributes are @court, @caseName, @docStatus and @docText.'
+        messages.add_message(request, messages.INFO, messageText)
 
-    messages.add_message(request, messages.INFO, messageText)
-    
     try:
         queryset = Document.search.query(query)
         results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
@@ -250,7 +251,7 @@ def deleteAlertConfirm(request, alertID):
     except:
         return HttpResponseRedirect('/')
     return render_to_response('profile/delete_confirm.html', {'alertID': alertID}, RequestContext(request))
-    
-    
+
+
 def toolsPage(request):
     return render_to_response('search/tools.html', {}, RequestContext(request))
