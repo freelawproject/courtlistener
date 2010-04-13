@@ -24,6 +24,18 @@ from alert.alertSystem.models import Document
 from alert.userHandling.models import Alert, UserProfile
 import re
 
+def oxford_comma(seq):
+    seq = tuple(seq)
+    if not seq:
+        return ''
+    elif len(seq) == 1:
+        return seq[0]
+    elif len(seq) == 2:
+        return '%s and %s' % seq
+    else:
+        return '%s, and %s' % (', '.join(seq[:-1]), seq[-1])
+
+
 def home(request):
     """Show the homepage"""
     if "q" in request.GET:
@@ -105,13 +117,23 @@ def showResults(request, queryType="search"):
         - date fields don't work"""
     
     # before searching, check that all attributes are valid. Create message if not.
-    attributeRegex = re.compile('(@.*)')
-    attributes = re.findall('@.*\W', query)
+    attributes = re.findall('@\w*', query)
+    badAttrs = []
     for attribute in attributes:
-        if attribute.lower() not in "@court @casename @docstatus @doctext":
-            messages.add_message(request, messages.INFO,
-                'We ran your search, but found invalid attributes.<br> \
-                Valid attributes are @court, @caseName, @docStatus and @docText')
+        if attribute.lower() != ("@court" or "@casename" or "@docstatus" or "@doctext"):
+            badAttrs.append(attribute)
+        
+    # pluralization is a pain, but we must do it...
+    if len(badAttrs) == 1:
+        messageText = 'We completed your search, but <strong>' + \
+        oxford_comma(badAttrs) + '</strong> is not a valid attribute.<br>\
+        Valid attributes are @court, @caseName, @docStatus and @docText.'
+    else:
+        messageText = 'We completed your search, but <strong>' + \
+        oxford_comma(badAttrs) + '</strong> are not valid attributes.<br>\
+        Valid attributes are @court, @caseName, @docStatus and @docText.'
+
+    messages.add_message(request, messages.INFO, messageText)
     
     try:
         queryset = Document.search.query(query)
