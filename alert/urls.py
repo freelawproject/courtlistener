@@ -53,10 +53,6 @@ urlpatterns = patterns('',
     (r'^parse/(\d{1,2})/$', parse),
     (r'^email/(daily|weekly|monthly)/$', emailer),
 
-    # Sitemap generator
-    (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.sitemap',
-        {'sitemaps': sitemaps}),
-
     # Court listing pages
     (r'^opinions/(ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc|all)/$',
         viewDocumentListByCourt),
@@ -107,10 +103,14 @@ urlpatterns = patterns('',
     (r'^feed/court/all/$', allCourtsFeed()),
     (r'^feed/court/(?P<court>ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc)/$', courtFeed()),
     
-    # Make Yahoo! and Bing happy
+    # SEO-related stuff
     (r'^y_key_6de7ece99e1672f2.html$', validateForYahoo),
     (r'^LiveSearchSiteAuth.xml$', validateForBing),
     (r'^ping/all/$', ping_all_search_engines),
+    # Sitemap generator
+    (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.sitemap',
+        {'sitemaps': sitemaps}),
+    (r'^robots.txt$', robots),
 )
 
 # if it's not the production site, serve the static files this way.

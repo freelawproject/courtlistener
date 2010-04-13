@@ -37,4 +37,12 @@ def ping_all_search_engines(request):
     
     return render_to_response('parse.html', {'result': pinged}, RequestContext(request))
 
+def robots(request):
+    robots = "User-agent: *\
+\nDisallow: /parse/\
+\nDisallow: /scrape/\
+\nDisallow: /ping/\
+\nDisallow: /email/"
+    return HttpResponse(robots)
+
 

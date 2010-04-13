@@ -33,8 +33,16 @@ def ping_all_search_engines(request):
     sitemap_url = '/sitemap.xml'
     for ping_url in settings.SITEMAP_PING_URLS :
         ping_google(sitemap_url, ping_url)
-        pinged.append(sitemap_url + " has been pinged")
+        pinged.append(ping_url + " has been pinged")
     
     return render_to_response('parse.html', {'result': pinged}, RequestContext(request))
+
+def robots(request):
+    robots = "User-agent: *\
+\nDisallow: /parse/*\
+\nDisallow: /scrape/*\
+\nDisallow: /ping/*\
+\nDisallow: /email/*"
+    return HttpResponse(robots)
 
 
