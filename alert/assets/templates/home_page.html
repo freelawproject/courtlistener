@@ -7,6 +7,7 @@
     <script type="text/javascript" src="/media/js/collapsible.js"></script>
     <script type="text/javascript">
 	    $(document).ready(function() {
+		    $('.auto-focus:first').focus();
 		    $("fieldset.collapsible").collapse();
 		    $("fieldset.collapsed").collapse( { closed: true } );
 	    });
@@ -30,7 +31,7 @@
         <div class="span-17 last">
             <h4 class="bottom">Search our corpus of circuit court opinions:</h4>
             <form action="" method="get">
-                <input class="title" name="q" id="search">&nbsp;&nbsp;
+                <input class="title auto-focus" name="q" id="search">&nbsp;&nbsp;
                 <button type="submit" class="button title" name="search">Search</button>
                 <button type="submit" class="button title" name="alert">Preview alert</button>
             </form>
