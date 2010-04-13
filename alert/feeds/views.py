@@ -113,6 +113,7 @@ class courtFeed(Feed):
         return cat
     
     description_template = 'feeds/template.html'
+    title_template = 'feeds/title_template.html'
     
     
 class allCourtsFeed(Feed):
@@ -145,3 +146,4 @@ class allCourtsFeed(Feed):
         return cat
     
     description_template = 'feeds/template.html'
+    title_template = 'feeds/title_template.html'
