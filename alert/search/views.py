@@ -118,7 +118,7 @@ def showResults(request, queryType="search"):
 
     # before searching, check that all attributes are valid. Create message if not.
     attributes = re.findall('@\w*', query)
-    validRegex = re.compile(r'(@court |@casename |@docstatus |@doctext )')
+    validRegex = re.compile(r'^@court$|^@casename$|^@docstatus$|^@doctext$')
     badAttrs = []
     for attribute in attributes:
         if validRegex.search(attribute.lower()) == None:
