@@ -17,7 +17,7 @@
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eleventh Circuit" href="/feed/court/ca11/">
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the D.C. Circuit" href="/feed/court/cadc/">
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Federal Circuit" href="/feed/court/cafc/">
-    <link rel="canonical" href="http://courtlistener.com/{{court.courtUUID}}/{{title}}/" />
+    <link rel="canonical" href="/{{court.courtUUID}}/{{title}}/" />
 {% endblock %}
 
 {% block content %}
@@ -35,7 +35,7 @@
                 {% ifequal doc.documentType "P" %}
                     <p><strong>Status:</strong> Precedential/Published.<br>
                 {% endifequal %}            
-                <strong>Download PDF: </strong><a href="{{ doc.download_URL }}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="http://courtlistener.com/{{doc.local_path}}">Our backup</a><br>
+                <strong>Download PDF: </strong><a href="{{doc.download_URL}}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="/{{doc.local_path}}">Our backup</a><br>
                 <strong>SHA1:</strong> {{doc.documentSHA1}}</p>
                 <br>
                 <h4>Document text</h4>
@@ -54,9 +54,9 @@
             
             <p class="bottom">Sorry about that. Would you like to try a different approach:</p>
             <ul>
-                <li>You can try a <a href="/search">search</a> for what you're looking for.</li>
-                <li>You can <a href="/contact">let us know</a> that something is wrong or missing.</li>
-                <li>If you think you have found a bug, you can <a href="contribute#bugs">file a bug</a>.</li>
+                <li>You can try a <a href="/search/">search</a> for what you're looking for.</li>
+                <li>You can <a href="/contact/">let us know</a> that something is wrong or missing.</li>
+                <li>If you think you have found a bug, you can <a href="/contribute#bugs">file a bug</a>.</li>
             </ul>
             <p>Sorry about this. If you continue having problems, do let us know.</p>
         
@@ -64,3 +64,18 @@
     </div>
 {% endblock %}
 
+
+{% block sidebar %}
+    {% if user.is_superuser and docs %} 
+        <div class="span-5 last" id="sidebar">
+            <h3>Admin</h3>
+            
+            {% for doc in docs %}
+                <a href="/admin/alertSystem/document/{{doc.documentUUID}}/">Edit {{doc.citation.caseNameShort}}</a><br>
+            {% endfor %}
+        </div>            
+    {% else %}
+        <div class="span-5 last" id="sidebar">
+        </div>
+    {% endif %}
+{% endblock %}
