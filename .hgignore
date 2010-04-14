@@ -29,3 +29,6 @@ Resource.org/
 
 # the django-sphinx code
 django-sphinx
+
+# the piwik install
+Piwik
