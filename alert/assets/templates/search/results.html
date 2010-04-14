@@ -8,6 +8,7 @@
     <script type="text/javascript" src="/media/js/collapsible.js"></script>
     <script type="text/javascript">
 	    $(document).ready(function() {
+		    $('.auto-focus:first').focus();
 		    $("fieldset.collapsible").collapse();
 		    $("fieldset.collapsed").collapse( { closed: true } );
 	    });
@@ -48,7 +49,7 @@
         
         <div class="span-18 last">
             <form action="" method="get">
-                <input class="title" name="q" id="search" value="{{query}}">&nbsp;&nbsp;
+                <input class="title {% if not results.object_list %}auto-focus{% endif %}" name="q" id="search" value="{{query}}">&nbsp;&nbsp;
                 {% if queryType == "search" %}
                     <button type="submit" class="button title" name="search">Search again</button>
                 {% endif %}
