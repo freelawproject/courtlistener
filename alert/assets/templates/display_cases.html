@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}CourtListener.com / Browse / {{ title }}{% endblock %}
+
+{% block headers %}
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the First Circuit" href="/feed/court/ca1/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Second Circuit" href="/feed/court/ca2/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Third Circuit" href="/feed/court/ca3/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Fourth Circuit" href="/feed/court/ca4/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Fifth Circuit" href="/feed/court/ca5/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Sixth Circuit" href="/feed/court/ca6/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Seventh Circuit" href="/feed/court/ca7/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eighth Circuit" href="/feed/court/ca8/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Ninth Circuit" href="/feed/court/ca9/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Tenth Circuit" href="/feed/court/ca10/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eleventh Circuit" href="/feed/court/ca11/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the D.C. Circuit" href="/feed/court/cadc/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Federal Circuit" href="/feed/court/cafc/">
+    <link rel="canonical" href="http://courtlistener.com/{{court.courtUUID}}/{{title}}/" />
+{% endblock %}
+
+{% block content %}
+    <div class="span-18 colborder">
+        {% if docs %}
+            {# if we have hits, display what we know #}
+            {% for doc in docs %}
+                <h2>{{ doc.citation.caseNameShort }}, {{ doc.citation.caseNumber }}</h2>
+                <h3>{{court}}</h3>
+                <h3 class="alt"> {{doc.dateFiled|date:"l, F jS, Y"}}</h3>
+                {# Print the whether the document is precedential #}
+                {% ifequal doc.documentType "U" %}
+                    <p><strong>Status:</strong> Non-precedential/Unpublished.<br>
+                {% endifequal %}
+                {% ifequal doc.documentType "P" %}
+                    <p><strong>Status:</strong> Precedential/Published.<br>
+                {% endifequal %}            
+                <strong>Download PDF: </strong><a href="{{ doc.download_URL }}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="http://courtlistener.com/{{doc.local_path}}">Our backup</a><br>
+                <strong>SHA1:</strong> {{doc.documentSHA1}}</p>
+                <br>
+                <h4>Document text</h4>
+                <pre>{{doc.documentPlainText}}</pre>
+            {% endfor %}
+                
+                
+                
+                
+        {% else %}
+            {# No documents found, tell the user, apologize. #}
+            <h2>No documents found</h2>
+            
+            <p>We looked in the <strong>{{ court }}</strong>, but were unable to find anything that 
+            had the case name or number of <strong>{{ title }}</strong>.</p>
+            
+            <p class="bottom">Sorry about that. Would you like to try a different approach:</p>
+            <ul>
+                <li>You can try a <a href="/search">search</a> for what you're looking for.</li>
+                <li>You can <a href="/contact">let us know</a> that something is wrong or missing.</li>
+                <li>If you think you have found a bug, you can <a href="contribute#bugs">file a bug</a>.</li>
+            </ul>
+            <p>Sorry about this. If you continue having problems, do let us know.</p>
+        
+        {% endif %}
+    </div>
+{% endblock %}
+

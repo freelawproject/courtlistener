@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}CourtListener.com / Sign in{% endblock %}
+
+{% block content %}
+    <div class="span-18 colborder" id="content">
+        {% block h2 %}<h2>Sign in</h2>{% endblock %}
+            
+        {% if form.errors %}
+            <div class="span-18">
+                <div class="span-10 error">
+                    <p class="bottom">Sorry, that is not a valid username or password.</p>
+                </div>
+                <div class="span-7 last">&nbsp;</div>
+            </div>
+        {% endif %}
+        
+        <form action="" method="post">{% csrf_token %}
+            <p>
+                <label for="username">Username</label><br>
+                <input type="text" name="username" value="" id="username">
+            </p>
+    
+            <p>
+                <label for="password">Password</label><br>
+                <input type="password" name="password" value="" id="password">
+
+            </p>
+            <input type="hidden" name="next" value="{{ next|escape }}">
+            <button type="submit" class="button">Sign in</button>
+        </form>
+        <p class="bottom"><a href="/reset-password/">Forgot password?</a></p>
+        <p><a href="/register/">Need to register?</a></p>
+    </div>
+{% endblock %}
