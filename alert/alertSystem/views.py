@@ -1389,4 +1389,4 @@ def viewDocumentListByCourt(request, court):
         documents = paginator.page(paginator.num_pages)
 
     return render_to_response('view_documents_by_court.html', {'title': ct,
-        "documents": documents}, RequestContext(request))
+        "documents": documents}, context_instance=RequestContext(request))

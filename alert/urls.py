@@ -71,7 +71,7 @@ urlpatterns = patterns('',
     (r'^contact/thanks/$', thanks),
     
     # Various sign in/out etc. functions as provided by django
-    (r'^sign-in/$', signIn),
+    url(r'^sign-in/$', signIn, name="sign-in"),
     (r'^sign-out/$', signOut),
     
     # Homepage and favicon
@@ -95,8 +95,8 @@ urlpatterns = patterns('',
 
     # Alert/search pages
     # These URLs support either GET requests or things like /alert/preview/searchterm.
-    (r'^(alert/preview)/$', showResults),
-    (r'^(search/results)/$', showResults),
+    url(r'^(alert/preview)/$', showResults, name="alertResults"),
+    url(r'^(search/results)/$', showResults, name="searchResults"),
     (r'^search/$', showResults), #for the URL hackers in the crowd
     (r'^alert/edit/(\d{1,6})/$', editAlert),
     (r'^alert/delete/(\d{1,6})/$', deleteAlert),

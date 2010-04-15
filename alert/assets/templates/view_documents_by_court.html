@@ -29,23 +29,26 @@
             <p> {{doc.dateFiled|date:"l, F jS, Y"}}<br>
                 {# Print the whether the document is precedential #}
                 {% ifequal doc.documentType "U" %}
-                    <strong>Status:</strong> Non-precedential/Unpublished.<br>
+                    <strong>Status:</strong> Non-precedential/Unpublished<br>
                 {% endifequal %}
                 {% ifequal doc.documentType "P" %}
-                    <strong>Status:</strong> Precedential/Published.<br>
-                {% endifequal %}            
+                    <strong>Status:</strong> Precedential/Published<br>
+                {% endifequal %}
+                {% ifequal doc.documentType "E" %}
+                    <strong>Status:</strong> Errata<br>
+                {% endifequal %}
                 <strong>Download PDF: </strong><a href="{{ doc.download_URL }}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="http://courtlistener.com/{{doc.local_path}}">Our backup</a></p><br>
         {% endfor %}
         
         <h3>
             {% if documents.has_previous %}
-                    <a href="?page=1">« first</a>&nbsp;&nbsp;
-                    <a href="?page={{ documents.previous_page_number }}">‹ previous</a>&nbsp;&nbsp;
+                    <a href="{{request.path}}?page=1">« first</a>&nbsp;&nbsp;
+                    <a href="{{request.path}}?page={{ documents.previous_page_number }}">‹ previous</a>&nbsp;&nbsp;
             {% endif %}
             Page {{ documents.number }} of {{ documents.paginator.num_pages }}</p>
             {% if documents.has_next %}
-                    &nbsp;&nbsp;<a href="?page={{ documents.next_page_number }}">next ›</a>
-                    &nbsp;&nbsp;<a href="?page={{ documents.paginator.num_pages }}">last »</a>
+                    &nbsp;&nbsp;<a href="{{request.path}}?page={{ documents.next_page_number }}">next ›</a>
+                    &nbsp;&nbsp;<a href="{{request.path}}?page={{ documents.paginator.num_pages }}">last »</a>
             {% endif %}
         </h3>
     </div>
