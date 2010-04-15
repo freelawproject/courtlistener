@@ -49,7 +49,7 @@ def makeDocFromURL(LinkToPdf, ct):
     
     # make the SHA1
     data = myFile.read()
-    sha1Hash = hashlib.sha1(data).hexdigest() #DELETE THIS LINE
+    sha1Hash = hashlib.sha1(data).hexdigest()
     
     # using that, we check for a dup
     try:
@@ -211,7 +211,7 @@ def scrapeCourt(courtID, result):
 
         today = datetime.date.today()
         #formattedToday = str(today.year) + str(today.month) + str(today.day)
-        formattedToday = str(today.year) + str(today.month) + '07'
+        formattedToday = str(today.year) + '03' + '07'
 
         data = "IW_DATABASE=OPN&IW_FIELD_TEXT=*&IW_FILTER_DATE_AFTER=" +\
             formattedToday + "&IW_FILTER_DATE_BEFORE=&IW_BATCHSIZE=20&" +\
@@ -1155,6 +1155,10 @@ def scrapeCourt(courtID, result):
             i += 1
 
         return result
+        
+    if (courtID == 14):
+        # we do SCOTUS
+        
 
 
 def getPDFContent(path):
