@@ -74,6 +74,21 @@ def deleteProfileDone(request):
     
 def register(request):
     """allow only an anonymous user to register"""
+    
+    redirect_to = request.REQUEST.get('next', '')
+    
+    # security checks:
+    # Light security check -- make sure redirect_to isn't garbage.
+    if not redirect_to or ' ' in redirect_to:
+        redirect_to = settings.LOGIN_REDIRECT_URL
+    
+    # Heavier security check -- redirects to http://example.com should 
+    # not be allowed, but things like /view/?param=http://example.com 
+    # should be allowed. This regex checks if there is a '//' *before* a
+    # question mark.
+    elif '//' in redirect_to and re.match(r'[^\?]*//', redirect_to):
+        redirect_to = settings.LOGIN_REDIRECT_URL
+    
     if request.user.is_anonymous():
         from django.contrib.auth.forms import UserCreationForm
         if request.method == 'POST':
@@ -94,8 +109,8 @@ def register(request):
                 password = str(cd['password1'])
                 
                 return render_to_response("profile/register_success.html", 
-                    {'form': form, 'username': username, 'password': password}, 
-                    RequestContext(request))
+                    {'form': form, 'username': username, 'password': password,
+                    'redirect_to': redirect_to}, RequestContext(request))
                 
         else:
             form = UserCreationFormExtended()

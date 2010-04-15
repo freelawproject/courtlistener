@@ -22,8 +22,8 @@
         
         <form action="/sign-in/" method="post">{% csrf_token %}
             {# Two hidden fields here, containing the username/password #}
-            <input type="text" name="username" value="{{username}}" id="username">
-            <input type="text" name="password" value="{{password}}" id="password">
+            <input type="hidden" name="username" value="{{username}}" id="username">
+            <input type="hidden" name="password" value="{{password}}" id="password">
             <input type="hidden" name="next" value="/">
             <button type="submit" class="button">Sign in</button>
         </form>

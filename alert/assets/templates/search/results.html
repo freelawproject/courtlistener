@@ -224,8 +224,8 @@
     </div>
     {% if not user.is_authenticated and queryType == "alert"%}
         <h3>Save this alert</h3>
-        <p>To save this alert, you need to <a href="/sign-in/">sign in</a> or
-            <a href="/register/">register</a> as a new user.</p>
+        <p>To save this alert, you need to <a href="/sign-in/?next=/alert/preview/?q={{query}}">sign in</a> or
+            <a href="/register/?next=/alert/preview/?q={{query}}">register</a> as a new user.</p>
     {% endif %}
 {% endblock %}
 
