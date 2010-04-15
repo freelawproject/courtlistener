@@ -210,11 +210,11 @@ def scrapeCourt(courtID, result):
         ct = Court.objects.get(courtUUID='ca2')
 
         today = datetime.date.today()
-        #formattedToday = str(today.year) + str(today.month) + str(today.day)
-        formattedToday = str(today.year) + '03' + '07'
+        formattedToday = str(today.year) + str(today.month) + str(today.day)
+        #formattedToday = str(today.year) + '03' + '07'
 
         data = "IW_DATABASE=OPN&IW_FIELD_TEXT=*&IW_FILTER_DATE_AFTER=" +\
-            formattedToday + "&IW_FILTER_DATE_BEFORE=&IW_BATCHSIZE=20&" +\
+            formattedToday + "&IW_FILTER_DATE_BEFORE=&IW_BATCHSIZE=50&" +\
             "IW_SORT=-DATE"
 
         req = urllib2.Request(url, data)
@@ -1158,7 +1158,7 @@ def scrapeCourt(courtID, result):
         
     if (courtID == 14):
         # we do SCOTUS
-        
+        pass
 
 
 def getPDFContent(path):
