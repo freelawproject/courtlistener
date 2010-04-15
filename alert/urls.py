@@ -16,6 +16,7 @@
 
 # imports of local settings and views
 from alert import settings
+from alert.alertSystem.models import PACER_CODES
 from alert.alertSystem.views import *
 from alert.alertSystem.sitemap import DocumentSitemap
 from alert.contact.views import *
@@ -24,6 +25,7 @@ from alert.feeds.views import *
 from alert.pinger.views import *
 from alert.search.views import *
 from alert.userHandling.views import *
+
 
 # needed to make urls work
 from django.conf.urls.defaults import *
@@ -43,6 +45,11 @@ sitemaps = {
     "Flatfiles": FlatPageSitemap,
 }
 
+# creates a list of the first element of the choices variable for the courts field
+pacer_codes = []
+for code in PACER_CODES:
+    pacer_codes.append(code[0]) 
+
 urlpatterns = patterns('',
     # Admin docs and site
     (r'^admin/doc/', include('django.contrib.admindocs.urls')),
@@ -54,12 +61,10 @@ urlpatterns = patterns('',
     (r'^email/(daily|weekly|monthly)/$', emailer),
 
     # Court listing pages
-    (r'^opinions/(ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc|scotus|all)/$',
-        viewDocumentListByCourt),
+    (r'^opinions/(' + "|".join(pacer_codes) + '|all)/$', viewDocumentListByCourt),
 
     # Display a case
-    url(r'^(ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc|scotus)/(.*)/$',
-        viewCases, name="viewCases"),
+    url(r'^(' + "|".join(pacer_codes) + ')/(.*)/$', viewCases, name="viewCases"),
 
     # Contact us pages
     (r'^contact/$', contact),
@@ -101,7 +106,7 @@ urlpatterns = patterns('',
     # Feeds
     (r'^feed/(search)/$', searchFeed()), #lacks URL capturing b/c it will use GET queries.
     (r'^feed/court/all/$', allCourtsFeed()),
-    (r'^feed/court/(?P<court>ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc|scotus)/$', courtFeed()),
+    (r'^feed/court/(?P<court>' + '|'.join(pacer_codes) + ')/$', courtFeed()),
     
     # SEO-related stuff
     (r'^y_key_6de7ece99e1672f2.html$', validateForYahoo),
