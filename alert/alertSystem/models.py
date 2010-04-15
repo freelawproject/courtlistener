@@ -39,6 +39,7 @@ PACER_CODES = (
 DOCUMENT_STATUSES = (
     ('P', 'Published'),
     ('U', 'Unpublished'),
+    ('E', 'Errata'),
 )
 
 
@@ -211,7 +212,7 @@ class Document(models.Model):
         if self.citation.caseNameShort:
             return self.citation.caseNameShort
         else:
-            documentSHA1
+            return documentSHA1
 
     @models.permalink
     def get_absolute_url(self):
