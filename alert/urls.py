@@ -54,11 +54,11 @@ urlpatterns = patterns('',
     (r'^email/(daily|weekly|monthly)/$', emailer),
 
     # Court listing pages
-    (r'^opinions/(ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc|all)/$',
+    (r'^opinions/(ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc|scotus|all)/$',
         viewDocumentListByCourt),
 
     # Display a case
-    url(r'^(ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc)/(.*)/$',
+    url(r'^(ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc|scotus)/(.*)/$',
         viewCases, name="viewCases"),
 
     # Contact us pages
@@ -101,7 +101,7 @@ urlpatterns = patterns('',
     # Feeds
     (r'^feed/(search)/$', searchFeed()), #lacks URL capturing b/c it will use GET queries.
     (r'^feed/court/all/$', allCourtsFeed()),
-    (r'^feed/court/(?P<court>ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc)/$', courtFeed()),
+    (r'^feed/court/(?P<court>ca1|ca2|ca3|ca4|ca5|ca6|ca7|ca8|ca9|ca10|ca11|cadc|cafc|scotus)/$', courtFeed()),
     
     # SEO-related stuff
     (r'^y_key_6de7ece99e1672f2.html$', validateForYahoo),
