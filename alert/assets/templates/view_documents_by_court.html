@@ -3,20 +3,21 @@
 {% block title %}CourtListener.com / Opinions / {{ title }} / Page / {{ documents.number }}{% endblock %}
 
 {% block headers %}
-     <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">
-     <link rel="alternate" type="application/rss+xml" title="Atom feed for the First Circuit" href="/feed/court/ca1/">
-     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Second Circuit" href="/feed/court/ca2/">
-     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Third Circuit" href="/feed/court/ca3/">
-     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Fourth Circuit" href="/feed/court/ca4/">
-     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Fifth Circuit" href="/feed/court/ca5/">
-     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Sixth Circuit" href="/feed/court/ca6/">
-     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Seventh Circuit" href="/feed/court/ca7/">
-     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eighth Circuit" href="/feed/court/ca8/">
-     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Ninth Circuit" href="/feed/court/ca9/">
-     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Tenth Circuit" href="/feed/court/ca10/">
-     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eleventh Circuit" href="/feed/court/ca11/">
-     <link rel="alternate" type="application/rss+xml" title="Atom feed for the D.C. Circuit" href="/feed/court/cadc/">
-     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Federal Circuit" href="/feed/court/cafc/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the U.S. Supreme Court" href="/feed/court/scotus/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the First Circuit" href="/feed/court/ca1/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Second Circuit" href="/feed/court/ca2/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Third Circuit" href="/feed/court/ca3/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Fourth Circuit" href="/feed/court/ca4/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Fifth Circuit" href="/feed/court/ca5/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Sixth Circuit" href="/feed/court/ca6/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Seventh Circuit" href="/feed/court/ca7/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eighth Circuit" href="/feed/court/ca8/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Ninth Circuit" href="/feed/court/ca9/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Tenth Circuit" href="/feed/court/ca10/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eleventh Circuit" href="/feed/court/ca11/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the D.C. Circuit" href="/feed/court/cadc/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Federal Circuit" href="/feed/court/cafc/">
 {% endblock %}
 
 {% block content %}
@@ -55,6 +56,7 @@
         <h3>Browse other courts</h3>
         <p>
             <a href="/opinions/all/">All opinions</a><br>
+            <a href="/opinions/scotus/">U.S. Supreme Court</a><br>
             <a href="/opinions/ca1/">First circuit</a><br>
             <a href="/opinions/ca2/">Second circuit</a><br>
             <a href="/opinions/ca3/">Third circuit</a><br>
@@ -67,7 +69,7 @@
             <a href="/opinions/ca10/">Tenth circuit</a><br>
             <a href="/opinions/ca11/">Eleventh circuit</a><br>
             <a href="/opinions/cadc/">D.C. circuit</a><br>
-            <a href="/opinions/cafc/">Federal circuit</a>
+            <a href="/opinions/cafc/">Federal circuit</a><br>
         </p>
     </div>
 {% endblock %}

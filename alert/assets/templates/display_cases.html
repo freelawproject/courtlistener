@@ -17,7 +17,12 @@
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eleventh Circuit" href="/feed/court/ca11/">
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the D.C. Circuit" href="/feed/court/cadc/">
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Federal Circuit" href="/feed/court/cafc/">
-    <link rel="canonical" href="/{{court.courtUUID}}/{{title}}/" />
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Supreme Court of the U.S." href="/feed/court/scotus/">
+    {% if docs %}
+        {% with docs|first as doc %}
+            <link rel="canonical" href="/{{court.courtUUID}}/{{doc.citation.caseNameShort}}/">
+        {% endwith %}
+    {% endif %}    
 {% endblock %}
 
 {% block content %}
