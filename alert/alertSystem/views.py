@@ -18,6 +18,7 @@
 """TODO: place these imports intelligently throughout the functions"""
 from alert.alertSystem.models import *
 from alert import settings
+from alert.alertSystem.models import PACER_CODES
 from alert.alertSystem.titlecase import titlecase
 from django.http import HttpResponse, Http404
 from django.core.exceptions import MultipleObjectsReturned
@@ -153,7 +154,7 @@ def scrapeCourt(courtID, result):
             caseLink = urljoin(url, caseLink)
 
             # then we download the PDF, make the hash and document
-            myFile, doc, created, dupCount = makeDocFromURL(caseLink, ct, dupCount)
+            myFile, doc, created = makeDocFromURL(caseLink, ct)
 
             if not created:
                 # it's an oldie, punt!
@@ -644,6 +645,7 @@ def scrapeCourt(courtID, result):
             aTags = soup.findAll(attrs={'href' : aTagsRegex})
 
             i = 0
+            dupCount = 0
             while i < len(aTags):
                 # we begin with the caseLink field
                 caseLink = aTags[i].get("href")
@@ -1230,15 +1232,15 @@ def parseCourt(courtID, result):
 
     returns a string containing the result"""
 
-    # a tuple for converting our courtID to a courtUUID...bad code.
-    courts = ('ca1','ca2','ca3','ca4','ca5','ca6','ca7','ca8','ca9','ca10',
-        'ca11','cadc','cafc')
+    # get the court IDs from models.py
+    courts = []
+    for code in PACER_CODES:
+        courts.append(code[0])
 
     # select all documents from this jurisdiction that lack plainText (this
     # achieves duplicate checking.
     selectedDocuments = Document.objects.filter(documentPlainText = "",
         court__courtUUID = courts[courtID-1])
-
 
     for doc in selectedDocuments:
         # for each of these documents, open it, parse it.
@@ -1265,7 +1267,6 @@ def scrape(request, courtID):
 
     # we show this string to users if things go smoothly
     result = "It worked<br>"
-    scrapeResult = ""
 
     # some data validation, for good measure - this should already be done via
     # our url regex
@@ -1278,7 +1279,7 @@ def scrape(request, courtID):
     if (courtID == 0):
         # we do ALL of the courts (useful for testing)
         i = 1
-        while i <= 13:
+        while i <= len(PACER_CODES):
             result += "NOW SCRAPING COURT: " + str(i) + "<br>"
             result = scrapeCourt(i, result) + "<br><br>"
             i += 1
@@ -1311,7 +1312,7 @@ def parse(request, courtID):
     if courtID == 0:
         # we parse the documents from all jurisdictions
         i = 1
-        while i <= 13:
+        while i <= len(PACER_CODES):
             result.append("NOW PARSING COURT: " + str(i))
             result = (parseCourt(i, result))
             i += 1

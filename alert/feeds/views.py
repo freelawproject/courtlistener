@@ -13,14 +13,6 @@
 # 
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-
-"""Here, I'll create two types of feeds:
-    1. Feeds that return the content of a search.
-    2. Feeds that return all of the cases for a court or for all courts
-I'll do this in two formats:
-    - first, I'll do Atom
-    - second, if Erik Wilde thinks it's helpful, I'll do RSS 2.01 r2."""
     
 from django.contrib.syndication.views import Feed
 from django.contrib.syndication.views import FeedDoesNotExist
