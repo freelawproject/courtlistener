@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from alert.settings import LOGIN_REDIRECT_URL
 from alert.userHandling.forms import *
 from alert.userHandling.models import BarMembership
 from django.contrib import messages
@@ -22,6 +23,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.http import HttpResponseRedirect
+
 
 
 @login_required
@@ -80,7 +82,7 @@ def register(request):
     # security checks:
     # Light security check -- make sure redirect_to isn't garbage.
     if not redirect_to or ' ' in redirect_to:
-        redirect_to = settings.LOGIN_REDIRECT_URL
+        redirect_to = LOGIN_REDIRECT_URL
     
     # Heavier security check -- redirects to http://example.com should 
     # not be allowed, but things like /view/?param=http://example.com 
