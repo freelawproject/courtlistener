@@ -20,7 +20,7 @@
         {% else %}
         
         
-        <form action="/sign-in/" method="post">{% csrf_token %}
+        <form action="/sign-in/?next={{redirect_to}}" method="post">{% csrf_token %}
             {# Two hidden fields here, containing the username/password #}
             <input type="hidden" name="username" value="{{username}}" id="username">
             <input type="hidden" name="password" value="{{password}}" id="password">
