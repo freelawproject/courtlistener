@@ -4,6 +4,7 @@ nonprecedential > u
 non-precedential > u
 published > p
 precedential > p
+errata > e
 0 > 0
 0s > 0s
 0th > 0th
