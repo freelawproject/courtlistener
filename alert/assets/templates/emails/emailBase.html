@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html style="font-size: 100.01%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">
+    <head> 
+        <style type="text/css">
+        a:visited { text-decoration: none !important; }
+        a:hover { text-decoration: underline !important; color: #009 !important; }
+        a:focus { text-decoration: underline !important; color: #009 !important; }
+        blockquote:before { content: "" !important; }
+        blockquote:after { content: "" !important; }
+        a:focus { color: #000 !important; }
+        a:hover { color: #000 !important; }
+        input[type=text]:focus { border-color: #666 !important; }
+        input[type=password]:focus { border-color: #666 !important; }
+        input.text:focus { border-color: #666 !important; }
+        input.title:focus { border-color: #666 !important; }
+        textarea:focus { border-color: #666 !important; }
+        select:focus { border-color: #666 !important; }
+        .clearfix:after { content: "\0020" !important; display: block !important; height: 0 !important; clear: both !important; visibility: hidden !important; overflow: hidden !important; }
+        .container:after { content: "\0020" !important; display: block !important; height: 0 !important; clear: both !important; visibility: hidden !important; overflow: hidden !important; }
+        a.positive:active { background-color: #529214 !important; border: 1px solid #529214 !important; color: #fff !important; }
+        a.negative:hover { background-color: #fbe3e4 !important; border: 1px solid #fbc2c4 !important; color: #d12f19 !important; }
+        button.negative:hover { background-color: #fbe3e4 !important; border: 1px solid #fbc2c4 !important; color: #d12f19 !important; }
+        a.negative:active { background-color: #d12f19 !important; border: 1px solid #d12f19 !important; color: #fff !important; }
+        </style>
+    </head>
+
+    <body style="font-size: 75%; font-weight: inherit; line-height: 1.5; font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif; color: #222; border: 0; vertical-align: baseline; font-style: inherit; background: #fff; margin: 0; padding: 0;">
+        <table>
+            {% block header %}
+                <tr>
+                    <td>
+                        <h1 class="bottom" style="font-size: 3em; font-weight: normal; line-height: 1; font-family: inherit; color: #111; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;"><a href="http://courtlistener.com/" style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; color: black; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">CourtListener</a></h1>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>
+                        <hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 100%; height: .1em; margin: 0 0 1.45em; border: none;" />
+                    </td>
+                </tr>
+            {% endblock %}
+            
+            
+                        
+            {% block content %}
+            <table>
+                <tr>
+                    <td>You lack a content block. Bad.</td>
+                </tr>
+            </table>                
+            {% endblock %}
+            
+                        
+            {% block footer %}                        
+            <table>
+                <tr>
+                    <td>
+                        <hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 100%; height: .1em; margin: 0 0 1.45em; border: none;" />
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <p>This email is being sent to you because because an alert you created at <a href="http://courtlistener.com" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: underline; vertical-align: baseline; margin: 0;">CourtListener.com</a> resulted in a hit. If you no longer wish to receive this alert, please sign in and delete this alert. If you should have any difficulty with this, please <a href="http://courtlistener.com/contact/" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: underline; vertical-align: baseline; margin: 0;">contact us</a> so we may help diagnose the problem.</p>
+                    </td>
+                </tr>
+            </table>
+            {% endblock %}
+        </table>
+    </body>
+</html>
+
