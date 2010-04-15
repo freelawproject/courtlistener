@@ -51,6 +51,9 @@ class Court(models.Model):
         primary_key=True,
         choices=PACER_CODES)
     courtURL = models.URLField("the homepage for each court")
+    courtShortName = models.CharField("the shortname for the court",
+        max_length=100,
+        blank=True)
 
     # uses the choices argument in courtUUID to create a good display of the object.
     def __unicode__(self):
