@@ -29,38 +29,39 @@ import datetime, hashlib, re, StringIO, subprocess, urllib, urllib2
 from BeautifulSoup import BeautifulSoup
 from lxml.html import fromstring
 from lxml import etree
+from urlparse import urljoin
 
 def makeDocFromURL(LinkToPdf, ct):
     """Receives a URL and a court as arguments, then downloads the PDF
-    that's in it, and makes it into a StringIO. Generates a sha1 hash of the 
+    that's in it, and makes it into a StringIO. Generates a sha1 hash of the
     file, and tries to add it to the db. If it's a duplicate, it gets the one in
-    the DB. If it's a new sha1, it creates a new document. 
+    the DB. If it's a new sha1, it creates a new document.
 
-    returns a StringIO of the PDF, a Document object, and a 
+    returns a StringIO of the PDF, a Document object, and a
         boolean indicating whether the Document was created
     """
-    
+
     # get the PDF
     webFile = urllib2.urlopen(LinkToPdf)
     stringThing = StringIO.StringIO()
     stringThing.write(webFile.read())
     myFile = ContentFile(stringThing.getvalue())
     webFile.close()
-    
+
     # make the SHA1
     data = myFile.read()
     sha1Hash = hashlib.sha1(data).hexdigest()
-    
+
     # using that, we check for a dup
     try:
         doc, created = Document.objects.get_or_create(
             documentSHA1 = sha1Hash,
             court = ct)
     except MultipleObjectsReturned:
-        # this shouldn't happen now that we're using SHA1 as the dup 
+        # this shouldn't happen now that we're using SHA1 as the dup
         # check, but the old data is problematic, so we must catch this.
         created = False
-    
+
     if created:
         # we only do this if it's new
         doc.documentSHA1 = sha1Hash
@@ -69,24 +70,6 @@ def makeDocFromURL(LinkToPdf, ct):
 
     return myFile, doc, created
 
-
-def make_url_absolute(url, rel_url):
-    """give it a URL and a URL you suspect to be a relative one. It'll strip the
-    domain name out of the first URL, and, if needed, attach it to the suspected
-    rel_url.
-
-    returns an absolute version of rel_url
-    """
-
-    # for the relative URLs that don't start with a slash, we need this check
-    startingSlash = re.compile('^(/)|(htt)')
-    if not startingSlash.search(rel_url):
-        rel_url = "/" + rel_url
-
-    if 'http:' not in rel_url:
-        #it's a relative url, fix it.
-        rel_url = url.split('/')[0] + "//" + url.split('/')[2] + rel_url
-    return rel_url
 
 
 def hasDuplicate(caseNum, caseName):
@@ -103,12 +86,27 @@ def hasDuplicate(caseNum, caseName):
     return cite, created
 
 
+def trunc(s, length):
+    """finds the rightmost space in a string, and truncates there. Lacking such
+    a space, truncates at length"""
+    
+    if len(s) <= length:
+        return s
+    else:
+        # find the rightmost space
+        end = s.rfind(' ', 0 , length)
+        if end == -1:
+            # no spaces found, just use max position
+            end = length
+        return s[0:end]
+
+
 def scrapeCourt(courtID, result):
     if (courtID == 1):
         """
         PDFs are available from the first circuit if you go to their RSS feed.
         So go to their RSS feed we shall.
-        
+
         This is the second version of this court. Good times.
         """
         url = "http://www.ca1.uscourts.gov/opinions/opinionrss.php"
@@ -152,11 +150,11 @@ def scrapeCourt(courtID, result):
 
             # next, we begin with the caseLink field
             caseLink = caseLinks[i].text
-            caseLink = make_url_absolute(url, caseLink)
-            
+            caseLink = urljoin(url, caseLink)
+
             # then we download the PDF, make the hash and document
             myFile, doc, created, dupCount = makeDocFromURL(caseLink, ct, dupCount)
-            
+
             if not created:
                 # it's an oldie, punt!
                 result += "Duplicate found at " + str(i) + "<br>"
@@ -168,10 +166,10 @@ def scrapeCourt(courtID, result):
                 continue
             else:
                 dupCount = 0
-            
+
             # otherwise, we continue
             doc.documentType = documentType
-            
+
             # next: caseDate
             caseDate = caseDateRegex.search(descriptions[i].text).group(1)
             splitDate = caseDate.split('/')
@@ -186,13 +184,13 @@ def scrapeCourt(courtID, result):
             # next: caseNameShort
             caseNameShort = caseNumberRegex.search(caseNamesAndNumbers[i].text)\
                 .group(2)
-            
+
             # check for dups, make the object if necessary, otherwise, get it
             cite, created = hasDuplicate(caseNumber, caseNameShort)
 
             # last, save evrything (pdf, citation and document)
             doc.citation = cite
-            doc.local_path.save(caseNameShort + ".pdf", myFile)
+            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
             doc.save()
 
             i += 1
@@ -211,7 +209,7 @@ def scrapeCourt(courtID, result):
 
         today = datetime.date.today()
         #formattedStartDate = str(today.year) + str(today.month) + str(today.day)
-        formattedStartDate = str(today.year) + '03' + '07' 
+        formattedStartDate = str(today.year) + '03' + '07'
 
         data = "IW_DATABASE=OPN&IW_FIELD_TEXT=*&IW_FILTER_DATE_AFTER=" +\
             formattedStartDate + "&IW_FILTER_DATE_BEFORE=&IW_BATCHSIZE=50&" +\
@@ -233,10 +231,10 @@ def scrapeCourt(courtID, result):
             # we begin with the caseLink field
             caseLink = aTags[i].get('href')
             caseLink = aTagsRegex.search(caseLink).group(1)
-            caseLink = make_url_absolute(url, caseLink)
-            
+            caseLink = urljoin(url, caseLink)
+
             myFile, doc, created = makeDocFromURL(caseLink, ct)
-            
+
             if not created:
                 # it's an oldie, punt!
                 result += "Duplicate found at " + str(i) + "<br>"
@@ -248,7 +246,7 @@ def scrapeCourt(courtID, result):
                 continue
             else:
                 dupCount = 0
-            
+
             # using caseLink, we can get the caseNumber and documentType
             caseNum = caseNumRegex.search(caseLink).group(1)
 
@@ -259,7 +257,7 @@ def scrapeCourt(courtID, result):
                 doc.documentType = "P"
             elif 'so' in documentType:
                 doc.documentType = "U"
-                
+
             # next, the caseNameShort (there's probably a better way to do this.
             caseNameShort = aTags[i].parent.parent.nextSibling.nextSibling\
                 .nextSibling.nextSibling.contents[0]
@@ -280,14 +278,14 @@ def scrapeCourt(courtID, result):
 
             # last, save evrything (pdf, citation and document)
             doc.citation = cite
-            doc.local_path.save(caseNameShort + ".pdf", myFile)
+            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
             doc.save()
 
             i += 1
 
         return result
-        
-        
+
+
     elif (courtID == 3):
         """
         This URL provides the latest 25 cases, so I need to pick out the new
@@ -320,9 +318,9 @@ def scrapeCourt(courtID, result):
             while i < len(aTags):
                 # caseLink and caseNameShort
                 caseLink = aTags[i].get('href')
-                
+
                 myFile, doc, created = makeDocFromURL(caseLink, ct)
-                    
+
                 if not created:
                     # it's an oldie, punt!
                     result += "Duplicate found at " + str(i) + "<br>"
@@ -334,7 +332,7 @@ def scrapeCourt(courtID, result):
                     continue
                 else:
                     dupCount = 0
-                
+
                 caseNameShort = aTags[i].contents[0]
 
                 # caseDate and caseNumber
@@ -346,7 +344,7 @@ def scrapeCourt(courtID, result):
                 except:
                     i = i+1
                     continue
-                
+
                 # next up is the caseDate
                 splitDate = caseDate.split('/')
                 caseDate = datetime.date(int("20" + splitDate[2]),int(splitDate[0]),
@@ -363,7 +361,7 @@ def scrapeCourt(courtID, result):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(caseNameShort + ".pdf", myFile)
+                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
@@ -400,10 +398,10 @@ def scrapeCourt(courtID, result):
         while i < len(aTags):
             # caseLink field, and save it
             caseLink = aTags[i].get('href')
-            caseLink = make_url_absolute(url, caseLink)
+            caseLink = urljoin(url, caseLink)
 
             myFile, doc, created = makeDocFromURL(caseLink, ct)
-                
+
             if not created:
                 # it's an oldie, punt!
                 result += "Duplicate found at " + str(i) + "<br>"
@@ -414,15 +412,15 @@ def scrapeCourt(courtID, result):
                 i += 1
                 continue
             else:
-                dupCount = 0    
-            
+                dupCount = 0
+
             # using caselink, we can get the caseNumber and documentType
             fileName = caseLink.split('/')[-1]
             caseNumber, documentType = fileName.split('.')[0:2]
             # the caseNumber needs a hyphen inserted after the second digit
             caseNumber = caseNumber[0:2] + "-" + caseNumber[2:]
-            doc.documentType = documentType    
-            
+            doc.documentType = documentType
+
             # next, we do the caseDate and caseNameShort, so we can quit before
             # we get too far along.
             junk = aTags[i].contents[0].replace('&nbsp;', ' ').strip()
@@ -442,10 +440,10 @@ def scrapeCourt(courtID, result):
 
             # let's check for duplicates before we proceed
             cite, created = hasDuplicate(caseNumber, caseNameShort)
-            
+
             # last, save evrything (pdf, citation and document)
             doc.citation = cite
-            doc.local_path.save(caseNameShort + ".pdf", myFile)
+            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
             doc.save()
 
             i += 1
@@ -482,10 +480,10 @@ def scrapeCourt(courtID, result):
 
             # we begin with the caseLink field
             caseLink = aTags[i].get('href')
-            caseLink = make_url_absolute(url, caseLink)
-            
+            caseLink = urljoin(url, caseLink)
+
             myFile, doc, created = makeDocFromURL(caseLink, ct)
-            
+
             if not created:
                 # it's an oldie, punt!
                 result += "Duplicate found at " + str(i) + "<br>"
@@ -496,7 +494,7 @@ def scrapeCourt(courtID, result):
                 i += 1
                 continue
             else:
-                dupCount = 0 
+                dupCount = 0
 
             # using caseLink, we can get the caseNumber and documentType
             caseNumber = aTags[i].contents[0]
@@ -527,7 +525,7 @@ def scrapeCourt(courtID, result):
 
             # last, save evrything (pdf, citation and document)
             doc.citation = cite
-            doc.local_path.save(caseNameShort + ".pdf", myFile)
+            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
             doc.save()
 
             i += 1
@@ -569,10 +567,10 @@ def scrapeCourt(courtID, result):
         while i < len(aTags):
             # we begin with the caseLink field
             caseLink = aTags[i].get('href')
-            caseLink = make_url_absolute(url, caseLink)
-            
+            caseLink = urljoin(url, caseLink)
+
             myFile, doc, created = makeDocFromURL(caseLink, ct)
-            
+
             if not created:
                 # it's an oldie, punt!
                 result += "Duplicate found at " + str(i) + "<br>"
@@ -584,7 +582,7 @@ def scrapeCourt(courtID, result):
                 continue
             else:
                 dupCount = 0
-                 
+
             # using caseLink, we can get the caseNumber and documentType
             caseNumber = aTags[i].next.next.next.next.next.contents[0].strip()\
                 .replace('&nbsp;','')
@@ -616,7 +614,7 @@ def scrapeCourt(courtID, result):
 
             # last, save evrything (pdf, citation and document)
             doc.citation = cite
-            doc.local_path.save(caseNameShort + ".pdf", myFile)
+            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
             doc.save()
 
             i += 1
@@ -649,10 +647,10 @@ def scrapeCourt(courtID, result):
             while i < len(aTags):
                 # we begin with the caseLink field
                 caseLink = aTags[i].get("href")
-                caseLink = make_url_absolute(url, caseLink)
-                
+                caseLink = urljoin(url, caseLink)
+
                 myFile, doc, created = makeDocFromURL(caseLink, ct)
-                
+
                 if not created:
                     # it's an oldie, punt!
                     result += "Duplicate found at " + str(i) + "<br>"
@@ -664,7 +662,7 @@ def scrapeCourt(courtID, result):
                     continue
                 else:
                     dupCount = 0
-                
+
                 # using caseLink, we can get the caseNumber and documentType
                 caseNumber = aTags[i].previous.previous.previous.previous.previous\
                     .previous.previous.previous.previous.previous.strip()
@@ -689,10 +687,10 @@ def scrapeCourt(courtID, result):
 
                 # now that we have the caseNumber and caseNameShort, we can dup check
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
-                
+
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(caseNameShort + ".pdf", myFile)
+                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
@@ -712,16 +710,16 @@ def scrapeCourt(courtID, result):
 
         caseNumRegex = re.compile('(\d{2})(\d{4})(u|p)', re.IGNORECASE)
         caseDateRegex = re.compile('(\d{2}/\d{2}/\d{4})(.*)(</b>)')
-        
+
         i = 0
         dupCount = 0
         while i < len(aTags):
             # we begin with the caseLink field
             caseLink = aTags[i].get('href')
-            caseLink = make_url_absolute(url, caseLink)
-        
+            caseLink = urljoin(url, caseLink)
+
             myFile, doc, created = makeDocFromURL(caseLink, ct)
-            
+
             if not created:
                 # it's an oldie, punt!
                 result += "Duplicate found at " + str(i) + "<br>"
@@ -753,13 +751,13 @@ def scrapeCourt(courtID, result):
             caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
                 int(splitDate[1]))
             doc.dateFiled = caseDate
-           
+
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
-            
+
             # last, save evrything (pdf, citation and document)
             doc.citation = cite
-            doc.local_path.save(caseNameShort + ".pdf", myFile)
+            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
             doc.save()
 
             i += 1
@@ -773,13 +771,13 @@ def scrapeCourt(courtID, result):
         has to be used. lxml seems pretty useful, but it was a pain to learn."""
 
         urls = ("http://www.ca9.uscourts.gov/opinions/?o_mode=view&amp;o_sort_field=19&amp;o_sort_type=DESC&o_page_size=100", "http://www.ca9.uscourts.gov/memoranda/?o_mode=view&amp;o_sort_field=21&amp;o_sort_type=DESC&o_page_size=100",)
-               
+
         ct = Court.objects.get(courtUUID = 'ca9')
-        
+
         for url in urls:
             req = urllib2.urlopen(url).read()
             tree = fromstring(req)
-            
+
             if url == urls[0]:
                 caseLinks = tree.xpath('//table[3]/tbody/tr/td/a')
                 caseNumbers = tree.xpath('//table[3]/tbody/tr/td[2]/label')
@@ -788,21 +786,21 @@ def scrapeCourt(courtID, result):
                 caseLinks = tree.xpath('//table[3]/tbody/tr/td/a')
                 caseNumbers = tree.xpath('//table[3]/tbody/tr/td[2]/label')
                 caseDates = tree.xpath('//table[3]/tbody/tr/td[7]/label')
-            
+
             i = 0
             dupCount = 0
             while i < len(caseLinks):
                 # we begin with the caseLink field
                 caseLink = caseLinks[i].get('href')
-                caseLink = make_url_absolute(url, caseLink)
-                
+                caseLink = urljoin(url, caseLink)
+
                 # special case
                 if 'no memos filed' in caseLink.lower():
                     i += 1
                     continue
-                
+
                 myFile, doc, created = makeDocFromURL(caseLink, ct)
-                
+
                 if not created:
                     # it's an oldie, punt!
                     result += "Duplicate found at " + str(i) + "<br>"
@@ -814,10 +812,10 @@ def scrapeCourt(courtID, result):
                     continue
                 else:
                     dupCount = 0
-                
+
                 # next, we'll do the caseNumber
                 caseNumber = caseNumbers[i].text
-                
+
                 # next up: document type (static for now)
                 if 'memoranda' in url:
                     doc.documentType = "U"
@@ -838,7 +836,7 @@ def scrapeCourt(courtID, result):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(caseNameShort + ".pdf", myFile)
+                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
@@ -875,10 +873,10 @@ def scrapeCourt(courtID, result):
         while i < len(caseLinks):
             # we begin with the caseLink field
             caseLink = caseLinks[i].text
-            caseLink = make_url_absolute(url, caseLink)
-            
+            caseLink = urljoin(url, caseLink)
+
             myFile, doc, created = makeDocFromURL(caseLink, ct)
-                
+
             if not created:
                 # it's an oldie, punt!
                 result += "Duplicate found at " + str(i) + "<br>"
@@ -921,7 +919,7 @@ def scrapeCourt(courtID, result):
 
             # last, save evrything (pdf, citation and document)
             doc.citation = cite
-            doc.local_path.save(caseNameShort + ".pdf", myFile)
+            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
             doc.save()
 
             i += 1
@@ -930,7 +928,7 @@ def scrapeCourt(courtID, result):
 
 
     elif (courtID == 11):
-        """Trying out an RSS feed this time, since the feed looks good. This 
+        """Trying out an RSS feed this time, since the feed looks good. This
         court lacks a feed for unpublished opinions, so we don't fetch them at
         present"""
         url = "http://www.ca11.uscourts.gov/rss/pubopnsfeed.php"
@@ -969,10 +967,10 @@ def scrapeCourt(courtID, result):
         while i < len(caseLinks):
             # we begin with the caseLink field
             caseLink = caseLinks[i].text
-            caseLink = make_url_absolute(url, caseLink)
-            
+            caseLink = urljoin(url, caseLink)
+
             myFile, doc, created = makeDocFromURL(caseLink, ct)
-                
+
             if not created:
                 # it's an oldie, punt!
                 result += "Duplicate found at " + str(i) + "<br>"
@@ -1009,7 +1007,7 @@ def scrapeCourt(courtID, result):
 
             # last, save evrything (pdf, citation and document)
             doc.citation = cite
-            doc.local_path.save(caseNameShort + ".pdf", myFile)
+            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
             doc.save()
 
             i += 1
@@ -1034,10 +1032,10 @@ def scrapeCourt(courtID, result):
         while i < len(aTags):
             # we begin with the caseLink field
             caseLink = aTags[i].get('href')
-            caseLink = make_url_absolute(url, caseLink)
+            caseLink = urljoin(url, caseLink)
 
             myFile, doc, created = makeDocFromURL(caseLink, ct)
-                
+
             if not created:
                 # it's an oldie, punt!
                 result += "Duplicate found at " + str(i) + "<br>"
@@ -1071,7 +1069,7 @@ def scrapeCourt(courtID, result):
 
             # last, save evrything (pdf, citation and document)
             doc.citation = cite
-            doc.local_path.save(caseNameShort + ".pdf", myFile)
+            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
             doc.save()
 
             i += 1
@@ -1096,7 +1094,7 @@ def scrapeCourt(courtID, result):
             try:
                 caseLink = trTags[i].td.nextSibling.nextSibling.nextSibling\
                     .nextSibling.nextSibling.nextSibling.a.get('href').strip('.')
-                caseLink = make_url_absolute(url, caseLink)
+                caseLink = urljoin(url, caseLink)
                 if 'opinion' not in caseLink:
                     # we have a non-case PDF. punt
                     i += 1
@@ -1105,9 +1103,9 @@ def scrapeCourt(courtID, result):
                 # the above fails when things get funky, in that case, we punt
                 i += 1
                 continue
-                
+
             myFile, doc, created = makeDocFromURL(caseLink, ct)
-                
+
             if not created:
                 # it's an oldie, punt!
                 result += "Duplicate found at " + str(i) + "<br>"
@@ -1146,19 +1144,72 @@ def scrapeCourt(courtID, result):
 
             # now that we have the caseNumber and caseNameShort, we can dup check
             cite, created = hasDuplicate(caseNumber, caseNameShort)
-            
+
             # last, save evrything (pdf, citation and document)
             doc.citation = cite
-            doc.local_path.save(caseNameShort + ".pdf", myFile)
+            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
             doc.save()
 
             i += 1
 
         return result
-        
+
     if (courtID == 14):
         # we do SCOTUS
-        pass
+        url = "http://www.supremecourt.gov/opinions/slipopinions.aspx"
+        ct = Court.objects.get(courtUUID = 'scotus')
+
+        req = urllib2.urlopen(url).read()
+        tree = fromstring(req)
+
+        caseLinks = tree.xpath('//table/tr/td[4]/a')
+        caseNumbers = tree.xpath('//table/tr/td[3]')
+        caseDates = tree.xpath('//table/tr/td[2]')
+
+        i = 0
+        dupCount = 0
+        while i < len(caseLinks):
+            # we begin with the caseLink field
+            caseLink = caseLinks[i].get('href')
+            caseLink = urljoin(url, caseLink)
+
+            myFile, doc, created = makeDocFromURL(caseLink, ct)
+
+            if not created:
+                # it's an oldie, punt!
+                result += "Duplicate found at " + str(i) + "<br>"
+                dupCount += 1
+                if dupCount == 3:
+                    # third dup in a a row. BREAK!
+                    break
+                i += 1
+                continue
+            else:
+                dupCount = 0
+
+            caseNumber = caseNumbers[i].text
+
+            caseNameShort = caseLinks[i].text
+
+            doc.documentType = "P"
+
+            splitDate = caseDates[i].text.split('/')
+            year = int("20" + splitDate[2])
+            caseDate = datetime.date(year, int(splitDate[0]),
+                int(splitDate[1]))
+            doc.dateFiled = caseDate
+
+            # now that we have the caseNumber and caseNameShort, we can dup check
+            cite, created = hasDuplicate(caseNumber, caseNameShort)
+
+            # last, save evrything (pdf, citation and document)
+            doc.citation = cite
+            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+            doc.save()
+
+            i += 1
+
+        return result
 
 
 def getPDFContent(path):

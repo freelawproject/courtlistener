@@ -34,6 +34,7 @@ PACER_CODES = (
     ('ca11', 'Court of Appeals for the Eleventh Circuit'),
     ('cadc', 'Court of Appeals for the D.C. Circuit'),
     ('cafc', 'Court of Appeals for the Federal Circuit'),
+    ('scotus', 'Supreme Court of the United States'),
 )
 
 DOCUMENT_STATUSES = (
