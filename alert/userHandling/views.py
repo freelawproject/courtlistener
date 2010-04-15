@@ -110,9 +110,7 @@ def register(request):
                 username = str(cd['username'])
                 password = str(cd['password1'])
                 
-                return render_to_response("profile/register_success.html", 
-                    {'form': form, 'username': username, 'password': password,
-                    'redirect_to': redirect_to}, RequestContext(request))
+                return HttpResponseRedirect('/sign-in/?next=' + redirect_to)
                 
         else:
             form = UserCreationFormExtended()
