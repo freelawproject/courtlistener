@@ -84,7 +84,7 @@ urlpatterns = patterns('',
     (r'^profile/password/change/$', password_change),
     (r'^profile/delete/$', deleteProfile),
     (r'^profile/delete/done/$', deleteProfileDone),
-    (r'^register/$', register),
+    url(r'^register/$', register, name="register"),
     (r'^register/success/$', registerSuccess),
     
     #Reset password pages
