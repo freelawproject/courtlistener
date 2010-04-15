@@ -1,2 +1,8 @@
 non-precedential => u
 Non-precedential => u
+precedential => p
+Precedential => p
+Published => p
+published => p
+errata => e
+Errata => e
