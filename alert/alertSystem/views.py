@@ -90,7 +90,7 @@ def hasDuplicate(caseNum, caseName):
 def trunc(s, length):
     """finds the rightmost space in a string, and truncates there. Lacking such
     a space, truncates at length"""
-    
+
     if len(s) <= length:
         return s
     else:
@@ -1332,26 +1332,20 @@ def viewCases(request, court, case):
     case.
     """
 
-    # get the court and citation information
+    # get the court information from the URL
     ct = Court.objects.get(courtUUID = court)
 
     # try looking it up by casename. Failing that, try the caseNumber.
-    try:
-        cites = Citation.objects.filter(caseNameShort = case)
-        if len(cites) == 0:
-            # if we can't find it by case name, try by case number
-            cites = Citation.objects.filter(caseNumber = case)
-    except:
-        # this is caught in the template, so no worries.
-        pass
+    cites = Citation.objects.filter(caseNameShort = case)
+    if cites.count() == 0:
+        # if we can't find it by case name, try by case number
+        cites = Citation.objects.filter(caseNumber = case)
 
-
-    docs = []
-    if len(cites) > 0:
-        # get any documents with that citation at that court. If there is more
-        # than one citation, we only need the first, so we slice to that one.
-        for cite in cites:
-            docs.append(Document.objects.get(court = ct, citation = cite))
+    if cites.count() > 0:
+        # get any documents with this/these citation(s) at that court. We need
+        # all the documents with what might be more than one citation, so we\
+        # use a filter, and the __in method.
+        docs = Document.objects.filter(court = ct, citation__in = cites).order_by("-dateFiled")
 
         return render_to_response('display_cases.html', {'title': case,
             'docs': docs, 'court': ct}, RequestContext(request))
