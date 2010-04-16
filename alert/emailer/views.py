@@ -18,20 +18,25 @@ from alert.userHandling.models import Alert, UserProfile
 from django.contrib.auth.models import User
 from django.http import HttpResponseRedirect, HttpResponse
 
+from alert.userHandling.models import FREQUENCY 
+
 
         
         
 def emailer(request, rate):
     """This will load all the users each day/week/month, and send them emails."""
+    # remap the FREQUENCY variable from the model so the human keys relate back 
+    # to the indices     
+    rates = {}
+    for r in FREQUENCY:
+        rates[r[1].lower()] = r[0]
     
-    # this is likely unnecesssay, and maps the choices var from the model
-    # to its short name. Bonus points for the person that fixes this...
-    if rate == 'daily':
-        rate = 'dly'
-    elif rate == 'weekly':
-        rate = 'wly'
-    elif rate == 'monthly':
-        rate = 'mly'
+    rate = rates['rate']
+    
+    
+    """TODO: this and the next step can/should be done with a subquery using the __IN syntax.""" 
+    
+    
     
     # query all users with alerts of the desired frequency
     # use the distinct method to only return one instance of each person.
@@ -64,6 +69,3 @@ def emailer(request, rate):
     
     # finally, we're done, so we say so. Better output here would be good.        
     return HttpResponse("DONE")
-    
-
-
