@@ -48,7 +48,7 @@ sitemaps = {
 # creates a list of the first element of the choices variable for the courts field
 pacer_codes = []
 for code in PACER_CODES:
-    pacer_codes.append(code[0]) 
+    pacer_codes.append(code[0])
 
 urlpatterns = patterns('',
     # Admin docs and site
@@ -69,15 +69,15 @@ urlpatterns = patterns('',
     # Contact us pages
     (r'^contact/$', contact),
     (r'^contact/thanks/$', thanks),
-    
+
     # Various sign in/out etc. functions as provided by django
     url(r'^sign-in/$', signIn, name="sign-in"),
     (r'^sign-out/$', signOut),
-    
+
     # Homepage and favicon
     (r'^$', home),
     (r'^favicon\.ico$', 'django.views.generic.simple.redirect_to', {'url': '/media/images/ico/favicon.ico'}),
-    
+
     # Settings pages
     (r'^profile/settings/$', viewSettings),
     (r'^profile/alerts/$', viewAlerts),
@@ -86,7 +86,7 @@ urlpatterns = patterns('',
     (r'^profile/delete/done/$', deleteProfileDone),
     url(r'^register/$', register, name="register"),
     (r'^register/success/$', registerSuccess),
-    
+
     #Reset password pages
     (r'^reset-password/$', password_reset),
     (r'^reset-password/instructions-sent/$', password_reset_done),
@@ -107,7 +107,7 @@ urlpatterns = patterns('',
     (r'^feed/(search)/$', searchFeed()), #lacks URL capturing b/c it will use GET queries.
     (r'^feed/court/all/$', allCourtsFeed()),
     (r'^feed/court/(?P<court>' + '|'.join(pacer_codes) + ')/$', courtFeed()),
-    
+
     # SEO-related stuff
     (r'^y_key_6de7ece99e1672f2.html$', validateForYahoo),
     (r'^LiveSearchSiteAuth.xml$', validateForBing),
