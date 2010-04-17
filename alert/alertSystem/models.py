@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from djangosphinx import SphinxSearch
+from djangosphinx.models import SphinxSearch
 from django.db import models
 import alert
 
