@@ -78,8 +78,8 @@ def hasDuplicate(caseNum, caseName):
     DB. If it doesn't, then it puts it in. If it does, it returns it.
     """
 
-    caseName = caseName.replace('&nbsp;', ' ').replace('%20', ' ').strip()
-    caseNum = caseNum.replace('&nbsp;', ' ').replace('%20', ' ').strip()
+    caseName = caseName.replace('&nbsp;', ' ').replace('%20', ' ').strip().strip(';')
+    caseNum = caseNum.replace('&nbsp;', ' ').replace('%20', ' ').strip().strip(';')
 
     # check for duplicates, make the object in their absence
     cite, created = Citation.objects.get_or_create(

@@ -19,8 +19,9 @@ from alert.alertSystem.models import Document
 from django.contrib.auth.models import User
 from django.http import HttpResponseRedirect, HttpResponse
 from django.shortcuts import render_to_response
-from django.template import RequestContext
-from alert.userHandling.models import FREQUENCY 
+from django.template import RequestContext, loader, Context
+from alert.userHandling.models import FREQUENCY
+
 
 import datetime, time
         
@@ -71,11 +72,14 @@ def emailer(request, rate):
         
                 
         
-        if user.plaintextPreferred:   
-            t = loader.get_template('registration/email.txt')
+        if user.plaintextPreferred:
+            hits
+            t = loader.get_template('emails/email.txt')
             c = Context({
                 'hits': hits,
             })
+            
+            print t.render(c)
 
             """
             send_mail('New hits for your alert at CourtListener.com', 
