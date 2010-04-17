@@ -1,0 +1,26 @@
+There have been new hits for your alerts at CourtListener.com.
+
+{% comment %}
+    # hits is a multidimensional array. Ugh.
+    # it consists of alerts, paired with a list of documents, of the form:
+    # [[alert1, [doc1, doc2, doc3, doc4]], [alert2, [doc5, doc6]]]
+{% endcomment %}
+
+{% for hit in hits %}
+    Your {{hit.alert.alertFrequency}} alert was: {{alert.alertText}}
+    Which has the following {{hits|count}} hit(s):
+    {% for hit in hits %}
+        *{{hit.citation.caseNameShort}},* {{hit.citation.caseNumber}} ({{hit.court.courtShortName}})
+        {{hit.dateFiled}} - {{hit.documentStatus}}
+        Download pdf from the court: {{hit.local_path}}
+        Download pdf from our server: {{ hit.download_URL}}
+
+
+    {%endfor%}
+
+Humbly, 
+
+The bots at CourtListener.com
+
+P.S. If you should wish to turn off this alert, or slow it down, 
+
