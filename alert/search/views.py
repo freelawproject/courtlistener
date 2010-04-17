@@ -112,10 +112,6 @@ def showResults(request, queryType="search"):
     # OLD SEARCH METHOD
     # results = Document.objects.filter(documentPlainText__icontains=query).order_by("-dateFiled")
 
-    # Sphinx search
-    """Known problems:
-        - date fields don't work"""
-
     # before searching, check that all attributes are valid. Create message if not.
     attributes = re.findall('@\w*', query)
     validRegex = re.compile(r'^@court$|^@casename$|^@docstatus$|^@doctext$')
