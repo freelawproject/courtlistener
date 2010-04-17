@@ -2,6 +2,15 @@
 
 {% block title %}CourtListener.com / Sign in{% endblock %}
 
+{% block headers %}
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+    <script type="text/javascript">
+	    $(document).ready(function() {
+		    $('.auto-focus:first').focus();
+	    });
+     </script>
+{% endblock %}
+
 {% block content %}
     <div class="span-18 colborder" id="content">
         {% block h2 %}<h2>Sign in</h2>{% endblock %}
@@ -18,7 +27,7 @@
         <form action="" method="post">{% csrf_token %}
             <p>
                 <label for="username">Username</label><br>
-                <input type="text" name="username" value="" id="username">
+                <input type="text" name="username" value="" id="username" class="auto-focus">
             </p>
     
             <p>

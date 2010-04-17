@@ -77,7 +77,7 @@ def emailer(request, rate):
                 'hits': hits,
             })
 
-            
+            """
             send_mail('New hits for your alert at CourtListener.com', 
                 t.render(c), 'no-reply@courtlistener.com', [user.email], 
                 fail_silently=False)
@@ -85,5 +85,5 @@ def emailer(request, rate):
             send_mail('New hits for your alert at CourtListener.com', 
                 t.render(c), 'no-reply@courtlistener.com', [user.email], 
                 fail_silently=False)
-        """
+            """
     return HttpResponse(notes)

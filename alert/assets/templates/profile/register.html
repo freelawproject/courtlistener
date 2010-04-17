@@ -2,6 +2,15 @@
 
 {% block title %}CourtListener.com / Register{% endblock %}
 
+{% block headers %}
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+    <script type="text/javascript">
+	    $(document).ready(function() {
+		    $('.auto-focus:first').focus();
+	    });
+     </script>
+{% endblock %}
+
 {% block content %}
     <div class="span-18 colborder">
         <h2>Register for a new account</h2>
@@ -24,7 +33,7 @@
                         {% endfor %}
                     </span>
                 {% endif %}<br>
-                {{ form.username }}
+                <input id="id_username" type="text" name="username" maxlength="30" class="auto-focus">
             </p>
             <p>
                 <label for="id_email">Email address*</label>
