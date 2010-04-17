@@ -44,53 +44,46 @@ def emailer(request, rate):
     # there doesn't appear to be an easier way to do this. The output can be 
     # tested in the shell with: date --date="2010-04-16" +%s
     unixTimeToday = int(time.mktime(datetime.date.today().timetuple()))
-    if DEBUG: notes.append("unixTimeToday: " + str(unixTimeToday))
 
     # for each user with a daily, weekly or monthly alert...
     for user in users:
-        if DEBUG: notes.append("We entered the forloop\n")
         #...get their alerts...
         alerts = user.alert.filter(alertFrequency = rate)
         
-        alertList = []
-        for alert in alerts:
-            alertList.append(alert.alertText) 
-        
-        
-        
+        hits = []
         # ...and iterate over their alerts.
         for alert in alerts:
-            
             if rate == 'dly':
-                if DEBUG: notes.append("User " + str(user) + " has the following alerts: " + str(alert) + "\n")
-                
+                print alert.alertText
                 # query the alert
                 queryset = Document.search.query(alert.alertText)
-                results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")
-                if DEBUG: notes.append("results before filtering: " + str(results._sphinx))
-                results = queryset.filter(datefiled=unixTimeToday)
+                results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
+                    .filter(datefiled=unixTimeToday)
+
+                if DEBUG: notes.append("result: " + str(results._sphinx) + "<br>")
                 
-                if DEBUG: notes.append("result: " + str(results._sphinx))
+                # hits is a multidimensional array. Ugh.
+                # it consists of alerts, paired with a list of documents, of the form:
+                # [[alert1, [hit1, hit2, hit3, hit4]], [alert2, [hit1, hit2]]]
+                if results.count() > 0:
+                    alertWithResults = [alert, results]
+                    hits.append(alertWithResults)
         
-        print str(notes)
                 
-        return render_to_response('emails/testing.html',
-            {'results': results, 'queryType': "search"},
-            RequestContext(request))
-#                if DEBUG:
-#                    print results.count()
-        """if hits:
-            # append the correct data to the variables that will be handed
-            # off to the email template
-            pass
-        else:
-            # no hits, so punt to next alert
-            pass"""
         
-        # At this point, all alerts should have been run, and all hits found
-        # so we send the email using django's sendmail function.
-        # sendmail (blah, blah, something, something.)
-    
-    
-    # finally, we're done, so we say so. Better output here would be good.        
+        if user.plaintextPreferred:   
+            t = loader.get_template('registration/email.txt')
+            c = Context({
+                'hits': hits,
+            })
+
+            
+            send_mail('New hits for your alert at CourtListener.com', 
+                t.render(c), 'no-reply@courtlistener.com', [user.email], 
+                fail_silently=False)
+        elif not user.plaintextPreferred:
+            send_mail('New hits for your alert at CourtListener.com', 
+                t.render(c), 'no-reply@courtlistener.com', [user.email], 
+                fail_silently=False)
+        """
     return HttpResponse(notes)
