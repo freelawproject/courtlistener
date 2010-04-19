@@ -139,7 +139,7 @@
                         <a href="{{request.path}}?page=1&q={{query}}&{{queryType}}="">« first</a>&nbsp;&nbsp;
                         <a href="{{request.path}}?page={{ results.previous_page_number }}&q={{query}}&{{queryType}}="">‹ previous</a>&nbsp;&nbsp;
                 {% endif %}
-                Page {{ results.number }} of {{ results.paginator.num_pages }}</p>
+                Page {{ results.number }} of {{ results.paginator.num_pages }}
                 {% if results.has_next %}
                         &nbsp;&nbsp;<a href="{{request.path}}?page={{ results.next_page_number }}&q={{query}}&{{queryType}}=">next ›</a>
                         &nbsp;&nbsp;<a href="{{request.path}}?page={{ results.paginator.num_pages }}&q={{query}}&{{queryType}}=">last »</a>
