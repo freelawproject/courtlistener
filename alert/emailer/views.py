@@ -148,7 +148,7 @@ def emailFoo(request):
                 
                     
                     
-                        <h3> class="alt bottom">Your weekly alert, "holder" had hits:</h3>
+                        <h3 class="alt bottom">Your weekly alert, "holder" had hits:</h3>
                     
                 
                 
