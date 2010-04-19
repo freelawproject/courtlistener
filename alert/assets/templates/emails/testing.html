@@ -1,33 +1,42 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset=utf-8>
+        <title>{% block title %}CourtListener.com{% endblock %}</title>
+        <link rel="stylesheet" href="/media/css/blueprint/override.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="/media/css/blueprint/screen.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="/media/css/blueprint/plugins/fancy-type/screen.css" type="text/css" media="screen, projection">
+    </head>
+    <body>
+        <h1 class="bottom"><a href="/">CourtListener</a></h1> 
+        <h3 class="alt top bottom">(Beta)</h3>
+        
+        <hr>
+        
+        <h2>We have news regarding your alerts at <a href="/">CourtListener.com</a></h2>
+        {% for alert, docs in hits %}
+            {% for doc in docs %}
+                {% if forloop.first %}
+                    {% if alert.sendNegativeAlert and docs = "None"  %}
+                        {# it's a negative alert with no hits. #}
+                        <h3>Your {{ alert.get_alertFrequency_display|lower}} alert, "{{alert.alertText}}" had 0 hits.</h3>
+                    {% endif %}
+                    {% if not alert.sendNegativeAlert %}
+                        <h3> class="alt bottom">Your {{alert.get_alertFrequency_display|lower}} alert, "{{alert.alertText}}" had hits:</h3>
+                    {% endif %}
+                {% endif %}
+                
+                {% if docs != "None" %}
+                    <h3 class="alt bottom"><a href="{{doc.get_absolute_url}}">{{forloop.counter}}. {{doc.citation.caseNameShort}}, {{doc.citation.caseNumber}} ({{doc.court.courtShortName}})</a></h3>
+                    <p><strong>Status:</strong> {{doc.get_documentType_display}}<br>
+                    <strong>Download pdf:</strong> <a href="{{doc.download_URL}}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="{{doc.local_path}}">From our backup</a></p><br>
 
-{% block title %} CourtListener.com / Email testing results{% endblock %}
-
-{% block content %}
-    <div class="span-18 colborder">
-        <h2>
-            {{queryType|title}} results
-        </h2>
-
-        {% if not results %}
-            <h3 class="alt">Your {{ queryType }} yielded no results.</h3>
-        {% endif %}
-
-        {% for result in results%}
-            <h3 class="alt bottom"><a href="{{result.get_absolute_url}}">{{ result.citation.caseNameShort }}, {{result.citation.caseNumber}} ({{result.court.courtShortName}})</a></h3>
-            <p> {{result.dateFiled|date:"l, F jS, Y"}}<br>
-                {# Print the whether the document is precedential #}
-                {% ifequal result.documentType "U" %}
-                    <strong>Status:</strong> Non-precedential/Unpublished<br>
-                {% endifequal %}
-                {% ifequal result.documentType "P" %}
-                    <strong>Status:</strong> Precedential/Published<br>
-                {% endifequal %}
-                {% ifequal result.documentType "E" %}
-                    <strong>Status:</strong> Errata<br>
-                {% endifequal %}
-
-                <strong>Download PDF: </strong><a href="{{ result.download_URL }}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="http://courtlistener.com/{{result.local_path}}">Our backup</a></p><br>
+                {% endif %}
+            {% endfor %}
         {% endfor %}
-    </div>
-{% endblock %}
+        <p>Humbly,</p>
+        <p>The bots at CourtListener.com</p>
 
+        <p>P.S. If you should wish to turn off or adjust this alert, sign in and edit your alerts.</p>
+    </body>
+</html>

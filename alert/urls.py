@@ -59,6 +59,7 @@ urlpatterns = patterns('',
     (r'^scrape/(\d{1,2})/$', scrape),
     (r'^parse/(\d{1,2})/$', parse),
     (r'^email/(daily|weekly|monthly)/$', emailer),
+    (r'^email/emailfoo/$', emailFoo),
 
     # Court listing pages
     (r'^opinions/(' + "|".join(pacer_codes) + '|all)/$', viewDocumentListByCourt),
