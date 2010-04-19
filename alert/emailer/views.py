@@ -130,203 +130,203 @@ def emailFoo(request):
     html = """<!DOCTYPE html>
 <html>
     <head>
-        <meta charset=3Dutf-8>
+        <meta charset=utf-8>
         <title>CourtListener.com</title>
-        <link rel=3D"stylesheet" href=3D"/media/css/blueprint/override.css" type=3D"text/css" media=3D"screen, projection">
-        <link rel=3D"stylesheet" href=3D"/media/css/blueprint/screen.css" type=3D"text/css" media=3D"screen, projection">
-        <link rel=3D"stylesheet" href=3D"/media/css/blueprint/plugins/fancy-type/screen.css" type=3D"text/css" media=3D"screen, projection">
+        <link rel="stylesheet" href="/media/css/blueprint/override.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="/media/css/blueprint/screen.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="/media/css/blueprint/plugins/fancy-type/screen.css" type="text/css" media="screen, projection">
     </head>
     <body>
-        <h1 class=3D"bottom"><a href=3D"/">CourtListener</a></h1> 
-        <h3 class=3D"alt top bottom">(Beta)</h3>
+        <h1 class="bottom"><a href="/">CourtListener</a></h1> 
+        <h3 class="alt top bottom">(Beta)</h3>
         
         <hr>
         
-        <h2>We have news regarding your alerts at <a href=3D"/">CourtListener.com</a></h2>
+        <h2>We have news regarding your alerts at <a href="/">CourtListener.com</a></h2>
         
             
                 
                     
                     
-                        <h3> class=3D"alt bottom">Your weekly alert, "holder" had hits:</h3>
+                        <h3> class="alt bottom">Your weekly alert, "holder" had hits:</h3>
                     
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca7/Francisca%20Paiz-Varga%20v.%20Eric%20Holder,%20Jr./">1. Francisca Paiz-Varga v. Eric Holder, Jr., 09-3369 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca7/Francisca%20Paiz-Varga%20v.%20Eric%20Holder,%20Jr./">1. Francisca Paiz-Varga v. Eric Holder, Jr., 09-3369 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca7.uscourts.gov/fdocs/docs.fwx?submit=3Dshowbr&amp;shofile=3D09-3369_001.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Francisca_Paiz-Varga_v._Eric_Holder_Jr..pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca7.uscourts.gov/fdocs/docs.fwx?submit=showbr&amp;shofile=09-3369_001.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Francisca_Paiz-Varga_v._Eric_Holder_Jr..pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Eneh%20v.%20Holder/">2. Eneh v. Holder, 08-30322 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Eneh%20v.%20Holder/">2. Eneh v. Holder, 08-30322 ()</a></h3>
                     <p><strong>Status:</strong> Published<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/opinions/2010/04/15/05-75264.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Eneh_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/opinions/2010/04/15/05-75264.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Eneh_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Joseph%20v.%20Holder/">3. Joseph v. Holder, 07-56672 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Joseph%20v.%20Holder/">3. Joseph v. Holder, 07-56672 ()</a></h3>
                     <p><strong>Status:</strong> Published<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/opinions/2010/04/14/05-74390.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Joseph_v._Holder.pdf">>From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/opinions/2010/04/14/05-74390.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Joseph_v._Holder.pdf">>From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Lopez-jacuinde%20v.%20Holder/">4. Lopez-jacuinde v. Holder, 05-73609 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Lopez-jacuinde%20v.%20Holder/">4. Lopez-jacuinde v. Holder, 05-73609 ()</a></h3>
                     <p><strong>Status:</strong> Published<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/opinions/2010/04/12/07-72046.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Lopez-jacuinde_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/opinions/2010/04/12/07-72046.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Lopez-jacuinde_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Alsoofi%20v.%20Holder/">5. Alsoofi v. Holder, 06-73204 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Alsoofi%20v.%20Holder/">5. Alsoofi v. Holder, 06-73204 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/06-73204.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Alsoofi_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/06-73204.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Alsoofi_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Harutyunyan%20v.%20Holder/">6. Harutyunyan v. Holder, 06-74594 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Harutyunyan%20v.%20Holder/">6. Harutyunyan v. Holder, 06-74594 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/06-74594.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Harutyunyan_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/06-74594.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Harutyunyan_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Stoliarova%20v.%20Holder/">7. Stoliarova v. Holder, 06-74688 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Stoliarova%20v.%20Holder/">7. Stoliarova v. Holder, 06-74688 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/06-74688.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Stoliarova_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/06-74688.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Stoliarova_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Lin%20v.%20Holder/">8. Lin v. Holder, 06-75274 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Lin%20v.%20Holder/">8. Lin v. Holder, 06-75274 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/06-75274.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Lin_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/06-75274.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Lin_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Singh%20v.%20Holder/">9. Singh v. Holder, 06-75849 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Singh%20v.%20Holder/">9. Singh v. Holder, 06-75849 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/06-75849.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Singh_v._Holder.pdf">>From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/06-75849.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Singh_v._Holder.pdf">>From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Mkrtchyan%20v.%20Holder/">10. Mkrtchyan v. Holder, 07-70147 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Mkrtchyan%20v.%20Holder/">10. Mkrtchyan v. Holder, 07-70147 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-70147.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Mkrtchyan_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-70147.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Mkrtchyan_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Cui%20v.%20Holder/">11. Cui v. Holder, 07-70399 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Cui%20v.%20Holder/">11. Cui v. Holder, 07-70399 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-70399.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Cui_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-70399.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Cui_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Ram%20v.%20Holder/">12. Ram v. Holder, 07-71978 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Ram%20v.%20Holder/">12. Ram v. Holder, 07-71978 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-71978.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Ram_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-71978.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Ram_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Prasad%20v.%20Holder/">13. Prasad v. Holder, 07-72294 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Prasad%20v.%20Holder/">13. Prasad v. Holder, 07-72294 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-72294.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Prasad_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-72294.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Prasad_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Johal%20v.%20Holder/">14. Johal v. Holder, 07-72357 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Johal%20v.%20Holder/">14. Johal v. Holder, 07-72357 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-72357.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Johal_v._Holder.pdf">>From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-72357.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Johal_v._Holder.pdf">>From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Gurpreet%20Singh%20v.%20Holder/">15. Gurpreet Singh v. Holder, 07-72539 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Gurpreet%20Singh%20v.%20Holder/">15. Gurpreet Singh v. Holder, 07-72539 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-72539.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Gurpreet_Singh_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-72539.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Gurpreet_Singh_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Ledezma%20v.%20Holder/">16. Ledezma v. Holder, 07-72740 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Ledezma%20v.%20Holder/">16. Ledezma v. Holder, 07-72740 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-72740.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Ledezma_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-72740.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Ledezma_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Ramirez-leon%20v.%20Holder/">17. Ramirez-leon v. Holder, 07-72765 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Ramirez-leon%20v.%20Holder/">17. Ramirez-leon v. Holder, 07-72765 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-72765.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Ramirez-leon_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-72765.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Ramirez-leon_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Chavez-villegas%20v.%20Holder/">18. Chavez-villegas v. Holder, 07-73243 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Chavez-villegas%20v.%20Holder/">18. Chavez-villegas v. Holder, 07-73243 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-73243.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Chavez-villegas_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-73243.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Chavez-villegas_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Alvarez-medina%20v.%20Holder/">19. Alvarez-medina v. Holder, 07-73270 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Alvarez-medina%20v.%20Holder/">19. Alvarez-medina v. Holder, 07-73270 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-73270.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Alvarez-medina_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-73270.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Alvarez-medina_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
                 
                 
                 
-                    <h3 class=3D"alt bottom"><a href=3D"/ca9/Bal%20v.%20Holder/">20. Bal v. Holder, 07-73422 ()</a></h3>
+                    <h3 class="alt bottom"><a href="/ca9/Bal%20v.%20Holder/">20. Bal v. Holder, 07-73422 ()</a></h3>
                     <p><strong>Status:</strong> Unpublished<br>
-                    <strong>Download pdf:</strong> <a href=3D"http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-73422.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=3D"pdf/2010/04/16/Bal_v._Holder.pdf">From our backup</a></p><br>
+                    <strong>Download pdf:</strong> <a href="http://www.ca9.uscourts.gov/datastore/memoranda/2010/04/16/07-73422.pdf">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="pdf/2010/04/16/Bal_v._Holder.pdf">From our backup</a></p><br>
 
                 
             
