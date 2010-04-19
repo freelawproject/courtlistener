@@ -38,8 +38,8 @@ PACER_CODES = (
 )
 
 DOCUMENT_STATUSES = (
-    ('P', 'Published'),
-    ('U', 'Unpublished'),
+    ('P', 'Published/Precedential'),
+    ('U', 'Unpublished/Non-Precedential'),
     ('E', 'Errata'),
 )
 
