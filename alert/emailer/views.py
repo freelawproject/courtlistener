@@ -126,7 +126,7 @@ def emailer(request, rate):
 
     return HttpResponse(notes)
 
-view emailFoo(request):
+def emailFoo(request):
     html = """<!DOCTYPE html>
 <html>
     <head>
