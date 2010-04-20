@@ -20,7 +20,6 @@ from alert.alertSystem.models import PACER_CODES
 from alert.alertSystem.views import *
 from alert.alertSystem.sitemap import DocumentSitemap
 from alert.contact.views import *
-from alert.emailer.views import *
 from alert.feeds.views import *
 from alert.pinger.views import *
 from alert.search.views import *
@@ -54,10 +53,6 @@ urlpatterns = patterns('',
     # Admin docs and site
     (r'^admin/doc/', include('django.contrib.admindocs.urls')),
     (r'^admin/', include(admin.site.urls)),
-
-    # The scraper, parser and emailer URLs
-    (r'^scrape/(\d{1,2})/$', scrape),
-    (r'^parse/(\d{1,2})/$', parse),
 
     # Court listing pages
     (r'^opinions/(' + "|".join(pacer_codes) + '|all)/$', viewDocumentListByCourt),
