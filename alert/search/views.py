@@ -95,16 +95,49 @@ def showResults(request):
         # of the page!
         alertForm = CreateAlertForm(initial = {'alertText': query})
 
-    # OLD SEARCH METHOD
-    # results = Document.objects.filter(documentPlainText__icontains=query).order_by("-dateFiled")
+    # before searching, check that all fieldnames are valid. Create message if not.
+    # for testing: @court @casename foo,bar @(doctext, courthouse, docstatus) @(docstatus, casename) @(casename) @courtname (court | doctext)
+    # this catches simple fields such as @court, @field and puts them in a list
+    attributes = re.findall('(?:@)([^\( ]*)', query)
+    
+    # this catches more complicated ones, like @(court), and @(court, test)
+    regex0 = re.compile('''
+        @               # at sign
+        (?:             # start non-capturing group
+            \w+             # non-whitespace, one or more
+            \b              # a boundary character (i.e. no more \w)
+            |               # OR
+            (               # capturing group
+                \(              # left paren
+                [^@(),]+        # not an @(),
+                (?:                 # another non-caputing group
+                    , *             # a comma, then some spaces
+                    [^@(),]+        # not @(),
+                )*              # some quantity of this non-capturing group
+                \)              # a right paren
+            )               # end of non-capuring group
+        )           # end of non-capturing group
+        ''', re.VERBOSE)
+    
+    # and this puts them into the attributes list.
+    groupedAttributes = re.findall(regex0, query)
+    for item in groupedAttributes:
+        attributes.extend(item.strip("(").strip(")").split(", "))
 
-    # before searching, check that all attributes are valid. Create message if not.
-    attributes = re.findall('@\w*', query)
-    validRegex = re.compile(r'^@court$|^@casename$|^@docstatus$|^@doctext$')
+    # check if the values are valid.
+    validRegex = re.compile(r'^court$|^casename$|^docstatus$|^doctext$')
+    
+    # if they aren't add them to a new list.
     badAttrs = []
     for attribute in attributes:
+        if len(attribute) == 0:
+            # if it's a zero length attribute, we punt
+            continue
         if validRegex.search(attribute.lower()) == None:
-            badAttrs.append(attribute)
+            # if the attribute from the search isn't in the valid list
+            if attribute not in badAttrs:
+                # and the attribute isn't already in the list
+                badAttrs.append(attribute)
 
     # pluralization is a pain, but we must do it...
     if len(badAttrs) == 1:
@@ -118,6 +151,11 @@ def showResults(request):
         Valid attributes are @court, @caseName, @docStatus and @docText.'
         messages.add_message(request, messages.INFO, messageText)
 
+    
+    # OLD SEARCH METHOD
+    # results = Document.objects.filter(documentPlainText__icontains=query).order_by("-dateFiled")
+
+    # NEW SEARCH METHOD
     try:
         queryset = Document.search.query(query)
         results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
@@ -127,7 +165,12 @@ def showResults(request):
 
     # next, we paginate we will show ten results/page
     paginator = Paginator(results, 10)
-    numResults = paginator.count
+    
+    # this will fail when the search fails, so try/except is needed.
+    try:
+        numResults = paginator.count
+    except:
+        numResults = 0
     
     # Make sure page request is an int. If not, deliver first page.
     try:
