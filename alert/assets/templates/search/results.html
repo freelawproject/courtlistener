@@ -24,10 +24,10 @@
             Search {% if query %}results{% else %}our corpus{% endif %}{% if results.object_list %}, page {{ results.number }} of {{ results.paginator.num_pages }}{% endif %}
         </h2>
         <p>
-            {%if results.object_list and numResults == "1000"%}
+            {%if results.object_list and numResults == 1000%}
                 More than {{numResults}} result{{numResults|pluralize}}
             {%endif%}
-            {% if results.object_list %}
+            {% if results.object_list and numResults != 1000%}
                 {{numResults}} result{{numResults|pluralize}}
             {% endif %}
         </p>
