@@ -105,11 +105,10 @@ urlpatterns = patterns('',
     # SEO-related stuff
     (r'^y_key_6de7ece99e1672f2.html$', validateForYahoo),
     (r'^LiveSearchSiteAuth.xml$', validateForBing),
-    (r'^ping/all/$', ping_all_search_engines),
     # Sitemap generator
     (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.sitemap',
         {'sitemaps': sitemaps}),
-    (r'^robots.txt$', robots),
+    #(r'^robots.txt$', robots), # removed for lack of need.
 )
 
 # if it's not the production site, serve the static files this way.
