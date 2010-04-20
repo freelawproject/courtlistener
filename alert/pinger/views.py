@@ -39,8 +39,6 @@ def ping_all_search_engines(request):
 
 def robots(request):
     robots = "User-agent: *\
-\nDisallow: /parse/\
-\nDisallow: /scrape/\
 \nDisallow: /ping/"
     return HttpResponse(robots)
 
