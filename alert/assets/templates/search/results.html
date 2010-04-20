@@ -23,7 +23,7 @@
         <h2 class="bottom">
             Search {% if query %}results{% else %}our corpus{% endif %}{% if results.object_list %}, page {{ results.number }} of {{ results.paginator.num_pages }}{% endif %}
         </h2>
-        {%if results.object_list%}<p>{%if numResults=="1000"%}More than {%endif%}{{numResults}} result{{numResults|pluralize}}</p>{%endif%}
+        {%if results.object_list%}<p>{%if numResults == "1000"%}More than {%endif%}{{numResults}} result{{numResults|pluralize}}</p>{%endif%}
 
         {% if form.errors %}
             {# there is only one possible error #}
