@@ -44,35 +44,21 @@ def home(request):
         if form.is_valid():
             cd = form.cleaned_data
             query = cd['q']
-
-            try:
-                if request.GET['search'] == "":
-                    queryType = 'search'
-                    return HttpResponseRedirect('/search/results/?q=' + query)
-            except:
-                if request.GET['alert'] == "":
-                    queryType = 'alert'
-                    return HttpResponseRedirect('/alert/preview/?q=' + query)
-
+            return HttpResponseRedirect('/search/results/?q=' + query)
     else:
         # the form is loading for the first time
         form = SearchForm()
-
     return render_to_response('home_page.html', {'form': form},
         RequestContext(request))
 
 
-def showResults(request, queryType="search"):
+def showResults(request):
     """Show the results for a query as either an alert or a search"""
-    if queryType == "alert/preview":
-        queryType = "alert"
-    elif queryType == "search/results":
-        queryType = "search"
 
     try:
         query = request.GET['q']
     except:
-        # if somebody is URL hacking at /search/results/ or alert/preview/
+        # if somebody is URL hacking at /search/results/
         query = ""
 
     # this handles the alert creation form.
@@ -100,7 +86,7 @@ def showResults(request, queryType="search"):
                 up.save()
             up.alert.add(alert)
             messages.add_message(request, messages.SUCCESS,
-                    'Your alert was created successfully.')
+                'Your alert was created successfully.')
 
             # and redirect to the alerts page
             return HttpResponseRedirect('/profile/alerts/')
@@ -156,9 +142,8 @@ def showResults(request, queryType="search"):
     except:
         results = []
 
-    return render_to_response('search/results.html',
-        {'results': results, 'queryType': queryType, 'query': query,
-        'alertForm': alertForm}, RequestContext(request))
+    return render_to_response('search/results.html', {'results': results, 
+        'query': query, 'alertForm': alertForm}, RequestContext(request))
 
 
 @login_required
@@ -197,7 +182,6 @@ def editAlert(request, alertID):
                 a.save() # this method saves it and returns it
                 messages.add_message(request, messages.SUCCESS,
                     'Your alert was saved successfully.')
-
 
                 # redirect to the alerts page
                 return HttpResponseRedirect('/profile/alerts/')
@@ -239,6 +223,7 @@ def deleteAlert(request, alertID):
         messages.add_message(request, messages.SUCCESS,
             'Your alert was deleted successfully.')
         return HttpResponseRedirect('/profile/alerts/')
+
 
 @login_required
 def deleteAlertConfirm(request, alertID):

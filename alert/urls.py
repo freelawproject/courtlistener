@@ -89,8 +89,8 @@ urlpatterns = patterns('',
 
     # Alert/search pages
     # These URLs support either GET requests or things like /alert/preview/searchterm.
-    url(r'^(alert/preview)/$', showResults, name="alertResults"),
-    url(r'^(search/results)/$', showResults, name="searchResults"),
+    #url(r'^(alert/preview)/$', showResults, name="alertResults"),
+    url(r'^search/results/$', showResults, name="searchResults"),
     (r'^search/$', showResults), #for the URL hackers in the crowd
     (r'^alert/edit/(\d{1,6})/$', editAlert),
     (r'^alert/delete/(\d{1,6})/$', deleteAlert),
