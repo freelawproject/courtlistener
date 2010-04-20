@@ -20,9 +20,10 @@
 
 {% block content %}
     <div class="span-18 colborder">
-        <h2>
+        <h2 class="bottom">
             Search {% if query %}results{% else %}our corpus{% endif %}{% if results.object_list %}, page {{ results.number }} of {{ results.paginator.num_pages }}{% endif %}
         </h2>
+        {%if results.object_list%}<p>{{results.object_list|length}} result{{results.object_list|pluralize}}</p>{%endif%}
 
         {% if form.errors %}
             {# there is only one possible error #}
@@ -47,7 +48,7 @@
         
         <div class="span-18 last">
             <form action="" method="get">
-                <input class="title {% if not results.object_list %}auto-focus{% endif %}" name="q" id="search" value="{{query}}">&nbsp;&nbsp;
+                <input class="title {% if not results.object_list or not query%}auto-focus{% endif %}" name="q" id="search" value="{{query}}">&nbsp;&nbsp;
                 <button type="submit" class="button title" name="search">Search again</button>
             </form>
             <div class="span-10 last">

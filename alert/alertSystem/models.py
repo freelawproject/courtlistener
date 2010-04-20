@@ -41,6 +41,9 @@ DOCUMENT_STATUSES = (
     ('P', 'Published/Precedential'),
     ('U', 'Unpublished/Non-Precedential'),
     ('E', 'Errata'),
+    ('I', 'In-chambers'),
+    ('R', 'Relating-to orders'),
+    ('S', 'Slip opinion'),
 )
 
 
