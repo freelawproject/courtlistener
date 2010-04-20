@@ -23,7 +23,7 @@
         <h2 class="bottom">
             Search {% if query %}results{% else %}our corpus{% endif %}{% if results.object_list %}, page {{ results.number }} of {{ results.paginator.num_pages }}{% endif %}
         </h2>
-        {%if results.object_list%}<p>{{numResults}} result{{numResults|pluralize}}</p>{%endif%}
+        {%if results.object_list%}<p>{%if numResults==1000%}More than {%endif%}{{numResults}} result{{numResults|pluralize}}</p>{%endif%}
 
         {% if form.errors %}
             {# there is only one possible error #}
@@ -126,18 +126,10 @@
         {% for result in results.object_list %}
             <h3 class="alt bottom"><a href="{{result.get_absolute_url}}">{{ result.citation.caseNameShort }}, {{result.citation.caseNumber}} ({{result.court.courtShortName}})</a></h3>
             <p> {{result.dateFiled|date:"l, F jS, Y"}}<br>
-                {# Print the whether the document is precedential #}
-                {% ifequal result.documentType "U" %}
-                    <strong>Status:</strong> Non-precedential/Unpublished<br>
-                {% endifequal %}
-                {% ifequal result.documentType "P" %}
-                    <strong>Status:</strong> Precedential/Published<br>
-                {% endifequal %}
-                {% ifequal result.documentType "E" %}
-                    <strong>Status:</strong> Errata<br>
-                {% endifequal %}
-
-                <strong>Download PDF: </strong><a href="{{ result.download_URL }}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="http://courtlistener.com/{{result.local_path}}">Our backup</a></p><br>
+                <strong>Status:</strong> {{result.get_documentType_display}}<br>
+                <strong>Download PDF: </strong><a href="{{ result.download_URL }}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="http://courtlistener.com/{{result.local_path}}">Our backup</a>
+            </p>
+            <br>
         {% endfor %}
 
         <h3>
