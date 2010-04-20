@@ -125,11 +125,10 @@ def showResults(request):
     except:
         results = []
 
-    numResults = results.count()
-    
     # next, we paginate we will show ten results/page
     paginator = Paginator(results, 10)
-
+    numResults = paginator.count
+    
     # Make sure page request is an int. If not, deliver first page.
     try:
         page = int(request.GET.get('page', '1'))
