@@ -33,7 +33,6 @@
             <form action="" method="get">
                 <input class="title auto-focus" name="q" id="search">&nbsp;&nbsp;
                 <button type="submit" class="button title" name="search">Search</button>
-                <button type="submit" class="button title" name="alert">Preview alert</button>
             </form>
         </div>
         <div class="span-10 last">
@@ -51,10 +50,6 @@
                     <tr>
                         <td>( )</td>
                         <td>Can be used to group queries</td>
-                    </tr>
-                    <tr>
-                        <td>@court</td>
-                        <td>Filters to a certain court</td>
                     </tr>
                     <tr>
                         <td>" "</td>
@@ -78,6 +73,22 @@
                     <tr>
                         <td>=</td>
                         <td>Defines an exact form of a word</td>
+                    </tr>
+                    <tr>
+                        <td>@court</td>
+                        <td>Filters to a certain court</td>
+                    </tr>
+                    <tr>
+                        <td>@caseName</td>
+                        <td>Searches only the case name field</td>
+                    </tr>
+                    <tr>
+                        <td>@docStatus</td>
+                        <td>Searches only the document status field</td>
+                    </tr>
+                    <tr>
+                        <td>@docText</td>
+                        <td>Searches only the body of the case</td>
                     </tr>
                 </table>
                 <a href="/search/advanced-techniques/" class="bottom">More details</a>
