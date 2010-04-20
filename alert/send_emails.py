@@ -1,32 +1,38 @@
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
-#
+# 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-#
+# 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-#
+# 
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from alert.userHandling.models import Alert, UserProfile
-from alert.alertSystem.models import Document
-from alert.userHandling.models import FREQUENCY
+
+import settings
+from django.core.management import setup_environ
+setup_environ(settings)
+
+
+from userHandling.models import Alert, UserProfile
+from userHandling.models import FREQUENCY
+from alertSystem.models import Document
 from django.contrib.auth.models import User
 from django.http import HttpResponseRedirect, HttpResponse
 from django.shortcuts import render_to_response
 from django.template import RequestContext, loader, Context
 from django.core.mail import send_mail, EmailMultiAlternatives
 
-
 import datetime, time, calendar
+from optparse import OptionParser
 
-def emailer(request, rate):
+def emailer(rate):
     """This will load all the users each day/week/month, and send them emails."""
     # remap the FREQUENCY variable from the model so the human keys relate back
     # to the indices
@@ -81,7 +87,6 @@ def emailer(request, rate):
                 queryset = Document.search.query(alert.alertText)
                 results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
                     .filter(datefiled=unixTimesPastMonth)
-                
             elif RATE == "off":
                 pass
 
@@ -90,19 +95,17 @@ def emailer(request, rate):
             # it consists of alerts, paired with a list of documents, of the form:
             # [[alert1, [hit1, hit2, hit3, hit4]], [alert2, [hit1, hit2]]]
             if results.count() > 0:
-                print results
-                alertWithResults = [alert, results]
+                # very important! if you don't do the slicing here, you'll only
+                # get the first 20 hits. also very frustrating!
+                alertWithResults = [alert, results[0:results.count()]]
                 hits.append(alertWithResults)
-                print hits
                 # set the hit date to today
                 alert.lastHitDate = datetime.date.today()
                 alert.save()
-
             elif alert.sendNegativeAlert:
                 # if they want an alert even when no hits.
                 alertWithResults = [alert, "None"]
                 hits.append(alertWithResults)
-
 
         if userProfile.plaintextPreferred:
             # send a plaintext email.
@@ -133,5 +136,22 @@ def emailer(request, rate):
 
             msg.send(fail_silently=False)
 
+    return "Done"
 
-    return HttpResponse("Done")
+
+def main():
+    usage = "usage: %prog -r RATE | --rate=RATE"
+    parser = OptionParser(usage)
+    parser.add_option('-r', '--rate', dest='rate', metavar='RATE',
+                      help="The rate to send emails")
+    (options, args) = parser.parse_args()
+    if not options.rate:
+        parser.error("You must specify a rate")
+
+    rate = options.rate
+    
+    return emailer(rate)
+
+        
+if __name__ == '__main__':
+    main()

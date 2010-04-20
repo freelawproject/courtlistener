@@ -24,7 +24,7 @@
                         <h2 style="font-size: 2em; font-weight: normal; font-family: inherit; color: #111; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 0.75em; padding: 0;">Your {{ alert.get_alertFrequency_display|lower}} alert, "{{alert.alertText}}" had 0 hits.</h2>
                     {% endif %}
                     {% if docs != "None" %}
-                        <h2 style="font-size: 2em; font-weight: normal; font-family: inherit; color: #111; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 0.75em; padding: 0;"> class="alt bottom">Your {{alert.get_alertFrequency_display|lower}} alert, "{{alert.alertText}}" had hits:</h2>
+                        <h2 style="font-size: 2em; font-weight: normal; font-family: inherit; color: #111; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 0.75em; padding: 0;"> class="alt bottom">Your {{alert.get_alertFrequency_display|lower}} alert, "{{alert.alertText}}" had {{docs.length}} hits:</h2>
                     {% endif %}
                 {% endif %}
 
