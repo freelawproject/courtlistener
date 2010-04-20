@@ -27,16 +27,7 @@
         {% for doc in documents.object_list %}
             <h3 class="alt bottom"><a href="{{doc.get_absolute_url}}">{{ doc.citation.caseNameShort }}, {{doc.citation.caseNumber}} ({{doc.court.courtShortName}})</a></h3>
             <p> {{doc.dateFiled|date:"l, F jS, Y"}}<br>
-                {# Print the whether the document is precedential #}
-                {% ifequal doc.documentType "U" %}
-                    <strong>Status:</strong> Non-precedential/Unpublished<br>
-                {% endifequal %}
-                {% ifequal doc.documentType "P" %}
-                    <strong>Status:</strong> Precedential/Published<br>
-                {% endifequal %}
-                {% ifequal doc.documentType "E" %}
-                    <strong>Status:</strong> Errata<br>
-                {% endifequal %}
+                <strong>Status:</strong> {{doc.get_documentType_display}}<br>
                 <strong>Download PDF: </strong><a href="{{ doc.download_URL }}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="http://courtlistener.com/{{doc.local_path}}">Our backup</a></p><br>
         {% endfor %}
         
