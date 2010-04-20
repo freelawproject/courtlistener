@@ -41,8 +41,7 @@ def robots(request):
     robots = "User-agent: *\
 \nDisallow: /parse/\
 \nDisallow: /scrape/\
-\nDisallow: /ping/\
-\nDisallow: /email/"
+\nDisallow: /ping/"
     return HttpResponse(robots)
 
 
