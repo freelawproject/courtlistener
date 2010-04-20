@@ -125,6 +125,8 @@ def showResults(request):
     except:
         results = []
 
+    numResults = results.count()
+    
     # next, we paginate we will show ten results/page
     paginator = Paginator(results, 10)
 
@@ -143,7 +145,8 @@ def showResults(request):
         results = []
 
     return render_to_response('search/results.html', {'results': results, 
-        'query': query, 'alertForm': alertForm}, RequestContext(request))
+        'numResults': numResults, 'query': query, 'alertForm': alertForm}, 
+        RequestContext(request))
 
 
 @login_required
