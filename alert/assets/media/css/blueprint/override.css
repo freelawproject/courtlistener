@@ -41,6 +41,11 @@ Sets up all the overrides or additional CSS that the site will use.
     -webkit-border-bottom-left-radius: 6px;
 }
 
+.pointer {
+    cursor: pointer;
+    cursor: hand;
+}
+
 a:link, a:visited {
     text-decoration: none;
 }
