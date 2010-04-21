@@ -1168,7 +1168,6 @@ def scrapeCourt(courtID, result):
         ct = Court.objects.get(courtUUID = 'scotus')
 
         for url in urls:
-            print "now scraping: " + url
             req = urllib2.urlopen(url).read()
             tree = fromstring(req)
 

@@ -1,6 +1,6 @@
 *****************
 CourtListener.com
-******************
+*****************
 {% comment %}
     # hits is a multidimensional array. Ugh.
     # it consists of alerts, paired with a list of documents, of the form:
