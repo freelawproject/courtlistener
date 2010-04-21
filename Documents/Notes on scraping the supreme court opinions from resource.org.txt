@@ -1,0 +1,20 @@
+Scraping from resource.org:
+
+Fields that we care about:
+ - SHA1 - provided in the index file for each reporter volume.
+ - dateFiled - can be found in the second column of the index page. For volumes 1-105, provided as "September, 1776". For 106-546, "September 13, 1979". I have seen one or two missing dates though.
+ - court - an easy one.
+ - judge -  no tricks here. Skip until later.
+ - party - these are in a field such as: <p class="parties">THE UNITED STATES, APPELLANTS,<br/>v.<br/>SAMUEL DAVENPORT'S HEIRS.</p>
+ - citation - make a record in the citation table. It has the following fields:
+    - caseNameShort - This will also come from a field such as: <p class="parties">THE UNITED STATES, APPELLANTS,<br/>v.<br/>SAMUEL DAVENPORT'S HEIRS.</p>. It is also the alt field for the link on the index page.
+    - caseNameFull - punt, though it should be easy to deal with later, if we choose.
+    - caseNumber - in the HTML title of the opinions, or the index page in the Cite/Page field.
+    - officialCitationWest - punt
+    - officialCitationLexis - punt
+ - excerptSummary - punt
+ - downloadURL - should point back to bulk.resource.org, with a "view on resource.org" link rather than a "from the court" link. Links are of the form: http://bulk.resource.org/courts.gov/c/US/1/1.US.11.html
+ - time_retrieved - automatic from django.
+ - local path - there's no PDF, so this seems like a blank field.
+ - documentPlainText - generally, this is the PDF plaintext from the document, but in this case, we have well formed HTML. Either we create a new field (documentHTML) and integrate that into templates, or we put HTML into this field, and render it nicely when applicable. The only way to do that is to have a "source" flag in the DB that loads templates differently based on the "source" of the document. A further solution might be to add the source field for good measure, and to also have a documentHTML field instead of the documentPlaintext field. There is also some footer information and other cruft from resource.org that will need to be sloughed off so things are clean. 
+ - documentType - these are all Slip Opinions, I believe, so this gets set to 'S'.
