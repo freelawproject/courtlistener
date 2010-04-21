@@ -23,5 +23,5 @@ Humbly,
 
 The bots at CourtListener.com
 
-P.S. If you should wish to turn off or adjust this alert, sign in and edit your alerts.
+P.S. If you should wish to turn off or adjust this alert, sign in and edit your alerts: http://courtlistener.com/sign-in/?next=/profile/alerts
 
