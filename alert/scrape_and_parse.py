@@ -21,12 +21,9 @@ setup_environ(settings)
 from alertSystem.models import *
 from alertSystem.titlecase import titlecase
 
-from django.http import HttpResponse, Http404
 from django.core.exceptions import MultipleObjectsReturned
 from django.core.files import File
 from django.core.files.base import ContentFile
-from django.shortcuts import render_to_response
-from django.template import RequestContext
 
 import datetime, hashlib, re, StringIO, subprocess, urllib, urllib2
 from BeautifulSoup import BeautifulSoup
@@ -1276,7 +1273,7 @@ def scrape_and_parse(courtID):
 
     If the courtID is 0, then we scrape all courts, one after the next.
 
-    returns HttpResponse containing the result
+    returns a list containing the result
     """
 
     # we show this string to stdout if things go smoothly
