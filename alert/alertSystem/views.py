@@ -28,8 +28,10 @@ def viewCases(request, court, case):
     # get the court information from the URL
     ct = Court.objects.get(courtUUID = court)
 
-    # try looking it up by casename. Failing that, try the caseNumber.
-    cites = Citation.objects.filter(caseNameShort = case)
+    # try looking it up by casename. Failing that, try the caseNumber. 
+    # replace spaces with hyphens to undo the URLizing that the get_absolute_url
+    # in the Document model sets up.
+    cites = Citation.objects.filter(caseNameShort__in = [case.replace('-', ' '), case])
     if cites.count() == 0:
         # if we can't find it by case name, try by case number
         cites = Citation.objects.filter(caseNumber = case)

@@ -224,7 +224,7 @@ class Document(models.Model):
     @models.permalink
     def get_absolute_url(self):
         return ('viewCases', [str(self.court.courtUUID),
-            str(self.citation.caseNameShort)])
+            str(self.citation.caseNameShort).replace(' ', '-')])
 
     class Meta:
         db_table = "Document"

@@ -57,7 +57,7 @@ urlpatterns = patterns('',
     # Court listing pages
     (r'^opinions/(' + "|".join(pacer_codes) + '|all)/$', viewDocumentListByCourt),
 
-    # Display a case
+    # Display a case, a named URL because the get_absolute_url uses it.
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/$', viewCases, name="viewCases"),
 
     # Contact us pages

@@ -20,7 +20,7 @@
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Supreme Court of the U.S." href="/feed/court/scotus/">
     {% if docs %}
         {% with docs|first as doc %}
-            <link rel="canonical" href="/{{court.courtUUID}}/{{doc.citation.caseNameShort}}/">
+            <link rel="canonical" href="{{doc.get_absolute_url}}">
         {% endwith %}
     {% endif %}    
 {% endblock %}
