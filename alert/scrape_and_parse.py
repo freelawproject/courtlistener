@@ -66,13 +66,12 @@ def makeDocFromURL(LinkToPdf, ct):
     doc, created = Document.objects.get_or_create(documentSHA1 = sha1Hash,
         court = ct)
 
-
     if created:
         # we only do this if it's new
         doc.documentSHA1 = sha1Hash
         doc.download_URL = LinkToPdf
         doc.court = ct
-    
+
     error = False
 
     return myFile, doc, created, error
@@ -91,8 +90,8 @@ def trunc(s, length):
             # no spaces found, just use max position
             end = length
         return s[0:end]
-        
-        
+
+
 def hasDuplicate(caseNum, caseName):
     """takes a caseName and a caseNum, and checks if the object exists in the
     DB. If it doesn't, then it puts it in. If it does, it returns it.
@@ -102,13 +101,13 @@ def hasDuplicate(caseNum, caseName):
         .strip(';')
     caseNum = caseNum.replace('&nbsp;', ' ').replace('%20', ' ').strip()\
         .strip(';')
-    
+
     caseNameShort = trunc(caseName, 100)
 
     # check for duplicates, make the object in their absence
     cite, created = Citation.objects.get_or_create(
         caseNameShort = str(caseNameShort), caseNumber = str(caseNum))
-        
+
     if caseNameShort == caseName:
         # no truncation.
         cite.caseNameFull = caseNameShort
@@ -116,7 +115,7 @@ def hasDuplicate(caseNum, caseName):
         # truncation happened. Therefore, use the untruncated value as the full
         # name.
         cite.caseNameFull = caseName
-        
+
     return cite, created
 
 
@@ -183,7 +182,7 @@ def scrapeCourt(courtID, result):
 
             # then we download the PDF, make the hash and document
             myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-            
+
             if error:
                 # things broke, punt this iteration
                 i += 1
@@ -267,14 +266,14 @@ def scrapeCourt(courtID, result):
             caseLink = urljoin(url, caseLink)
 
             myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-            
+
             #TODO: CONTINUE ADDING THE BLOCK BELOW THROUGHOUT!!!
-            
+
             if error:
                 # things broke, punt this iteration
                 i += 1
                 continue
-            
+
             if not created:
                 # it's an oldie, punt!
                 result += "Duplicate found at " + str(i) + "\n"
@@ -359,7 +358,7 @@ def scrapeCourt(courtID, result):
                 caseLink = aTags[i].get('href')
 
                 myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-            
+
                 if error:
                     # things broke, punt this iteration
                     i += 1
@@ -445,7 +444,7 @@ def scrapeCourt(courtID, result):
             caseLink = urljoin(url, caseLink)
 
             myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-            
+
             if error:
                 # things broke, punt this iteration
                 i += 1
@@ -531,7 +530,7 @@ def scrapeCourt(courtID, result):
             caseLink = urljoin(url, caseLink)
 
             myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-            
+
             if error:
                 # things broke, punt this iteration
                 i += 1
@@ -622,7 +621,7 @@ def scrapeCourt(courtID, result):
             caseLink = urljoin(url, caseLink)
 
             myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-            
+
             if error:
                 # things broke, punt this iteration
                 i += 1
@@ -707,7 +706,7 @@ def scrapeCourt(courtID, result):
                 caseLink = urljoin(url, caseLink)
 
                 myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-                
+
                 if error:
                     # things broke, punt this iteration
                     i += 1
@@ -780,7 +779,7 @@ def scrapeCourt(courtID, result):
             caseLink = urljoin(url, caseLink)
 
             myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-            
+
             if error:
                     # things broke, punt this iteration
                     i += 1
@@ -865,7 +864,7 @@ def scrapeCourt(courtID, result):
                     continue
 
                 myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-                
+
                 if error:
                     # things broke, punt this iteration
                     i += 1
@@ -946,7 +945,7 @@ def scrapeCourt(courtID, result):
             caseLink = urljoin(url, caseLink)
 
             myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-            
+
             if error:
                     # things broke, punt this iteration
                     i += 1
@@ -1030,7 +1029,7 @@ def scrapeCourt(courtID, result):
             .*?             # some junk, not greedy
             (\d{2}-\d{5})   # two digits a hyphen then five more
             ''', re.IGNORECASE | re.VERBOSE)
-        
+
         # this could be improved with time.strptimme.
         caseDateRegex = re.compile('''
             date                    # the word date
@@ -1046,7 +1045,7 @@ def scrapeCourt(courtID, result):
             caseLink = urljoin(url, caseLink)
 
             myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-            
+
             if error:
                     # things broke, punt this iteration
                     i += 1
@@ -1117,7 +1116,7 @@ def scrapeCourt(courtID, result):
             caseLink = urljoin(url, caseLink)
 
             myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-            
+
             if error:
                     # things broke, punt this iteration
                     i += 1
@@ -1192,7 +1191,7 @@ def scrapeCourt(courtID, result):
                 continue
 
             myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-            
+
             if error:
                     # things broke, punt this iteration
                     i += 1
@@ -1279,7 +1278,7 @@ def scrapeCourt(courtID, result):
                 caseLink = urljoin(url, caseLink)
 
                 myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-                
+
                 if error:
                     # things broke, punt this iteration
                     i += 1
@@ -1350,7 +1349,7 @@ def parseCourt(courtID, result):
 
     for doc in selectedDocuments:
         # for each of these documents, open it, parse it.
-        result += "Parsed: " + doc.citation.caseNameShort
+        result += "Parsed: " + doc.citation.caseNameShort + "\n"
 
         relURL = str(doc.local_path)
         relURL = settings.MEDIA_ROOT + relURL

@@ -49,6 +49,7 @@ DOCUMENT_STATUSES = (
 DOCUMENT_SOURCES = (
     ('C', 'court website'),
     ('R', 'bulk.resource.org'),
+    ('M', 'manual input'),
 )
 
 
