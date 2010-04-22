@@ -31,7 +31,7 @@ def viewCases(request, court, case):
     # try looking it up by casename. Failing that, try the caseNumber. 
     # replace spaces with hyphens to undo the URLizing that the get_absolute_url
     # in the Document model sets up.
-    cites = Citation.objects.filter(caseNameShort__in = [case.replace('_', ' ').replace('-', ' '), case])
+    cites = Citation.objects.filter(caseNameShort__in = [case.replace('-', ' ').replace('_', '-'), case])
     if cites.count() == 0:
         # if we can't find it by case name, try by case number
         cites = Citation.objects.filter(caseNumber = case)
