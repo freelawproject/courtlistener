@@ -96,6 +96,8 @@ def showResults(request):
         alertForm = CreateAlertForm(initial = {'alertText': query})
 
     # before searching, check that all fieldnames are valid. Create message if not.
+    # this thread has a solution using pyparse which is probably a better approach to investigate:
+    # http://stackoverflow.com/questions/2677713/regex-for-finding-valid-sphinx-fields
     # for testing: @court @casename foo,bar @(doctext, courthouse, docstatus) @(docstatus, casename) @(casename) @courtname (court | doctext)
     # this catches simple fields such as @court, @field and puts them in a list
     attributes = re.findall('(?:@)([^\( ]*)', query)

@@ -14,9 +14,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
-
-
 import os
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 
@@ -27,11 +24,29 @@ sys.path.append("/home/mlissner/FinalProject")
 
 # get our settings
 from django.conf import settings
-from alert.alertSystem.models import Court
+from django.core.exceptions import MultipleObjectsReturned
+from django.utils.encoding import smart_str, smart_unicode
+from alert.alertSystem.models import Court, Citation, Document, Party
+from alert.alertSystem.titlecase import titlecase
 
-from lxml.html import fromstring
-import urllib2
+from lxml.html import fromstring, tostring
 from urlparse import urljoin
+import datetime, time, re, urllib2
+
+def trunc(s, length):
+    """finds the rightmost space in a string, and truncates there. Lacking such
+    a space, truncates at length"""
+
+    if len(s) <= length:
+        return s
+    else:
+        # find the rightmost space
+        end = s.rfind(' ', 0 , length)
+        if end == -1:
+            # no spaces found, just use max position
+            end = length
+        return s[0:end]
+
 
 def scrape_and_parse():
     """Probably lots of ways to go about this, but I think the easiest will be the following:
@@ -41,6 +56,8 @@ def scrape_and_parse():
      - put it all in the DB
      - rock the casbah.
     """
+    results = []
+    DEBUG = 1
     url = "file:///home/mlissner/Documents/Cal/FinalProject/Resource.org/US/index.html"
     
     ct = Court.objects.get(courtUUID = 'scotus')
@@ -50,86 +67,109 @@ def scrape_and_parse():
 
     volumeLinks = tree.xpath('//table/tbody/tr/td[1]/a')
     
-    i = 0
-    while i < len(volumeLinks):
+    i = 378
+    if DEBUG == 1: print len(volumeLinks)-i
+    while i < (len(volumeLinks)):
         # we iterate over every case in the volume
-        
         volumeURL = volumeLinks[i].text + "/index.html"
         volumeURL = urljoin(url, volumeURL)
+        if DEBUG == 1: print "volumeURL: " + volumeURL
         
         req = urllib2.urlopen(volumeURL).read()
         volumeTree = fromstring(req)
         caseLinks = volumeTree.xpath('//table/tbody/tr/td[1]/a')
-        
+        caseDates = volumeTree.xpath('//table/tbody/tr/td[2]/a')
+        sha1Hashes = volumeTree.xpath('//table/tbody/tr/td[3]/a')
+
         j = 0
         while j < len(caseLinks):
             # iterate over each case, throwing it in the DB
             
-            # like the scraper, we begin with the caseLink field
-            caseLink = caseLink[j].get('href')
+            # like the scraper, we begin with the caseLink field (relative for 
+            # now, not absolute)
+            caseLink = caseLinks[j].get('href')
             
-            print caseLink
-            j += 1
+            # sha1 is easy
+            sha1Hash = sha1Hashes[j].text
+            if DEBUG == 5: print sha1Hash
             
-            """
-            # we begin with the caseLink field
-            caseLink = aTags[i].get('href')
-            caseLink = aTagsRegex.search(caseLink).group(1)
-            caseLink = urljoin(url, caseLink)
-
-            myFile, doc, created = makeDocFromURL(caseLink, ct)
-
+            try:
+                doc, created = Document.objects.get_or_create(
+                    documentSHA1 = sha1Hash, court = ct)
+            except MultipleObjectsReturned:
+                # this shouldn't happen now that we're using SHA1 as the dup
+                # check, but the old data is problematic, so we must catch this.
+                created = False
+            
+            if created:
+                # we only do this if it's new
+                doc.documentSHA1 = sha1Hash
+                doc.download_URL = "http://bulk.resource.org/courts.gov/c/US/"\
+                    + str(i+1) + "/" + caseLink
+                doc.court = ct
+                        
             if not created:
-                # it's an oldie, punt!
-                result += "Duplicate found at " + str(i) + "\n"
-                dupCount += 1
-                if dupCount == 3:
-                    # third dup in a a row. BREAK!
-                    break
-                i += 1
+                # something is afoot. Throw a big error.
+                results.append("Duplicate found at volume " + str(i+1) + \
+                    " and row " + str(j+1) + "!!!!")
+                j += 1
                 continue
-            else:
-                dupCount = 0
-
-            # using caseLink, we can get the caseNumber and documentType
-            caseNum = caseNumRegex.search(caseLink).group(1)
-
-            # and the docType
-            documentType = caseNumRegex.search(caseLink).group(2)
-            if 'opn' in documentType:
-                # it's unpublished
-                doc.documentType = "P"
-            elif 'so' in documentType:
-                doc.documentType = "U"
-
-            # next, the caseNameShort (there's probably a better way to do this.
-            caseNameShort = aTags[i].parent.parent.nextSibling.nextSibling\
-                .nextSibling.nextSibling.contents[0]
-
-            # next, we can do the caseDate
-            caseDate = aTags[i].parent.parent.nextSibling.nextSibling\
-                .nextSibling.nextSibling.nextSibling.nextSibling.contents[0]\
-                .replace('&nbsp;', ' ').strip()
-
-            # some caseDate cleanup
-            splitDate = caseDate.split('-')
-            caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
-                int(splitDate[1]))
-            doc.dateFiled = caseDate
-
-            # check for duplicates, make the object in their absence
-            cite, created = hasDuplicate(caseNum, caseNameShort)
-
-            # last, save evrything (pdf, citation and document)
-            doc.citation = cite
-            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
-            doc.save()
-
-            i += 1"""
+                        
+            # using the caselink from above, and the volumeURL, we can get the
+            # documentHTML
+            absCaseLink = urljoin(volumeURL, caseLink) 
+            html = urllib2.urlopen(absCaseLink).read()
+            htmlTree = fromstring(html)
+            bodyContents = htmlTree.xpath('//body/*[not(@id="footer")]')
+            body = ""
+            for element in bodyContents:
+                body = body + tostring(element)
+            if DEBUG == 5: print body
+            doc.documentHTML = body
             
-            pass
-        
+            
+            # next: caseNum and caseName (short and full)
+            caseNum = caseLinks[j].text
+            caseName = smart_str(titlecase(trunc(caseLinks[j].get('title'), 100).lower()))
+            if DEBUG == 5: print "caseName (trunc'ed): " + caseName
+            
+            cite, created = Citation.objects.get_or_create(
+                caseNameShort = str(caseName), caseNumber = str(caseNum))
+            cite.caseNameFull = titlecase(caseLinks[j].get('title').lower())
+            cite.save()
+            doc.citation = cite
+            
+            # date is kinda tricky...details here:
+            # http://pleac.sourceforge.net/pleac_python/datesandtimes.html
+
+            rawDate = caseDates[j].text
+
+            if DEBUG == 5: print rawDate
+            try:
+                caseDate = datetime.datetime(*time.strptime(rawDate, "%B, %Y")[0:5])
+            except ValueError, TypeError:
+                caseDate = datetime.datetime(*time.strptime(rawDate, "%B %d, %Y")[0:5])
+            except:
+                # something is afoot. Throw another big error.
+                results.append("Date parsing error at volume " + str(i+1) + \
+                    " and row " + str(j+1) + "!!!!")
+                continue
+            
+            # assuming we get the date object...
+            doc.dateFiled = caseDate
+            
+            # an easy field
+            doc.documentType = "S"
+            
+            # and another easy one
+            doc.source = "R"
+            
+            doc.save()
+            
+            j += 1
         i += 1
+        
+    return results
 
 def main():
     print scrape_and_parse()
