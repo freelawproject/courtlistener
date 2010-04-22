@@ -46,6 +46,11 @@ DOCUMENT_STATUSES = (
     ('S', 'Slip opinion'),
 )
 
+DOCUMENT_SOURCES = (
+    ('C', 'court website'),
+    ('R', 'bulk.resource.org'),
+)
+
 
 # A class to represent some information about each court, can be extended as needed.
 class Court(models.Model):
@@ -177,6 +182,10 @@ class Document(models.Model):
     search = SphinxSearch()
     documentUUID = models.AutoField("a unique ID for each document",
         primary_key=True)
+    source = models.CharField("the source of the document",
+        max_length=3,
+        choices=DOCUMENT_SOURCES,
+        blank=True)
     documentSHA1 = models.CharField("unique ID for the document, as generated via sha1 on the PDF",
         max_length=40)
     dateFiled = models.DateField("the date filed by the court",
@@ -209,6 +218,8 @@ class Document(models.Model):
         upload_to='pdf/%Y/%m/%d',
         blank=True)
     documentPlainText = models.TextField("plain text of the document after extraction from the PDF",
+        blank=True)
+    documentHTML = models.TextField("HTML of the document",
         blank=True)
     documentType = models.CharField("the type of document, as described by document_types.txt",
         max_length=50,

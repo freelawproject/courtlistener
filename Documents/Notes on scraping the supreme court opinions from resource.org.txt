@@ -8,8 +8,8 @@ Fields that we care about:
  - judge -  no tricks here. Skip until later.
  - party - these are in a field such as: <p class="parties">THE UNITED STATES, APPELLANTS,<br/>v.<br/>SAMUEL DAVENPORT'S HEIRS.</p>
  - citation - make a record in the citation table. It has the following fields:
-    - caseNameShort - This will also come from a field such as: <p class="parties">THE UNITED STATES, APPELLANTS,<br/>v.<br/>SAMUEL DAVENPORT'S HEIRS.</p>. It is also the alt field for the link on the index page.
-    - caseNameFull - punt, though it should be easy to deal with later, if we choose.
+    - caseNameShort - This will also come from a field such as: <p class="parties">THE UNITED STATES, APPELLANTS,<br/>v.<br/>SAMUEL DAVENPORT'S HEIRS.</p>. It is also the alt field for the link on the index page. This needs to get truncated to 100 characters.
+    - caseNameFull - use the title value from the links on the index page.
     - caseNumber - in the HTML title of the opinions, or the index page in the Cite/Page field.
     - officialCitationWest - punt
     - officialCitationLexis - punt
@@ -22,3 +22,5 @@ Fields that we care about:
  
 Associated bug is here: http://bitbucket.org/mlissner/legal-current-awareness/issue/45/
 
+
+Volume 44, 96, 154, 186, 207, 307, 335, 353, 355, 361, 364, 372, 375, 389, 441, 453, 457, 475, 489,  has a data error.
