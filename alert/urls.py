@@ -111,6 +111,12 @@ urlpatterns = patterns('',
     #(r'^robots.txt$', robots), # removed for lack of need.
 )
 
+# redirects
+urlpatterns += patterns('django.views.generic.simple',
+    ('^privacy/$', 'redirect_to', {'url': '/terms/#privacy/'}),
+)
+
+
 # if it's not the production site, serve the static files this way.
 if settings.DEVELOPMENT:
     urlpatterns += patterns('',
