@@ -23,4 +23,4 @@ Fields that we care about:
 Associated bug is here: http://bitbucket.org/mlissner/legal-current-awareness/issue/45/
 
 
-Volume 44, 96, 154, 186, 207, 307, 335, 353, 355, 361, 364, 372, 375, 389, 441, 453, 457, 475, 489,  has a data error.
+Volume 44, 96, 154, 186, 207, 307, 335, 353, 355, 361, 364, 372, 375, 377, 389, 441, 453, 457, 475, 489,  has a data error.

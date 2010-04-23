@@ -106,35 +106,37 @@ def emailer(rate):
                 # if they want an alert even when no hits.
                 alertWithResults = [alert, "None"]
                 hits.append(alertWithResults)
+        
+        if hits.count() > 0:
+            # either the hits var has the value "None", or it has hits.
+            if userProfile.plaintextPreferred:
+                # send a plaintext email.
+                txtTemplate = loader.get_template('emails/email.txt')
+                c = Context({
+                    'hits': hits,
+                })
+                email_text = txtTemplate.render(c)
 
-        if userProfile.plaintextPreferred:
-            # send a plaintext email.
-            txtTemplate = loader.get_template('emails/email.txt')
-            c = Context({
-                'hits': hits,
-            })
-            email_text = txtTemplate.render(c)
+                send_mail(
+                    EMAIL_SUBJECT,
+                    email_text,
+                    EMAIL_SENDER,
+                    [userProfile.user.email],
+                    fail_silently=False)
+            else:
+                # send a multi-part email
+                txtTemplate = loader.get_template('emails/email.txt')
+                htmlTemplate = loader.get_template('emails/email.html')
+                c = Context({
+                    'hits': hits,
+                })
+                email_text = txtTemplate.render(c)
+                html_text = htmlTemplate.render(c)
 
-            send_mail(
-                EMAIL_SUBJECT,
-                email_text,
-                EMAIL_SENDER,
-                [userProfile.user.email],
-                fail_silently=False)
-        else:
-            # send a multi-part email
-            txtTemplate = loader.get_template('emails/email.txt')
-            htmlTemplate = loader.get_template('emails/email.html')
-            c = Context({
-                'hits': hits,
-            })
-            email_text = txtTemplate.render(c)
-            html_text = htmlTemplate.render(c)
+                msg = EmailMultiAlternatives(EMAIL_SUBJECT, email_text, EMAIL_SENDER, [userProfile.user.email])
+                msg.attach_alternative(html_text, "text/html")
 
-            msg = EmailMultiAlternatives(EMAIL_SUBJECT, email_text, EMAIL_SENDER, [userProfile.user.email])
-            msg.attach_alternative(html_text, "text/html")
-
-            msg.send(fail_silently=False)
+                msg.send(fail_silently=False)
 
     return "Done"
 
