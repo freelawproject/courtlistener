@@ -165,6 +165,9 @@ def emailer(rate, verbose, simulate):
                     msg = EmailMultiAlternatives(EMAIL_SUBJECT, email_text, EMAIL_SENDER, [userProfile.user.email])
                     msg.attach_alternative(html_text, "text/html")
                     msg.send(fail_silently=False)
+        elif verbose:
+            print "Not sending mail for this alert."
+            
 
     return "Done"
 
