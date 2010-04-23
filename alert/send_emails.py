@@ -115,8 +115,8 @@ def emailer(rate, verbose, simulate):
                 alert.lastHitDate = datetime.date.today()
                 alert.save()
                 if verbose:
-                    print "alertWithResults: " + alertWithResults
-                    print "hits: " + hits
+                    print "alertWithResults: " + str(alertWithResults)
+                    print "hits: " + str(hits)
                 
             elif alert.sendNegativeAlert:
                 # if they want an alert even when no hits.
