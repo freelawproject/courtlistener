@@ -32,7 +32,7 @@ from django.core.mail import send_mail, EmailMultiAlternatives
 import datetime, time, calendar
 from optparse import OptionParser
 
-def emailer(rate, verbose):
+def emailer(rate, verbose, simulate):
     """This will load all the users each day/week/month, and send them emails."""
     # remap the FREQUENCY variable from the model so the human keys relate back
     # to the indices
@@ -138,14 +138,15 @@ def emailer(rate, verbose):
                 })
                 email_text = txtTemplate.render(c)
                 
-                if verbose: print "email_text: " + str(email_text)
+                if verbose and simulate: print "email_text: " + str(email_text)
                 
-                send_mail(
-                    EMAIL_SUBJECT,
-                    email_text,
-                    EMAIL_SENDER,
-                    [userProfile.user.email],
-                    fail_silently=False)
+                if not simulate:
+                    send_mail(
+                        EMAIL_SUBJECT,
+                        email_text,
+                        EMAIL_SENDER,
+                        [userProfile.user.email],
+                        fail_silently=False)
             else:
                 # send a multi-part email
                 txtTemplate = loader.get_template('emails/email.txt')
@@ -156,14 +157,14 @@ def emailer(rate, verbose):
                 email_text = txtTemplate.render(c)
                 html_text = htmlTemplate.render(c)
 
-                if verbose: 
+                if verbose and simulate: 
                     print "email_text: " + str(email_text)
                     print "html_text: " + str(html_text) 
                 
-                msg = EmailMultiAlternatives(EMAIL_SUBJECT, email_text, EMAIL_SENDER, [userProfile.user.email])
-                msg.attach_alternative(html_text, "text/html")
-
-                msg.send(fail_silently=False)
+                if not simulate:
+                    msg = EmailMultiAlternatives(EMAIL_SUBJECT, email_text, EMAIL_SENDER, [userProfile.user.email])
+                    msg.attach_alternative(html_text, "text/html")
+                    msg.send(fail_silently=False)
 
     return "Done"
 
@@ -175,14 +176,22 @@ def main():
         help="The rate to send emails")
     parser.add_option('-v', '--verbose', action="store_true", dest='verbose', 
         default=False, help="Display variable values during execution")
+    parser.add_option('-s', '--simulate', action="store_true", dest='simulate', 
+        default=False, help="Simulate the emails that would be sent, using the console backend")
     (options, args) = parser.parse_args()
     if not options.rate:
         parser.error("You must specify a rate")
-
+    
     rate = options.rate
     verbose = options.verbose
+    simulate = options.simulate
     
-    return emailer(rate, verbose)
+    if simulate:
+        print "******************"
+        print "* NO EMAILS SENT *"
+        print "******************"
+    
+    return emailer(rate, verbose, simulate)
 
 
 if __name__ == '__main__':
