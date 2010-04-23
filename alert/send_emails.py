@@ -32,7 +32,7 @@ from django.core.mail import send_mail, EmailMultiAlternatives
 import datetime, time, calendar
 from optparse import OptionParser
 
-def emailer(rate):
+def emailer(rate, verbose):
     """This will load all the users each day/week/month, and send them emails."""
     # remap the FREQUENCY variable from the model so the human keys relate back
     # to the indices
@@ -63,11 +63,20 @@ def emailer(rate):
     # query all users with alerts of the desired frequency
     # use the distinct method to only return one instance of each person.
     userProfiles = UserProfile.objects.filter(alert__alertFrequency = RATE).distinct()
+    
+    if verbose:
+        print "today: " + str(today)
+        print "unixTimeToday: " + str(unixTimeToday)
+        print "unixTimesPastWeek: " + str(unixTimesPastWeek)
+        print "unixTimesPastMonth: " + str(unixTimesPastMonth)
+        print "userProfiles (with " + rate + " alerts): " + str(userProfiles)
 
     # for each user with a daily, weekly or monthly alert...
     for userProfile in userProfiles:
         #...get their alerts...
         alerts = userProfile.alert.filter(alertFrequency = RATE)
+        if verbose: 
+            print rate + " alerts for user " + userProfile.user.email + ": " + str(alerts)
 
         hits = []
         # ...and iterate over their alerts.
@@ -90,7 +99,10 @@ def emailer(rate):
             elif RATE == "off":
                 pass
 
-
+            if verbose: print "There were " + str(results.count()) + \
+                " hits for the alert \"" + alert.alertText + \
+                "\". Here are the first 0-20: " + str(results)
+            
             # hits is a multidimensional array. Ugh.
             # it consists of alerts, paired with a list of documents, of the form:
             # [[alert1, [hit1, hit2, hit3, hit4]], [alert2, [hit1, hit2]]]
@@ -102,12 +114,21 @@ def emailer(rate):
                 # set the hit date to today
                 alert.lastHitDate = datetime.date.today()
                 alert.save()
+                if verbose:
+                    print "alertWithResults: " + alertWithResults
+                    print "hits: " + hits
+                
             elif alert.sendNegativeAlert:
                 # if they want an alert even when no hits.
                 alertWithResults = [alert, "None"]
                 hits.append(alertWithResults)
+                
+                if verbose:
+                    print "Sending results for negative alert, " + alert.alertText + "."
+                    print "alertWithResults: " + str(alertWithResults)
+                    print "hits: " + str(hits)
         
-        if hits.count() > 0:
+        if len(hits) > 0:
             # either the hits var has the value "None", or it has hits.
             if userProfile.plaintextPreferred:
                 # send a plaintext email.
@@ -116,7 +137,9 @@ def emailer(rate):
                     'hits': hits,
                 })
                 email_text = txtTemplate.render(c)
-
+                
+                if verbose: print "email_text: " + str(email_text)
+                
                 send_mail(
                     EMAIL_SUBJECT,
                     email_text,
@@ -133,6 +156,10 @@ def emailer(rate):
                 email_text = txtTemplate.render(c)
                 html_text = htmlTemplate.render(c)
 
+                if verbose: 
+                    print "email_text: " + str(email_text)
+                    print "html_text: " + str(html_text) 
+                
                 msg = EmailMultiAlternatives(EMAIL_SUBJECT, email_text, EMAIL_SENDER, [userProfile.user.email])
                 msg.attach_alternative(html_text, "text/html")
 
@@ -145,14 +172,17 @@ def main():
     usage = "usage: %prog -r RATE | --rate=RATE"
     parser = OptionParser(usage)
     parser.add_option('-r', '--rate', dest='rate', metavar='RATE',
-                      help="The rate to send emails")
+        help="The rate to send emails")
+    parser.add_option('-v', '--verbose', action="store_true", dest='verbose', 
+        default=False, help="Display variable values during execution")
     (options, args) = parser.parse_args()
     if not options.rate:
         parser.error("You must specify a rate")
 
     rate = options.rate
-
-    return emailer(rate)
+    verbose = options.verbose
+    
+    return emailer(rate, verbose)
 
 
 if __name__ == '__main__':
