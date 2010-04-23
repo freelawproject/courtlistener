@@ -43,7 +43,6 @@ DOCUMENT_STATUSES = (
     ('E', 'Errata'),
     ('I', 'In-chambers'),
     ('R', 'Relating-to orders'),
-    ('S', 'Slip opinion'),
 )
 
 DOCUMENT_SOURCES = (

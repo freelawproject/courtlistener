@@ -159,7 +159,7 @@ def scrape_and_parse():
             doc.dateFiled = caseDate
             
             # an easy field
-            doc.documentType = "S"
+            doc.documentType = "P"
             
             # and another easy one
             doc.source = "R"
