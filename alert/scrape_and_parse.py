@@ -71,6 +71,7 @@ def makeDocFromURL(LinkToPdf, ct):
         doc.documentSHA1 = sha1Hash
         doc.download_URL = LinkToPdf
         doc.court = ct
+        doc.source = "C"
 
     error = False
 
@@ -1301,7 +1302,7 @@ def scrapeCourt(courtID, result):
                 caseNameShort = caseLinks[i].text
 
                 if 'slipopinion' in url:
-                    doc.documentType = "S"
+                    doc.documentType = "P"
                 elif 'in-chambers' in url:
                     doc.documentType = "I"
                 elif 'relatingtoorders' in url:
