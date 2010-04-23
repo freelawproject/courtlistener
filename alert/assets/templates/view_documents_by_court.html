@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}CourtListener.com / Opinions / {{ title }} / Page / {{ documents.number }}{% endblock %}
+{% block title %}CourtListener.com / Opinions / {{ title }}
+{% if documents.paginator.num_pages %}
+ / Page / {{ documents.number }} of {{documents.paginator.num_pages}}
+ {% endif %}{% endblock %}
 
 {% block headers %}
     <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">

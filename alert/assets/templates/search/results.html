@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 
 {# this could mirror the titles of yahoo, google and bing more closely, if we want. #}
-{% block title %} CourtListener.com / Results / {{ query }} / Page / {{ results.number }}{% endblock %}
+{% block title %} CourtListener.com / Results / {{ query }} / 
+{% if results.paginator.num_pages %}
+Page / {{ results.number }} of {{results.paginator.num_pages}}
+{% endif %}
+{% endblock %}
 
 {% block headers %}
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
