@@ -20,6 +20,7 @@ from alert.alertSystem.models import PACER_CODES
 from alert.alertSystem.views import *
 from alert.alertSystem.sitemap import DocumentSitemap
 from alert.contact.views import *
+from alert.coverage.views import *
 from alert.feeds.views import *
 from alert.pinger.views import *
 from alert.search.views import *
@@ -63,7 +64,10 @@ urlpatterns = patterns('',
     # Contact us pages
     (r'^contact/$', contact),
     (r'^contact/thanks/$', thanks),
-
+    
+    # coverage page
+    (r'^coverage/$', coverage),
+    
     # Various sign in/out etc. functions as provided by django
     url(r'^sign-in/$', signIn, name="sign-in"),
     (r'^sign-out/$', signOut),

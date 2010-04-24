@@ -127,7 +127,7 @@ def showResults(request):
         attributes.extend(item.strip("(").strip(")").split(", "))
 
     # check if the values are valid.
-    validRegex = re.compile(r'^court$|^casename$|^docstatus$|^doctext$')
+    validRegex = re.compile(r'^court$|^casename$|^docstatus$|^doctext$|^casenumber$')
     
     # if they aren't add them to a new list.
     badAttrs = []
@@ -145,12 +145,12 @@ def showResults(request):
     if len(badAttrs) == 1:
         messageText = 'We completed your search, but <strong>' + \
         oxford_comma(badAttrs) + '</strong> is not a valid attribute.<br>\
-        Valid attributes are @court, @caseName, @docStatus and @docText.'
+        Valid attributes are @court, @caseName, @caseNumber, @docStatus and @docText.'
         messages.add_message(request, messages.INFO, messageText)
     elif len(badAttrs) > 1:
         messageText = 'We completed your search, but <strong>' + \
         oxford_comma(badAttrs) + '</strong> are not valid attributes.<br>\
-        Valid attributes are @court, @caseName, @docStatus and @docText.'
+        Valid attributes are @court, @caseName, @caseNumber, @docStatus and @docText.'
         messages.add_message(request, messages.INFO, messageText)
 
     
