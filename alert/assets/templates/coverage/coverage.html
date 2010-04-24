@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% load humanize %}
+
+{% block title %}CourtListener.com / Sign out{% endblock %}
+
+{% block content %}
+    <div class="span-18 colborder">
+        <h2>Coverage</h2>
+        <h3>We currently have {{totalCasesQ|intcomma}} documents in our corpus.</h3>
+        
+        {% if statsP != 0 %}
+            <h3>Precedential/published documents</h3>
+            <table>
+                <tr>
+                    <th>Court</th>
+                    <th>Number of cases</th>
+                    <th>Earliest case</th>
+                    <th>Notes</th>
+                </tr>
+                {% for document,numCases in statsP %}
+                    <tr>
+                        <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td>
+                        {% if document.court.courtUUID == "scotus" %}
+                            <td>Five year gap between 2005 and 2010</td>
+                        {% else %}
+                            <td>No known gaps.</td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+            </table>
+        {% endif %}
+        
+        {% if statsU|length != 0 %}
+            <h3>Non-precedential/unpublished documents</h3>
+            <table>
+                <tr>
+                    <th>Court</th>
+                    <th>Number of cases</th>
+                    <th>Earliest case</th>
+                    <th>Notes</th>
+                </tr>
+                {% for document,numCases in statsU %}
+                    <tr>
+                        <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td>
+                        {% if document.court.courtUUID == "scotus" %}
+                            <td>Five year gap between 2005 and 2010</td>
+                        {% else %}
+                            <td>No known gaps.</td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+            </table>
+        {% endif %}
+        
+        {% if statsMissingType|length != 0 %}
+            <h3>Documents with unknown status</h3>
+            <table>
+                <tr>
+                    <th>Court</th>
+                    <th>Number of cases</th>
+                    <th>Earliest case</th>
+                    <th>Notes</th>
+                </tr>
+                {% for document,numCases in statsMissingType %}
+                    <tr>
+                        <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td>
+                        {% if document.court.courtUUID == "scotus" %}
+                            <td>Five year gap between 2005 and 2010</td>
+                        {% else %}
+                            <td>No known gaps.</td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+            </table>
+        {% endif %}
+    </div>
+{% endblock %}
