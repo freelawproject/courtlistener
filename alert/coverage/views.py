@@ -52,7 +52,7 @@ def coverage(request):
     
     statsU = []
     for code in PACER_CODES:
-        q = Document.objects.filter(court=code[0], documentType=["U","E","I","R"])
+        q = Document.objects.filter(court=code[0], documentType__in=["U",'E','I','R'])
         numDocs = q.count()
         if numDocs == 0:
             doc = "None"
