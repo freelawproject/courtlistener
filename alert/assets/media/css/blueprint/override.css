@@ -68,12 +68,18 @@ a:hover, a:focus {
     color: black;
 }
 
+input.wide-title {
+    width: 390px;
+    padding: 5px;
+    font-size:1.5em;
+}
+
 fieldset.collapsed {
-	border-bottom-width: 0;
-	border-left-width: 0;
-	border-right-width: 0;
-	border-top-width: 0;
-	margin-bottom: 0;
+	border-bottom-width: 0px;
+	border-left-width: 0px;
+	border-right-width: 0px;
+	border-top-width: 0px;
+	margin-bottom: 0px;
 	padding: 0em;
 }
 
