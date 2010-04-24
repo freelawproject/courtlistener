@@ -131,7 +131,7 @@ def getPDFContent(path):
     return content, err
 
 
-def scrapeCourt(courtID, result):
+def scrapeCourt(courtID, result, verbose):
     if (courtID == 1):
         """
         PDFs are available from the first circuit if you go to their RSS feed.
@@ -192,7 +192,8 @@ def scrapeCourt(courtID, result):
 
             if not created:
                 # it's an oldie, punt!
-                result += "Duplicate found at " + str(i) + "\n"
+                if verbose >= 1:
+                    result += "Duplicate found at " + str(i) + "\n"
                 dupCount += 1
                 if dupCount == 3:
                     # third dup in a a row. BREAK!
@@ -252,7 +253,7 @@ def scrapeCourt(courtID, result):
             aTagsRegex = re.compile('(.*?.pdf).*?', re.IGNORECASE)
             aTags = soup.findAll(attrs={'href' : aTagsRegex})
 
-            caseNumRegex = re.compile('.*/(\d{2}-\d{4})(.*).pdf')
+            caseNumRegex = re.compile('.*/(\d{1,2}-\d{3,4})(.*).pdf')
 
             i = 0
             dupCount = 0
@@ -261,7 +262,8 @@ def scrapeCourt(courtID, result):
                 caseLink = aTags[i].get('href')
                 caseLink = aTagsRegex.search(caseLink).group(1)
                 caseLink = urljoin(url, caseLink)
-                print str(i) + ": " +caseLink
+                if verbose >= 2:
+                    print str(i) + ": " + caseLink
                 
                 myFile, doc, created, error = makeDocFromURL(caseLink, ct)
 
@@ -272,7 +274,8 @@ def scrapeCourt(courtID, result):
 
                 if not created:
                     # it's an oldie, punt!
-                    result += "Duplicate found at " + str(i) + "\n"
+                    if verbose >= 1:
+                        result += "Duplicate found at " + str(i) + "\n"
                     #dupCount += 1
                     if dupCount == 3:
                         # third dup in a a row. BREAK!
@@ -284,7 +287,8 @@ def scrapeCourt(courtID, result):
 
                 # using caseLink, we can get the caseNumber and documentType
                 caseNum = caseNumRegex.search(caseLink).group(1)
-                print "caseNum: " + str(caseNum)
+                if verbose >= 2:
+                    print "caseNum: " + str(caseNum)
 
                 # and the docType
                 documentType = caseNumRegex.search(caseLink).group(2)
@@ -363,7 +367,8 @@ def scrapeCourt(courtID, result):
 
                 if not created:
                     # it's an oldie, punt!
-                    result += "Duplicate found at " + str(i) + "\n"
+                    if verbose >= 1:
+                        result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 3:
                         # third dup in a a row. BREAK!
@@ -449,7 +454,8 @@ def scrapeCourt(courtID, result):
 
             if not created:
                 # it's an oldie, punt!
-                result += "Duplicate found at " + str(i) + "\n"
+                if verbose >= 1:
+                    result += "Duplicate found at " + str(i) + "\n"
                 dupCount += 1
                 if dupCount == 3:
                     # third dup in a a row. BREAK!
@@ -535,7 +541,8 @@ def scrapeCourt(courtID, result):
 
             if not created:
                 # it's an oldie, punt!
-                result += "Duplicate found at " + str(i) + "\n"
+                if verbose >= 1: 
+                    result += "Duplicate found at " + str(i) + "\n"
                 dupCount += 1
                 if dupCount == 3:
                     # third dup in a a row. BREAK!
@@ -626,7 +633,8 @@ def scrapeCourt(courtID, result):
 
             if not created:
                 # it's an oldie, punt!
-                result += "Duplicate found at " + str(i) + "\n"
+                if verbose >= 1:
+                    result += "Duplicate found at " + str(i) + "\n"
                 dupCount += 1
                 if dupCount == 3:
                     # third dup in a a row. BREAK!
@@ -711,7 +719,8 @@ def scrapeCourt(courtID, result):
 
                 if not created:
                     # it's an oldie, punt!
-                    result += "Duplicate found at " + str(i) + "\n"
+                    if verbose >= 1:
+                        result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 3:
                         # third dup in a a row. BREAK!
@@ -784,7 +793,8 @@ def scrapeCourt(courtID, result):
 
             if not created:
                 # it's an oldie, punt!
-                result += "Duplicate found at " + str(i) + "\n"
+                if verbose >= 1:
+                    result += "Duplicate found at " + str(i) + "\n"
                 dupCount += 1
                 if dupCount == 3:
                     # third dup in a a row. BREAK!
@@ -869,7 +879,8 @@ def scrapeCourt(courtID, result):
 
                 if not created:
                     # it's an oldie, punt!
-                    result += "Duplicate found at " + str(i) + "\n"
+                    if verbose >= 1:
+                        result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 3:
                         # third dup in a a row. BREAK!
@@ -950,7 +961,8 @@ def scrapeCourt(courtID, result):
 
             if not created:
                 # it's an oldie, punt!
-                result += "Duplicate found at " + str(i) + "\n"
+                if verbose >= 1:
+                    result += "Duplicate found at " + str(i) + "\n"
                 dupCount += 1
                 if dupCount == 3:
                     # third dup in a a row. BREAK!
@@ -1050,7 +1062,8 @@ def scrapeCourt(courtID, result):
 
             if not created:
                 # it's an oldie, punt!
-                result += "Duplicate found at " + str(i) + "\n"
+                if verbose >= 1:
+                    result += "Duplicate found at " + str(i) + "\n"
                 dupCount += 1
                 if dupCount == 3:
                     # third dup in a a row. BREAK!
@@ -1121,7 +1134,8 @@ def scrapeCourt(courtID, result):
 
             if not created:
                 # it's an oldie, punt!
-                result += "Duplicate found at " + str(i) + "\n"
+                if verbose >= 1:
+                    result += "Duplicate found at " + str(i) + "\n"
                 dupCount += 1
                 if dupCount == 3:
                     # third dup in a a row. BREAK!
@@ -1196,7 +1210,8 @@ def scrapeCourt(courtID, result):
 
             if not created:
                 # it's an oldie, punt!
-                result += "Duplicate found at " + str(i) + "\n"
+                if verbose >= 1:
+                    result += "Duplicate found at " + str(i) + "\n"
                 dupCount += 1
                 if dupCount == 3:
                     # third dup in a a row. BREAK!
@@ -1283,7 +1298,8 @@ def scrapeCourt(courtID, result):
 
                 if not created:
                     # it's an oldie, punt!
-                    result += "Duplicate found at " + str(i) + "\n"
+                    if verbose >= 1:
+                        result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 3:
                         # third dup in a a row. BREAK!
@@ -1326,7 +1342,7 @@ def scrapeCourt(courtID, result):
         return result
 
 
-def parseCourt(courtID, result):
+def parseCourt(courtID, result, verbose):
     """Here, we do the following:
         1. For a given court, find all of its documents
         2. Determine if the document has been parsed already
@@ -1346,7 +1362,8 @@ def parseCourt(courtID, result):
 
     for doc in selectedDocuments:
         # for each of these documents, open it, parse it.
-        result += "Parsed: " + doc.citation.caseNameShort + "\n"
+        if verbose >= 1:
+            result += "Parsed: " + doc.citation.caseNameShort + "\n"
 
         relURL = str(doc.local_path)
         relURL = settings.MEDIA_ROOT + relURL
@@ -1356,7 +1373,7 @@ def parseCourt(courtID, result):
     return result
 
 
-def scrape_and_parse(courtID):
+def scrape_and_parse(courtID, verbose):
     """
     The master function. This will receive a court ID, determine the correct
     action to take, then hand it off to another function that will handle the
@@ -1368,7 +1385,8 @@ def scrape_and_parse(courtID):
     """
 
     # we show this string to stdout if things go smoothly
-    result = "It worked\n"
+    if verbose >= 1:
+        result = "It worked\n"
 
     # some data validation, for good measure - this should already be done via
     # our url regex
@@ -1384,29 +1402,39 @@ def scrape_and_parse(courtID):
         i = 1
         from alertSystem.models import PACER_CODES
         while i <= len(PACER_CODES):
-            result += "NOW SCRAPING COURT: " + str(i) + "\n"
-            result = scrapeCourt(i, result) + "\n\n"
-            result += "NOW PARSING COURT: " + str(i) + "\n"
-            result = parseCourt(i, result)
+            if verbose >= 1:
+                result += "NOW SCRAPING COURT: " + str(i) + "\n"
+            result = scrapeCourt(i, result, verbose) + "\n\n"
+            if verbose >= 1:
+                result += "NOW PARSING COURT: " + str(i) + "\n\n"
+            result = parseCourt(i, result, verbose)
             i += 1
     else:
-        result += scrapeCourt(courtID, result)
-        result += parseCourt(courtID, result)
+        result += scrapeCourt(courtID, result, verbose)
+        result += parseCourt(courtID, result, verbose)
     return result
 
 
 def main():
-    usage = "usage: %prog -c COURTID | --court=COURTID"
+    usage = "usage: %prog (-c COURTID | --court=COURTID) [-v | -V]"
     parser = OptionParser(usage)
     parser.add_option('-c', '--court', dest='courtID', metavar='COURTID',
                       help="The court to scrape and parse")
+    parser.add_option('-v', '--verbose', action="store_true", dest='verbose', 
+        default=False, help="Display status messages after execution")
+    parser.add_option('-V', '--vverbose', action="store_true", dest='vverbose', 
+        default=False, help="Display status messages after execution, and display verbose variable values during execution")
     (options, args) = parser.parse_args()
     if not options.courtID:
         parser.error("You must specify a court to scrape and parse")
 
     courtID = options.courtID
+    if options.verbose:
+        verbose = 1
+    elif options.vverbose:
+        verbose = 2
 
-    print scrape_and_parse(courtID)
+    print scrape_and_parse(courtID, verbose)
 
     return 0
 
