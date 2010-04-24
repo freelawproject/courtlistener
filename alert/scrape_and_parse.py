@@ -234,30 +234,16 @@ def scrapeCourt(courtID, result):
 
     elif (courtID == 2):
         """
-        queries can be made on their system via HTTP POST.
+        URL hacking FTW.
         """
 
         # second circuit
-        urls = ("http://www.ca2.uscourts.gov/decisions?IW_DATABASE=SUM&IW_FIELD_TEXT=SUM&IW_SORT=-Date&IW_BATCHSIZE=1000", 
-        "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=OPN&IW_FIELD_TEXT=SUM&IW_SORT=-Date&IW_BATCHSIZE=1000")
-        #url = "http://www.ca2.uscourts.gov/decisions"
+        urls = (
+            "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=OPN&IW_FIELD_TEXT=SUM&IW_SORT=-Date&IW_BATCHSIZE=1000",
+            "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=SUM&IW_FIELD_TEXT=SUM&IW_SORT=-Date&IW_BATCHSIZE=1000",
+        ) 
+        
         ct = Court.objects.get(courtUUID='ca2')
-
-        #today = datetime.date.today()
-        #formattedStartDate = str(today.year) + str(today.month) + str(today.day)
-        # this is OK, even though the post data looks like it will only get the 
-        # 50 after this start date. In actuality, it gets the latest fifty, with
-        # a cap at this date, if applicable. It's confusing.
-#        formattedStartDate = str(today.year) + '03' + '07' 
-        #formattedStartDate = '20080101'
-
-        #data = "IW_DATABASE=OPN&IW_FIELD_TEXT=*&IW_FILTER_DATE_AFTER=" +\
-            #formattedStartDate + "&IW_FILTER_DATE_BEFORE=&IW_BATCHSIZE=500&" +\
-           # "IW_SORT=-DATE"
-
-        #req = urllib2.Request(url, data)
-        #response = urllib2.urlopen(req)
-        #html = response.read()
         
         for url in urls:
             html = urllib2.urlopen(url)
@@ -266,9 +252,9 @@ def scrapeCourt(courtID, result):
             aTagsRegex = re.compile('(.*?.pdf).*?', re.IGNORECASE)
             aTags = soup.findAll(attrs={'href' : aTagsRegex})
 
-            caseNumRegex = re.compile('.*/(/d*-/d*)(?:_|-)(.*?).pdf')
+            caseNumRegex = re.compile('.*/(\d{2}-\d{4})(.*).pdf')
 
-            i = 99
+            i = 0
             dupCount = 0
             while i < len(aTags):
                 # we begin with the caseLink field
