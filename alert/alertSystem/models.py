@@ -37,6 +37,7 @@ PACER_CODES = (
     ('scotus', 'Supreme Court of the United States'),
 )
 
+# changes here need to be mirrored in the coverage page view.
 DOCUMENT_STATUSES = (
     ('P', 'Published/Precedential'),
     ('U', 'Unpublished/Non-Precedential'),
