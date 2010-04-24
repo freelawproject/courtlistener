@@ -26,6 +26,7 @@ from alertSystem.titlecase import titlecase
 from django.core.exceptions import MultipleObjectsReturned
 from django.core.files import File
 from django.core.files.base import ContentFile
+from django.utils.encoding import smart_str
 
 import datetime, hashlib, re, StringIO, subprocess, urllib, urllib2
 from BeautifulSoup import BeautifulSoup
@@ -98,8 +99,8 @@ def hasDuplicate(caseNum, caseName):
     DB. If it doesn't, then it puts it in. If it does, it returns it.
     """
 
-    caseName = caseName.replace('&nbsp;', ' ').replace('%20', ' ').strip()\
-        .strip(';')
+    caseName = smart_str(caseName.replace('&nbsp;', ' ').replace('%20', ' ').strip()\
+        .strip(';'))
     caseNum = caseNum.replace('&nbsp;', ' ').replace('%20', ' ').strip()\
         .strip(';')
 
@@ -237,91 +238,100 @@ def scrapeCourt(courtID, result):
         """
 
         # second circuit
-        url = "http://www.ca2.uscourts.gov/decisions"
+        urls = ("http://www.ca2.uscourts.gov/decisions?IW_DATABASE=SUM&IW_FIELD_TEXT=SUM&IW_SORT=-Date&IW_BATCHSIZE=1000", 
+        "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=OPN&IW_FIELD_TEXT=SUM&IW_SORT=-Date&IW_BATCHSIZE=1000")
+        #url = "http://www.ca2.uscourts.gov/decisions"
         ct = Court.objects.get(courtUUID='ca2')
 
-        today = datetime.date.today()
+        #today = datetime.date.today()
         #formattedStartDate = str(today.year) + str(today.month) + str(today.day)
-        formattedStartDate = str(today.year) + '03' + '07'
+        # this is OK, even though the post data looks like it will only get the 
+        # 50 after this start date. In actuality, it gets the latest fifty, with
+        # a cap at this date, if applicable. It's confusing.
+#        formattedStartDate = str(today.year) + '03' + '07' 
+        #formattedStartDate = '20080101'
 
-        data = "IW_DATABASE=OPN&IW_FIELD_TEXT=*&IW_FILTER_DATE_AFTER=" +\
-            formattedStartDate + "&IW_FILTER_DATE_BEFORE=&IW_BATCHSIZE=50&" +\
-            "IW_SORT=-DATE"
+        #data = "IW_DATABASE=OPN&IW_FIELD_TEXT=*&IW_FILTER_DATE_AFTER=" +\
+            #formattedStartDate + "&IW_FILTER_DATE_BEFORE=&IW_BATCHSIZE=500&" +\
+           # "IW_SORT=-DATE"
 
-        req = urllib2.Request(url, data)
-        response = urllib2.urlopen(req)
-        html = response.read()
-        soup = BeautifulSoup(html)
+        #req = urllib2.Request(url, data)
+        #response = urllib2.urlopen(req)
+        #html = response.read()
+        
+        for url in urls:
+            html = urllib2.urlopen(url)
+            soup = BeautifulSoup(html)
 
-        aTagsRegex = re.compile('(.*?.pdf).*?', re.IGNORECASE)
-        aTags = soup.findAll(attrs={'href' : aTagsRegex})
+            aTagsRegex = re.compile('(.*?.pdf).*?', re.IGNORECASE)
+            aTags = soup.findAll(attrs={'href' : aTagsRegex})
 
-        caseNumRegex = re.compile('.*/(.*?)_(.*?).pdf')
+            caseNumRegex = re.compile('.*/(/d*-/d*)(?:_|-)(.*?).pdf')
 
-        i = 0
-        dupCount = 0
-        while i < len(aTags):
-            # we begin with the caseLink field
-            caseLink = aTags[i].get('href')
-            caseLink = aTagsRegex.search(caseLink).group(1)
-            caseLink = urljoin(url, caseLink)
+            i = 99
+            dupCount = 0
+            while i < len(aTags):
+                # we begin with the caseLink field
+                caseLink = aTags[i].get('href')
+                caseLink = aTagsRegex.search(caseLink).group(1)
+                caseLink = urljoin(url, caseLink)
+                print str(i) + ": " +caseLink
+                
+                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
 
-            myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+                if error:
+                    # things broke, punt this iteration
+                    i += 1
+                    continue
 
-            #TODO: CONTINUE ADDING THE BLOCK BELOW THROUGHOUT!!!
+                if not created:
+                    # it's an oldie, punt!
+                    result += "Duplicate found at " + str(i) + "\n"
+                    #dupCount += 1
+                    if dupCount == 3:
+                        # third dup in a a row. BREAK!
+                        break
+                    i += 1
+                    continue
+                else:
+                    dupCount = 0
 
-            if error:
-                # things broke, punt this iteration
+                # using caseLink, we can get the caseNumber and documentType
+                caseNum = caseNumRegex.search(caseLink).group(1)
+                print "caseNum: " + str(caseNum)
+
+                # and the docType
+                documentType = caseNumRegex.search(caseLink).group(2)
+                if 'opn' in documentType:
+                    # it's unpublished
+                    doc.documentType = "P"
+                elif 'so' in documentType:
+                    doc.documentType = "U"
+
+                # next, the caseNameShort (there's probably a better way to do this.
+                caseNameShort = aTags[i].parent.parent.nextSibling.nextSibling\
+                    .nextSibling.nextSibling.contents[0]
+
+                # next, we can do the caseDate
+                caseDate = aTags[i].parent.parent.nextSibling.nextSibling\
+                    .nextSibling.nextSibling.nextSibling.nextSibling.contents[0]\
+                    .replace('&nbsp;', ' ').strip()
+
+                # some caseDate cleanup
+                splitDate = caseDate.split('-')
+                caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
+                    int(splitDate[1]))
+                doc.dateFiled = caseDate
+
+                # check for duplicates, make the object in their absence
+                cite, created = hasDuplicate(caseNum, caseNameShort)
+
+                # last, save evrything (pdf, citation and document)
+                doc.citation = cite
+                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.save()
+
                 i += 1
-                continue
-
-            if not created:
-                # it's an oldie, punt!
-                result += "Duplicate found at " + str(i) + "\n"
-                dupCount += 1
-                if dupCount == 3:
-                    # third dup in a a row. BREAK!
-                    break
-                i += 1
-                continue
-            else:
-                dupCount = 0
-
-            # using caseLink, we can get the caseNumber and documentType
-            caseNum = caseNumRegex.search(caseLink).group(1)
-
-            # and the docType
-            documentType = caseNumRegex.search(caseLink).group(2)
-            if 'opn' in documentType:
-                # it's unpublished
-                doc.documentType = "P"
-            elif 'so' in documentType:
-                doc.documentType = "U"
-
-            # next, the caseNameShort (there's probably a better way to do this.
-            caseNameShort = aTags[i].parent.parent.nextSibling.nextSibling\
-                .nextSibling.nextSibling.contents[0]
-
-            # next, we can do the caseDate
-            caseDate = aTags[i].parent.parent.nextSibling.nextSibling\
-                .nextSibling.nextSibling.nextSibling.nextSibling.contents[0]\
-                .replace('&nbsp;', ' ').strip()
-
-            # some caseDate cleanup
-            splitDate = caseDate.split('-')
-            caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
-                int(splitDate[1]))
-            doc.dateFiled = caseDate
-
-            # check for duplicates, make the object in their absence
-            cite, created = hasDuplicate(caseNum, caseNameShort)
-
-            # last, save evrything (pdf, citation and document)
-            doc.citation = cite
-            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
-            doc.save()
-
-            i += 1
 
         return result
 
