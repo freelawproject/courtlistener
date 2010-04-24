@@ -255,7 +255,10 @@ def scrapeCourt(courtID, result, verbose):
 
             caseNumRegex = re.compile('.*/(\d{1,2}-\d{3,4})(.*).pdf')
 
-            i = 0
+            if 'BASE=OPN' in url:
+	    	i = 534
+	    elif 'BASE=SUM' in url:
+	    	i = 0
             dupCount = 0
             while i < len(aTags):
                 # we begin with the caseLink field
