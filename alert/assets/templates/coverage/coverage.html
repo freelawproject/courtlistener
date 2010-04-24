@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% load humanize %}
+
 {% block title %}CourtListener.com / Sign out{% endblock %}
 
 {% block content %}
@@ -7,6 +9,7 @@
         <h2>Coverage</h2>
         <h3>We currently have {{totalCasesQ}} documents in our corpus.</h3>
         
+        <h3>Precedential/published cases</h3>
         <table>
             <tr>
                 <th>Court</th>
@@ -15,15 +18,40 @@
                 <th>Notes</th>
             <tr>
                 
-            {% for document,numCases in stats %}
-                <tr>
-                    <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td>
-                    {% if document.court.courtUUID == "scotus" %}
-                        <td>Five year gap between 2005 and 2010</td>
-                    {% else %}
-                        <td>No known gaps.</td>
-                    {% endif %}
-                </tr>
+            {% for document,numCases in statsP %}
+                {%if document != "None"%}
+                    <tr>
+                        <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td>
+                        {% if document.court.courtUUID == "scotus" %}
+                            <td>Five year gap between 2005 and 2010</td>
+                        {% else %}
+                            <td>No known gaps.</td>
+                        {% endif %}
+                    </tr>
+                {% endif %}
+            {% endfor %}
+        </table>
+        
+        <h3>Non-precedential/unpublished cases</h3>
+        <table>
+            <tr>
+                <th>Court</th>
+                <th>Number of cases</th>
+                <th>Earliest case</th>
+                <th>Notes</th>
+            <tr>
+                
+            {% for document,numCases in statsU %}
+                {% if document != "None" %}
+                    <tr>
+                        <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td>
+                        {% if document.court.courtUUID == "scotus" %}
+                            <td>Five year gap between 2005 and 2010</td>
+                        {% else %}
+                            <td>No known gaps.</td>
+                        {% endif %}
+                    </tr>
+                {% endif %}
             {% endfor %}
         </table>
     </div>
