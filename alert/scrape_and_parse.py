@@ -240,8 +240,8 @@ def scrapeCourt(courtID, result, verbose):
 
         # second circuit
         urls = (
-            "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=OPN&IW_FIELD_TEXT=SUM&IW_SORT=-Date&IW_BATCHSIZE=1000",
-            "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=SUM&IW_FIELD_TEXT=SUM&IW_SORT=-Date&IW_BATCHSIZE=1000",
+            "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=OPN&IW_FIELD_TEXT=SUM&IW_SORT=-Date&IW_BATCHSIZE=100",
+            "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=SUM&IW_FIELD_TEXT=SUM&IW_SORT=-Date&IW_BATCHSIZE=100",
         ) 
         
         ct = Court.objects.get(courtUUID='ca2')
@@ -276,7 +276,7 @@ def scrapeCourt(courtID, result, verbose):
                     # it's an oldie, punt!
                     if verbose >= 1:
                         result += "Duplicate found at " + str(i) + "\n"
-                    #dupCount += 1
+                    dupCount += 1
                     if dupCount == 3:
                         # third dup in a a row. BREAK!
                         break
@@ -322,7 +322,6 @@ def scrapeCourt(courtID, result, verbose):
                 doc.save()
 
                 i += 1
-
         return result
 
     elif (courtID == 3):
@@ -410,7 +409,6 @@ def scrapeCourt(courtID, result, verbose):
                 doc.save()
 
                 i += 1
-
         return result
 
     elif (courtID == 4):
@@ -498,7 +496,6 @@ def scrapeCourt(courtID, result, verbose):
             doc.save()
 
             i += 1
-
         return result
 
     elif (courtID == 5):
@@ -585,7 +582,6 @@ def scrapeCourt(courtID, result, verbose):
             doc.save()
 
             i += 1
-
         return result
 
     elif (courtID == 6):
@@ -679,7 +675,6 @@ def scrapeCourt(courtID, result, verbose):
             doc.save()
 
             i += 1
-
         return result
 
     elif (courtID == 7):

@@ -93,7 +93,7 @@ def showResults(request):
     else:
         # the form is loading for the first time, load it, then load the rest
         # of the page!
-        alertForm = CreateAlertForm(initial = {'alertText': query})
+        alertForm = CreateAlertForm(initial = {'alertText': query, 'alertFrequency': "dly"})
 
     # before searching, check that all fieldnames are valid. Create message if not.
     # this thread has a solution using pyparse which is probably a better approach to investigate:
