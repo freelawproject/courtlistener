@@ -48,7 +48,6 @@ def coverage(request):
         tempList = [doc, numDocs]
         
         stats.append(tempList)
-    print stats
     
     return render_to_response('coverage/coverage.html', {'totalCasesQ': totalCasesQ, 'stats':stats},
         RequestContext(request))
