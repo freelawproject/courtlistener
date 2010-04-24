@@ -37,7 +37,8 @@ PACER_CODES = (
     ('scotus', 'Supreme Court of the United States'),
 )
 
-# changes here need to be mirrored in the coverage page view.
+# changes here need to be mirrored in the coverage page view and the exceptions 
+# list for sphinx
 DOCUMENT_STATUSES = (
     ('P', 'Published/Precedential'),
     ('U', 'Unpublished/Non-Precedential'),
