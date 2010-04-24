@@ -1,0 +1,82 @@
+/* -----------------------------------------------------------------------------
+
+Sets up all the overrides or additional CSS that the site will use.
+
+------------------------------------------------------------------------------*/
+
+.inline {
+    display: inline;
+}
+
+.navigation {
+    padding: 0.75em 0em .75em 1.5em;
+}
+
+.navigation * {
+    display: inline;
+    padding: 0em;
+    margin: 0;
+}
+
+.navigation > ul {
+    padding: 0;
+}
+
+.navigation > ul > li {
+    list-style: none outside none;
+    padding: 0em 0.7em 0em 0.7em;
+    white-space: nowrap;
+    text-align: center;
+}
+
+.round {
+    -moz-border-radius: 6px 6px 6px 6px;
+    -webkit-border-radius: 6px;
+}
+
+.round-bottom {
+    -moz-border-radius-bottomright: 6px;
+    -moz-border-radius-bottomleft: 6px;
+    -webkit-border-bottom-right-radius: 6px;
+    -webkit-border-bottom-left-radius: 6px;
+}
+
+.pointer {
+    cursor: pointer;
+    cursor: hand;
+}
+
+a:link, a:visited {
+    text-decoration: none;
+}
+
+a:hover, a:focus {
+    text-decoration: underline;
+    color: #009;
+}
+
+.errortext {
+    color: #8a1f11;
+}
+
+.header > h1 > a {
+    text-decoration: none;
+    color: black;
+}
+
+.header > h3 > a {
+    color: black;
+}
+
+fieldset.collapsed {
+	border-bottom-width: 0;
+	border-left-width: 0;
+	border-right-width: 0;
+	border-top-width: 0;
+	margin-bottom: 0;
+	padding: 0em;
+}
+
+fieldset.collapsed > legend {
+    font-size: 100%;
+}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}CourtListener.com / Registration complete{% endblock %}
+
+{% block content %}
+    <div class="span-18 colborder">
+        <h2>Registration complete</h2>
+        <p>
+            Thanks for registering with our site. Please sign in to continue.
+        </p>
+        {# this should never be seen, but in case something happens, we ought to be prepared #}
+        {% if form.errors %}
+            <div class="span-18">
+                <div class="span-10 error">
+                    <p class="bottom">There has been an error signing in. Please
+                    try our normal sign in page, above.</p>
+                </div>
+                <div class="span-7 last">&nbsp;</div>
+            </div>
+        {% else %}
+        
+        
+        <form action="/sign-in/?next={{redirect_to}}" method="post">{% csrf_token %}
+            {# Two hidden fields here, containing the username/password #}
+            <input type="hidden" name="username" value="{{username}}" id="username">
+            <input type="hidden" name="password" value="{{password}}" id="password">
+            <input type="hidden" name="next" value="/">
+            <button type="submit" class="button">Sign in</button>
+        </form>
+        {% endif %}
+    </div>
+{% endblock %}
+
