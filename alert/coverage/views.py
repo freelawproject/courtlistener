@@ -65,8 +65,6 @@ def coverage(request):
             doc = q.order_by('dateFiled')[0]
             tempList = [doc, numDocs]
             statsMissingType.append(tempList)
-    
-    statsMissingType = []
 
     return render_to_response('coverage/coverage.html', {'totalCasesQ': totalCasesQ,
         'statsP':statsP, 'statsU': statsU, 'statsMissingType': statsMissingType},
