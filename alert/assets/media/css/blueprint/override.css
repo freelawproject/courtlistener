@@ -8,6 +8,10 @@ Sets up all the overrides or additional CSS that the site will use.
     display: inline;
 }
 
+.container {
+    padding: 0px 10px;
+}
+
 .navigation {
     padding: 0.75em 0em .75em 1.5em;
 }
