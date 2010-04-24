@@ -41,8 +41,13 @@ def coverage(request):
     stats = []
     # get all the courts
     for code in PACER_CODES:
-        doc = Document.objects.filter(court=code[0]).order_by('dateFiled')[0]
-        stats.append(doc)
+        q = Document.objects.filter(court=code[0])
+        doc = q.order_by('dateFiled')[0]
+        numDocs = q.count()
+        
+        tempList = [doc, numDocs]
+        
+        stats.append(tempList)
     print stats
     
     return render_to_response('coverage/coverage.html', {'totalCasesQ': totalCasesQ, 'stats':stats},
