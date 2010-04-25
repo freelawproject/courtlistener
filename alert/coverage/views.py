@@ -26,12 +26,12 @@ def coverage(request):
     kindly display them all for us.
 
     Stats we want include:
-        - total number of cases in the db
-        - number of cases in each court
-        - earliest and latest case in each court
+        - total number of documents in the db
+        - number of documents from each court
+        - earliest and latest document from each court
 
     Thus, our method will be:
-        1. Get the number of cases (easy)
+        1. Get the number of documents (easy)
         2. Build a nested list of the following form:
             [[oldestDocInCourt, numCasesInCourt],[oldestDocInCourt2, numCasesInCourt2]]
     """
