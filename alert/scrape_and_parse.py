@@ -514,7 +514,7 @@ def scrapeCourt(courtID, result, verbose):
         i = 0
         while True:
             # 1992-01-01 + 30 days * i
-            newDate = 694252800 + (2592000 * i)
+            newDate = 1165824000 + (2592000 * i)
             dates.append(datetime.datetime.fromtimestamp(newDate))
             if newDate > unixTimeToday:
                 break
@@ -1251,6 +1251,7 @@ def scrapeCourt(courtID, result, verbose):
                         j += 1
                     i += 1
                 if verbose >= 2: print "years: " + str(years)
+
             elif 'opinions' in url:
                 i = 0
                 years = []
@@ -1314,6 +1315,8 @@ def scrapeCourt(courtID, result, verbose):
                         # it's an oldie, punt!
                         if verbose >= 1: 
                             result += "Duplicate found at " + str(i) + "\n"
+                        if verbose >= 2:
+                            print "Duplicate found at " + str(i)
                         dupCount += 1
                         #if dupCount == 3:
                             # third dup in a a row. BREAK!
