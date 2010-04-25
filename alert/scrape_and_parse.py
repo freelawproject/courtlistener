@@ -30,7 +30,7 @@ from django.utils.encoding import smart_str
 
 import datetime, calendar, hashlib, re, StringIO, subprocess, time, urllib, urllib2
 from BeautifulSoup import BeautifulSoup
-from lxml.html import fromstring
+from lxml.html import fromstring, tostring
 from lxml import etree
 from optparse import OptionParser
 from urlparse import urljoin
@@ -1136,97 +1136,198 @@ def scrapeCourt(courtID, result, verbose):
 
     elif (courtID == 11):
         """Trying out an RSS feed this time, since the feed looks good. This
-        court lacks a feed for unpublished opinions, so we don't fetch them at
-        present"""
+        court lacks a feed for unpublished opinions, so they are fetched after
+        the below RSS feed finishes."""
         # Missing a day == OK.
         url = "http://www.ca11.uscourts.gov/rss/pubopnsfeed.php"
         ct = Court.objects.get(courtUUID = 'ca11')
 
-        req = urllib2.urlopen(url)
+#        req = urllib2.urlopen(url)
 
-        # this code gets rid of errant ampersands - they throw big errors.
-        contents = req.read()
-        if '&' in contents:
-            punctuationRegex = re.compile(" & ")
-            contents = re.sub(punctuationRegex, " &amp; ", contents)
-            tree = etree.fromstring(contents)
-        else:
-            tree = etree.fromstring(contents)
+#        # this code gets rid of errant ampersands - they throw big errors.
+#        contents = req.read()
+#        if '&' in contents:
+#            punctuationRegex = re.compile(" & ")
+#            contents = re.sub(punctuationRegex, " &amp; ", contents)
+#            tree = etree.fromstring(contents)
+#        else:
+#            tree = etree.fromstring(contents)
 
-        caseLinks = tree.xpath('//item/link')
-        description = tree.xpath('//item/description')
-        caseNames = tree.xpath('//item/title')
+#        caseLinks = tree.xpath('//item/link')
+#        description = tree.xpath('//item/description')
+#        caseNames = tree.xpath('//item/title')
 
-        # some regexes
-        caseNumRegex = re.compile('''
-            case            # the word case
-            .*?             # some junk, not greedy
-            (\d{2}-\d{5})   # two digits a hyphen then five more
-            ''', re.IGNORECASE | re.VERBOSE)
+#        # some regexes
+#        caseNumRegex = re.compile('''
+#            case            # the word case
+#            .*?             # some junk, not greedy
+#            (\d{2}-\d{5})   # two digits a hyphen then five more
+#            ''', re.IGNORECASE | re.VERBOSE)
 
-        # this could be improved with time.strptimme.
-        caseDateRegex = re.compile('''
-            date                    # the word date
-            .*?                     # some junk, not greedy
-            (\d{2}-\d{2}-\d{4})     # two digits - two digits - four digits
-            ''', re.IGNORECASE | re.VERBOSE)
+#        # this could be improved with time.strptimme.
+#        caseDateRegex = re.compile('''
+#            date                    # the word date
+#            .*?                     # some junk, not greedy
+#            (\d{2}-\d{2}-\d{4})     # two digits - two digits - four digits
+#            ''', re.IGNORECASE | re.VERBOSE)
 
-        i = 0
-        dupCount = 0
-        while i < len(caseLinks):
-            # we begin with the caseLink field
-            caseLink = caseLinks[i].text
-            caseLink = urljoin(url, caseLink)
+#        i = 0
+#        dupCount = 0
+#        while i < len(caseLinks):
+#            # we begin with the caseLink field
+#            caseLink = caseLinks[i].text
+#            caseLink = urljoin(url, caseLink)
 
-            myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+#            myFile, doc, created, error = makeDocFromURL(caseLink, ct)
 
-            if error:
-                    # things broke, punt this iteration
+#            if error:
+#                    # things broke, punt this iteration
+#                    i += 1
+#                    continue
+
+#            if not created:
+#                # it's an oldie, punt!
+#                if verbose >= 1:
+#                    result += "Duplicate found at " + str(i) + "\n"
+#                dupCount += 1
+#                if dupCount == 3:
+#                    # third dup in a a row. BREAK!
+#                    break
+#                i += 1
+#                continue
+#            else:
+#                dupCount = 0
+
+#            # these are only published opinions, unpublished lack a feed (boo!)
+#            doc.documentType = "P"
+
+#            # next, we'll do the caseNumber
+#            caseNumber = caseNumRegex.search(description[i].text).group(1)
+
+#            # next up: caseDate
+#            caseDate = caseDateRegex.search(description[i].text).group(1)
+#            splitDate = caseDate.split('-')
+#            caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
+#                int(splitDate[1]))
+#            doc.dateFiled = caseDate
+
+#            #next up: caseNameShort
+#            caseNameShort = caseNames[i].text
+
+#            # now that we have the caseNumber and caseNameShort, we can dup check
+#            cite, created = hasDuplicate(caseNumber, caseNameShort)
+
+#            # if that goes well, we save to the DB
+#            doc.citation = cite
+
+#            # last, save evrything (pdf, citation and document)
+#            doc.citation = cite
+#            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+#            doc.save()
+
+#            i += 1
+
+        urls = (
+            "http://www.ca11.uscourts.gov/unpub/searchdate.php",
+            "http://www.ca11.uscourts.gov/opinions/searchdate.php",
+        )
+        
+        for url in urls:
+            if 'unpub' in url:
+                i = 0
+                years = ["2010-01"]
+                while i <= 5:
+                    years.append(2005+i)
                     i += 1
-                    continue
+                if verbose >= 2: print "years: " + str(years)
+            elif 'opinions' in url:
+                i = 0
+                years = []
+                while i <= 16:
+                    years.append(1994+i)
+                    i += 1
+                if verbose >= 2: print "years: " + str(years)
+        
+            for year in years:
+                postValues = {
+                    'date'  : year,
+                }
+                
+                data = urllib.urlencode(postValues)
+                req = urllib2.Request(url, data)
+                response = urllib2.urlopen(req)
+                html = response.read()
 
-            if not created:
-                # it's an oldie, punt!
-                if verbose >= 1:
-                    result += "Duplicate found at " + str(i) + "\n"
-                dupCount += 1
-                if dupCount == 3:
-                    # third dup in a a row. BREAK!
-                    break
-                i += 1
-                continue
-            else:
+                tree = fromstring(html)
+                
+                if 'unpub' in url:
+                    caseNumbers = tree.xpath('//table[3]//table//table/tr[1]/td[2]')
+                    caseLinks   = tree.xpath('//table[3]//table//table/tr[3]/td[2]/a')
+                    caseDates   = tree.xpath('//table[3]//table//table/tr[4]/td[2]')
+                    caseNames   = tree.xpath('//table[3]//table//table/tr[6]/td[2]')
+                elif 'opinion' in url:
+                    caseNumbers = tree.xpath('//table[3]//td[3]//table/tr[1]/td[2]')
+                    caseLinks   = tree.xpath('//table[3]//td[3]//table/tr[3]/td[2]/a')
+                    caseDates   = tree.xpath('//table[3]//td[3]//table/tr[4]/td[2]')
+                    caseNames   = tree.xpath('//table[3]//td[3]//table/tr[6]/td[2]')
+                
+                '''
+                # for debugging
+                print "length: " + str(len(caseNames))
+                for foo in caseNames:
+                    print str(foo.text)
+                
+                return result'''
+                
+                i = 0
                 dupCount = 0
-
-            # these are only published opinions, unpublished lack a feed (boo!)
-            doc.documentType = "P"
-
-            # next, we'll do the caseNumber
-            caseNumber = caseNumRegex.search(description[i].text).group(1)
-
-            # next up: caseDate
-            caseDate = caseDateRegex.search(description[i].text).group(1)
-            splitDate = caseDate.split('-')
-            caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
-                int(splitDate[1]))
-            doc.dateFiled = caseDate
-
-            #next up: caseNameShort
-            caseNameShort = caseNames[i].text
-
-            # now that we have the caseNumber and caseNameShort, we can dup check
-            cite, created = hasDuplicate(caseNumber, caseNameShort)
-
-            # if that goes well, we save to the DB
-            doc.citation = cite
-
-            # last, save evrything (pdf, citation and document)
-            doc.citation = cite
-            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
-            doc.save()
-
-            i += 1
-
+                while i < len(caseNumbers):
+                    caseLink = caseLinks[i].get('href')
+                    caseLink = urljoin(url, caseLink)
+                    
+                    myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+                    
+                    if error:
+                        # things broke, punt this iteration
+                        i += 1
+                        continue
+                    
+                    if not created:
+                        # it's an oldie, punt!
+                        if verbose >= 1: 
+                            result += "Duplicate found at " + str(i) + "\n"
+                        dupCount += 1
+                        #if dupCount == 3:
+                            # third dup in a a row. BREAK!
+                            #break
+                        i += 1
+                        continue
+                    else:
+                        dupCount = 0
+                    
+                    if 'unpub' in url:
+                        doc.documentType = "U"
+                    elif 'opinion' in url:
+                        doc.documentType = "P"
+                    if verbose >= 2: print "documentType: " + str(doc.documentType)
+                    
+                    cleanDate = caseDates[i].text.strip()
+                    doc.dateFiled = datetime.datetime(*time.strptime(cleanDate, "%m-%d-%Y")[0:5])
+                    if verbose >= 2: print "dateFiled: " + str(doc.dateFiled)
+                    
+                    caseNameShort = caseNames[i].text
+                    caseNumber = caseNumbers[i].text
+                    
+                    cite, created = hasDuplicate(caseNumber, caseNameShort)
+                    if verbose >= 2: 
+                        print "caseNameShort: " + cite.caseNameShort
+                        print "caseNumber: " + cite.caseNumber + "\n"
+                    
+                    doc.citation = cite
+                    doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                    doc.save()
+                    
+                    i += 1
         return result
 
     elif (courtID == 12):
