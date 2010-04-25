@@ -28,7 +28,7 @@ from django.core.files import File
 from django.core.files.base import ContentFile
 from django.utils.encoding import smart_str
 
-import datetime, hashlib, re, StringIO, subprocess, urllib, urllib2
+import datetime, calendar, hashlib, re, StringIO, subprocess, time, urllib, urllib2
 from BeautifulSoup import BeautifulSoup
 from lxml.html import fromstring
 from lxml import etree
@@ -255,10 +255,7 @@ def scrapeCourt(courtID, result, verbose):
 
             caseNumRegex = re.compile('.*/(\d{1,2}-\d{3,4})(.*).pdf')
 
-            if 'BASE=OPN' in url:
-	    	i = 534
-	    elif 'BASE=SUM' in url:
-	    	i = 0
+            i = 0
             dupCount = 0
             while i < len(aTags):
                 # we begin with the caseLink field
@@ -500,7 +497,138 @@ def scrapeCourt(courtID, result, verbose):
 
             i += 1
         return result
+    
+    elif (courtID == 5):
+        """New fifth circuit scraper, which can get back versions all the way to 1992!"""
+        url = "http://www.ca5.uscourts.gov/Opinions.aspx"
+        ct = Court.objects.get(courtUUID='ca5')
+        
+        # build an array of every the date every 30 days from 1992-01-01 to today
+        hoy = datetime.date.today()
+        unixTimeToday = int(time.mktime(hoy.timetuple()))
+        dates = []
+        i = 0
+        while True:
+            # 1992-01-01 + 30 days * i
+            newDate = 694252800 + (2592000 * i)
+            dates.append(datetime.datetime.fromtimestamp(newDate))
+            if newDate > unixTimeToday:
+                break
+            else:
+                i += 1
+        if verbose >= 2: print "dates: " + str(dates)
+        
+        
+        # next, iterate over these until there are no more!
+        j = 0
+        while j < (len(dates)-1):
+            startDate = time.strftime('%m/%d/%Y', dates[j].timetuple())
+            endDate = time.strftime('%m/%d/%Y', dates[j+1].timetuple())
+            
+            if verbose >= 2:
+                print "startDate: " + startDate
+                print "endDate: " + endDate
+            
+            # these are a mess because the court has a security check.
+            postValues = {
+                '__EVENTTARGET'     : '',
+                '__EVENTARGUMENT'   : '',
+                '__VIEWSTATE'       : '/wEPDwULLTEwOTU2NTA2NDMPZBYCAgEPZBYKAgEPDxYIHgtDZWxsUGFkZGluZ2YeC0NlbGxTcGFjaW5nZh4JQmFja0NvbG9yCRcQJ/8eBF8hU0ICiIAYZGQCAw8PFggfAGYfAWYfAgmZzP//HwMCiIAYZGQCGQ9kFgYCAg8PFgQfAgqHAR8DAghkZAIEDw8WBB8CCocBHwMCCGRkAgYPDxYEHwIKhwEfAwIIZGQCGw9kFooBAgIPDxYEHwIKhwEfAwIIZGQCBA8PFgQfAgqHAR8DAghkZAIGDw8WBB8CCocBHwMCCGRkAggPDxYEHwIKhwEfAwIIZGQCCg8PFgQfAgqHAR8DAghkZAIMDw8WBB8CCocBHwMCCGRkAg4PDxYEHwIKhwEfAwIIZGQCEA8PFgQfAgqHAR8DAghkZAISDw8WBB8CCocBHwMCCGRkAhQPDxYEHwIKhwEfAwIIZGQCFg8PFgQfAgqHAR8DAghkZAIYDw8WBB8CCocBHwMCCGRkAhoPDxYEHwIKhwEfAwIIZGQCHA8PFgQfAgqHAR8DAghkZAIeDw8WBB8CCocBHwMCCGRkAiAPDxYEHwIKhwEfAwIIZGQCIg8PFgQfAgqHAR8DAghkZAIkDw8WBB8CCocBHwMCCGRkAiYPDxYEHwIKhwEfAwIIZGQCKA8PFgQfAgqHAR8DAghkZAIqDw8WBB8CCocBHwMCCGRkAiwPDxYEHwIKhwEfAwIIZGQCLg8PFgQfAgqHAR8DAghkZAIwDw8WBB8CCocBHwMCCGRkAjIPDxYEHwIKhwEfAwIIZGQCNA8PFgQfAgqHAR8DAghkZAI2Dw8WBB8CCocBHwMCCGRkAjgPDxYEHwIKhwEfAwIIZGQCOg8PFgQfAgqHAR8DAghkZAI8Dw8WBB8CCocBHwMCCGRkAj4PDxYEHwIKhwEfAwIIZGQCQA8PFgQfAgqHAR8DAghkZAJCDw8WBB8CCocBHwMCCGRkAkQPDxYEHwIKhwEfAwIIZGQCRg8PFgQfAgqHAR8DAghkZAJIDw8WBB8CCocBHwMCCGRkAkoPDxYEHwIKhwEfAwIIZGQCTA8PFgQfAgqHAR8DAghkZAJODw8WBB8CCocBHwMCCGRkAlAPDxYEHwIKhwEfAwIIZGQCUg8PFgQfAgqHAR8DAghkZAJUDw8WBB8CCocBHwMCCGRkAlYPDxYEHwIKhwEfAwIIZGQCWA8PFgQfAgqHAR8DAghkZAJaDw8WBB8CCocBHwMCCGRkAlwPDxYEHwIKhwEfAwIIZGQCXg8PFgQfAgqHAR8DAghkZAJgDw8WBB8CCocBHwMCCGRkAmIPDxYEHwIKhwEfAwIIZGQCZA8PFgQfAgqHAR8DAghkZAJmDw8WBB8CCocBHwMCCGRkAmgPDxYEHwIKhwEfAwIIZGQCag8PFgQfAgqHAR8DAghkZAJsDw8WBB8CCocBHwMCCGRkAm4PDxYEHwIKhwEfAwIIZGQCcA8PFgQfAgqHAR8DAghkZAJyDw8WBB8CCocBHwMCCGRkAnQPDxYEHwIKhwEfAwIIZGQCdg8PFgQfAgqHAR8DAghkZAJ4Dw8WBB8CCocBHwMCCGRkAnoPDxYEHwIKhwEfAwIIZGQCfA8PFgQfAgqHAR8DAghkZAJ+Dw8WBB8CCocBHwMCCGRkAoABDw8WBB8CCocBHwMCCGRkAoIBDw8WBB8CCocBHwMCCGRkAoQBDw8WBB8CCocBHwMCCGRkAoYBDw8WBB8CCocBHwMCCGRkAogBDw8WBB8CCocBHwMCCGRkAooBDw8WBB8CCocBHwMCCGRkAh0PEGRkFgECAmRkcx2JRvTiy039dck7+vdOCUS6J5s=', 
+                'txtBeginDate'      : startDate,
+                'txtEndDate'        : endDate,
+                'txtDocketNumber'   : '',
+                'txtTitle='         : '',
+                'btnSearch'         : 'Search',
+                '__EVENTVALIDATION' : '/wEWCALd2o3pAgLH8d2nDwKAzfnNDgLChrRGAr2b+P4BAvnknLMEAqWf8+4KAqC3sP0KVcw25xdB1YPfbcUwUCqEYjQqaqM=',
+            }
+            j += 1
+            
+            data = urllib.urlencode(postValues)
+            req = urllib2.Request(url, data)
+            response = urllib2.urlopen(req)
+            html = response.read()
+            
+            soup = BeautifulSoup(html)
+            #if verbose >= 2: print soup
+            
+            #all links ending in pdf, case insensitive
+            aTagRegex = re.compile("pdf$", re.IGNORECASE)
+            aTags = soup.findAll(attrs={"href": aTagRegex})
+            
+            unpubRegex = re.compile(r"pinions.*unpub")
+            
+            i = 0
+            dupCount = 0
+            while i < len(aTags):
+                print str(aTags[i])
+                # this page has PDFs that aren't cases, we must filter them out
+                if 'pinion' not in str(aTags[i]):
+                    # it's not an opinion, increment and punt
+                    if verbose >= 2: print "Punting"
+                    i += 1
+                    continue
 
+                # we begin with the caseLink field
+                caseLink = aTags[i].get('href')
+                caseLink = urljoin(url, caseLink)
+
+                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+
+                if error:
+                    # things broke, punt this iteration
+                    i += 1
+                    continue
+
+                if not created:
+                    # it's an oldie, punt!
+                    if verbose >= 1: 
+                        result += "Duplicate found at " + str(i) + "\n"
+                    dupCount += 1
+                    #if dupCount == 3:
+                        # third dup in a a row. BREAK!
+                        #break
+                    i += 1
+                    continue
+                else:
+                    dupCount = 0
+
+                # using caseLink, we can get the caseNumber and documentType
+                caseNumber = aTags[i].contents[0]
+
+                if unpubRegex.search(str(aTags[i])) == None:
+                    # it's published, else it's unpublished
+                    documentType = "P"
+                else:
+                    documentType = "U"
+                if verbose >= 2: print documentType
+
+                doc.documentType = documentType
+
+                # next, we do the caseDate
+                caseDate = aTags[i].next.next.contents[0].contents[0]
+
+                # some caseDate cleanup
+                splitDate = caseDate.split('/')
+                caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
+                    int(splitDate[1]))
+                doc.dateFiled = caseDate
+
+                # next, we do the caseNameShort
+                caseNameShort = aTags[i].next.next.next.next.next.contents[0]\
+                    .contents[0]
+
+                # now that we have the caseNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(caseNumber, caseNameShort)
+
+                # last, save evrything (pdf, citation and document)
+                doc.citation = cite
+                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.save()
+
+                i += 1
+
+        return result
+        
     elif (courtID == 5):
         """Fifth circuit scraper. Similar process as to elsewhere, as you might
         expect at this point"""
@@ -510,7 +638,6 @@ def scrapeCourt(courtID, result, verbose):
 
         html = urllib2.urlopen(url)
         soup = BeautifulSoup(html)
-
 
         #all links ending in pdf, case insensitive
         aTagRegex = re.compile("pdf$", re.IGNORECASE)
