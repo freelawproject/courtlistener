@@ -104,7 +104,7 @@ def hasDuplicate(caseNum, caseName):
         .replace('&ldquo;',"\"").replace('&nbsp;', ' ').replace('%20', ' ')\
         .strip().strip(';'))
     caseNum = caseNum.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
-        .replace('&ldquo;',"\"").replace('&nbsp;', ' ').replace('%20', ' ')
+        .replace('&ldquo;',"\"").replace('&nbsp;', ' ').replace('%20', ' ')\
         .strip().strip(';')
 
     caseNameShort = trunc(caseName, 100)
