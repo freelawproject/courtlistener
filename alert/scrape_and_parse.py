@@ -1264,7 +1264,7 @@ def scrapeCourt(courtID, result, verbose):
                         j += 1
                     i += 1
                 if verbose >= 2: print "years: " + str(years)
-            return results
+
             for year in years:
                 postValues = {
                     'date'  : year,
