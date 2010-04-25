@@ -120,6 +120,7 @@ def hasDuplicate(caseNum, caseName):
         # truncation happened. Therefore, use the untruncated value as the full
         # name.
         cite.caseNameFull = caseName
+    cite.save()
 
     return cite, created
 

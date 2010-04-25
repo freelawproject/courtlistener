@@ -30,7 +30,7 @@
         {% if docs %}
             {# if we have hits, display what we know #}
             {% for doc in docs %}
-                <h2>{{ doc.citation.caseNameShort }}, {{ doc.citation.caseNumber }}</h2>
+                <h2>{{ doc.citation.caseNameFull }}, {{ doc.citation.caseNumber }}</h2>
                 <h3>{{court}}</h3>
                 <h3 class="alt"> {{doc.dateFiled|date:"l, F jS, Y"}}</h3>
                 <p>
@@ -72,7 +72,7 @@
             <h3>Admin</h3>
             
             {% for doc in docs %}
-                <a href="/admin/alertSystem/document/{{doc.documentUUID}}/">Edit {{doc.citation.caseNameShort}}</a><br>
+                <a href="/admin/alertSystem/document/{{doc.documentUUID}}/">Edit {{doc.citation.caseNameFull}}</a><br>
             {% endfor %}
         </div>            
     {% else %}
