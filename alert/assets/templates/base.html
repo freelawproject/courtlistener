@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset=utf-8>
+        <title>{% block title %}CourtListener.com{% endblock %}</title>
+        <link rel="stylesheet" href="/media/css/blueprint/override.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="/media/css/blueprint/screen.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="/media/css/blueprint/print.css" type="text/css" media="print">
+        <link rel="stylesheet" href="/media/css/blueprint/plugins/fancy-type/screen.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="/media/css/blueprint/plugins/buttons/screen.css" type="text/css" media="screen, projection">
+        <!--[if lt IE 8]><link rel="stylesheet" href="/media/css/blueprint/ie.css" type="text/css" media="screen, projection"><![endif]-->
+        {% block headers %}{% endblock %}
+        <meta name="description" content="Create alerts, search for and browse the latest Circuit Court opinions. Updated daily with the latest appeals court documents.">
+        <base href="http://courtlistener.com/">
+    </head>
+
+    <body>
+        <div class="container">            
+            {% block header %}
+                <div class="span-15 header" id="header">
+                    <h1 class="bottom"><a href="/">CourtListener</a></h1> 
+                    <h3 class="alt top bottom">(Beta)</h3>               
+                </div>
+            {% endblock %}            
+
+
+            {% block headerLinks %}            
+                {% if user.is_authenticated %}
+                    <div class="span-9 last">
+                        <div class="navigation box round-bottom">
+                            <ul>
+                                <li><a href="/">Search</a></li>
+                                <li><a href="/opinions/all/">Opinions</a></li>
+                                <li><a href="/profile/alerts/">Alerts</a></li>
+                                <li><a href="/profile/settings/">Settings</a></li>
+                                <li><a href="/sign-out/">Sign out</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="span-9 last">
+                        <div class="navigation box round-bottom">
+                            <ul>
+                                <li><a href="/about/">About</a></li>
+                                <li><a href="/">Search</a></li>
+                                <li><a href="/opinions/all">Opinions</a></li>
+                                <li><a href="{%url register%}?next={{request.path}}">Register</a></li>
+                                <li><a href="{%url sign-in%}?next={{request.path}}">Sign in</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endblock %}
+            
+            <hr>
+            
+           {% block content %}
+                <div class="span-18 colborder" id="content"> 
+                    <p>Your content seems to be missing!</p>
+                </div>
+            {% endblock %}
+            
+            {% block sidebar %}
+                <div class="span-5 last" id="sidebar">
+                </div>
+            {% endblock %}
+
+    
+            
+            {% block footer %}
+                <div class="span-24 last">
+                    <hr>
+                </div>
+                <div class="span-24 last small quiet" id="footer">
+                    <div class="span-2">
+                        <a href="/about/">About</a>
+                    </div>
+                    <div class="span-3">
+                        <a href="/terms/">Terms &amp; Privacy</a>
+                    </div>
+                    <div class="span-2">
+                        <a href="/sitemap/">Sitemap</a>
+                    </div>
+                    <div class="span-2">
+                        <a href="/contribute/">Contribute</a>
+                    </div>
+                    <div class="span-2">
+                        <a href="/contact/">Contact</a>
+                    </div>
+                    <div class="span-2 last">
+                        <a href="/tools/">Tools</a>
+                    </div>
+                </div>
+            {% endblock %}        
+        </div>
+    {% if not user.is_superuser  %}
+        <!-- Piwik -->
+        <script type="text/javascript">
+        var pkBaseURL = (("https:" == document.location.protocol) ? "https://piwik.courtlistener.com/" : "http://piwik.courtlistener.com/");
+        document.write(unescape("%3Cscript src='" + pkBaseURL + "piwik.js' type='text/javascript'%3E%3C/script%3E"));
+        </script><script type="text/javascript">
+        try {
+        var piwikTracker = Piwik.getTracker(pkBaseURL + "piwik.php", 1);
+        piwikTracker.trackPageView();
+        piwikTracker.enableLinkTracking();
+        } catch( err ) {}
+        </script><noscript><p><img src="http://piwik.courtlistener.com/piwik.php?idsite=1" style="border:0" alt=""/></p></noscript>
+        <!-- End Piwik Tag -->
+    {% endif %}
+    </body>
+</html>
