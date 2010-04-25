@@ -112,6 +112,7 @@ urlpatterns = patterns('',
     # Sitemap generator
     (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.sitemap',
         {'sitemaps': sitemaps}),
+    (r'^sitemap-(?P<section>.+)\.xml$', 'django.contrib.sitemaps.views.sitemap', {'sitemaps': sitemaps}),
     #(r'^robots.txt$', robots), # removed for lack of need.
 )
 
