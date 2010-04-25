@@ -98,11 +98,14 @@ def hasDuplicate(caseNum, caseName):
     """takes a caseName and a caseNum, and checks if the object exists in the
     DB. If it doesn't, then it puts it in. If it does, it returns it.
     """
-
-    caseName = smart_str(caseName.replace('&nbsp;', ' ').replace('%20', ' ').strip()\
-        .strip(';'))
-    caseNum = caseNum.replace('&nbsp;', ' ').replace('%20', ' ').strip()\
-        .strip(';')
+    
+    # data cleanup...
+    caseName = smart_str(caseName.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
+        .replace('&ldquo;',"\"").replace('&nbsp;', ' ').replace('%20', ' ')\
+        .strip().strip(';'))
+    caseNum = caseNum.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
+        .replace('&ldquo;',"\"").replace('&nbsp;', ' ').replace('%20', ' ')
+        .strip().strip(';')
 
     caseNameShort = trunc(caseName, 100)
 
@@ -1235,19 +1238,33 @@ def scrapeCourt(courtID, result, verbose):
         for url in urls:
             if 'unpub' in url:
                 i = 0
-                years = ["2010-01"]
+                years = []
                 while i <= 5:
-                    years.append(2005+i)
+                    j = 1
+                    while j <= 12:
+                        if j < 10:
+                            month = "0" + str(j)
+                        else:
+                            month = str(j)
+                        years.append(str(2005+i) + "-" + month)
+                        j += 1
                     i += 1
                 if verbose >= 2: print "years: " + str(years)
             elif 'opinions' in url:
                 i = 0
                 years = []
                 while i <= 16:
-                    years.append(1994+i)
+                    j = 1
+                    while j <= 12:
+                        if j < 10:
+                            month = "0" + str(j)
+                        else:
+                            month = str(j)
+                        years.append(str(1994+i) + "-" + month)
+                        j += 1
                     i += 1
                 if verbose >= 2: print "years: " + str(years)
-        
+            return results
             for year in years:
                 postValues = {
                     'date'  : year,
