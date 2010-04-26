@@ -236,8 +236,12 @@ class Document(models.Model):
 
     @models.permalink
     def get_absolute_url(self):
-        return ('viewCases', [str(self.court.courtUUID),
-            str(self.citation.caseNameShort).replace('-', '_').replace(' ', '-')])
+        try:
+            return ('viewCases', [str(self.court.courtUUID),
+                str(self.citation.caseNameShort).replace('-', '_').replace(' ', '-')])
+        except:
+            return ('viewCases', [str(self.court.courtUUID),
+                str(self.documentSHA1)])
 
     class Meta:
         db_table = "Document"

@@ -58,7 +58,7 @@ def scrape_and_parse():
     """
     results = []
     DEBUG = 1
-    url = "file:///home/mlissner/Documents/Cal/FinalProject/Resource.org/US/index.html"
+    url = "file:///home/mlissner/FinalProject/Resource.org/US/index.html"
     
     ct = Court.objects.get(courtUUID = 'scotus')
     
@@ -67,7 +67,7 @@ def scrape_and_parse():
 
     volumeLinks = tree.xpath('//table/tbody/tr/td[1]/a')
     
-    i = 378
+    i = 42
     if DEBUG == 1: print len(volumeLinks)-i
     while i < (len(volumeLinks)):
         # we iterate over every case in the volume
@@ -141,22 +141,25 @@ def scrape_and_parse():
             
             # date is kinda tricky...details here:
             # http://pleac.sourceforge.net/pleac_python/datesandtimes.html
-
-            rawDate = caseDates[j].text
-
             if DEBUG == 5: print rawDate
             try:
+                rawDate = caseDates[j].text
                 caseDate = datetime.datetime(*time.strptime(rawDate, "%B, %Y")[0:5])
+                doc.dateFiled = caseDate
             except ValueError, TypeError:
+                rawDate = caseDates[j].text
                 caseDate = datetime.datetime(*time.strptime(rawDate, "%B %d, %Y")[0:5])
+                doc.dateFiled = caseDate
+            except IndexError:
+                # date is missing, we must move on.
+                results.append("date index error at volume " + str(i+1) + \
+                    " and row " + str(j+1) + "!!!!")
+                pass
             except:
                 # something is afoot. Throw another big error.
                 results.append("Date parsing error at volume " + str(i+1) + \
                     " and row " + str(j+1) + "!!!!")
-                continue
-            
-            # assuming we get the date object...
-            doc.dateFiled = caseDate
+                pass
             
             # an easy field
             doc.documentType = "P"

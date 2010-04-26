@@ -2,7 +2,7 @@
 
 {% load humanize %}
 
-{% block title %}CourtListener.com / Sign out{% endblock %}
+{% block title %}CourtListener.com / Coverage{% endblock %}
 
 {% block content %}
     <div class="span-18 colborder">
@@ -44,11 +44,7 @@
                 {% for document,numCases in statsU %}
                     <tr>
                         <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td>
-                        {% if document.court.courtUUID == "scotus" %}
-                            <td>Five year gap between 2005 and 2010</td>
-                        {% else %}
-                            <td>No known gaps.</td>
-                        {% endif %}
+                        <td>No known gaps.</td>
                     </tr>
                 {% endfor %}
             </table>
