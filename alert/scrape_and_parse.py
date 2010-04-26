@@ -509,21 +509,32 @@ def scrapeCourt(courtID, result, verbose):
         url = "http://www.ca5.uscourts.gov/Opinions.aspx"
         ct = Court.objects.get(courtUUID='ca5')
         
-        # build an array of every the date every 30 days from 1992-01-01 to today
+        """
+        # This code was used to get the backlog of cases. Uncomment this section 
+        # to get the backlog a second time. It should, however, be complete.
+        
+        # Build an array of every the date every 30 days from 1992-01-01 to today
         hoy = datetime.date.today()
         unixTimeToday = int(time.mktime(hoy.timetuple()))
         dates = []
         i = 0
         while True:
             # 1992-01-01 + 30 days * i
-	    newDate = 1165824000 + (2592000 * i)
+	        newDate = 1202112000 + (2592000 * i)
             dates.append(datetime.datetime.fromtimestamp(newDate))
             if newDate > unixTimeToday:
                 break
             else:
                 i += 1
-        if verbose >= 2: print "dates: " + str(dates)
+        """
         
+        # make an array of two dates: today, and a week ago. That's our range.
+        todayObject = datetime.date.today()
+        unixTimeToday = int(time.mktime(todayObject.timetuple()))
+        unixTimeAWeekAgo = unixTimeToday - 604800
+        aWeekAgoObject = datetime.datetime.fromtimestamp(unixTimeAWeekAgo)
+        dates = [aWeekAgoObject, todayObject]
+        if verbose >= 2: print "dates: " + str(dates)
         
         # next, iterate over these until there are no more!
         j = 0
@@ -635,90 +646,7 @@ def scrapeCourt(courtID, result, verbose):
 
         return result
         
-    elif (courtID == 5):
-        """Fifth circuit scraper. Similar process as to elsewhere, as you might
-        expect at this point"""
 
-        url = "http://www.ca5.uscourts.gov/Opinions.aspx"
-        ct = Court.objects.get(courtUUID='ca5')
-
-        html = urllib2.urlopen(url)
-        soup = BeautifulSoup(html)
-
-        #all links ending in pdf, case insensitive
-        aTagRegex = re.compile("pdf$", re.IGNORECASE)
-        aTags = soup.findAll(attrs={"href": aTagRegex})
-
-        opinionRegex = re.compile(r"\opinions.*pub")
-        unpubRegex = re.compile(r"\opinions\unpub")
-
-        i = 0
-        dupCount = 0
-        while i < len(aTags):
-            # this page has PDFs that aren't cases, we must filter them out
-            if opinionRegex.search(str(aTags[i])) == None:
-                # it's not an opinion, increment and punt
-                i += 1
-                continue
-
-            # we begin with the caseLink field
-            caseLink = aTags[i].get('href')
-            caseLink = urljoin(url, caseLink)
-
-            myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-            if error:
-                # things broke, punt this iteration
-                i += 1
-                continue
-
-            if not created:
-                # it's an oldie, punt!
-                if verbose >= 1: 
-                    result += "Duplicate found at " + str(i) + "\n"
-                dupCount += 1
-                if dupCount == 3:
-                    # third dup in a a row. BREAK!
-                    break
-                i += 1
-                continue
-            else:
-                dupCount = 0
-
-            # using caseLink, we can get the caseNumber and documentType
-            caseNumber = aTags[i].contents[0]
-
-            if unpubRegex.search(str(aTags[i])) == None:
-                # it's published, else it's unpublished
-                documentType = "P"
-            else:
-                documentType = "U"
-
-            doc.documentType = documentType
-
-            # next, we do the caseDate
-            caseDate = aTags[i].next.next.contents[0].contents[0]
-
-            # some caseDate cleanup
-            splitDate = caseDate.split('/')
-            caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
-                int(splitDate[1]))
-            doc.dateFiled = caseDate
-
-            # next, we do the caseNameShort
-            caseNameShort = aTags[i].next.next.next.next.next.contents[0]\
-                .contents[0]
-
-            # now that we have the caseNumber and caseNameShort, we can dup check
-            cite, created = hasDuplicate(caseNumber, caseNameShort)
-
-            # last, save evrything (pdf, citation and document)
-            doc.citation = cite
-            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
-            doc.save()
-
-            i += 1
-        return result
 
     elif (courtID == 6):
         """Results are available without an HTML POST, but those results lack a
@@ -1242,14 +1170,14 @@ def scrapeCourt(courtID, result, verbose):
             if 'unpub' in url:
                 i = 0
                 years = []
-                while i <= 5:
-                    j = 1
+                while i <= 1:
+                    j = 5
                     while j <= 12:
                         if j < 10:
                             month = "0" + str(j)
                         else:
                             month = str(j)
-                        years.append(str(2005+i) + "-" + month)
+                        years.append(str(2008+i) + "-" + month)
                         j += 1
                     i += 1
                 if verbose >= 2: print "years: " + str(years)
@@ -1675,8 +1603,8 @@ def main():
     parser.add_option('-V', '--vverbose', action="store_true", dest='vverbose', 
         default=False, help="Display status messages after execution, and display verbose variable values during execution")
     (options, args) = parser.parse_args()
-    if not options.courtID:
-        parser.error("You must specify a court to scrape and parse")
+    if not options.scrapeID or options.parseID:
+        parser.error("You must specify a court to scrape and/or parse")
 
     if options.verbose:
         verbose = 1
@@ -1690,7 +1618,7 @@ def main():
         print parseCourt(courtID, result, verbose)
     elif options.scrapeID:
         # we scrape and parse. Currently no option to only scrape.
-        courtID = options.courtID
+        courtID = options.scrapeID
         print scrape_and_parse(courtID, verbose)
 
     return 0
