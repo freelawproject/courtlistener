@@ -1,0 +1,15 @@
+non-precedential => u
+Non-precedential => u
+precedential => p
+Precedential => p
+Published => p
+published => p
+errata => e
+Errata => e
+relating-to => r
+Relating-to => r
+in-chambers => i
+In-chambers => i
+U.S.C => usc
+u.s.c => usc
+USC => usc
