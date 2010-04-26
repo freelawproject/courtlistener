@@ -516,7 +516,7 @@ def scrapeCourt(courtID, result, verbose):
         i = 0
         while True:
             # 1992-01-01 + 30 days * i
-	    newDate = 1171008000 + (2592000 * i)
+	    newDate = 1202112000 + (2592000 * i)
             dates.append(datetime.datetime.fromtimestamp(newDate))
             if newDate > unixTimeToday:
                 break
@@ -1242,14 +1242,14 @@ def scrapeCourt(courtID, result, verbose):
             if 'unpub' in url:
                 i = 0
                 years = []
-                while i <= 5:
-                    j = 1
+                while i <= 1:
+                    j = 5
                     while j <= 12:
                         if j < 10:
                             month = "0" + str(j)
                         else:
                             month = str(j)
-                        years.append(str(2005+i) + "-" + month)
+                        years.append(str(2008+i) + "-" + month)
                         j += 1
                     i += 1
                 if verbose >= 2: print "years: " + str(years)
