@@ -516,7 +516,7 @@ def scrapeCourt(courtID, result, verbose):
         i = 0
         while True:
             # 1992-01-01 + 30 days * i
-	    newDate = 1165824000 + (2592000 * i)
+	    newDate = 1171008000 + (2592000 * i)
             dates.append(datetime.datetime.fromtimestamp(newDate))
             if newDate > unixTimeToday:
                 break
