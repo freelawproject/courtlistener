@@ -99,13 +99,15 @@ def hasDuplicate(caseNum, caseName):
     DB. If it doesn't, then it puts it in. If it does, it returns it.
     """
     
-    # data cleanup...
+    # data cleanup: Removes white space and a bunch of stray characters
     caseName = smart_str(caseName.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
         .replace('&ldquo;',"\"").replace('&nbsp;', ' ').replace('%20', ' ')\
         .strip().strip(';'))
     caseNum = caseNum.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
         .replace('&ldquo;',"\"").replace('&nbsp;', ' ').replace('%20', ' ')\
         .strip().strip(';')
+    caseName = " ".join(caseName.split())
+    caseNum = " ".join(caseNum.split())
 
     caseNameShort = trunc(caseName, 100)
 
