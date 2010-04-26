@@ -1601,7 +1601,7 @@ def main():
     parser.add_option('-V', '--vverbose', action="store_true", dest='vverbose', 
         default=False, help="Display status messages after execution, and display verbose variable values during execution")
     (options, args) = parser.parse_args()
-    if not options.scrapeID and options.parseID:
+    if not options.scrapeID and not options.parseID:
         parser.error("You must specify a court to scrape and/or parse")
 
     if options.verbose:
