@@ -1611,12 +1611,12 @@ def main():
     
     if options.parseID:
         # we are only parsing.
-        courtID = options.parseID
+        courtID = int(options.parseID)
         if verbose >= 1: result = "It worked\n"
         print parseCourt(courtID, result, verbose)
     elif options.scrapeID:
         # we scrape and parse. Currently no option to only scrape.
-        courtID = options.scrapeID
+        courtID = int(options.scrapeID)
         print scrape_and_parse(courtID, verbose)
 
     return 0
