@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}CourtListener.com / Profile / Alerts / Edit{% endblock %}
+
+{% block content %}
+    <div class="span-24 last">
+        <h2>Settings / Alerts / Edit</h2>
+        <div class="span-6 box round header">
+            <h3 class="bottom">
+                <a href="/profile/settings/">Account</a>&nbsp;&nbsp;&nbsp;<a href="/profile/alerts/"><strong>Alerts</strong></a>&nbsp;&nbsp;&nbsp;<a href="/profile/password/change">Password</a>
+            </h3>
+        </div>
+    </div>
+    <div class="span-18 colborder" id="content">
+        {% if form.errors %}
+            <div class="span-10 error">
+                <p class="bottom">There were errors with your submission.</p>
+            </div>
+            <div class="span-7 last">&nbsp;</div>
+        {% endif %}
+    
+        <div class="span-18">
+            <form action="" method="post">{% csrf_token %}
+                <p>
+                    <label for="id_alertName">Give the alert a name</label>
+                    {% if form.alertName.errors %}
+                        <br><span class="errortext">
+                            {% for error in form.alertName.errors %}
+                                {{ error|escape }}  
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                    {{ form.alertName }}
+                </p>
+                <p>
+                    <label for="id_alertText">Alert query</label>
+                    {% if form.alertText.errors %}
+                        <br><span class="errortext">
+                            {% for error in form.alertText.errors %}
+                                {{ error|escape }}  
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                    {{ form.alertText }}
+                </p>
+                <p>
+                    <label for="id_alertFrequency">How often should we notify you</label>
+                    {% if form.alertFrequency.errors %}
+                        <br><span class="errortext">
+                            {% for error in form.alertFrequency.errors %}
+                                {{ error|escape }}  
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                    {{ form.alertFrequency }}
+                </p>
+                <p>
+                    {{ form.alertPrivacy }}
+                    <label for="id_alertPrivacy">This alert is private</label>
+                    {% if form.alertPrivacy.errors %}
+                        <span class="errortext">
+                            {% for error in form.alertPrivacy.errors %}
+                                {{ error|escape }}  
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+
+                </p>
+                <p>
+                    {{ form.sendNegativeAlert }}
+                    <label for="id_alertName">Send me alerts even when there are no hits</label>
+                    {% if form.sendNegativeAlert.errors %}
+                        <span class="errortext">
+                            {% for error in form.sendNegativeAlert.errors %}
+                                {{ error|escape }}  
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                </p>
+                <button type="submit" class="button title" name="alertSave">Save alert</button>
+                <a href="/alert/delete/confirm/{{alertID}}">Delete this alert</a>
+            </form> 
+        </div>   
+    </div>
+{% endblock %}
