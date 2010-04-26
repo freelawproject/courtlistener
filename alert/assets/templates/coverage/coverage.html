@@ -14,8 +14,8 @@
             <table>
                 <tr>
                     <th>Court</th>
-                    <th>Number of cases</th>
-                    <th>Earliest case</th>
+                    <th>Number of documents</th>
+                    <th>Earliest document</th>
                     <th>Notes</th>
                 </tr>
                 {% for document,numCases in statsP %}
@@ -33,11 +33,12 @@
         
         {% if statsU|length != 0 %}
             <h3>Non-precedential/unpublished documents</h3>
+		<p>(Including Supreme Court <a href="http://www.supremecourt.gov/opinions/relatingtoorders.aspx">Opinions Relating to Orders</a> and <a href="http://www.supremecourt.gov/opinions/in-chambers.aspx">In-Chambers Opinions</a>)
             <table>
                 <tr>
                     <th>Court</th>
-                    <th>Number of cases</th>
-                    <th>Earliest case</th>
+                    <th>Number of documents</th>
+                    <th>Earliest document</th>
                     <th>Notes</th>
                 </tr>
                 {% for document,numCases in statsU %}
