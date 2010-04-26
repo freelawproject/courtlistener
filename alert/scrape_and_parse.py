@@ -127,14 +127,25 @@ def hasDuplicate(caseNum, caseName):
     return cite, created
 
 
-def getPDFContent(path):
-    """Get the contents of a PDF file, and put them in a variable"""
-
-    process = subprocess.Popen(
-        ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"], shell=False,
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    content, err = process.communicate()
-    return content, err
+def getPDFContent(docs, result, verbose):
+    """Get the contents of a list of PDF files, and add them to the DB"""
+    for doc in docs:
+        if verbose >= 1: result += "Parsed: " + doc.citation.caseNameShort + "\n"
+        if verbose >= 2: print "Parsed: " + doc.citation.caseNameShort + "\n"
+        
+        path = str(doc.local_path)
+        path = settings.MEDIA_ROOT + path
+        
+        # do the pdftotext work
+        process = subprocess.Popen(
+            ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"], shell=False,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        content, err = process.communicate() # we're not doing anything with err as of now...
+        
+        # add the plain text to the DB!
+        doc.documentPlainText = content
+        doc.save()
+    return result
 
 
 def scrapeCourt(courtID, result, verbose):
@@ -1160,7 +1171,7 @@ def scrapeCourt(courtID, result, verbose):
 #            i += 1
 
         urls = (
-            "http://www.ca11.uscourts.gov/unpub/searchdate.php",
+            #"http://www.ca11.uscourts.gov/unpub/searchdate.php",
             "http://www.ca11.uscourts.gov/opinions/searchdate.php",
         )
         
@@ -1182,14 +1193,14 @@ def scrapeCourt(courtID, result, verbose):
             elif 'opinions' in url:
                 i = 0
                 years = []
-                while i <= 16:
+                while i <= 9:
                     j = 1
                     while j <= 12:
                         if j < 10:
                             month = "0" + str(j)
                         else:
                             month = str(j)
-                        years.append(str(1994+i) + "-" + month)
+                        years.append(str(2001+i) + "-" + month)
                         j += 1
                     i += 1
                 if verbose >= 2: print "years: " + str(years)
@@ -1523,26 +1534,28 @@ def parseCourt(courtID, result, verbose):
         3. If it has, punt, if not, open the PDF and parse it.
 
     returns a string containing the result"""
+    from threading import Thread
 
     # get the court IDs from models.py
     courts = []
     for code in PACER_CODES:
         courts.append(code[0])
 
-    # select all documents from this jurisdiction that lack plainText (this
-    # achieves duplicate checking.
-    selectedDocuments = Document.objects.filter(documentPlainText = "",
-        court__courtUUID = courts[courtID-1])
-
-    for doc in selectedDocuments:
-        # for each of these documents, open it, parse it.
-        if verbose >= 1:
-            result += "Parsed: " + doc.citation.caseNameShort + "\n"
-
-        relURL = str(doc.local_path)
-        relURL = settings.MEDIA_ROOT + relURL
-        doc.documentPlainText = getPDFContent(relURL)[0]
-        doc.save()
+    # select all documents from this jurisdiction that lack plainText and were
+    # downloaded from the court.
+    docs = Document.objects.filter(documentPlainText = "",
+        court__courtUUID = courts[courtID-1], source="C").order_by('documentUUID')
+    
+    numDocs = docs.count()
+  
+    # this is a crude way to start threads, but I'm lazy, and two is a good 
+    # starting point. This essentially starts two threads, each with half of the
+    # unparsed PDFs.
+    if numDocs > 0:
+        t1 = Thread(target=getPDFContent, args=(docs[0:numDocs/2], result, verbose,))
+        t2 = Thread(target=getPDFContent, args=(docs[numDocs/2:numDocs], result, verbose,))
+        t1.start()
+        t2.start()
 
     return result
 
