@@ -1664,10 +1664,12 @@ def scrape_and_parse(courtID, verbose):
 
 
 def main():
-    usage = "usage: %prog (-c COURTID | --court=COURTID) [-v | -V]"
+    usage = "usage: %prog (-s SCRAPEID | -p PARSEID) [-v | -V]"
     parser = OptionParser(usage)
-    parser.add_option('-c', '--court', dest='courtID', metavar='COURTID',
+    parser.add_option('-s', '--scrape', dest='scrapeID', metavar='SCRAPEID',
                       help="The court to scrape and parse")
+    parser.add_option('-p', '--parse', dest='parseID', metavar='PARSEID',
+                      help="The court to only parse")
     parser.add_option('-v', '--verbose', action="store_true", dest='verbose', 
         default=False, help="Display status messages after execution")
     parser.add_option('-V', '--vverbose', action="store_true", dest='vverbose', 
@@ -1676,13 +1678,20 @@ def main():
     if not options.courtID:
         parser.error("You must specify a court to scrape and parse")
 
-    courtID = options.courtID
     if options.verbose:
         verbose = 1
     elif options.vverbose:
         verbose = 2
-
-    print scrape_and_parse(courtID, verbose)
+    
+    if options.parseID:
+        # we are only parsing.
+        courtID = options.parseID
+        if verbose >= 1: result = "It worked\n"
+        print parseCourt(courtID, result, verbose)
+    elif options.scrapeID:
+        # we scrape and parse. Currently no option to only scrape.
+        courtID = options.courtID
+        print scrape_and_parse(courtID, verbose)
 
     return 0
 

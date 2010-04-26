@@ -31,7 +31,20 @@
             <h3 class="alt bottom"><a href="{{doc.get_absolute_url}}">{{ doc.citation.caseNameFull }}, {{doc.citation.caseNumber}} ({{doc.court.courtShortName}})</a></h3>
             <p>{{doc.dateFiled|date:"l, F jS, Y"}}<br>
                 <strong>Status:</strong> {{doc.get_documentType_display}}<br>
-                <strong>Download PDF: </strong><a href="{{ doc.download_URL }}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="http://courtlistener.com/{{doc.local_path}}">Our backup</a></p><br>
+                {% if doc.downloadURL or doc.local_path %}
+                    <strong>Download PDF: </strong>
+                    {% if doc.download_URL %}
+                        <a href="{{doc.download_URL}}">From the court</a>
+                    {% endif %}
+                    {% if doc.downloadURL and doc.local_path %}
+                        &nbsp;&nbsp;|&nbsp;&nbsp;
+                    {% endif %}
+                    {% if doc.local_path %}
+                        <a href="/{{doc.local_path}}">Our backup</a>
+                    {% endif %}<br>
+                {% else %}
+                    No downloadable versions.<br>
+                {endif %}
         {% endfor %}
         
         <h3>

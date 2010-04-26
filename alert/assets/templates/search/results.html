@@ -144,7 +144,20 @@ Page / {{ results.number }} of {{results.paginator.num_pages}}
             <p>{{result.dateFiled|date:"l, F jS, Y"}}<br>
                 
                 <strong>Status:</strong> {{result.get_documentType_display}}<br>
-                <strong>Download PDF: </strong><a href="{{ result.download_URL }}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="http://courtlistener.com/{{result.local_path}}">Our backup</a>
+                {% if result.downloadURL or result.local_path %}
+                    <strong>Download PDF: </strong>
+                    {% if result.download_URL %}
+                        <a href="{{result.download_URL}}">From the court</a>
+                    {% endif %}
+                    {% if result.downloadURL and result.local_path %}
+                        &nbsp;&nbsp;|&nbsp;&nbsp;
+                    {% endif %}
+                    {% if result.local_path %}
+                        <a href="/{{result.local_path}}">Our backup</a>
+                    {% endif %}<br>
+                {% else %}
+                    No downloadable versions.<br>
+                {endif %}
             </p>
             <br>
         {% endfor %}
