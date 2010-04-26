@@ -58,7 +58,7 @@ def scrape_and_parse():
     """
     results = []
     DEBUG = 1
-    url = "file:///home/mlissner/Documents/Cal/FinalProject/Resource.org/US/index.html"
+    url = "file:///home/mlissner/FinalProject/Resource.org/US/index.html"
     
     ct = Court.objects.get(courtUUID = 'scotus')
     
@@ -67,7 +67,7 @@ def scrape_and_parse():
 
     volumeLinks = tree.xpath('//table/tbody/tr/td[1]/a')
     
-    i = 402
+    i = 95
     if DEBUG == 1: print len(volumeLinks)-i
     while i < (len(volumeLinks)):
         # we iterate over every case in the volume
