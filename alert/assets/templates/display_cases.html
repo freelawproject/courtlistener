@@ -30,9 +30,9 @@
         {% if docs %}
             {# if we have hits, display what we know #}
             {% for doc in docs %}
-                <h2>{{ doc.citation.caseNameShort }}, {{ doc.citation.caseNumber }}</h2>
+                <h2>{{ doc.citation.caseNameFull }}, {{ doc.citation.caseNumber }}</h2>
                 <h3>{{court}}</h3>
-                <h3 class="alt"> {{doc.dateFiled|date:"l, F jS, Y"}}</h3>
+                <h3 class="alt">{{doc.dateFiled|date:"l, F jS, Y"}}</h3>
                 <p>
                     <strong>Status:</strong> {{doc.get_documentType_display}}<br>          
                     <strong>Download PDF: </strong><a href="{{doc.download_URL}}">From the court</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="/{{doc.local_path}}">Our backup</a><br>
@@ -40,7 +40,12 @@
                 </p>
                 <br>
                 <h4>Document text</h4>
-                <pre>{{doc.documentPlainText}}</pre>
+                {% if doc.source == "C" or doc.source == "M"%}
+                    <pre>{{doc.documentPlainText}}</pre>
+                {% endif %}
+                {% if doc.source == "R" %}
+                    {{doc.documentHTML|safe}}
+                {%endif%}
             {% endfor %}
                 
                 
@@ -72,7 +77,7 @@
             <h3>Admin</h3>
             
             {% for doc in docs %}
-                <a href="/admin/alertSystem/document/{{doc.documentUUID}}/">Edit {{doc.citation.caseNameShort}}</a><br>
+                <a href="/admin/alertSystem/document/{{doc.documentUUID}}/">Edit {{doc.citation.caseNameFull}}</a><br>
             {% endfor %}
         </div>            
     {% else %}
