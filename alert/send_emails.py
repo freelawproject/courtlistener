@@ -76,11 +76,12 @@ def emailer(rate, verbose, simulate):
         #...get their alerts...
         alerts = userProfile.alert.filter(alertFrequency = RATE)
         if verbose: 
-            print rate + " alerts for user " + userProfile.user.email + ": " + str(alerts)
+            print "\n\n" + rate + " alerts for user " + userProfile.user.email + ": " + str(alerts)
 
         hits = []
         # ...and iterate over their alerts.
         for alert in alerts:
+            if verbose: print "Now running the query: " + alert.alertText
             if RATE == 'dly':
                 # query the alert
                 if verbose: "Now running the search for: " + alert.alertText
@@ -101,8 +102,11 @@ def emailer(rate, verbose, simulate):
                     .filter(datefiled=unixTimesPastMonth)
             elif RATE == "off":
                 pass
-
-            if verbose: print "There were " + str(results.count()) + \
+            
+	    if verbose: 
+	        print "The value of results is: " + str(results)
+                print "The value of results.count() is: " + str(results.count())
+                print "There were " + str(results.count()) + \
                 " hits for the alert \"" + alert.alertText + \
                 "\". Here are the first 0-20: " + str(results)
             
@@ -176,7 +180,7 @@ def emailer(rate, verbose, simulate):
 
 
 def main():
-    usage = "usage: %prog -r RATE | --rate=RATE"
+    usage = "usage: %prog -r RATE [--verbose] [--simulate]"
     parser = OptionParser(usage)
     parser.add_option('-r', '--rate', dest='rate', metavar='RATE',
         help="The rate to send emails")

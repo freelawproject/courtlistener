@@ -1199,14 +1199,14 @@ def scrapeCourt(courtID, result, verbose):
             elif 'opinions' in url:
                 i = 0
                 years = []
-                while i <= 9:
-                    j = 1
+                while i <= 0:
+                    j = 3
                     while j <= 12:
                         if j < 10:
                             month = "0" + str(j)
                         else:
                             month = str(j)
-                        years.append(str(2001+i) + "-" + month)
+                        years.append(str(2010+i) + "-" + month)
                         j += 1
                     i += 1
                 if verbose >= 2: print "years: " + str(years)
