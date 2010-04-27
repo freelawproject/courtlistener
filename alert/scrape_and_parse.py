@@ -612,9 +612,9 @@ def scrapeCourt(courtID, result, verbose):
                     if verbose >= 1: 
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    #if dupCount == 3:
+                    if dupCount == 3:
                         # third dup in a a row. BREAK!
-                        #break
+                        break
                     i += 1
                     continue
                 else:
