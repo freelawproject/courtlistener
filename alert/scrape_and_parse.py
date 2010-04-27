@@ -587,6 +587,8 @@ def scrapeCourt(courtID, result, verbose):
             
             i = 0
             dupCount = 0
+            numP = 0
+            numQ = 0
             while i < len(aTags):
                 print str(aTags[i])
                 # this page has PDFs that aren't cases, we must filter them out
@@ -599,6 +601,19 @@ def scrapeCourt(courtID, result, verbose):
                 # we begin with the caseLink field
                 caseLink = aTags[i].get('href')
                 caseLink = urljoin(url, caseLink)
+                
+                # next, we do the docStatus field, b/c we need to include it in 
+                # the dup check.
+                if unpubRegex.search(str(aTags[i])) == None:
+                    # it's published, else it's unpublished
+                    documentType = "P"
+                    numP += 1
+                else:
+                    documentType = "U"
+                    numQ += 1
+                if verbose >= 2: print documentType
+                doc.documentType = documentType
+                
 
                 myFile, doc, created, error = makeDocFromURL(caseLink, ct)
 
@@ -612,8 +627,8 @@ def scrapeCourt(courtID, result, verbose):
                     if verbose >= 1: 
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    if dupCount == 3:
-                        # third dup in a a row. BREAK!
+                    if dupCount >= 3 and numP >= 3 and numQ >= 3:
+                        # third dup in a a row for both U and P.
                         break
                     i += 1
                     continue
@@ -622,15 +637,6 @@ def scrapeCourt(courtID, result, verbose):
 
                 # using caseLink, we can get the caseNumber and documentType
                 caseNumber = aTags[i].contents[0]
-
-                if unpubRegex.search(str(aTags[i])) == None:
-                    # it's published, else it's unpublished
-                    documentType = "P"
-                else:
-                    documentType = "U"
-                if verbose >= 2: print documentType
-
-                doc.documentType = documentType
 
                 # next, we do the caseDate
                 caseDate = aTags[i].next.next.contents[0].contents[0]

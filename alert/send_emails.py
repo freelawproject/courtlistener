@@ -83,16 +83,19 @@ def emailer(rate, verbose, simulate):
         for alert in alerts:
             if RATE == 'dly':
                 # query the alert
+                if verbose: "Now running the search for: " + alert.alertText
                 queryset = Document.search.query(alert.alertText)
                 results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
                     .filter(datefiled=unixTimeToday)
             elif RATE == 'wly' and today.weekday() == 6:
                 # if it's a weekly alert and today is Sunday
+                if verbose: "Now running the search for: " + alert.alertText
                 queryset = Document.search.query(alert.alertText)
                 results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
                     .filter(datefiled=unixTimesPastWeek)
             elif RATE == 'mly' and today.day == 19:
                 # if it's a monthly alert and today is the first of the month
+                if verbose: "Now running the search for: " + alert.alertText
                 queryset = Document.search.query(alert.alertText)
                 results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
                     .filter(datefiled=unixTimesPastMonth)
