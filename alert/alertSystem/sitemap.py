@@ -20,9 +20,10 @@ from alert.alertSystem.models import Document
 
 class DocumentSitemap(Sitemap):
     priority = 0.5
+    limit = 20000
 
     def items(self):
-        return Document.objects.all()
+        return Document.objects.all()[0:100]
 
     def lastmod(self, obj):
         return obj.dateFiled
