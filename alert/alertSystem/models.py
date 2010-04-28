@@ -81,7 +81,10 @@ class Party(models.Model):
     partyExtracted = models.CharField("a party name", max_length=100)
 
     def __unicode__(self):
-        return self.partyExtracted
+        if self.partyExtracted:
+            return self.partyExtracted
+        else:
+            return str(self.partyUUID)
 
     class Meta:
         verbose_name_plural = "parties"
@@ -103,7 +106,10 @@ class Judge(models.Model):
     endDate = models.DateField("the end date that the judge is on the bench")
 
     def __unicode__(self):
-        return self.canonicalName
+        if self.canonicalName:
+            return self.canonicalName
+        else:
+            return str(self.judgeUUID)
 
     class Meta:
         db_table = "Judge"
@@ -154,7 +160,7 @@ class Citation(models.Model):
         if self.caseNameShort:
             return self.caseNameShort
         else:
-            return self.citationUUID
+            return str(self.citationUUID)
 
     class Meta:
         db_table = "Citation"

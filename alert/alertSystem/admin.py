@@ -19,13 +19,14 @@ from django.contrib import admin
 from alert.alertSystem.models import *
 
 class CitationAdmin(admin.ModelAdmin):
+    # ordering is brutal on MySQL. Don't put it here. Sorry.
     list_display = ('caseNameShort',)
     search_fields = ['caseNameShort', 'caseNameFull', 'caseNumber']
     
 class DocumentAdmin(admin.ModelAdmin):
+    # ordering is brutal on MySQL. Don't put it here. Sorry.
     list_display = ('citation',)
     list_filter = ('court',)
-    ordering = ('citation',)
     search_fields = ['@documentPlainText']
 
 

@@ -156,8 +156,6 @@ def scrapeCourt(courtID, result, verbosity):
         """
         PDFs are available from the first circuit if you go to their RSS feed.
         So go to their RSS feed we shall.
-
-        This is the second version of this court. Good times.
         """
         url = "http://www.ca1.uscourts.gov/opinions/opinionrss.php"
         ct = Court.objects.get(courtUUID='ca1')
@@ -526,20 +524,22 @@ def scrapeCourt(courtID, result, verbosity):
         # make an array of two dates: today, and a week ago. That's our range.
         todayObject = datetime.date.today()
         unixTimeToday = int(time.mktime(todayObject.timetuple()))
-        unixTimeAWeekAgo = unixTimeToday - 604800
+        
+        unixTimeAWeekAgo = unixTimeToday - 86400 #604800
         aWeekAgoObject = datetime.datetime.fromtimestamp(unixTimeAWeekAgo)
-        dates = [aWeekAgoObject, todayObject]
+        #dates = [aWeekAgoObject, todayObject]
+        dates = [aWeekAgoObject]
         if verbosity >= 2: print "dates: " + str(dates)
 
         # next, iterate over these until there are no more!
         j = 0
         while j < (len(dates)-1):
             startDate = time.strftime('%m/%d/%Y', dates[j].timetuple())
-            endDate = time.strftime('%m/%d/%Y', dates[j+1].timetuple())
+            #endDate = time.strftime('%m/%d/%Y', dates[j+1].timetuple())
 
             if verbosity >= 2:
-                print "startDate: " + startDate
-                print "endDate: " + endDate
+                print "Today is: " + startDate
+                #print "endDate: " + endDate
 
             # these are a mess because the court has a security check.
             postValues = {
@@ -547,7 +547,7 @@ def scrapeCourt(courtID, result, verbosity):
                 '__EVENTARGUMENT'   : '',
                 '__VIEWSTATE'       : '/wEPDwULLTEwOTU2NTA2NDMPZBYCAgEPZBYKAgEPDxYIHgtDZWxsUGFkZGluZ2YeC0NlbGxTcGFjaW5nZh4JQmFja0NvbG9yCRcQJ/8eBF8hU0ICiIAYZGQCAw8PFggfAGYfAWYfAgmZzP//HwMCiIAYZGQCGQ9kFgYCAg8PFgQfAgqHAR8DAghkZAIEDw8WBB8CCocBHwMCCGRkAgYPDxYEHwIKhwEfAwIIZGQCGw9kFooBAgIPDxYEHwIKhwEfAwIIZGQCBA8PFgQfAgqHAR8DAghkZAIGDw8WBB8CCocBHwMCCGRkAggPDxYEHwIKhwEfAwIIZGQCCg8PFgQfAgqHAR8DAghkZAIMDw8WBB8CCocBHwMCCGRkAg4PDxYEHwIKhwEfAwIIZGQCEA8PFgQfAgqHAR8DAghkZAISDw8WBB8CCocBHwMCCGRkAhQPDxYEHwIKhwEfAwIIZGQCFg8PFgQfAgqHAR8DAghkZAIYDw8WBB8CCocBHwMCCGRkAhoPDxYEHwIKhwEfAwIIZGQCHA8PFgQfAgqHAR8DAghkZAIeDw8WBB8CCocBHwMCCGRkAiAPDxYEHwIKhwEfAwIIZGQCIg8PFgQfAgqHAR8DAghkZAIkDw8WBB8CCocBHwMCCGRkAiYPDxYEHwIKhwEfAwIIZGQCKA8PFgQfAgqHAR8DAghkZAIqDw8WBB8CCocBHwMCCGRkAiwPDxYEHwIKhwEfAwIIZGQCLg8PFgQfAgqHAR8DAghkZAIwDw8WBB8CCocBHwMCCGRkAjIPDxYEHwIKhwEfAwIIZGQCNA8PFgQfAgqHAR8DAghkZAI2Dw8WBB8CCocBHwMCCGRkAjgPDxYEHwIKhwEfAwIIZGQCOg8PFgQfAgqHAR8DAghkZAI8Dw8WBB8CCocBHwMCCGRkAj4PDxYEHwIKhwEfAwIIZGQCQA8PFgQfAgqHAR8DAghkZAJCDw8WBB8CCocBHwMCCGRkAkQPDxYEHwIKhwEfAwIIZGQCRg8PFgQfAgqHAR8DAghkZAJIDw8WBB8CCocBHwMCCGRkAkoPDxYEHwIKhwEfAwIIZGQCTA8PFgQfAgqHAR8DAghkZAJODw8WBB8CCocBHwMCCGRkAlAPDxYEHwIKhwEfAwIIZGQCUg8PFgQfAgqHAR8DAghkZAJUDw8WBB8CCocBHwMCCGRkAlYPDxYEHwIKhwEfAwIIZGQCWA8PFgQfAgqHAR8DAghkZAJaDw8WBB8CCocBHwMCCGRkAlwPDxYEHwIKhwEfAwIIZGQCXg8PFgQfAgqHAR8DAghkZAJgDw8WBB8CCocBHwMCCGRkAmIPDxYEHwIKhwEfAwIIZGQCZA8PFgQfAgqHAR8DAghkZAJmDw8WBB8CCocBHwMCCGRkAmgPDxYEHwIKhwEfAwIIZGQCag8PFgQfAgqHAR8DAghkZAJsDw8WBB8CCocBHwMCCGRkAm4PDxYEHwIKhwEfAwIIZGQCcA8PFgQfAgqHAR8DAghkZAJyDw8WBB8CCocBHwMCCGRkAnQPDxYEHwIKhwEfAwIIZGQCdg8PFgQfAgqHAR8DAghkZAJ4Dw8WBB8CCocBHwMCCGRkAnoPDxYEHwIKhwEfAwIIZGQCfA8PFgQfAgqHAR8DAghkZAJ+Dw8WBB8CCocBHwMCCGRkAoABDw8WBB8CCocBHwMCCGRkAoIBDw8WBB8CCocBHwMCCGRkAoQBDw8WBB8CCocBHwMCCGRkAoYBDw8WBB8CCocBHwMCCGRkAogBDw8WBB8CCocBHwMCCGRkAooBDw8WBB8CCocBHwMCCGRkAh0PEGRkFgECAmRkcx2JRvTiy039dck7+vdOCUS6J5s=',
                 'txtBeginDate'      : startDate,
-                'txtEndDate'        : endDate,
+                'txtEndDate'        : '',
                 'txtDocketNumber'   : '',
                 'txtTitle='         : '',
                 'btnSearch'         : 'Search',
@@ -602,7 +602,7 @@ def scrapeCourt(courtID, result, verbosity):
                 else:
                     documentType = "U"
                     numQ += 1
-                if verbosity >= 2: print documentType
+                if verbosity >= 2: print "documentType: " + documentType
                 doc.documentType = documentType
                 
                 if not created:
