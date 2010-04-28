@@ -234,11 +234,10 @@ class Document(models.Model):
         choices=DOCUMENT_STATUSES)
 
     def __unicode__(self):
-        try:
-            tempvar = self.citation.caseNameShort
-            return tempvar
-        except:
-            return documentSHA1
+        if self.citation:
+            return self.citation.caseNameShort
+        else:
+            return self.documentSHA1
 
     @models.permalink
     def get_absolute_url(self):
