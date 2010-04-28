@@ -577,7 +577,7 @@ def scrapeCourt(courtID, result, verbosity):
                 # this page has PDFs that aren't cases, we must filter them out
                 if 'pinion' not in str(aTags[i]):
                     # it's not an opinion, increment and punt
-                    if verbosity >= 2: print "Punting"
+                    if verbosity >= 2: print "Punting non-opinion URL: " + str(aTags[i])
                     i += 1
                     continue
 

@@ -149,7 +149,7 @@ Page / {{ results.number }} of {{results.paginator.num_pages}}
                     {% if result.download_URL %}
                         <a href="{{result.download_URL}}">From the court</a>
                     {% endif %}
-                    {% if result.downloadURL and result.local_path %}
+                    {% if result.download_URL and result.local_path %}
                         &nbsp;&nbsp;|&nbsp;&nbsp;
                     {% endif %}
                     {% if result.local_path %}
