@@ -31,7 +31,7 @@ from alert.userHandling.views import *
 from django.conf.urls.defaults import *
 
 # for the flatfiles in the sitemap
-from django.contrib.sitemaps import FlatPageSitemap
+#from django.contrib.sitemaps import FlatPageSitemap
 from django.contrib.auth.views import login as signIn, logout as signOut,\
     password_reset, password_reset_done, password_reset_confirm,\
     password_reset_complete
@@ -42,11 +42,8 @@ admin.autodiscover()
 
 
 from alert.alertSystem.sitemap import all_sitemaps as sitemaps
-sitemaps["Flatfiles"] = FlatPageSitemap
-"""sitemaps = {
-    "Opinion": DocumentSitemap,
-    "Flatfiles": FlatPageSitemap,
-}"""
+from alert.alertSystem.sitemap import MyFlatPageSitemap
+sitemaps["Flatfiles"] = MyFlatPageSitemap
 
 # creates a list of the first element of the choices variable for the courts field
 pacer_codes = []
