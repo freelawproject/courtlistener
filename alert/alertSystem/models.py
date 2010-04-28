@@ -234,9 +234,9 @@ class Document(models.Model):
         choices=DOCUMENT_STATUSES)
 
     def __unicode__(self):
-        if self.citation.caseNameShort:
+        try:
             return self.citation.caseNameShort
-        else:
+        except:
             return documentSHA1
 
     @models.permalink
