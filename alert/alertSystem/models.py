@@ -235,7 +235,8 @@ class Document(models.Model):
 
     def __unicode__(self):
         try:
-            return self.citation.caseNameShort
+            tempvar = self.citation.caseNameShort
+            return tempvar
         except:
             return documentSHA1
 
