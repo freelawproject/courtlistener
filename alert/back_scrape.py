@@ -324,6 +324,12 @@ back_scrape_court(courtID, result, verbose):
                     
                     i += 1
         return result
+    
+    if courtID == 12:
+        """This could seems to have fabulous pages such as this one:
+        http://pacer.cadc.uscourts.gov/common/opinions/201002.htm"
+        """
+        return result
 
 
 def main():
