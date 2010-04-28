@@ -237,7 +237,7 @@ class Document(models.Model):
         if self.citation:
             return self.citation.caseNameShort
         else:
-            return self.documentSHA1
+            return self.documentUUID
 
     @models.permalink
     def get_absolute_url(self):
