@@ -149,8 +149,8 @@ def getPDFContent(docs, result, verbosity):
 
 
 def scrapeCourt(courtID, result, verbosity):
-    if verbosity >= 1:
-        result += "NOW SCRAPING COURT: " + str(courtID) + "\n"
+    if verbosity >= 1: result += "NOW SCRAPING COURT: " + str(courtID) + "\n"
+    if verbosity >= 2: print "NOW SCRAPING COURT: " + str(courtID)
 
     if (courtID == 1):
         """
@@ -1418,6 +1418,7 @@ def parseCourt(courtID, result, verbosity):
 
     returns a string containing the result"""
     if verbosity >= 1: result += "NOW PARSING COURT: " + str(courtID) + "\n"
+    if verbosity >= 2: print "NOW PARSING COURT: " + str(courtID)
 
     from threading import Thread
 
