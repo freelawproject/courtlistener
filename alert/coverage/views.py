@@ -17,9 +17,12 @@
 
 from django.shortcuts import render_to_response
 from django.template import RequestContext
+from django.views.decorators.cache import cache_page
 from alert.alertSystem.models import Document, Court
 from alert.alertSystem.models import PACER_CODES
 
+# cache the page for six hours. Might as well.
+@cache_page(60*60*6)
 def coverage(request):
     """A view that displays some sweet (and accurate) coverage stats. Essentially,
     we'll gather the stats here, and hand them all off to a template that will

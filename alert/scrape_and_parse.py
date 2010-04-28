@@ -517,132 +517,126 @@ def scrapeCourt(courtID, result, verbosity):
         return result
 
     elif (courtID == 5):
-        """New fifth circuit scraper, which can get back versions all the way to 1992!"""
+        """New fifth circuit scraper, which can get back versions all the way to
+        1992!
+         
+        This is exciting, but be warned, the search is not reliable on recent
+        dates. It has been known not to bring back results that are definitely
+        within the set. Watch closely.
+        """
         url = "http://www.ca5.uscourts.gov/Opinions.aspx"
         ct = Court.objects.get(courtUUID='ca5')
 
         # make an array of two dates: today, and a week ago. That's our range.
         todayObject = datetime.date.today()
-        unixTimeToday = int(time.mktime(todayObject.timetuple()))
-        
-        unixTimeAWeekAgo = unixTimeToday - 86400 #604800
-        aWeekAgoObject = datetime.datetime.fromtimestamp(unixTimeAWeekAgo)
-        #dates = [aWeekAgoObject, todayObject]
-        dates = [aWeekAgoObject]
-        if verbosity >= 2: print "dates: " + str(dates)
+        if verbosity >= 2: print "start date: " + str(dates)
 
-        # next, iterate over these until there are no more!
-        j = 0
-        while j < (len(dates)-1):
-            startDate = time.strftime('%m/%d/%Y', dates[j].timetuple())
-            #endDate = time.strftime('%m/%d/%Y', dates[j+1].timetuple())
+        startDate = time.strftime('%m/%d/%Y', todayObject.timetuple())
 
-            if verbosity >= 2:
-                print "Today is: " + startDate
-                #print "endDate: " + endDate
+        if verbosity >= 2:
+            print "Start date is: " + startDate
 
-            # these are a mess because the court has a security check.
-            postValues = {
-                '__EVENTTARGET'     : '',
-                '__EVENTARGUMENT'   : '',
-                '__VIEWSTATE'       : '/wEPDwULLTEwOTU2NTA2NDMPZBYCAgEPZBYKAgEPDxYIHgtDZWxsUGFkZGluZ2YeC0NlbGxTcGFjaW5nZh4JQmFja0NvbG9yCRcQJ/8eBF8hU0ICiIAYZGQCAw8PFggfAGYfAWYfAgmZzP//HwMCiIAYZGQCGQ9kFgYCAg8PFgQfAgqHAR8DAghkZAIEDw8WBB8CCocBHwMCCGRkAgYPDxYEHwIKhwEfAwIIZGQCGw9kFooBAgIPDxYEHwIKhwEfAwIIZGQCBA8PFgQfAgqHAR8DAghkZAIGDw8WBB8CCocBHwMCCGRkAggPDxYEHwIKhwEfAwIIZGQCCg8PFgQfAgqHAR8DAghkZAIMDw8WBB8CCocBHwMCCGRkAg4PDxYEHwIKhwEfAwIIZGQCEA8PFgQfAgqHAR8DAghkZAISDw8WBB8CCocBHwMCCGRkAhQPDxYEHwIKhwEfAwIIZGQCFg8PFgQfAgqHAR8DAghkZAIYDw8WBB8CCocBHwMCCGRkAhoPDxYEHwIKhwEfAwIIZGQCHA8PFgQfAgqHAR8DAghkZAIeDw8WBB8CCocBHwMCCGRkAiAPDxYEHwIKhwEfAwIIZGQCIg8PFgQfAgqHAR8DAghkZAIkDw8WBB8CCocBHwMCCGRkAiYPDxYEHwIKhwEfAwIIZGQCKA8PFgQfAgqHAR8DAghkZAIqDw8WBB8CCocBHwMCCGRkAiwPDxYEHwIKhwEfAwIIZGQCLg8PFgQfAgqHAR8DAghkZAIwDw8WBB8CCocBHwMCCGRkAjIPDxYEHwIKhwEfAwIIZGQCNA8PFgQfAgqHAR8DAghkZAI2Dw8WBB8CCocBHwMCCGRkAjgPDxYEHwIKhwEfAwIIZGQCOg8PFgQfAgqHAR8DAghkZAI8Dw8WBB8CCocBHwMCCGRkAj4PDxYEHwIKhwEfAwIIZGQCQA8PFgQfAgqHAR8DAghkZAJCDw8WBB8CCocBHwMCCGRkAkQPDxYEHwIKhwEfAwIIZGQCRg8PFgQfAgqHAR8DAghkZAJIDw8WBB8CCocBHwMCCGRkAkoPDxYEHwIKhwEfAwIIZGQCTA8PFgQfAgqHAR8DAghkZAJODw8WBB8CCocBHwMCCGRkAlAPDxYEHwIKhwEfAwIIZGQCUg8PFgQfAgqHAR8DAghkZAJUDw8WBB8CCocBHwMCCGRkAlYPDxYEHwIKhwEfAwIIZGQCWA8PFgQfAgqHAR8DAghkZAJaDw8WBB8CCocBHwMCCGRkAlwPDxYEHwIKhwEfAwIIZGQCXg8PFgQfAgqHAR8DAghkZAJgDw8WBB8CCocBHwMCCGRkAmIPDxYEHwIKhwEfAwIIZGQCZA8PFgQfAgqHAR8DAghkZAJmDw8WBB8CCocBHwMCCGRkAmgPDxYEHwIKhwEfAwIIZGQCag8PFgQfAgqHAR8DAghkZAJsDw8WBB8CCocBHwMCCGRkAm4PDxYEHwIKhwEfAwIIZGQCcA8PFgQfAgqHAR8DAghkZAJyDw8WBB8CCocBHwMCCGRkAnQPDxYEHwIKhwEfAwIIZGQCdg8PFgQfAgqHAR8DAghkZAJ4Dw8WBB8CCocBHwMCCGRkAnoPDxYEHwIKhwEfAwIIZGQCfA8PFgQfAgqHAR8DAghkZAJ+Dw8WBB8CCocBHwMCCGRkAoABDw8WBB8CCocBHwMCCGRkAoIBDw8WBB8CCocBHwMCCGRkAoQBDw8WBB8CCocBHwMCCGRkAoYBDw8WBB8CCocBHwMCCGRkAogBDw8WBB8CCocBHwMCCGRkAooBDw8WBB8CCocBHwMCCGRkAh0PEGRkFgECAmRkcx2JRvTiy039dck7+vdOCUS6J5s=',
-                'txtBeginDate'      : startDate,
-                'txtEndDate'        : '',
-                'txtDocketNumber'   : '',
-                'txtTitle='         : '',
-                'btnSearch'         : 'Search',
-                '__EVENTVALIDATION' : '/wEWCALd2o3pAgLH8d2nDwKAzfnNDgLChrRGAr2b+P4BAvnknLMEAqWf8+4KAqC3sP0KVcw25xdB1YPfbcUwUCqEYjQqaqM=',
-            }
-            j += 1
+        # these are a mess because the court has a security check.
+        postValues = {
+            '__EVENTTARGET'     : '',
+            '__EVENTARGUMENT'   : '',
+            '__VIEWSTATE'       : '/wEPDwULLTEwOTU2NTA2NDMPZBYCAgEPZBYKAgEPDxYIHgtDZWxsUGFkZGluZ2YeC0NlbGxTcGFjaW5nZh4JQmFja0NvbG9yCRcQJ/8eBF8hU0ICiIAYZGQCAw8PFggfAGYfAWYfAgmZzP//HwMCiIAYZGQCGQ9kFgYCAg8PFgQfAgqHAR8DAghkZAIEDw8WBB8CCocBHwMCCGRkAgYPDxYEHwIKhwEfAwIIZGQCGw9kFooBAgIPDxYEHwIKhwEfAwIIZGQCBA8PFgQfAgqHAR8DAghkZAIGDw8WBB8CCocBHwMCCGRkAggPDxYEHwIKhwEfAwIIZGQCCg8PFgQfAgqHAR8DAghkZAIMDw8WBB8CCocBHwMCCGRkAg4PDxYEHwIKhwEfAwIIZGQCEA8PFgQfAgqHAR8DAghkZAISDw8WBB8CCocBHwMCCGRkAhQPDxYEHwIKhwEfAwIIZGQCFg8PFgQfAgqHAR8DAghkZAIYDw8WBB8CCocBHwMCCGRkAhoPDxYEHwIKhwEfAwIIZGQCHA8PFgQfAgqHAR8DAghkZAIeDw8WBB8CCocBHwMCCGRkAiAPDxYEHwIKhwEfAwIIZGQCIg8PFgQfAgqHAR8DAghkZAIkDw8WBB8CCocBHwMCCGRkAiYPDxYEHwIKhwEfAwIIZGQCKA8PFgQfAgqHAR8DAghkZAIqDw8WBB8CCocBHwMCCGRkAiwPDxYEHwIKhwEfAwIIZGQCLg8PFgQfAgqHAR8DAghkZAIwDw8WBB8CCocBHwMCCGRkAjIPDxYEHwIKhwEfAwIIZGQCNA8PFgQfAgqHAR8DAghkZAI2Dw8WBB8CCocBHwMCCGRkAjgPDxYEHwIKhwEfAwIIZGQCOg8PFgQfAgqHAR8DAghkZAI8Dw8WBB8CCocBHwMCCGRkAj4PDxYEHwIKhwEfAwIIZGQCQA8PFgQfAgqHAR8DAghkZAJCDw8WBB8CCocBHwMCCGRkAkQPDxYEHwIKhwEfAwIIZGQCRg8PFgQfAgqHAR8DAghkZAJIDw8WBB8CCocBHwMCCGRkAkoPDxYEHwIKhwEfAwIIZGQCTA8PFgQfAgqHAR8DAghkZAJODw8WBB8CCocBHwMCCGRkAlAPDxYEHwIKhwEfAwIIZGQCUg8PFgQfAgqHAR8DAghkZAJUDw8WBB8CCocBHwMCCGRkAlYPDxYEHwIKhwEfAwIIZGQCWA8PFgQfAgqHAR8DAghkZAJaDw8WBB8CCocBHwMCCGRkAlwPDxYEHwIKhwEfAwIIZGQCXg8PFgQfAgqHAR8DAghkZAJgDw8WBB8CCocBHwMCCGRkAmIPDxYEHwIKhwEfAwIIZGQCZA8PFgQfAgqHAR8DAghkZAJmDw8WBB8CCocBHwMCCGRkAmgPDxYEHwIKhwEfAwIIZGQCag8PFgQfAgqHAR8DAghkZAJsDw8WBB8CCocBHwMCCGRkAm4PDxYEHwIKhwEfAwIIZGQCcA8PFgQfAgqHAR8DAghkZAJyDw8WBB8CCocBHwMCCGRkAnQPDxYEHwIKhwEfAwIIZGQCdg8PFgQfAgqHAR8DAghkZAJ4Dw8WBB8CCocBHwMCCGRkAnoPDxYEHwIKhwEfAwIIZGQCfA8PFgQfAgqHAR8DAghkZAJ+Dw8WBB8CCocBHwMCCGRkAoABDw8WBB8CCocBHwMCCGRkAoIBDw8WBB8CCocBHwMCCGRkAoQBDw8WBB8CCocBHwMCCGRkAoYBDw8WBB8CCocBHwMCCGRkAogBDw8WBB8CCocBHwMCCGRkAooBDw8WBB8CCocBHwMCCGRkAh0PEGRkFgECAmRkcx2JRvTiy039dck7+vdOCUS6J5s=',
+            'txtBeginDate'      : startDate,
+            'txtEndDate'        : '',
+            'txtDocketNumber'   : '',
+            'txtTitle='         : '',
+            'btnSearch'         : 'Search',
+            '__EVENTVALIDATION' : '/wEWCALd2o3pAgLH8d2nDwKAzfnNDgLChrRGAr2b+P4BAvnknLMEAqWf8+4KAqC3sP0KVcw25xdB1YPfbcUwUCqEYjQqaqM=',
+        }
 
-            data = urllib.urlencode(postValues)
-            req = urllib2.Request(url, data)
-            response = urllib2.urlopen(req)
-            html = response.read()
+        data = urllib.urlencode(postValues)
+        req = urllib2.Request(url, data)
+        response = urllib2.urlopen(req)
+        html = response.read()
 
-            soup = BeautifulSoup(html)
-            #if verbosity >= 2: print soup
+        soup = BeautifulSoup(html)
+        #if verbosity >= 2: print soup
 
-            #all links ending in pdf, case insensitive
-            aTagRegex = re.compile("pdf$", re.IGNORECASE)
-            aTags = soup.findAll(attrs={"href": aTagRegex})
+        #all links ending in pdf, case insensitive
+        aTagRegex = re.compile("pdf$", re.IGNORECASE)
+        aTags = soup.findAll(attrs={"href": aTagRegex})
 
-            unpubRegex = re.compile(r"pinions.*unpub")
+        unpubRegex = re.compile(r"pinions.*unpub")
 
-            i = 0
-            dupCount = 0
-            numP = 0
-            numQ = 0
-            while i < len(aTags):
-                # this page has PDFs that aren't cases, we must filter them out
-                if 'pinion' not in str(aTags[i]):
-                    # it's not an opinion, increment and punt
-                    if verbosity >= 2: print "Punting non-opinion URL: " + str(aTags[i])
-                    i += 1
-                    continue
-
-                # we begin with the caseLink field
-                caseLink = aTags[i].get('href')
-                caseLink = urljoin(url, caseLink)
-
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                if error:
-                    # things broke, punt this iteration
-                    i += 1
-                    continue
-                
-                # next, we do the docStatus field, b/c we need to include it in
-                # the dup check. This is because we need to abort after we have 
-                # three non-precedential and three precedential from this court.
-                if unpubRegex.search(str(aTags[i])) == None:
-                    # it's published, else it's unpublished
-                    documentType = "P"
-                    numP += 1
-                else:
-                    documentType = "U"
-                    numQ += 1
-                if verbosity >= 2: print "documentType: " + documentType
-                doc.documentType = documentType
-                
-                if not created:
-                    # it's an oldie, punt!
-                    if verbosity >= 1:
-                        result += "Duplicate found at " + str(i) + "\n"
-                    dupCount += 1
-                    if dupCount >= 3 and numP >= 3 and numQ >= 3:
-                        # third dup in a a row for both U and P.
-                        break
-                    i += 1
-                    continue
-                else:
-                    dupCount = 0
-
-                # using caseLink, we can get the caseNumber and documentType
-                caseNumber = aTags[i].contents[0]
-
-                # next, we do the caseDate
-                caseDate = aTags[i].next.next.contents[0].contents[0]
-
-                # some caseDate cleanup
-                splitDate = caseDate.split('/')
-                caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
-                    int(splitDate[1]))
-                doc.dateFiled = caseDate
-
-                # next, we do the caseNameShort
-                caseNameShort = aTags[i].next.next.next.next.next.contents[0]\
-                    .contents[0]
-
-                # now that we have the caseNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
-
-                # last, save evrything (pdf, citation and document)
-                doc.citation = cite
-                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
-                doc.save()
-
+        i = 0
+        dupCount = 0
+        numP = 0
+        numQ = 0
+        while i < len(aTags):
+            # this page has PDFs that aren't cases, we must filter them out
+            if 'pinion' not in str(aTags[i]):
+                # it's not an opinion, increment and punt
+                if verbosity >= 2: print "Punting non-opinion URL: " + str(aTags[i])
                 i += 1
+                continue
+
+            # we begin with the caseLink field
+            caseLink = aTags[i].get('href')
+            caseLink = urljoin(url, caseLink)
+
+            myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+
+            if error:
+                # things broke, punt this iteration
+                i += 1
+                continue
+            
+            # next, we do the docStatus field, b/c we need to include it in
+            # the dup check. This is because we need to abort after we have 
+            # three non-precedential and three precedential from this court.
+            if unpubRegex.search(str(aTags[i])) == None:
+                # it's published, else it's unpublished
+                documentType = "P"
+                numP += 1
+            else:
+                documentType = "U"
+                numQ += 1
+            if verbosity >= 2: print "documentType: " + documentType
+            doc.documentType = documentType
+            
+            if not created:
+                # it's an oldie, punt!
+                if verbosity >= 1:
+                    result += "Duplicate found at " + str(i) + "\n"
+                dupCount += 1
+                if dupCount >= 3 and numP >= 3 and numQ >= 3:
+                    # third dup in a a row for both U and P.
+                    break
+                i += 1
+                continue
+            else:
+                dupCount = 0
+
+            # using caseLink, we can get the caseNumber and documentType
+            caseNumber = aTags[i].contents[0]
+
+            # next, we do the caseDate
+            caseDate = aTags[i].next.next.contents[0].contents[0]
+
+            # some caseDate cleanup
+            splitDate = caseDate.split('/')
+            caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
+                int(splitDate[1]))
+            doc.dateFiled = caseDate
+
+            # next, we do the caseNameShort
+            caseNameShort = aTags[i].next.next.next.next.next.contents[0]\
+                .contents[0]
+
+            # now that we have the caseNumber and caseNameShort, we can dup check
+            cite, created = hasDuplicate(caseNumber, caseNameShort)
+
+            # last, save evrything (pdf, citation and document)
+            doc.citation = cite
+            doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+            doc.save()
+
+            i += 1
 
         return result
 
@@ -744,14 +738,17 @@ def scrapeCourt(courtID, result, verbosity):
 
     elif (courtID == 7):
         """another court where we need to do a post. This will be a good
-        starting place for getting the judge field, when we're ready for that"""
+        starting place for getting the judge field, when we're ready for that.
+        
+        Missing a day == OK. Queries return cases for the past week.
+        """
 
         url = "http://www.ca7.uscourts.gov/fdocs/docs.fwx"
         ct = Court.objects.get(courtUUID = 'ca7')
 
         # if these strings change, check that documentType still gets set correctly.
-        dataStrings = ("yr=&num=&Submit=Today&dtype=Opinion&scrid=Select+a+Case",
-            "yr=&num=&Submit=Today&dtype=Nonprecedential+Disposition&scrid=Select+a+Case")
+        dataStrings = ("yr=&num=&Submit=Past+Week&dtype=Opinion&scrid=Select+a+Case",
+            "yr=&num=&Submit=Past+Week&dtype=Nonprecedential+Disposition&scrid=Select+a+Case")
 
         for dataString in dataStrings:
             req = urllib2.Request(url, dataString)
@@ -804,7 +801,6 @@ def scrapeCourt(courtID, result, verbosity):
                 # next up: caseNameShort
                 caseNameShort = aTags[i].previous.previous.previous.previous\
                     .previous.previous.previous
-
 
                 # next up: docStatus
                 if "type=Opinion" in dataString:
