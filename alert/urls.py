@@ -18,7 +18,7 @@
 from alert import settings
 from alert.alertSystem.models import PACER_CODES
 from alert.alertSystem.views import *
-from alert.alertSystem.sitemap import DocumentSitemap
+#from alert.alertSystem.sitemap import DocumentSitemap
 from alert.contact.views import *
 from alert.coverage.views import *
 from alert.feeds.views import *
@@ -40,10 +40,13 @@ from django.contrib.auth.views import login as signIn, logout as signOut,\
 from django.contrib import admin
 admin.autodiscover()
 
-sitemaps = {
+
+from alert.alertSystem.sitemap import all_sitemaps as sitemaps
+sitemaps["Flatfiles"] = FlatPageSitemap
+"""sitemaps = {
     "Opinion": DocumentSitemap,
     "Flatfiles": FlatPageSitemap,
-}
+}"""
 
 # creates a list of the first element of the choices variable for the courts field
 pacer_codes = []
@@ -110,9 +113,10 @@ urlpatterns = patterns('',
     (r'^y_key_6de7ece99e1672f2.html$', validateForYahoo),
     (r'^LiveSearchSiteAuth.xml$', validateForBing),
     # Sitemap generator
-    (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.sitemap',
+    (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.index',
         {'sitemaps': sitemaps}),
-    (r'^sitemap-(?P<section>.+)\.xml$', 'django.contrib.sitemaps.views.sitemap', {'sitemaps': sitemaps}),
+    (r'^sitemap-(?P<section>.+)\.xml$', 'django.contrib.sitemaps.views.sitemap', 
+        {'sitemaps': sitemaps}),
     #(r'^robots.txt$', robots), # removed for lack of need.
 )
 
