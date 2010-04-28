@@ -45,6 +45,11 @@ Sets up all the overrides or additional CSS that the site will use.
     -webkit-border-bottom-left-radius: 6px;
 }
 
+div.footnote {
+    font-size: 0.7em;
+    vertical-align: text-top;
+}
+
 .pointer {
     cursor: pointer;
     cursor: hand;
