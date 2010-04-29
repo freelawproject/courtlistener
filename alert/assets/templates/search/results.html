@@ -141,8 +141,12 @@ Page / {{ results.number }} of {{results.paginator.num_pages}}
 
         {% for result in results.object_list %}
             <h3 class="alt bottom"><a href="{{result.get_absolute_url}}">{{ result.citation.caseNameFull }}, {{result.citation.caseNumber}} ({{result.court.courtShortName}})</a></h3>
-            <p>{{result.dateFiled|date:"l, F jS, Y"}}<br>
-                
+            <p>
+                {% if result.dateFiled %}
+                    {{result.dateFiled|date:"l, F jS, Y"}}<br>
+                {% else %}
+                    Unknown date<br>
+                {% endif %}
                 <strong>Status:</strong> {{result.get_documentType_display}}<br>
                 {% if result.downloadURL or result.local_path %}
                     <strong>Download PDF: </strong>

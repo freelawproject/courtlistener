@@ -20,11 +20,10 @@
                 </tr>
                 {% for document,numCases in statsP %}
                     <tr>
-                        <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td>
-                        {% if document.court.courtUUID == "scotus" %}
-                            <td>Five year gap between 2005 and 2010</td>
+                        {% if document.court.courtUUID != "scotus" %}
+                            <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td><td>No known gaps</td>
                         {% else %}
-                            <td>No known gaps.</td>
+                            <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>9/1/1754</td><td>Five year gap between 2005 and 2010</td>
                         {% endif %}
                     </tr>
                 {% endfor %}
@@ -33,7 +32,7 @@
         
         {% if statsU|length != 0 %}
             <h3>Non-precedential/unpublished documents</h3>
-		<p>(Including Supreme Court <a href="http://www.supremecourt.gov/opinions/relatingtoorders.aspx">Opinions Relating to Orders</a> and <a href="http://www.supremecourt.gov/opinions/in-chambers.aspx">In-Chambers Opinions</a>)</p>
+		<p>Including Supreme Court <a href="http://www.supremecourt.gov/opinions/relatingtoorders.aspx">Opinions Relating to Orders</a> and <a href="http://www.supremecourt.gov/opinions/in-chambers.aspx">In-Chambers Opinions</a></p>
             <table>
                 <tr>
                     <th>Court</th>
@@ -44,7 +43,7 @@
                 {% for document,numCases in statsU %}
                     <tr>
                         <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td>
-                        <td>No known gaps.</td>
+                        <td>No known gaps</td>
                     </tr>
                 {% endfor %}
             </table>
@@ -56,17 +55,11 @@
                 <tr>
                     <th>Court</th>
                     <th>Number of cases</th>
-                    <th>Earliest case</th>
                     <th>Notes</th>
                 </tr>
                 {% for document,numCases in statsMissingType %}
                     <tr>
-                        <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td>
-                        {% if document.court.courtUUID == "scotus" %}
-                            <td>Five year gap between 2005 and 2010</td>
-                        {% else %}
-                            <td>No known gaps.</td>
-                        {% endif %}
+                        <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>None</td>
                     </tr>
                 {% endfor %}
             </table>

@@ -29,7 +29,12 @@
         <h3>Recent opinions, page {{ documents.number }} of {{ documents.paginator.num_pages }}</h3>
         {% for doc in documents.object_list %}
             <h3 class="alt bottom"><a href="{{doc.get_absolute_url}}">{{ doc.citation.caseNameFull }}, {{doc.citation.caseNumber}} ({{doc.court.courtShortName}})</a></h3>
-            <p>{{doc.dateFiled|date:"l, F jS, Y"}}<br>
+            <p>
+                {% if doc.dateFiled %}
+                    {{doc.dateFiled|date:"l, F jS, Y"}}<br>
+                {% else %}
+                    Unknown date<br>
+                {% endif %}
                 <strong>Status:</strong> {{doc.get_documentType_display}}<br>
                 {% if doc.downloadURL or doc.local_path %}
                     <strong>Download PDF: </strong>
@@ -45,14 +50,14 @@
                 {% else %}
                     No downloadable versions.<br>
                 {% endif %}
-        {% endfor %}
+        {% endfor %}</p>
         
         <h3>
             {% if documents.has_previous %}
                     <a href="{{request.path}}?page=1">« first</a>&nbsp;&nbsp;
                     <a href="{{request.path}}?page={{ documents.previous_page_number }}">‹ previous</a>&nbsp;&nbsp;
             {% endif %}
-            Page {{ documents.number }} of {{ documents.paginator.num_pages }}</p>
+            Page {{ documents.number }} of {{ documents.paginator.num_pages }}
             {% if documents.has_next %}
                     &nbsp;&nbsp;<a href="{{request.path}}?page={{ documents.next_page_number }}">next ›</a>
                     &nbsp;&nbsp;<a href="{{request.path}}?page={{ documents.paginator.num_pages }}">last »</a>
