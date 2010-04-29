@@ -154,13 +154,13 @@ def showResults(request):
         messages.add_message(request, messages.INFO, messageText)
 
     
-    # OLD SEARCH METHOD
+    # OLD SEARCH METHOD (crude, slow, powerless)
     # results = Document.objects.filter(documentPlainText__icontains=query).order_by("-dateFiled")
 
     # NEW SEARCH METHOD
     try:
         queryset = Document.search.query(query)
-        results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
+        results = queryset.set_options(mode="SPH_MATCH_EXTENDED2", index="Document delta")\
             .order_by('-dateFiled')
     except:
         results = []
