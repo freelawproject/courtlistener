@@ -35,6 +35,9 @@ def viewCases(request, court, case):
     if cites.count() == 0:
         # if we can't find it by case name, try by case number
         cites = Citation.objects.filter(caseNumber = case)
+    if cites.count() == 0:
+        #case number didn't work either, try SHA1
+        docs = Document.objects.filter(documentSHA1 = case, court = ct).order_by("-dateFiled")
 
     if cites.count() > 0:
         # get any documents with this/these citation(s) at that court. We need
@@ -42,13 +45,9 @@ def viewCases(request, court, case):
         # use a filter, and the __in method.
         docs = Document.objects.filter(court = ct, citation__in = cites).order_by("-dateFiled")
 
-        return render_to_response('display_cases.html', {'title': case,
-            'docs': docs, 'court': ct}, RequestContext(request))
+    return render_to_response('display_cases.html', {'title': case,
+        'docs': docs, 'court': ct}, RequestContext(request))
 
-    else:
-        # we have no hits, punt
-        return render_to_response('display_cases.html', {'title': case,
-            'court': ct}, RequestContext(request))
 
 @cache_page(60*15)
 def viewDocumentListByCourt(request, court):

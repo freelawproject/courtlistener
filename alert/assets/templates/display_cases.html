@@ -27,12 +27,16 @@
 
 {% block content %}
     <div class="span-18 colborder">
-        {% if docs %}
+        {% if docs|length > 0 %}
             {# if we have hits, display what we know #}
             {% for doc in docs %}
                 <h2>{{ doc.citation.caseNameFull }}, {{ doc.citation.caseNumber }}</h2>
                 <h3>{{court}}</h3>
-                <h3 class="alt">{{doc.dateFiled|date:"l, F jS, Y"}}</h3>
+                {% if doc.dateFiled %}
+                    <h3 class="alt">{{doc.dateFiled|date:"l, F jS, Y"}}</h3>
+                {% else %}
+                    <h3 class="alt">Unknown date</h3>
+                {% endif %}
                 <p>
                     <strong>Status:</strong> {{doc.get_documentType_display}}<br>
                     {% if doc.downloadURL or doc.local_path %}
