@@ -189,7 +189,7 @@ class ExcerptSummary(models.Model):
 # A class which holds the bulk of the information regarding documents. This must
 # go last, since it references the above classes
 class Document(models.Model):
-    search = SphinxSearch()
+    search = SphinxSearch(index="Document delta")
     documentUUID = models.AutoField("a unique ID for each document",
         primary_key=True)
     source = models.CharField("the source of the document",
