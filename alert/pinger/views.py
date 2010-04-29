@@ -28,6 +28,9 @@ def validateForYahoo(request):
 def validateForBing(request):
     return HttpResponse('<?xml version="1.0"?><users><user>3251009A11EF3EB9D6A7B40EAD9264AD</user></users>')
 
+def validateForGoogle(request):
+    return HttpResponse('google-site-verification: googleef3d845637ccb353.html')
+
 def robots(request):
     robots = "User-agent: *\
 Disallow: "
