@@ -1432,7 +1432,9 @@ def parseCourt(courtID, result, verbosity):
 
     # this is a crude way to start threads, but I'm lazy, and two is a good
     # starting point. This essentially starts two threads, each with half of the
-    # unparsed PDFs.
+    # unparsed PDFs. If the -c 0 flag is used, it's likely for the next court 
+    # to begin scraping before both of these have finished. This should be OK, 
+    # but seems noteworthy.
     if numDocs > 0:
         t1 = Thread(target=getPDFContent, args=(docs[0:numDocs/2], result, verbosity,))
         t2 = Thread(target=getPDFContent, args=(docs[numDocs/2:numDocs], result, verbosity,))
