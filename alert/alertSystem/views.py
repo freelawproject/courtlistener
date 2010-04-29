@@ -14,12 +14,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+from django.decorators.views.cache import cache_page
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from alert.alertSystem.models import *
 
-
+@cache_page(60*5)
 def viewCases(request, court, case):
     """Take a court and a caseNameShort, and display what we know about that
     case.
@@ -50,7 +50,7 @@ def viewCases(request, court, case):
         return render_to_response('display_cases.html', {'title': case,
             'court': ct}, RequestContext(request))
 
-
+@cache_page(60*15)
 def viewDocumentListByCourt(request, court):
     """Show documents for a court, ten at a time"""
     from django.core.paginator import Paginator, InvalidPage, EmptyPage
