@@ -527,9 +527,9 @@ def scrapeCourt(courtID, result, verbosity):
         url = "http://www.ca5.uscourts.gov/Opinions.aspx"
         ct = Court.objects.get(courtUUID='ca5')
 
-        # make an array of two dates: today, and a week ago. That's our range.
+        # Use just one date, it seems to work better this way.
         todayObject = datetime.date.today()
-        if verbosity >= 2: print "start date: " + str(dates)
+        if verbosity >= 2: print "start date: " + str(todayObject)
 
         startDate = time.strftime('%m/%d/%Y', todayObject.timetuple())
 
