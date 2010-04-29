@@ -160,7 +160,7 @@ def showResults(request):
     # NEW SEARCH METHOD
     try:
         queryset = Document.search.query(query)
-        results = queryset.set_options(mode="SPH_MATCH_EXTENDED2", index="Document delta")\
+        results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
             .order_by('-dateFiled')
     except:
         results = []
