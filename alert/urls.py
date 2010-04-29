@@ -109,6 +109,7 @@ urlpatterns = patterns('',
     # SEO-related stuff
     (r'^y_key_6de7ece99e1672f2.html$', validateForYahoo),
     (r'^LiveSearchSiteAuth.xml$', validateForBing),
+    (r'^googleef3d845637ccb353.html$', validateForGoogle),
     # Sitemap generator
     (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.index',
         {'sitemaps': sitemaps}),
