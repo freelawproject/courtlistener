@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from django.decorators.views.cache import cache_page
+from django.views.decorators.cache import cache_page
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from alert.alertSystem.models import *
