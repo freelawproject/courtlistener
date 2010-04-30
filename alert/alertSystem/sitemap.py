@@ -15,19 +15,36 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from django.contrib.sitemaps import Sitemap
+#from django.contrib.sitemaps import Sitemap
+from django.contrib.sitemaps import GenericSitemap
+from django.contrib.sitemaps import FlatPageSitemap
 from alert.alertSystem.models import Document
+from alert.alertSystem.models import PACER_CODES
 
-class DocumentSitemap(Sitemap):
-    priority = 0.5
-    limit = 20000
+# from http://stackoverflow.com/questions/1392338/django-sitemap-index-example
+# generates a sitemap per court
+all_sitemaps = {}
+for courtTuple in PACER_CODES:
+    info_dict = {
+        'queryset'  : Document.objects.filter(court=courtTuple[0]),
+        'date_field': 'dateFiled',
+    }
 
-    def items(self):
-        return Document.objects.all()[0:100]
+    sitemap = GenericSitemap(info_dict, priority=0.5, changefreq="never")
 
-    def lastmod(self, obj):
-        return obj.dateFiled
+    # dict key is provided as 'section' in sitemap index view
+    all_sitemaps[courtTuple[0]] = sitemap
 
-    # changefreq can be callable too
+
+class MyFlatPageSitemap(FlatPageSitemap):
+    # prioritizes the about page, deprioritizes the legal pages.
+    def priority(self, item):
+        if 'about' in str(item.get_absolute_url).lower():
+            return 0.8
+        elif 'contribute' in str(item.get_absolute_url).lower():
+            return 0.7
+        else:
+            return 0.2
+
     def changefreq(self, obj):
-        return "never"
+        return "monthly"

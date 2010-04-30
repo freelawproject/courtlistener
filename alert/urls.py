@@ -18,9 +18,8 @@
 from alert import settings
 from alert.alertSystem.models import PACER_CODES
 from alert.alertSystem.views import *
-from alert.alertSystem.sitemap import DocumentSitemap
+#from alert.alertSystem.sitemap import DocumentSitemap
 from alert.contact.views import *
-from alert.coverage.views import *
 from alert.feeds.views import *
 from alert.pinger.views import *
 from alert.search.views import *
@@ -31,7 +30,7 @@ from alert.userHandling.views import *
 from django.conf.urls.defaults import *
 
 # for the flatfiles in the sitemap
-from django.contrib.sitemaps import FlatPageSitemap
+#from django.contrib.sitemaps import FlatPageSitemap
 from django.contrib.auth.views import login as signIn, logout as signOut,\
     password_reset, password_reset_done, password_reset_confirm,\
     password_reset_complete
@@ -40,10 +39,10 @@ from django.contrib.auth.views import login as signIn, logout as signOut,\
 from django.contrib import admin
 admin.autodiscover()
 
-sitemaps = {
-    "Opinion": DocumentSitemap,
-    "Flatfiles": FlatPageSitemap,
-}
+
+from alert.alertSystem.sitemap import all_sitemaps as sitemaps
+from alert.alertSystem.sitemap import MyFlatPageSitemap
+sitemaps["Flatfiles"] = MyFlatPageSitemap
 
 # creates a list of the first element of the choices variable for the courts field
 pacer_codes = []
@@ -64,9 +63,6 @@ urlpatterns = patterns('',
     # Contact us pages
     (r'^contact/$', contact),
     (r'^contact/thanks/$', thanks),
-    
-    # coverage page
-    (r'^coverage/$', coverage),
     
     # Various sign in/out etc. functions as provided by django
     url(r'^sign-in/$', signIn, name="sign-in"),
@@ -109,10 +105,12 @@ urlpatterns = patterns('',
     # SEO-related stuff
     (r'^y_key_6de7ece99e1672f2.html$', validateForYahoo),
     (r'^LiveSearchSiteAuth.xml$', validateForBing),
+    (r'^googleef3d845637ccb353.html$', validateForGoogle),
     # Sitemap generator
-    (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.sitemap',
+    (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.index',
         {'sitemaps': sitemaps}),
-    (r'^sitemap-(?P<section>.+)\.xml$', 'django.contrib.sitemaps.views.sitemap', {'sitemaps': sitemaps}),
+    (r'^sitemap-(?P<section>.+)\.xml$', 'django.contrib.sitemaps.views.sitemap', 
+        {'sitemaps': sitemaps}),
     #(r'^robots.txt$', robots), # removed for lack of need.
 )
 
