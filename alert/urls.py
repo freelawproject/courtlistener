@@ -117,6 +117,7 @@ urlpatterns = patterns('',
 # redirects
 urlpatterns += patterns('django.views.generic.simple',
     ('^privacy/$', 'redirect_to', {'url': '/terms/#privacy/'}),
+    ('^opinions/$', 'redirect_to', {'url': '/opinions/all/'}),
 )
 
 

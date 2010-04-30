@@ -8,13 +8,24 @@ Page / {{ results.number }} of {{results.paginator.num_pages}}
 {% endblock %}
 
 {% block headers %}
+    <link rel="stylesheet" href="/media/css/jquery.tooltip.css" type="text/css" media="screen, projection">
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
     <script type="text/javascript" src="/media/js/collapsible.js"></script>
+    <script type="text/javascript" src="/media/js/jquery.tooltip.min.js"></script>
     <script type="text/javascript">
 	    $(document).ready(function() {
 		    $('.auto-focus:first').focus();
 		    $("fieldset.collapsible").collapse();
 		    $("fieldset.collapsed").collapse( { closed: true } );
+		    $('#q').tooltip({
+	            track: true,
+	            delay: 0,
+	            showURL: false,
+	            showBody: " - ",
+	            fade: 250,
+	            positionLeft: true,
+            });
+
 	    });
      </script>
      <link rel="search" type="application/opensearchdescription+xml" title="Court Listener" href="/media/xml/opensearch.xml" />
@@ -232,6 +243,7 @@ Page / {{ results.number }} of {{results.paginator.num_pages}}
                 <p>
                     {{ alertForm.alertPrivacy }}
                     <label for="id_alertPrivacy">This alert is private</label>
+                    <label style="color:#000099; font-weight:normal;" title=" - In the future, we may share public alerts among users" href="#" id="q" class="help">[?]</label>
                     {% if alertForm.alertPrivacy.errors %}
                         <span class="errortext">
                             {% for error in alertForm.alertPrivacy.errors %}
