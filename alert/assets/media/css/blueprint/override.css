@@ -50,6 +50,10 @@ Sets up all the overrides or additional CSS that the site will use.
     cursor: hand;
 }
 
+.help {
+    cursor: help;
+}
+
 a:link, a:visited {
     text-decoration: none;
 }
