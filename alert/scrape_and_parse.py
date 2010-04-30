@@ -258,7 +258,7 @@ def scrapeCourt(courtID, result, verbosity):
 
         # second circuit
         urls = (
-            "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=OPN&IW_FIELD_TEXT=SUM&IW_SORT=-Date&IW_BATCHSIZE=100",
+            "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=OPN&IW_FIELD_TEXT=OPN&IW_SORT=-Date&IW_BATCHSIZE=100",
             "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=SUM&IW_FIELD_TEXT=SUM&IW_SORT=-Date&IW_BATCHSIZE=100",
         )
 
@@ -527,9 +527,9 @@ def scrapeCourt(courtID, result, verbosity):
         url = "http://www.ca5.uscourts.gov/Opinions.aspx"
         ct = Court.objects.get(courtUUID='ca5')
 
-        # make an array of two dates: today, and a week ago. That's our range.
+        # Use just one date, it seems to work better this way.
         todayObject = datetime.date.today()
-        if verbosity >= 2: print "start date: " + str(dates)
+        if verbosity >= 2: print "start date: " + str(todayObject)
 
         startDate = time.strftime('%m/%d/%Y', todayObject.timetuple())
 
@@ -1432,7 +1432,9 @@ def parseCourt(courtID, result, verbosity):
 
     # this is a crude way to start threads, but I'm lazy, and two is a good
     # starting point. This essentially starts two threads, each with half of the
-    # unparsed PDFs.
+    # unparsed PDFs. If the -c 0 flag is used, it's likely for the next court 
+    # to begin scraping before both of these have finished. This should be OK, 
+    # but seems noteworthy.
     if numDocs > 0:
         t1 = Thread(target=getPDFContent, args=(docs[0:numDocs/2], result, verbosity,))
         t2 = Thread(target=getPDFContent, args=(docs[numDocs/2:numDocs], result, verbosity,))
