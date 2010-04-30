@@ -121,13 +121,20 @@ def showResults(request):
         )           # end of non-capturing group
         ''', re.VERBOSE)
     
+    
+    messageText = ""
     # and this puts them into the attributes list.
     groupedAttributes = re.findall(regex0, query)
     for item in groupedAttributes:
-        attributes.extend(item.strip("(").strip(")").split(", "))
-
+        attributes.extend(item.strip("(").strip(")").strip().split(","))
+        if " " in item:
+            # if there is a space in the item
+            if "Multiple" not in messageText:
+                # we only add this warning once.
+                messageText += "Mutiple field searches cannot contain spaces.<br>"
+            
     # check if the values are valid.
-    validRegex = re.compile(r'^court$|^casename$|^docstatus$|^doctext$|^casenumber$')
+    validRegex = re.compile(r'^\W?court\W?$|^\W?casename\W?$|^\W?docstatus\W?$|^\W?doctext\W?$|^\W?casenumber\W?$')
     
     # if they aren't add them to a new list.
     badAttrs = []
@@ -143,14 +150,15 @@ def showResults(request):
 
     # pluralization is a pain, but we must do it...
     if len(badAttrs) == 1:
-        messageText = 'We completed your search, but <strong>' + \
-        oxford_comma(badAttrs) + '</strong> is not a valid attribute.<br>\
-        Valid attributes are @court, @caseName, @caseNumber, @docStatus and @docText.'
-        messages.add_message(request, messages.INFO, messageText)
+        messageText += '<strong>' + oxford_comma(badAttrs) + '</strong> is not a \
+        valid field. Valid fields are @court, @caseName, @caseNumber,\
+        @docStatus and @docText.'
     elif len(badAttrs) > 1:
-        messageText = 'We completed your search, but <strong>' + \
-        oxford_comma(badAttrs) + '</strong> are not valid attributes.<br>\
-        Valid attributes are @court, @caseName, @caseNumber, @docStatus and @docText.'
+        messageText += '<strong>' + oxford_comma(badAttrs) + '</strong> are not \
+        valid fields. Valid fields are @court, @caseName, @caseNumber,\
+        @docStatus and @docText.'
+    
+    if len(messageText) > 0:
         messages.add_message(request, messages.INFO, messageText)
 
     

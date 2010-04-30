@@ -41,3 +41,15 @@ hand-crafted alerts for various areas of the law.
     + Not too hard to implement
     - CPU intensive b/c requires running the weekly/monthly emailers every day.
     - Requires changes to the alert models.
+
+6. Sponsorships
+    = That is, there are one or two pages where firms get to list their logos
+      as sponsors, maybe even at various levels Platinum, Gold, Silver, etc.
+    + Could generate significant revenue.
+    + Could be more discrete than ads on every page.
+    - Still sort of adds to the lameness of the site.
+    - Probably requires that at least those sponsors get some sort of guarantee
+      of reliability of the site.
+    - Requires at least annual outreach/fundraising efforts.
+    - Would be easier to get such support as a 501(c)(3) non-profit, but then
+      we have to go through the overhead of creating such an entity.
