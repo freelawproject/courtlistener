@@ -81,27 +81,33 @@ def emailer(rate, verbose, simulate):
         hits = []
         # ...and iterate over their alerts.
         for alert in alerts:
-            if verbose: print "Now running the query: " + alert.alertText
-            if RATE == 'dly':
-                # query the alert
-                if verbose: "Now running the search for: " + alert.alertText
-                queryset = Document.search.query(alert.alertText)
-                results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
-                    .filter(datefiled=unixTimeToday)
-            elif RATE == 'wly' and today.weekday() == 6:
-                # if it's a weekly alert and today is Sunday
-                if verbose: "Now running the search for: " + alert.alertText
-                queryset = Document.search.query(alert.alertText)
-                results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
-                    .filter(datefiled=unixTimesPastWeek)
-            elif RATE == 'mly' and today.day == 19:
-                # if it's a monthly alert and today is the first of the month
-                if verbose: "Now running the search for: " + alert.alertText
-                queryset = Document.search.query(alert.alertText)
-                results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
-                    .filter(datefiled=unixTimesPastMonth)
-            elif RATE == "off":
-                pass
+            try:
+                if verbose: print "Now running the query: " + alert.alertText
+                if RATE == 'dly':
+                    # query the alert
+                    if verbose: "Now running the search for: " + alert.alertText
+                    queryset = Document.search.query(alert.alertText)
+                    results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
+                        .filter(datefiled=unixTimeToday)
+                elif RATE == 'wly' and today.weekday() == 6:
+                    # if it's a weekly alert and today is Sunday
+                    if verbose: "Now running the search for: " + alert.alertText
+                    queryset = Document.search.query(alert.alertText)
+                    results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
+                        .filter(datefiled=unixTimesPastWeek)
+                elif RATE == 'mly' and today.day == 19:
+                    # if it's a monthly alert and today is the first of the month
+                    if verbose: "Now running the search for: " + alert.alertText
+                    queryset = Document.search.query(alert.alertText)
+                    results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
+                        .filter(datefiled=unixTimesPastMonth)
+                elif RATE == "off":
+                    pass
+            except:
+                # search occasionally barfs. We need to log this.
+                print "Search barfed on this alert: " + alert.alertText
+                continue
+                
             
 	    if verbose: 
 	        print "The value of results is: " + str(results)
@@ -113,27 +119,30 @@ def emailer(rate, verbose, simulate):
             # hits is a multidimensional array. Ugh.
             # it consists of alerts, paired with a list of documents, of the form:
             # [[alert1, [hit1, hit2, hit3, hit4]], [alert2, [hit1, hit2]]]
-            if results.count() > 0:
-                # very important! if you don't do the slicing here, you'll only
-                # get the first 20 hits. also very frustrating!
-                alertWithResults = [alert, results[0:results.count()]]
-                hits.append(alertWithResults)
-                # set the hit date to today
-                alert.lastHitDate = datetime.date.today()
-                alert.save()
-                if verbose:
-                    print "alertWithResults: " + str(alertWithResults)
-                    print "hits: " + str(hits)
-                
-            elif alert.sendNegativeAlert:
-                # if they want an alert even when no hits.
-                alertWithResults = [alert, "None"]
-                hits.append(alertWithResults)
-                
-                if verbose:
-                    print "Sending results for negative alert, " + alert.alertText + "."
-                    print "alertWithResults: " + str(alertWithResults)
-                    print "hits: " + str(hits)
+            try:
+                if results.count() > 0:
+                    # very important! if you don't do the slicing here, you'll only
+                    # get the first 20 hits. also very frustrating!
+                    alertWithResults = [alert, results[0:results.count()]]
+                    hits.append(alertWithResults)
+                    # set the hit date to today
+                    alert.lastHitDate = datetime.date.today()
+                    alert.save()
+                    if verbose:
+                        print "alertWithResults: " + str(alertWithResults)
+                        print "hits: " + str(hits)
+                    
+                elif alert.sendNegativeAlert:
+                    # if they want an alert even when no hits.
+                    alertWithResults = [alert, "None"]
+                    hits.append(alertWithResults)
+                    
+                    if verbose:
+                        print "Sending results for negative alert, " + alert.alertText + "."
+                        print "alertWithResults: " + str(alertWithResults)
+                        print "hits: " + str(hits)
+            except:
+                print "Search barfed on this alert: " + alert.alertText
         
         if len(hits) > 0:
             # either the hits var has the value "None", or it has hits.
