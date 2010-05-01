@@ -81,31 +81,33 @@ def emailer(rate, verbose, simulate):
         hits = []
         # ...and iterate over their alerts.
         for alert in alerts:
+            query = preparseQuery(alert.alertText)
+            
             try:
-                if verbose: print "Now running the query: " + alert.alertText
+                if verbose: print "Now running the query: " + query
                 if RATE == 'dly':
                     # query the alert
-                    if verbose: "Now running the search for: " + alert.alertText
-                    queryset = Document.search.query(alert.alertText)
+                    if verbose: "Now running the search for: " + query
+                    queryset = Document.search.query(query)
                     results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
                         .filter(datefiled=unixTimeToday)
                 elif RATE == 'wly' and today.weekday() == 6:
                     # if it's a weekly alert and today is Sunday
-                    if verbose: "Now running the search for: " + alert.alertText
-                    queryset = Document.search.query(alert.alertText)
+                    if verbose: "Now running the search for: " + query
+                    queryset = Document.search.query(query)
                     results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
                         .filter(datefiled=unixTimesPastWeek)
                 elif RATE == 'mly' and today.day == 19:
                     # if it's a monthly alert and today is the first of the month
-                    if verbose: "Now running the search for: " + alert.alertText
-                    queryset = Document.search.query(alert.alertText)
+                    if verbose: "Now running the search for: " + query
+                    queryset = Document.search.query(query)
                     results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
                         .filter(datefiled=unixTimesPastMonth)
                 elif RATE == "off":
                     pass
             except:
                 # search occasionally barfs. We need to log this.
-                print "Search barfed on this alert: " + alert.alertText
+                print "Search barfed on this alert: " + query
                 continue
                 
             
@@ -113,7 +115,7 @@ def emailer(rate, verbose, simulate):
 	        print "The value of results is: " + str(results)
                 print "The value of results.count() is: " + str(results.count())
                 print "There were " + str(results.count()) + \
-                " hits for the alert \"" + alert.alertText + \
+                " hits for the alert \"" + query + \
                 "\". Here are the first 0-20: " + str(results)
             
             # hits is a multidimensional array. Ugh.
@@ -138,11 +140,11 @@ def emailer(rate, verbose, simulate):
                     hits.append(alertWithResults)
                     
                     if verbose:
-                        print "Sending results for negative alert, " + alert.alertText + "."
+                        print "Sending results for negative alert, " + query + "."
                         print "alertWithResults: " + str(alertWithResults)
                         print "hits: " + str(hits)
             except:
-                print "Search barfed on this alert: " + alert.alertText
+                print "Search barfed on this alert: " + query
         
         if len(hits) > 0:
             # either the hits var has the value "None", or it has hits.

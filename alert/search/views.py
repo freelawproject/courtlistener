@@ -36,6 +36,102 @@ def oxford_comma(seq):
         return '%s, and %s' % (', '.join(seq[:-1]), seq[-1])
 
 
+def preparseQuery(query):
+    query = query.lower()
+    
+    # @doctext needs to become @(doctext,dochtml).
+    # @(doctext) needs to become @(doctext, dochtml).
+    # @(doctext,court) needs to be come @(doctext,dochtml,court)
+    query = re.sub('doctext', 'doctext,dochtml', query)
+    # @doctext now is @doctext,dochtml --> BAD
+    # @(doctext) is now @(doctext,dochtml) --> GOOD
+    # @(doctext,court) is now @(doctext,dochtml,court) --> GOOD
+    query = re.sub('@doctext,dochtml', '@(doctext,dochtml)', query)    
+    # All are now good.
+
+    return query
+
+def adjustQueryForUser(query):
+    """This is where the "Did you mean" type of thing lives, for example, 
+    where we correct the user's input if needed.
+    
+    Currently, though, it's not implemented.
+    """
+    return query
+
+
+def messageUser(query, request):
+    # before searching, check that all fieldnames are valid. Create message if not.
+    # Alter the query string if needed so that it will return the correct results.
+    # this thread has a solution using pyparsing which is probably a better approach to investigate:
+    # http://stackoverflow.com/questions/2677713/regex-for-finding-valid-sphinx-fields
+    # for testing: @court @casename foo,bar @(doctext, courthouse, docstatus) @(docstatus, casename) @(casename) @courtname (court | doctext)
+    # this catches simple fields such as @court, @field and puts them in a list
+    attributes = re.findall('(?:@)([^\( ]*)', query)
+    
+    # this catches more complicated ones, like @(court), and @(court, test)
+    regex0 = re.compile('''
+        @               # at sign
+        (?:             # start non-capturing group
+            \w+             # non-whitespace, one or more
+            \b              # a boundary character (i.e. no more \w)
+            |               # OR
+            (               # capturing group
+                \(              # left paren
+                [^@(),]+        # not an @(),
+                (?:                 # another non-caputing group
+                    , *             # a comma, then some spaces
+                    [^@(),]+        # not @(),
+                )*              # some quantity of this non-capturing group
+                \)              # a right paren
+            )               # end of non-capuring group
+        )           # end of non-capturing group
+        ''', re.VERBOSE)
+    
+    
+    messageText = ""
+    # and this puts them into the attributes list.
+    groupedAttributes = re.findall(regex0, query)
+    for item in groupedAttributes:
+        attributes.extend(item.strip("(").strip(")").strip().split(","))
+            
+    # check if the values are valid.
+    validRegex = re.compile(r'^\W?court\W?$|^\W?casename\W?$|^\W?docstatus\W?$|^\W?doctext\W?$|^\W?casenumber\W?$')
+    
+    # if they aren't add them to a new list.
+    badAttrs = []
+    for attribute in attributes:
+        if len(attribute) == 0:
+            # if it's a zero length attribute, we punt
+            continue
+        if validRegex.search(attribute.lower()) == None:
+            # if the attribute from the search isn't in the valid list
+            if attribute not in badAttrs:
+                # and the attribute isn't already in the list
+                badAttrs.append(attribute)
+        if " " in attribute:
+            # if there is a space in the item
+            if "Multiple" not in messageText:
+                # we only add this warning once.
+                messageText += "Mutiple field searches cannot contain spaces.<br>"
+        
+
+    # pluralization is a pain, but we must do it...
+    if len(badAttrs) == 1:
+        messageText += '<strong>' + oxford_comma(badAttrs) + '</strong> is not a \
+        valid field. Valid fields are @court, @caseName, @caseNumber,\
+        @docStatus and @docText.'
+    elif len(badAttrs) > 1:
+        messageText += '<strong>' + oxford_comma(badAttrs) + '</strong> are not \
+        valid fields. Valid fields are @court, @caseName, @caseNumber,\
+        @docStatus and @docText.'
+    
+    if len(messageText) > 0:
+        messages.add_message(request, messages.INFO, messageText)
+    
+    return True
+
+
 def home(request):
     """Show the homepage"""
     if "q" in request.GET:
@@ -94,80 +190,20 @@ def showResults(request):
         # the form is loading for the first time, load it, then load the rest
         # of the page!
         alertForm = CreateAlertForm(initial = {'alertText': query, 'alertFrequency': "dly"})
-
-    # before searching, check that all fieldnames are valid. Create message if not.
-    # this thread has a solution using pyparse which is probably a better approach to investigate:
-    # http://stackoverflow.com/questions/2677713/regex-for-finding-valid-sphinx-fields
-    # for testing: @court @casename foo,bar @(doctext, courthouse, docstatus) @(docstatus, casename) @(casename) @courtname (court | doctext)
-    # this catches simple fields such as @court, @field and puts them in a list
-    attributes = re.findall('(?:@)([^\( ]*)', query)
     
-    # this catches more complicated ones, like @(court), and @(court, test)
-    regex0 = re.compile('''
-        @               # at sign
-        (?:             # start non-capturing group
-            \w+             # non-whitespace, one or more
-            \b              # a boundary character (i.e. no more \w)
-            |               # OR
-            (               # capturing group
-                \(              # left paren
-                [^@(),]+        # not an @(),
-                (?:                 # another non-caputing group
-                    , *             # a comma, then some spaces
-                    [^@(),]+        # not @(),
-                )*              # some quantity of this non-capturing group
-                \)              # a right paren
-            )               # end of non-capuring group
-        )           # end of non-capturing group
-        ''', re.VERBOSE)
+    # alert the user if there are any errors in their query
+    messageUser(query, request)
     
-    
-    messageText = ""
-    # and this puts them into the attributes list.
-    groupedAttributes = re.findall(regex0, query)
-    for item in groupedAttributes:
-        attributes.extend(item.strip("(").strip(")").strip().split(","))
-        if " " in item:
-            # if there is a space in the item
-            if "Multiple" not in messageText:
-                # we only add this warning once.
-                messageText += "Mutiple field searches cannot contain spaces.<br>"
-            
-    # check if the values are valid.
-    validRegex = re.compile(r'^\W?court\W?$|^\W?casename\W?$|^\W?docstatus\W?$|^\W?doctext\W?$|^\W?casenumber\W?$')
-    
-    # if they aren't add them to a new list.
-    badAttrs = []
-    for attribute in attributes:
-        if len(attribute) == 0:
-            # if it's a zero length attribute, we punt
-            continue
-        if validRegex.search(attribute.lower()) == None:
-            # if the attribute from the search isn't in the valid list
-            if attribute not in badAttrs:
-                # and the attribute isn't already in the list
-                badAttrs.append(attribute)
-
-    # pluralization is a pain, but we must do it...
-    if len(badAttrs) == 1:
-        messageText += '<strong>' + oxford_comma(badAttrs) + '</strong> is not a \
-        valid field. Valid fields are @court, @caseName, @caseNumber,\
-        @docStatus and @docText.'
-    elif len(badAttrs) > 1:
-        messageText += '<strong>' + oxford_comma(badAttrs) + '</strong> are not \
-        valid fields. Valid fields are @court, @caseName, @caseNumber,\
-        @docStatus and @docText.'
-    
-    if len(messageText) > 0:
-        messages.add_message(request, messages.INFO, messageText)
-
+    # adjust the query if need be for the search to happen correctly.
+    query = adjustQueryForUser(query)
+    internalQuery = preparseQuery(query)
     
     # OLD SEARCH METHOD (crude, slow, powerless)
     # results = Document.objects.filter(documentPlainText__icontains=query).order_by("-dateFiled")
 
     # NEW SEARCH METHOD
     try:
-        queryset = Document.search.query(query)
+        queryset = Document.search.query(internalQuery)
         results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
             .order_by('-dateFiled')
     except:

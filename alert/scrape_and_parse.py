@@ -186,11 +186,11 @@ def scrapeCourt(courtID, result, verbosity):
             # First: docType, since we don't support them all...
             docType = docTypes[i].text.strip()
             if "unpublished" in docType.lower():
-                documentType = "U"
+                documentType = "Unpublished"
             elif "published" in docType.lower():
-                documentType = "P"
+                documentType = "Published"
             elif "errata" in docType.lower():
-                documentType = "E"
+                documentType = "Errata"
             else:
                 # something weird we don't know about, punt
                 i += 1
@@ -312,9 +312,9 @@ def scrapeCourt(courtID, result, verbosity):
                 documentType = caseNumRegex.search(caseLink).group(2)
                 if 'opn' in documentType:
                     # it's unpublished
-                    doc.documentType = "P"
+                    doc.documentType = "Published"
                 elif 'so' in documentType:
-                    doc.documentType = "U"
+                    doc.documentType = "Unpublished"
 
                 # next, the caseNameShort (there's probably a better way to do this.
                 caseNameShort = aTags[i].parent.parent.nextSibling.nextSibling\
@@ -415,9 +415,9 @@ def scrapeCourt(courtID, result, verbosity):
 
                 # Make a decision about the docType.
                 if "recprec.htm" in str(url):
-                    doc.documentType = "P"
+                    doc.documentType = "Published"
                 elif "recnon2day.htm" in str(url):
-                    doc.documentType = "U"
+                    doc.documentType = "Unpublished"
 
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
 
@@ -591,10 +591,10 @@ def scrapeCourt(courtID, result, verbosity):
             # three non-precedential and three precedential from this court.
             if unpubRegex.search(str(aTags[i])) == None:
                 # it's published, else it's unpublished
-                documentType = "P"
+                documentType = "Published"
                 numP += 1
             else:
-                documentType = "U"
+                documentType = "Unpublished"
                 numQ += 1
             if verbosity >= 2: print "documentType: " + documentType
             doc.documentType = documentType
@@ -707,9 +707,9 @@ def scrapeCourt(courtID, result, verbosity):
             fileName = aTags[i].contents[0]
             if 'n' in fileName:
                 # it's unpublished
-                doc.documentType = "U"
-            elif 'p' in fileName:
-                doc.documentType = "P"
+                doc.documentType = "Unpublished"
+            elif "Published" in fileName:
+                doc.documentType = "Published"
 
             # next, we can do the caseDate
             caseDate = aTags[i].next.next.next.next.next.next.next.next\
@@ -804,9 +804,9 @@ def scrapeCourt(courtID, result, verbosity):
 
                 # next up: docStatus
                 if "type=Opinion" in dataString:
-                    doc.documentType = 'P'
+                    doc.documentType = "Published"
                 elif "type=Nonprecedential+Disposition" in dataString:
-                    doc.documentType = 'U'
+                    doc.documentType = "Unpublished"
 
                 # now that we have the caseNumber and caseNameShort, we can dup check
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
@@ -951,9 +951,9 @@ def scrapeCourt(courtID, result, verbosity):
 
                 # next up: document type (static for now)
                 if 'memoranda' in url:
-                    doc.documentType = "U"
+                    doc.documentType = "Unpublished"
                 elif 'opinions' in url:
-                    doc.documentType = "P"
+                    doc.documentType = "Published"
 
                 # next up: caseDate
                 splitDate = caseDates[i].text.split('/')
@@ -1031,9 +1031,9 @@ def scrapeCourt(courtID, result, verbosity):
             # next: docType (this order of if statements IS correct)
             docType = docTypes[i].text.strip()
             if "unpublished" in docType.lower():
-                doc.documentType = "U"
+                doc.documentType = "Unpublished"
             elif "published" in docType.lower():
-                doc.documentType = "P"
+                doc.documentType = "Published"
             else:
                 # it's an errata, or something else we don't care about
                 i += 1
@@ -1144,9 +1144,9 @@ def scrapeCourt(courtID, result, verbosity):
                     dupCount = 0
 
                 if 'unpub' in url:
-                    doc.documentType = "U"
+                    doc.documentType = "Unpublished"
                 elif 'opinion' in url:
-                    doc.documentType = "P"
+                    doc.documentType = "Published"
                 if verbosity >= 2: print "documentType: " + str(doc.documentType)
 
                 cleanDate = caseDates[i].text.strip()
@@ -1214,7 +1214,7 @@ def scrapeCourt(courtID, result, verbosity):
 
             # we can hard-code this b/c the D.C. Court paywalls all
             # unpublished opinions.
-            doc.documentType = "P"
+            doc.documentType = "Published"
 
             # caseDate is next on the block
             caseDate = datetime.date.today()
@@ -1305,8 +1305,10 @@ def scrapeCourt(courtID, result, verbosity):
                 .nextSibling.nextSibling.nextSibling.nextSibling.nextSibling\
                 .contents[0].contents[0]
             # normalize the result for our internal purposes...
-            if documentType == 'N':
-                documentType = 'U'
+            if documentType == "N":
+                documentType = "Unpublished"
+            elif documentType == "P":
+                documentType = "Published"
             doc.documentType = documentType
 
             # now that we have the caseNumber and caseNameShort, we can dup check
@@ -1378,11 +1380,11 @@ def scrapeCourt(courtID, result, verbosity):
                 caseNameShort = caseLinks[i].text
 
                 if 'slipopinion' in url:
-                    doc.documentType = "P"
+                    doc.documentType = "Published"
                 elif 'in-chambers' in url:
-                    doc.documentType = "I"
+                    doc.documentType = "In-chambers"
                 elif 'relatingtoorders' in url:
-                    doc.documentType = "R"
+                    doc.documentType = "Relating-to"
 
                 if '/' in caseDates[i].text:
                     splitDate = caseDates[i].text.split('/')

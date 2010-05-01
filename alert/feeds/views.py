@@ -22,6 +22,7 @@ from django.utils import feedgenerator
 from django.utils.feedgenerator import Atom1Feed
 
 from alert.alertSystem.models import Court, Document
+from alert.search.views import preparseQuery
 
 
 class searchFeed(Feed):
@@ -48,6 +49,7 @@ class searchFeed(Feed):
     
     def items(self, obj):
         # Do a Sphinx query here. Return the first 20 results
+        obj = preparseQuery(obj)
         queryset = Document.search.query(obj)
         results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
             .order_by('-dateFiled')

@@ -44,7 +44,7 @@ def coverage(request):
     statsP = []
     # get all the courts
     for code in PACER_CODES:
-        q = Document.objects.filter(court=code[0], documentType="P")
+        q = Document.objects.filter(court=code[0], documentType="Published")
         numDocs = q.count()
         if numDocs != 0:
             doc = q.order_by('dateFiled')[0]
@@ -53,7 +53,7 @@ def coverage(request):
 
     statsU = []
     for code in PACER_CODES:
-        q = Document.objects.filter(court=code[0], documentType__in=["U","E","I","R"])
+        q = Document.objects.filter(court=code[0], documentType__in=["Unpublished","Errata","In-chambers","Relating-to"])
         numDocs = q.count()
         if numDocs != 0:
             doc = q.order_by('dateFiled')[0]
