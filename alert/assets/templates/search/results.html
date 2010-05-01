@@ -18,7 +18,7 @@ Page / {{ results.number }} of {{results.paginator.num_pages}}
 		    $("fieldset.collapsible").collapse();
 		    $("fieldset.collapsed").collapse( { closed: true } );
 		    $('#q').tooltip({
-	            track: true,
+	            track: false,
 	            delay: 0,
 	            showURL: false,
 	            showBody: " - ",
@@ -243,7 +243,7 @@ Page / {{ results.number }} of {{results.paginator.num_pages}}
                 <p>
                     {{ alertForm.alertPrivacy }}
                     <label for="id_alertPrivacy">This alert is private</label>
-                    <label style="color:#000099; font-weight:normal;" title=" - In the future, we may share public alerts among users" href="#" id="q" class="help">[?]</label>
+                    <label style="color:#000099; font-weight:normal;" title=" - In the future, we may allow users to display their public alerts" href="#" id="q" class="help">[?]</label>
                     {% if alertForm.alertPrivacy.errors %}
                         <span class="errortext">
                             {% for error in alertForm.alertPrivacy.errors %}
