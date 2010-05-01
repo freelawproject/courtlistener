@@ -22,6 +22,7 @@ setup_environ(settings)
 
 from userHandling.models import Alert, UserProfile
 from userHandling.models import FREQUENCY
+from search.views import preparseQuery
 from alertSystem.models import Document
 from django.contrib.auth.models import User
 from django.http import HttpResponseRedirect, HttpResponse
