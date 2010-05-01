@@ -21,6 +21,12 @@ from django.contrib.sitemaps import FlatPageSitemap
 from alert.alertSystem.models import Document
 from alert.alertSystem.models import PACER_CODES
 
+
+
+class LimitedGenericSitemap(GenericSitemap):
+    limit = 1000
+
+
 # from http://stackoverflow.com/questions/1392338/django-sitemap-index-example
 # generates a sitemap per court
 all_sitemaps = {}
@@ -30,10 +36,11 @@ for courtTuple in PACER_CODES:
         'date_field': 'dateFiled',
     }
 
-    sitemap = GenericSitemap(info_dict, priority=0.5, changefreq="never")
+    sitemap = LimitedGenericSitemap(info_dict, priority=0.5, changefreq="never")
 
     # dict key is provided as 'section' in sitemap index view
     all_sitemaps[courtTuple[0]] = sitemap
+
 
 
 class MyFlatPageSitemap(FlatPageSitemap):
@@ -41,6 +48,8 @@ class MyFlatPageSitemap(FlatPageSitemap):
     def priority(self, item):
         if 'about' in str(item.get_absolute_url).lower():
             return 0.8
+        elif 'coverage' in str(item.get_absolute_url).lower():
+            return 0.7
         elif 'contribute' in str(item.get_absolute_url).lower():
             return 0.7
         else:

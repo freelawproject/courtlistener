@@ -1,3 +1,8 @@
-<pre>{{obj.documentPlainText|fix_ampersands|linebreaksbr|truncatewords:"500"|stringformat:"s"}}</pre><br>
+{% if obj.source == "C" or obj.source == "M" %}
+    <pre>{{obj.documentPlainText|fix_ampersands|linebreaksbr|truncatewords:"500"|stringformat:"s"}}</pre><br>
+{% endif %}
+{% if obj.source == "R" %}
+    {{obj.documentHTML|safe|fix_ampersands|truncatewords:"500"}}<br>
+{% endif %}
 
 <a href="{{obj.get_absolute_url}}">Original document</a>
