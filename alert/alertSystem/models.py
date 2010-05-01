@@ -40,11 +40,11 @@ PACER_CODES = (
 # changes here need to be mirrored in the coverage page view and the exceptions 
 # list for sphinx
 DOCUMENT_STATUSES = (
-    ('P', 'Published/Precedential'),
-    ('U', 'Unpublished/Non-Precedential'),
-    ('E', 'Errata'),
-    ('I', 'In-chambers'),
-    ('R', 'Relating-to orders'),
+    ('Published', 'Published/Precedential'),
+    ('Unpublished', 'Unpublished/Non-Precedential'),
+    ('Errata', 'Errata'),
+    ('In-chambers', 'In-chambers'),
+    ('Relating-to', 'Relating-to orders'),
 )
 
 DOCUMENT_SOURCES = (

@@ -133,10 +133,10 @@ back_scrape_court(courtID, result, verbose):
                 # the dup check.
                 if unpubRegex.search(str(aTags[i])) == None:
                     # it's published, else it's unpublished
-                    documentType = "P"
+                    documentType = "Published"
                     numP += 1
                 else:
-                    documentType = "U"
+                    documentType = "Unpublished"
                     numQ += 1
                 if verbose >= 2: print documentType
                 doc.documentType = documentType
@@ -301,9 +301,9 @@ back_scrape_court(courtID, result, verbose):
                         dupCount = 0
                     
                     if 'unpub' in url:
-                        doc.documentType = "U"
+                        doc.documentType = "Unpublished"
                     elif 'opinion' in url:
-                        doc.documentType = "P"
+                        doc.documentType = "Published"
                     if verbose >= 2: print "documentType: " + str(doc.documentType)
                     
                     cleanDate = caseDates[i].text.strip()
