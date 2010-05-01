@@ -100,7 +100,7 @@ def courtChanged(url, contents):
     and it is the same, it returns false. Else, it returns true."""
     sha1Hash = hashlib.sha1(contents).hexdigest()
     url2Hash, created = urlToHash.objects.get_or_create(url=url)
-    
+
     if not created and url2Hash.SHA1 == sha1Hash:
         # it wasn't created, and it has the same SHA --> not changed.
         return False
@@ -109,11 +109,11 @@ def courtChanged(url, contents):
         # and save the changes.
         url2Hash.SHA1 = sha1Hash
         url2Hash.save()
-            
+
         # Log the change time and URL
         global logger
         logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + ": URL: " + url)
-        
+
         return True
 
 
@@ -314,10 +314,10 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
             aTagsRegex = re.compile('(.*?.pdf).*?', re.IGNORECASE)
             caseNumRegex = re.compile('.*/(\d{1,2}-\d{3,4})(.*).pdf')
             aTags = soup.findAll(attrs={'href' : aTagsRegex})
-            
+
             if daemonmode:
-                # this mess is necessary because the court puts random 
-                # (literally) numbers throughout their links. No idea why, 
+                # this mess is necessary because the court puts random
+                # (literally) numbers throughout their links. No idea why,
                 # but the solution is to figure out the caselinks here, and to hand
                 # those to the sha1 generator.
                 aTagsEncoded = []
@@ -329,7 +329,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     except:
                         caseNumbers = ""
                     aTagsEncoded.append(caseNumbers)
-                
+
                 # if it's daemonmode, see if the court has changed
                 changed = courtChanged(url, str(aTagsEncoded))
                 if not changed:
@@ -1001,7 +1001,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
         has to be used. lxml seems pretty useful, but it was a pain to learn."""
 
         urls = (
-            "http://www.ca9.uscourts.gov/opinions/?o_mode=view&amp;o_sort_field=19&amp;o_sort_type=DESC&o_page_size=100", 
+            "http://www.ca9.uscourts.gov/opinions/?o_mode=view&amp;o_sort_field=19&amp;o_sort_type=DESC&o_page_size=100",
             "http://www.ca9.uscourts.gov/memoranda/?o_mode=view&amp;o_sort_field=21&amp;o_sort_type=DESC&o_page_size=100",)
 
         ct = Court.objects.get(courtUUID = 'ca9')
@@ -1019,7 +1019,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 caseLinks = tree.xpath('//table[3]/tbody/tr/td/a')
                 caseNumbers = tree.xpath('//table[3]/tbody/tr/td[2]/label')
                 caseDates = tree.xpath('//table[3]/tbody/tr/td[7]/label')
-            
+
             if daemonmode:
                 # if it's daemonmode, see if the court has changed
                 # this is necessary because the 9th circuit puts random numbers
@@ -1031,7 +1031,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 if not changed:
                     # if not, bail. If so, continue to the scraping.
                     return result
-                    
+
             i = 0
             dupCount = 0
             while i < len(caseLinks):
@@ -1490,7 +1490,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 caseLinks = tree.xpath('//table/tr/td[3]/a')
                 caseNumbers = tree.xpath('//table/tr/td[2]')
                 caseDates = tree.xpath('//table/tr/td[1]')
-                
+
             if daemonmode:
                 # if it's daemonmode, see if the court has changed
                 # this is necessary because the SCOTUS puts random numbers
@@ -1635,9 +1635,9 @@ def main():
         verbosity = options.verbosity
     else:
         verbosity = 0
-    
+
     daemonmode = options.daemonmode
-    
+
     if not daemonmode:
         # some data validation, for good measure
         try:
@@ -1666,8 +1666,7 @@ def main():
         # of twenty minutes. When checking a court, see if its HTML has changed.
         # If so, run the scrapers. If not, check the next one.
         from alertSystem.models import PACER_CODES
-        #wait = (20*60)/len(PACER_CODES)########################
-        wait = 0
+        wait = (30*60)/len(PACER_CODES)
         courtID = 1
         while courtID <= len(PACER_CODES):
             scrapeCourt(courtID, result, verbosity, daemonmode)
