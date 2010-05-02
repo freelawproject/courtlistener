@@ -130,6 +130,23 @@ def trunc(s, length):
             # no spaces found, just use max position
             end = length
         return s[0:end]
+    
+
+def cleanString(s):
+    # replace evil characters with better ones, get rid of white space on the 
+    # ends, and get rid of semicolons on the ends.
+    s = s.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
+        .replace('&ldquo;',"\"").replace('&nbsp;', ' ').replace('%20', ' ')\
+        .strip().strip(';')
+
+    # get rid of '\t\n\x0b\x0c\r ', and replace them with a single space.
+    s = " ".join(s.split())
+    
+    # get rid of bad character encodings
+    s = smart_str(s)
+    
+    # return something vaguely sane
+    return s
 
 
 def hasDuplicate(caseNum, caseName):
@@ -137,16 +154,10 @@ def hasDuplicate(caseNum, caseName):
     DB. If it doesn't, then it puts it in. If it does, it returns it.
     """
 
-    # data cleanup: Removes white space and a bunch of stray characters
-    caseName = smart_str(caseName.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
-        .replace('&ldquo;',"\"").replace('&nbsp;', ' ').replace('%20', ' ')\
-        .strip().strip(';'))
-    caseNum = caseNum.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
-        .replace('&ldquo;',"\"").replace('&nbsp;', ' ').replace('%20', ' ')\
-        .strip().strip(';')
-    caseName = " ".join(caseName.split())
-    caseNum = " ".join(caseNum.split())
-
+    # data cleanup
+    caseName = cleanString(caseName)
+    caseNum  = cleanString(caseNum)
+    
     caseNameShort = trunc(caseName, 100)
 
     # check for duplicates, make the object in their absence

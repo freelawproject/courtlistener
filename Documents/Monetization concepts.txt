@@ -53,3 +53,12 @@ hand-crafted alerts for various areas of the law.
     - Requires at least annual outreach/fundraising efforts.
     - Would be easier to get such support as a 501(c)(3) non-profit, but then
       we have to go through the overhead of creating such an entity.
+      
+7. Extra security for premium users. Https could be rolled out on the login page 
+and change password page for all users, but for those users that are premium, 
+one of the benefits could be increased security of their traffic and activities.
+    + Certain people would definitely be willing to pay for this.
+    + Nice feature
+    - Would be nicer to give it to everybody.
+    - Might make promises about security that we'd be bound to
+    - Adds CPU and Certificate costs...
