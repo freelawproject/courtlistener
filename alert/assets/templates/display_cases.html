@@ -38,7 +38,12 @@
                     <h3 class="alt">Unknown date</h3>
                 {% endif %}
                 <p>
-                    <strong>Status:</strong> {{doc.get_documentType_display}}<br>
+                    <strong>Status: </strong>
+                        {% if doc.documentType %}
+                            {{doc.get_documentType_display}}<br>
+                        {% else %}
+                            Unknown<br>
+                        {% endif %}
                     {% if doc.downloadURL or doc.local_path %}
                         <strong>Download PDF: </strong>
                         {% if doc.download_URL %}

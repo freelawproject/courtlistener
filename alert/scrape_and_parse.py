@@ -235,12 +235,16 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
             caseDateRegex = re.compile("(\d{2}/\d{2}/\d{4})",
                 re.VERBOSE | re.DOTALL)
             caseNumberRegex = re.compile("(\d{2}-.*?\W)(.*)$")
-
-            i = 0
+            
+            # incredibly, this RSS feed is in cron order, so new stuff is at the 
+            # end. Mind blowing.
+            i = len(caseLinks)-1
+            if verbosity >= 2: print str(i)
             dupCount = 0
-            while i < len(caseLinks):
+            while i > 0:
                 # First: docType, since we don't support them all...
                 docType = docTypes[i].text.strip()
+                if verbosity >= 2: print docType
                 if "unpublished" in docType.lower():
                     documentType = "Unpublished"
                 elif "published" in docType.lower():
@@ -249,7 +253,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     documentType = "Errata"
                 else:
                     # something weird we don't know about, punt
-                    i += 1
+                    i -= 1
                     continue
 
                 # next, we begin with the caseLink field
@@ -261,7 +265,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 if error:
                     # things broke, punt this iteration
-                    i += 1
+                    i -= 1
                     continue
 
                 if not created:
@@ -269,10 +273,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     if verbosity >= 1:
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    if dupCount == 3:
-                        # third dup in a a row. BREAK!
+                    if dupCount == 8:
+                        # eighth dup in a a row. BREAK!
+                        # this is 8 here b/c this court has tech problems.
                         break
-                    i += 1
+                    i -= 1
                     continue
                 else:
                     dupCount = 0
@@ -303,7 +308,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
                 doc.save()
 
-                i += 1
+                i -= 1
 
         return result
 
@@ -575,6 +580,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 caseNumber, documentType = fileName.split('.')[0:2]
                 # the caseNumber needs a hyphen inserted after the second digit
                 caseNumber = caseNumber[0:2] + "-" + caseNumber[2:]
+                
+                if documentType == 'U':
+                    doc.documentType = 'Unpublished'
+                elif documentType == 'P':
+                    doc.documentType = 'Published'
                 doc.documentType = documentType
 
                 # next, we do the caseDate and caseNameShort, so we can quit before
@@ -582,8 +592,8 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 junk = aTags[i].contents[0].replace('&nbsp;', ' ').strip()
                 try:
                     # this error seems to happen upon dups...not sure why yet
-                    caseDate = regexII.search(junk).group(0).strip()
-                    caseNameShort = regexIII.search(junk).group(1).strip()
+                    caseDate = cleanString(regexII.search(junk).group(0))
+                    caseNameShort = regexIII.search(junk).group(1)
                 except:
                     i += 1
                     continue
@@ -801,20 +811,20 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     dupCount = 0
 
                 # using caseLink, we can get the caseNumber and documentType
-                caseNumber = aTags[i].next.next.next.next.next.contents[0].strip()\
-                    .replace('&nbsp;','')
+                caseNumber = aTags[i].next.next.next.next.next.contents[0]
 
                 # using the filename, we can determine the documentType...
                 fileName = aTags[i].contents[0]
                 if 'n' in fileName:
                     # it's unpublished
                     doc.documentType = "Unpublished"
-                elif "Published" in fileName:
+                elif 'p' in fileName:
                     doc.documentType = "Published"
 
                 # next, we can do the caseDate
                 caseDate = aTags[i].next.next.next.next.next.next.next.next\
-                    .contents[0].replace('&nbsp;', ' ').strip()
+                    .contents[0]
+                caseDate = cleanString(caseDate)
 
                 # some caseDate cleanup
                 splitDate = caseDate.split('/')
@@ -896,10 +906,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                     # using caseLink, we can get the caseNumber and documentType
                     caseNumber = aTags[i].previous.previous.previous.previous.previous\
-                        .previous.previous.previous.previous.previous.strip()
+                        .previous.previous.previous.previous.previous
 
                     # next up: caseDate
-                    caseDate = aTags[i].previous.previous.previous.contents[0].strip()
+                    caseDate = aTags[i].previous.previous.previous.contents[0]
+                    caseDate = cleanString(caseDate)
                     splitDate = caseDate.split('/')
                     caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                         int(splitDate[1]))
@@ -981,12 +992,15 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     caseNumRegex.search(junk).group(2)
 
                 documentType = caseNumRegex.search(junk).group(3).upper()
-                doc.documentType = documentType
+                if documentType == 'U':
+                    doc.documentType = 'Unpublished'
+                elif documentType == 'P':
+                    doc.documentType = 'Published'
 
                 # caseDate is next on the block
                 junk = str(aTags[i].next.next.next)
                 caseDate = caseDateRegex.search(junk).group(1)\
-                    .replace('&nbsp;', ' ').strip()
+                caseDate = cleanString(caseDate)
                 caseNameShort = caseDateRegex.search(junk).group(2)
 
                 # some caseDate cleanup
@@ -1288,7 +1302,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     doc.documentType = "Published"
                 if verbosity >= 2: print "documentType: " + str(doc.documentType)
 
-                cleanDate = caseDates[i].text.strip()
+                cleanDate = cleanString(caseDates[i].text)
                 doc.dateFiled = datetime.datetime(*time.strptime(cleanDate, "%m-%d-%Y")[0:5])
                 if verbosity >= 2: print "dateFiled: " + str(doc.dateFiled)
 
