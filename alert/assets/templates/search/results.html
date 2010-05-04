@@ -158,7 +158,12 @@ Page / {{ results.number }} of {{results.paginator.num_pages}}
                 {% else %}
                     Unknown date<br>
                 {% endif %}
-                <strong>Status:</strong> {{result.get_documentType_display}}<br>
+                <strong>Status: </strong>
+                    {% if result.documentType %}
+                        {{result.get_documentType_display}}<br>
+                    {% else %}
+                        Unknown<br>
+                    {% endif %}
                 {% if result.downloadURL or result.local_path %}
                     <strong>Download PDF: </strong>
                     {% if result.download_URL %}
