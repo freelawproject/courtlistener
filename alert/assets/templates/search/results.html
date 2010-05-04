@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{# this could mirror the titles of yahoo, google and bing more closely, if we want. #}
+{% block title %} CourtListener.com / Results / {{ query }} / 
+{% if results.paginator.num_pages %}
+Page / {{ results.number }} of {{results.paginator.num_pages}}
+{% endif %}
+{% endblock %}
+
+{% block headers %}
+    <link rel="stylesheet" href="/media/css/jquery.tooltip.css" type="text/css" media="screen, projection">
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+    <script type="text/javascript" src="/media/js/collapsible.js"></script>
+    <script type="text/javascript" src="/media/js/jquery.tooltip.min.js"></script>
+    <script type="text/javascript">
+	    $(document).ready(function() {
+		    $('.auto-focus:first').focus();
+		    $("fieldset.collapsible").collapse();
+		    $("fieldset.collapsed").collapse( { closed: true } );
+		    $('#q').tooltip({
+	            track: false,
+	            delay: 0,
+	            showURL: false,
+	            showBody: " - ",
+	            fade: 250,
+	            positionLeft: true,
+            });
+
+	    });
+     </script>
+     <link rel="search" type="application/opensearchdescription+xml" title="Court Listener" href="/media/xml/opensearch.xml" />
+     <link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?q={{query}}" />
+     <link rel="canonical" href="http://courtlistener.com/search/results/{%if query%}?q={{query}}{%endif%}" />
+{% endblock %}
+
+{% block content %}
+    <div class="span-18 colborder">
+        <h2 class="bottom">
+            Search {% if query %}results{% else %}our corpus{% endif %}{% if results.object_list %}, page {{ results.number }} of {{ results.paginator.num_pages }}{% endif %}
+        </h2>
+        {# the number of hits #}
+        <p>
+            {%if results.object_list and numResults == 1000%}
+                More than {{numResults}} result{{numResults|pluralize}}
+            {%endif%}
+            {% if results.object_list and numResults != 1000%}
+                {{numResults}} result{{numResults|pluralize}}
+            {% endif %}
+        </p>
+
+        {% if form.errors %}
+            {# there is only one possible error #}
+            <div class="span-8">
+                <div class="error">
+                    <p class="bottom">Please be sure to make a query</p>
+                </div>
+            </div>
+            <div class="span-10 last">&nbsp;</div>
+        {% endif %}
+        
+        {% if messages %}
+            <div class="span-24 last">
+                <div class="span-11">
+                {% for message in messages %}
+                        <p class="bottom {{message.tags}}">{{message|safe}}</p>
+                {% endfor %}
+                </div>
+                <div class="span-13 last">&nbsp;</div>
+            </div>
+        {% endif %}
+        
+        <div class="span-18 last">
+            <form action="" method="get">
+                <input class="wide-title {% if not results.object_list or not query%}auto-focus{% endif %}" name="q" id="search" value="{{query}}">&nbsp;&nbsp;
+                <button type="submit" class="button title" name="search">Search again</button>
+            </form>
+            <div class="span-10 last">
+                <fieldset class="collapsed">
+                    <legend class="pointer">Advanced</legend>
+                    <table>
+                        <tr>
+                            <td>-</td>
+                            <td>Excludes words</td>
+                        </tr>
+                        <tr>
+                            <td>|</td>
+                            <td>Searches either word</td>
+                        </tr>
+                        <tr>
+                            <td>( )</td>
+                            <td>Can be used to group queries</td>
+                        </tr>
+                        <tr>
+                            <td>" "</td>
+                            <td>Creates a phrase to search</td>
+                        </tr>
+                        <tr>
+                            <td>*</td>
+                            <td>Creates a wildcard search</td>
+                        </tr>
+                        <tr>
+                            <td>~10</td>
+                            <td>Limits distance to 10 words</td>
+                        </tr>
+                        <tr>
+                            <td>/10</td>
+                            <td>Creates a quorum</td>
+                        <tr>
+                            <td>&lt;&lt;</td>
+                            <td>Defines an order</td>
+                        </tr>
+                        <tr>
+                            <td>=</td>
+                            <td>Defines an exact form of a word</td>
+                        </tr>
+                        <tr>
+                            <td>@court</td>
+                            <td>Filters to a certain court</td>
+                        </tr>
+                        <tr>
+                            <td>@caseName</td>
+                            <td>Searches only the case name field</td>
+                        </tr>
+                        <tr>
+                            <td>@caseNumber</td>
+                            <td>Searches only the case number field</td>
+                        </tr>
+                        <tr>
+                            <td>@docStatus</td>
+                            <td>Searches only the document status field</td>
+                        </tr>
+                        <tr>
+                            <td>@docText</td>
+                            <td>Searches only the body of the case</td>
+                        </tr>
+                    </table>
+                    <a href="/search/advanced-techniques/" class="bottom">More details</a>
+                </fieldset>
+                <p></p>
+            </div>
+        </div>
+
+
+        {% if not results.object_list and query %}
+            <h3 class="alt">Your search yielded no results.</h3>
+            <ul>
+                <li>Check if your spelling is correct</li>
+                <li>Loosen your boolean construction</li>
+                <li>Remove quotes where possible</li>
+            </ul>
+        {% endif %}
+
+        {% for result in results.object_list %}
+            <h3 class="alt bottom"><a href="{{result.get_absolute_url}}">{{ result.citation.caseNameFull }}, {{result.citation.caseNumber}} ({{result.court.courtShortName}})</a></h3>
+            <p>
+                {% if result.dateFiled %}
+                    {{result.dateFiled|date:"l, F jS, Y"}}<br>
+                {% else %}
+                    Unknown date<br>
+                {% endif %}
+                <strong>Status:</strong> {{result.get_documentType_display}}<br>
+                {% if result.downloadURL or result.local_path %}
+                    <strong>Download PDF: </strong>
+                    {% if result.download_URL %}
+                        <a href="{{result.download_URL}}">From the court</a>
+                    {% endif %}
+                    {% if result.download_URL and result.local_path %}
+                        &nbsp;&nbsp;|&nbsp;&nbsp;
+                    {% endif %}
+                    {% if result.local_path %}
+                        <a href="/{{result.local_path}}">Our backup</a>
+                    {% endif %}<br>
+                {% else %}
+                    No downloadable versions.<br>
+                {%endif %}
+            </p>
+            <br>
+        {% endfor %}
+
+        <h3>
+            {% if results.object_list %}
+                {% if results.has_previous %}
+                        <a href="{{request.path}}?page=1&q={{query}}">« first</a>&nbsp;&nbsp;
+                        <a href="{{request.path}}?page={{ results.previous_page_number }}&q={{query}}">‹ previous</a>&nbsp;&nbsp;
+                {% endif %}
+                Page {{ results.number }} of {{ results.paginator.num_pages }}
+                {% if results.has_next %}
+                        &nbsp;&nbsp;<a href="{{request.path}}?page={{ results.next_page_number }}&q={{query}}">next ›</a>
+                        &nbsp;&nbsp;<a href="{{request.path}}?page={{ results.paginator.num_pages }}&q={{query}}">last »</a>
+                {% endif %}
+            {% endif %}
+        </h3>
+    </div>
+{% endblock %}
+
+
+{% block sidebar %}
+    <div class="span-5 last">
+        {% if user.is_authenticated and query %}
+            <h3>Save this as an alert</h3>
+            {% if alertForm.errors %}
+                <div class="span-4 error">
+                    <p class="bottom">Please fix the errors below.</p>
+                </div>
+            {% endif %}
+
+            <form action="" method="post">{% csrf_token %}
+                <p>
+                    <label for="id_alertText">Alert query</label>
+                    {% if alertForm.alertText.errors %}
+                        <br><span class="errortext">
+                            {% for error in alertForm.alertText.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                    {{ alertForm.alertText }}
+                </p>
+
+                <p>
+                    <label for="id_alertName">Give the alert a name</label>
+                    {% if alertForm.alertName.errors %}
+                        <br><span class="errortext">
+                            {% for error in alertForm.alertName.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </span>
+                    {% endif %}
+                    {{ alertForm.alertName }}
+                </p>
+
+                <p>
+                    <label for="id_alertFrequency">How often should we notify you</label>
+                    {% if alertForm.alertFrequency.errors %}
+                        <br><span class="errortext">
+                            {% for error in alertForm.alertFrequency.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                    {{ alertForm.alertFrequency }}
+                </p>
+                <p>
+                    {{ alertForm.alertPrivacy }}
+                    <label for="id_alertPrivacy">This alert is private</label>
+                    <label style="color:#000099; font-weight:normal;" title=" - In the future, we may allow users to display their public alerts" href="#" id="q" class="help">[?]</label>
+                    {% if alertForm.alertPrivacy.errors %}
+                        <span class="errortext">
+                            {% for error in alertForm.alertPrivacy.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+
+                </p>
+                <p>
+                    {{ alertForm.sendNegativeAlert }}
+                    <label for="id_alertName">Send me alerts even when there are no hits</label>
+                    {% if alertForm.sendNegativeAlert.errors %}
+                        <span class="errortext">
+                            {% for error in alertForm.sendNegativeAlert.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                </p>
+                <button type="submit" class="button title" name="alertSave">Save alert</button>
+            </form>
+        {% endif %}
+    </div>
+    {% if not user.is_authenticated and query%}
+        <h3>Save this as an alert</h3>
+        <p>To save this alert, you need to <a href="{%url sign-in%}?next={{request.path}}?q={{query}}&page={{results.number}}">sign in</a> or
+            <a href="{%url register%}?next={{request.path}}?q={{query}}&page={{results.number}}">register</a> as a new user.</p>
+    {% endif %}
+{% endblock %}
+
