@@ -999,7 +999,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 # caseDate is next on the block
                 junk = str(aTags[i].next.next.next)
-                caseDate = caseDateRegex.search(junk).group(1)\
+                caseDate = caseDateRegex.search(junk).group(1)
                 caseDate = cleanString(caseDate)
                 caseNameShort = caseDateRegex.search(junk).group(2)
 
