@@ -15,7 +15,7 @@ We have news regarding your alerts at CourtListener.com.
 This document is: {{doc.get_documentType_display}}
  - View on our site: http://courtlistener.com/{{doc.court.courtUUID}}/{{doc.citation.caseNumber}}/
  - Download pdf from the court: {{doc.download_URL}}
- - Download pdf from our server: http://courtlistener.com/{{doc.local_path}}
+ - Download pdf from our backup: http://courtlistener.com/{{doc.local_path}}
 
 {% endif %}{% endfor %}{% endfor %}
 
