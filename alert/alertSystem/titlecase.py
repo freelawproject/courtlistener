@@ -31,17 +31,18 @@ import unittest
 import sys
 import re
 
-
+BIG = 'USA|FCC|FTC|DOJ|USC|WTO'
 SMALL = 'a|an|and|as|at|but|by|en|for|if|in|of|on|or|the|to|v\.?|via|vs\.?'
 PUNCT = "[!\"#$%&'‘()*+,-./:;?@[\\\\\\]_`{|}~]"
 
-SMALL_WORDS = re.compile(r'^(%s)$' % SMALL, re.I)
-INLINE_PERIOD = re.compile(r'[a-zA-Z][.][a-zA-Z]')
-UC_ELSEWHERE = re.compile(r'%s*?[a-zA-Z]+[A-Z]+?' % PUNCT)
-CAPFIRST = re.compile(r"^%s*?([A-Za-z])" % PUNCT)
-SMALL_FIRST = re.compile(r'^(%s*)(%s)\b' % (PUNCT, SMALL), re.I)
-SMALL_LAST = re.compile(r'\b(%s)%s?$' % (SMALL, PUNCT), re.I)
-SUBPHRASE = re.compile(r'([:.;?!][ ])(%s)' % SMALL)
+SMALL_WORDS     = re.compile(r'^(%s)$' % SMALL, re.I)
+BIG_WORDS       = re.compile(r'^(%s)$' % BIG, re.I)
+INLINE_PERIOD   = re.compile(r'[a-zA-Z][.][a-zA-Z]')
+UC_ELSEWHERE    = re.compile(r'%s*?[a-zA-Z]+[A-Z]+?' % PUNCT)
+CAPFIRST        = re.compile(r"^%s*?([A-Za-z])" % PUNCT)
+SMALL_FIRST     = re.compile(r'^(%s*)(%s)\b' % (PUNCT, SMALL), re.I)
+SMALL_LAST      = re.compile(r'\b(%s)%s?$' % (SMALL, PUNCT), re.I)
+SUBPHRASE       = re.compile(r'([:.;?!][ ])(%s)' % SMALL)
 
 def titlecase(text):
 
@@ -64,6 +65,9 @@ def titlecase(text):
             continue
         if SMALL_WORDS.match(word):
             line.append(word.lower())
+            continue
+        if BIG_WORDS.match(word):
+            line.append(word.upper())
             continue
         line.append(CAPFIRST.sub(lambda m: m.group(0).upper(), word))
 
@@ -184,6 +188,14 @@ class TitlecaseTests(unittest.TestCase):
         )
         result = 'Sub-Phrase With a Small Word in Quotes: "A Trick, Perhaps?"'
         self.assertEqual(text, result, "%s should be: %s" % (text, result, ))
+        
+    def test_big_word(self):
+        """Testing: Word that gets forced to uppercase"""
+        text = titlecase(
+            "ftc usa Usa USA, USC"
+        )
+        result = "FTC USA USA USA, USC"
+        self.assertEqual(text, result, "%s should be: %s" % (text, result))
 
     def test_nothing_to_be_afraid_of(self):
         """Testing: \"Nothing to Be Afraid of?\""""
