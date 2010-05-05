@@ -18,7 +18,7 @@
 {% block content %}
     <div class="span-18 colborder">
         <h2>Create alerts. Search for opinions. Browse our corpus.</h2>
-        <h3 class="alt">We follow the courts so you don't have to.</h3><br><br>
+        <br><br>
         {% if form.errors %}
             {# there is only one possible error #}
             <div class="span-8">
@@ -29,7 +29,7 @@
             <div class="span-10 last">&nbsp;</div>
         {% endif %}
         <div class="span-17 last">
-            <h4 class="bottom">Search our corpus of Circuit and Supreme Court opinions:</h4>
+            <h4 class="bottom">Create an alert by entering a search query:</h4>
             <form action="" method="get">
                 <input class="auto-focus wide-title" name="q" id="search">&nbsp;&nbsp;
                 <button type="submit" class="button title" name="search">Search</button>
