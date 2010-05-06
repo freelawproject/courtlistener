@@ -31,7 +31,7 @@ import unittest
 import sys
 import re
 
-BIG = 'USA|FCC|FTC|DOJ|USC|WTO'
+BIG = 'USA|US|FCC|FTC|DOJ|USC|WTO'
 SMALL = 'a|an|and|as|at|but|by|en|for|if|in|of|on|or|the|to|v\.?|via|vs\.?'
 PUNCT = "[!\"#$%&'‘()*+,-./:;?@[\\\\\\]_`{|}~]"
 
