@@ -13,6 +13,10 @@
 % Make pdf bookmarks for the mo'. Make them NOT have a crazy red border. [mlissner]
 \usepackage[bookmarks=true, pdfborder = 0]{hyperref}
 
+% Make images work
+\usepackage[pdftex]{graphicx}
+
+
 % Do citations as footnotes.
 \usepackage[style=footnote-dw]{biblatex}
 \bibliography{bibliography}
@@ -22,8 +26,8 @@
 % this title is meh, but sort of works. Might be stronger words than we intend. Might not be.
 \title{CourtListener.com: A platform for researching and staying abreast of the latest in the law}
 
-% in alphabetical order, by last name, homies
-\author{Michael Lissner, advised by Brian Carver}
+% in alphabetical order, by last name
+\author{Michael Lissner, advised by, and with much debt to Brian Carver}
 \date{May 7, 2010}
 \maketitle
 \begin{quote}
@@ -42,6 +46,10 @@
 % if we want each section to start on a new page, use \include.  figured we didn't (brho)
 % Good call. It might look better if we do certain ones. TBD later. [mlissner]
 \input{intro}
+\input{solutiondesign}
+\input{techdecisions}
+\input{future}
+\input{appendixI}
 
 \clearpage
 %\printbibliography UNCOMMENT THIS TO TURN THE BIBLIOGRAPHY BACK ON
