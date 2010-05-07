@@ -7,11 +7,17 @@ II. Designing a Solution
 A. Interviews with Librarians
 B. Interviews with public interest lawyers
 
+
+
 III. Technical Decisions
 A. Why Python/Django/Sphinx/MySQL/apache/beautiful soup/etc ?
 B. Decisions regarding the user interface(s)
 C. Anything interesting happen while designing scraper/backend/user
 accounts/etc. (optional)
+
+III. Features and coverage
+A. Features
+B. Coverage.
 
 IV. Future Possibilities
 A. Expanding coverage (corpus)
@@ -21,9 +27,5 @@ D. Generalizability: What problems have been encountered and solved in
 this context that might arise and be similarly treated in some other
 information service on a totally different subject?
 
-Latex notes:
- - footnotes not working
- 
-Other notes:
- - thank brian, and others for their patience and hard work.
- 
+
+
