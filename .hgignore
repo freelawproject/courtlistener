@@ -1,0 +1,38 @@
+# .hgignore file
+
+# Seperated into two sections, glob, and regexp
+# Globs are shell-style regular expressions, as distinct from perl-style
+
+
+# Beginning with the globs
+syntax: glob
+
+# no compiled files!
+*.class
+*.pyc
+*~
+
+# no private files!
+*[P|p][R|r][I|i][V|v][A|a][T|t][E|e]*
+
+# ignore the django directory
+django
+
+# the desktop config
+alert/media/pdf
+
+# the server and laptop config
+alert/assets/media/pdf
+
+# the resource.org data
+Resource.org/
+
+# the django-sphinx code
+django-sphinx
+
+# the piwik install
+Piwik
+
+# Sphinx
+Sphinx/data
+Sphinx/log
