@@ -20,13 +20,13 @@ from alert.alertSystem.models import *
 
 class CitationAdmin(admin.ModelAdmin):
     # ordering is brutal on MySQL. Don't put it here. Sorry.
-    list_display = ('caseNameShort',)
+    list_display = ('caseNumber','caseNameShort')
     search_fields = ['caseNameShort', 'caseNameFull', 'caseNumber']
     
 class DocumentAdmin(admin.ModelAdmin):
     # ordering is brutal on MySQL. Don't put it here. Sorry.
-    list_display = ('citation',)
-    list_filter = ('court',)
+    #list_display = ('citation',)
+    #list_filter = ('court',)
     search_fields = ['@documentPlainText']
 
 

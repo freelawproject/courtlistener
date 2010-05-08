@@ -45,7 +45,7 @@ These are generally much more hacked than those scrapers in scrape_and_parse.py,
 but they should work with some editing or updating."""
 
 
-back_scrape_court(courtID, result, verbose):
+def back_scrape_court(courtID, result, verbosity):
     if (courtID == 5):
         """Court is accessible via a HTTP Post, but requires some random fields
         in order to work. The method here, as of 2010/04/27, is to create an
@@ -62,7 +62,7 @@ back_scrape_court(courtID, result, verbose):
             # This is the start date + 30 days for each value of i.
             # it's expressed in Unixtime, and can be arbitrarily set by running
             # date --date="2010-04-19" +%s in the terminal.
-	        newDate = 1202112000 + (2592000 * i)
+            newDate = 1202112000 + (2592000 * i)
             dates.append(datetime.datetime.fromtimestamp(newDate))
             if newDate > unixTimeToday:
                 break
@@ -72,7 +72,7 @@ back_scrape_court(courtID, result, verbose):
         url = "http://www.ca5.uscourts.gov/Opinions.aspx"
         ct = Court.objects.get(courtUUID='ca5')
 
-        if verbose >= 2: print "dates: " + str(dates)
+        if verbosity >= 2: print "dates: " + str(dates)
         
         # next, iterate over these until there are no more!
         j = 0
@@ -80,7 +80,7 @@ back_scrape_court(courtID, result, verbose):
             startDate = time.strftime('%m/%d/%Y', dates[j].timetuple())
             endDate = time.strftime('%m/%d/%Y', dates[j+1].timetuple())
             
-            if verbose >= 2:
+            if verbosity >= 2:
                 print "startDate: " + startDate
                 print "endDate: " + endDate
             
@@ -104,7 +104,7 @@ back_scrape_court(courtID, result, verbose):
             html = response.read()
             
             soup = BeautifulSoup(html)
-            #if verbose >= 2: print soup
+            #if verbosity >= 2: print soup
             
             #all links ending in pdf, case insensitive
             aTagRegex = re.compile("pdf$", re.IGNORECASE)
@@ -121,7 +121,7 @@ back_scrape_court(courtID, result, verbose):
                 # this page has PDFs that aren't cases, we must filter them out
                 if 'pinion' not in str(aTags[i]):
                     # it's not an opinion, increment and punt
-                    if verbose >= 2: print "Punting"
+                    if verbosity >= 2: print "Punting"
                     i += 1
                     continue
 
@@ -138,7 +138,7 @@ back_scrape_court(courtID, result, verbose):
                 else:
                     documentType = "Unpublished"
                     numQ += 1
-                if verbose >= 2: print documentType
+                if verbosity >= 2: print documentType
                 doc.documentType = documentType
                 
 
@@ -151,7 +151,7 @@ back_scrape_court(courtID, result, verbose):
 
                 if not created:
                     # it's an oldie, punt!
-                    if verbose >= 1: 
+                    if verbosity >= 1: 
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount >= 3 and numP >= 3 and numQ >= 3:
@@ -225,7 +225,7 @@ back_scrape_court(courtID, result, verbose):
                         years.append(str(2008+i) + "-" + month)
                         j += 1
                     i += 1
-                if verbose >= 2: print "years: " + str(years)
+                if verbosity >= 2: print "years: " + str(years)
             elif 'opinions' in url:
                 i = 0
                 years = []
@@ -239,7 +239,7 @@ back_scrape_court(courtID, result, verbose):
                         years.append(str(2010+i) + "-" + month)
                         j += 1
                     i += 1
-                if verbose >= 2: print "years: " + str(years)
+                if verbosity >= 2: print "years: " + str(years)
 
             for year in years:
                 postValues = {
@@ -287,10 +287,10 @@ back_scrape_court(courtID, result, verbose):
                     
                     if not created:
                         # it's an oldie, punt!
-                        if verbose >= 1: 
+                        if verbosity >= 1: 
                             result += "Duplicate found at " + str(i) + "\n"
-			            if verbose >= 2:
-			                print "Duplicate found at " + str(i)
+                        if verbosity >= 2:
+                            print "Duplicate found at " + str(i)
                         dupCount += 1
                         #if dupCount == 3:
                             # third dup in a a row. BREAK!
@@ -304,17 +304,17 @@ back_scrape_court(courtID, result, verbose):
                         doc.documentType = "Unpublished"
                     elif 'opinion' in url:
                         doc.documentType = "Published"
-                    if verbose >= 2: print "documentType: " + str(doc.documentType)
+                    if verbosity >= 2: print "documentType: " + str(doc.documentType)
                     
                     cleanDate = caseDates[i].text.strip()
                     doc.dateFiled = datetime.datetime(*time.strptime(cleanDate, "%m-%d-%Y")[0:5])
-                    if verbose >= 2: print "dateFiled: " + str(doc.dateFiled)
+                    if verbosity >= 2: print "dateFiled: " + str(doc.dateFiled)
                     
                     caseNameShort = caseNames[i].text
                     caseNumber = caseNumbers[i].text
                     
                     cite, created = hasDuplicate(caseNumber, caseNameShort)
-                    if verbose >= 2: 
+                    if verbosity >= 2: 
                         print "caseNameShort: " + cite.caseNameShort
                         print "caseNumber: " + cite.caseNumber + "\n"
                     
@@ -329,6 +329,113 @@ back_scrape_court(courtID, result, verbose):
         """This could seems to have fabulous pages such as this one:
         http://pacer.cadc.uscourts.gov/common/opinions/201002.htm"
         """
+        return result
+    
+    if courtID == 14:
+        """SCOTUS. This code is the same as in the scraper as of today (2010-05-05).
+        There is a two year overlap between the resource.org stuff and the stuff
+        obtained this way. That two years could be obtained, but for now, I've 
+        simply closed the gap."""
+        
+         # we do SCOTUS
+        urls = ("http://www.supremecourt.gov/opinions/slipopinions.aspx?Term=05",
+                "http://www.supremecourt.gov/opinions/slipopinions.aspx?Term=06",
+                "http://www.supremecourt.gov/opinions/slipopinions.aspx?Term=07",
+                "http://www.supremecourt.gov/opinions/slipopinions.aspx?Term=08",
+                "http://www.supremecourt.gov/opinions/in-chambers.aspx?Term=05",
+                "http://www.supremecourt.gov/opinions/in-chambers.aspx?Term=06",
+                "http://www.supremecourt.gov/opinions/in-chambers.aspx?Term=07",
+                "http://www.supremecourt.gov/opinions/in-chambers.aspx?Term=08",
+                "http://www.supremecourt.gov/opinions/relatingtoorders.aspx?Term=05",
+                "http://www.supremecourt.gov/opinions/relatingtoorders.aspx?Term=06",
+                "http://www.supremecourt.gov/opinions/relatingtoorders.aspx?Term=07",
+                "http://www.supremecourt.gov/opinions/relatingtoorders.aspx?Term=08",)
+        ct = Court.objects.get(courtUUID = 'scotus')
+
+        for url in urls:
+            if verbosity >= 2: print "Now scraping: " + url
+            html = urllib2.urlopen(url).read()
+            tree = fromstring(html)
+
+            if 'slipopinion' in url:
+                caseLinks = tree.xpath('//table/tr/td[4]/a')
+                caseNumbers = tree.xpath('//table/tr/td[3]')
+                caseDates = tree.xpath('//table/tr/td[2]')
+            elif 'in-chambers' in url:
+                caseLinks = tree.xpath('//table/tr/td[3]/a')
+                caseNumbers = tree.xpath('//table/tr/td[2]')
+                caseDates = tree.xpath('//table/tr/td[1]')
+            elif 'relatingtoorders' in url:
+                caseLinks = tree.xpath('//table/tr/td[3]/a')
+                caseNumbers = tree.xpath('//table/tr/td[2]')
+                caseDates = tree.xpath('//table/tr/td[1]')
+
+            i = 0
+            dupCount = 0
+            while i < len(caseLinks):
+                if 'slipopinion' in url and "Term=05" in url and i == 76:
+                    # dups could begin here.
+                    break
+                # we begin with the caseLink field
+                caseLink = caseLinks[i].get('href')
+                caseLink = urljoin(url, caseLink)
+
+                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+
+                if error:
+                    # things broke, punt this iteration
+                    i += 1
+                    continue
+
+                if not created:
+                    # it's an oldie, punt!
+                    if verbosity >= 1:
+                        result += "Duplicate found at " + str(i) + "\n"
+                    dupCount += 1
+                    if dupCount == 3:
+                        # third dup in a a row. BREAK!
+                        break
+                    i += 1
+                    continue
+                else:
+                    dupCount = 0
+
+                caseNumber = caseNumbers[i].text
+                caseNameShort = caseLinks[i].text
+
+                if 'slipopinion' in url:
+                    doc.documentType = "Published"
+                elif 'in-chambers' in url:
+                    doc.documentType = "In-chambers"
+                elif 'relatingtoorders' in url:
+                    doc.documentType = "Relating-to"
+
+                if '/' in caseDates[i].text:
+                    splitDate = caseDates[i].text.split('/')
+                elif '-' in caseDates[i].text:
+                    splitDate = caseDates[i].text.split('-')
+                year = int("20" + splitDate[2])
+                caseDate = datetime.date(year, int(splitDate[0]),
+                    int(splitDate[1]))
+                doc.dateFiled = caseDate
+
+                # now that we have the caseNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(caseNumber, caseNameShort)
+
+                if verbosity >= 2:
+                    print "Link: " + caseLink
+                    print "Doc Status: " + doc.documentType
+                    print "Case Name: " + caseNameShort
+                    print "Case number: " + caseNumber
+                    print "Date filed: " + str(caseDate)
+                    print " "
+
+                # last, save evrything (pdf, citation and document)
+                doc.citation = cite
+                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.save()
+
+                i += 1
         return result
 
 
@@ -376,12 +483,12 @@ def main():
         courtID = 1
         from alertSystem.models import PACER_CODES
         while courtID <= len(PACER_CODES):
-            if options.scrape: result = scrapeCourt(courtID, result, verbosity)
+            if options.scrape: result = back_scrape_court(courtID, result, verbosity)
             if options.parse:  result = parseCourt(courtID, result, verbosity)
             courtID += 1
     else:
         # we're only doing one court
-        if options.scrape: result = scrapeCourt(courtID, result, verbosity)
+        if options.scrape: result = back_scrape_court(courtID, result, verbosity)
         if options.parse:  result = parseCourt(courtID, result, verbosity)
 
     print str(result)
