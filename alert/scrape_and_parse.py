@@ -29,7 +29,7 @@ from django.core.files import File
 from django.core.files.base import ContentFile
 from django.utils.encoding import smart_str
 
-import datetime, calendar, hashlib, re, StringIO, subprocess, time, urllib, urllib2
+import datetime, calendar, hashlib, re, signal, StringIO, subprocess, sys, time, urllib, urllib2
 from BeautifulSoup import BeautifulSoup
 from lxml.html import fromstring, tostring
 from lxml import etree
@@ -50,6 +50,14 @@ handler = logging.handlers.RotatingFileHandler(
               LOG_FILENAME, maxBytes=512000, backupCount=1)
 
 logger.addHandler(handler)
+
+# for use in catching the SIGINT (Ctrl+C)
+dieNow = False
+
+def signal_handler(signal, frame):
+        print 'Exiting safely...this will finish the current court, then exit...'
+        global dieNow
+        dieNow = True
 
 def makeDocFromURL(LinkToPdf, ct):
     """Receives a URL and a court as arguments, then downloads the PDF
@@ -136,8 +144,8 @@ def cleanString(s):
     # replace evil characters with better ones, get rid of white space on the 
     # ends, and get rid of semicolons on the ends.
     s = s.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
-        .replace('&ldquo;',"\"").replace('&nbsp;', ' ').replace('%20', ' ')\
-        .strip().strip(';')
+        .replace('&ldquo;',"\"").replace('&nbsp;', ' ').replace('&amp;', '&')\
+        .replace('%20', ' ').strip().strip(';')
 
     # get rid of '\t\n\x0b\x0c\r ', and replace them with a single space.
     s = " ".join(s.split())
@@ -219,7 +227,8 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     # if not, bail. If so, continue to the scraping.
                     return result
 
-            # this code gets rid of errant ampersands - they throw big errors.
+            # this code gets rid of errant ampersands - they throw big errors
+            # when parsing. We replace them later.
             if '&' in html:
                 punctuationRegex = re.compile(" & ")
                 html = re.sub(punctuationRegex, " &amp; ", html)
@@ -585,7 +594,8 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     doc.documentType = 'Unpublished'
                 elif documentType == 'P':
                     doc.documentType = 'Published'
-                doc.documentType = documentType
+                else: 
+                    doc.documentType = ""
 
                 # next, we do the caseDate and caseNameShort, so we can quit before
                 # we get too far along.
@@ -1133,7 +1143,8 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     # if not, bail. If so, continue to the scraping.
                     return result
 
-            # this code gets rid of errant ampersands - they throw big errors.
+            # this code gets rid of errant ampersands - they throw big errors
+            # when parsing. We replace them later.
             if '&' in html:
                 punctuationRegex = re.compile(" & ")
                 html = re.sub(punctuationRegex, " &amp; ", html)
@@ -1637,6 +1648,10 @@ def main():
 
     returns a list containing the result
     """
+    
+    # these two lines are used for handling SIGINT, so things can die safely.
+    global dieNow
+    signal.signal(signal.SIGINT, signal_handler)
 
     result = ""
 
@@ -1678,11 +1693,18 @@ def main():
             while courtID <= len(PACER_CODES):
                 if options.scrape: result = scrapeCourt(courtID, result, verbosity, daemonmode)
                 if options.parse:  result = parseCourt(courtID, result, verbosity)
+                # this catches SIGINT, so the code can be killed safely.
+                if dieNow == True:
+                    sys.exit(0)
                 courtID += 1
         else:
             # we're only doing one court
             if options.scrape: result = scrapeCourt(courtID, result, verbosity, daemonmode)
             if options.parse:  result = parseCourt(courtID, result, verbosity)
+            # this catches SIGINT, so the code can be killed safely.
+            if dieNow == True:
+                sys.exit(0)
+
 
         print str(result)
     elif daemonmode:
@@ -1696,6 +1718,10 @@ def main():
         while courtID <= len(PACER_CODES):
             scrapeCourt(courtID, result, verbosity, daemonmode)
             parseCourt(courtID, result, verbosity)
+            # this catches SIGINT, so the code can be killed safely.
+            if dieNow == True:
+                sys.exit(0)
+
             time.sleep(wait)
             if courtID == len(PACER_CODES):
                 # reset courtID

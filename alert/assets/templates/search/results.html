@@ -19,7 +19,7 @@ Page / {{ results.number }} of {{results.paginator.num_pages}}
 		    $("fieldset.collapsed").collapse( { closed: true } );
 		    $('#q').tooltip({
 	            track: false,
-	            delay: 0,
+	            delay: 1,
 	            showURL: false,
 	            showBody: " - ",
 	            fade: 250,
@@ -41,7 +41,7 @@ Page / {{ results.number }} of {{results.paginator.num_pages}}
         {# the number of hits #}
         <p>
             {%if results.object_list and numResults == 1000%}
-                More than {{numResults}} result{{numResults|pluralize}}
+                More than 1,000 results
             {%endif%}
             {% if results.object_list and numResults != 1000%}
                 {{numResults}} result{{numResults|pluralize}}
@@ -274,8 +274,8 @@ Page / {{ results.number }} of {{results.paginator.num_pages}}
         {% endif %}
     </div>
     {% if not user.is_authenticated and query%}
-        <h3>Save this as an alert</h3>
-        <p>To save this alert, you need to <a href="{%url sign-in%}?next={{request.path}}?q={{query}}&page={{results.number}}">sign in</a> or
+        <h3>Make an alert</h3>
+        <p>To get daily alerts for this search, you need to <a href="{%url sign-in%}?next={{request.path}}?q={{query}}&page={{results.number}}">sign in</a> or
             <a href="{%url register%}?next={{request.path}}?q={{query}}&page={{results.number}}">register</a> as a new user.</p>
     {% endif %}
 {% endblock %}
