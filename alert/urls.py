@@ -103,7 +103,7 @@ urlpatterns = patterns('',
     (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.index',
         {'sitemaps': sitemaps}),
     # this uses a custom sitemap generator that has a file-based cache.    
-    (r'^sitemap-(?P<section>.+)\.xml$', 'django.contrib.views.sitemaps.views.sitemap', {'sitemaps': sitemaps}),
+    (r'^sitemap-(?P<section>.+)\.xml$', 'django.contrib.sitemaps.views.sitemap', {'sitemaps': sitemaps}),
     #(r'^robots.txt$', robots), # removed for lack of need.
 )
 
