@@ -60,7 +60,7 @@ for courtTuple in PACER_CODES:
 # finally, we add the flatpages sitemap to the end
 all_sitemaps["Flatfiles"] = MyFlatPageSitemap
   
-    
+"""
 def sitemap(request, sitemaps, section=None):
     maps, urls = [], []
     if section is not None:
@@ -73,7 +73,7 @@ def sitemap(request, sitemaps, section=None):
     
     return Null
 
-    """
+    
     page = request.GET.get("p", 1)
     for site in maps:
         if 
