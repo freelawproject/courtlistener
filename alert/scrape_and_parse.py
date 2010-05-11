@@ -314,7 +314,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 doc.save()
 
                 i -= 1
@@ -424,7 +424,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
@@ -519,7 +519,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
@@ -619,7 +619,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
@@ -749,7 +749,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
@@ -851,7 +851,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
@@ -941,7 +941,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                     # last, save evrything (pdf, citation and document)
                     doc.citation = cite
-                    doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                    doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                     doc.save()
 
                     i += 1
@@ -1024,7 +1024,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
@@ -1122,7 +1122,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
@@ -1218,7 +1218,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
@@ -1326,7 +1326,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     print "caseNumber: " + cite.caseNumber + "\n"
 
                 doc.citation = cite
-                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
@@ -1403,7 +1403,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
@@ -1497,7 +1497,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
@@ -1591,7 +1591,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
