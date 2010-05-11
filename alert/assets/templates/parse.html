@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}CourtListener.com / Parse{% endblock %}
+
+{% block content %}
+    <div class="span-18 colborder">
+        <h2>Parsing courts...</h2>
+        <ul>
+            {{ result|unordered_list }}
+        </ul>
+    </div>
+{% endblock %}
+
