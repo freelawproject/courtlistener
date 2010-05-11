@@ -18,31 +18,24 @@
 from alert import settings
 from alert.alertSystem.models import PACER_CODES
 from alert.alertSystem.views import *
-#from alert.alertSystem.sitemap import DocumentSitemap
 from alert.contact.views import *
 from alert.feeds.views import *
 from alert.pinger.views import *
 from alert.search.views import *
 from alert.userHandling.views import *
-
-
-# needed to make urls work
+# this imports a variable that can be handed to the sitemap index generator function.
+from alert.alertSystem.sitemap import all_sitemaps as sitemaps
+from alert.alertSystem.sitemap import sitemap
 from django.conf.urls.defaults import *
 
 # for the flatfiles in the sitemap
-#from django.contrib.sitemaps import FlatPageSitemap
 from django.contrib.auth.views import login as signIn, logout as signOut,\
     password_reset, password_reset_done, password_reset_confirm,\
     password_reset_complete
 
-# Uncomment the next two lines to enable the admin:
+# enables the admin:
 from django.contrib import admin
 admin.autodiscover()
-
-
-from alert.alertSystem.sitemap import all_sitemaps as sitemaps
-from alert.alertSystem.sitemap import MyFlatPageSitemap
-sitemaps["Flatfiles"] = MyFlatPageSitemap
 
 # creates a list of the first element of the choices variable for the courts field
 pacer_codes = []
@@ -106,11 +99,11 @@ urlpatterns = patterns('',
     (r'^y_key_6de7ece99e1672f2.html$', validateForYahoo),
     (r'^LiveSearchSiteAuth.xml$', validateForBing),
     (r'^googleef3d845637ccb353.html$', validateForGoogle),
-    # Sitemap generator
+    # Sitemap index generator
     (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.index',
         {'sitemaps': sitemaps}),
-    (r'^sitemap-(?P<section>.+)\.xml$', 'django.contrib.sitemaps.views.sitemap', 
-        {'sitemaps': sitemaps}),
+    # this uses a custom sitemap generator that has a file-based cache.    
+    (r'^sitemap-(?P<section>.+)\.xml$', 'sitemap', {'sitemaps': sitemaps}),
     #(r'^robots.txt$', robots), # removed for lack of need.
 )
 
@@ -118,6 +111,7 @@ urlpatterns = patterns('',
 urlpatterns += patterns('django.views.generic.simple',
     ('^privacy/$', 'redirect_to', {'url': '/terms/#privacy/'}),
     ('^opinions/$', 'redirect_to', {'url': '/opinions/all/'}),
+    ('^report/$', 'redirect_to', {'url': 'http://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf'}),
 )
 
 
