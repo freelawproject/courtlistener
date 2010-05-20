@@ -26,7 +26,7 @@
 {% block content %}
     <div class="span-18 colborder">
         <h2>{{ title }}</h2>
-        <h3>Recent opinions, page {{ documents.number }} of {{ documents.paginator.num_pages }}</h3>
+        <h3>Recent documents, page {{ documents.number }} of {{ documents.paginator.num_pages }}</h3>
         {% for doc in documents.object_list %}
             <h3 class="alt bottom"><a href="{{doc.get_absolute_url}}">{{ doc.citation.caseNameFull }}, {{doc.citation.caseNumber}} ({{doc.court.courtShortName}})</a></h3>
             <p>
@@ -76,7 +76,7 @@
     <div class="span-5 last" id="sidebar">
         <h3>Browse other courts</h3>
         <p>
-            <a href="/opinions/all/">All opinions</a><br>
+            <a href="/opinions/all/">All courts</a><br>
             <a href="/opinions/scotus/">U.S. Supreme Court</a><br>
             <a href="/opinions/ca1/">First Circuit</a><br>
             <a href="/opinions/ca2/">Second Circuit</a><br>
