@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-
+{% load humanize %}
 {% block title %}CourtListener.com / Opinions / {{ title }}
 {% if documents.paginator.num_pages %}
- / Page / {{ documents.number }} of {{documents.paginator.num_pages}}
+ / Page / {{ documents.number }} of {{documents.paginator.num_pages|intcomma}}
  {% endif %}{% endblock %}
 
 {% block headers %}
@@ -26,7 +26,7 @@
 {% block content %}
     <div class="span-18 colborder">
         <h2>{{ title }}</h2>
-        <h3>Recent documents, page {{ documents.number }} of {{ documents.paginator.num_pages }}</h3>
+        <h3>Recent documents, page {{ documents.number }} of {{ documents.paginator.num_pages|intcomma }}</h3>
         {% for doc in documents.object_list %}
             <h3 class="alt bottom"><a href="{{doc.get_absolute_url}}">{{ doc.citation.caseNameFull }}, {{doc.citation.caseNumber}} ({{doc.court.courtShortName}})</a></h3>
             <p>
@@ -63,7 +63,7 @@
                     <a href="{{request.path}}?page=1">« first</a>&nbsp;&nbsp;
                     <a href="{{request.path}}?page={{ documents.previous_page_number }}">‹ previous</a>&nbsp;&nbsp;
             {% endif %}
-            Page {{ documents.number }} of {{ documents.paginator.num_pages }}
+            Page {{ documents.number }} of {{ documents.paginator.num_pages|intcomma }}
             {% if documents.has_next %}
                     &nbsp;&nbsp;<a href="{{request.path}}?page={{ documents.next_page_number }}">next ›</a>
                     &nbsp;&nbsp;<a href="{{request.path}}?page={{ documents.paginator.num_pages }}">last »</a>
