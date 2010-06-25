@@ -51,6 +51,7 @@ DOCUMENT_SOURCES = (
     ('C', 'court website'),
     ('R', 'bulk.resource.org'),
     ('M', 'manual input'),
+    ('A', 'internet archive'),
 )
 
 # A class to hold URLs and the hash of their contents. This could be added to 
