@@ -18,9 +18,9 @@
    version="1.1"
    inkscape:version="0.47pre4 r22446"
    sodipodi:docname="v1.svg"
-   inkscape:export-filename="/home/mlissner/Documents/Cal/FinalProject/Documents/Final Poster/v1.png"
-   inkscape:export-xdpi="90"
-   inkscape:export-ydpi="90">
+   inkscape:export-filename="/home/mlissner/Documents/Cal/FinalProject/Documents/Final Poster/v1-giant.png"
+   inkscape:export-xdpi="900"
+   inkscape:export-ydpi="900">
   <title
      id="title2818">CourtListener.com</title>
   <defs
@@ -1494,7 +1494,7 @@
      inkscape:pageshadow="2"
      inkscape:zoom="0.67185185"
      inkscape:cx="567.31816"
-     inkscape:cy="2283.7606"
+     inkscape:cy="259.50482"
      inkscape:document-units="in"
      inkscape:current-layer="layer1"
      showgrid="true"
@@ -2714,7 +2714,7 @@
            height="80"
            x="1464"
            y="732" /></flowRegion><flowPara
-         id="flowPara13006"></flowPara></flowRoot>    <g
+         id="flowPara13006" /></flowRoot>    <g
        id="g13882"
        transform="translate(233,74.999959)">
       <rect
@@ -2841,7 +2841,7 @@
            height="502"
            x="946"
            y="2214" /></flowRegion><flowPara
-         id="flowPara13645"></flowPara></flowRoot>    <path
+         id="flowPara13645" /></flowRoot>    <path
        d="m 1047.9059,-77.58357 c -15.4582,32.61522 15.5759,55.59221 42.0516,65.60049 -6.9301,15.49181 -16.4338,28.42687 -23.5489,43.73366 14.6676,-11.67353 27.8213,-24.87773 42.0516,-37.00541 57.207,17.14023 182.8739,9.18407 193.4373,-47.09778 3.7006,-19.73061 -8.1243,-34.43185 -20.1848,-43.73366 -51.3029,-39.5285 -206.7592,-38.5529 -233.8068,18.5027 z m 47.0978,63.91842 c -33.3722,-7.83841 -63.0438,-41.51333 -38.6875,-70.64667 39.2257,-46.92958 232.6126,-52.58132 242.2172,18.5027 8.9149,66.03782 -134.6324,75.94518 -190.0732,57.19016 -10.8998,5.93769 -20.538,22.05186 -30.2772,23.5489 6.661,-8.47761 10.9334,-19.34374 16.8207,-28.59509 z"
        id="path14-9" />
     <text
@@ -2893,7 +2893,7 @@
            height="530.44702"
            x="1806.0458"
            y="2316.8994" /></flowRegion><flowPara
-         id="flowPara13864"></flowPara></flowRoot>    <path
+         id="flowPara13864" /></flowRoot>    <path
        style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#Arrow1Lend-3)"
        d="m 1739.9693,-326.57453 0,194.24987"
        id="path12565-6-6-9"
@@ -2974,7 +2974,7 @@
            y="1940.9041"
            style="text-align:justify;text-anchor:start;fill:#000000;fill-opacity:1;stroke:#484848;stroke-opacity:0" /></flowRegion><flowPara
          style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:justify;text-anchor:start;fill:#000000;fill-opacity:1;stroke:#484848;stroke-opacity:0;font-family:AvantGarde CE;-inkscape-font-specification:AvantGarde CE"
-         id="flowPara16034">CourtListener.com, aims to ease the difficulty of staying up to date with court documents by providing a free and open source platform for the aggregation, organization, search and retrieval of legal documents. The aggregation of new court documents is completed by a custom-designed web crawler on a rolling basis, building a huge corpus, and providing the latest cases from the Federal Courts of Appeal within – on average – about fifteen minutes from the moment they are published on the court website. From there, the documents are quickly indexed, and Atom feeds and document listings are updated. Finally, at the user's option, alerts are emailed either daily, weekly, or monthly informing them about the documents that matched their alert queries.</flowPara><flowPara
+         id="flowPara16034">CourtListener.com aims to ease the difficulty of staying up to date with court documents by providing a free and open source platform for the aggregation, organization, search and retrieval of legal documents. The aggregation of new court documents is completed by a custom-designed web crawler on a rolling basis, building a huge corpus, and providing the latest cases from the Federal Courts of Appeal within – on average – about fifteen minutes from the moment they are published on the court website. From there, the documents are quickly indexed and Atom feeds and document listings are updated. Finally, at the user's option, alerts are emailed either daily, weekly, or monthly informing them about the documents that matched their alert queries.</flowPara><flowPara
          style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:justify;text-anchor:start;fill:#000000;fill-opacity:1;stroke:#484848;stroke-opacity:0;font-family:AvantGarde CE;-inkscape-font-specification:AvantGarde CE"
          id="flowPara14549" /><flowPara
          style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:justify;text-anchor:start;fill:#000000;fill-opacity:1;stroke:#484848;stroke-opacity:0;font-family:AvantGarde CE;-inkscape-font-specification:AvantGarde CE"

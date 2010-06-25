@@ -33,6 +33,9 @@ django-sphinx
 # the piwik install
 Piwik
 
+# the FederalReports
+FederalReports/
+
 # Sphinx
 Sphinx/data
 Sphinx/log
