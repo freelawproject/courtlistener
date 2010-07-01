@@ -31,7 +31,7 @@ import unittest
 import sys
 import re
 
-BIG = 'USA|FCC|FTC|DOJ|USC|WTO|EFF|CDT|RSS|LLP|USPS|LLC|CDC'
+BIG = 'USA|FCC|FTC|DOJ|USC|WTO|EFF|CDT|RSS|LLP|USPS|LLC|CDC|CNMI'
 SMALL = 'a|an|and|as|at|but|by|en|for|if|in|of|on|or|the|to|v\.?|via|vs\.?'
 PUNCT = "[!\"#$%&'‘()*+,-./:;?@[\\\\\\]_`{|}~]"
 
@@ -192,9 +192,9 @@ class TitlecaseTests(unittest.TestCase):
     def test_big_word(self):
         """Testing: Word that gets forced to uppercase"""
         text = titlecase(
-            "ftc usa Usa USA, USC Llp Usps Llc Cdc"
+            "ftc usa Usa USA, USC Llp Usps Llc Cdc Cnmi"
         )
-        result = "FTC USA USA USA, USC LLP USPS LLC CDC"
+        result = "FTC USA USA USA, USC LLP USPS LLC CDC CNMI"
         self.assertEqual(text, result, "%s should be: %s" % (text, result))
 
     def test_nothing_to_be_afraid_of(self):
