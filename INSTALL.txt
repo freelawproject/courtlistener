@@ -13,6 +13,7 @@ If you take the time to install this system, please help update these docs.
  - django (devel version)
  - apache2
  - poppler-utils
+ - mysql-client
  
 2. Configure django
 
