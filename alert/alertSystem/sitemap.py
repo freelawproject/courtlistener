@@ -25,7 +25,7 @@ from alert.alertSystem.models import PACER_CODES
 
 class LimitedGenericSitemap(GenericSitemap):
     # if this is changed, the sitemap function (below) needs updating
-    limit = 1000
+    limit = 250
 
 class MyFlatPageSitemap(FlatPageSitemap):
     # prioritizes the about page, deprioritizes the legal pages.

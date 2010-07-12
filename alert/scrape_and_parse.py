@@ -1034,7 +1034,8 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
         """This court, by virtue of having a javascript laden website, was very
         hard to parse properly. BeautifulSoup couldn't handle it at all, so lxml
         has to be used. lxml seems pretty useful, but it was a pain to learn."""
-
+        
+        # these URLs redirect now. So much for hacking them. A new approach can probably be done using POST data.
         urls = (
             "http://www.ca9.uscourts.gov/opinions/?o_mode=view&amp;o_sort_field=19&amp;o_sort_type=DESC&o_page_size=100",
             "http://www.ca9.uscourts.gov/memoranda/?o_mode=view&amp;o_sort_field=21&amp;o_sort_type=DESC&o_page_size=100",)
@@ -1042,6 +1043,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
         ct = Court.objects.get(courtUUID = 'ca9')
 
         for url in urls:
+            if verbosity >= 2: print "Link is now: " + url
             html = urllib2.urlopen(url).read()
 
             tree = fromstring(html)
@@ -1073,6 +1075,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # we begin with the caseLink field
                 caseLink = caseLinks[i].get('href')
                 caseLink = urljoin(url, caseLink)
+                if verbosity >= 2: print "CaseLink is: " + caseLink
 
                 # special case
                 if 'no memos filed' in caseLink.lower():
@@ -1083,6 +1086,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 if error:
                     # things broke, punt this iteration
+                    if verbosity >= 2: print "Error creating file. Punting..."
                     i += 1
                     continue
 
@@ -1101,21 +1105,25 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 # next, we'll do the caseNumber
                 caseNumber = caseNumbers[i].text
+                if verbosity >= 2: print "CaseNumber is: " + caseNumber
 
                 # next up: document type (static for now)
                 if 'memoranda' in url:
                     doc.documentType = "Unpublished"
                 elif 'opinions' in url:
                     doc.documentType = "Published"
+                if verbosity >= 2: print "Document type is: " + doc.documentType
 
                 # next up: caseDate
                 splitDate = caseDates[i].text.split('/')
                 caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
+                if verbosity >= 2: print "CaseDate is: " + str(caseDate)
 
                 #next up: caseNameShort
                 caseNameShort = titlecase(caseLinks[i].text.lower())
+                if verbosity >= 2: print "CaseNameShort is: " + caseNameShort + "\n\n"
 
                 # now that we have the caseNumber and caseNameShort, we can dup check
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
@@ -1167,11 +1175,13 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # we begin with the caseLink field
                 caseLink = caseLinks[i].text
                 caseLink = urljoin(url, caseLink)
-
+                if verbosity >= 2: print "Link: " + caseLink
+                
                 myFile, doc, created, error = makeDocFromURL(caseLink, ct)
 
                 if error:
                         # things broke, punt this iteration
+                        if verbosity >= 1: print "Error creating file, punting."
                         i += 1
                         continue
 
@@ -1205,13 +1215,16 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
+                if verbosity >= 2: print "Case date is: " + str(caseDate)
 
                 # next: caseNumber
                 caseNumber = caseNumberRegex.search(descriptions[i].text)\
                     .group(1)
+                if verbosity >= 2: print "Case number is: " + caseNumber
 
                 # next: caseNameShort
                 caseNameShort = caseNames[i].text
+                if verbosity >= 2: print "Case name is: " + caseNameShort
 
                 # check for dups, make the object if necessary, otherwise, get it
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
