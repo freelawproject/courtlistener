@@ -29,9 +29,13 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from alertSystem.models import *
-from scrape_and_parse import makeDocFromURL, trunc, hasDuplicate, getPDFContent, parseCourt
+from scrape_and_parse import cleanString, makeDocFromURL, trunc, hasDuplicate, getPDFContent, parseCourt
+from django.core.files.base import ContentFile
+from django.core.files import File
+from django.core.exceptions import ObjectDoesNotExist
 
-import datetime, calendar, re, time, urllib, urllib2
+
+import datetime, calendar, hashlib, httplib, re, time, urllib, urllib2
 from BeautifulSoup import BeautifulSoup
 from lxml.html import fromstring, tostring
 from lxml import etree
@@ -437,6 +441,121 @@ def back_scrape_court(courtID, result, verbosity):
 
                 i += 1
         return result
+    
+    if courtID == '14v545':
+        """This scraper uses the internet archives copy of the supreme court site
+        to pull in all the documents from volume 545 of United States Reports.
+        Amazingly, resource.org simply lacks this volume."""
+        httplib.HTTPConnection.debuglevel = 1
+        urls = ('http://web.archive.org/web/20051222044311/www.supremecourtus.gov/opinions/04slipopinion.html',)
+        ct = Court.objects.get(courtUUID = 'scotus')
+        
+        for url in urls:
+            if verbosity >= 2: print "Now scraping: " + url
+            data = urllib2.urlopen(url).read()
+            
+            # this decompresses the data, since IA is annoying about sending compressed data no matter what.
+            import StringIO
+            data = StringIO.StringIO(data)
+            import gzip
+            gzipper = gzip.GzipFile(fileobj=data)
+            html = gzipper.read()
+            tree = fromstring(html)
+            
+            # xpath goodness
+            caseLinks   = tree.xpath('/html//table[2]//tr/td[4]/a')
+            caseNumbers = tree.xpath('/html//table[2]//tr/td[3]')
+            caseDates   = tree.xpath('/html//table[2]//tr/td[2]')
+            
+
+            # for debugging
+            """print "length: " + str(len(caseLinks))  
+            print str(caseLinks)
+            print str(caseNumbers)
+            print str(caseDates)
+            i = 2
+            while i <= (28):
+                print str(caseDates[i].text) + "  |  " + str(caseNumbers[i].text)   + "  |  " + str(urljoin(url, caseLinks[i].get('href'))) + "  |  " + str(caseLinks[i].text)
+                i = i + 1
+                #print str(foo.text)
+                #print foo.get('href')
+                #print tostring(foo)
+            
+            """
+            
+            i = 2
+            while i <= 28: #cut this off at the end of v545
+                # we begin with the caseLink field
+                caseLink = caseLinks[i].get('href')
+                caseLink = urljoin(url, caseLink)
+                
+                # set some easy ones
+                caseNumber = caseNumbers[i].text
+                caseNameShort = caseLinks[i].text
+                
+                # get the PDF
+                try:
+                    request = urllib2.Request("http://web.archive.org/web/20051222044311/" + caseLink)
+                    request.add_header('User-agent', 'Mozilla/5.0(Windows; U; Windows NT 5.2; rv:1.9.2) Gecko/20100101 Firefox/3.6')
+                    h = urllib2.HTTPHandler(debuglevel=1)
+                    opener = urllib2.build_opener(h)
+                    webFile = opener.open(request).read()
+                    stringThing = StringIO.StringIO()
+                    stringThing.write(webFile)
+                    myFile = ContentFile(stringThing.getvalue())
+                    """
+                    webFile = urllib2.urlopen(caseLink)
+                    stringThing = StringIO.StringIO()
+                    stringThing.write(webFile.read())
+                    myFile = ContentFile(stringThing.getvalue())
+                    webFile.close()"""
+                    
+                except:
+                    print "ERROR DOWNLOADING FILE!: " + str(caseNameShort) + "\n\n"
+                    i += 1
+                    continue
+
+                # make the SHA1
+                data = myFile.read()
+                sha1Hash = hashlib.sha1(data).hexdigest()
+
+                # using that, we check for a dup
+                doc, created = Document.objects.get_or_create(documentSHA1 = sha1Hash,
+                    court = ct)
+
+                if created:
+                    # we only do this if it's new
+                    doc.documentSHA1 = sha1Hash
+                    doc.download_URL = caseLink
+                    doc.court = ct
+                    doc.source = "A"    
+                    doc.documentType = "Published"
+                
+                if not created:
+                    # it's an oldie, punt!
+                    if verbosity >= 1:
+                        result += "Duplicate found at " + str(i) + "\n"
+                    i += 1
+                    continue
+
+                if '/' in caseDates[i].text:
+                    splitDate = caseDates[i].text.split('/')
+                year = int("20" + splitDate[2])
+                caseDate = datetime.date(year, int(splitDate[0]),
+                    int(splitDate[1]))
+                doc.dateFiled = caseDate
+
+                # now that we have the caseNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(caseNumber, caseNameShort)
+
+                # last, save evrything (pdf, citation and document)
+                doc.citation = cite
+                doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
+                doc.save()
+
+                i += 1
+            
+        return result
 
 
 def main():
@@ -473,10 +592,10 @@ def main():
 
     # some data validation, for good measure
     try:
-        courtID = int(options.courtID)
+        courtID = options.courtID
     except:
         result = "Error: court not found\n"
-        raise django.core.exceptions.ObjectDoesNotExist
+        raise ObjectDoesNotExist
 
     if courtID == 0:
         # we use a while loop to do all courts.
