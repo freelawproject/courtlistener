@@ -123,7 +123,7 @@ EOF
     read -p "The default location for your django installation is /opt. Is this OK? (y/n): " proceed
     if [ $proceed == "n" ]
     then
-        read -p "Where shall we install django (starting at /)?: " DJANGO_INSTALL_DIR
+        read -p "Where shall we install django (starting at /, no trailing slash)?: " DJANGO_INSTALL_DIR
     else
         DJANGO_INSTALL_DIR='/opt'
     fi
@@ -133,7 +133,7 @@ EOF
     read -p "The default location for your CourtListener installation is /var/www. Is this OK? (y/n): " proceed
     if [ $proceed == 'n' ]
     then
-        read -p "Where shall we install CourtListener (starting at /)?: " CL_INSTALL_DIR
+        read -p "Where shall we install CourtListener (starting at /, no trailing slash)?: " CL_INSTALL_DIR
     else
         CL_INSTALL_DIR='/var/www'
     fi
@@ -371,8 +371,8 @@ DEVELOPMENT = True
 
 #EMAIL_BACKEND is set to default, so nothing listed here.
 
-# this setting helps with settings elsewhere...
-INSTALL_ROOT = '$CL_INSTALL_DIR'
+# this setting helps with settings elsewhere...include a trailing slash!
+INSTALL_ROOT = '$CL_INSTALL_DIR/court-listener/'
 
 EOF
 
@@ -748,7 +748,7 @@ function main {
 and running the command:
     $ python manage.py runserver
 If that works, you should be able to see the CourtListener website in your browser
-at http://localhost://8000.
+at http://localhost:8000.
 
 If you would like Sphinx to start at bootup, add this line to the root's cron file:
 @reboot /usr/local/bin/searchd -c $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf
