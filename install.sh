@@ -183,6 +183,13 @@ function checkDeps {
     echo -e "\n########################"
     echo "Checking dependencies..."
     echo "########################"
+    read -p "Do you need to check and install dependencies? (y/n): " proceed
+    if [ $proceed == "n" ]
+    then
+        echo -e '\nGreat. Moving on.'
+        return 0
+    fi
+    
     for dep in ${deps[@]}
     do
         echo -n "Checking for $dep..."
@@ -230,6 +237,13 @@ function installDjango {
     echo -e "\n####################"
     echo "Installing django..."
     echo "####################"
+    read -p "Would you like to download and configure django? (y/n): " proceed
+    if [ $proceed == "n" ]
+    then
+        echo -e '\nGreat. Moving on.'
+        return 0
+    fi
+    
     if [ ! -d $DJANGO_INSTALL_DIR ]
     then
         read -p "Directory '$DJANGO_INSTALL_DIR' doesn't exist. Create it? (y/n): " proceed
@@ -268,6 +282,13 @@ function installCourtListener {
     echo -e "\n########################"
     echo "Downloading and configuring CourtListener itself..."
     echo "########################"
+    read -p "Would you like to download and configure CourtListener? (y/n): " proceed
+    if [ $proceed == "n" ]
+    then
+        echo -e '\nGreat. Moving on.'
+        return 0
+    fi
+    
     if [ ! -d $CL_INSTALL_DIR ]
     then
         read -p "Directory '$CL_INSTALL_DIR' doesn't exist. Create it? (y/n): " proceed
@@ -360,6 +381,12 @@ function configureMySQL {
     echo -e "\n####################"
     echo "Configuring MySQL..."
     echo "####################"
+    read -p "Would you like to configure MySQL? (y/n): " proceed
+    if [ $proceed == "n" ]
+    then
+        echo -e '\nGreat. Moving on.'
+        return 0
+    fi
 
     # create and configure the db.
     # first, we make a SQL script, then we execute it, then we delete it.
@@ -397,6 +424,13 @@ function installSphinx {
     echo -e "\n####################"
     echo "Installing Sphinx..."
     echo "####################"
+    read -p "Would you like to install Sphinx? (y/n): " proceed
+    if [ $proceed == "n" ]
+    then
+        echo -e '\nGreat. Moving on.'
+        return 0
+    fi
+    
     cd $CL_INSTALL_DIR/court-listener/Sphinx
     wget http://www.sphinxsearch.com/downloads/sphinx-0.9.9.tar.gz
     tar xzvf sphinx-0.9.9.tar.gz; rm sphinx-0.9.9.tar.gz
@@ -587,6 +621,13 @@ function installDjangoSphinx {
     echo -e "\n###########################"
     echo "Installing django-sphinx..."
     echo "###########################"
+    read -p "Would you like to install django-sphinx? (y/n): " proceed
+    if [ $proceed == "n" ]
+    then
+        echo -e '\nGreat. Moving on.'
+        return 0
+    fi
+    
     # we install django-sphinx, and patch it per bug #X
     cd $DJANGO_INSTALL_DIR
     git clone git://github.com/dcramer/django-sphinx.git django-sphinx
@@ -653,8 +694,7 @@ function installDebugToolbar {
     echo -e '\n##################################'
     echo 'Installing django debug toolbar...'
     echo '##################################
-'
-    
+' 
     read -p "Is the django debug toolbar installed on this computer? (y/n): " installed
     if [ $installed == "n" ]
     then
@@ -663,8 +703,8 @@ function installDebugToolbar {
         echo -e '\nDjango debug toolbar installed successfully.'
     else
         echo -e '\nGreat. Moving on.'
+        return 0
     fi
-
 }
 
 
@@ -672,11 +712,18 @@ function finalize {
     echo -e '\n##############################'
     echo 'Finalizing the installation...'
     echo '##############################'
+    read -p "Would you like to finalize the installation? (y/n): " proceed
+    if [ $proceed == "n" ]
+    then
+        echo -e '\nGreat. Moving on.'
+        return 0
+    fi
+    
     echo -e '\nSyncing the django data model...'
     cd $CL_INSTALL_DIR/court-listener/alert
     python manage.py syncdb
     
-    echo '\nInstallation finalized successfully.'
+    echo -e '\nInstallation finalized successfully.'
 }
 
 function main {
