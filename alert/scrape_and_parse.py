@@ -1208,9 +1208,12 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    if dupCount == 5:
-                        # fifth dup in a a row. BREAK!
-                        break
+                    # this section is commented out because ca10 doesn't publish
+                    # their cases in any order resembling sanity. Thus, this bit
+                    # of code is moot. Ugh.
+#                    if dupCount == 5:
+#                        # fifth dup in a a row. BREAK!
+#                        break
                     i += 1
                     continue
                 else:
