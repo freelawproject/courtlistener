@@ -316,7 +316,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
-                    ": Added " + ct.courtShortName + doc.caseNameShort)
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
                 i -= 1
@@ -428,7 +428,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
-                    ": Added " + ct.courtShortName + doc.caseNameShort)
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
                 i += 1
@@ -525,7 +525,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
-                    ": Added " + ct.courtShortName + doc.caseNameShort)
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
                 i += 1
@@ -627,7 +627,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
-                    ": Added " + ct.courtShortName + doc.caseNameShort)
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
                 i += 1
@@ -759,7 +759,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
-                    ": Added " + ct.courtShortName + doc.caseNameShort)
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
                 i += 1
@@ -863,7 +863,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
-                    ": Added " + ct.courtShortName + doc.caseNameShort)
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
                 i += 1
@@ -955,7 +955,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     doc.citation = cite
                     doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
-                       ": Added " + ct.courtShortName + doc.caseNameShort)
+                       ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                     doc.save()
 
                     i += 1
@@ -1040,7 +1040,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
-                    ": Added " + ct.courtShortName + doc.caseNameShort)
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
                 i += 1
@@ -1148,7 +1148,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
-                    ": Added " + ct.courtShortName + doc.caseNameShort)
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
                 i += 1
@@ -1254,7 +1254,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
-                    ": Added " + ct.courtShortName + doc.caseNameShort)
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
                 i += 1
@@ -1362,7 +1362,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
-                    ": Added " + ct.courtShortName + doc.caseNameShort)
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
                 i += 1
@@ -1441,7 +1441,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
-                    ": Added " + ct.courtShortName + doc.caseNameShort)
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
                 i += 1
@@ -1537,7 +1537,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
-                    ": Added " + ct.courtShortName + doc.caseNameShort)
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
                 i += 1
@@ -1642,7 +1642,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
                 logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
-                    ": Added " + ct.courtShortName + doc.caseNameShort)
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
                 i += 1
