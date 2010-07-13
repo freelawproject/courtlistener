@@ -279,7 +279,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 if not created:
                     # it's an oldie, punt!
-                    if verbosity >= 1:
+                    if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 8:
@@ -380,11 +380,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 if not created:
                     # it's an oldie, punt!
-                    if verbosity >= 1:
+                    if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    if dupCount == 3:
-                        # third dup in a a row. BREAK!
+                    if dupCount == 5:
+                        # fifth dup in a a row. BREAK!
                         break
                     i += 1
                     continue
@@ -480,11 +480,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 if not created:
                     # it's an oldie, punt!
-                    if verbosity >= 1:
+                    if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    if dupCount == 3:
-                        # third dup in a a row. BREAK!
+                    if dupCount == 5:
+                        # fifth dup in a a row. BREAK!
                         break
                     i += 1
                     continue
@@ -573,11 +573,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 if not created:
                     # it's an oldie, punt!
-                    if verbosity >= 1:
+                    if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    if dupCount == 3:
-                        # third dup in a a row. BREAK!
+                    if dupCount == 5:
+                        # fifth dup in a a row. BREAK!
                         break
                     i += 1
                     continue
@@ -717,7 +717,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 if not created:
                     # it's an oldie, punt!
-                    if verbosity >= 1:
+                    if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount >= 3 and numP >= 3 and numQ >= 3:
@@ -809,11 +809,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 if not created:
                     # it's an oldie, punt!
-                    if verbosity >= 1:
+                    if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    if dupCount == 3:
-                        # third dup in a a row. BREAK!
+                    if dupCount == 5:
+                        # fifth dup in a a row. BREAK!
                         break
                     i += 1
                     continue
@@ -903,11 +903,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                     if not created:
                         # it's an oldie, punt!
-                        if verbosity >= 1:
+                        if verbosity >= 2:
                             result += "Duplicate found at " + str(i) + "\n"
                         dupCount += 1
-                        if dupCount == 3:
-                            # third dup in a a row. BREAK!
+                        if dupCount == 5:
+                            # fifth dup in a a row. BREAK!
                             break
                         i += 1
                         continue
@@ -985,11 +985,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 if not created:
                     # it's an oldie, punt!
-                    if verbosity >= 1:
+                    if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    if dupCount == 3:
-                        # third dup in a a row. BREAK!
+                    if dupCount == 5:
+                        # fifth dup in a a row. BREAK!
                         break
                     i += 1
                     continue
@@ -1092,11 +1092,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 if not created:
                     # it's an oldie, punt!
-                    if verbosity >= 1:
+                    if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    if dupCount == 3:
-                        # third dup in a a row. BREAK!
+                    if dupCount == 5:
+                        # fifth dup in a a row. BREAK!
                         break
                     i += 1
                     continue
@@ -1187,11 +1187,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 if not created:
                     # it's an oldie, punt!
-                    if verbosity >= 1:
+                    if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    if dupCount == 3:
-                        # third dup in a a row. BREAK!
+                    if dupCount == 5:
+                        # fifth dup in a a row. BREAK!
                         break
                     i += 1
                     continue
@@ -1307,13 +1307,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 if not created:
                     # it's an oldie, punt!
-                    if verbosity >= 1:
+                    if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
-            		if verbosity >= 2:
-            		    print "Duplicate found at " + str(i)
                     dupCount += 1
-                    if dupCount == 3:
-                        # third dup in a a row. BREAK!
+                    if dupCount == 5:
+                        # fifth dup in a a row. BREAK!
                         break
                     i += 1
                     continue
@@ -1384,11 +1382,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 if not created:
                     # it's an oldie, punt!
-                    if verbosity >= 1:
+                    if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    if dupCount == 3:
-                        # third dup in a a row. BREAK!
+                    if dupCount == 5:
+                        # fifth dup in a a row. BREAK!
                         break
                     i += 1
                     continue
@@ -1468,11 +1466,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 if not created:
                     # it's an oldie, punt!
-                    if verbosity >= 1:
+                    if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    if dupCount == 3:
-                        # third dup in a a row. BREAK!
+                    if dupCount == 5:
+                        # fifth dup in a a row. BREAK!
                         break
                     i += 1
                     continue
@@ -1570,13 +1568,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 if not created:
                     # it's an oldie, punt!
-                    if verbosity >= 1:
+                    if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
-                    if verbosity >= 2: 
-                        print "Duplicate found at " + str(i) + '\n'
                     dupCount += 1
-                    if dupCount == 3:
-                        # third dup in a a row. BREAK!
+                    if dupCount == 5:
+                        # fifth dup in a a row. BREAK!
                         break
                     i += 1
                     continue
@@ -1596,16 +1592,19 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 elif 'relatingtoorders' in url:
                     doc.documentType = "Relating-to"
                 if verbosity >= 2: print "documentType: " + doc.documentType
-
-                if '/' in caseDates[i].text:
-                    splitDate = caseDates[i].text.split('/')
-                elif '-' in caseDates[i].text:
-                    splitDate = caseDates[i].text.split('-')
-                year = int("20" + splitDate[2])
-                caseDate = datetime.date(year, int(splitDate[0]),
-                    int(splitDate[1]))
-                doc.dateFiled = caseDate
-                if verbosity >= 2: print "caseDate: " + str(caseDate)
+                
+                try:
+                    if '/' in caseDates[i].text:
+                        splitDate = caseDates[i].text.split('/')
+                    elif '-' in caseDates[i].text:
+                        splitDate = caseDates[i].text.split('-')
+                    year = int("20" + splitDate[2])
+                    caseDate = datetime.date(year, int(splitDate[0]),
+                        int(splitDate[1]))
+                    doc.dateFiled = caseDate
+                    if verbosity >= 2: print "caseDate: " + str(caseDate)
+                except:
+                    result += "Error obtaining date field for " + caseLink
 
                 # now that we have the caseNumber and caseNameShort, we can dup check
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
