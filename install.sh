@@ -371,6 +371,9 @@ DEVELOPMENT = True
 
 #EMAIL_BACKEND is set to default, so nothing listed here.
 
+# this setting helps with settings elsewhere...
+INSTALL_ROOT = '$CL_INSTALL_DIR'
+
 EOF
 
     echo -e 'Done\n\nCourtListener installed and configured successfully.'
