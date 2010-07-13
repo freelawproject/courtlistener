@@ -1524,6 +1524,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
         ct = Court.objects.get(courtUUID = 'scotus')
 
         for url in urls:
+            if verbosity >= 2: print "Scraping URL: " + url
             html = urllib2.urlopen(url).read()
             tree = fromstring(html)
 
@@ -1558,6 +1559,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # we begin with the caseLink field
                 caseLink = caseLinks[i].get('href')
                 caseLink = urljoin(url, caseLink)
+                if verbosity >= 2: print "caseLink: " + caseLink
 
                 myFile, doc, created, error = makeDocFromURL(caseLink, ct)
 
@@ -1570,6 +1572,8 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     # it's an oldie, punt!
                     if verbosity >= 1:
                         result += "Duplicate found at " + str(i) + "\n"
+                    if verbosity >= 2: 
+                        print "Duplicate found at " + str(i) + '\n'
                     dupCount += 1
                     if dupCount == 3:
                         # third dup in a a row. BREAK!
@@ -1580,8 +1584,10 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     dupCount = 0
 
                 caseNumber = caseNumbers[i].text
+                if verbosity >= 2: print "caseNumber: " + caseNumber
 
                 caseNameShort = caseLinks[i].text
+                if verbosity >= 2: print "caseNameShort: " + caseNameShort
 
                 if 'slipopinion' in url:
                     doc.documentType = "Published"
@@ -1589,6 +1595,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     doc.documentType = "In-chambers"
                 elif 'relatingtoorders' in url:
                     doc.documentType = "Relating-to"
+                if verbosity >= 2: print "documentType: " + doc.documentType
 
                 if '/' in caseDates[i].text:
                     splitDate = caseDates[i].text.split('/')
@@ -1598,6 +1605,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 caseDate = datetime.date(year, int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
+                if verbosity >= 2: print "caseDate: " + str(caseDate)
 
                 # now that we have the caseNumber and caseNameShort, we can dup check
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
