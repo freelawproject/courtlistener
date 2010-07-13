@@ -120,7 +120,7 @@ urlpatterns += patterns('django.views.generic.simple',
 if settings.DEVELOPMENT:
     urlpatterns += patterns('',
     (r'^media/(?P<path>.*)$', 'django.views.static.serve',
-        {'document_root': '/home/mlissner/Documents/Cal/FinalProject/alert/assets/media',
+        {'document_root': settings.INSTALL_ROOT + '/alert/assets/media',
         'show_indexes': True}),
     (r'^500/$', 'django.views.generic.simple.direct_to_template',
         {'template': '500.html'}),
