@@ -158,14 +158,14 @@ TIME_ZONE is set to America/Los Angeles
     # set up the MySQL configs
     read -p "We will be setting up a MySQL DB. What would you like its name to be (e.g. courtListener): " MYSQL_DB_NAME
     read -p "And we will be giving it a username. What would you like that to be (e.g. courtListener): " MYSQL_USERNAME
-    MYSQL_PWD=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)") for i in range(30)]);'`
+    MYSQL_PWD=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789!@$%^&*(-_=+)") for i in range(30)]);'`
     echo -e "\nYou can set up the MySQL password manually, but we recommend a randomly 
 generated password, since you should not ever need to type it in.
 "
     read -p "Use the following random password: '$MYSQL_PWD'? (y/n): " proceed
     if [ $proceed == 'n' ]
     then
-        read -p "Very well. What would you like the password to be: " MYSQL_PWD
+        read -p "Very well. What would you like the password to be (do not include the # symbol): " MYSQL_PWD
     fi
     
     read -p "
@@ -497,9 +497,7 @@ source delta : Document
 {
     sql_query_pre = SET NAMES utf8
     sql_query           = \
-        SELECT Document.documentUUID, Citation.caseNameShort as caseName, Citation.caseNameFull, Citation.caseNumber as caseNumber, Citation.officialCitationWest, Citation.officia
-lCitationLexis, Document.documentSHA1, UNIX_TIMESTAMP(Document.dateFiled) as dateFiled, UNIX_TIMESTAMP(Document.time_retrieved) as time_retrieved, Document.court_id as court, Docu
-ment.documentPlainText as docText, Document.documentHTML as docHTML, Document.documentType as docStatus\
+        SELECT Document.documentUUID, Citation.caseNameShort as caseName, Citation.caseNameFull, Citation.caseNumber as caseNumber, Citation.officialCitationWest, Citation.officialCitationLexis, Document.documentSHA1, UNIX_TIMESTAMP(Document.dateFiled) as dateFiled, UNIX_TIMESTAMP(Document.time_retrieved) as time_retrieved, Document.court_id as court, Document.documentPlainText as docText, Document.documentHTML as docHTML, Document.documentType as docStatus\
         FROM Document, Citation\
         WHERE Document.citation_id = Citation.citationUUID\
 	AND Document.documentUUID >= $start\
