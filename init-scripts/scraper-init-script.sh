@@ -1,3 +1,4 @@
+#!/bin/bash
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
 # 
@@ -23,12 +24,15 @@
 #  b) You are prohibited from misrepresenting the origin of any material
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
-#!/bin/bash
+
+# import the settings we need, and make some useful variables.
+INSTALL_ROOT=`python -c "import sys; sys.path.append('../alert/'); import settings; print settings.INSTALL_ROOT"`
+SCRAPER_LOCATION=$INSTALL_ROOT\alert/scrape_and_parse.py
 
 case "${1:-''}" in
   'start')
            echo -n "Starting the scraper...."
-           su - www-data -c '/usr/bin/python /home/mlissner/FinalProject/alert/scrape_and_parse.py -d' &
+           su - www-data -c "/usr/bin/python $SCRAPER_LOCATION -d" &
            echo $$ > /tmp/scraper.pid
            sleep 1
            echo "Done"
@@ -49,7 +53,7 @@ case "${1:-''}" in
            sleep 1
            echo "Dead"
            echo -n "Restarting the scraper...."
-           su - www-data -c '/usr/bin/python /home/mlissner/FinalProject/alert/scrape_and_parse.py -d' &
+           su - www-data -c "/usr/bin/python $SCRAPER_LOCATION -d" &
            echo $$ > /tmp/scraper.pid
            sleep 1
            echo "Done"
