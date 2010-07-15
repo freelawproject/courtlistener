@@ -22,12 +22,12 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from alertSystem.models import *
-from alertSystem.titlecase import titlecase
+from alertSystem.cleanstrings import *
 
+from django.utils.encoding import smart_str
 from django.core.exceptions import MultipleObjectsReturned
 from django.core.files import File
 from django.core.files.base import ContentFile
-from django.utils.encoding import smart_str
 
 import datetime, calendar, hashlib, re, signal, StringIO, subprocess, sys, time, urllib, urllib2
 from BeautifulSoup import BeautifulSoup
@@ -138,23 +138,6 @@ def trunc(s, length):
             # no spaces found, just use max position
             end = length
         return s[0:end]
-    
-
-def cleanString(s):
-    # replace evil characters with better ones, get rid of white space on the 
-    # ends, and get rid of semicolons on the ends.
-    s = s.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
-        .replace('&ldquo;',"\"").replace('&nbsp;', ' ').replace('&amp;', '&')\
-        .replace('%20', ' ').strip().strip(';')
-
-    # get rid of '\t\n\x0b\x0c\r ', and replace them with a single space.
-    s = " ".join(s.split())
-    
-    # get rid of bad character encodings
-    s = smart_str(s)
-    
-    # return something vaguely sane
-    return s
 
 
 def hasDuplicate(caseNum, caseName):
@@ -163,7 +146,7 @@ def hasDuplicate(caseNum, caseName):
     """
 
     # data cleanup
-    caseName = cleanString(caseName)
+    caseName = harmonize(cleanString(caseName))
     caseNum  = cleanString(caseNum)
     
     caseNameShort = trunc(caseName, 100)
@@ -188,7 +171,7 @@ def getPDFContent(docs, result, verbosity):
     """Get the contents of a list of PDF files, and add them to the DB"""
     for doc in docs:
         if verbosity >= 1: result += "Parsed: " + doc.citation.caseNameShort + "\n"
-        if verbosity >= 2: print "Parsed: " + doc.citation.caseNameShort + "\n"
+        if verbosity >= 2: print "Parsing: " + doc.citation.caseNameShort + "\n"
 
         path = str(doc.local_path)
         path = settings.MEDIA_ROOT + path
@@ -197,11 +180,15 @@ def getPDFContent(docs, result, verbosity):
         process = subprocess.Popen(
             ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"], shell=False,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        content, err = process.communicate() # we're not doing anything with err as of now...
+        content, err = process.communicate() 
+        if err: result += "Error parsing file: " + doc.citation.caseNameShort
 
         # add the plain text to the DB!
-        doc.documentPlainText = content
-        doc.save()
+        doc.documentPlainText = smart_str(content)
+        try:
+            doc.save()
+        except:
+            result += "Error saving pdf text to the db for: " + doc.citation.caseNameShort
     return result
 
 
