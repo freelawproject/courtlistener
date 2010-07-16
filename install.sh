@@ -80,6 +80,8 @@ OPTIONS
             install the django debug toolbar
     --djangoSphinx
             install the django-sphinx connector
+    --djangoExtensions
+            install the django-extensions package from github
     --finalize
             finalize the installation
 
@@ -145,13 +147,22 @@ This file should NEVER be checked into revision control!
 "
     read -p "What name would you like used as the admin name for the site (e.g. Michael Lissner): " CONFIG_NAME
     read -p "What email address should be used for the admin of the site (e.g. mike@courtlistener.com): " CONFIG_EMAIL
+    read -p "Would you like the django-debug toolbar installed? It's good for dev work. (y/n): " INSTALL_DEBUG_TOOLBAR
+    read -p "Would you like the django-extensions package installed? It's good for dev work. (y/n): " INSTALL_DJANGO_EXTENSIONS
+    read -p "Is this a development machine? (y/n): " DEVELOPMENT
+    if [ $DEVELOPMENT == 'y' ]
+    then
+        $DEVELOPMENT=true
+    else
+        $DEVELOPMENT=false
+    fi
     echo -e "\nGreat. These are stored in a tuple in the 20-private.conf file. You can add more
 people manually, if you like.
 \nMANAGERS is set equal to the admins.
 DEBUG is set to True.
 CACHE_BACKEND is not set (which is fine for a dev machine).
 TEMPLATE_DEBUG is set to DEBUG.
-DEVELOPMENT is set to True (which helps with the runserver command, see urls.py for details).
+DEVELOPMENT is set to $DEVELOPMENT
 TIME_ZONE is set to America/Los Angeles
 "
     
@@ -179,7 +190,7 @@ Press any key to proceed, or Ctrl+C to abort. " proceed
 function checkDeps {
     # this function checks for various dependencies that the script assumes are 
     # installed for its own functionality.
-    deps=(aptitude mercurial subversion git-core python python-beautifulsoup python-docutils python-mysqldb python-pip python-setuptools poppler-utils mysql-client mysql-server wget tar libmysqlclient-dev gcc g++ make)
+    deps=(aptitude mercurial subversion python ipython git-core python python-beautifulsoup python-docutils python-mysqldb python-pip python-setuptools poppler-utils mysql-client mysql-server wget tar libmysqlclient-dev gcc g++ make)
     echo -e "\n########################"
     echo "Checking dependencies..."
     echo "########################"
@@ -193,7 +204,6 @@ function checkDeps {
     for dep in ${deps[@]}
     do
         echo -n "Checking for $dep..."
-        sleep 0.5
         if dpkg -l $dep 2>/dev/null | grep -q ^.i
         then
             echo "found."
@@ -319,6 +329,14 @@ function installCourtListener {
     MEDIA_ROOT="$CL_INSTALL_DIR/court-listener/alert/assets/media/"
     TEMPLATE_DIRS="$CL_INSTALL_DIR/court-listener/alert/assets/templates/"
     
+    # convrt true and false to True and False
+    if $DEVELOPMENT
+    then
+        DEVELOPMENT="True"
+    else
+        DEVELOPMENT="False"
+    fi
+    
     # all settings should be in place. Now we make the file...
     echo -e "\nGenerating the installation config, 20-private.conf..."
 cat <<EOF > $CL_INSTALL_DIR/court-listener/alert/settings/20-private.conf
@@ -367,14 +385,27 @@ TEMPLATE_DIRS = (
 
 TEMPLATE_DEBUG = DEBUG
 
-DEVELOPMENT = True
+DEVELOPMENT = $DEVELOPMENT
 
 #EMAIL_BACKEND is set to default, so nothing listed here.
 
 # this setting helps with settings elsewhere...include a trailing slash!
 INSTALL_ROOT = '$CL_INSTALL_DIR/court-listener/'
 
+INTERNAL_IPS = ('127.0.0.1',)
+
+INSTALLED_APPS.extend([
 EOF
+
+    if [ $INSTALL_DEBUG_TOOLBAR == 'y' ]
+    then
+        echo "    'debug_toolbar'," >> $CL_INSTALL_DIR/court-listener/alert/settings/20-private.conf
+    fi 
+    if [ $INSTALL_DJANGO_EXTENSIONS == 'y' ]
+    then
+        echo "    'django_extensions'," >> $CL_INSTALL_DIR/court-listener/alert/settings/20-private.conf
+    fi
+    echo "])" >> $CL_INSTALL_DIR/court-listener/alert/settings/20-private.conf #this closes off the INSTALLED_APPS var.
 
     echo -e 'Done\n\nCourtListener installed and configured successfully.'
 }
@@ -692,22 +723,48 @@ EOF
 }
 
 function installDebugToolbar {
-    echo -e '\n##################################'
-    echo 'Installing django debug toolbar...'
-    echo '##################################
-' 
-    read -p "Is the django debug toolbar installed on this computer? (y/n): " installed
-    if [ $installed == "n" ]
+    if INSTALL_DEBUG_TOOLBAR
     then
-        # we install it
-        pip install django-debug-toolbar
-        echo -e '\nDjango debug toolbar installed successfully.'
-    else
-        echo -e '\nGreat. Moving on.'
-        return 0
+        echo -e '\n##################################'
+        echo 'Installing django debug toolbar...'
+        echo '##################################
+' 
+        read -p "Is the django debug toolbar installed on this computer? (y/n): " installed
+        if [ $installed == "n" ]
+        then
+            # we install it
+            pip install django-debug-toolbar
+            echo -e '\nDjango debug toolbar installed successfully.'
+        else
+            echo -e '\nGreat. Moving on.'
+            return 0
+        fi
     fi
 }
 
+
+function installDjangoExtensions {
+    if INSTALL_DJANGO_EXTENSIONS
+    then
+        echo -e '\n###############################'
+        echo 'Installing django-extensions...'
+        echo '###############################
+'
+        read -p "Install django-extensions on this computer? (y/n): " proceed
+        if [ $proceed == "n" ]
+        then
+            echo -e '\nGreat. Moving on.'
+            return 0
+        fi
+        
+        # install the mo'
+        cd $DJANGO_INSTALL_DIR
+        git clone git://github.com/django-extensions/django-extensions.git django-extensions
+        cd django-extensions
+        python setup.py install
+        
+        echo -e '\ndjango-extensions installed successfully'
+    fi
 
 function finalize {
     echo -e '\n##############################'
@@ -737,6 +794,7 @@ function main {
     installSphinx
     installDjangoSphinx
     installDebugToolbar
+    installDjangoExtensions
     finalize
 
     echo -e "\n\n#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#"
@@ -786,6 +844,7 @@ else
         --courtListener) getUserInput; installCourtListener;;
         --debugToolbar) installDebugToolbar;;
         --djangoSphinx) getUserInput; installDjangoSphinx;;
+        --djangoExtensions) getUserInput; installDjangoExtensions
         --finalize) getUserInput; finalize;;
         *) echo "install.sh: Invalid argument. Try the --help argument."
            exit 2;
