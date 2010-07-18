@@ -1532,10 +1532,10 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     dupCount = 0
 
                 # next: caseNumber
-                caseNumber = trTags[i].td.nextSibling.nextSibling.contents[0]\
+                caseNumber = trTags[i].td.nextSibling.nextSibling.contents[0].strip()
 
                 # next: dateFiled
-                dateFiled = trTags[i].td.contents
+                dateFiled = trTags[i].td.contents.strip()
                 splitDate = dateFiled[0].split("-")
                 dateFiled = datetime.date(int(splitDate[0]), int(splitDate[1]),
                     int(splitDate[2]))
