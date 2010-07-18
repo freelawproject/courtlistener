@@ -1471,15 +1471,13 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
         return result
 
     elif (courtID == 13):
-        # running log of all opinions
-        urls = ("http://www.cafc.uscourts.gov/dailylog.html",)
+        # today's cases; missing a day not good.
+        urls = ("http://www.cafc.uscourts.gov/index.php?option=com_reports&view=report&layout=search&Itemid=12",)
+        # for last seven days use urls = ("http://www.cafc.uscourts.gov/index.php?searchword=&ordering=&date=7&type=&origin=&searchphrase=all&Itemid=12&option=com_reports",)
         ct = Court.objects.get(courtUUID = "cafc")
 
         for url in urls:
-            try: html = urllib2.urlopen(url).read()
-            except:
-                result += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
-                continue
+            html = urllib2.urlopen(url).read()
 
             if daemonmode:
                 # if it's daemonmode, see if the court has changed
@@ -1493,13 +1491,13 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
             aTagsRegex = re.compile('pdf$', re.IGNORECASE)
             trTags = soup.findAll('tr')
 
-            # start on the second row, since the first is headers.
-            i = 1
+            # start on the seventh row, since the prior trTags are junk.
+            i = 6
             dupCount = 0
-            while i <= 50: #stop at 50, if no triple dups first.
+            while i <= 50: #stop at 50, if not three dupes first.
                 try:
                     caseLink = trTags[i].td.nextSibling.nextSibling.nextSibling\
-                        .nextSibling.nextSibling.nextSibling.a.get('href').strip('.')
+                        .nextSibling.nextSibling.nextSibling.a.get('href')
                     caseLink = urljoin(url, caseLink)
                     if 'opinion' not in caseLink:
                         # we have a non-case PDF. punt
@@ -1522,8 +1520,8 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    if dupCount == 5:
-                        # fifth dup in a a row. BREAK!
+                    if dupCount == 3:
+                        # third duplicate in a a row. BREAK!
                         break
                     i += 1
                     continue
@@ -1532,27 +1530,27 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 # next: caseNumber
                 caseNumber = trTags[i].td.nextSibling.nextSibling.contents[0]\
-                    .strip('.pdf')
 
                 # next: dateFiled
                 dateFiled = trTags[i].td.contents
-                splitDate = dateFiled[0].split("/")
+                splitDate = dateFiled[0].split("-")
                 dateFiled = datetime.date(int(splitDate[0]), int(splitDate[1]),
                     int(splitDate[2]))
                 doc.dateFiled = dateFiled
 
                 # next: caseNameShort
-                caseNameShort = trTags[i].td.nextSibling.nextSibling.nextSibling\
-                    .nextSibling.nextSibling.nextSibling.a.contents[0]
+                upperCaseName = trTags[i].td.nextSibling.nextSibling.nextSibling\
+                    .nextSibling.nextSibling.nextSibling.a.contents[0].strip('[Motion]').strip('[order]')
+                caseNameShort = titlecase(upperCaseName.lower())
 
                 # next: documentType
                 documentType = trTags[i].td.nextSibling.nextSibling.nextSibling\
                     .nextSibling.nextSibling.nextSibling.nextSibling.nextSibling\
-                    .contents[0].contents[0]
+                    .contents[0].strip()
                 # normalize the result for our internal purposes...
-                if documentType == "N":
+                if documentType == "Non-precedential":
                     documentType = "Unpublished"
-                elif documentType == "P":
+                elif documentType == "Precedential":
                     documentType = "Published"
                 doc.documentType = documentType
 
@@ -1562,7 +1560,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
+                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                     ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
