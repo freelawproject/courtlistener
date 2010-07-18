@@ -1477,7 +1477,10 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
         ct = Court.objects.get(courtUUID = "cafc")
 
         for url in urls:
-            html = urllib2.urlopen(url).read()
+            try: html = urllib2.urlopen(url).read()
+            except:
+                result += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+                continue
 
             if daemonmode:
                 # if it's daemonmode, see if the court has changed
