@@ -32,6 +32,9 @@ MAC_MC = re.compile(r"^([Mm]a?c)(\w+)")
 UNITED_STATES = re.compile('(?:U\.S\.(?:A\.)?(?=\s+|$)|usa|United States(?: of America)?)', re.IGNORECASE)
 ET_AL = re.compile(',?\set\.?\sal\.?', re.IGNORECASE)
 
+# For use in anonymize function
+SSN_AND_ITIN = re.compile(r'\d{3}-\d{2}-\d{4}')
+EIN = re.compile(r'\d{2}-\d{7}')
 
 
 def titlecase(text):
@@ -174,4 +177,11 @@ def cleanString(s):
     s = smart_str(s)
     
     # return something vaguely sane
+    return s
+    
+def anonymize(s):
+    """Convert SSNs, EIN and alienIDs to X's. Hat tip to Altlaw for the regexes."""
+    s = re.sub(SSN_AND_ITIN, "XXX-XX-XXXX", s)
+    s = re.sub(EIN, "XX-XXXXXXX", s)
+    
     return s

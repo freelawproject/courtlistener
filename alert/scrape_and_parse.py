@@ -182,8 +182,8 @@ def getPDFContent(docs, result, verbosity):
         content, err = process.communicate() 
         if err: result += "Error parsing file: " + doc.citation.caseNameShort
 
-        # add the plain text to the DB!
-        doc.documentPlainText = smart_str(content)
+        # add the anonymized plain text to the DB!
+        doc.documentPlainText = anonymize(smart_str(content))
         try:
             doc.save()
         except:
