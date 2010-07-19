@@ -158,7 +158,7 @@ def harmonize(text):
     
     text = re.sub(UNITED_STATES, 'United States', text)
     text = text.replace('US', 'United States') #needed separately, because case sensitive
-    text = re.sub(ET_AL, ', et al.', text)
+    text = re.sub(ET_AL, '', text)
     
     return text
 
