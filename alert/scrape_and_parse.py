@@ -490,7 +490,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 else:
                     dupCount = 0
 
-                caseNameShort = aTags[i].contents[0]
+                caseNameShort = aTags[i].contents[0].replace(", et al.", "")
 
                 # caseDate and caseNumber
                 junk = aTags[i].previous.previous.previous
