@@ -41,7 +41,7 @@
                         <td>{{ alert.alertName|capfirst|truncatewords:"6" }}</td>
                         <td><a href="/search/results/?q={{alert.alertText}}">{{ alert.alertText|truncatewords:"14" }}</a></td>
                         <td>{{ alert.get_alertFrequency_display }}</td>
-                        <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"None" }}</td>
+                        <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"Never" }}</td>
                         <td>{{ alert.alertPrivacy|yesno:"Yes,No" }}</td>
                         <td><a href="/feed/search/?q={{alert.alertText}}"><img src="/media/images/png/atom-feed.png" alt="atom icon"></a>
                         <td><a href="/alert/edit/{{ alert.alertUUID }}/">edit/delete</a></td>
