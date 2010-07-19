@@ -319,9 +319,13 @@ function installCourtListener {
     # location of the django installation. Else, admin templates won't work.
     ln -s $DJANGO_INSTALL_DIR/django-trunk/django/contrib/admin/media court-listener/alert/assets/media/adminMedia
     
-    # and we link up the init scripts
+    # we link up the init scripts
     echo "Installing init scripts."
     ln -s $CL_INSTALL_DIR/court-listener/init-scripts/scraper-init-script.sh /etc/init.d/scraper
+    
+    # we create the logging file
+    mkdir -p "/var/log/scraper"
+    touch /var/log/scraper/daemon_log.out
         
     # this generates a nice random number, as it is done by django-admin.py
     SECRET_KEY=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)") for i in range(50)]);'`

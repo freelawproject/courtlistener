@@ -86,7 +86,6 @@ def makeDocFromURL(LinkToPdf, ct):
     sha1Hash = hashlib.sha1(data).hexdigest()
 
     # using that, we check for a dup
-
     doc, created = Document.objects.get_or_create(documentSHA1 = sha1Hash,
         court = ct)
 
@@ -500,7 +499,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     caseDate = regexII.search(junk).group(0)
                     caseNumber = regexIII.search(junk).group(0)
                 except:
-                    i = i+1
+                    i += 1
                     continue
 
                 # next up is the caseDate
@@ -1473,7 +1472,8 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
     elif (courtID == 13):
         # today's cases; missing a day not good.
         urls = ("http://www.cafc.uscourts.gov/index.php?option=com_reports&view=report&layout=search&Itemid=12",)
-        # for last seven days use urls = ("http://www.cafc.uscourts.gov/index.php?searchword=&ordering=&date=7&type=&origin=&searchphrase=all&Itemid=12&option=com_reports",)
+        # for last seven days use:
+        #urls = ("http://www.cafc.uscourts.gov/index.php?searchword=&ordering=&date=7&type=&origin=&searchphrase=all&Itemid=12&option=com_reports",)
         ct = Court.objects.get(courtUUID = "cafc")
 
         for url in urls:
@@ -1523,8 +1523,8 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     if verbosity >= 2:
                         result += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    if dupCount == 3:
-                        # third duplicate in a a row. BREAK!
+                    if dupCount == 5:
+                        # fifth duplicate in a a row. BREAK!
                         break
                     i += 1
                     continue
@@ -1532,19 +1532,20 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     dupCount = 0
 
                 # next: caseNumber
-                caseNumber = trTags[i].td.nextSibling.nextSibling.contents[0].strip()
+                caseNumber = trTags[i].td.nextSibling.nextSibling.contents[0]
 
                 # next: dateFiled
-                dateFiled = trTags[i].td.contents.strip()
-                splitDate = dateFiled[0].split("-")
+                dateFiled = trTags[i].td.contents[0].strip()
+                splitDate = dateFiled.split("-")
                 dateFiled = datetime.date(int(splitDate[0]), int(splitDate[1]),
                     int(splitDate[2]))
                 doc.dateFiled = dateFiled
 
                 # next: caseNameShort
-                upperCaseName = trTags[i].td.nextSibling.nextSibling.nextSibling\
-                    .nextSibling.nextSibling.nextSibling.a.contents[0].strip('[Motion]').strip('[order]')
-                caseNameShort = titlecase(upperCaseName.lower())
+                caseNameShort = trTags[i].td.nextSibling.nextSibling.nextSibling\
+                    .nextSibling.nextSibling.nextSibling.a.contents[0]\
+                    .replace('[Motion]', '').replace('[order]', '')
+                caseNameShort = titlecase(caseNameShort.lower())
 
                 # next: documentType
                 documentType = trTags[i].td.nextSibling.nextSibling.nextSibling\
