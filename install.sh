@@ -164,6 +164,7 @@ people manually, if you like.
 \nMANAGERS is set equal to the admins.
 DEBUG is set to True.
 CACHE_BACKEND is not set (which is fine for a dev machine).
+EMAIL_BACKEND is set to Console (for a production machine, this should be changed)
 TEMPLATE_DEBUG is set to DEBUG.
 DEVELOPMENT is set to $DEVELOPMENT
 TIME_ZONE is set to America/Los Angeles
@@ -315,7 +316,7 @@ function installCourtListener {
     fi
     cd $CL_INSTALL_DIR
     echo "Downloading CourtListener with mercurial..."
-    hg clone https://mlissner@bitbucket.org/mlissner/legal-current-awareness court-listener
+    hg clone http://bitbucket.org/mlissner/legal-current-awareness court-listener
 
     # begin the harder thing: configuring it correctly...    
     # We need a link between the 20-private.conf adminMedia location and the 
@@ -394,7 +395,7 @@ TEMPLATE_DEBUG = DEBUG
 
 DEVELOPMENT = $DEVELOPMENT
 
-#EMAIL_BACKEND is set to default, so nothing listed here.
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # this setting helps with settings elsewhere...include a trailing slash!
 INSTALL_ROOT = '$CL_INSTALL_DIR/court-listener/'
