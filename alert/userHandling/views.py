@@ -20,10 +20,13 @@ from alert.userHandling.models import BarMembership
 from django.contrib import messages
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.contrib.sites.models import Site
+from django.core.mail import send_mail
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.http import HttpResponseRedirect
-
+import datetime, random, hashlib
 
 
 @login_required
@@ -96,21 +99,60 @@ def register(request):
         if request.method == 'POST':
             form = UserCreationFormExtended(request.POST)
             if form.is_valid():
+                # it seems like I should use this, but it's causing trouble...
                 cd = form.cleaned_data
                 
-                # make a new user, and then a new UserProfile associated with it.
-                # this makes it so every time we call get_profile(), we can be sure
-                # there is a profile waiting for us (a good thing).
-                new_user = form.save()
-                up = UserProfile()
-                up.user = new_user
-                up.save()
-                
-                # make these into strings so we can pass them off to the template
                 username = str(cd['username'])
                 password = str(cd['password1'])
+                email = str(cd['email'])
+                fname = str(cd['first_name'])
+                lname = str(cd['last_name'])
                 
-                return HttpResponseRedirect('/sign-in/?next=' + redirect_to)
+                # make a new user that is inactive
+                new_user = User.objects.create_user(username, email, password)
+                new_user.first_name = fname
+                new_user.last_name = lname
+                new_user.save()
+                            
+                # Build the activation key for the new account
+                salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
+                activationKey = hashlib.sha1(salt+new_user.username).hexdigest()
+                key_expires = datetime.datetime.today() + datetime.timedelta(5)
+                
+                # associate a new UserProfile associated with the new user
+                # this makes it so every time we call get_profile(), we can be sure
+                # there is a profile waiting for us (a good thing).
+                up = UserProfile(user = new_user,
+                                 activationKey = activationKey,
+                                 key_expires = key_expires)
+                up.save()
+                
+                # Send an email with the confirmation link
+                current_site = Site.objects.get_current()
+                email_subject = 'Confirm your account on' + current_site.name,
+                email_body = "Hello, %s, and thanks for signing up for an \
+account!\n\nTo send you emails, we need you to activate your account with CourtListener.com. \
+To activate your account, click this link within 5 days:\
+\n\nhttp://courtlistener.com/accounts/confirm/%s\n\nThanks for using our site,\n\n\
+The CourtListener team\n\n\
+-------------------\n\
+For questions or comments, please see our contact page, http://courtlistener.com/contact/." % (
+                    new_user.username,
+                    up.activationKey)
+                send_mail(email_subject,
+                          email_body,
+                          'no-reply@courtlistener.com',
+                          [new_user.email])
+
+
+#                # make these into strings so we can pass them off to the template
+#                username = str(cd['username'])
+#                password = str(cd['password1'])
+                
+                #return HttpResponseRedirect('/sign-in/?next=' + redirect_to)
+                return render_to_response("registration/registration_complete.html",
+                    {'email': new_user.email},
+                    RequestContext(request))
                 
         else:
             form = UserCreationFormExtended()

@@ -101,6 +101,8 @@ class UserProfile(models.Model):
     key_expires = models.DateTimeField("The time and date when the user's activationKey expires",
         blank=True,
         null=True)
+    emailConfirmed = models.BooleanField("The user has confirmed their email address",
+        default=False)
 
     def __unicode__(self):
         return self.user.username

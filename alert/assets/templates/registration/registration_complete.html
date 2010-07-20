@@ -1,0 +1,10 @@
+{% extends "registration/login.html" %}
+
+{% block h2 %}
+<h2>Registration complete</h2>
+{% endblock %}
+
+{% block subtext %}
+<p>We have sent a confirmation email to <strong>{{email}}</strong>. Please check your email within five days to confirm your account.</p>
+<p>You may sign in to continue.</p>
+{%endblock%}
