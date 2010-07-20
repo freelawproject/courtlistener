@@ -97,6 +97,10 @@ class UserProfile(models.Model):
         null=True)
     plaintextPreferred = models.BooleanField("should the alert should be sent in plaintext",
         default=False)
+#    activationKey = models.CharField(max_length=40)
+#    key_expires = models.DateTimeField("The time and date when the user's activationKey expires",
+#        blank=True,
+#        null=True)
 
     def __unicode__(self):
         return self.user.username

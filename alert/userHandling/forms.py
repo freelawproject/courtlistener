@@ -26,7 +26,7 @@ class ProfileForm(ModelForm):
         model = UserProfile
         # things MUST be excluded, or they get deleted. Creates confusing
         # deletions. 
-        exclude = ('user','alert', 'avatar',)
+        exclude = ('user','alert', 'avatar', 'activationKey', 'key_expires')
 
         
 class UserForm(ModelForm):
@@ -55,7 +55,7 @@ class UserCreationFormExtended(UserCreationForm):
         super(UserCreationFormExtended, self).__init__(*args, **kwargs)
         self.fields['email'].required = True
 
-    # ensure that emails are always unique.
+    # ensure that emails are always unique. Not sure why this is duplicated from above. mlissner, 2010-07-20.
     def clean_email(self):
         email = self.cleaned_data.get('email')
         if email and User.objects.filter(email=email).count():

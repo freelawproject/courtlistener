@@ -65,7 +65,7 @@ def deleteProfile(request):
         
         request.user.delete()
         
-        return HttpResponseRedirect('/profile/delete/done')
+        return HttpResponseRedirect('/profile/delete/done/')
     
     
     return render_to_response('profile/delete.html', {}, RequestContext(request))
@@ -120,9 +120,13 @@ def register(request):
         # the user is already logged in, direct them to their settings page as a
         # logical fallback
         return HttpResponseRedirect('/profile/settings/')
-        
+
+
+# I am half-convinced this method isn't being used at all, and that the corresponding
+# url config is not either. Difficult to check, however. mlissner, 2010-07-20.
 def registerSuccess(request):
-    return HttpResponseRedirect('/register/success')
+    return HttpResponseRedirect('/register/success/')
+
 
 @login_required
 def password_change(request):
@@ -132,7 +136,7 @@ def password_change(request):
             form.save()
             messages.add_message(request, messages.SUCCESS, 
                 'Your password was changed successfully.')
-            return HttpResponseRedirect('/profile/password/change')
+            return HttpResponseRedirect('/profile/password/change/')
     else:
         form = PasswordChangeForm(user=request.user)
     return render_to_response('profile/password_form.html', {'form': form},
