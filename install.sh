@@ -878,7 +878,7 @@ else
         --debugToolbar) installDebugToolbar;;
         --djangoSphinx) getUserInput; installDjangoSphinx;;
         --djangoExtensions) getUserInput; installDjangoExtensions;;
-        --south) getUserInput; installSouth;;
+        --south) getUserInput; installSouth; finalize;;
         --finalize) getUserInput; finalize;;
         *) echo "install.sh: Invalid argument. Try the --help argument."
            exit 2;
