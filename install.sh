@@ -42,6 +42,7 @@
 # - install django-sphinx
 # - configure mysql & courtlistener
 # - install the django-debug toolbar
+# - install the south DB migration tool
 # - sync the django configuration with the database
 # - exit
 
@@ -82,6 +83,8 @@ OPTIONS
             install the django-sphinx connector
     --djangoExtensions
             install the django-extensions package from github
+    --south
+            install the South DB migration tool from mercurial
     --finalize
             finalize the installation
 
@@ -148,13 +151,13 @@ This file should NEVER be checked into revision control!
     read -p "What name would you like used as the admin name for the site (e.g. Michael Lissner): " CONFIG_NAME
     read -p "What email address should be used for the admin of the site (e.g. mike@courtlistener.com): " CONFIG_EMAIL
     read -p "Would you like the django-debug toolbar installed? It's good for dev work. (y/n): " INSTALL_DEBUG_TOOLBAR
-    read -p "Would you like the django-extensions package installed? It's good for dev work. (y/n): " INSTALL_DJANGO_EXTENSIONS
+    read -p "Would you like the django-extensions package installed? It's also good for dev work. (y/n): " INSTALL_DJANGO_EXTENSIONS
     read -p "Is this a development machine? (y/n): " DEVELOPMENT
     if [ $DEVELOPMENT == 'y' ]
     then
-        $DEVELOPMENT=true
+        DEVELOPMENT=true
     else
-        $DEVELOPMENT=false
+        DEVELOPMENT=false
     fi
     echo -e "\nGreat. These are stored in a tuple in the 20-private.conf file. You can add more
 people manually, if you like.
@@ -767,8 +770,32 @@ function installDjangoExtensions {
         cd django-extensions
         python setup.py install
         
-        echo -e '\ndjango-extensions installed successfully'
+        echo -e '\ndjango-extensions installed successfully.'
     fi
+}
+
+
+function installSouth {
+    echo -e '\n###################'
+    echo 'Installing South...'
+    echo '###################'
+    
+    read -p "Install South on this computer? (y/n): " proceed
+    if [ $proceed == 'n' ]
+    then
+        echo -e '\nGreat. Moving on.'
+        return 0
+    fi
+    
+    # install the mo'
+    cd $DJANGO_INSTALL_DIR
+    hg clone http://bitbucket.org/andrewgodwin/south/ South
+    cd South
+    python setup.py develop
+    
+    echo -e '\nSouth installed successfully.'
+}
+
 
 function finalize {
     echo -e '\n##############################'
@@ -788,6 +815,7 @@ function finalize {
     echo -e '\nInstallation finalized successfully.'
 }
 
+
 function main {
     # run the program!
     getUserInput
@@ -799,6 +827,7 @@ function main {
     installDjangoSphinx
     installDebugToolbar
     installDjangoExtensions
+    installSouth
     finalize
 
     echo -e "\n\n#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#"
@@ -848,7 +877,8 @@ else
         --courtListener) getUserInput; installCourtListener;;
         --debugToolbar) installDebugToolbar;;
         --djangoSphinx) getUserInput; installDjangoSphinx;;
-        --djangoExtensions) getUserInput; installDjangoExtensions
+        --djangoExtensions) getUserInput; installDjangoExtensions;;
+        --south) getUserInput; installSouth;;
         --finalize) getUserInput; finalize;;
         *) echo "install.sh: Invalid argument. Try the --help argument."
            exit 2;
