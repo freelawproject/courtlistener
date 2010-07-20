@@ -32,9 +32,7 @@ MAC_MC = re.compile(r"^([Mm]a?c)(\w+)")
 UNITED_STATES = re.compile('(?:U\.S\.(?:A\.)?(?=\s+|$)|usa|United States(?: of America)?)', re.IGNORECASE)
 ET_AL = re.compile(',?\set\.?\sal\.?', re.IGNORECASE)
 
-# For use in anonymize function
-SSN_AND_ITIN = re.compile(r'\d{3}-\d{2}-\d{4}')
-EIN = re.compile(r'\d{2}-\d{7}')
+
 
 
 def titlecase(text):
@@ -178,10 +176,33 @@ def cleanString(s):
     
     # return something vaguely sane
     return s
-    
+
+# For use in anonymize function
+SSN_AND_ITIN = re.compile('(\s|^)(\d{3}-\d{2}-\d{4})(\s|$)')
+EIN = re.compile('(\s|^)(\d{2}-\d{7})(\s|$)')
+
 def anonymize(s):
-    """Convert SSNs, EIN and alienIDs to X's. Hat tip to Altlaw for the regexes."""
-    s = re.sub(SSN_AND_ITIN, "XXX-XX-XXXX", s)
-    s = re.sub(EIN, "XX-XXXXXXX", s)
+    """Convert SSNs, EIN and alienIDs to X's."""
+    """
+    # For testing
+    testStrings = [
+        ("444-44-4444", "XXX-XX-XXXX"),
+        ("   444-44-4444", "   XXX-XX-XXXX"),
+        ("   444-44-4444   ", "   XXX-XX-XXXX   "),
+        ("4444-44-4444", "4444-44-4444"),
+        (" 4444-44-4444", " 4444-44-4444"),
+        (" 4444-44-4444 ", " 4444-44-4444 "),
+        ("444-44-44444", "444-44-44444"),
+        ("444-444-4444", "444-444-4444")]
+        
+    for test, goal in testStrings:
+        result = re.sub(SSN_AND_ITIN, r"\1XXX-XX-XXXX\3", test)
+        result = re.sub(EIN, r'\1XX-XXXXXXX\3', result)
+        if result != goal:
+            print "\"" + test + "\"" + " --> " + "\"" + result + "\""
+    """
     
+    s = re.sub(SSN_AND_ITIN, r"\1XXX-XX-XXXX\3", s)
+    s = re.sub(EIN, r"\1XX-XXXXXXX\3", s)
+
     return s
