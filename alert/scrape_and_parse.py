@@ -1552,7 +1552,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     .nextSibling.nextSibling.nextSibling.nextSibling.nextSibling\
                     .contents[0].strip()
                 # normalize the result for our internal purposes...
-                if documentType == "Non-precedential":
+                if documentType == "Nonprecedential":
                     documentType = "Unpublished"
                 elif documentType == "Precedential":
                     documentType = "Published"
