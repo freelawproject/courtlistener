@@ -1544,7 +1544,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # next: caseNameShort
                 caseNameShort = trTags[i].td.nextSibling.nextSibling.nextSibling\
                     .nextSibling.nextSibling.nextSibling.a.contents[0]\
-                    .replace('[Motion]', '').replace('[order]', '')
+                    .replace('[Motion]', '').replace('[order]', '').replace('(RULE 36)', '')
                 caseNameShort = titlecase(caseNameShort.lower())
 
                 # next: documentType
