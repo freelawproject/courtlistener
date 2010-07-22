@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/"
+                       xmlns:moz="http://www.mozilla.org/2006/browser/search/">
+  <ShortName>Court Listener</ShortName>
+  <Description>Search the CourtListener.com database</Description>
+  <Url type="text/html" method="get" template="http://courtlistener.com/search/results/?q={searchTerms}&amp;search="/>
+  <Image width="16" height="16">http://courtlistener.com/media/images/ico/favicon.ico</Image>
+  <Developer>Court Listener</Developer>
+
+  <InputEncoding>UTF-8</InputEncoding>
+  <moz:SearchForm>http://courtlistener.com</moz:SearchForm>
+  <Url type="application/opensearchdescription+xml" rel="self" template="http://courtlistener.com/media/xml/opensearch.xml"/>
+  <moz:UpdateUrl>http://courtlistener.com/media/xml/opensearch.xml</moz:UpdateUrl>
+</OpenSearchDescription>
