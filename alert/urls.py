@@ -58,6 +58,7 @@ urlpatterns = patterns('',
     (r'^contact/thanks/$', thanks),
     
     # Various sign in/out etc. functions as provided by django
+    (r'^sign-in-register/$', combined_signin_register),
     url(r'^sign-in/$', signIn, name="sign-in"),
     (r'^sign-out/$', signOut),
 
