@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {# this could mirror the titles of yahoo, google and bing more closely, if we want. #}
-{% block title %} CourtListener.com / Results / {{ query }} / 
+{% block title %} CourtListener.com / Results / {{ query }} /
 {% if results.paginator.num_pages %}
 Page / {{ results.number }} of {{results.paginator.num_pages}}
 {% endif %}
@@ -62,13 +62,13 @@ Page / {{ results.number }} of {{results.paginator.num_pages}}
             <div class="span-24 last">
                 <div class="span-11">
                 {% for message in messages %}
-                        <p class="bottom {{message.tags}}">{{message|safe}}</p>
+                    <p class="bottom {{message.tags}}">{{message|safe}}</p>
                 {% endfor %}
                 </div>
                 <div class="span-13 last">&nbsp;</div>
             </div>
         {% endif %}
-        
+
         <div class="span-18 last">
             <form action="" method="get">
                 <input class="wide-title {% if not results.object_list or not query%}auto-focus{% endif %}" name="q" id="search" value="{{query}}">&nbsp;&nbsp;

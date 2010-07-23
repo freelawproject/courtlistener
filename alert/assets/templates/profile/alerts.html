@@ -11,20 +11,7 @@
             </h3>
         </div>
     </div>
-    <div class="span-24 last" id="content">
-        
-        {% if messages %}
-            <div class="span-24 last">
-                <div class="span-10">
-                {% for message in messages %}
-                        <p class="bottom {{message.tags}}">{{message}}</p>
-                {% endfor %}
-                </div>
-                <div class="span-14 last">&nbsp;</div>
-            </div>
-        {% endif %}
-        
-        
+    <div class="span-24 last" id="content">        
         {% if user.get_profile.alert.all %}
             <div class="span-24 last content">
                 <table>
