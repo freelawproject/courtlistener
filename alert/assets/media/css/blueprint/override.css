@@ -12,17 +12,8 @@ Sets up all the overrides or additional CSS that the site will use.
     padding: 0px 10px;
 }
 
-.navigation {
-    padding: 0.75em 0em .75em 1.5em;
-}
-
-.navigation * {
-    display: inline;
-    padding: 0em;
-    margin: 0;
-}
-
 .navigation > ul {
+    display: inline;
     padding: 0;
 }
 
@@ -31,6 +22,7 @@ Sets up all the overrides or additional CSS that the site will use.
     padding: 0em 0.7em 0em 0.7em;
     white-space: nowrap;
     text-align: center;
+    display: inline;
 }
 
 .round {
@@ -58,7 +50,7 @@ a:link, a:visited {
     text-decoration: none;
 }
 
-a:hover, a:focus {
+a:focus, a:hover {
     text-decoration: underline;
     color: #009;
 }
@@ -76,9 +68,9 @@ a:hover, a:focus {
     color: black;
 }
 
-.header > h3 > a {
+/*.header > h3 > a {
     color: black;
-}
+}*/
 
 input.wide-title {
     width: 390px;
