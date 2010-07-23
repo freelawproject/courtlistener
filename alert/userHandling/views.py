@@ -77,6 +77,7 @@ def deleteProfile(request):
 def deleteProfileDone(request):
     return render_to_response('profile/deleted.html', {}, RequestContext(request))
 
+
 def register(request):
     """allow only an anonymous user to register"""
     redirect_to = request.REQUEST.get('next', '')

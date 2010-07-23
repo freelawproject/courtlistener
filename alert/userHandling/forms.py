@@ -26,7 +26,7 @@ class ProfileForm(ModelForm):
         model = UserProfile
         # things MUST be excluded, or they get deleted. Creates confusing
         # deletions.
-        exclude = ('user','alert', 'avatar', 'activationKey', 'key_expires')
+        exclude = ('user','alert', 'avatar', 'activationKey', 'key_expires', 'emailConfirmed')
 
 
 class UserForm(ModelForm):
