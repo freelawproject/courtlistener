@@ -23,7 +23,7 @@
         {% if messages %}    
             <div class="span-10">
                 {% for message in messages %}
-                    <p class="bottom {{message.tags}}">{{message}}</p>
+                    <p class="bottom {{message.tags}}">{{message|safe}}</p>
                 {% endfor %}
             </div>
             <div class="span-7 last">&nbsp;</div>
