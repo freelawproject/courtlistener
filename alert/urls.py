@@ -56,7 +56,7 @@ urlpatterns = patterns('',
     # Contact us pages
     (r'^contact/$', contact),
     (r'^contact/thanks/$', thanks),
-    
+
     # Various sign in/out etc. functions as provided by django
     url(r'^sign-in-register/$', combined_signin_register, name="sign-in-register"),
     url(r'^sign-in/$', signIn, name="sign-in"),
@@ -73,11 +73,13 @@ urlpatterns = patterns('',
     (r'^profile/delete/$', deleteProfile),
     (r'^profile/delete/done/$', deleteProfileDone),
     url(r'^register/$', register, name="register"),
-    
+    (r'^register/success/$', registerSuccess),
+
     # Registration pages
     (r'^email/confirm/([0-9a-f]{40})/$', confirmEmail),
-    (r'^request-email-confirmation/$', requestEmailConfirmation),
-    
+    (r'^email-confirmation/request/$', requestEmailConfirmation),
+    (r'^email-confirmation/success/$', emailConfirmSuccess),
+
     #Reset password pages
     (r'^reset-password/$', password_reset),
     (r'^reset-password/instructions-sent/$', password_reset_done),
@@ -106,7 +108,7 @@ urlpatterns = patterns('',
     # Sitemap index generator
     (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.index',
         {'sitemaps': sitemaps}),
-    # this uses a custom sitemap generator that has a file-based cache.    
+    # this uses a custom sitemap generator that has a file-based cache.
     (r'^sitemap-(?P<section>.+)\.xml$', 'django.contrib.sitemaps.views.sitemap', {'sitemaps': sitemaps}),
     #(r'^robots.txt$', robots), # removed for lack of need.
 )
