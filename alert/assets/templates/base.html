@@ -43,8 +43,11 @@
                                 <li><a href="/about/">About</a></li>
                                 <li><a href="/">Search</a></li>
                                 <li><a href="/opinions/all">Opinions</a></li>
-                                <li><a href="{%url register%}?next={{request.path}}">Register</a></li>
-                                <li><a href="{%url sign-in%}?next={{request.path}}">Sign in</a></li>
+                                {% if request.path != "/sign-out/" %}
+                                    <li><a href="{%url sign-in-register%}?next={{request.path}}">Sign in / Register</a></li>
+                                {% else %}
+                                    <li><a href="{%url sign-in-register%}">Sign in / Register</a></li>
+                                {% endif %}
                             </ul>
                         </div>
                     </div>
@@ -53,8 +56,18 @@
             
             <hr>
             
-           {% block content %}
-                <div class="span-18 colborder" id="content"> 
+            {% block messages %}
+                <div class="span-24 last">
+                    {% if messages %}    
+                        {% for message in messages %}
+                            <p class="bottom {{message.tags}}">{{message|safe}}</p>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            {% endblock %}
+            
+            {% block content %}
+                <div class="span-18 colborder" id="content">
                     <p>Your content seems to be missing!</p>
                 </div>
             {% endblock %}
@@ -68,6 +81,7 @@
             
             {% block footer %}
                 <div class="span-24 last">
+                    <hr class="space">
                     <hr>
                 </div>
                 <div class="span-24 last small quiet" id="footer">

@@ -18,9 +18,11 @@ from alert.settings import LOGIN_REDIRECT_URL
 from alert.userHandling.forms import *
 from alert.userHandling.models import BarMembership
 from django.contrib import messages
+from django.contrib.auth import authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import User
+from django.contrib.auth import login
 from django.contrib.auth.views import login as signIn
 from django.contrib.sites.models import Site
 from django.core.mail import send_mail
@@ -81,7 +83,6 @@ def deleteProfileDone(request):
 
 def register(request):
     """allow only an anonymous user to register"""
-
     redirect_to = request.REQUEST.get('next', '')
 
     # security checks:
@@ -128,7 +129,12 @@ def register(request):
                                  activationKey = activationKey,
                                  key_expires = key_expires)
                 up.save()
-
+                
+                # Log the user in (pulled from the login view and here:
+                # http://bitbucket.org/ubernostrum/django-registration/src/tip/registration/backends/simple/__init__.py#cl-26
+                new_user = authenticate(username=username, password=password)
+                login(request, new_user)
+                    
                 # Send an email with the confirmation link
                 current_site = Site.objects.get_current()
                 email_subject = 'Confirm your account on' + current_site.name,
@@ -147,14 +153,11 @@ For questions or comments, please see our contact page, http://courtlistener.com
                           [new_user.email])
 
 
-#                # make these into strings so we can pass them off to the template
-#                username = str(cd['username'])
-#                password = str(cd['password1'])
-
                 #return HttpResponseRedirect('/sign-in/?next=' + redirect_to)
-                return render_to_response("registration/registration_complete.html",
-                    {'email': new_user.email},
-                    RequestContext(request))
+                messageText = "An email has been sent to <strong>" + new_user.email + "</strong>. \
+                    Please check your email within 5 days to confirm your account."
+                messages.add_message(request, messages.INFO, messageText)
+                return HttpResponseRedirect(redirect_to)
 
         else:
             form = UserCreationFormExtended()
@@ -167,33 +170,14 @@ For questions or comments, please see our contact page, http://courtlistener.com
 
 
 def combined_signin_register(request):
-    """This function uses the stock django sign-in function and the custom 
-    register function to sign users in or register them, depending on what they
-    try to do."""
+    """Checks that the user is anonymous, then allows them to register or sign-in"""
     if request.user.is_anonymous():
-        if request.method == 'POST':
-            try:
-                if request.POST['sign-in'] == "": 
-                    # A user is signing in - run the signIn function.
-                    return signIn(request)
-            except:
-                if request.POST['register'] == "": 
-                    # A user is registering - run the register function
-                    return register(request)
-        else:
-            form = UserCreationFormExtended()
-            return render_to_response('profile/login_or_register.html', {'form': form},
-                RequestContext(request))
+        next = request.REQUEST.get('next', '')
+        form = UserCreationFormExtended()
+        return render_to_response('profile/login_or_register.html', {'form': form, 'next': next},
+            RequestContext(request))
     else:
-        # the user is already logged in, direct them to their settings page as a
-        # logical fallback
         return HttpResponseRedirect('/profile/settings/')
-
-
-# I am half-convinced this method isn't being used at all, and that the corresponding
-# url config is not either. Difficult to check, however. mlissner, 2010-07-20.
-def registerSuccess(request):
-    return HttpResponseRedirect('/register/success/')
 
 
 @login_required
