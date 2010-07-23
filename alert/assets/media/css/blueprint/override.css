@@ -63,6 +63,10 @@ a:hover, a:focus {
     color: #009;
 }
 
+.error a, .notice a, .success a {
+    text-decoration: underline;
+}
+
 .errortext {
     color: #8a1f11;
 }
