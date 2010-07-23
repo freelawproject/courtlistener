@@ -133,7 +133,7 @@ def register(request):
                 email_body = "Hello, %s, and thanks for signing up for an \
 account!\n\nTo send you emails, we need you to activate your account with CourtListener.com. \
 To activate your account, click this link within 5 days:\
-\n\nhttp://courtlistener.com/accounts/confirm/%s\n\nThanks for using our site,\n\n\
+\n\nhttp://courtlistener.com/email/confirm/%s\n\nThanks for using our site,\n\n\
 The CourtListener team\n\n\
 -------------------\n\
 For questions or comments, please see our contact page, http://courtlistener.com/contact/." % (
@@ -144,12 +144,6 @@ For questions or comments, please see our contact page, http://courtlistener.com
                           'no-reply@courtlistener.com',
                           [new_user.email])
 
-
-#                # make these into strings so we can pass them off to the template
-#                username = str(cd['username'])
-#                password = str(cd['password1'])
-                
-                #return HttpResponseRedirect('/sign-in/?next=' + redirect_to)
                 return render_to_response("registration/registration_complete.html",
                     {'email': new_user.email},
                     RequestContext(request))
@@ -163,6 +157,23 @@ For questions or comments, please see our contact page, http://courtlistener.com
         # logical fallback
         return HttpResponseRedirect('/profile/settings/')
 
+
+def confirmEmail(request, activationKey):
+    if request.user.emailConfirmed:
+        return render_to_response('confirm.html', {'confirmed': True})
+    try:
+        user_profile = Userprofile.objects.get(activationKey=activationKey)
+    except:
+        return render_to_response('confirm.html', {'invalid': True})
+    if user_profile.key_expires < datetime.datetime.today():
+        return render_to_response('confirm.html', {'expired': True})
+    user_profile.emailConfirmed = True
+    user_profile.save()
+    return render_to_response('confirm.html', {'success': True})
+
+
+def requestEmailConfirmation(request):
+    pass
 
 # I am half-convinced this method isn't being used at all, and that the corresponding
 # url config is not either. Difficult to check, however. mlissner, 2010-07-20.

@@ -73,7 +73,11 @@ urlpatterns = patterns('',
     (r'^profile/delete/done/$', deleteProfileDone),
     url(r'^register/$', register, name="register"),
     (r'^register/success/$', registerSuccess),
-
+    
+    # Registration pages
+    (r'^email/confirm/([0-9a-f]{40})/$', confirmEmail),
+    (r'^request-email-confirmation/$', requestEmailConfirmation),
+    
     #Reset password pages
     (r'^reset-password/$', password_reset),
     (r'^reset-password/instructions-sent/$', password_reset_done),
