@@ -12,16 +12,16 @@
 {% endblock %}
 
 {% block content %}
-    <div class="span-10 last" id="content">
+    <div class="span-18 last colborder" id="content">
         {% if alreadyConfirmed %}
-            <div class="span-10 error bottom">
+            <div class="span-18">
                 <h2>Already confirmed</h2>
                 <p class="bottom">That email address is already confirmed. <a href="/settings/profile/">Proceed to your account</a>.</p>
             </div>
         {% else %}
-            <div class="span-10 error bottom">
+            <div class="span-18">
                 <h2>Email confirmation sent</h2>
-                <p>We have sent a confirmation email to that address. Please verify your email address within five days.</p>
+                <p>We have sent a confirmation message to your email address. To continue receiving emails, please verify your email address within five days.</p>
             </div>
         {% endif %}
 

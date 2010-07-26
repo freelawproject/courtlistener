@@ -80,12 +80,25 @@ http://courtlistener.com/contact/." % (
                       'no-reply@courtlistener.com',
                       [newEmail])
 
+            messages.add_message(request, messages.SUCCESS,
+                'Your settings were saved successfully. To continue ' +
+                'receiving emails, please confirm your new email address ' +
+                'by checking your email within five days.')
+        elif up.emailConfirmed == False:
+            # they didn't just change their email, but it isn't confirmed.
+            messages.add_message(request, messages.INFO,
+                'Your email address has not been confirmed. To receive ' +
+                'alerts, you must <a href="/email-confirmation/request/">' +
+                'confirm your email address</a>.')
+        else:
+            # if the email wasn't changed, simply inform of success.
+            messages.add_message(request, messages.SUCCESS,
+                'Your settings were saved successfully.')
 
         # New email address and changes above are saved here.
         profileForm.save()
         userForm.save()
-        messages.add_message(request, messages.SUCCESS,
-            'Your settings were saved successfully.')
+
         return HttpResponseRedirect('/profile/settings/')
     return render_to_response('profile/settings.html',
         {'profileForm': profileForm,
@@ -248,72 +261,51 @@ def confirmEmail(request, activationKey):
     return render_to_response('registration/confirm.html', {'success': True})
 
 
+@login_required
 def requestEmailConfirmation(request):
-    if request.method == 'POST':
-        # Send a new confirmation key to the email address provided.
-        form = EmailConfirmationForm(request.POST)
-        if form.is_valid():
-            # we look up the user in the user table. If we find them, we send
-            # an email, and associate the new confirmation link with that
-            # account. If we don't find the user, we tell the person, and
-            # point them towards the registration and forgot password pages.
-            cd = form.cleaned_data
-            email = cd['email']
+    # Send a confirmation link, and inform the user that it has been sent.
+    user = request.user
+    up = user.get_profile()
+    if up.emailConfirmed:
+        # their email is already confirmed.
+        return render_to_response(
+            'registration/request_email_confirmation.html',
+            {'alreadyConfirmed': True}, RequestContext(request))
+    else:
+        # we look up the user in the user table. If we find them, we send
+        # an email, and associate the new confirmation link with that
+        # account. If we don't find the user, we tell the person, and
+        # point them towards the registration and forgot password pages.
+        email = user.email
 
-            try:
-                user = User.objects.get(email=email)
-            except:
-                return render_to_response(
-                    'registration/request_email_confirmation.html',
-                    {'unknownAccount': True, 'form': form},
-                    RequestContext(request))
+        # make a new activation key.
+        salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
+        activationKey = hashlib.sha1(salt+user.username).hexdigest()
+        key_expires = datetime.datetime.today() + datetime.timedelta(5)
 
-            # make a new activation key.
-            salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-            activationKey = hashlib.sha1(salt+user.username).hexdigest()
-            key_expires = datetime.datetime.today() + datetime.timedelta(5)
+        # associate it with the user's account.
+        up.activationKey = activationKey
+        up.key_expires = key_expires
+        up.save()
 
-            # associate it with the user's account.
-            up = user.get_profile()
-            up.activationKey = activationKey
-            up.key_expires = key_expires
-            up.save()
-
-            # and send the email
-            current_site = Site.objects.get_current()
-            email_subject = 'Confirm your account on' + current_site.name,
-            email_body = "Hello, %s,\n\nPlease confirm your email address by \
+        # and send the email
+        current_site = Site.objects.get_current()
+        email_subject = 'Confirm your account on' + current_site.name,
+        email_body = "Hello, %s,\n\nPlease confirm your email address by \
 clicking the following link within 5 days:\
 \n\nhttp://courtlistener.com/email/confirm/%s\n\nThanks for using our site,\
-\n\n\The CourtListener team\n\n\-------------------\n\
+\n\nThe CourtListener team\n\n\-------------------\n\
 For questions or comments, please see our contact page, \
 http://courtlistener.com/contact/." % (
-                user.username,
-                up.activationKey)
-            send_mail(email_subject,
-                      email_body,
-                      'no-reply@courtlistener.com',
-                      [user.email])
+            user.username,
+            up.activationKey)
+        send_mail(email_subject,
+                  email_body,
+                  'no-reply@courtlistener.com',
+                  [user.email])
 
-        return HttpResponseRedirect('/email-confirmation/success/')
-
-    else:
-        if request.user.is_anonymous():
-            form = EmailConfirmationForm()
-        else:
-            up = UserProfile(user = request.user)
-            if up.emailConfirmed:
-                # their email is already confirmed.
-                return render_to_response(
-                    'registration/request_email_confirmation.html',
-                    {'alreadyConfirmed': True}, RequestContext(request))
-            else:
-                # they are seeing the form for the first time, and their email
-                # is unconfirmed.
-                email_addy = request.user.email
-                form = EmailConfirmationForm(initial = {'email': email_addy})
         return render_to_response(
-            'registration/request_email_confirmation.html', {'form': form},
+            'registration/request_email_confirmation.html', {},
             RequestContext(request))
 
 
