@@ -29,7 +29,9 @@ from django.core.mail import send_mail
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.http import HttpResponseRedirect
-import datetime, random, hashlib
+import datetime
+import random
+import hashlib
 
 
 @login_required
@@ -41,21 +43,63 @@ def viewAlerts(request):
 @login_required
 def viewSettings(request):
     userForm = UserForm(request.POST or None, instance=request.user)
-    profileForm = ProfileForm(request.POST or None, instance=request.user.get_profile())
+    profileForm = ProfileForm(request.POST or None,
+        instance=request.user.get_profile())
     if profileForm.is_valid() and userForm.is_valid():
+        cd = profileForm.cleaned_data
+        newEmail = cd['email']
+        oldEmail = request.user.email
+        up = request.user.get_profile()
+
+        if oldEmail != newEmail:
+            # email changed, send an email, toggle their email confirmation
+            # status, and send them a confirmation link.
+
+            # Build the activation key for the new account
+            salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
+            activationKey = hashlib.sha1(salt+new_user.username).hexdigest()
+            key_expires = datetime.datetime.today() + datetime.timedelta(5)
+
+            # Toggle the confirmation status.
+            up.emailConfirmed = False
+            up.activationKey = activationKey
+            up.key_expires = key_expires
+
+            # Send the email.
+            current_site = Site.objects.get_current()
+            email_subject = 'Email changed successfully on ' + \
+                current_site.name,
+            email_body = "Hello, %s,\n\nYou have successfully changed your \
+email address at %s. Please confirm this change by clicking the following \
+link within 5 days:\n\nhttp://courtlistener.com/email/confirm/%s\n\n\
+Thanks for using our site,\n\n\The CourtListener team\n\n\
+-------------------\nFor questions or comments, please see our contact page, \
+http://courtlistener.com/contact/." % (
+                user.username,
+                current_site.name,
+                up.activationKey)
+            send_mail(email_subject,
+                      email_body,
+                      'no-reply@courtlistener.com',
+                      [newEmail])
+
+
+        # New email address and changes above are saved here.
         profileForm.save()
         userForm.save()
         messages.add_message(request, messages.SUCCESS,
             'Your settings were saved successfully.')
         return HttpResponseRedirect('/profile/settings/')
-    return render_to_response('profile/settings.html', {'profileForm': profileForm,
-        'userForm': userForm}, RequestContext(request))
+    return render_to_response('profile/settings.html',
+        {'profileForm': profileForm,
+         'userForm': userForm}, RequestContext(request))
 
 
 @login_required
 def deleteProfile(request):
     if request.method == 'POST':
-        # Gather their foreign keys, delete those, then delete their profile and user info
+        # Gather their foreign keys, delete those, then delete their profile
+        # and user info
         try:
             # they may not have a userProfile
             userProfile = request.user.get_profile()
@@ -71,11 +115,13 @@ def deleteProfile(request):
         request.user.delete()
         return HttpResponseRedirect('/profile/delete/done/')
 
-    return render_to_response('profile/delete.html', {}, RequestContext(request))
+    return render_to_response('profile/delete.html', {},
+        RequestContext(request))
 
 
 def deleteProfileDone(request):
-    return render_to_response('profile/deleted.html', {}, RequestContext(request))
+    return render_to_response('profile/deleted.html', {},
+        RequestContext(request))
 
 
 def register(request):
@@ -102,13 +148,14 @@ def register(request):
                 # it seems like I should use this, but it's causing trouble...
                 cd = form.cleaned_data
 
-                username = str(cd['username'])
-                password = str(cd['password1'])
-                email = str(cd['email'])
-                fname = str(cd['first_name'])
-                lname = str(cd['last_name'])
+                username = cd['username']
+                password = cd['password1']
+                email = cd['email']
+                fname = cd['first_name']
+                lname = cd['last_name']
 
-                # make a new user that is active, but has not confirmed their email.
+                # make a new user that is active, but has not confirmed their
+                # email.
                 new_user = User.objects.create_user(username, email, password)
                 new_user.first_name = fname
                 new_user.last_name = lname
@@ -116,19 +163,22 @@ def register(request):
 
                 # Build the activation key for the new account
                 salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-                activationKey = hashlib.sha1(salt+new_user.username).hexdigest()
-                key_expires = datetime.datetime.today() + datetime.timedelta(5)
+                activationKey = hashlib.sha1(salt+new_user.username)\
+                    .hexdigest()
+                key_expires = datetime.datetime.today() + datetime\
+                    .timedelta(5)
 
                 # associate a new UserProfile associated with the new user
-                # this makes it so every time we call get_profile(), we can be sure
-                # there is a profile waiting for us (a good thing).
+                # this makes it so every time we call get_profile(), we can be
+                # sure there is a profile waiting for us (a good thing).
                 up = UserProfile(user = new_user,
                                  activationKey = activationKey,
                                  key_expires = key_expires)
                 up.save()
 
                 # Log the user in (pulled from the login view and here:
-                # http://bitbucket.org/ubernostrum/django-registration/src/tip/registration/backends/simple/__init__.py#cl-26
+                # http://bitbucket.org/ubernostrum/django-registration/src/\
+                #   tip registration/backends/simple/__init__.py#cl-26
                 new_user = authenticate(username=username, password=password)
                 login(request, new_user)
 
@@ -136,12 +186,13 @@ def register(request):
                 current_site = Site.objects.get_current()
                 email_subject = 'Confirm your account on' + current_site.name,
                 email_body = "Hello, %s, and thanks for signing up for an \
-account!\n\nTo send you emails, we need you to activate your account with CourtListener.com. \
-To activate your account, click this link within 5 days:\
-\n\nhttp://courtlistener.com/email/confirm/%s\n\nThanks for using our site,\n\n\
-The CourtListener team\n\n\
+account!\n\nTo send you emails, we need you to activate your account with \
+CourtListener.com. To activate your account, click this link within 5 days:\
+\n\nhttp://courtlistener.com/email/confirm/%s\n\nThanks for using our site,\
+\n\n\The CourtListener team\n\n\
 -------------------\n\
-For questions or comments, please see our contact page, http://courtlistener.com/contact/." % (
+For questions or comments, please see our contact page, \
+http://courtlistener.com/contact/." % (
                     new_user.username,
                     up.activationKey)
                 send_mail(email_subject,
@@ -149,31 +200,34 @@ For questions or comments, please see our contact page, http://courtlistener.com
                           'no-reply@courtlistener.com',
                           [new_user.email])
 
-                return HttpResponseRedirect('/register/success/?next=' + redirect_to)
+                return HttpResponseRedirect('/register/success/?next=' \
+                    + redirect_to)
         else:
             form = UserCreationFormExtended()
         return render_to_response("profile/register.html", {'form': form},
             RequestContext(request))
     else:
-        # the user is already logged in, direct them to their settings page as a
-        # logical fallback
+        # the user is already logged in, direct them to their settings page as
+        # a logical fallback
         return HttpResponseRedirect('/profile/settings/')
 
+
 def registerSuccess(request):
-    '''all redirect security checks should be done by now. Inform the user of their
-    status, and redirect them.'''
+    '''all redirect security checks should be done by now. Inform the user of
+    their status, and redirect them.'''
     redirect_to = request.REQUEST.get('next', '')
     return render_to_response('registration/registration_complete.html',
         {'redirect_to': redirect_to})
 
 
 def combined_signin_register(request):
-    """Checks that the user is anonymous, then allows them to register or sign-in"""
+    """Checks that the user is anonymous, then allows them to register or
+    sign-in"""
     if request.user.is_anonymous():
         next = request.REQUEST.get('next', '')
         form = UserCreationFormExtended()
-        return render_to_response('profile/login_or_register.html', {'form': form, 'next': next},
-            RequestContext(request))
+        return render_to_response('profile/login_or_register.html',
+            {'form': form, 'next': next}, RequestContext(request))
     else:
         return HttpResponseRedirect('/profile/settings/')
 
@@ -185,11 +239,14 @@ def confirmEmail(request, activationKey):
         user_profile = UserProfile.objects.get(activationKey=activationKey)
         if user_profile.emailConfirmed:
             # their email is already confirmed.
-            return render_to_response('registration/confirm.html', {'alreadyConfirmed': True})
+            return render_to_response('registration/confirm.html',
+                {'alreadyConfirmed': True})
     except:
-        return render_to_response('registration/confirm.html', {'invalid': True})
+        return render_to_response('registration/confirm.html',
+            {'invalid': True})
     if user_profile.key_expires < datetime.datetime.today():
-        return render_to_response('registration/confirm.html', {'expired': True})
+        return render_to_response('registration/confirm.html',
+            {'expired': True})
     user_profile.emailConfirmed = True
     user_profile.save()
     return render_to_response('registration/confirm.html', {'success': True})
@@ -200,19 +257,19 @@ def requestEmailConfirmation(request):
         # Send a new confirmation key to the email address provided.
         form = EmailConfirmationForm(request.POST)
         if form.is_valid():
-            # we look up the user in the user table. If we find them, we send an
-            # email, and associate the new confirmation link with that account. If
-            # we don't find the user, we tell the person, and point them towards
-            # the registration and forgot password pages.
+            # we look up the user in the user table. If we find them, we send
+            # an email, and associate the new confirmation link with that
+            # account. If we don't find the user, we tell the person, and
+            # point them towards the registration and forgot password pages.
             cd = form.cleaned_data
             email = cd['email']
 
             try:
                 user = User.objects.get(email=email)
-                print str(user)
             except:
-                return render_to_response('registration/request_email_confirmation.html',
-                    {'unknownAccount': True, 'form':form}, RequestContext(request))
+                return render_to_response('registration/request_email_\
+                    confirmation.html', {'unknownAccount': True,
+                    'form': form}, RequestContext(request))
 
             # make a new activation key.
             salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
@@ -230,10 +287,10 @@ def requestEmailConfirmation(request):
             email_subject = 'Confirm your account on' + current_site.name,
             email_body = "Hello, %s,\n\nPlease confirm your email address by \
 clicking the following link within 5 days:\
-\n\nhttp://courtlistener.com/email/confirm/%s\n\nThanks for using our site,\n\n\
-The CourtListener team\n\n\
--------------------\n\
-For questions or comments, please see our contact page, http://courtlistener.com/contact/." % (
+\n\nhttp://courtlistener.com/email/confirm/%s\n\nThanks for using our site,\
+\n\n\The CourtListener team\n\n\-------------------\n\
+For questions or comments, please see our contact page, \
+http://courtlistener.com/contact/." % (
                 user.username,
                 up.activationKey)
             send_mail(email_subject,
@@ -250,19 +307,21 @@ For questions or comments, please see our contact page, http://courtlistener.com
             up = UserProfile(user = request.user)
             if up.emailConfirmed:
                 # their email is already confirmed.
-                return render_to_response('registration/request_email_confirmation.html',
-                    {'alreadyConfirmed': True}, RequestContext(request))
+                return render_to_response('registration/request_email_\
+                    confirmation.html', {'alreadyConfirmed': True},
+                    RequestContext(request))
             else:
-                # they are seeing the form for the first time, and their email is unconfirmed.
+                # they are seeing the form for the first time, and their email
+                # is unconfirmed.
                 email_addy = request.user.email
                 form = EmailConfirmationForm(initial = {'email': email_addy})
-        return render_to_response('registration/request_email_confirmation.html',
-                {'form':form}, RequestContext(request))
+        return render_to_response('registration/request_email_\
+                confirmation.html', {'form': form}, RequestContext(request))
 
 
 def emailConfirmSuccess(request):
-    return render_to_response('registration/request_email_confirmation_success.html',
-        {}, RequestContext(request))
+    return render_to_response('registration/request_email_confirmation_\
+        success.html', {}, RequestContext(request))
 
 
 @login_required
