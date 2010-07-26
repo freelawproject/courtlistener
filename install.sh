@@ -2,17 +2,17 @@
 
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
@@ -26,11 +26,11 @@
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
 
-# This script is designed to install the CourtListener project on a Linux 
+# This script is designed to install the CourtListener project on a Linux
 # machine. It was written for Ubuntu Lucid Linux - v. 10.04, but should work on
 # most debian derivatives.
 #
-# This script should also serve as the documentation for the installation 
+# This script should also serve as the documentation for the installation
 # process.
 
 # This script does the following:
@@ -38,6 +38,7 @@
 # - get various input from the user.
 # - install django from source
 # - install CourtListener from source
+# - put some basic data in the database
 # - install & configure Sphinx
 # - install django-sphinx
 # - configure mysql & courtlistener
@@ -58,14 +59,14 @@ SYNOPSIS
     install.sh --help | --install
 
 OPTIONS
-    This program will install the courtlistener software on your computer. It 
+    This program will install the courtlistener software on your computer. It
     makes a number of assumptions, but does its best. Patches and contributions
     are welcome.
-    
+
     Standard Options
     --help      Print this help file
     --install   Install all components of the courtlistener software
-    
+
     Untested Options
     --checkdeps
             Verify that the required dependencies are installed.
@@ -77,6 +78,8 @@ OPTIONS
             install Django
     --courtListener
             set up the CL repository, and configure it with django
+    --importData
+            import some basic data into the DB, setting up the courts
     --debugToolbar
             install the django debug toolbar
     --djangoSphinx
@@ -100,7 +103,7 @@ EXIT STATUS
         7   Error configuring MySQL
 
 AUTHOR AND COPYRIGHT
-    This script was authored by Michael Lissner and is released under the same 
+    This script was authored by Michael Lissner and is released under the same
     permissive license as the remainder of the courtlistener program.
 
 EOF
@@ -109,9 +112,9 @@ EOF
 
 function getUserInput {
 cat<<EOF
-Welcome to the install script. This script will install the courtlistener system 
-on your Debian-based Linux computer. We will begin by gathering several pieces 
-of input from you, and then we will install django, courtlistener, sphinx, 
+Welcome to the install script. This script will install the courtlistener system
+on your Debian-based Linux computer. We will begin by gathering several pieces
+of input from you, and then we will install django, courtlistener, sphinx,
 django-sphinx, django-debug toolbar, MySQL, and all their dependencies.
 
 EOF
@@ -123,7 +126,7 @@ EOF
         sleep 0.5
         echo -e "\nGreat. Off we go.\n"
     fi
-    
+
     # this function sets some variables that will be used throughout the program
     read -p "The default location for your django installation is /opt. Is this OK? (y/n): " proceed
     if [ $proceed == "n" ]
@@ -132,7 +135,7 @@ EOF
     else
         DJANGO_INSTALL_DIR='/opt'
     fi
-    
+
     # set up the PYTHON_SITES_PACKAGES_DIR
     PYTHON_SITES_PACKAGES_DIR=`python -c "from distutils.sysconfig import get_python_lib; print get_python_lib()"`
     read -p "The default location for your CourtListener installation is /var/www. Is this OK? (y/n): " proceed
@@ -142,10 +145,10 @@ EOF
     else
         CL_INSTALL_DIR='/var/www'
     fi
-    
+
     # set up the private settings file
-    echo -e "\nWe are going to set up two settings files. One with private data, and one with 
-public data. For the private data, we will need to gather some information. 
+    echo -e "\nWe are going to set up two settings files. One with private data, and one with
+public data. For the private data, we will need to gather some information.
 This file should NEVER be checked into revision control!
 "
     read -p "What name would you like used as the admin name for the site (e.g. Michael Lissner): " CONFIG_NAME
@@ -169,12 +172,12 @@ TEMPLATE_DEBUG is set to DEBUG.
 DEVELOPMENT is set to $DEVELOPMENT
 TIME_ZONE is set to America/Los Angeles
 "
-    
+
     # set up the MySQL configs
     read -p "We will be setting up a MySQL DB. What would you like its name to be (e.g. courtListener): " MYSQL_DB_NAME
     read -p "And we will be giving it a username. What would you like that to be (e.g. courtListener): " MYSQL_USERNAME
     MYSQL_PWD=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789!@$%^&*(-_=+)") for i in range(30)]);'`
-    echo -e "\nYou can set up the MySQL password manually, but we recommend a randomly 
+    echo -e "\nYou can set up the MySQL password manually, but we recommend a randomly
 generated password, since you should not ever need to type it in.
 "
     read -p "Use the following random password: '$MYSQL_PWD'? (y/n): " proceed
@@ -182,9 +185,9 @@ generated password, since you should not ever need to type it in.
     then
         read -p "Very well. What would you like the password to be (do not include the # symbol): " MYSQL_PWD
     fi
-    
+
     read -p "
-Great. This is all the input we need for a while. We will now complete the 
+Great. This is all the input we need for a while. We will now complete the
 installation process.
 
 Press any key to proceed, or Ctrl+C to abort. " proceed
@@ -192,7 +195,7 @@ Press any key to proceed, or Ctrl+C to abort. " proceed
 
 
 function checkDeps {
-    # this function checks for various dependencies that the script assumes are 
+    # this function checks for various dependencies that the script assumes are
     # installed for its own functionality.
     deps=(aptitude mercurial subversion python ipython git-core python python-beautifulsoup python-docutils python-mysqldb python-pip python-setuptools poppler-utils mysql-client mysql-server wget tar libmysqlclient-dev gcc g++ make)
     echo -e "\n########################"
@@ -204,7 +207,7 @@ function checkDeps {
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-    
+
     for dep in ${deps[@]}
     do
         echo -n "Checking for $dep..."
@@ -222,7 +225,7 @@ function checkDeps {
             fi
         fi
     done
-    
+
     if [ $missingDeps ]
     then
         echo -e "\nThe following dependencies are missing: "
@@ -257,7 +260,7 @@ function installDjango {
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-    
+
     if [ ! -d $DJANGO_INSTALL_DIR ]
     then
         read -p "Directory '$DJANGO_INSTALL_DIR' doesn't exist. Create it? (y/n): " proceed
@@ -274,7 +277,7 @@ function installDjango {
     echo "Downloading django with svn..."
     cd $DJANGO_INSTALL_DIR
     svn co http://code.djangoproject.com/svn/django/trunk/ django-trunk
-    
+
     # link django with python
     if [ ! -d $PYTHON_SITES_PACKAGES_DIR ]
     then
@@ -302,7 +305,7 @@ function installCourtListener {
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-    
+
     if [ ! -d $CL_INSTALL_DIR ]
     then
         read -p "Directory '$CL_INSTALL_DIR' doesn't exist. Create it? (y/n): " proceed
@@ -318,25 +321,25 @@ function installCourtListener {
     echo "Downloading CourtListener with mercurial..."
     hg clone http://bitbucket.org/mlissner/legal-current-awareness court-listener
 
-    # begin the harder thing: configuring it correctly...    
-    # We need a link between the 20-private.conf adminMedia location and the 
+    # begin the harder thing: configuring it correctly...
+    # We need a link between the 20-private.conf adminMedia location and the
     # location of the django installation. Else, admin templates won't work.
     ln -s $DJANGO_INSTALL_DIR/django-trunk/django/contrib/admin/media court-listener/alert/assets/media/adminMedia
-    
+
     # we link up the init scripts
     echo "Installing init scripts."
     ln -s $CL_INSTALL_DIR/court-listener/init-scripts/scraper-init-script.sh /etc/init.d/scraper
-    
+
     # we create the logging file
     mkdir -p "/var/log/scraper"
     touch /var/log/scraper/daemon_log.out
-        
+
     # this generates a nice random number, as it is done by django-admin.py
     SECRET_KEY=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)") for i in range(50)]);'`
     # this is the MEDIA_ROOT
     MEDIA_ROOT="$CL_INSTALL_DIR/court-listener/alert/assets/media/"
     TEMPLATE_DIRS="$CL_INSTALL_DIR/court-listener/alert/assets/templates/"
-    
+
     # convrt true and false to True and False
     if $DEVELOPMENT
     then
@@ -344,7 +347,7 @@ function installCourtListener {
     else
         DEVELOPMENT="False"
     fi
-    
+
     # all settings should be in place. Now we make the file...
     echo -e "\nGenerating the installation config, 20-private.conf..."
 cat <<EOF > $CL_INSTALL_DIR/court-listener/alert/settings/20-private.conf
@@ -408,7 +411,7 @@ EOF
     if [ $INSTALL_DEBUG_TOOLBAR == 'y' ]
     then
         echo "    'debug_toolbar'," >> $CL_INSTALL_DIR/court-listener/alert/settings/20-private.conf
-    fi 
+    fi
     if [ $INSTALL_DJANGO_EXTENSIONS == 'y' ]
     then
         echo "    'django_extensions'," >> $CL_INSTALL_DIR/court-listener/alert/settings/20-private.conf
@@ -433,7 +436,7 @@ function configureMySQL {
     # create and configure the db.
     # first, we make a SQL script, then we execute it, then we delete it.
     # this will also set up a table for Sphinx's main+delta scheme. Kludgy.
-cat <<EOF > install.sql
+    cat <<EOF > install.sql
 CREATE DATABASE $MYSQL_DB_NAME;
 GRANT ALL ON $MYSQL_DB_NAME.* to $MYSQL_USERNAME WITH GRANT OPTION;
 SET PASSWORD FOR $MYSQL_USERNAME = password('$MYSQL_PWD');
@@ -445,10 +448,9 @@ CREATE TABLE sph_counter
     max_doc_id INTEGER NOT NULL
 );
 EOF
-    echo "We are about to create the database $MYSQL_DB_NAME, with username
+    echo -e "\nWe are about to create the database $MYSQL_DB_NAME, with username
 $MYSQL_USERNAME and password $MYSQL_PWD."
-    read -p "Press any key to continue, or Ctrl+C to abort. " proceed
-    sleep 1
+    read -p "Press any key to continue, or Ctrl+C to abort. \n" proceed
     echo "Please enter your root MySQL password."
     mysql -u'root' -p < install.sql
     if [ $? == "0" ]
@@ -458,7 +460,32 @@ $MYSQL_USERNAME and password $MYSQL_PWD."
     else
         echo -e '\nError configuring MySQL. Aborting.'
         exit 7
-    fi    
+    fi
+}
+
+
+function importData {
+    echo -e "\n############################"
+    echo "Importing data into MySQL..."
+    echo "############################"
+    read -p "Would you like to set up the DB with information about the courts? (y/n): " proceed
+    if [ $proceed == "n" ]
+    then
+        echo -e '\nGreat. Moving on.'
+        return 0
+    fi
+
+    # import data using the manage.py function.
+    cd $CL_INSTALL_DIR/court-listener/alert
+    cat <<EOF > /tmp/courts.json
+[{"pk": "ca1", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca1.uscourts.gov", "courtShortName": "1st Cir."}}, {"pk": "ca10", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca10.uscourts.gov", "courtShortName": "10th Cir."}}, {"pk": "ca11", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca11.uscourts.gov", "courtShortName": "11th Cir."}}, {"pk": "ca2", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca2.uscourts.gov", "courtShortName": "2d Cir."}}, {"pk": "ca3", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca3.uscourts.gov", "courtShortName": "3rd Cir."}}, {"pk": "ca4", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca4.uscourts.gov", "courtShortName": "4th Cir."}}, {"pk": "ca5", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca5.uscourts.gov", "courtShortName": "5th Cir."}}, {"pk": "ca6", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca6.uscourts.gov", "courtShortName": "6th Cir."}}, {"pk": "ca7", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca7.uscourts.gov", "courtShortName": "7th Cir."}}, {"pk": "ca8", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca8.uscourts.gov", "courtShortName": "8th Cir."}}, {"pk": "ca9", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca9.uscourts.gov", "courtShortName": "9th Cir."}}, {"pk": "cadc", "model": "alertSystem.court", "fields": {"courtURL": "http://www.cadc.uscourts.gov", "courtShortName": "D.C. Cir."}}, {"pk": "cafc", "model": "alertSystem.court", "fields": {"courtURL": "http://www.cafc.uscourts.gov", "courtShortName": "Fed. Cir."}}, {"pk": "scotus", "model": "alertSystem.court", "fields": {"courtURL": "http://supremecourt.gov", "courtShortName": "SCOTUS"}}]
+EOF
+    python manage.py syncdb
+    python manage.py migrate
+    python manage.py loaddata /tmp/courts.json
+    rm /tmp/courts.json
+
+    echo -e '\nInformation loaded into the database successfully.'
 }
 
 
@@ -472,7 +499,7 @@ function installSphinx {
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-    
+
     cd $CL_INSTALL_DIR/court-listener/Sphinx
     wget http://www.sphinxsearch.com/downloads/sphinx-0.9.9.tar.gz
     tar xzvf sphinx-0.9.9.tar.gz; rm sphinx-0.9.9.tar.gz
@@ -491,7 +518,7 @@ function installSphinx {
         echo "Error building Sphinx. Aborting."
         exit 6
     fi
-    
+
     # next we configure the thing...this is going to be ugly.
     # note: EOF without quotes interprets variables and backslashes. To preserve
     # things with either \ or $foo, use 'EOF'
@@ -503,7 +530,7 @@ source Document
     sql_user            = $MYSQL_USERNAME
     sql_pass            = $MYSQL_PWD
     sql_db              = $MYSQL_DB_NAME
-    sql_port            =   
+    sql_port            =
 EOF
 
 # In this section, we need the $variables to not get interpreted by bash...
@@ -520,7 +547,7 @@ cat <<'EOF' >> $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf
 	AND Document.documentUUID >= $start\
 	AND Document.documentUUID <= $end\
 	AND Document.documentUUID <= (SELECT max_doc_id FROM sph_counter WHERE counter_id=1);
-        
+
     sql_query_info      = SELECT * FROM `Document` WHERE `documentUUID` = $id
 
     # ForeignKey's
@@ -555,11 +582,11 @@ index Document
     stopwords = $CL_INSTALL_DIR/court-listener/Sphinx/conf/stopwords.txt
     exceptions = $CL_INSTALL_DIR/court-listener/Sphinx/conf/exceptions.txt
     docinfo = extern
-        
+
     # sets the minimum word length to index
     min_word_len = 2
     charset_type = utf-8
-    
+
     # DISABLED DUE TO LACK OF HD SPACE
     # these set up star searching (at a performance hit), but *test, *test* and test* all will work.
     # min_infix_len= 3
@@ -567,17 +594,17 @@ index Document
     min_prefix_len = 3
     prefix_fields = caseName, docText, docHTML, Citation.caseNameFull, caseNumber
     enable_star = 1
-    
+
     # enables exact word form searching (=cat)
     index_exact_words = 1
-    
+
     # enables stemming of english words longer than 3 characters
     morphology      = stem_en
     min_stemming_len = 4
-    
+
     # the default character set, with the addition of the hyphen and the removal of the Cryllic set.
     charset_table = 0..9, A..Z->a..z, _, -, U+00A7, a..z
-    
+
     # Enable HTML stripping
     html_strip = 1
 }
@@ -667,14 +694,14 @@ function installDjangoSphinx {
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-    
+
     # we install django-sphinx, and patch it per bug #X
     cd $DJANGO_INSTALL_DIR
     git clone git://github.com/dcramer/django-sphinx.git django-sphinx
     cd django-sphinx
-    
+
     echo -e "\nPatching django-sphinx, since bug fixes aren't handled by its author..."
-    
+
     git apply << 'EOF'
 From a3c8c847d1ba6742f0a8e2ae9c69de3d30db42c1 Mon Sep 17 00:00:00 2001
 From: root <mike@courtlistener.com>
@@ -692,7 +719,7 @@ index 24a1907..18abb10 100644
 +++ b/djangosphinx/utils/config.py
 @@ -11,8 +11,8 @@ import djangosphinx.apis.current as sphinxapi
  __all__ = ('generate_config_for_model', 'generate_config_for_models')
- 
+
  def _get_database_engine():
 -    if settings.DATABASE_ENGINE == 'mysql':
 -        return settings.DATABASE_ENGINE
@@ -702,9 +729,9 @@ index 24a1907..18abb10 100644
          return 'pgsql'
      raise ValueError, "Only MySQL and PostgreSQL engines are supported by Sphinx."
 @@ -188,4 +188,4 @@ def generate_source_for_models(model_classes, index=None, sphinx_params={}):
- 
+
      c = Context(params)
-     
+
 -    return t.render(c)
 \ No newline at end of file
 +    return t.render(c)
@@ -720,13 +747,13 @@ index 43b8582..c04bf9e 100755
      description = 'An integration layer bringing Django and Sphinx Search together.',
      packages=find_packages(),
      include_package_data=True,
--- 
+--
 1.7.0.4
 
 EOF
-    
+
     python setup.py install
-    
+
     echo -e '\ndjango-sphinx installed successfully.'
 }
 
@@ -736,7 +763,7 @@ function installDebugToolbar {
         echo -e '\n##################################'
         echo 'Installing django debug toolbar...'
         echo '##################################
-' 
+'
         read -p "Is the django debug toolbar installed on this computer? (y/n): " installed
         if [ $installed == "n" ]
         then
@@ -764,13 +791,13 @@ function installDjangoExtensions {
             echo -e '\nGreat. Moving on.'
             return 0
         fi
-        
+
         # install the mo'
         cd $DJANGO_INSTALL_DIR
         git clone git://github.com/django-extensions/django-extensions.git django-extensions
         cd django-extensions
         python setup.py install
-        
+
         echo -e '\ndjango-extensions installed successfully.'
     fi
 }
@@ -780,20 +807,20 @@ function installSouth {
     echo -e '\n###################'
     echo 'Installing South...'
     echo '###################'
-    
+
     read -p "Install South on this computer? (y/n): " proceed
     if [ $proceed == 'n' ]
     then
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-    
+
     # install the mo'
     cd $DJANGO_INSTALL_DIR
     hg clone http://bitbucket.org/andrewgodwin/south/ South
     cd South
     python setup.py develop
-    
+
     echo -e '\nSouth installed successfully.'
 }
 
@@ -808,11 +835,12 @@ function finalize {
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-    
+
     echo -e '\nSyncing the django data model...'
     cd $CL_INSTALL_DIR/court-listener/alert
     python manage.py syncdb
-    
+    python manage.py migrate
+
     echo -e '\nInstallation finalized successfully.'
 }
 
@@ -824,6 +852,7 @@ function main {
     installDjango
     installCourtListener
     configureMySQL
+    importData
     installSphinx
     installDjangoSphinx
     installDebugToolbar
@@ -859,11 +888,11 @@ index every other week.
 #initiation sequence
 if [ $# -eq 0 -o $# -gt 1 ]
 then
-    # We need to give them help using the program. 
+    # We need to give them help using the program.
     echo "install.sh:  Invalid number of arguments."
     echo "Usage: install.sh --help | --install"
     exit 2
-elif [[ $EUID -ne 0 ]]; 
+elif [[ $EUID -ne 0 ]];
 then
     echo "install.sh: This script must be run as root" 1>&2
     exit 2
@@ -876,6 +905,7 @@ else
         --sphinx) getUserInput; installSphinx;;
         --django) getUserInput; installDjango;;
         --courtListener) getUserInput; installCourtListener;;
+        --importData) getUserInput; configureMySQL; importData;;
         --debugToolbar) installDebugToolbar;;
         --djangoSphinx) getUserInput; installDjangoSphinx;;
         --djangoExtensions) getUserInput; installDjangoExtensions;;
