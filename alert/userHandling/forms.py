@@ -14,19 +14,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.forms import ModelForm
 from alert.userHandling.models import UserProfile
 
+
 class ProfileForm(ModelForm):
     class Meta:
         model = UserProfile
         # things MUST be excluded, or they get deleted. Creates confusing
         # deletions.
-        exclude = ('user','alert', 'avatar', 'activationKey', 'key_expires', 'emailConfirmed')
+        exclude = ('user', 'alert', 'avatar', 'activationKey', 'key_expires',
+            'emailConfirmed')
 
 
 class UserForm(ModelForm):
@@ -37,16 +38,18 @@ class UserForm(ModelForm):
         email = self.cleaned_data.get('email')
         username = self.instance.username
 
-        if email and (User.objects.filter(email=email).exclude(username=self.instance.username).count() > 0):
-            raise forms.ValidationError(u'This email address is already in use.')
+        if email and (User.objects.filter(email=email).count() > 1):
+            raise forms.ValidationError(
+                u'This email address is already in use.')
         return email
 
     class Meta:
         model = User
         # If these aren't excluded, they throw errors or get deleted.
         # Either is BAD, BAD, BAD
-        exclude = ('password', 'last_login', 'date_joined', 'is_staff', 'username',
-            'is_active', 'is_superuser', 'groups', 'user_permissions',)
+        exclude = ('password', 'last_login', 'date_joined', 'is_staff',
+            'username', 'is_active', 'is_superuser', 'groups',
+            'user_permissions', )
 
 
 class UserCreationFormExtended(UserCreationForm):
@@ -54,11 +57,13 @@ class UserCreationFormExtended(UserCreationForm):
         super(UserCreationFormExtended, self).__init__(*args, **kwargs)
         self.fields['email'].required = True
 
-    # ensure that emails are always unique. Not sure why this is duplicated from above. mlissner, 2010-07-20.
+    # ensure that emails are always unique. Not sure why this is duplicated
+    # from above. mlissner, 2010-07-20.
     def clean_email(self):
         email = self.cleaned_data.get('email')
         if email and User.objects.filter(email=email).count():
-            raise forms.ValidationError(u'This email address is already in use.')
+            raise forms.ValidationError(
+                u'This email address is already in use.')
         return email
 
     class Meta:
