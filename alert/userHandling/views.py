@@ -69,7 +69,7 @@ def viewSettings(request):
             email_body = "Hello, %s,\n\nYou have successfully changed your \
 email address at %s. Please confirm this change by clicking the following \
 link within 5 days:\n\nhttp://courtlistener.com/email/confirm/%s\n\n\
-Thanks for using our site,\n\n\The CourtListener team\n\n\
+Thanks for using our site,\n\nThe CourtListener team\n\n\
 -------------------\nFor questions or comments, please see our contact page, \
 http://courtlistener.com/contact/." % (
                 user.username,
@@ -198,7 +198,7 @@ def register(request):
 account!\n\nTo send you emails, we need you to activate your account with \
 CourtListener.com. To activate your account, click this link within 5 days:\
 \n\nhttp://courtlistener.com/email/confirm/%s\n\nThanks for using our site,\
-\n\n\The CourtListener team\n\n\
+\n\nThe CourtListener team\n\n\
 -------------------\n\
 For questions or comments, please see our contact page, \
 http://courtlistener.com/contact/." % (
