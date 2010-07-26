@@ -1,8 +1,8 @@
-/* -----------------------------------------------------------------------------
+/* --------------------------------------------------------------------------
 
 Sets up all the overrides or additional CSS that the site will use.
 
-------------------------------------------------------------------------------*/
+---------------------------------------------------------------------------*/
 
 .inline {
     display: inline;
@@ -59,6 +59,14 @@ a:focus, a:hover {
     text-decoration: underline;
 }
 
+.error a:focus, .error a:hover {
+    color: #8A1F11;
+}
+
+.notice a:focus, .notice a:hover, .success a:focus, .success a:hover {
+    color: #514721;
+}
+
 .errortext {
     color: #8a1f11;
 }
@@ -68,9 +76,10 @@ a:focus, a:hover {
     color: black;
 }
 
-/*.header > h3 > a {
+/* for the nav in the settings pages*/
+.header > h3 > a {
     color: black;
-}*/
+}
 
 input.wide-title {
     width: 390px;
@@ -79,12 +88,12 @@ input.wide-title {
 }
 
 fieldset.collapsed {
-	border-bottom-width: 0px;
-	border-left-width: 0px;
-	border-right-width: 0px;
-	border-top-width: 0px;
-	margin-bottom: 0px;
-	padding: 0em;
+    border-bottom-width: 0px;
+    border-left-width: 0px;
+    border-right-width: 0px;
+    border-top-width: 0px;
+    margin-bottom: 0px;
+    padding: 0em;
 }
 
 fieldset.collapsed > legend {

@@ -13,29 +13,18 @@
 
 {% block content %}
     <div class="span-10 last" id="content">
-        <h2>Request an email confirmation link</h2>
         {% if alreadyConfirmed %}
             <div class="span-10 error bottom">
+                <h2>Already confirmed</h2>
                 <p class="bottom">That email address is already confirmed. <a href="/settings/profile/">Proceed to your account</a>.</p>
             </div>
-        {% endif %}
-        
-        {% if unknownAccount %}
+        {% else %}
             <div class="span-10 error bottom">
-                <p class="bottom">That e-mail address doesn't have an associated user account. Are you sure that account is <a href="{%url register%}">registered</a>?</p>
+                <h2>Email confirmation sent</h2>
+                <p>We have sent a confirmation email to that address. Please verify your email address within five days.</p>
             </div>
         {% endif %}
 
-        <p>Enter an email address to send a confirmation link to that address.</p>
-        
-        <form action="" method="post">{% csrf_token %}
-            <p class="bottom">
-                <label for="id_email">Your email address</label><br>
-                <input id="id_email" type="text" name="email" maxlength="75" class="wide-title auto-focus"/>
-                {# No need for errors block, since there is only one possible error, which is indicated above #}
-            </p>
-          <button type="submit" class="button">Submit</button>
-        </form>
         <br><p>If you are unable to confirm your email address, please <a href="/contact/">contact us</a> for assistance.</p>
     </div>
 {% endblock %}

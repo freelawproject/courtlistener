@@ -16,14 +16,12 @@
 
 from alert.settings import LOGIN_REDIRECT_URL
 from alert.userHandling.forms import *
-from alert.userHandling.models import BarMembership
 from django.contrib import messages
 from django.contrib.auth import authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import User
 from django.contrib.auth import login
-from django.contrib.auth.views import login as signIn
 from django.contrib.sites.models import Site
 from django.core.mail import send_mail
 from django.shortcuts import render_to_response
@@ -42,22 +40,21 @@ def viewAlerts(request):
 
 @login_required
 def viewSettings(request):
-    userForm = UserForm(request.POST or None, instance=request.user)
-    profileForm = ProfileForm(request.POST or None,
-        instance=request.user.get_profile())
+    oldEmail = request.user.email # this line has to be at the top to work.
+    user = request.user
+    up = user.get_profile()
+    userForm = UserForm(request.POST or None, instance=user)
+    profileForm = ProfileForm(request.POST or None, instance=up)
     if profileForm.is_valid() and userForm.is_valid():
-        cd = profileForm.cleaned_data
+        cd = userForm.cleaned_data
         newEmail = cd['email']
-        oldEmail = request.user.email
-        up = request.user.get_profile()
 
         if oldEmail != newEmail:
-            # email changed, send an email, toggle their email confirmation
-            # status, and send them a confirmation link.
+            # Email was changed.
 
             # Build the activation key for the new account
             salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-            activationKey = hashlib.sha1(salt+new_user.username).hexdigest()
+            activationKey = hashlib.sha1(salt+user.username).hexdigest()
             key_expires = datetime.datetime.today() + datetime.timedelta(5)
 
             # Toggle the confirmation status.
@@ -141,7 +138,6 @@ def register(request):
         redirect_to = settings.LOGIN_REDIRECT_URL
 
     if request.user.is_anonymous():
-        from django.contrib.auth.forms import UserCreationForm
         if request.method == 'POST':
             form = UserCreationFormExtended(request.POST)
             if form.is_valid():
@@ -267,9 +263,10 @@ def requestEmailConfirmation(request):
             try:
                 user = User.objects.get(email=email)
             except:
-                return render_to_response('registration/request_email_\
-                    confirmation.html', {'unknownAccount': True,
-                    'form': form}, RequestContext(request))
+                return render_to_response(
+                    'registration/request_email_confirmation.html',
+                    {'unknownAccount': True, 'form': form},
+                    RequestContext(request))
 
             # make a new activation key.
             salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
@@ -307,21 +304,23 @@ http://courtlistener.com/contact/." % (
             up = UserProfile(user = request.user)
             if up.emailConfirmed:
                 # their email is already confirmed.
-                return render_to_response('registration/request_email_\
-                    confirmation.html', {'alreadyConfirmed': True},
-                    RequestContext(request))
+                return render_to_response(
+                    'registration/request_email_confirmation.html',
+                    {'alreadyConfirmed': True}, RequestContext(request))
             else:
                 # they are seeing the form for the first time, and their email
                 # is unconfirmed.
                 email_addy = request.user.email
                 form = EmailConfirmationForm(initial = {'email': email_addy})
-        return render_to_response('registration/request_email_\
-                confirmation.html', {'form': form}, RequestContext(request))
+        return render_to_response(
+            'registration/request_email_confirmation.html', {'form': form},
+            RequestContext(request))
 
 
 def emailConfirmSuccess(request):
-    return render_to_response('registration/request_email_confirmation_\
-        success.html', {}, RequestContext(request))
+    return render_to_response(
+        'registration/request_email_confirmation_success.html',
+        {}, RequestContext(request))
 
 
 @login_required
