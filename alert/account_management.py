@@ -103,9 +103,26 @@ http://courtlistener.com/contact/." % (
     return 0
 
 
+def find_legit():
+    # find accounts that have alerts, and mark them as confirmed.
+    # this is a one-off script used to grandfather-in old accounts
+    real_users = UserProfile.objects.filter(emailConfirmed = False)
+
+    for user in real_users:
+        if user.alert.count() > 0:
+            print "User \"" + user.user.username + \
+                "\" is toggled to confirmed."
+            user.emailConfirmed = True
+            user.save()
+
+    return 0
+
+
 def main():
     usage = "usage: %prog [--verbose] [--simulate]"
     parser = OptionParser(usage)
+    parser.add_option('-g', '--grandfather', action='store_true',
+        dest='grandfather', default=False, help="Grandfather in legit users.")
     parser.add_option('-n', '--notify', action="store_true", dest='notify',
         default=False, help="Notify users with unconfirmed accounts older " +\
         "five days.")
@@ -123,7 +140,10 @@ def main():
     simulate = options.simulate
     delete = options.delete
     notify = options.notify
+    grandfather = options.grandfather
 
+    if grandfather:
+        find_legit()
     if delete:
         delete_old_accounts(verbose, simulate)
     if notify:
