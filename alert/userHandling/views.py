@@ -65,7 +65,7 @@ def viewSettings(request):
             # Send the email.
             current_site = Site.objects.get_current()
             email_subject = 'Email changed successfully on ' + \
-                current_site.name,
+                str(current_site.name)
             email_body = "Hello, %s,\n\nYou have successfully changed your \
 email address at %s. Please confirm this change by clicking the following \
 link within 5 days:\n\nhttp://courtlistener.com/email/confirm/%s\n\n\
@@ -101,8 +101,8 @@ http://courtlistener.com/contact/." % (
 
         return HttpResponseRedirect('/profile/settings/')
     return render_to_response('profile/settings.html',
-        {'profileForm': profileForm,
-         'userForm': userForm}, RequestContext(request))
+        {'profileForm': profileForm, 'userForm': userForm},
+        RequestContext(request))
 
 
 @login_required
@@ -137,6 +137,9 @@ def deleteProfileDone(request):
 def register(request):
     """allow only an anonymous user to register"""
     redirect_to = request.REQUEST.get('next', '')
+    if 'sign-in' in redirect_to:
+        # thus, we don't redirect people back to the sign-in form
+        redirect_to = ''
 
     # security checks:
     # Light security check -- make sure redirect_to isn't garbage.
@@ -193,7 +196,8 @@ def register(request):
 
                 # Send an email with the confirmation link
                 current_site = Site.objects.get_current()
-                email_subject = 'Confirm your account on' + current_site.name,
+                email_subject = 'Confirm your account on ' + \
+                    str(current_site.name)
                 email_body = "Hello, %s, and thanks for signing up for an \
 account!\n\nTo send you emails, we need you to activate your account with \
 CourtListener.com. To activate your account, click this link within 5 days:\
@@ -226,7 +230,7 @@ def registerSuccess(request):
     their status, and redirect them.'''
     redirect_to = request.REQUEST.get('next', '')
     return render_to_response('registration/registration_complete.html',
-        {'redirect_to': redirect_to})
+        {'redirect_to': redirect_to}, RequestContext(request))
 
 
 def combined_signin_register(request):
@@ -249,16 +253,17 @@ def confirmEmail(request, activationKey):
         if user_profile.emailConfirmed:
             # their email is already confirmed.
             return render_to_response('registration/confirm.html',
-                {'alreadyConfirmed': True})
+                {'alreadyConfirmed': True}, RequestContext(request))
     except:
         return render_to_response('registration/confirm.html',
-            {'invalid': True})
+            {'invalid': True}, RequestContext(request))
     if user_profile.key_expires < datetime.datetime.today():
         return render_to_response('registration/confirm.html',
-            {'expired': True})
+            {'expired': True}, RequestContext(request))
     user_profile.emailConfirmed = True
     user_profile.save()
-    return render_to_response('registration/confirm.html', {'success': True})
+    return render_to_response('registration/confirm.html', {'success': True},
+        RequestContext(request))
 
 
 @login_required
@@ -290,12 +295,12 @@ def requestEmailConfirmation(request):
 
         # and send the email
         current_site = Site.objects.get_current()
-        email_subject = 'Confirm your account on' + current_site.name,
+        email_subject = 'Confirm your account on %s' % str(current_site.name)
         email_body = "Hello, %s,\n\nPlease confirm your email address by \
 clicking the following link within 5 days:\
 \n\nhttp://courtlistener.com/email/confirm/%s\n\nThanks for using our site,\
-\n\nThe CourtListener team\n\n\-------------------\n\
-For questions or comments, please see our contact page, \
+\n\nThe CourtListener team\n\n-------------------\n\
+For questions or comments, please visit our contact page, \
 http://courtlistener.com/contact/." % (
             user.username,
             up.activationKey)
