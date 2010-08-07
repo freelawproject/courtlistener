@@ -19,6 +19,7 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from userHandling.models import UserProfile
+from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
 from django.core.mail import send_mail
 
@@ -39,20 +40,34 @@ def delete_old_accounts(verbose, simulate):
     unconfirmed_ups = UserProfile.objects.filter(emailConfirmed = False,
         key_expires__lte = two_months_ago.isoformat())
 
+    # some redundant code here, but emphasis is on getting it right.
     for up in unconfirmed_ups:
-        if verbose:
-            print "User \"" + up.user.username + "\" deleted."
+        try:
+            user = str(up.user.username)
+            if verbose:
+                print "User \"" + user + "\" deleted."
+            if not simulate:
+                # Gather their foreign keys, delete those, then delete their
+                # profile and user info
+                alerts = up.alert.all()
+                for alert in alerts:
+                    alert.delete()
 
-        if not simulate:
-            # Gather their foreign keys, delete those, then delete their
-            # profile and user info
-            alerts = up.alert.all()
-            for alert in alerts:
-                alert.delete()
+                # delete the user then the profile.
+                up.user.delete()
+                up.delete()
+        except:
+            if verbose:
+                print "Deleting orphaned profile, " + str(up)
+            if not simulate:
+                # it's an orphan user profile, so we delete it and any alerts
+                # attached to it.
+                alerts = up.alert.all()
+                for alert in alerts:
+                    alert.delete()
 
-            # delete the user then the profile.
-            up.user.delete()
-            up.delete()
+                # delete the profile.
+                up.delete()
 
     return 0
 
@@ -72,26 +87,41 @@ def notify_unconfirmed(verbose, simulate):
 
     for up in unconfirmed_ups:
         if verbose:
-            print "User \"" + up.user.username + "\" will be notified."
+            try:
+                print "User \"" + str(up.user) + "\" will be notified."
+            except User.DoesNotExist:
+                # the user profile doesn't have a profile attached to it
+                # anymore due to deletion.
+                print "***No user id on user_profile %s. Orphaned profile deleted.***" % up.userProfileUUID
+                if not simulate:
+                    alerts = up.alert.all()
+                    for alert in alerts:
+                        alert.delete()
+                    up.delete()
+                continue
+
         if not simulate:
             user = up.user
             # Build and save a new activation key for the account.
             salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
             activationKey = hashlib.sha1(salt+user.username).hexdigest()
+            key_expires = datetime.datetime.today() + datetime\
+                    .timedelta(5)
             up.activationKey = activationKey
+            up.key_expires = key_expires
             up.save()
 
             # Send the email.
             current_site = Site.objects.get_current()
             email_subject = 'Please confirm your account on ' + \
-                current_site.name,
+                str(current_site.name)
             email_body = "Hello, %s,\n\nDuring routine maintenance of our \
 site, we discovered that your email address has not yet been confirmed. \
 To confirm your email address and continue using our site, please click the \
 following link:\n\nhttp://courtlistener.com/email/confirm/%s\n\n\
 Unfortuantely, accounts that are not confirmed will stop receiving alerts, \
 and must eventually be deleted from our system.\n\n\
-Thanks for using our site,\n\nThe CourtListener team\n\n\
+Thanks for using our site,\n\nThe CourtListener team\n\n\n\
 -------------------\nFor questions or comments, please see our contact page, \
 http://courtlistener.com/contact/." % (
                 user.username,
@@ -101,6 +131,19 @@ http://courtlistener.com/contact/." % (
                       'no-reply@courtlistener.com',
                       [user.email])
     return 0
+
+
+def generate_keys_expiration_dates():
+    # generate keys expiration dates for accounts that lack them
+    keyless = UserProfile.objects.filter(key_expires = None)
+
+    for up in keyless:
+        print "User \"" + up.user.username + \
+            "\" got a new key expiration date."
+        key_expires = datetime.datetime.today() + datetime\
+                    .timedelta(5)
+        up.key_expires = key_expires
+        up.save()
 
 
 def find_legit():
@@ -125,7 +168,7 @@ def main():
         dest='grandfather', default=False, help="Grandfather in legit users.")
     parser.add_option('-n', '--notify', action="store_true", dest='notify',
         default=False, help="Notify users with unconfirmed accounts older " +\
-        "five days.")
+        "five days and delete orphaned profiles.")
     parser.add_option('-d', '--delete', action="store_true", dest='delete',
         default=False, help="Delete unconfirmed accounts older than two " +\
         "months.")
@@ -134,6 +177,8 @@ def main():
     parser.add_option('-s', '--simulate', action="store_true",
         dest='simulate', default=False, help="Simulate the emails that " + \
         "would be sent, using the console backend. Do not delete accounts.")
+    parser.add_option('-k', '--generate', action="store_true",
+        dest="generate", default=False, help="Generate key expiration dates.")
     (options, args) = parser.parse_args()
 
     verbose = options.verbose
@@ -141,6 +186,7 @@ def main():
     delete = options.delete
     notify = options.notify
     grandfather = options.grandfather
+    generate = options.generate
 
     if grandfather:
         find_legit()
@@ -148,10 +194,12 @@ def main():
         delete_old_accounts(verbose, simulate)
     if notify:
         notify_unconfirmed(verbose, simulate)
+    if generate:
+        generate_keys_expiration_dates()
     if simulate:
-        print "******************************************"
-        print "* NO EMAILS SENT OR ACCOUNTS DEACTIVATED *"
-        print "******************************************"
+        print "**************************************"
+        print "* NO EMAILS SENT OR ACCOUNTS DELETED *"
+        print "**************************************"
 
     return 0
 
