@@ -1169,7 +1169,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
     elif (courtID == 10):
         # a daily feed of all the items posted THAT day. Missing a day == bad.
-        urls = ("http://www.ck10.uscourts.gov/opinions/new/daily_decisions.rss",)
+        urls = ("http://www.ca10.uscourts.gov/opinions/new/daily_decisions.rss",)
         ct = Court.objects.get(courtUUID = 'ca10')
 
         for url in urls:
