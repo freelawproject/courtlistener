@@ -147,7 +147,7 @@ def hasDuplicate(caseNum, caseName):
     # data cleanup
     caseName = harmonize(cleanString(caseName))
     caseNum  = cleanString(caseNum)
-    
+
     caseNameShort = trunc(caseName, 100)
 
     # check for duplicates, make the object in their absence
@@ -179,7 +179,7 @@ def getPDFContent(docs, result, verbosity):
         process = subprocess.Popen(
             ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"], shell=False,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        content, err = process.communicate() 
+        content, err = process.communicate()
         if err: result += "Error parsing file: " + doc.citation.caseNameShort
 
         # add the anonymized plain text to the DB!
@@ -233,8 +233,8 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
             caseDateRegex = re.compile("(\d{2}/\d{2}/\d{4})",
                 re.VERBOSE | re.DOTALL)
             caseNumberRegex = re.compile("(\d{2}-.*?\W)(.*)$")
-            
-            # incredibly, this RSS feed is in cron order, so new stuff is at the 
+
+            # incredibly, this RSS feed is in cron order, so new stuff is at the
             # end. Mind blowing.
             i = len(caseLinks)-1
             if verbosity >= 2: print str(i)
@@ -304,7 +304,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
+                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                     ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
@@ -419,7 +419,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
+                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                     ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
@@ -519,7 +519,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
+                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                     ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
@@ -593,12 +593,12 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 caseNumber, documentType = fileName.split('.')[0:2]
                 # the caseNumber needs a hyphen inserted after the second digit
                 caseNumber = caseNumber[0:2] + "-" + caseNumber[2:]
-                
+
                 if documentType == 'U':
                     doc.documentType = 'Unpublished'
                 elif documentType == 'P':
                     doc.documentType = 'Published'
-                else: 
+                else:
                     doc.documentType = ""
 
                 # next, we do the caseDate and caseNameShort, so we can quit before
@@ -624,7 +624,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
+                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                     ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
@@ -759,7 +759,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
+                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                     ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
@@ -866,7 +866,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
+                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                     ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
@@ -961,7 +961,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     # last, save evrything (pdf, citation and document)
                     doc.citation = cite
                     doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
+                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                     doc.save()
 
@@ -1049,7 +1049,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
+                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                     ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
@@ -1060,7 +1060,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
         """This court, by virtue of having a javascript laden website, was very
         hard to parse properly. BeautifulSoup couldn't handle it at all, so lxml
         has to be used. lxml seems pretty useful, but it was a pain to learn."""
-        
+
         # these URLs redirect now. So much for hacking them. A new approach can probably be done using POST data.
         urls = (
             "http://www.ca9.uscourts.gov/opinions/?o_mode=view&amp;o_sort_field=19&amp;o_sort_type=DESC&o_page_size=100",
@@ -1160,7 +1160,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
+                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                     ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
@@ -1210,7 +1210,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 caseLink = caseLinks[i].text
                 caseLink = urljoin(url, caseLink)
                 if verbosity >= 2: print "Link: " + caseLink
-                
+
                 myFile, doc, created, error = makeDocFromURL(caseLink, ct)
 
                 if error:
@@ -1269,7 +1269,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
+                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                     ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
@@ -1380,7 +1380,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
+                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                     ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
@@ -1462,7 +1462,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
+                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                     ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
@@ -1544,7 +1544,8 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # next: caseNameShort
                 caseNameShort = trTags[i].td.nextSibling.nextSibling.nextSibling\
                     .nextSibling.nextSibling.nextSibling.a.contents[0]\
-                    .replace('[Motion]', '').replace('[order]', '').replace('(RULE 36)', '')
+                    .replace('[MOTION]', '').replace('[ORDER]', '').replace('(RULE 36)', '')\
+                    .replace('[ERRATA]', '').replace('[CORRECTED]','')
                 caseNameShort = titlecase(caseNameShort.lower())
 
                 # next: documentType
@@ -1652,7 +1653,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 elif 'relatingtoorders' in url:
                     doc.documentType = "Relating-to"
                 if verbosity >= 2: print "documentType: " + doc.documentType
-                
+
                 try:
                     if '/' in caseDates[i].text:
                         splitDate = caseDates[i].text.split('/')
@@ -1672,7 +1673,7 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + 
+                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                     ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 doc.save()
 
@@ -1730,7 +1731,7 @@ def main():
 
     returns a list containing the result
     """
-    
+
     # these two lines are used for handling SIGINT, so things can die safely.
     global dieNow
     signal.signal(signal.SIGINT, signal_handler)
