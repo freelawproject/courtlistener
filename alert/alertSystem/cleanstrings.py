@@ -28,10 +28,13 @@ UC_INITIALS = re.compile(r"^(?:[A-Z]{1}\.{1}|[A-Z]{1}\.{1}[A-Z]{1})+$")
 MAC_MC = re.compile(r"^([Mm]a?c)(\w+)")
 
 # For use in harmonize function
-# works for all but U.S. Steel (not much to do about that).
 US = 'USA|U\.S\.A\.|U\.S\.|United States of America'
 UNITED_STATES = re.compile(r'^(%s)$' % US, re.I)
 ET_AL = re.compile(',?\set\.?\sal\.?', re.IGNORECASE)
+
+# For use in anonymize function
+SSN_AND_ITIN = re.compile('(\s|^)(\d{3}-\d{2}-\d{4})(\s|$)')
+EIN = re.compile('(\s|^)(\d{2}-\d{7})(\s|$)')
 
 
 def titlecase(text):
@@ -105,7 +108,7 @@ def titlecase(text):
         return "\n".join(processed)
 
 
-def harmony(text):
+def harmonize(text):
     '''This function fixes case names so they're cleaner. It fixes various
     ways of writing United States, gets rid of et al, and changes vs. to v.'''
     result = ''
@@ -115,21 +118,22 @@ def harmony(text):
     # split on all ' v. '
     text = text.split(' v. ')
     i = 1
-    for s in text:
-        s = s.strip()
-        if UNITED_STATES.match(s):
+    for frag in text:
+        frag = frag.strip()
+        if UNITED_STATES.match(frag):
             if i == len(text):
                 # it's the last iteration don't append v.
                 result = result + "United States"
             else:
                 result = result + "United States v. "
         else:
-            s = re.sub(re.compile(r'^US$'), 'United States', s) #needed here, because case sensitive
+            #needed here, because case sensitive
+            frag = re.sub(re.compile(r'^US$'), 'United States', frag)
             # no match
             if i == len(text):
-                result = result + s
+                result = result + frag
             else:
-                result = result + s + " v. "
+                result = result + frag + " v. "
         i += 1
 
     result = re.sub(ET_AL, '', result)
@@ -138,8 +142,10 @@ def harmony(text):
 
 
 def test():
+    '''Run a series of queries over the harmonize function to see if it works
+    properly'''
     # This section for testing. TODO: Use django testing system.
-    testStrings = [
+    test_strings = [
         # tests of various ways of writing United States
         ('U.S.A. v. Lissner', 'United States v. Lissner'),
         ('U.S. v. Lissner', 'United States v. Lissner'),
@@ -149,9 +155,12 @@ def test():
         ('United States of America v. Lissner', 'United States v. Lissner'),
         # tests of changes of order and additional v's
         ('Lissner v. United States of America', 'Lissner v. United States'),
-        ('V.Vivack and Associates v. US', 'V.Vivack and Associates v. United States'),
-        ('v.v. Hendricks & Sons v. James v. Smith', 'v.v. Hendricks & Sons v. James v. Smith'),
-        ('v.v. Hendricks v. James V. Smith v. US', 'v.v. Hendricks v. James V. Smith v. United States'),
+        ('V.Vivack and Associates v. US', \
+            'V.Vivack and Associates v. United States'),
+        ('v.v. Hendricks & Sons v. James v. Smith', \
+            'v.v. Hendricks & Sons v. James v. Smith'),
+        ('v.v. Hendricks v. James V. Smith v. US', \
+            'v.v. Hendricks v. James V. Smith v. United States'),
         ('U.S.A. v. Mr. v.', 'United States v. Mr. v.'),
         # tests of things that shouldn't change
         ('U.S.S. v. Lissner', 'U.S.S. v. Lissner'),
@@ -173,7 +182,7 @@ def test():
 
 
     # Checking that et al is correct.
-    testStrings.extend([
+    test_strings.extend([
         ('Lissner, et. al.', 'Lissner'),
         ('Lissner, et. al' , 'Lissner'),
         ('Lissner, et al.' , 'Lissner'), # <-- Correct
@@ -184,100 +193,40 @@ def test():
         ('Lissner et al'   , 'Lissner'),
         ('clarinet alibi'  , 'clarinet alibi')])
 
-    for q, a in testStrings:
-        result = harmony(q)
-        if result == a:
-            print q + " ==> " + "Success!"
+    for query, answer in test_strings:
+        result = harmonize(query)
+        if result == answer:
+            print query + " ==> " + "Success!"
         else:
-            print q + " ==> " + result
+            print query + " ==> " + result
 
     return "Done"
 
 
-def harmonize(text):
-    """This method will go through each of the problem words above, and try to
-    fix some of the more annoying word problems. Regex FTW."""
-
-
-    # This section for testing. TODO: Use django testing system.
-    # for variations on United States. Fails for U.S. Steel.
-    testStrings = [
-        ('U.S.A.', 'United States'),
-        ('U.S.', 'United States'),
-        ('United States', 'United States'),
-        ('United States of America', 'United States'),
-        ('Usa', 'United States'),
-        ('USA', 'United States'),
-        ('U.S.S.', 'U.S.S.'),
-        ('USC', 'USC'),
-        ('U.S.C.', 'U.S.C.'),
-        ('U.S. Steel', 'U.S. Steel'),
-        ('the U.S.A. is', 'the United States is'),
-        ('the U.S. is', 'the United States is'),
-        ('the United States is', 'the United States is'),
-        ('the United States of America is', 'the United States is'),
-        ('the Usa is','the United States is'),
-        ('the USA is','the United States is'),
-        ('the U.S.S. is','the U.S.S. is'),
-        ('the U.S. Steel is', 'the U.S. Steel is'),
-        ('papusa', 'papusa'),
-        ('CUSANO', 'CUSANO')]
-
-    # Checking that et al is correct.
-    testStrings.extend([
-        ('Lissner, et. al.', 'Lissner, et al.'),
-        ('Lissner, et. al' , 'Lissner, et al.'),
-        ('Lissner, et al.' , 'Lissner, et al.'), # <-- Correct
-        ('Lissner, et al'  , 'Lissner, et al.'),
-        ('Lissner et. al.' , 'Lissner, et al.'),
-        ('Lissner et. al'  , 'Lissner, et al.'),
-        ('Lissner et al.'  , 'Lissner, et al.'),
-        ('Lissner et al'   , 'Lissner, et al.'),
-        ('clarinet alibi'  , 'clarinet alibi')])
-
-
-    for test, goal in testStrings:
-        result = re.sub(UNITED_STATES, "United States", test)
-        result = test.replace('US', 'United States') #needed separately, because case sensitive
-        result = re.sub(ET_AL, ', et al.', result)
-        if result != goal:
-            print test + " --> " + result
-
-
-    text = re.sub(UNITED_STATES, 'United States', text)
-    text = text.replace('US', 'United States') #needed separately, because case sensitive
-    text = re.sub(ET_AL, '', text)
-
-    return text
-
-
-def cleanString(s):
-    # replace evil characters with better ones, get rid of white space on the
-    # ends, and get rid of semicolons on the ends.
-    s = s.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
+def clean_string(string):
+    ''' replace evil characters with better ones, get rid of white space on
+    the ends, and get rid of semicolons on the ends.'''
+    string = string.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
         .replace('&ldquo;', "\"").replace('&nbsp;', ' ')\
         .replace('&amp;', '&').replace('%20', ' ').replace('&#160;', ' ')\
         .strip().strip(';')
 
     # get rid of '\t\n\x0b\x0c\r ', and replace them with a single space.
-    s = " ".join(s.split())
+    string = " ".join(string.split())
 
     # get rid of bad character encodings
-    s = smart_str(s)
+    string = smart_str(string)
 
     # return something vaguely sane
-    return s
-
-# For use in anonymize function
-SSN_AND_ITIN = re.compile('(\s|^)(\d{3}-\d{2}-\d{4})(\s|$)')
-EIN = re.compile('(\s|^)(\d{2}-\d{7})(\s|$)')
+    return string
 
 
-def anonymize(s):
+def anonymize(string):
     """Convert SSNs, EIN and alienIDs to X's."""
-    """
+
+    '''
     # For testing
-    testStrings = [
+    test_strings = [
         ("444-44-4444", "XXX-XX-XXXX"),
         ("   444-44-4444", "   XXX-XX-XXXX"),
         ("   444-44-4444   ", "   XXX-XX-XXXX   "),
@@ -287,14 +236,14 @@ def anonymize(s):
         ("444-44-44444", "444-44-44444"),
         ("444-444-4444", "444-444-4444")]
 
-    for test, goal in testStrings:
+    for test, goal in test_strings:
         result = re.sub(SSN_AND_ITIN, r"\1XXX-XX-XXXX\3", test)
         result = re.sub(EIN, r'\1XX-XXXXXXX\3', result)
         if result != goal:
             print "\"" + test + "\"" + " --> " + "\"" + result + "\""
-    """
+    '''
 
-    s = re.sub(SSN_AND_ITIN, r"\1XXX-XX-XXXX\3", s)
-    s = re.sub(EIN, r"\1XX-XXXXXXX\3", s)
+    string = re.sub(SSN_AND_ITIN, r"\1XXX-XX-XXXX\3", string)
+    string = re.sub(EIN, r"\1XX-XXXXXXX\3", string)
 
-    return s
+    return string

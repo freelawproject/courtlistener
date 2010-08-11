@@ -30,7 +30,7 @@ setup_environ(settings)
 
 from alertSystem.models import *
 from alertSystem.cleanstrings import *
-from scrape_and_parse import cleanString, makeDocFromURL, trunc, hasDuplicate, getPDFContent, parseCourt
+from scrape_and_parse import clean_string, makeDocFromURL, trunc, hasDuplicate, getPDFContent, parseCourt
 from django.core.files.base import ContentFile
 from django.core.files import File
 from django.core.exceptions import ObjectDoesNotExist
@@ -203,15 +203,14 @@ def back_scrape_court(courtID, result, verbosity):
         url = "http://www.ca10.uscourts.gov/searchbydateresults.php"
         ct = Court.objects.get(courtUUID = 'ca10')
 
-        i = 1
-        while i < 22000:
+        i = 21414
+        dupCount = 0
+        while i <= 21536:
             if verbosity >= 2: print "i: " + str(i)
             postValues = {
                 'start_index' : i,
                 'end_index'   : i
             }
-            # increment i by one, because their site has NO semantics.
-            i = i + 1
 
             data = urllib.urlencode(postValues)
             req = urllib2.Request(url, data)
@@ -230,6 +229,26 @@ def back_scrape_court(courtID, result, verbosity):
 
             myFile, doc, created, error = makeDocFromURL(caseLink, ct)
 
+            # Check for dups or errors
+            if error:
+                # things broke, punt this iteration
+                if verbosity >= 2:
+                    print "Error in makeDocFromURL function at: " + str(i)
+                i += 1
+                continue
+
+            if not created:
+                # it's an oldie, punt!
+                if verbosity >= 2: print "Duplicate found at " + str(i)
+                dupCount += 1
+                if dupCount == 10:
+                    # third dup in a a row. BREAK!
+                    break
+                i += 1
+                continue
+            else:
+                dupCount = 0
+
             # split the URL on /, and get the file name, then split on ., and
             # get the caseNumber
             caseNumber = caseLink.split('/')[5]
@@ -246,9 +265,12 @@ def back_scrape_court(courtID, result, verbosity):
             # the first element with the class headline is the caseDate
             caseDate = tree.find_class('headline')[0].text
             splitDate = caseDate.split('/')
-            if int(splitDate[2]) > 80:
+            year = int(splitDate[2])
+            if year > 80 and year < 2000:
                 year = int("19" + splitDate[2])
-            else:
+            elif year > 2000:
+                pass
+            elif year < 80 and year > 0:
                 year = int("20" + splitDate[2])
             caseDate = datetime.date(year, int(splitDate[0]), int(splitDate[1]))
             doc.dateFiled = caseDate
@@ -256,7 +278,7 @@ def back_scrape_court(courtID, result, verbosity):
 
             # save the pdf to disk, link the citation
             doc.citation = cite
-            doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
+            doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
 
             # we do the PDF parsing here, because we need to determine if it's
             # a published or unpublished doc.
@@ -285,6 +307,7 @@ def back_scrape_court(courtID, result, verbosity):
 
             doc.save()
 
+            i += 1
         return result
 
 
@@ -644,7 +667,7 @@ def back_scrape_court(courtID, result, verbosity):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(cleanString(caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 doc.save()
 
                 i += 1
