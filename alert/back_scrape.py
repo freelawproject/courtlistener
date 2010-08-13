@@ -202,6 +202,7 @@ def back_scrape_court(courtID, result, verbosity):
 
         url = "http://www.ca10.uscourts.gov/searchbydateresults.php"
         ct = Court.objects.get(courtUUID = 'ca10')
+        not_binding = re.compile('not(\s+)binding(\s+)precedent', re.IGNORECASE)
 
         i = 2060
         dupCount = 0
@@ -298,8 +299,8 @@ def back_scrape_court(courtID, result, verbosity):
             doc.documentPlainText = anonymize(smart_str(content))
 
             # determine if it's published or not by checking for the words
-            # "not binding precedent" in the first 10000 characters.
-            if 'not binding precedent' in doc.documentPlainText[:3000]:
+            # "not binding precedent" in the first 3000 characters.
+            if NOT_BINDING.match(doc.documentPlainText[:3000]):
                 doc.documentType = "Unpublished"
             else:
                 doc.documentType = "Published"
