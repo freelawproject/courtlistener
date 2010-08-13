@@ -195,7 +195,7 @@ def back_scrape_court(courtID, result, verbosity):
         return result
 
     if courtID == '10':
-        '''Functional as of 2010/08/10. This court has a search form, which
+        '''Functional as of 2010/08/11. This court has a search form, which
         returns ten results at a time. The results are in pretty shabby form,
         hence we request then ONE AT A TIME!
         '''
@@ -203,7 +203,7 @@ def back_scrape_court(courtID, result, verbosity):
         url = "http://www.ca10.uscourts.gov/searchbydateresults.php"
         ct = Court.objects.get(courtUUID = 'ca10')
 
-        i = 21414
+        i = 2060
         dupCount = 0
         while i <= 21536:
             if verbosity >= 2: print "i: " + str(i)
