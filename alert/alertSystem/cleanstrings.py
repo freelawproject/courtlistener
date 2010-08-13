@@ -109,85 +109,11 @@ def titlecase(text):
 
 
 def harmonize(text):
-    '''This function fixes case names so they're cleaner. It fixes various
+    """This function fixes case names so they're cleaner. It fixes various
     ways of writing United States, gets rid of et al, and changes vs. to v.
-    Lots of tests ensue...
+    Lots of tests are in tests.py.
+    """
 
-    # tests of various ways of writing United States
-    >>> harmonize('U.S.A. v. Lissner')
-    'United States v. Lissner'
-    >>> harmonize('U.S. v. Lissner')
-    'United States v. Lissner'
-    >>> harmonize('United States v. Lissner')
-    'United States v. Lissner'
-    >>> harmonize('Usa v. Lissner')
-    'United States v. Lissner'
-    >>> harmonize('USA v. Lissner')
-    'United States v. Lissner'
-    >>> harmonize('United States of America v. Lissner')
-    'United States v. Lissner'
-    # tests of changes of order and additional v's
-    >>> harmonize('Lissner v. United States of America')
-    'Lissner v. United States'
-    >>> harmonize('V.Vivack and Associates v. US')
-    'V.Vivack and Associates v. United States'
-    >>> harmonize('v.v. Hendricks & Sons v. James v. Smith')
-    'v.v. Hendricks & Sons v. James v. Smith'
-    >>> harmonize('v.v. Hendricks v. James V. Smith v. US')
-    'v.v. Hendricks v. James V. Smith v. United States'
-    >>> harmonize('U.S.A. v. Mr. v.')
-    'United States v. Mr. v.'
-    # tests of things that shouldn't change
-    >>> harmonize('U.S.S. v. Lissner')
-    'U.S.S. v. Lissner'
-    >>> harmonize('USC v. Lissner')
-    'USC v. Lissner'
-    >>> harmonize('U.S.C. v. Lissner')
-    'U.S.C. v. Lissner'
-    >>> harmonize('U.S. Steel v. Colgate')
-    'U.S. Steel v. Colgate'
-    >>> harmonize('papusa')
-    'papusa'
-    >>> harmonize('CUSANO')
-    'CUSANO'
-    >>> harmonize('US Steel v.  US')
-    'US Steel v. United States'
-    # Testing that US gets changed correctly.
-    >>> harmonize('US v. V.Vivack')
-    'United States v. V.Vivack'
-    # Testing that vs. gets fixed correctly.
-    >>> harmonize('US vs. Lissner')
-    'United States v. Lissner'
-    >>> harmonize('vs.boxer@gmail.com vs. USA')
-    'vs.boxer@gmail.com v. United States'
-    # Testing that plantiff and defendant can be the same
-    >>> harmonize('US v. US')
-    'United States v. United States'
-    # Testing that spaces don't affect success
-    >>> harmonize('US  Steel v.  US')
-    'US  Steel v. United States')]
-
-    # Checking that et al is correct.
-    test_strings.extend([
-    >>> harmonize('Lissner, et. al.')
-    'Lissner'
-    >>> harmonize('Lissner, et. al')
-    'Lissner'
-    >>> harmonize('Lissner, et al.')
-    'Lissner' # <-- Correct
-    >>> harmonize('Lissner, et al')
-    'Lissner'
-    >>> harmonize('Lissner et. al.')
-    'Lissner'
-    >>> harmonize('Lissner et. al')
-    'Lissner'
-    >>> harmonize('Lissner et al.')
-    'Lissner'
-    >>> harmonize('Lissner et al')
-    'Lissner'
-    >>> harmonize('clarinet alibi')
-    'clarinet alibi'
-    '''
     result = ''
     # replace vs. with v.
     text = re.sub(re.compile(r'\Wvs\.\W'), ' v. ', text)

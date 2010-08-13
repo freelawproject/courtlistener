@@ -204,7 +204,7 @@ def back_scrape_court(courtID, result, verbosity):
         ct = Court.objects.get(courtUUID = 'ca10')
         not_binding = re.compile('not(\s+)binding(\s+)precedent', re.IGNORECASE)
 
-        i = 2060
+        i = 45
         dupCount = 0
         while i <= 21536:
             if verbosity >= 2: print "i: " + str(i)
@@ -299,8 +299,8 @@ def back_scrape_court(courtID, result, verbosity):
             doc.documentPlainText = anonymize(smart_str(content))
 
             # determine if it's published or not by checking for the words
-            # "not binding precedent" in the first 3000 characters.
-            if NOT_BINDING.match(doc.documentPlainText[:3000]):
+            # "not binding precedent" in the first 5000 characters.
+            if not_binding.search(doc.documentPlainText[:5000]):
                 doc.documentType = "Unpublished"
             else:
                 doc.documentType = "Published"
