@@ -59,6 +59,7 @@ def signal_handler(signal, frame):
         global dieNow
         dieNow = True
 
+
 def makeDocFromURL(LinkToPdf, ct):
     '''Receives a URL and a court as arguments, then downloads the PDF
     that's in it, and makes it into a StringIO. Generates a sha1 hash of the
