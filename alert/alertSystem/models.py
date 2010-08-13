@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from django.utils.text import get_valid_filename
 from djangosphinx.models import SphinxSearch
 from django.db import models
 import alert
@@ -37,7 +38,7 @@ PACER_CODES = (
     ('scotus', 'Supreme Court of the United States'),
 )
 
-# changes here need to be mirrored in the coverage page view and the exceptions 
+# changes here need to be mirrored in the coverage page view and the exceptions
 # list for sphinx
 DOCUMENT_STATUSES = (
     ('Published', 'Published/Precedential'),
@@ -54,7 +55,15 @@ DOCUMENT_SOURCES = (
     ('A', 'internet archive'),
 )
 
-# A class to hold URLs and the hash of their contents. This could be added to 
+def make_pdf_upload_path(instance, filename):
+    """Return a string like pdf/2010/08/13/foo_v._var.pdf, with the date set
+    as the dateFiled for the case."""
+    # this code NOT cross platform. Use os.path.join or similar to fix.
+    return 'pdf/' + instance.dateFiled.strftime("%Y/%m/%d/") + \
+        get_valid_filename(filename)
+
+
+# A class to hold URLs and the hash of their contents. This could be added to
 # the Court table, except that courts often have more than one URL they parse.
 class urlToHash(models.Model):
     hashUUID = models.AutoField("a unique ID for each hash/url pairing", primary_key=True)
@@ -66,10 +75,10 @@ class urlToHash(models.Model):
         max_length=40,
         blank=True,
         editable=False)
-        
+
     def __unicode__(self):
         return self.url
-    
+
     class Meta:
         db_table = "urlToHash"
 
@@ -248,7 +257,7 @@ class Document(models.Model):
         auto_now_add=True,
         editable=False)
     local_path = models.FileField("the location, relative to MEDIA_ROOT, where the files are stored",
-        upload_to='pdf/%Y/%m/%d',
+        upload_to=make_pdf_upload_path,
         blank=True)
     documentPlainText = models.TextField("plain text of the document after extraction from the PDF",
         blank=True)
