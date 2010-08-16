@@ -1,11 +1,11 @@
-{% extends "base.html" %} 
+{% extends "base.html" %}
 
 {% block title %}CourtListener.com / Contact{% endblock %}
 
 {% block content %}
     <div class="span-18 colborder" id="content">
         <h2>Contact Us</h2>
-        
+
         {% if form.errors %}
             <div class="span-18">
                 <div class="span-10 error">
@@ -21,14 +21,14 @@
                 {% if form.name.errors %}
                     <span class="errortext">
                         {% for error in form.name.errors %}
-                            {{ error|escape }}  
+                            {{ error|escape }}
                         {% endfor %}
                     </span>
                 {% endif %}<br>
                 {{ form.name }}
             </p>
-            
-            
+
+
             <p>
                 <label for="id_email">Email (optional)</label>
                 {% if form.email.errors %}
@@ -40,8 +40,8 @@
                 {% endif %}<br>
                 {{ form.email }}
             </p>
-            
-            
+
+
             <p>
                 <label for="id_subject">Subject</label>
                 {% if form.subject.errors %}
@@ -53,8 +53,8 @@
                 {% endif %}<br>
                 {{ form.subject }}
             </p>
-            
-            
+
+
             <p>
                 <label for="id_message">Message</label>
                 {% if form.message.errors %}
@@ -74,8 +74,13 @@
 {% block sidebar %}
     <div class="span-5 last" id="sidebar">
         <h3>Updates</h3>
-        <p>For updates, bug fixes, and status messages, follow <a href="https://twitter.com/courtlistener" target="_blank">@courtlistener</a> on Twitter.</p>
+        <p>For updates, bug fixes, and status messages, follow <a href="https://twitter.com/courtlistener">@courtlistener</a> on Twitter.</p>
         <br><br>
+
+        <h3>Discussion</h3>
+        <p>You can <a href="https://groups.google.com/group/courtlistener-discuss">visit our forum</a> if you're interested in discussing the site with others.</p>
+        <br><br>
+
         <h3>Mail</h3>
         <p>School of Information<br>
         University of California, Berkeley<br>
