@@ -278,7 +278,7 @@ class Document(models.Model):
     def get_absolute_url(self):
         try:
             return ('viewCases', [str(self.court.courtUUID),
-                str(self.citation.caseNameShort).replace('-', '_').replace(' ', '-')])
+                str(self.citation.caseNameShort).replace(' ', '-')])
         except:
             return ('viewCases', [str(self.court.courtUUID),
                 str(self.documentSHA1)])

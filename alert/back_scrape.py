@@ -198,15 +198,20 @@ def back_scrape_court(courtID, result, verbosity):
         '''Functional as of 2010/08/11. This court has a search form, which
         returns ten results at a time. The results are in pretty shabby form,
         hence we request then ONE AT A TIME!
+
+        To re-use this, find the index number on the court website of the
+        starting and ending points you want by doing a search for a date
+        range, then monitoring the POST values submitted when the next button
+        on the results page is pressed.
         '''
 
         url = "http://www.ca10.uscourts.gov/searchbydateresults.php"
         ct = Court.objects.get(courtUUID = 'ca10')
         not_binding = re.compile('not(\s+)binding(\s+)precedent', re.IGNORECASE)
 
-        i = 45
+        i = 0
         dupCount = 0
-        while i <= 21536:
+        while i <= 20000:
             if verbosity >= 2: print "i: " + str(i)
             postValues = {
                 'start_index' : i,
@@ -267,11 +272,11 @@ def back_scrape_court(courtID, result, verbosity):
             caseDate = tree.find_class('headline')[0].text
             splitDate = caseDate.split('/')
             year = int(splitDate[2])
-            if year > 80 and year < 2000:
+            if year > 80 and year <= 99:
                 year = int("19" + splitDate[2])
-            elif year > 2000:
+            elif year >= 2000:
                 pass
-            elif year < 80 and year > 0:
+            elif year < 80 and year >= 0:
                 year = int("20" + splitDate[2])
             caseDate = datetime.date(year, int(splitDate[0]), int(splitDate[1]))
             doc.dateFiled = caseDate
