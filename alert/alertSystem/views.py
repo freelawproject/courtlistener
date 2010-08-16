@@ -28,22 +28,25 @@ def viewCases(request, court, case):
     # get the court information from the URL
     ct = Court.objects.get(courtUUID = court)
 
-    # try looking it up by casename. Failing that, try the caseNumber. 
-    # replace spaces with hyphens to undo the URLizing that the get_absolute_url
-    # in the Document model sets up.
-    cites = Citation.objects.filter(caseNameShort__in = [case.replace('-', ' ').replace('_', '-'), case])
+    # try looking it up by casename. Failing that, try the caseNumber.
+    # replace hyphens with spaces to undo the URLizing that
+    # the get_absolute_url in the Document model sets up.
+    cites = Citation.objects.filter(caseNameShort = \
+        case.replace('-', ' '))
     if cites.count() == 0:
         # if we can't find it by case name, try by case number
         cites = Citation.objects.filter(caseNumber = case)
     if cites.count() == 0:
         #case number didn't work either, try SHA1
-        docs = Document.objects.filter(documentSHA1 = case, court = ct).order_by("-dateFiled")
+        docs = Document.objects.filter(documentSHA1 = \
+            case, court = ct).order_by("-dateFiled")
 
     if cites.count() > 0:
         # get any documents with this/these citation(s) at that court. We need
         # all the documents with what might be more than one citation, so we\
         # use a filter, and the __in method.
-        docs = Document.objects.filter(court = ct, citation__in = cites).order_by("-dateFiled")
+        docs = Document.objects.filter(court = ct, citation__in = cites)\
+            .order_by("-dateFiled")
 
     return render_to_response('display_cases.html', {'title': case,
         'docs': docs, 'court': ct}, RequestContext(request))
