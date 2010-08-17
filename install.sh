@@ -321,6 +321,10 @@ function installCourtListener {
     echo "Downloading CourtListener with mercurial..."
     hg clone http://bitbucket.org/mlissner/legal-current-awareness court-listener
 
+    # make the log file for the scraper
+    mkdir /var/log/scraper
+    touch /var/log/scraper/daemon_log.out
+
     # begin the harder thing: configuring it correctly...
     # We need a link between the 20-private.conf adminMedia location and the
     # location of the django installation. Else, admin templates won't work.
@@ -336,6 +340,7 @@ function installCourtListener {
 
     # this generates a nice random number, as it is done by django-admin.py
     SECRET_KEY=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)") for i in range(50)]);'`
+
     # this is the MEDIA_ROOT
     MEDIA_ROOT="$CL_INSTALL_DIR/court-listener/alert/assets/media/"
     TEMPLATE_DIRS="$CL_INSTALL_DIR/court-listener/alert/assets/templates/"
@@ -757,6 +762,7 @@ EOF
     echo -e '\ndjango-sphinx installed successfully.'
 }
 
+
 function installDebugToolbar {
     if INSTALL_DEBUG_TOOLBAR
     then
@@ -880,7 +886,7 @@ Cron jobs such as the following might work well:
 The first updates the delta index once every 20 minutes. The second updates the main
 index every other week.
 "
-    read -p "Press any key to exit the install script, and begin hacking. "
+    read -p "Press any key to exit the install script, and begin hacking. Whew."
     exit 0
 }
 

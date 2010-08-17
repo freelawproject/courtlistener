@@ -11,7 +11,7 @@ from django.utils.encoding import smart_str
 
 
 # For use in titlecase
-BIG = 'USA|FCC|FTC|DOJ|USC|WTO|EFF|CDT|RSS|LLP|USPS|LLC|CDC|CNMI|DVA|MSPB'
+BIG = 'CDC|CDT|CNMI|DOJ|DVA|EFF|FCC|FTC|LLC|LLP|MSPB|RSS|SEC|USA|USC|USPS|WTO'
 SMALL = 'a|an|and|as|at|but|by|en|for|if|in|of|on|or|the|to|v\.?|via|vs\.?'
 PUNCT = r"""!"#$%&'‘()*+,\-./:;?@[\\\]_`{|}~"""
 BIG_WORDS = re.compile(r'^(%s)$' % BIG, re.I)

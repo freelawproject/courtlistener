@@ -22,7 +22,7 @@
         {% with docs|first as doc %}
             <link rel="canonical" href="{{doc.get_absolute_url}}">
         {% endwith %}
-    {% endif %}    
+    {% endif %}
 {% endblock %}
 
 {% block content %}
@@ -68,15 +68,15 @@
                 {% if doc.source == "R" %}
                     {{doc.documentHTML|safe}}
                 {% endif %}
-            {% endfor %}            
-                
+            {% endfor %}
+
         {% else %}
             {# No documents found, tell the user, apologize. #}
             <h2>No documents found</h2>
-            
-            <p>We looked in the <strong>{{ court }}</strong>, but were unable to find anything that 
+
+            <p>We looked in the <strong>{{ court }}</strong>, but were unable to find anything that
             had the case name or number of <strong>{{ title }}</strong>.</p>
-            
+
             <p class="bottom">Sorry about that. Would you like to try a different approach:</p>
             <ul>
                 <li>You can try a <a href="/search/">search</a> for what you're looking for.</li>
@@ -84,21 +84,23 @@
                 <li>If you think you have found a bug, you can <a href="/contribute#bugs">file a bug</a>.</li>
             </ul>
             <p>Sorry about this. If you continue having problems, do let us know.</p>
-        
+
         {% endif %}
     </div>
 {% endblock %}
 
 
 {% block sidebar %}
-    {% if user.is_superuser and docs %} 
+    {% if user.is_superuser and docs %}
         <div class="span-5 last" id="sidebar">
             <h3>Admin</h3>
-            
+            <ol>
             {% for doc in docs %}
-                <a href="/admin/alertSystem/document/{{doc.documentUUID}}/">Edit {{doc.citation.caseNameFull}}</a><br>
+                <li><a href="/admin/alertSystem/document/{{doc.documentUUID}}/">Document</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+                <a href="/admin/alertSystem/citation/{{doc.citation_id}}/">Citation</a></li>
             {% endfor %}
-        </div>            
+            </ol>
+        </div>
     {% else %}
         <div class="span-5 last" id="sidebar">
         </div>
