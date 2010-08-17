@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}CourtListener.com / Sign in or register{% endblock %}
+
+{% block headers %}
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+    <script type="text/javascript">
+	    $(document).ready(function() {
+		    $('.auto-focus:first').focus();
+	    });
+     </script>
+{% endblock %}
+
+{% block content %}
+    <div class="span-24 last id="content"">
+        <div class="span-11 colborder">
+            {% block h2 %}<h2>Sign in</h2>{% endblock %}
+            <form action="/sign-in/?next={{next}}" method="post">{% csrf_token %}
+                <p>
+                    <label for="username">Username</label><br>
+                    <input type="text" name="username" value="" id="username" class="auto-focus">
+                </p>
+        
+                <p>
+                    <label for="password">Password</label><br>
+                    <input type="password" name="password" value="" id="password">
+
+                </p>
+                <input type="hidden" name="next" value="{{ next|escape }}">
+                <button type="submit" class="button" name="sign-in">Sign in</button>
+            </form>
+            <p class="bottom"><a href="/reset-password/">Forgot username/password?</a></p>
+        </div>
+        
+        <div class="span-12 last">
+            <h2>Register for a new account</h2>
+            <form action="/register/?next={{next}}" method="post">{% csrf_token %}
+                <p>
+                    <label for="id_username">Username*</label><br>
+                    <input id="id_username" type="text" name="username" maxlength="30">
+                </p>
+                <p>
+                    <label for="id_email">Email address*</label><br>
+                    {{ form.email }}
+                </p>
+                <p>
+                    <label for="id_password1">Enter password*</label><br>
+                    {{ form.password1 }}
+                </p>
+                <p>
+                    <label for="id_password2">Re-enter password*</label><br>
+                    {{ form.password2 }}
+                </p>
+                <p>
+                    <label for="id_first_name">First name</label><br>
+                    {{ form.first_name }}
+                </p>
+                <p>
+                    <label for="id_last_name">Last name</label><br>
+                    {{ form.last_name }}
+                </p>            
+                <button type="submit" class="button" name="register">Register</button>
+            </form>
+        </div>
+    </div>
+{% endblock %}
