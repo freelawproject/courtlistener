@@ -2,6 +2,7 @@ User-agent: *
 Disallow: /sitemap-*
 Crawl-delay: 20
 # Added May 21, 2010
+Disallow: /ca5/Fenghui-Fan-v.-Vicki-Brewer,-et-al/
 Disallow: /ca5/Fenghui-Fan-v.-Vicki-Brewer/
 Disallow: /pdf/2010/05/06/Fenghui_Fan_v._Vicki_Brewer_et_al.pdf
 Disallow: /ca5/09-20430/
