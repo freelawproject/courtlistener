@@ -148,6 +148,17 @@ def home(request):
         RequestContext(request))
 
 
+def getDateFiledOrReturnZero(doc):
+    """Used for sorting dates. Returns the date field or the earliest date
+    possible in Python. With this done, items without dates will be listed
+    last without throwing errors to the sort function."""
+    if (doc.dateFiled != None):
+        return doc.dateFiled
+    else:
+        import datetime
+        return datetime.date(1,1,1)
+
+
 def showResults(request):
     """Show the results for a query"""
 
@@ -195,10 +206,13 @@ def showResults(request):
     # NEW SEARCH METHOD
     try:
         queryset = Document.search.query(internalQuery)
-        results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
-            .order_by('-dateFiled')
+        results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")
     except:
         results = []
+
+    # Put the results in order by dateFiled. Fixes issue 124
+    # From: http://wiki.python.org/moin/HowTo/Sorting/
+    results = sorted(results, key=getDateFiledOrReturnZero, reverse=True)
 
     # next, we paginate we will show ten results/page
     paginator = Paginator(results, 10)
