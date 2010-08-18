@@ -197,7 +197,7 @@ Press any key to proceed, or Ctrl+C to abort. " proceed
 function checkDeps {
     # this function checks for various dependencies that the script assumes are
     # installed for its own functionality.
-    deps=(aptitude mercurial subversion python ipython git-core python python-beautifulsoup python-docutils python-mysqldb python-pip python-setuptools poppler-utils mysql-client mysql-server wget tar libmysqlclient-dev gcc g++ make)
+    deps=(aptitude mercurial subversion python ipython git-core logrotate python python-beautifulsoup python-docutils python-mysqldb python-pip python-setuptools poppler-utils mysql-client mysql-server wget tar libmysqlclient-dev gcc g++ make)
     echo -e "\n########################"
     echo "Checking dependencies..."
     echo "########################"
@@ -321,7 +321,7 @@ function installCourtListener {
     echo "Downloading CourtListener with mercurial..."
     hg clone http://bitbucket.org/mlissner/legal-current-awareness court-listener
 
-    # make the log file for the scraper
+    # make the log file for the scraper and install the log script
     mkdir /var/log/scraper
     touch /var/log/scraper/daemon_log.out
 
@@ -334,9 +334,10 @@ function installCourtListener {
     echo "Installing init scripts."
     ln -s $CL_INSTALL_DIR/court-listener/init-scripts/scraper-init-script.sh /etc/init.d/scraper
 
-    # we create the logging file
+    # we create the logging file and set up logrotate scripts
     mkdir -p "/var/log/scraper"
     touch /var/log/scraper/daemon_log.out
+    ln -s $CL_INSTALL_DIR/court-listener/log-scripts/scraper /etc/logrotate.d/scraper
 
     # this generates a nice random number, as it is done by django-admin.py
     SECRET_KEY=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)") for i in range(50)]);'`
@@ -524,6 +525,10 @@ function installSphinx {
         exit 6
     fi
 
+    # make a directory where logs will be created and set up the logger
+    mkdir /var/log/sphinx/
+    ln -s $CL_INSTALL_DIR/court-listener/log-scripts/sphinx /etc/logrotate.d/sphinx
+
     # next we configure the thing...this is going to be ugly.
     # note: EOF without quotes interprets variables and backslashes. To preserve
     # things with either \ or $foo, use 'EOF'
@@ -647,11 +652,11 @@ searchd
 
 	# log file, searchd run info is logged here
 	# optional, default is 'searchd.log'
-	log = $CL_INSTALL_DIR/court-listener/Sphinx/log/searchd.log
+	log = /var/log/sphinx/searchd.log
 
 	# query log file, all search queries are logged here
 	# optional, default is empty (do not log queries)
-	query_log = $CL_INSTALL_DIR/court-listener/Sphinx/log/query.log
+	query_log = /var/log/sphinx/query.log
 
 	# client read timeout, seconds
 	# optional, default is 5
@@ -663,7 +668,7 @@ searchd
 
 	# PID file, searchd process ID file name
 	# mandatory
-	pid_file = $CL_INSTALL_DIR/court-listener/Sphinx/log/searchd.pid
+	pid_file = /var/log/sphinx/searchd.pid
 
 	# max amount of matches the daemon ever keeps in RAM, per-index
 	# WARNING, THERE'S ALSO PER-QUERY LIMIT, SEE SetLimits() API CALL
