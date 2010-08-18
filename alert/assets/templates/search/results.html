@@ -57,7 +57,7 @@ Page / {{ results.number }} of {{results.paginator.num_pages}}
             </div>
             <div class="span-10 last">&nbsp;</div>
         {% endif %}
-        
+
         {% if messages %}
             <div class="span-24 last">
                 <div class="span-11">
@@ -140,61 +140,73 @@ Page / {{ results.number }} of {{results.paginator.num_pages}}
             </div>
         </div>
 
-
-        {% if not results.object_list and query %}
-            <h3 class="alt">Your search yielded no results.</h3>
+        {% if over_limit %}
+            {# We have exceeded the page number limit #}
+            <h3 class="alt">Limit exceeded</h3>
+            <p>Sorry, but CourtListener does not return more than 1000 results for any query.</p>
+            <p class="bottom">Would you like to try a different approach:</p>
             <ul>
-                <li>Check if your spelling is correct</li>
-                <li>Loosen your boolean construction</li>
-                <li>Remove quotes where possible</li>
+                <li>You can try a <a href="/search/">search</a> for what you're looking for.</li>
+                <li>You can <a href="/contact/">let us know</a> that something is wrong or missing.</li>
+                <li>If you think you have found a bug, you can <a href="/contribute/#bugs">file a bug</a>.</li>
             </ul>
-        {% endif %}
-
-        {% for result in results.object_list %}
-            <h3 class="alt bottom"><a href="{{result.get_absolute_url}}">{{ result.citation.caseNameFull }}, {{result.citation.caseNumber}} ({{result.court.courtShortName}})</a></h3>
-            <p>
-                {% if result.dateFiled %}
-                    {{result.dateFiled|date:"l, F jS, Y"}}<br>
-                {% else %}
-                    Unknown date<br>
-                {% endif %}
-                <strong>Status: </strong>
-                    {% if result.documentType %}
-                        {{result.get_documentType_display}}<br>
-                    {% else %}
-                        Unknown<br>
-                    {% endif %}
-                {% if result.downloadURL or result.local_path %}
-                    <strong>Download PDF: </strong>
-                    {% if result.download_URL %}
-                        <a href="{{result.download_URL}}">From the court</a>
-                    {% endif %}
-                    {% if result.download_URL and result.local_path %}
-                        &nbsp;&nbsp;|&nbsp;&nbsp;
-                    {% endif %}
-                    {% if result.local_path %}
-                        <a href="/{{result.local_path}}">Our backup</a>
-                    {% endif %}<br>
-                {% else %}
-                    No downloadable versions.<br>
-                {%endif %}
-            </p>
-            <br>
-        {% endfor %}
-
-        <h3>
-            {% if results.object_list %}
-                {% if results.has_previous %}
-                        <a href="{{request.path}}?page=1&q={{query}}">« first</a>&nbsp;&nbsp;
-                        <a href="{{request.path}}?page={{ results.previous_page_number }}&q={{query}}">‹ previous</a>&nbsp;&nbsp;
-                {% endif %}
-                Page {{ results.number }} of {{ results.paginator.num_pages }}
-                {% if results.has_next %}
-                        &nbsp;&nbsp;<a href="{{request.path}}?page={{ results.next_page_number }}&q={{query}}">next ›</a>
-                        &nbsp;&nbsp;<a href="{{request.path}}?page={{ results.paginator.num_pages }}&q={{query}}">last »</a>
-                {% endif %}
+            <p>Sorry about this. If you continue having problems, <a href="/contact/">please let us know</a>.</p>
+        {% else %}
+            {% if not results.object_list and query %}
+                <h3 class="alt">Your search yielded no results.</h3>
+                <ul>
+                    <li>Check if your spelling is correct</li>
+                    <li>Loosen your boolean construction</li>
+                    <li>Remove quotes where possible</li>
+                </ul>
             {% endif %}
-        </h3>
+
+            {% for result in results.object_list %}
+                <h3 class="alt bottom"><a href="{{result.get_absolute_url}}">{{ result.citation.caseNameFull }}, {{result.citation.caseNumber}} ({{result.court.courtShortName}})</a></h3>
+                <p>
+                    {% if result.dateFiled %}
+                        {{result.dateFiled|date:"l, F jS, Y"}}<br>
+                    {% else %}
+                        Unknown date<br>
+                    {% endif %}
+                    <strong>Status: </strong>
+                        {% if result.documentType %}
+                            {{result.get_documentType_display}}<br>
+                        {% else %}
+                            Unknown<br>
+                        {% endif %}
+                    {% if result.downloadURL or result.local_path %}
+                        <strong>Download PDF: </strong>
+                        {% if result.download_URL %}
+                            <a href="{{result.download_URL}}">From the court</a>
+                        {% endif %}
+                        {% if result.download_URL and result.local_path %}
+                            &nbsp;&nbsp;|&nbsp;&nbsp;
+                        {% endif %}
+                        {% if result.local_path %}
+                            <a href="/{{result.local_path}}">Our backup</a>
+                        {% endif %}<br>
+                    {% else %}
+                        No downloadable versions.<br>
+                    {%endif %}
+                </p>
+                <br>
+            {% endfor %}
+
+            <h3>
+                {% if results.object_list %}
+                    {% if results.has_previous %}
+                            <a href="{{request.path}}?page=1&q={{query}}">« first</a>&nbsp;&nbsp;
+                            <a href="{{request.path}}?page={{ results.previous_page_number }}&q={{query}}">‹ previous</a>&nbsp;&nbsp;
+                    {% endif %}
+                    Page {{ results.number }} of {{ results.paginator.num_pages }}
+                    {% if results.has_next %}
+                            &nbsp;&nbsp;<a href="{{request.path}}?page={{ results.next_page_number }}&q={{query}}">next ›</a>
+                            &nbsp;&nbsp;<a href="{{request.path}}?page={{ results.paginator.num_pages }}&q={{query}}">last »</a>
+                    {% endif %}
+                {% endif %}
+            </h3>
+        {% endif %}
     </div>
 {% endblock %}
 

@@ -76,7 +76,7 @@ def viewDocumentListByCourt(request, court):
     # only allow queries up to page 100.
     if page > 100:
         return render_to_response('view_documents_by_court.html',
-            {'title': ct, 'over_limit': True})
+            {'over_limit': True}, RequestContext(request))
 
     # If page request is out of range, deliver last page of results.
     try:
@@ -85,5 +85,4 @@ def viewDocumentListByCourt(request, court):
         documents = paginator.page(paginator.num_pages)
 
     return render_to_response('view_documents_by_court.html', {'title': ct,
-        "documents": documents, 'lastPage': lastPage},
-        context_instance=RequestContext(request))
+        "documents": documents}, RequestContext(request))

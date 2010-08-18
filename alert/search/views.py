@@ -38,7 +38,7 @@ def oxford_comma(seq):
 
 def preparseQuery(query):
     query = query.lower()
-    
+
     # @doctext needs to become @(doctext,dochtml).
     # @(doctext) needs to become @(doctext, dochtml).
     # @(doctext,court) needs to be come @(doctext,dochtml,court)
@@ -46,15 +46,15 @@ def preparseQuery(query):
     # @doctext now is @doctext,dochtml --> BAD
     # @(doctext) is now @(doctext,dochtml) --> GOOD
     # @(doctext,court) is now @(doctext,dochtml,court) --> GOOD
-    query = re.sub('@doctext,dochtml', '@(doctext,dochtml)', query)    
+    query = re.sub('@doctext,dochtml', '@(doctext,dochtml)', query)
     # All are now good.
 
     return query
 
 def adjustQueryForUser(query):
-    """This is where the "Did you mean" type of thing lives, for example, 
+    """This is where the "Did you mean" type of thing lives, for example,
     where we correct the user's input if needed.
-    
+
     Currently, though, it's not implemented.
     """
     return query
@@ -68,7 +68,7 @@ def messageUser(query, request):
     # for testing: @court @casename foo,bar @(doctext, courthouse, docstatus) @(docstatus, casename) @(casename) @courtname (court | doctext)
     # this catches simple fields such as @court, @field and puts them in a list
     attributes = re.findall('(?:@)([^\( ]*)', query)
-    
+
     # this catches more complicated ones, like @(court), and @(court, test)
     regex0 = re.compile('''
         @               # at sign
@@ -87,17 +87,17 @@ def messageUser(query, request):
             )               # end of non-capuring group
         )           # end of non-capturing group
         ''', re.VERBOSE)
-    
-    
+
+
     messageText = ""
     # and this puts them into the attributes list.
     groupedAttributes = re.findall(regex0, query)
     for item in groupedAttributes:
         attributes.extend(item.strip("(").strip(")").strip().split(","))
-            
+
     # check if the values are valid.
     validRegex = re.compile(r'^\W?court\W?$|^\W?casename\W?$|^\W?docstatus\W?$|^\W?doctext\W?$|^\W?casenumber\W?$')
-    
+
     # if they aren't add them to a new list.
     badAttrs = []
     for attribute in attributes:
@@ -114,7 +114,7 @@ def messageUser(query, request):
             if "Multiple" not in messageText:
                 # we only add this warning once.
                 messageText += "Mutiple field searches cannot contain spaces.<br>"
-        
+
 
     # pluralization is a pain, but we must do it...
     if len(badAttrs) == 1:
@@ -125,10 +125,10 @@ def messageUser(query, request):
         messageText += '<strong>' + oxford_comma(badAttrs) + '</strong> are not \
         valid fields. Valid fields are @court, @caseName, @caseNumber,\
         @docStatus and @docText.'
-    
+
     if len(messageText) > 0:
         messages.add_message(request, messages.INFO, messageText)
-    
+
     return True
 
 
@@ -190,14 +190,14 @@ def showResults(request):
         # the form is loading for the first time, load it, then load the rest
         # of the page!
         alertForm = CreateAlertForm(initial = {'alertText': query, 'alertFrequency': "dly"})
-    
+
     # alert the user if there are any errors in their query
     messageUser(query, request)
-    
+
     # adjust the query if need be for the search to happen correctly.
     query = adjustQueryForUser(query)
     internalQuery = preparseQuery(query)
-    
+
     # OLD SEARCH METHOD (crude, slow, powerless)
     # results = Document.objects.filter(documentPlainText__icontains=query).order_by("-dateFiled")
 
@@ -211,18 +211,24 @@ def showResults(request):
 
     # next, we paginate we will show ten results/page
     paginator = Paginator(results, 10)
-    
+
     # this will fail when the search fails, so try/except is needed.
     try:
         numResults = paginator.count
     except:
         numResults = 0
-    
+
     # Make sure page request is an int. If not, deliver first page.
     try:
         page = int(request.GET.get('page', '1'))
     except ValueError:
         page = 1
+
+    # only allow queries up to page 100.
+    if page > 100:
+        return render_to_response('search/results.html', {'over_limit': True,
+            'query': query, 'alertForm': alertForm},
+            RequestContext(request))
 
     # If page request is out of range, deliver last page of results.
     try:
@@ -232,8 +238,8 @@ def showResults(request):
     except:
         results = []
 
-    return render_to_response('search/results.html', {'results': results, 
-        'numResults': numResults, 'query': query, 'alertForm': alertForm}, 
+    return render_to_response('search/results.html', {'results': results,
+        'numResults': numResults, 'query': query, 'alertForm': alertForm},
         RequestContext(request))
 
 
