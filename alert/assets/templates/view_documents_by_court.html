@@ -26,7 +26,7 @@
 {% block content %}
     <div class="span-18 colborder">
         <h2>{{ title }}</h2>
-        <h3>Recent documents, page {{ documents.number|intcomma }} of {{ documents.paginator.num_pages|intcomma }}</h3>
+        <h3>Recent documents, page {{ documents.number|intcomma }}</h3>
         {% for doc in documents.object_list %}
             <h3 class="alt bottom"><a href="{{doc.get_absolute_url}}">{{ doc.citation.caseNameFull }}, {{doc.citation.caseNumber}} ({{doc.court.courtShortName}})</a></h3>
             <p>
@@ -41,7 +41,7 @@
                     {% else %}
                         Unknown<br>
                     {% endif %}
-                    
+
                 {% if doc.downloadURL or doc.local_path %}
                     <strong>Download PDF: </strong>
                     {% if doc.download_URL %}
@@ -57,7 +57,7 @@
                     No downloadable versions.<br>
                 {% endif %}
         {% endfor %}</p>
-        
+
         <h3>
             {% if documents.has_previous %}
                     <a href="{{request.path}}?page=1">« first</a>&nbsp;&nbsp;
