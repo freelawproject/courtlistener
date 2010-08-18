@@ -54,8 +54,14 @@ class searchFeed(Feed):
         obj = preparseQuery(obj)
         queryset = Document.search.query(obj)
         results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
-            .order_by('-dateFiled').filter(dateFiled__gt=datetime.date(1950, 1, 1))
-        return results
+            .order_by('-dateFiled')
+        # parse out documents prior to 1900. This could be done with
+        # .exclude, if it worked.
+        parsedResults = []
+        for result in results:
+            if (result.dateFiled > datetime.date(1900, 1, 1)):
+                parsedResults.append(result)
+        return parsedResults
 
     def item_author_name(self, item):
         return item.court

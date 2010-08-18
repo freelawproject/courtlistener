@@ -149,7 +149,7 @@ def home(request):
 
 
 def showResults(request):
-    """Show the results for a query as either an alert or a search"""
+    """Show the results for a query"""
 
     try:
         query = request.GET['q']
@@ -170,16 +170,7 @@ def showResults(request):
             alert = a.save() # this method saves it and returns it
 
             # associate the user with the alert
-            try:
-                # This works...but only if they already have an account.
-                up = request.user.get_profile()
-            except:
-                # if the user doesn't have a profile yet, we make them one, and
-                # associate it with their username.
-                u = request.user
-                up = UserProfile()
-                up.user = u
-                up.save()
+            up = request.user.get_profile()
             up.alert.add(alert)
             messages.add_message(request, messages.SUCCESS,
                 'Your alert was created successfully.')
