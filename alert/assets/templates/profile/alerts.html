@@ -14,13 +14,24 @@
     <div class="span-24 last" id="content">
         {% if user.get_profile.alert.all %}
             <div class="span-24 last content">
-                {% if not request.user.get_profile.emailConfirmed %}
+                {% if messages %}
                     <div class="span-18">
                         <div class="span-10">
-                            <p class="bottom notice">Your email address has not been confirmed. To receive alerts, you must <a href="/email-confirmation/request/">confirm your email address</a>.</p>
+                            {% for message in messages %}
+                                <p class="bottom {{message.tags}}">{{message|safe}}</p>
+                            {% endfor %}
                         </div>
                         <div class="span-7 last">&nbsp;</div>
                     </div>
+                {% else %}
+                    {% if not request.user.get_profile.emailConfirmed %}
+                        <div class="span-18">
+                            <div class="span-10">
+                                <p class="bottom notice">Your email address has not been confirmed. To receive alerts, you must <a href="/email-confirmation/request/">confirm your email address</a>.</p>
+                            </div>
+                            <div class="span-7 last">&nbsp;</div>
+                        </div>
+                    {% endif %}
                 {% endif %}
                 <table>
                     <tr>
@@ -33,8 +44,8 @@
                     </tr>
                     {% for alert in user.get_profile.alert.all %}
                     <tr>
-                        <td>{{ alert.alertName|capfirst|truncatewords:"6" }}</td>
-                        <td><a href="/search/results/?q={{alert.alertText}}">{{ alert.alertText|truncatewords:"14" }}</a></td>
+                        <td><p class="bottom" title="{{alert.alertName}}">{{ alert.alertName|capfirst|truncatewords:"6" }}</p></td>
+                        <td><a href="/search/results/?q={{alert.alertText}}" title="{{alert.alertText}}">{{ alert.alertText|truncatewords:"14" }}</a></td>
                         <td>{{ alert.get_alertFrequency_display }}</td>
                         <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"Never" }}</td>
                         <td>{{ alert.alertPrivacy|yesno:"Yes,No" }}</td>
