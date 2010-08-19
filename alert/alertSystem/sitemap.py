@@ -19,11 +19,36 @@ from alert.alertSystem.models import PACER_CODES
 import settings
 from django.contrib.sitemaps import GenericSitemap
 from django.contrib.sitemaps import FlatPageSitemap
+from django.contrib.sites.models import Site
 from django.core.paginator import EmptyPage, PageNotAnInteger
+from django.core import urlresolvers
 from django.http import HttpResponse, Http404
 from django.template import loader
 from django.utils.encoding import smart_str
 import os
+
+
+def indexCopy(request, sitemaps):
+    '''
+    Copied from django.contrib.sitemaps.index. Had to, because it has the
+    urlresolver hardcoded. Grr. Only difference is the urlresolvers.reverse
+    line.
+    '''
+    current_site = Site.objects.get_current()
+    sites = []
+    protocol = request.is_secure() and 'https' or 'http'
+    for section, site in sitemaps.items():
+        if callable(site):
+            pages = site().paginator.num_pages
+        else:
+            pages = site.paginator.num_pages
+        sitemap_url = urlresolvers.reverse('alert.alertSystem.sitemap.cachedSitemap', kwargs={'section': section})
+        sites.append('%s://%s%s' % (protocol, current_site.domain, sitemap_url))
+        if pages > 1:
+            for page in range(2, pages+1):
+                sites.append('%s://%s%s?p=%s' % (protocol, current_site.domain, sitemap_url, page))
+    xml = loader.render_to_string('sitemap_index.xml', {'sitemaps': sites})
+    return HttpResponse(xml, mimetype='application/xml')
 
 
 def cachedSitemap(request, sitemaps, section=None):

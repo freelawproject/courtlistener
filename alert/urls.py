@@ -105,7 +105,7 @@ urlpatterns = patterns('',
     (r'^LiveSearchSiteAuth.xml$', validateForBing),
     (r'^googleef3d845637ccb353.html$', validateForGoogle),
     # Sitemap index generator
-    (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.index',
+    (r'^sitemap\.xml$', 'alert.alertSystem.sitemap.indexCopy',
         {'sitemaps': sitemaps}),
     # this uses a custom sitemap generator that has a file-based cache.
     (r'^sitemap-(?P<section>.+)\.xml$', 'alert.alertSystem.sitemap.cachedSitemap', {'sitemaps': sitemaps}),
