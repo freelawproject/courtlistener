@@ -96,7 +96,7 @@ def cachedSitemap(request, sitemaps, section=None):
 
         # save the new sitemap to disk, but only if it's full-length
         from string import count
-        if (count(xml, "<url>") == 2):
+        if (count(xml, "<url>") == 250):
             # The sitemap is complete, cache it.
             filename = os.path.join(settings.MEDIA_ROOT, "sitemaps",
                                     section + "-p" + str(page) + ".xml")
