@@ -212,7 +212,8 @@ def showResults(request):
 
     # Put the results in order by dateFiled. Fixes issue 124
     # From: http://wiki.python.org/moin/HowTo/Sorting/
-    results = sorted(results, key=getDateFiledOrReturnZero, reverse=True)
+    # Need to do the [0:results.count()] business, else returns only first 20.
+    results = sorted(results[0:results.count()], key=getDateFiledOrReturnZero, reverse=True)
 
     # next, we paginate we will show ten results/page
     paginator = Paginator(results, 10)
