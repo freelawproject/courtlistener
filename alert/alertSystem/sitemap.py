@@ -16,7 +16,7 @@
 
 from alert.alertSystem.models import Document
 from alert.alertSystem.models import PACER_CODES
-import settings
+from alert import settings
 from django.contrib.sitemaps import GenericSitemap
 from django.contrib.sitemaps import FlatPageSitemap
 from django.contrib.sites.models import Site
