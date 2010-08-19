@@ -25,7 +25,6 @@ from alert.search.views import *
 from alert.userHandling.views import *
 # this imports a variable that can be handed to the sitemap index generator function.
 from alert.alertSystem.sitemap import all_sitemaps as sitemaps
-from alert.alertSystem.sitemap import sitemap
 from django.conf.urls.defaults import *
 
 # for the flatfiles in the sitemap
@@ -109,8 +108,7 @@ urlpatterns = patterns('',
     (r'^sitemap\.xml$', 'django.contrib.sitemaps.views.index',
         {'sitemaps': sitemaps}),
     # this uses a custom sitemap generator that has a file-based cache.
-    (r'^sitemap-(?P<section>.+)\.xml$', 'django.contrib.sitemaps.views.sitemap', {'sitemaps': sitemaps}),
-    #(r'^robots.txt$', robots), # removed for lack of need.
+    (r'^sitemap-(?P<section>.+)\.xml$', 'alert.alertSystem.sitemap.cachedSitemap', {'sitemaps': sitemaps}),
 )
 
 # redirects
