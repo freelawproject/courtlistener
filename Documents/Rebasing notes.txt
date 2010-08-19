@@ -1,0 +1,17 @@
+2010-04-16
+
+Notes on rebasing the project:
+ - Lots of things point to the directory where things are installed, and need to be updated. This is why I've been lazy about it. My bad.
+ 
+Things to update:
+ - apache config for Piwik and django (restart server)
+ - link to django in the python config:
+    - cd /usr/lib/python2.6/dist-packages
+    - rm django
+    - ln -s /home/mlissner/Documents/Cal/FinalProject/django/django django
+ - any links in your settings files (restart server if changes made)
+ - links in the development section of URLs.py
+ - Sphinx config
+ - Bash aliases
+ 
+
