@@ -25,6 +25,7 @@ from django.core import urlresolvers
 from django.http import HttpResponse, Http404
 from django.template import loader
 from django.utils.encoding import smart_str
+import datetime
 import os
 
 
@@ -113,6 +114,17 @@ class LimitedGenericSitemap(GenericSitemap):
     # if this is changed, the sitemap function (below) needs updating
     limit = 250
 
+    def __init__(self, info_dict, priority=None, changefreq=None):
+        # Extend the GenericSitemap __init__ method
+        GenericSitemap.__init__(self, info_dict)
+        self.priority = priority
+        self.changefreq = changefreq
+        # convert datetimes to dates, where necessary
+        foo = info_dict.get('date_field', None)
+        if type(foo).__name__ == 'datetime':
+            foo = foo.date()
+        self.date_field = foo
+
 
 class MyFlatPageSitemap(FlatPageSitemap):
     """Extends the FlatPageSitemap class so that specific priorities can be
@@ -139,7 +151,7 @@ all_sitemaps = {}
 for courtTuple in PACER_CODES:
     info_dict = {
         'queryset'  : Document.objects.filter(court=courtTuple[0]),
-        'date_field': 'dateFiled',
+        'date_field': 'time_retrieved',
     }
 
     sitemap = LimitedGenericSitemap(info_dict, priority=0.5, changefreq="never")
