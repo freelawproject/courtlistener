@@ -22,6 +22,7 @@ from alert.userHandling.models import *
 
 def getEmailConfirmed(obj):
     return obj.get_profile().emailConfirmed
+getEmailConfirmed.short_description = "Email Confirmed?"
 
 
 class UserProfileInline(admin.StackedInline):
