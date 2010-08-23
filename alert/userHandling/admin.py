@@ -27,7 +27,6 @@ def getEmailConfirmed(obj):
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
 
-
 class UserAdmin(admin.ModelAdmin):
     inlines = [UserProfileInline, ]
     list_display = ('username', getEmailConfirmed)
