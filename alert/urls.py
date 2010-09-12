@@ -51,6 +51,8 @@ urlpatterns = patterns('',
 
     # Display a case, a named URL because the get_absolute_url uses it.
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/$', viewCases, name="viewCases"),
+    # Redirect users
+    (r'^x/(.*)/$', redirect_short_url),
 
     # Contact us pages
     (r'^contact/$', contact),

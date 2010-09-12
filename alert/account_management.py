@@ -75,7 +75,15 @@ def delete_old_accounts(verbose, simulate):
 def notify_unconfirmed(verbose, simulate):
     """This function will notify people who have not confirmed their accounts
     that they must do so for fear of the deletion bots (above). This function
-    should be run once a week, or so."""
+    should be run once a week, or so.
+
+    Because it updates the expiration date of the user's key, and also uses
+    that field to determine if the user should be notified in the first place,
+    the first week, a user will have an old enough key, and will be notified,
+    but the next week their key will have a very recent expiration date
+    (because it was just updated the prior week). This means that they won't
+    be selected the next week, but the one after, their key will be old again,
+    and they will be selected. It's not ideal, but it's OK."""
 
     # if your account is more than a week old, and you have not confirmed it,
     # we will send you a notification, requesting that you confirm it.

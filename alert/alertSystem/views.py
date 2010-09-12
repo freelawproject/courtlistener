@@ -14,10 +14,37 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from django.views.decorators.cache import cache_page
+from alert.alertSystem.models import *
+from django.http import HttpResponsePermanentRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
-from alert.alertSystem.models import *
+from django.views.decorators.cache import cache_page
+
+
+def redirect_short_url(request, encoded_string):
+    """Redirect a user to the CourtListener site from the crt.li site."""
+
+    # Decode the string to find the object ID, and construct a link.
+    alphabet = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
+
+    base = len(alphabet)
+    strlen = len(encoded_string)
+    num = 0
+    i = 0
+    for char in encoded_string:
+        power = (strlen - (i + 1))
+        num += alphabet.index(char) * (base ** power)
+        i += 1
+
+    # Get the document
+    doc = Document.objects.get(documentUUID = num)
+
+    # Construct the URL
+    linkifiedCaseName = doc.citation.caseNameShort.replace(' ', '-')
+    court = str(doc.court.courtUUID)
+    return HttpResponsePermanentRedirect("http://courtlistener.name:8000/" + court \
+        + "/" + linkifiedCaseName + "/")
+
 
 @cache_page(60*5)
 def viewCases(request, court, case):

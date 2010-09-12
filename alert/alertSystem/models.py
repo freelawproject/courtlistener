@@ -19,6 +19,8 @@ from djangosphinx.models import SphinxSearch
 from django.db import models
 import alert
 
+# alphabet used for url shrinking. Omits some letters, like O0l1, etc.
+ALPHABET = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
 
 # a tuple, which we'll pass to the choices argument in various places
 PACER_CODES = (
@@ -282,6 +284,25 @@ class Document(models.Model):
         except:
             return ('viewCases', [str(self.court.courtUUID),
                 str(self.documentSHA1)])
+
+    # source: http://stackoverflow.com/questions/1119722/base-62-conversion-in-python
+    def get_small_url(self, alphabet=ALPHABET):
+        """Encode a number in Base X
+
+        `num`: The number to encode
+        `alphabet`: The alphabet to use for encoding
+        """
+        num = self.documentUUID
+        if (num <= 0):
+            return alphabet[0]
+        arr = []
+        base = len(alphabet)
+        while num:
+            rem = num % base
+            num = num // base
+            arr.append(alphabet[rem])
+        arr.reverse()
+        return "http://crt.li/x/" + ''.join(arr)
 
     class Meta:
         db_table = "Document"

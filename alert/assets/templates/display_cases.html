@@ -91,8 +91,9 @@
 
 
 {% block sidebar %}
-    {% if user.is_superuser and docs %}
-        <div class="span-5 last" id="sidebar">
+    <div class="span-5 last" id="sidebar">
+        {# show the admin tools if applicable #}
+        {% if user.is_superuser and docs %}
             <h3>Admin</h3>
             <ol>
             {% for doc in docs %}
@@ -100,9 +101,11 @@
                 <a href="/admin/alertSystem/citation/{{doc.citation_id}}/">Citation</a></li>
             {% endfor %}
             </ol>
-        </div>
-    {% else %}
-        <div class="span-5 last" id="sidebar">
-        </div>
-    {% endif %}
+        {% endif %}
+
+        {# Show the social links using sprites #}
+        <h3>Share</h3>
+        <p><a href="{{docs.0.get_small_url}}">Short link</a> | {{docs.0.documentUUID}}</p>
+    </div>
+
 {% endblock %}
