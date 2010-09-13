@@ -24,6 +24,10 @@ Disallow: /ca11/06-11098/
 Disallow: /ca5/United-States-v.-Willia-Allen/
 Disallow: /pdf/2010/04/24/U.S._v._Allen.pdf
 Disallow: /ca5/94-20403/
+# Added August 24, 2010
+Disallow: /ca3/Chafik-Sebki-v.-Atty-Gen-USA/
+Disallow: /pdf/2010/04/23/Chafik_Sebki_v._Atty_Gen_USA.pdf
+Disallow: /ca3/09-2427/
 #Temporary blockage in effort to keep site online
 User-agent: Baiduspider
 Disallow: /
