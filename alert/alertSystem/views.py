@@ -42,7 +42,7 @@ def redirect_short_url(request, encoded_string):
     # Construct the URL
     linkifiedCaseName = doc.citation.caseNameShort.replace(' ', '-')
     court = str(doc.court.courtUUID)
-    return HttpResponsePermanentRedirect("http://courtlistener.name:8000/" + court \
+    return HttpResponsePermanentRedirect("http://courtlistener.com/" + court \
         + "/" + linkifiedCaseName + "/")
 
 
