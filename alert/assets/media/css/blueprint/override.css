@@ -99,3 +99,84 @@ fieldset.collapsed {
 fieldset.collapsed > legend {
     font-size: 100%;
 }
+
+/* Sprites! */
+.sprites {
+    background-image     : url(/media/images/png/social-sprite.png);
+    background-color     : transparent;
+    background-repeat    : no-repeat;
+    display: inline;
+    float: left;
+}
+
+#delicious_png {
+    height               : 16px;
+    width                : 16px;
+    background-position  : -0px -16px;
+    margin: 0px 5px 0px 5px;
+}
+
+#delicious_png:hover {
+    background-position  : -0px 0px;
+    margin: 0px 5px 0px 5px;
+}
+
+#digg_png {
+    height               : 14px;
+    width                : 16px;
+    background-position  : -16px -14px;
+    margin: 0px 5px 0px 5px;
+}
+
+#digg_png:hover {
+    background-position  : -16px 0px;
+    margin: 0px 5px 0px 5px;
+}
+
+#email_link_png {
+    height               : 16px;
+    width                : 16px;
+    background-position  : -32px -16px;
+    margin: 0px 5px 0px 0px;
+}
+
+#email_link_png:hover {
+    background-position  : -32px 0px;
+    margin: 0px 5px 0px 0px;
+}
+
+#facebook_png {
+    height               : 16px;
+    width                : 16px;
+    background-position  : -48px -16px;
+    margin: 0px 5px 0px 5px;
+}
+
+#facebook_png:hover {
+    background-position  : -48px 0px;
+    margin: 0px 5px 0px 5px;
+}
+
+#reddit_png {
+    height               : 18px;
+    width                : 18px;
+    background-position  : -80px -18px;
+    margin: 0px 5px 0px 5px;
+}
+
+#reddit_png:hover {
+    background-position  : -80px 0px;
+    margin: 0px 5px 0px 5px;
+}
+
+#twitter_gif {
+    height               : 16px;
+    width                : 16px;
+    background-position  : -64px -16px;
+    margin: 0px 5px 0px 5px;
+}
+
+#twitter_gif:hover {
+    background-position  : -64px 0px;
+    margin: 0px 5px 0px 5px;
+}
