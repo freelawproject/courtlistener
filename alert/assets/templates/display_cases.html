@@ -44,20 +44,6 @@
                         {% else %}
                             Unknown<br>
                         {% endif %}
-                    {% if doc.downloadURL or doc.local_path %}
-                        <strong>Download PDF: </strong>
-                        {% if doc.download_URL %}
-                            <a href="{{doc.download_URL}}">From the court</a>
-                        {% endif %}
-                        {% if doc.download_URL and doc.local_path %}
-                            &nbsp;&nbsp;|&nbsp;&nbsp;
-                        {% endif %}
-                        {% if doc.local_path %}
-                            <a href="/{{doc.local_path}}">Our backup</a>
-                        {% endif %}<br>
-                    {% else %}
-                        No downloadable versions.<br>
-                    {% endif %}
                     <strong><acronym title="(digital fingerprint)">SHA1</acronym>:</strong> {{doc.documentSHA1}}
                 </p>
                 <br>
@@ -94,7 +80,7 @@
     <div class="span-5 last" id="sidebar">
         {# show the admin tools if applicable #}
         {% if user.is_superuser and docs %}
-            <h3>Admin</h3>
+            <h3 class="bottom">Admin</h3>
             <ol>
             {% for doc in docs %}
                 <li><a href="/admin/alertSystem/document/{{doc.documentUUID}}/">Document</a>&nbsp;&nbsp;|&nbsp;&nbsp;
@@ -103,17 +89,36 @@
             </ol>
         {% endif %}
 
-        {# Show the social links using sprites #}
-        <h3>Share this page</h3>
-        <p>
-            <a href="mailto:?subject={{title}} at CourtListener.com&body={{docs.0.get_small_url}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
-            <a href="http://www.facebook.com/share.php?u={{docs.0.get_small_url}}&t={{title}} at CourtListener.com" target="_blank" title="Facebook" class="sprites" id="facebook_png"></a>
-            <a href="http://twitter.com/home?status={{docs.0.get_small_url}}" target="_blank" title="Twitter" class="sprites" id="twitter_gif"></a>
-            <a href="http://digg.com/submit?phase=2&url={{docs.0.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Digg" class="sprites" id="digg_png"></a>
-            <a href="http://reddit.com/submit?url={{docs.0.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Reddit" class="sprites" id="reddit_png"></a>
-            <a href="http://del.icio.us/post?url={{docs.0.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="delicious" class="sprites" id="delicious_png"></a>
-        </p>
+        {% if docs|length > 0 %}
+            {# Download PDF? #}
+            <h3 class="bottom">Download</h3>
+            {% if docs.0.downloadURL or docs.0.local_path %}
+                <p>
+                {% if docs.0.download_URL %}
+                    <a href="{{docs.0.download_URL}}">From the court</a>
+                {% endif %}
+                {% if docs.0.download_URL and docs.0.local_path %}
+                    &nbsp;&nbsp;|&nbsp;&nbsp;
+                {% endif %}
+                {% if docs.0.local_path %}
+                    <a href="/{{docs.0.local_path}}">Our backup</a>
+                {% endif %}</p>
+            {% else %}
+                <p>No downloadable versions</p>
+            {% endif %}
 
+            {# Show the social links using sprites #}
+            <h3 class="bottom">Share</h3>
+            <p>
+                <a href="mailto:?subject={{title}} at CourtListener.com&body={{docs.0.get_small_url}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
+                <a href="{{docs.0.get_small_url}}" title="Copy link to clipboard" class="sprites" id="copy_png"></a>
+                <a href="http://www.facebook.com/share.php?u={{docs.0.get_small_url}}&t={{title}} at CourtListener.com" target="_blank" title="Facebook" class="sprites" id="facebook_png"></a>
+                <a href="http://twitter.com/home?status={{docs.0.get_small_url}}" target="_blank" title="Twitter" class="sprites" id="twitter_gif"></a>
+                <a href="http://digg.com/submit?phase=2&url={{docs.0.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Digg" class="sprites" id="digg_png"></a>
+                <a href="http://reddit.com/submit?url={{docs.0.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Reddit" class="sprites" id="reddit_png"></a>
+                <a href="http://del.icio.us/post?url={{docs.0.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="delicious" class="sprites" id="delicious_png"></a>
+            </p>
+        {% endif %}
 
     </div>
 
