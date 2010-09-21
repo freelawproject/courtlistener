@@ -14,13 +14,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from alert.urlmapper.models import UrlMapper
+from alert.alertSystem.cleanstrings import num_to_ascii
+from django.template.defaultfilters import slugify
 from django.utils.text import get_valid_filename
 from djangosphinx.models import SphinxSearch
 from django.db import models
 import alert
-
-# alphabet used for url shrinking. Omits some letters, like O0l1, etc.
-ALPHABET = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
 
 # a tuple, which we'll pass to the choices argument in various places
 PACER_CODES = (
@@ -269,6 +269,10 @@ class Document(models.Model):
         max_length=50,
         blank=True,
         choices=DOCUMENT_STATUSES)
+    url = models.SlugField("URL that the document should map to",
+        max_length=50,
+        db_index=False,
+        null=True)
 
     def __unicode__(self):
         if self.citation:
@@ -276,33 +280,29 @@ class Document(models.Model):
         else:
             return str(self.documentUUID)
 
+    def save(self):
+        '''
+        two things:
+            1) create the URL from the case name, but only if this is the first
+               time it has been saved.
+            2) create the link to that slug.
+        '''
+        if not self.id:
+            # it's the first time it has been saved; generate the slug stuff
+            u = UrlMapper(url = slugify(self.citation.caseNameShort), document = self)
+            u.save()
+            self.url = u
+        super(Document, self).save()
+
     @models.permalink
     def get_absolute_url(self):
-        try:
-            return ('viewCases', [str(self.court.courtUUID),
-                str(self.citation.caseNameShort).replace(' ', '-')])
-        except:
-            return ('viewCases', [str(self.court.courtUUID),
-                str(self.documentSHA1)])
+        return ('viewCase', [str(self.court.courtUUID),
+            num_to_ascii(self.documentUUID), self.url])
 
     # source: http://stackoverflow.com/questions/1119722/base-62-conversion-in-python
-    def get_small_url(self, alphabet=ALPHABET):
-        """Encode a number in Base X
-
-        `num`: The number to encode
-        `alphabet`: The alphabet to use for encoding
-        """
-        num = self.documentUUID
-        if (num <= 0):
-            return alphabet[0]
-        arr = []
-        base = len(alphabet)
-        while num:
-            rem = num % base
-            num = num // base
-            arr.append(alphabet[rem])
-        arr.reverse()
-        return "http://crt.li/x/" + ''.join(arr)
+    def get_small_url(self):
+        ascii = num_to_ascii(self.documentUUID)
+        return "http://crt.li/x/" + ascii
 
     class Meta:
         db_table = "Document"

@@ -36,6 +36,10 @@ ET_AL = re.compile(',?\set\.?\sal\.?', re.IGNORECASE)
 SSN_AND_ITIN = re.compile('(\s|^)(\d{3}-\d{2}-\d{4})(\s|$)')
 EIN = re.compile('(\s|^)(\d{2}-\d{7})(\s|$)')
 
+# alphabet used for url encoding and decoding. Omits some letters, like O0l1.
+ALPHABET = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
+
+
 
 def titlecase(text):
     """
@@ -188,3 +192,38 @@ def anonymize(string):
     string = re.sub(EIN, r"\1XX-XXXXXXX\3", string)
 
     return string
+
+
+def ascii_to_num(string, alphabet=ALPHABET):
+    """Decode an ascii string back to the number it represents
+
+    `string`: The string to decode
+    """
+
+    base = len(alphabet)
+    strlen = len(string)
+    num = 0
+    i = 0
+    for char in string:
+        power = (strlen - (i + 1))
+        num += alphabet.index(char) * (base ** power)
+        i += 1
+    return num
+
+
+def num_to_ascii(num, alphabet=ALPHABET):
+    """Encode a number in Base X
+
+    `num`: The number to encode
+    """
+    if (num <= 0):
+        return alphabet[0]
+    arr = []
+    base = len(alphabet)
+    while num:
+        rem = num % base
+        num = num // base
+        arr.append(alphabet[rem])
+    arr.reverse()
+    return ''.join(arr)
+
