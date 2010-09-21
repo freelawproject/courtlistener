@@ -25,11 +25,12 @@ from django.core import urlresolvers
 from django.http import HttpResponse, Http404
 from django.template import loader
 from django.utils.encoding import smart_str
-from django.views.decorators.cache import cache_page
+from django.views.decorators.cache import never_cache
 import datetime
 import os
 
 
+@never_cache
 def indexCopy(request, sitemaps):
     '''
     Copied from django.contrib.sitemaps.index. Had to, because it has the
@@ -53,10 +54,11 @@ def indexCopy(request, sitemaps):
     return HttpResponse(xml, mimetype='application/xml')
 
 
+@never_cache
 def cachedSitemap(request, sitemaps, section=None):
     '''Copied from django.contrib.sitemaps.view, and modified to add a
     file-based cache.'''
-    
+
     # creates two new lists
     maps, urls = [], []
     if section is not None:

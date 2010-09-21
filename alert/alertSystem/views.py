@@ -15,26 +15,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert.alertSystem.models import *
+from alert.alertSystem.cleanstrings import ascii_to_num
 from django.http import HttpResponsePermanentRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.views.decorators.cache import cache_page
 
-
+@cache_page(60*5)
 def redirect_short_url(request, encoded_string):
     """Redirect a user to the CourtListener site from the crt.li site."""
 
     # Decode the string to find the object ID, and construct a link.
-    alphabet = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
-
-    base = len(alphabet)
-    strlen = len(encoded_string)
-    num = 0
-    i = 0
-    for char in encoded_string:
-        power = (strlen - (i + 1))
-        num += alphabet.index(char) * (base ** power)
-        i += 1
+    num = ascii_to_num(encoded_string)
 
     # Get the document
     doc = Document.objects.get(documentUUID = num)
@@ -47,36 +39,64 @@ def redirect_short_url(request, encoded_string):
 
 
 @cache_page(60*5)
-def viewCases(request, court, case):
-    """Take a court and a caseNameShort, and display what we know about that
-    case.
+def viewCase(request, court, id, casename):
     """
+    Take a court, an ID, and a casename, and return the document.
+
+    This is remarkably easy compared to old method, below.
+    """
+
+    # Decode the id string back to an int
+    id = ascii_to_num(id)
+
+    try:
+        # Look up the court and document
+        doc = Document.objects.get(documentUUID = id)
+        ct = Court.objects.get(courtUUID = court)
+        # look up the title
+        title = doc.citation.caseNameShort
+    except:
+        # TODO: Exception
+        pass
+
+    return render_to_response('display_cases.html', {'title': title,
+        'doc': doc, 'court': ct}, RequestContext(request))
+
+
+@cache_page(60*5)
+def viewCasesDeprecated(request, court, case):
+    '''
+    This is a fallback view that is only used by old links that have not yet
+    been flushed from the Interwebs. It was too slow, so viewCases was
+    created to replace it.
+
+    Take a court and a caseNameShort, and display what we know about that
+    case. If the casename fails, try the case number.
+    '''
 
     # get the court information from the URL
     ct = Court.objects.get(courtUUID = court)
 
     # try looking it up by casename. Failing that, try the caseNumber.
-    # replace hyphens with spaces to undo the URLizing that
-    # the get_absolute_url in the Document model sets up.
-    cites = Citation.objects.filter(caseNameShort = \
-        case.replace('-', ' '))
-    if cites.count() == 0:
+    # replace hyphens with spaces, and underscores with hyphens to undo the
+    # URLizing that the get_absolute_url in the Document model sets up.
+    caseName = case.replace('-', ' ').replace('_', '-')
+    try:
+        cite = Citation.objects.get(caseNameShort = caseName)
+    except:
+        # TODO: get the correct exception here...
         # if we can't find it by case name, try by case number
-        cites = Citation.objects.filter(caseNumber = case)
-    if cites.count() == 0:
-        #case number didn't work either, try SHA1
-        docs = Document.objects.filter(documentSHA1 = \
-            case, court = ct).order_by("-dateFiled")
+        cite = Citation.objects.get(caseNumber = case)
 
-    if cites.count() > 0:
-        # get any documents with this/these citation(s) at that court. We need
-        # all the documents with what might be more than one citation, so we\
-        # use a filter, and the __in method.
-        docs = Document.objects.filter(court = ct, citation__in = cites)\
-            .order_by("-dateFiled")
+    # get any documents with this citation at that court.
+    try:
+        doc = Document.objects.get(court = ct, citation = cite)
+    except:
+        # TODO: get correct exception here
+        pass
 
-    return render_to_response('display_cases.html', {'title': case,
-        'docs': docs, 'court': ct}, RequestContext(request))
+    return HttpResponsePermanentRedirect("http://courtlistener.com/" + court \
+        + "/" + str(doc.documentUUID) + "/" + slugify(caseName) + "/")
 
 
 @cache_page(60*15)
