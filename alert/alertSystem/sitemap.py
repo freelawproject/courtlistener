@@ -25,6 +25,7 @@ from django.core import urlresolvers
 from django.http import HttpResponse, Http404
 from django.template import loader
 from django.utils.encoding import smart_str
+from django.views.decorators.cache import cache_page
 import datetime
 import os
 
@@ -55,7 +56,7 @@ def indexCopy(request, sitemaps):
 def cachedSitemap(request, sitemaps, section=None):
     '''Copied from django.contrib.sitemaps.view, and modified to add a
     file-based cache.'''
-
+    
     # creates two new lists
     maps, urls = [], []
     if section is not None:
@@ -80,7 +81,10 @@ def cachedSitemap(request, sitemaps, section=None):
         filename = os.path.join(settings.MEDIA_ROOT, "sitemaps",
                                 section + "-p" + str(page) + ".xml")
         f = open(filename, 'r')
-        return HttpResponse(f, mimetype='application/xml')
+	xml = f.read()
+	resp = HttpResponse(xml, mimetype='application/xml')
+	f.close()
+        return resp
     except IOError:
         # the sitemap is not cached to disk; make it, save it, return it
         for site in maps:
