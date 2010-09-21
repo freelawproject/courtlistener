@@ -1,0 +1,35 @@
+User-agent: *
+Crawl-delay: 20
+# Added May 21, 2010
+Disallow: /ca5/Fenghui-Fan-v.-Vicki-Brewer,-et-al/
+Disallow: /ca5/Fenghui-Fan-v.-Vicki-Brewer/
+Disallow: /pdf/2010/05/06/Fenghui_Fan_v._Vicki_Brewer_et_al.pdf
+Disallow: /ca5/09-20430/
+# Added May 24, 2010
+Disallow: /ca2/Yero-v.-Holder/
+Disallow: /pdf/2010/04/24/Yero_v._Holder.pdf/
+Disallow: /ca2/08-6084/
+# Added July 12, 2010
+Disallow: /ca10/Cedrins-v.-USCIS/
+Disallow: /pdf/2010/06/23/Cedrins_v._USCIS.pdf
+Disallow: /ca10/10-2048/
+Disallow: /ca10/Cedrins-v.-Central-New-Mexico-Community-College/
+Disallow: /pdf/2010/06/23/Cedrins_v._Central_New_Mexico_Comm_Colleg.pdf
+Disallow: /ca10/10-2064/
+# Added July 20, 2010
+Disallow: /ca11/Steven-M.-Bircoll-v.-Miami_Dade-County/
+Disallow: /pdf/2010/04/26/Steven_M._Bircoll_v._Miami-Dade_County.pdf/
+Disallow: /ca11/06-11098/
+# Added August 9, 2010
+Disallow: /ca5/United-States-v.-Willia-Allen/
+Disallow: /pdf/2010/04/24/U.S._v._Allen.pdf
+Disallow: /ca5/94-20403/
+# Added August 24, 2010
+Disallow: /ca3/Chafik-Sebki-v.-Atty-Gen-USA/
+Disallow: /pdf/2010/04/23/Chafik_Sebki_v._Atty_Gen_USA.pdf
+Disallow: /ca3/09-2427/
+#Temporary blockage in effort to keep site online
+User-agent: Baiduspider
+Disallow: /
+User-agent: Twiceler
+Disallow: /
