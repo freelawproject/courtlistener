@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from alert.urlmapper.models import UrlMapper
+from django.template.defaultfilters import slugify
 from django.utils.text import get_valid_filename
 from djangosphinx.models import SphinxSearch
 from django.db import models
@@ -269,12 +271,34 @@ class Document(models.Model):
         max_length=50,
         blank=True,
         choices=DOCUMENT_STATUSES)
+    """
+    slug = models.ForeignKey(UrlMapper,
+        verbose_name = "the canonical slug for the Document",
+        blank=True,
+        null=True)
+    """
 
     def __unicode__(self):
         if self.citation:
             return self.citation.caseNameShort
         else:
             return str(self.documentUUID)
+
+    def save(self):
+        '''
+        two things:
+            1) create the URL from the case name, but only if this is the first
+               time it has been saved.
+            2) create the link to that slug.
+        '''
+        if not self.id:
+            # it's the first time it has been saved; generate the slug stuff
+            u = UrlMapper(url = slugify(self.citation.caseNameShort), document = self)
+            u.save()
+            self.slug = u
+        super(Document, self).save()
+
+
 
     @models.permalink
     def get_absolute_url(self):
