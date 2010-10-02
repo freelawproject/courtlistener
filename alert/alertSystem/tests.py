@@ -23,7 +23,7 @@ Replace these with more appropriate tests for your application.
 """
 
 from django.test import TestCase
-from cleanstrings import harmonize
+from string_utils import harmonize
 
 class SimpleTest(TestCase):
     def test_basic_addition(self):

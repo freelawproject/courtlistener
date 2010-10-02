@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert.alertSystem.models import *
-from alert.alertSystem.cleanstrings import ascii_to_num
+from alert.alertSystem.string_utils import ascii_to_num
 from django.http import HttpResponsePermanentRedirect
 from django.shortcuts import render_to_response
 from django.shortcuts import get_object_or_404
@@ -36,7 +36,7 @@ def redirect_short_url(request, encoded_string):
     # Decode the string to find the object ID, and construct a link.
     num = ascii_to_num(encoded_string)
 
-    # Get the document
+    # Get the document or throw a 404
     doc = get_object_or_404(Document, documentUUID = num)
 
     # Construct the URL
