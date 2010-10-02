@@ -29,8 +29,8 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from alertSystem.models import *
-from alertSystem.cleanstrings import *
-from scrape_and_parse import clean_string, makeDocFromURL, trunc, hasDuplicate, getPDFContent, parseCourt
+from alertSystem.string_utils import *
+from scrape_and_parse import clean_string, makeDocFromURL, hasDuplicate, getPDFContent, parseCourt
 from django.core.files.base import ContentFile
 from django.core.files import File
 from django.core.exceptions import ObjectDoesNotExist
