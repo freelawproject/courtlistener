@@ -120,7 +120,10 @@ def courtChanged(url, contents):
 
         # Log the change time and URL
         global logger
-        logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + ": URL: " + url)
+        try:
+            logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + ": URL: " + url)
+        except UnicodeDecodeError:
+                    pass
 
         return True
 
@@ -290,8 +293,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                try:
+                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                except UnicodeDecodeError:
+                    pass
                 doc.save()
 
                 i -= 1
@@ -405,8 +411,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                try:
+                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                except UnicodeDecodeError:
+                    pass
                 doc.save()
 
                 i += 1
@@ -505,8 +514,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                try:
+                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                except UnicodeDecodeError:
+                    pass
                 doc.save()
 
                 i += 1
@@ -610,8 +622,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                try:
+                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                except UnicodeDecodeError:
+                    pass
                 doc.save()
 
                 i += 1
@@ -745,8 +760,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                try:
+                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                except UnicodeDecodeError:
+                    pass
                 doc.save()
 
                 i += 1
@@ -852,8 +870,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                try:
+                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                except UnicodeDecodeError:
+                    pass
                 doc.save()
 
                 i += 1
@@ -947,8 +968,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                     # last, save evrything (pdf, citation and document)
                     doc.citation = cite
                     doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                       ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                    try:
+                        logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                            ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                    except UnicodeDecodeError:
+                        pass
                     doc.save()
 
                     i += 1
@@ -1035,8 +1059,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                try:
+                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                except UnicodeDecodeError:
+                    pass
                 doc.save()
 
                 i += 1
@@ -1146,8 +1173,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                try:
+                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                except UnicodeDecodeError:
+                    pass
                 doc.save()
 
                 i += 1
@@ -1255,8 +1285,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                try:
+                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                except UnicodeDecodeError:
+                    pass
                 doc.save()
 
                 i += 1
@@ -1366,8 +1399,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
 
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                try:
+                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                except UnicodeDecodeError:
+                    pass
                 doc.save()
 
                 i += 1
@@ -1448,8 +1484,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                try:
+                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                except UnicodeDecodeError:
+                    pass
                 doc.save()
 
                 i += 1
@@ -1551,8 +1590,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                try:
+                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                except UnicodeDecodeError:
+                    pass
                 doc.save()
 
                 i += 1
@@ -1659,8 +1701,11 @@ def scrapeCourt(courtID, result, verbosity, daemonmode):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                try:
+                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                except UnicodeDecodeError:
+                    pass
                 doc.save()
 
                 i += 1
