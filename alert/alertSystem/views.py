@@ -18,18 +18,26 @@ from alert.alertSystem.models import *
 from alert.alertSystem.cleanstrings import ascii_to_num
 from django.http import HttpResponsePermanentRedirect
 from django.shortcuts import render_to_response
+from django.shortcuts import get_object_or_404
 from django.template import RequestContext
 from django.views.decorators.cache import cache_page
+import string
 
 @cache_page(60*5)
 def redirect_short_url(request, encoded_string):
     """Redirect a user to the CourtListener site from the crt.li site."""
 
+    # strip any GET arguments from the string
+    index = string.find(encoded_string, "&")
+    if index != -1:
+        # there's an ampersand. Strip the GET params.
+        encoded_string = encoded_string[0, index]
+
     # Decode the string to find the object ID, and construct a link.
     num = ascii_to_num(encoded_string)
 
     # Get the document
-    doc = Document.objects.get(documentUUID = num)
+    doc = get_object_or_404(Document, documentUUID = num)
 
     # Construct the URL
     linkifiedCaseName = doc.citation.caseNameShort.replace(' ', '-')
@@ -57,6 +65,7 @@ def viewCase(request, court, id, casename):
         title = doc.citation.caseNameShort
     except:
         # TODO: Exception
+        # doc, title and ct all need to be assigned here, or else bad things
         pass
 
     return render_to_response('display_cases.html', {'title': title,
@@ -82,6 +91,7 @@ def viewCasesDeprecated(request, court, case):
     # URLizing that the get_absolute_url in the Document model sets up.
     caseName = case.replace('-', ' ').replace('_', '-')
     try:
+        # TODO: This will crash with case names that aren't unique
         cite = Citation.objects.get(caseNameShort = caseName)
     except:
         # TODO: get the correct exception here...
@@ -93,6 +103,7 @@ def viewCasesDeprecated(request, court, case):
         doc = Document.objects.get(court = ct, citation = cite)
     except:
         # TODO: get correct exception here
+        # doc and cite need to be defined here, or else bad things.
         pass
 
     return HttpResponsePermanentRedirect("http://courtlistener.com/" + court \

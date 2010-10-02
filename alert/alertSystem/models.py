@@ -289,9 +289,7 @@ class Document(models.Model):
         '''
         if not self.id:
             # it's the first time it has been saved; generate the slug stuff
-            u = UrlMapper(url = slugify(self.citation.caseNameShort), document = self)
-            u.save()
-            self.url = u
+            self.url = slugify(self.citation.caseNameShort)
         super(Document, self).save()
 
     @models.permalink
