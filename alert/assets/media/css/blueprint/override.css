@@ -109,74 +109,80 @@ fieldset.collapsed > legend {
     float: left;
 }
 
-#delicious_png {
+#copy_png {
+	height               : 16px;
+	width                : 16px;
+	background-position  : -0px -16px;
+    margin: 0px 2px 0px 2px;
+ }
+
+ #copy_png:hover {
+	background-position  : -0px 0px;
+ }
+
+ #delicious_png {
+	height               : 16px;
+	width                : 16px;
+	background-position  : -16px -16px;
+    margin: 0px 2px 0px 2px;
+ }
+
+ #delicious_png:hover {
+	background-position  : -16px 0px;
+ }
+
+ #digg_png {
+	height               : 14px;
+	width                : 16px;
+	background-position  : -32px -14px;
+    margin: 0px 2px 0px 2px;
+ }
+
+ #digg_png:hover {
+	background-position  : -32px 0px;
+ }
+
+ #email_link_png {
+	height               : 16px;
+	width                : 16px;
+	background-position  : -48px -16px;
+    margin: 0px 0px 0px 2px;
+ }
+
+ #email_link_png:hover {
+	background-position  : -48px 0px;
+ }
+
+ #facebook_png {
     height               : 16px;
-    width                : 16px;
-    background-position  : -0px -16px;
-    margin: 0px 5px 0px 5px;
-}
+	width                : 16px;
+    background-position  : -82px -16px;
+    margin: 0px 2px 0px 2px;
+ }
 
-#delicious_png:hover {
-    background-position  : -0px 0px;
-    margin: 0px 5px 0px 5px;
-}
+ #facebook_png:hover {
+    background-position  : -82px 0px;
+ }
 
-#digg_png {
-    height               : 14px;
-    width                : 16px;
-    background-position  : -16px -14px;
-    margin: 0px 5px 0px 5px;
-}
+ #reddit_png {
+	height               : 18px;
+	width                : 18px;
 
-#digg_png:hover {
-    background-position  : -16px 0px;
-    margin: 0px 5px 0px 5px;
-}
+	background-position  : -64px -18px;
+    margin: 0px 2px 0px 2px;
+ }
 
-#email_link_png {
-    height               : 16px;
-    width                : 16px;
-    background-position  : -32px -16px;
-    margin: 0px 5px 0px 0px;
-}
+ #reddit_png:hover {
+	background-position  : -64px 0px;
+ }
 
-#email_link_png:hover {
-    background-position  : -32px 0px;
-    margin: 0px 5px 0px 0px;
-}
+ #twitter_gif {
+	height               : 16px;
+	width                : 16px;
+	background-position  : -98px -16px;
+    margin: 0px 2px 0px 2px;
+ }
 
-#facebook_png {
-    height               : 16px;
-    width                : 16px;
-    background-position  : -48px -16px;
-    margin: 0px 5px 0px 5px;
-}
-
-#facebook_png:hover {
-    background-position  : -48px 0px;
-    margin: 0px 5px 0px 5px;
-}
-
-#reddit_png {
-    height               : 18px;
-    width                : 18px;
-    background-position  : -80px -18px;
-    margin: 0px 5px 0px 5px;
-}
-
-#reddit_png:hover {
-    background-position  : -80px 0px;
-    margin: 0px 5px 0px 5px;
-}
-
-#twitter_gif {
-    height               : 16px;
-    width                : 16px;
-    background-position  : -64px -16px;
-    margin: 0px 5px 0px 5px;
-}
-
-#twitter_gif:hover {
-    background-position  : -64px 0px;
-    margin: 0px 5px 0px 5px;
-}
+ #twitter_gif:hover {
+	background-position  : -98px 0px;
+ }

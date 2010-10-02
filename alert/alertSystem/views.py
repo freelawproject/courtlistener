@@ -15,68 +15,93 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert.alertSystem.models import *
-from django.http import HttpResponsePermanentRedirect
+from alert.alertSystem.string_utils import ascii_to_num
+from django.contrib.sites.models import Site
+from django.http import HttpResponsePermanentRedirect, Http404
 from django.shortcuts import render_to_response
+from django.shortcuts import get_object_or_404, get_list_or_404
 from django.template import RequestContext
+from django.template.defaultfilters import slugify
 from django.views.decorators.cache import cache_page
+import string
 
-
+@cache_page(60*5)
 def redirect_short_url(request, encoded_string):
     """Redirect a user to the CourtListener site from the crt.li site."""
 
+    # strip any GET arguments from the string
+    index = string.find(encoded_string, "&")
+    if index != -1:
+        # there's an ampersand. Strip the GET params.
+        encoded_string = encoded_string[0:index]
+
     # Decode the string to find the object ID, and construct a link.
-    alphabet = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
+    num = ascii_to_num(encoded_string)
 
-    base = len(alphabet)
-    strlen = len(encoded_string)
-    num = 0
-    i = 0
-    for char in encoded_string:
-        power = (strlen - (i + 1))
-        num += alphabet.index(char) * (base ** power)
-        i += 1
-
-    # Get the document
-    doc = Document.objects.get(documentUUID = num)
+    # Get the document or throw a 404
+    doc = get_object_or_404(Document, documentUUID = num)
 
     # Construct the URL
-    linkifiedCaseName = doc.citation.caseNameShort.replace(' ', '-')
+    slug = doc.citation.slug
     court = str(doc.court.courtUUID)
-    return HttpResponsePermanentRedirect("http://courtlistener.com/" + court \
-        + "/" + linkifiedCaseName + "/")
+    current_site = Site.objects.get_current()
+    URL = "http://" + current_site.domain + "/" + court + "/" + \
+        encoded_string + "/" + slug + "/"
+    return HttpResponsePermanentRedirect(URL)
 
 
 @cache_page(60*5)
-def viewCases(request, court, case):
-    """Take a court and a caseNameShort, and display what we know about that
-    case.
+def viewCase(request, court, id, casename):
     """
+    Take a court, an ID, and a casename, and return the document.
+
+    This is remarkably easy compared to old method, below. casename isn't
+    used, and can be anything.
+    """
+
+    # Decode the id string back to an int
+    id = ascii_to_num(id)
+
+    # Look up the court, document, and title
+    doc   = get_object_or_404(Document, documentUUID = id)
+    ct    = get_object_or_404(Court, courtUUID = court)
+    title = doc.citation.caseNameShort
+
+    return render_to_response('display_cases.html', {'title': title,
+        'doc': doc, 'court': ct}, RequestContext(request))
+
+
+@cache_page(60*5)
+def viewCasesDeprecated(request, court, case):
+    '''
+    This is a fallback view that is only used by old links that have not yet
+    been flushed from the Interwebs. It was too slow, so viewCases was
+    created to replace it.
+
+    Take a court and a caseNameShort, and display what we know about that
+    case. If the casename fails, try the case number.
+
+    It no longer will return more than one case per URL.
+    '''
 
     # get the court information from the URL
     ct = Court.objects.get(courtUUID = court)
 
     # try looking it up by casename. Failing that, try the caseNumber.
-    # replace hyphens with spaces to undo the URLizing that
-    # the get_absolute_url in the Document model sets up.
-    cites = Citation.objects.filter(caseNameShort = \
-        case.replace('-', ' '))
-    if cites.count() == 0:
-        # if we can't find it by case name, try by case number
-        cites = Citation.objects.filter(caseNumber = case)
-    if cites.count() == 0:
-        #case number didn't work either, try SHA1
-        docs = Document.objects.filter(documentSHA1 = \
-            case, court = ct).order_by("-dateFiled")
+    # replace hyphens with spaces, and underscores with hyphens to undo the
+    # URLizing that the get_absolute_url in the Document model used to set up.
+    caseName = case.replace('-', ' ').replace('_', '-')
+    cites = get_list_or_404(Citation, caseNameShort = caseName)
 
-    if cites.count() > 0:
-        # get any documents with this/these citation(s) at that court. We need
-        # all the documents with what might be more than one citation, so we\
-        # use a filter, and the __in method.
-        docs = Document.objects.filter(court = ct, citation__in = cites)\
-            .order_by("-dateFiled")
+    # get any documents with this citation at that court.
+    doc = get_list_or_404(Document, court = ct, citation = cites[0])
 
-    return render_to_response('display_cases.html', {'title': case,
-        'docs': docs, 'court': ct}, RequestContext(request))
+    # Construct a URL
+    current_site = Site.objects.get_current()
+    slug = doc[0].citation.slug
+    URL = "http://" + current_site.domain + "/" + court + "/" + \
+        num_to_ascii(doc[0].documentUUID) + "/" + slug + "/"
+    return HttpResponsePermanentRedirect(URL)
 
 
 @cache_page(60*15)

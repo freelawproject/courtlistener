@@ -50,7 +50,8 @@ urlpatterns = patterns('',
     (r'^opinions/(' + "|".join(pacer_codes) + '|all)/$', viewDocumentListByCourt),
 
     # Display a case, a named URL because the get_absolute_url uses it.
-    url(r'^(' + "|".join(pacer_codes) + ')/(.*)/$', viewCases, name="viewCases"),
+    url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', viewCase, name="viewCase"),
+    (r'^(' + "|".join(pacer_codes) + ')/(.*)/$', viewCasesDeprecated),
     # Redirect users
     (r'^x/(.*)/$', redirect_short_url),
 
