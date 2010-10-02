@@ -22,7 +22,7 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from alertSystem.models import *
-from alertSystem.cleanstrings import *
+from alertSystem.string_utils import *
 
 from django.utils.encoding import smart_str
 from django.core.exceptions import MultipleObjectsReturned

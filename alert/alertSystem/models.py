@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert.urlmapper.models import UrlMapper
-from alert.alertSystem.cleanstrings import num_to_ascii
+from alert.alertSystem.string_utils import num_to_ascii
 from django.template.defaultfilters import slugify
 from django.utils.text import get_valid_filename
 from djangosphinx.models import SphinxSearch
