@@ -28,6 +28,10 @@ Disallow: /ca5/94-20403/
 Disallow: /ca3/Chafik-Sebki-v.-Atty-Gen-USA/
 Disallow: /pdf/2010/04/23/Chafik_Sebki_v._Atty_Gen_USA.pdf
 Disallow: /ca3/09-2427/
+# Added September 24, 2010
+Disallow: /ca11/Delon-Anthony-Magua-v.-United-States-Attorney-General/
+Disallow: /pdf/2010/07/28/Delon_Anthony_Magua_v._U.S._Attorney_General.pdf
+Disallow: /ca11/09-15927/
 #Temporary blockage in effort to keep site online
 User-agent: Baiduspider
 Disallow: /
