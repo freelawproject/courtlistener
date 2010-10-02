@@ -16,10 +16,12 @@
 
 from alert.alertSystem.models import *
 from alert.alertSystem.string_utils import ascii_to_num
-from django.http import HttpResponsePermanentRedirect
+from django.contrib.sites.models import Site
+from django.http import HttpResponsePermanentRedirect, Http404
 from django.shortcuts import render_to_response
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, get_list_or_404
 from django.template import RequestContext
+from django.template.defaultfilters import slugify
 from django.views.decorators.cache import cache_page
 import string
 
@@ -31,7 +33,7 @@ def redirect_short_url(request, encoded_string):
     index = string.find(encoded_string, "&")
     if index != -1:
         # there's an ampersand. Strip the GET params.
-        encoded_string = encoded_string[0, index]
+        encoded_string = encoded_string[0:index]
 
     # Decode the string to find the object ID, and construct a link.
     num = ascii_to_num(encoded_string)
@@ -40,10 +42,12 @@ def redirect_short_url(request, encoded_string):
     doc = get_object_or_404(Document, documentUUID = num)
 
     # Construct the URL
-    linkifiedCaseName = doc.citation.caseNameShort.replace(' ', '-')
+    slug = doc.citation.slug
     court = str(doc.court.courtUUID)
-    return HttpResponsePermanentRedirect("http://courtlistener.com/" + court \
-        + "/" + linkifiedCaseName + "/")
+    current_site = Site.objects.get_current()
+    URL = "http://" + current_site.domain + "/" + court + "/" + \
+        encoded_string + "/" + slug + "/"
+    return HttpResponsePermanentRedirect(URL)
 
 
 @cache_page(60*5)
@@ -51,22 +55,17 @@ def viewCase(request, court, id, casename):
     """
     Take a court, an ID, and a casename, and return the document.
 
-    This is remarkably easy compared to old method, below.
+    This is remarkably easy compared to old method, below. casename isn't
+    used, and can be anything.
     """
 
     # Decode the id string back to an int
     id = ascii_to_num(id)
 
-    try:
-        # Look up the court and document
-        doc = Document.objects.get(documentUUID = id)
-        ct = Court.objects.get(courtUUID = court)
-        # look up the title
-        title = doc.citation.caseNameShort
-    except:
-        # TODO: Exception
-        # doc, title and ct all need to be assigned here, or else bad things
-        pass
+    # Look up the court, document, and title
+    doc   = get_object_or_404(Document, documentUUID = id)
+    ct    = get_object_or_404(Court, courtUUID = court)
+    title = doc.citation.caseNameShort
 
     return render_to_response('display_cases.html', {'title': title,
         'doc': doc, 'court': ct}, RequestContext(request))
@@ -81,6 +80,8 @@ def viewCasesDeprecated(request, court, case):
 
     Take a court and a caseNameShort, and display what we know about that
     case. If the casename fails, try the case number.
+
+    It no longer will return more than one case per URL.
     '''
 
     # get the court information from the URL
@@ -88,26 +89,19 @@ def viewCasesDeprecated(request, court, case):
 
     # try looking it up by casename. Failing that, try the caseNumber.
     # replace hyphens with spaces, and underscores with hyphens to undo the
-    # URLizing that the get_absolute_url in the Document model sets up.
+    # URLizing that the get_absolute_url in the Document model used to set up.
     caseName = case.replace('-', ' ').replace('_', '-')
-    try:
-        # TODO: This will crash with case names that aren't unique
-        cite = Citation.objects.get(caseNameShort = caseName)
-    except:
-        # TODO: get the correct exception here...
-        # if we can't find it by case name, try by case number
-        cite = Citation.objects.get(caseNumber = case)
+    cites = get_list_or_404(Citation, caseNameShort = caseName)
 
     # get any documents with this citation at that court.
-    try:
-        doc = Document.objects.get(court = ct, citation = cite)
-    except:
-        # TODO: get correct exception here
-        # doc and cite need to be defined here, or else bad things.
-        pass
+    doc = get_list_or_404(Document, court = ct, citation = cites[0])
 
-    return HttpResponsePermanentRedirect("http://courtlistener.com/" + court \
-        + "/" + str(doc.documentUUID) + "/" + slugify(caseName) + "/")
+    # Construct a URL
+    current_site = Site.objects.get_current()
+    slug = doc[0].citation.slug
+    URL = "http://" + current_site.domain + "/" + court + "/" + \
+        num_to_ascii(doc[0].documentUUID) + "/" + slug + "/"
+    return HttpResponsePermanentRedirect(URL)
 
 
 @cache_page(60*15)

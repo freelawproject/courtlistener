@@ -125,21 +125,6 @@ def courtChanged(url, contents):
         return True
 
 
-def trunc(s, length):
-    """finds the rightmost space in a string, and truncates there. Lacking such
-    a space, truncates at length"""
-
-    if len(s) <= length:
-        return s
-    else:
-        # find the rightmost space
-        end = s.rfind(' ', 0 , length)
-        if end == -1:
-            # no spaces found, just use max position
-            end = length
-        return s[0:end]
-
-
 def hasDuplicate(caseNum, caseName):
     """takes a caseName and a caseNum, and checks if the object exists in the
     DB. If it doesn't, then it puts it in. If it does, it returns it.

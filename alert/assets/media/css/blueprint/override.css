@@ -113,7 +113,7 @@ fieldset.collapsed > legend {
 	height               : 16px;
 	width                : 16px;
 	background-position  : -0px -16px;
-    margin: 0px 5px 0px 5px;
+    margin: 0px 2px 0px 2px;
  }
 
  #copy_png:hover {
@@ -124,7 +124,7 @@ fieldset.collapsed > legend {
 	height               : 16px;
 	width                : 16px;
 	background-position  : -16px -16px;
-    margin: 0px 5px 0px 5px;
+    margin: 0px 2px 0px 2px;
  }
 
  #delicious_png:hover {
@@ -135,7 +135,7 @@ fieldset.collapsed > legend {
 	height               : 14px;
 	width                : 16px;
 	background-position  : -32px -14px;
-    margin: 0px 5px 0px 5px;
+    margin: 0px 2px 0px 2px;
  }
 
  #digg_png:hover {
@@ -146,7 +146,7 @@ fieldset.collapsed > legend {
 	height               : 16px;
 	width                : 16px;
 	background-position  : -48px -16px;
-    margin: 0px 5px 0px 5px;
+    margin: 0px 0px 0px 2px;
  }
 
  #email_link_png:hover {
@@ -157,7 +157,7 @@ fieldset.collapsed > legend {
     height               : 16px;
 	width                : 16px;
     background-position  : -82px -16px;
-    margin: 0px 5px 0px 5px;
+    margin: 0px 2px 0px 2px;
  }
 
  #facebook_png:hover {
@@ -169,7 +169,7 @@ fieldset.collapsed > legend {
 	width                : 18px;
 
 	background-position  : -64px -18px;
-    margin: 0px 5px 0px 5px;
+    margin: 0px 2px 0px 2px;
  }
 
  #reddit_png:hover {
@@ -180,7 +180,7 @@ fieldset.collapsed > legend {
 	height               : 16px;
 	width                : 16px;
 	background-position  : -98px -16px;
-    margin: 0px 5px 0px 5px;
+    margin: 0px 2px 0px 2px;
  }
 
  #twitter_gif:hover {
