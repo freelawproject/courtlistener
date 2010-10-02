@@ -101,13 +101,13 @@
             {# Show the social links using sprites #}
             <h3 class="bottom">Share</h3>
             <p>
-                <a href="mailto:?subject={{title}} at CourtListener.com&body={{docs.0.get_small_url}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
-                <a href="{{docs.0.get_small_url}}" title="Copy link to clipboard" class="sprites" id="copy_png"></a>
-                <a href="http://www.facebook.com/share.php?u={{docs.0.get_small_url}}&t={{title}} at CourtListener.com" target="_blank" title="Facebook" class="sprites" id="facebook_png"></a>
-                <a href="http://twitter.com/home?status={{docs.0.get_small_url}}" target="_blank" title="Twitter" class="sprites" id="twitter_gif"></a>
-                <a href="http://digg.com/submit?phase=2&url={{docs.0.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Digg" class="sprites" id="digg_png"></a>
-                <a href="http://reddit.com/submit?url={{docs.0.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Reddit" class="sprites" id="reddit_png"></a>
-                <a href="http://del.icio.us/post?url={{docs.0.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="delicious" class="sprites" id="delicious_png"></a>
+                <a href="mailto:?subject={{title}} at CourtListener.com&body={{doc.get_small_url}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
+                <a href="{{doc.get_small_url}}" title="Copy link to clipboard" class="sprites" id="copy_png"></a>
+                <a href="http://www.facebook.com/share.php?u={{doc.get_small_url}}&t={{title}} at CourtListener.com" target="_blank" title="Facebook" class="sprites" id="facebook_png"></a>
+                <a href="http://twitter.com/home?status={{doc.get_small_url}}" target="_blank" title="Twitter" class="sprites" id="twitter_gif"></a>
+                <a href="http://digg.com/submit?phase=2&url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Digg" class="sprites" id="digg_png"></a>
+                <a href="http://reddit.com/submit?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Reddit" class="sprites" id="reddit_png"></a>
+                <a href="http://del.icio.us/post?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="delicious" class="sprites" id="delicious_png"></a>
             </p>
         {% endif %}
 

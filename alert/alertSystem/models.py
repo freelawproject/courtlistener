@@ -14,8 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from alert.urlmapper.models import UrlMapper
-from alert.alertSystem.string_utils import num_to_ascii
+from alert.alertSystem.string_utils import num_to_ascii, trunc
 from django.template.defaultfilters import slugify
 from django.utils.text import get_valid_filename
 from djangosphinx.models import SphinxSearch
@@ -170,6 +169,10 @@ class Citation(models.Model):
     search = SphinxSearch()
     citationUUID = models.AutoField("a unique ID for each citation",
         primary_key=True)
+    slug = models.SlugField("URL that the document should map to",
+        max_length=50,
+        db_index=False,
+        null=True)
     caseNameShort = models.CharField("short name, as it is usually found on the court website",
         max_length=100,
         blank=True,
@@ -186,6 +189,16 @@ class Citation(models.Model):
     officialCitationLexis = models.CharField("the citation number, as described by LexisNexis",
         max_length=50,
         blank=True)
+
+    def save(self, *args, **kwargs):
+        '''
+        create the URL from the case name, but only if this is the first
+        time it has been saved.
+        '''
+        if not self.citationUUID:
+            # it's the first time it has been saved; generate the slug stuff
+            self.slug = trunc(slugify(self.caseNameShort), 50)
+        super(Citation, self).save(*args, **kwargs)
 
     def __unicode__(self):
         if self.caseNameShort:
@@ -269,10 +282,6 @@ class Document(models.Model):
         max_length=50,
         blank=True,
         choices=DOCUMENT_STATUSES)
-    url = models.SlugField("URL that the document should map to",
-        max_length=50,
-        db_index=False,
-        null=True)
 
     def __unicode__(self):
         if self.citation:
@@ -280,22 +289,10 @@ class Document(models.Model):
         else:
             return str(self.documentUUID)
 
-    def save(self):
-        '''
-        two things:
-            1) create the URL from the case name, but only if this is the first
-               time it has been saved.
-            2) create the link to that slug.
-        '''
-        if not self.id:
-            # it's the first time it has been saved; generate the slug stuff
-            self.url = slugify(self.citation.caseNameShort)
-        super(Document, self).save()
-
     @models.permalink
     def get_absolute_url(self):
         return ('viewCase', [str(self.court.courtUUID),
-            num_to_ascii(self.documentUUID), self.url])
+            num_to_ascii(self.documentUUID), self.citation.slug])
 
     # source: http://stackoverflow.com/questions/1119722/base-62-conversion-in-python
     def get_small_url(self):
