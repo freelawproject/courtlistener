@@ -30,10 +30,10 @@ setup_environ(settings)
 
 from alert.alertSystem.models import Document
 from optparse import OptionParser
-import gc, errno, os, os.path, time
+import gc, errno, os, os.path, string, time
 
-def queryset_iterator(queryset, chunksize=1000):
-    '''''
+def queryset_iterator(queryset, chunksize=100):
+    '''
     from: http://djangosnippets.org/snippets/1949/
     Iterate over a Django Queryset ordered by the primary key
 
@@ -94,7 +94,16 @@ def update_date(doc, simulate):
     if old != new:
         if not simulate:
             mkdir_p(os.path.join(root, "pdf", year, month, day))
-            os.link(old, new)
+            try:
+                os.link(old, new)
+            except OSError as exc:
+                if exc.errno == 17:
+                    # Error 17: File exists. Append "-2", and move on.
+                    print "Duplicate file found, appending -2"
+                    filename = filename[0:string.rfind(filename, ".")] + "-2" \
+                        + filename[string.rfind(filename, "."):]
+                    new = os.path.join(root, "pdf", year, month, day, filename)
+                    os.link(old, new)
             doc.local_path = os.path.join("pdf", year, month, day, filename)
             doc.save()
         print "***Created new hard link to " + new + " for doc: " + str(doc.documentUUID) + " ***"
