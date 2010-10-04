@@ -38,7 +38,7 @@ def delete_old_accounts(verbose, simulate):
 
     # get the accounts
     unconfirmed_ups = UserProfile.objects.filter(emailConfirmed = False,
-        key_expires__lte = two_months_ago.isoformat())
+        user__date_joined__lte = two_months_ago.isoformat())
 
     # some redundant code here, but emphasis is on getting it right.
     for up in unconfirmed_ups:
