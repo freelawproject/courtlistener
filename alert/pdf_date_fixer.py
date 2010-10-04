@@ -98,9 +98,9 @@ def update_date(doc, simulate):
                 os.link(old, new)
             except OSError as exc:
                 if exc.errno == 17:
-                    # Error 17: File exists. Append "-2", and move on.
-                    print "Duplicate file found, appending -2"
-                    filename = filename[0:string.rfind(filename, ".")] + "-2" \
+                    # Error 17: File exists. Append "2", and move on.
+                    print "Duplicate file found, appending 2"
+                    filename = filename[0:string.rfind(filename, ".")] + "2" \
                         + filename[string.rfind(filename, "."):]
                     new = os.path.join(root, "pdf", year, month, day, filename)
                     os.link(old, new)
