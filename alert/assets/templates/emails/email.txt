@@ -1,0 +1,27 @@
+*****************
+CourtListener.com
+*****************
+{% comment %}
+    # hits is a multidimensional array. Ugh.
+    # it consists of alerts, paired with a list of documents, of the form:
+    # [[alert1, [doc1, doc2, doc3, doc4]], [alert2, [doc5, doc6]]]
+{% endcomment %}
+--------------------------------------------------------
+We have news regarding your alerts at CourtListener.com.
+--------------------------------------------------------
+
+{% for alert, docs in hits %}{% for doc in docs %}{% if forloop.first %}{% if alert.sendNegativeAlert and docs = "None"  %}{# it's a negative alert with no hits. #}Your {{ alert.get_alertFrequency_display|lower}} alert, "{{alert.alertText}}" had 0 hits.{% endif %}{% if docs != "None" %}Your {{alert.get_alertFrequency_display|lower}} alert, "{{alert.alertText}}" had {{docs|length}} hit{{docs|pluralize}}:{% endif %}{% endif %}
+{% if docs != "None" %}{{forloop.counter}}. {{doc.citation.caseNameFull}}, {{doc.citation.caseNumber}} ({{doc.court.courtShortName}})
+This document is: {{doc.get_documentType_display}}
+ - View on our site: http://courtlistener.com{{doc.get_absolute_url}}
+ - Download pdf from the court: {{doc.download_URL}}
+ - Download pdf from our backup: http://courtlistener.com/{{doc.local_path}}
+
+{% endif %}{% endfor %}{% endfor %}
+
+Humbly,
+
+The bots at CourtListener.com
+
+P.S. To turn off or adjust this alert, sign in and edit your alerts: http://courtlistener.com/sign-in/?next=/profile/alerts
+

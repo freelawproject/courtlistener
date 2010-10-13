@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}CourtListener.com / Send email confirmation{% endblock %}
+
+{% block headers %}
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+    <script type="text/javascript">
+	    $(document).ready(function() {
+		    $('.auto-focus:first').focus();
+	    });
+     </script>
+{% endblock %}
+
+{% block content %}
+    <div class="span-18 last colborder" id="content">
+        {% if alreadyConfirmed %}
+            <div class="span-18">
+                <h2>Already confirmed</h2>
+                <p class="bottom">That email address is already confirmed. <a href="/profile/settings/">Proceed to your account</a>.</p>
+            </div>
+        {% else %}
+            <div class="span-18">
+                <h2>Email confirmation sent</h2>
+                <p>We have sent a confirmation message to your email address. To continue receiving emails, please verify your email address within five days.</p>
+            </div>
+        {% endif %}
+
+        <br><p>If you are unable to confirm your email address, please <a href="/contact/">contact us</a> for assistance.</p>
+    </div>
+{% endblock %}
