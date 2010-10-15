@@ -19,21 +19,11 @@ from django.contrib import messages
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
 from django.shortcuts import render_to_response, HttpResponseRedirect
 from django.template import RequestContext
+from django.utils.text import get_text_list
 from alert.search.forms import SearchForm, CreateAlertForm
 from alert.alertSystem.models import Document
 from alert.userHandling.models import Alert, UserProfile
 import re
-
-def oxford_comma(seq):
-    seq = tuple(seq)
-    if not seq:
-        return ''
-    elif len(seq) == 1:
-        return seq[0]
-    elif len(seq) == 2:
-        return '%s and %s' % seq
-    else:
-        return '%s, and %s' % (', '.join(seq[:-1]), seq[-1])
 
 
 def preparseQuery(query):
@@ -118,11 +108,11 @@ def messageUser(query, request):
 
     # pluralization is a pain, but we must do it...
     if len(badAttrs) == 1:
-        messageText += '<strong>' + oxford_comma(badAttrs) + '</strong> is not a \
+        messageText += '<strong>' + get_text_list(badAttrs, "and") + '</strong> is not a \
         valid field. Valid fields are @court, @caseName, @caseNumber,\
         @docStatus and @docText.'
     elif len(badAttrs) > 1:
-        messageText += '<strong>' + oxford_comma(badAttrs) + '</strong> are not \
+        messageText += '<strong>' + get_text_list(badAttrs, "and") + '</strong> are not \
         valid fields. Valid fields are @court, @caseName, @caseNumber,\
         @docStatus and @docText.'
 
