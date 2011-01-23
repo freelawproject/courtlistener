@@ -206,14 +206,14 @@ def showResults(request):
     # NEW SEARCH METHOD
     try:
         queryset = Document.search.query(internalQuery)
-        results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")
+        results = queryset.set_options(mode="SPH_MATCH_EXTENDED2").order_by('-dateFiled')
     except:
         results = []
 
     # Put the results in order by dateFiled. Fixes issue 124
     # From: http://wiki.python.org/moin/HowTo/Sorting/
     # Need to do the [0:results.count()] business, else returns only first 20.
-    results = sorted(results[0:results.count()], key=getDateFiledOrReturnZero, reverse=True)
+    # results = sorted(results[0:results.count()], key=getDateFiledOrReturnZero, reverse=True)
 
     # next, we paginate we will show ten results/page
     paginator = Paginator(results, 10)

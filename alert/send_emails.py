@@ -44,17 +44,19 @@ def emailer(rate, verbose, simulate):
     # sphinx likes time in UnixTime format, which the below accomplishes.
     # There doesn't appear to be an easier way to do this. The output can be
     # tested in the shell with: date --date="2010-04-16" +%s
+    # Unfortunately, Sphinx gets confused with negative dates, which is what
+    # UnixTimes do before 1970. Thus, we add about 500 years.
     today = datetime.date.today()
-    unixTimeToday = int(time.mktime(today.timetuple()))
-    unixTimesPastWeek = []
-    unixTimesPastMonth = []
+    todayInt = today.toordinal() + 365
+    dateIntsPastWeek = []
+    dateIntsPastMonth = []
     i = 0
     while i < 7:
-        unixTimesPastWeek.append(unixTimeToday - (86400 * i))
+        dateIntsPastWeek.append(todayInt - (1 * i))
         i += 1
     i = 0
     while i < calendar.mdays[datetime.date.today().month]:
-        unixTimesPastMonth.append(unixTimeToday - (86400 * i))
+        dateIntsPastMonth.append(todayInt - (1 * i))
         i += 1
 
     EMAIL_SUBJECT = 'New hits for your alert at CourtListener.com'
@@ -66,10 +68,9 @@ def emailer(rate, verbose, simulate):
         .distinct()
 
     if verbose:
-        print "today: " + str(today)
-        print "unixTimeToday: " + str(unixTimeToday)
-        print "unixTimesPastWeek: " + str(unixTimesPastWeek)
-        print "unixTimesPastMonth: " + str(unixTimesPastMonth)
+        print "todayInt: " + str(todayInt)
+        print "dateIntsPastWeek: " + str(dateIntsPastWeek)
+        print "dateIntsPastMonth: " + str(dateIntsPastMonth)
         print "userProfiles (with " + rate + " alerts): " + str(userProfiles)
 
     # for each user with a daily, weekly or monthly alert...
@@ -95,7 +96,7 @@ def emailer(rate, verbose, simulate):
                     queryset = Document.search.query(query)
                     results = queryset.set_options(
                         mode="SPH_MATCH_EXTENDED2")\
-                        .filter(datefiled=unixTimeToday)
+                        .filter(datefiled=todayInt)
                 elif RATE == 'wly' and today.weekday() == 6:
                     # if it's a weekly alert and today is Sunday
                     if verbose:
@@ -103,8 +104,8 @@ def emailer(rate, verbose, simulate):
                     queryset = Document.search.query(query)
                     results = queryset.set_options(
                         mode="SPH_MATCH_EXTENDED2")\
-                        .filter(datefiled=unixTimesPastWeek)
-                elif RATE == 'mly' and today.day == 19:
+                        .filter(datefiled=dateIntsPastWeek)
+                elif RATE == 'mly' and today.day == 1:
                     # if it's a monthly alert and today is the first of the
                     # month
                     if verbose:
@@ -112,12 +113,12 @@ def emailer(rate, verbose, simulate):
                     queryset = Document.search.query(query)
                     results = queryset.set_options(
                         mode="SPH_MATCH_EXTENDED2")\
-                        .filter(datefiled=unixTimesPastMonth)
+                        .filter(datefiled=dateIntsPastMonth)
                 elif RATE == "off":
                     pass
             except:
-                # search occasionally barfs. We need to log this.
-                print "Search barfed on this alert: " + query
+                # search occasionally fails. We need to log this.
+                print "Search for this alert failed: " + query
                 continue
 
 
@@ -155,8 +156,9 @@ def emailer(rate, verbose, simulate):
                             query + "."
                         print "alertWithResults: " + str(alertWithResults)
                         print "hits: " + str(hits)
-            except:
+            except Exception,e:
                 print "Search barfed on this alert: " + query
+		print e
 
         if len(hits) > 0:
             # either the hits var has the value "None", or it has hits.
@@ -232,3 +234,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

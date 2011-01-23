@@ -102,13 +102,22 @@ def update_date(doc, simulate):
                     print "Duplicate file found, appending 2"
                     filename = filename[0:string.rfind(filename, ".")] + "2" \
                         + filename[string.rfind(filename, "."):]
-                    new = os.path.join(root, "pdf", year, month, day, filename)
-                    os.link(old, new)
+		    new = os.path.join(root, "pdf", year, month, day, filename)
+                    try:
+			os.link(old, new)
+		    except OSError as exc:
+		        if exc.errno == 17:
+			    print "Duplicate file found again, appending 3"
+			    filename = filename[0:string.rfind(filename, ".")] + "3" \
+			        + filename[string.rfind(filename, "."):]
+		            new = os.path.join(root, "pdf", year, month, day, filename)
+			    os.link(old, new)
+		     
             doc.local_path = os.path.join("pdf", year, month, day, filename)
             doc.save()
         print "***Created new hard link to " + new + " for doc: " + str(doc.documentUUID) + " ***"
     else:
-        print 'Same. Not updating link.'
+        print 'Same. Not updating link for ' + str(doc.documentUUID)
 
 
 def main():
