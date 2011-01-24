@@ -272,3 +272,4 @@ def trunc(s, length):
             # no spaces found, just use max position
             end = length
         return s[0:end]
+

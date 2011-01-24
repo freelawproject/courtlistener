@@ -30,7 +30,8 @@ from optparse import OptionParser
 
 
 def delete_old_accounts(verbose, simulate):
-    """This script will find accounts older than roughly two months that have
+    """
+    This script will find accounts older than roughly two months that have
     not been confirmed, and delete them. It can be run once a month, or so.
     """
 

@@ -34,7 +34,7 @@
 # process.
 
 # This script does the following:
-# - check for its own dependencies (such as aptitude, hg, svn, etc)
+# - check for and install its own dependencies (such as aptitude, hg, svn, etc)
 # - get various input from the user.
 # - install django from source
 # - install CourtListener from source
@@ -72,6 +72,8 @@ OPTIONS
             Verify that the required dependencies are installed.
     --mysql
             Configure the MySQL database
+    --ffmpeg
+            install the FFmpeg audio transcoding library from source
     --sphinx
             install the Sphinx search engine
     --django
@@ -141,7 +143,7 @@ EOF
     read -p "The default location for your CourtListener installation is /var/www. Is this OK? (y/n): " proceed
     if [ $proceed == 'n' ]
     then
-        read -p "Where shall we install CourtListener (starting at /, no trailing slash)?: " CL_INSTALL_DIR
+        read -p "Where shall we install CourtListener (starting at /, no trailing slash): " CL_INSTALL_DIR
     else
         CL_INSTALL_DIR='/var/www'
     fi
@@ -163,7 +165,7 @@ This file should NEVER be checked into revision control!
         DEVELOPMENT=false
     fi
     echo -e "\nGreat. These are stored in a tuple in the 20-private.conf file. You can add more
-people manually, if you like.
+people and other settings manually, if you like.
 \nMANAGERS is set equal to the admins.
 DEBUG is set to True.
 CACHE_BACKEND is not set (which is fine for a dev machine).
@@ -197,7 +199,7 @@ Press any key to proceed, or Ctrl+C to abort. " proceed
 function checkDeps {
     # this function checks for various dependencies that the script assumes are
     # installed for its own functionality.
-    deps=(aptitude mercurial subversion python ipython git-core logrotate python python-beautifulsoup python-docutils python-mysqldb python-pip python-setuptools poppler-utils mysql-client mysql-server wget tar libmysqlclient-dev gcc g++ make)
+    deps=(aptitude checkinstall g++ gcc git-core ipython libmysqlclient-dev logrotate make mercurial mysql-client mysql-server poppler-utils python python python-beautifulsoup python-docutils python-mysqldb python-pip python-setuptools subversion tar wget)
     echo -e "\n########################"
     echo "Checking dependencies..."
     echo "########################"
@@ -492,6 +494,70 @@ EOF
     rm /tmp/courts.json
 
     echo -e '\nInformation loaded into the database successfully.'
+}
+
+
+function installFFmpeg {
+    echo -e "\n####################"
+    echo "Installing FFmpeg..."
+    echo "####################"
+    echo -e "\nFFmpeg is used by CourtListener to transcode audio files, but
+unfortunately, the version that ships in most Debian derivatives is a tad old, and
+installing from source is necessary.\n"
+    read -p "Install FFmpeg from source now? (y/n): " proceed
+    if [$proceed == "n" ]
+    then
+        echo -e '\nYou can install this at a later date with the --ffmpeg flag.'
+        return 0
+    fi
+
+    read -p "The default location for FFmpeg is /opt/ffmpeg. Is this OK? (y/n): " proceed
+    if [ $proceed == 'n' ]
+    then
+        read -p "Where shall we install FFmpeg (starting at /, no trailing slash): " FFMPEG_INSTALL_DIR
+    else
+        FFMPEG_INSTALL_DIR='/opt/ffmpeg'
+    fi
+
+    if [ ! -d $FFMPEG_INSTALL_DIR ]
+    then
+        read -p "Directory '$FFMPEG_INSTALL_DIR' doesn't exist. Create it? (y/n): " proceed
+        if [ $proceed == "n" ]
+        then
+            echo "Bad juju. Aborting."
+            exit 5
+        else
+            mkdir -p $FFMPEG_INSTALL_DIR
+        fi
+    fi
+
+    cd $FFMPEG_INSTALL_DIR
+
+    echo "Removing old versions..."
+    aptitude remove -P ffmpeg libmp3lame-dev libx264-dev
+
+    echo "Installing dependencies..."
+    aptitude install -P nasm
+
+    # Installs lame
+    echo "Downloading lame from source..."
+    wget 'http://downloads.sourceforge.net/project/lame/lame/3.98.4/lame-3.98.4.tar.gz'
+    tar xzvf lame-3.98.4.tar.gz
+    mv lame-3.98.4 lame
+    cd lame
+    ./configure --enable-nasm --disable-shared
+    make
+    checkinstall --pkgname=lame-ffmpeg --pkgversion="3.98.4" --backup=no --default --deldoc=yes
+
+    # Installs FFmpeg from source
+    svn checkout svn://svn.ffmpeg.org/ffmpeg/trunk ffmpeg
+    cd ffmpeg
+    ./configure --enable-gpl --enable-version3 --enable-nonfree --enable-postproc --enable-libfaac --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libtheora --enable-libvorbis --enable-libmp3lame --enable-libxvid --enable-x11grab
+    make
+    checkinstall --pkgname=ffmpeg --pkgversion "4:SVN-r`LANG=C svn info | grep Revision | awk '{ print $NF }'`" --backup=no --default --deldoc=yes
+    hash ffmpeg ffplay
+
+    echo -e '\nFFmpeg installed successfully.'
 }
 
 
@@ -913,6 +979,7 @@ else
         --install) main;;
         --checkdeps) checkDeps;;
         --mysql) getUserInput; configureMySQL;;
+        --ffmpeg) getUserInput; installFFmpeg;;
         --sphinx) getUserInput; installSphinx;;
         --django) getUserInput; installDjango;;
         --courtListener) getUserInput; installCourtListener;;
