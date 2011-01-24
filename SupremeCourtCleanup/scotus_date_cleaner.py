@@ -69,7 +69,7 @@ def remove_words(phrase):
     # Removes words and punctuation that don't help the diff comparison.
     stop_words = 'a|an|and|as|at|but|by|en|etc|for|if|in|is|of|on|or|the|to|v\.?|via' +\
         '|vs\.?|united|states?|et|al|appellant|defendant|administrator|plaintiffs?|error' +\
-        'others|against|ex|parte'
+        '|others|against|ex|parte'
     stop_words_reg = re.compile(r'^(%s)$' % stop_words, re.IGNORECASE)
 
     # strips punctuation
