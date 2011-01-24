@@ -51,6 +51,7 @@ Spec/features:
 
 import sys
 sys.path.append('/var/www/court-listener/alert')
+sys.path.append('/home/mlissner/FinalProject/alert')
 
 import settings
 from django.core.management import setup_environ
@@ -59,8 +60,28 @@ setup_environ(settings)
 from alertSystem.models import Document, Citation
 import datetime
 import difflib
+import string
 from optparse import OptionParser
 import re
+
+
+def remove_words(phrase):
+    # Removes words and punctuation that don't help the diff comparison.
+    stop_words = 'a|an|and|as|at|but|by|en|etc|for|if|in|is|of|on|or|the|to|v\.?|via' +\
+        '|vs\.?|united|states?|et|al|appellant|defendant|administrator|plaintiffs?|error' +\
+        'others|against|ex|parte'
+    stop_words_reg = re.compile(r'^(%s)$' % stop_words, re.IGNORECASE)
+
+    # strips punctuation
+    exclude = set(string.punctuation)
+    phrase = ''.join(ch for ch in phrase if ch not in exclude)
+
+    words = re.split('[\t ]', phrase)
+    result = []
+    for word in words:
+        word = stop_words_reg.sub('', word)
+        result.append(word)
+    return ''.join(result)
 
 
 def gen_diff_ratio(case_name_left, case_name_right):
@@ -71,26 +92,19 @@ def gen_diff_ratio(case_name_left, case_name_right):
     '''
     # Remove common strings from all case names /before/ comparison.
     # Doing so lowers the opportunity for false positives.
-    usa = re.compile(r'United States')
-    case_name_left  = usa.sub('', case_name_left)
-    case_name_right = usa.sub('', case_name_right)
-
-    vs = re.compile(r'v.')
-    case_name_left  = vs.sub('', case_name_left)
-    case_name_right = vs.sub('', case_name_right)
+    case_name_left = remove_words(case_name_left)
+    case_name_right = remove_words(case_name_right)
 
     # compute the difference value
-    diff = difflib.SequenceMatcher(None, case_name_left, case_name_right).ratio()
+    diff = difflib.SequenceMatcher(None, case_name_left.strip(), case_name_right.strip()).ratio()
 
     return diff
 
 
 def cleaner(simulate=False, verbose=False):
-    THRESHOLD = 0.75
-
     f            = open("date_of_decisions.csv", 'r')
-    updated_file = open('updated_file.csv', 'w')
-    punt_file    = open('punted_cases.csv', 'w')
+    updated_file = open('updated_file.log', 'w')
+    punt_file    = open('punted_cases.log', 'w')
 
     line_num = 1
     for line in f:
@@ -100,7 +114,7 @@ def cleaner(simulate=False, verbose=False):
         csv_page_num       = line.split("|")[3]
         csv_date_published = line.split("|")[4]
 
-        query = "@casenumber " + csv_volume_num_csv + " " + csv_page_num + " @court scotus"
+        query = "@casenumber (" + csv_volume_num + " << " + csv_page_num + ") @court scotus"
 
         # search for the case number using Sphinx
         queryset = Document.search.query(query)
@@ -108,14 +122,17 @@ def cleaner(simulate=False, verbose=False):
 
         if results.count() == 0:
             # No hits for the doc. Log and punt it.
-            if verbose: print "Punted line " + line_num + ": " + line
-            punt_file.write("Punted line " + line_num + ": " + line)
+            print "Results: %d. Line number %d. Line contents: %s" % \
+                (results.count(), line_num, line.strip())
+            punt_file.write("Results: %d. Line number %d. Line contents %s\n" % \
+                (results.count(), line_num, line.strip()))
 
         elif results.count() == 1:
             # One hit returned make sure it's above THRESHOLD. If so, fix it.
+            THRESHOLD = 0.1
             db_case_name = str(results[0])
             diff = gen_diff_ratio(db_case_name, csv_case_name)
-            if diff > THRESHOLD:
+            if diff >= THRESHOLD:
                 # Update the date in the DB
                 if not simulate:
                     splitDate = csv_date_published.split('-')
@@ -124,20 +141,22 @@ def cleaner(simulate=False, verbose=False):
                     results[0].save()
 
                 # Log as appropriate
-                if verbose: print "Used line %d to update doc %d. Threshold: %d; \
-                    Line contents: %s" % (line_num, results[0].documentUUID, diff, line)
-                updated_file.write("Used line %d to update doc %d. Threshold: %d; \
-                    Line contents: %s" % (line_num, results[0].documentUUID, diff, line)
+                if verbose: print "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s" % \
+                    (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip())
+                updated_file.write("Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s\n" % \
+                    (results.count(), line_num,  diff,results[0].documentUUID, results[0], line.strip()))
 
             else:
                 # Below the threshold. Punt!
-                print "Line number %d below threshold. Threshold: %d. \
-                    Line contents: %s" % (line_num, diff, line)
-                punt_file.write("Line number %d below threshold. Threshold: %d. \
-                    Line contents: %s" % (line_num, diff, line))
+                print "Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s" % \
+                    (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip())
+                punt_file.write("Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s\n" % \
+                    (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip()))
 
-        else results.count() > 1:
+        elif results.count() > 1:
             # More than one hit. Find the best one using diff_lib
+            THRESHOLD = 0.65
+
             diff_ratios = []
             for result in results:
                 # Calculate its diff_ratio, and add it to an array
@@ -157,25 +176,22 @@ def cleaner(simulate=False, verbose=False):
                     results[i].save()
 
                 # Log as appropriate
-                if verbose: print "Used line %d to update doc %d. Threshold: %d; \
-                    Line contents: %s" % (line_num, results[0].documentUUID, diff, line)
-                updated_file.write("Used line %d to update doc %d. Threshold: %d; \
-                    Line contents: %s" % (line_num, results[0].documentUUID, diff, line)
+                if verbose:
+                    print "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s" % \
+                        (results.count(), line_num, max_ratio, results[i].documentUUID, results[i], line.strip())
+                updated_file.write("Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s\n" % \
+                    (results.count(), line_num, max_ratio, results[i].documentUUID, results[i], line.strip()))
 
             else:
                 # Below the threshold. Punt!
-                print "Line number %d below threshold. Threshold: %d. \
-                    Line contents: %s" % (line_num, diff, line)
-                punt_file.write("Line number %d below threshold. Threshold: %d. \
-                    Line contents: %s" % (line_num, diff, line))
-
-        else:
-            # Not close enough. Punt.
-            print "Ratio below threshold: " + str(max_ratio)
-            punt_file.write("Punted line: " + line)
+                if verbose:
+                    print "Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s" % \
+                        (results.count(), line_num, max_ratio, results[i].documentUUID, results[i], line.strip())
+                punt_file.write("Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s\n" % \
+                    (results.count(), line_num, max_ratio, results[i].documentUUID, results[i], line.strip()))
 
         # increment the line number counter
-        line_num++
+        line_num += 1
 
 
 
@@ -185,8 +201,8 @@ def main():
     parser.add_option('-v', '--verbose', action="store_true", dest='verbose',
         default=False, help="Display log during execution")
     parser.add_option('-s', '--simulate', action="store_true",
-        dest='simulate', default=False, help="Simulate the corrections without\
-        actually making them.")
+        dest='simulate', default=False, help="Simulate the corrections without " + \
+        "actually making them.")
     (options, args) = parser.parse_args()
 
     verbose = options.verbose
@@ -203,47 +219,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-'''
-    docs = Document.objects.filter(citation__caseNumber = caseNum)
-
-    diff_ratios = []
-    for doc in docs:
-        caseNameDB  = doc.citation.caseNameShort
-        caseNameCSV = line.split("|")[1]
-
-        # Remove 'United States' from all case names /before/ comparison.
-        # Not doing so lowers the opportunity for false positives.
-        usa = re.compile(r'United States')
-        caseNameDB  = usa.sub('', caseNameDB)
-        caseNameCSV = usa.sub('', caseNameCSV)
-
-        # compute the difference value
-        diff = difflib.SequenceMatcher(None, caseNameDB, caseNameCSV).ratio()
-        diff_ratios.append(diff)
-
-    # Find the max value and its index
-    if len(diff_ratios) > 0:
-        max_ratio = max(diff_ratios)
-        i = diff_ratios.index(max_ratio)
-        if max_ratio >= THRESHOLD:
-            # A hit!
-            dateCSV = line.split('|')[4]
-            doc = docs[i]
-            doc.dateFiled = dateCSV
-            doc.save()
-
-            # Logging
-            print "Updated document " + str(doc) + " with date: " + dateCSV
-            updated_file.write(str(doc.documentUUID) + ":" + str(doc) + "|" + caseNameCSV + "|" + str(max_ratio)[0:7])
-        else:
-            # Not close enough. Punt.
-            print "Ratio below threshold: " + str(max_ratio)
-            punt_file.write("Punted line: " + line)
-
-    else:
-        # No diff ratios generated.
-        print "Punted line: " + line
-        punt_file.write("Punted line: " + line)
-'''
