@@ -1,79 +1,182 @@
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
-#
+# 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-#
+# 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-#
+# 
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#  Under Sections 7(a) and 7(b) of version 3 of the GNU Affero General Public
+#  License, that license is supplemented by the following terms:
+#
+#  a) You are required to preserve this legal notice and all author
+#  attributions in this program and its accompanying documentation.
+#
+#  b) You are prohibited from misrepresenting the origin of any material
+#  within this covered work and you are required to mark in reasonable
+#  ways how any modified versions differ from the original version.
+'''
+    This is some complicated stuff. The basic process is as follows:
+     - Go to the court site, identify the audio file
+     - Encode it properly as mono mp3 and mono ogg
+     - Update ID3 information for mp3, and header info for ogg.
+     - Update the DB to link to it from the documents page, save it to DB
 
-#TODO: Use of the time.strptime function would improve this code here and there.
-#   info here: http://docs.python.org/library/time.html#time.strptime
+    Some notes:
+     - Oyez does a good job with id3 information:
+        - Title: Case name
+        - Artist: Court name
+        - Album: Supreme Court 2009 Term
+        - Year: 2009
+        - Comment: 2009 Term (Docket No. 08-861)
+        - Album Cover: CL Logo?
+     - Audio conversions:
+        - Update ID3 tags
+        - Convert to mono
+        - Convert to a reasonable sample rate/bitrate combo
+     - UI notes:
+        - Need RSS feeds for audio
+        - Coverage page needs to be updated
+        - UI hooks on each page, with rewrite of pages so they look right when we only have audio for a case.
+
+    Court notes:
+     - First Circuit:
+        - RSS: http://www.ca1.uscourts.gov/files/audio/audiorss.php
+        - mp3
+        - meta: case name, docket num, arg date
+     - Second Circuit:
+        - None
+     - Third Circuit:
+        - Last seven days: http://www.ca3.uscourts.gov/oralargument/ListArguments7.aspx
+        - All: http://www.ca3.uscourts.gov/oralargument/ListArgumentsAll.aspx (can be chron sorted)
+        - wma
+        - meta: case name, docket num, arg date
+     - Fourth Circuit:
+        - None
+     - Fifth Circuit:
+        - http://www.ca5.uscourts.gov/OralArgumentRecordings.aspx (use date fields to return all oral args)
+        - http://www.ca5.uscourts.gov/Rss.aspx?Feed=OralArgRecs (Feed of args)
+        - wma
+        - meta: case name, docket num, arg date, appearing attorneys
+     - Sixth Circuit
+        - None
+     - Seventh Circuit
+        - RSS: http://www.ca7.uscourts.gov/fdocs/docs.fwx?submit=rss_args
+        - Also available via POST at http://www.ca7.uscourts.gov/fdocs/docs.fwx (submit 10 for all 2010 cases, etc.)
+        - Audio is at: http://www.ca7.uscourts.gov/fdocs/docs.fwx?submit=showbr&shofile=10-2056_001.mp3
+        - mp3
+        - meta (RSS): case name, docket num, case type
+        - meta (HTML): case name, docket num, more on linked page.
+     - Eighth Circuit:
+        - RSS: http://8cc-www.ca8.uscourts.gov/circ8rss.xml (reverse order?)
+        - mp3
+        - meta: case name, docket num, arg date
+     - Ninth Circuit:
+        - Cases are here: http://www.ca9.uscourts.gov/media/ (can be sorted)
+        - Links take the form: http://www.ca9.uscourts.gov/datastore/media/2010/10/13/08-16436.wma
+        - mp3
+        - meta: case name, docket num, arg date
+     - Tenth Circuit:
+        -None
+     - Eleventh Circuit:
+        - None
+     - DC Circuit:
+        - Denied.
+     - Fed. Circuit:
+        - RSS with ALL cases back to 2009-01: http://www.cafc.uscourts.gov/rss-audio-recordings.php
+        - Also available via search queries
+        - mp3
+        - meta: case name, docket num, date (?)
+     - SCOTUS:
+        - Latest from here: http://www.supremecourt.gov/oral_arguments/argument_audio.aspx
+        - Old from Oyez
+        - mp3, wma, ra
+        - meta: case name, docket num, arg date
+
+    Counts:
+     - 1st: Latest only
+     - 2nd: None
+     - 3rd: 574
+     - 4th: None
+     - 5th: 236
+     - 6th: None
+     - 7th: (2010: 136, 2009: 905, 2008: 1165, 2007: 1122, 2006: 1260,
+             2005: 1317, 2004: 1005, 2003: 933, 2002: 864, 2001: 806,
+             2000: 661, 1999: 576, 1998: 134, 1997: 20, 1996: 3, 1995: 1,
+             1994: 1, 1993: 1, 1992: 0)
+             TOTAL: ~10,000 cases, most lack audio...maybe 3,000 with audio.
+     - 8th: Latest only.
+     - 9th: ~6000
+     - D.C.: Denied
+     - Fed: 2152
+     - Scotus: Latest plus Oyez.
+     - GRAND TOTAL: 11962
+     - SIZE, AT 20MB/ARG: 233GB.
+
+'''
+
+
 import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alertSystem.models import *
-from alertSystem.string_utils import *
-
-from django.utils.encoding import smart_str
-from django.core.exceptions import MultipleObjectsReturned
-from django.core.files import File
-from django.core.files.base import ContentFile
-
-import datetime, calendar, hashlib, re, signal, StringIO, subprocess, sys, time, urllib, urllib2
-from BeautifulSoup import BeautifulSoup
-from lxml.html import fromstring, tostring
-from lxml import etree
-from optparse import OptionParser
-from urlparse import urljoin
-
 import logging
 import logging.handlers
 
+import Audio.models
+
+import hashlib, re, StringIO, urllib2
+from time import localtime, sleep, strftime, strptime
+from urlparse import urljoin
+
+# local vars
 DAEMONMODE = False
 RESULT = ""
 VERBOSITY = 0
-LOG_FILENAME = '/var/log/scraper/daemon_log.out'
+LOG_FILENAME = '/var/log/scraper/audio_log.out'
 
-# Set up a specific logger with our desired output level
-logger = logging.getLogger('Logger')
-logger.setLevel(logging.DEBUG)
-
-# Add the log message handler to the logger
-handler = logging.handlers.RotatingFileHandler(
-              LOG_FILENAME, maxBytes=512000, backupCount=1)
-
-logger.addHandler(handler)
-
-# for use in catching the SIGINT (Ctrl+C)
+# for use as a global var in catching the SIGINT (Ctrl+C)
 dieNow = False
+def setup_logging():
+    # Set up a specific logger with our desired output level
+    logger = logging.getLogger('Logger')
+    logger.setLevel(logging.DEBUG)
+
+    # Add the log message handler to the logger
+    handler = logging.handlers.RotatingFileHandler(
+                  LOG_FILENAME, maxBytes=512000, backupCount=1)
+    logger.addHandler(handler)
+
 
 def signal_handler(signal, frame):
-        print 'Exiting safely...this will finish the current court, then exit...'
-        dieNow = True
+    print 'Exiting safely...this will finish the current court, then exit...'
+    global dieNow
+    dieNow = True
 
 
-def makeDocFromURL(LinkToPdf, ct):
-    '''Receives a URL and a court as arguments, then downloads the PDF
-    that's in it, and makes it into a StringIO. Generates a sha1 hash of the
-    file, and tries to add it to the db. If it's a duplicate, it gets the one in
-    the DB. If it's a new sha1, it creates a new document.
+def makeAudioFromUrl(url, audioLink):
+    '''
+    Using a URL, downloads the file at the other end.
 
-    returns a StringIO of the PDF, a Document object, and a boolean indicating
-    whether the Document was created
+    Returns a StringIO of the audio file, an Audio object, a boolean
+    indicating whether the Audio file was created or pulled from the DB, and
+    a boolean indicating if there were any errors.
     '''
 
-    # get the PDF
+    # Intelligently fixes relative links and problems of that sort.
+    url = urljoin(url, audioLink)
+
+    # get the audio file!
     try:
-        webFile = urllib2.urlopen(LinkToPdf)
+        webFile = urllib2.urlopen(url)
         stringThing = StringIO.StringIO()
         stringThing.write(webFile.read())
         myFile = ContentFile(stringThing.getvalue())
@@ -81,26 +184,80 @@ def makeDocFromURL(LinkToPdf, ct):
     except:
         print "ERROR DOWNLOADING FILE!: " + str(LinkToPdf)
         error = True
-        return "Bad", "Bad", "Bad", error
+        return "ERROR", "DOWNLOADING", "FILE", error
 
     # make the SHA1
     data = myFile.read()
     sha1Hash = hashlib.sha1(data).hexdigest()
 
     # using that, we check for a dup
-    doc, created = Document.objects.get_or_create(documentSHA1 = sha1Hash,
-        court = ct)
+    audio, created = Audio.objects.get_or_create(SHA1 = sha1Hash)
 
     if created:
         # we only do this if it's new
-        doc.documentSHA1 = sha1Hash
-        doc.download_URL = LinkToPdf
-        doc.court = ct
-        doc.source = "C"
+        audio.documentSHA1 = sha1Hash
+        audio.download_URL = url
 
     error = False
 
-    return myFile, doc, created, error
+    return myFile, audio, created, error
+
+
+def encode_audio(mime-type, data):
+    '''
+    Fires off a new thread that does the audio encoding for the file. If
+    possible, uses a low nice value when doing encoding.
+
+    Currently handles wma or mp3.
+
+    Adds ffmpeg and libavcodec-extra-52 as dependencies....and they need to be
+    installed from source b/c ubuntu sucks it up on keeping these up to date.
+    Follow these instructions, but remember to install lame as well:
+    http://ubuntuforums.org/showpost.php?p=9868359&postcount=1289
+
+    Convert to 22050 sample rate, mono, 64kps bitrate:
+     -ar 22050 -ab 64k -ac 1 out.mp3
+     -ar 22050 -ab 64k -ac 1 -acodec libvorbis out.ogg
+
+    Commands that work:
+     - Convert wma to ogg: ffmpeg -i 03-4353RayvWarrenetal.wma -metadata Artist="Artist name" -metadata Title="Case name" -metadata Album="Supreme court 2009 term" -metadata Year="2009" -metadata Comment="Docket number: 09-2661" -ar 22050 -ab 64k -ac 1 -acodec libvorbis 09-2661.new-ffmpeg.ogg
+     - Convert mp3 to ogg: ffmpeg -i 09-2661.mp3 -metadata Artist="Artist name" -metadata Title="Case name" -metadata Album="Supreme court 2009 term" -metadata Year="2009" -metadata Comment="Docket number: 09-2661" -ar 22050 -ab 64k -ac 1 -acodec libvorbis 09-2661.new-ffmpeg.ogg
+     - Convert mp3 to mp3: ffmpeg -i 09-2661.mp3 -metadata Artist="Artist name" -metadata Title="Case name" -metadata Album="Supreme court 2009 term" -metadata Year="2009" -metadata Comment="Docket number: 09-2661" -ar 22050 -ab 64k -ac 1 new-ffmpeg.mp3
+
+    Sets meta data:
+    ffmpeg -i in.avi -metadata title="my title" out.flv
+
+    Returns an mp3 and an ogg of the file that are encoded properly.
+    '''
+    # This might indicate how to set the nice value of this process:
+    # http://stackoverflow.com/questions/2463533/is-it-possible-to-renice-a-subprocess
+    # A better method is probably using a preexec_fn of os.nice() to the
+    # subprocess call.
+    if mime-type == "mp3":
+        # Convert the sample rate to something good, make it mono.
+    elif mime-type == "wma":
+        # Convert make an acceptable mp3 from the wma.
+
+    # make the ogg from the mp3.
+
+    # add id3 data to the mp3
+
+    # add meta data to the ogg
+
+    return
+
+def set_meta_data(mp3, ogg, casename, court, year, argdate, docketNum):
+    '''
+    Sets the meta data on the mp3 and ogg files as follows:
+     - Title: Case name
+     - Artist: Court name
+     - Album: Supreme Court, 2009
+     - Year: 2009
+     - Comment: Argued: 2009-01-22. Docket num: 04-3329
+     - Album Cover: CL Logo?
+
+    Returns the two new and improved files.
+    '''
 
 
 def courtChanged(url, contents):
@@ -120,8 +277,9 @@ def courtChanged(url, contents):
         url2Hash.save()
 
         # Log the change time and URL
+        global logger
         try:
-            logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + ": URL: " + url)
+            logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) + ": URL: " + url)
         except UnicodeDecodeError:
                     pass
 
@@ -177,6 +335,7 @@ def getPDFContent(docs):
             doc.save()
         except:
             RESULT += "Error saving pdf text to the db for: " + doc.citation.caseNameShort
+    return
 
 
 def scrapeCourt(courtID):
@@ -185,121 +344,114 @@ def scrapeCourt(courtID):
 
     if (courtID == 1):
         """
-        PDFs are available from the first circuit if you go to their RSS feed.
+        Audio is available from the first circuit if you go to their RSS feed.
         So go to their RSS feed we shall.
         """
-        urls = ("http://www.ca1.uscourts.gov/opinions/opinionrss.php",)
-        ct = Court.objects.get(courtUUID='ca1')
 
-        for url in urls:
-            try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
-                RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+        url = "http://www.ca1.uscourts.gov/files/audio/audiorss.php"
+        try: html = urllib2.urlopen(url).read()
+        except urllib2.HTTPError:
+            RESULT += "***ERROR CONNECTING TO COURT: " + str(courtID) + "***\n"
+
+        if DAEMONMODE:
+            changed = courtChanged(url, html)
+            if not changed:
+                # if the court hasn't changed, punt.
+                return
+
+        # gets rid of errant ampersands, making the XML valid.
+        punctuationRegex = re.compile(" & ")
+        html = re.sub(punctuationRegex, " &amp; ", html)
+        tree = etree.fromstring(html)
+
+        '''
+        Process:
+         - Get the URL of the audio file, and hand that to makeAudioFromUrl
+         - Hand the audio file to encode_audio to make the mp3 and ogg files
+         - Figure out the case name, court, year, argdate and docketNum
+            - hand all that to the set_meta_data function.
+         - See if a document can be linked up with the audio file.
+         - Save everything.
+        '''
+
+        ###############
+        # BELOW HERE is OLD CODE!
+        ###############
+
+
+        caseLinks = tree.xpath("//item/link")
+        descriptions = tree.xpath("//item/description")
+        docTypes = tree.xpath("//item/category")
+        caseNamesAndNumbers = tree.xpath("//item/title")
+
+        caseDateRegex = re.compile("(\d{2}/\d{2}/\d{4})",
+            re.VERBOSE | re.DOTALL)
+        caseNumberRegex = re.compile("(\d{2}-.*?\W)(.*)$")
+
+        # incredibly, this RSS feed is in cron order, so new stuff is at the
+        # end. Mind blowing.
+        i = len(caseLinks)-1
+        if VERBOSITY >= 2: print str(i)
+        dupCount = 0
+        while i > 0:
+            # next, we begin with the caseLink field
+            caseLink = caseLinks[i].text
+
+            # then we download the PDF, make the hash and document
+            myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
+
+            if error:
+                # things broke, punt this iteration
+                i -= 1
                 continue
 
-            if DAEMONMODE:
-                # if it's DAEMONMODE, see if the court has changed
-                changed = courtChanged(url, html)
-                if not changed:
-                    # if not, bail. If so, continue to the scraping.
-                    return
-
-            # this code gets rid of errant ampersands - they throw big errors
-            # when parsing. We replace them later.
-            if '&' in html:
-                punctuationRegex = re.compile(" & ")
-                html = re.sub(punctuationRegex, " &amp; ", html)
-                tree = etree.fromstring(html)
-            else:
-                tree = etree.fromstring(html)
-
-            caseLinks = tree.xpath("//item/link")
-            descriptions = tree.xpath("//item/description")
-            docTypes = tree.xpath("//item/category")
-            caseNamesAndNumbers = tree.xpath("//item/title")
-
-            caseDateRegex = re.compile("(\d{2}/\d{2}/\d{4})",
-                re.VERBOSE | re.DOTALL)
-            caseNumberRegex = re.compile("(\d{2}-.*?\W)(.*)$")
-
-            # incredibly, this RSS feed is in cron order, so new stuff is at the
-            # end. Mind blowing.
-            i = len(caseLinks)-1
-            if VERBOSITY >= 2: print str(i)
-            dupCount = 0
-            while i > 0:
-                # First: docType, since we don't support them all...
-                docType = docTypes[i].text.strip()
-                if VERBOSITY >= 2: print docType
-                if "unpublished" in docType.lower():
-                    documentType = "Unpublished"
-                elif "published" in docType.lower():
-                    documentType = "Published"
-                elif "errata" in docType.lower():
-                    documentType = "Errata"
-                else:
-                    # something weird we don't know about, punt
-                    i -= 1
-                    continue
-
-                # next, we begin with the caseLink field
-                caseLink = caseLinks[i].text
-                caseLink = urljoin(url, caseLink)
-
-                # then we download the PDF, make the hash and document
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                if error:
-                    # things broke, punt this iteration
-                    i -= 1
-                    continue
-
-                if not created:
-                    # it's an oldie, punt!
-                    if VERBOSITY >= 2:
-                        RESULT += "Duplicate found at " + str(i) + "\n"
-                    dupCount += 1
-                    if dupCount == 8:
-                        # eighth dup in a a row. BREAK!
-                        # this is 8 here b/c this court has tech problems.
-                        break
-                    i -= 1
-                    continue
-                else:
-                    dupCount = 0
-
-                # otherwise, we continue
-                doc.documentType = documentType
-
-                # next: caseDate
-                caseDate = caseDateRegex.search(descriptions[i].text).group(1)
-                splitDate = caseDate.split('/')
-                caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
-                    int(splitDate[1]))
-                doc.dateFiled = caseDate
-
-                # next: caseNumber
-                caseNumber = caseNumberRegex.search(caseNamesAndNumbers[i].text)\
-                    .group(1)
-
-                # next: caseNameShort
-                caseNameShort = caseNumberRegex.search(caseNamesAndNumbers[i].text)\
-                    .group(2)
-
-                # check for dups, make the object if necessary, otherwise, get it
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
-
-                # last, save evrything (pdf, citation and document)
-                doc.citation = cite
-                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
-                except UnicodeDecodeError:
-                    pass
-                doc.save()
-
+            if not created:
+                # it's an oldie, punt!
+                if VERBOSITY >= 2:
+                    RESULT += "Duplicate found at " + str(i) + "\n"
+                dupCount += 1
+                if dupCount == 8:
+                    # eighth dup in a a row. BREAK!
+                    # this is 8 here b/c this court has tech problems.
+                    break
                 i -= 1
+                continue
+            else:
+                dupCount = 0
+
+            # otherwise, we continue
+            doc.documentType = documentType
+
+            # next: caseDate
+            caseDate = caseDateRegex.search(descriptions[i].text).group(1)
+            splitDate = caseDate.split('/')
+            caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
+                int(splitDate[1]))
+            doc.dateFiled = caseDate
+
+            # next: caseNumber
+            caseNumber = caseNumberRegex.search(caseNamesAndNumbers[i].text)\
+                .group(1)
+
+            # next: caseNameShort
+            caseNameShort = caseNumberRegex.search(caseNamesAndNumbers[i].text)\
+                .group(2)
+
+            # check for dups, make the object if necessary, otherwise, get it
+            cite, created = hasDuplicate(caseNumber, caseNameShort)
+
+            # last, save evrything (pdf, citation and document)
+            doc.citation = cite
+            doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+            try:
+                logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+            except UnicodeDecodeError:
+                pass
+            doc.save()
+
+            i -= 1
+
         return
 
     elif (courtID == 2):
@@ -314,7 +466,7 @@ def scrapeCourt(courtID):
 
         for url in urls:
             try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
+            except:
                 RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
                 continue
 
@@ -351,11 +503,10 @@ def scrapeCourt(courtID):
                 # we begin with the caseLink field
                 caseLink = aTags[i].get('href')
                 caseLink = aTagsRegex.search(caseLink).group(1)
-                caseLink = urljoin(url, caseLink)
                 if VERBOSITY >= 2:
                     print str(i) + ": " + caseLink
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+                myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
 
                 if error:
                     # things broke, punt this iteration
@@ -410,7 +561,7 @@ def scrapeCourt(courtID):
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                    logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
@@ -435,7 +586,7 @@ def scrapeCourt(courtID):
 
         for url in urls:
             try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
+            except:
                 RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
                 continue
 
@@ -463,7 +614,7 @@ def scrapeCourt(courtID):
                 # caseLink and caseNameShort
                 caseLink = aTags[i].get('href')
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+                myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
 
                 if error:
                     # things broke, punt this iteration
@@ -513,7 +664,7 @@ def scrapeCourt(courtID):
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                    logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
@@ -531,7 +682,7 @@ def scrapeCourt(courtID):
 
         for url in urls:
             try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
+            except:
                 RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
                 continue
 
@@ -562,9 +713,8 @@ def scrapeCourt(courtID):
             while i < len(aTags):
                 # caseLink field, and save it
                 caseLink = aTags[i].get('href')
-                caseLink = urljoin(url, caseLink)
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+                myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
 
                 if error:
                     # things broke, punt this iteration
@@ -621,7 +771,7 @@ def scrapeCourt(courtID):
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                    logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
@@ -635,7 +785,7 @@ def scrapeCourt(courtID):
         1992!
 
         This is exciting, but be warned, the search is not reliable on recent
-        dates. It has been known not to bring back results that are definitely
+        dates. It has been known not to bring back RESULTs that are definitely
         within the set. Watch closely.
         """
         urls = ("http://www.ca5.uscourts.gov/Opinions.aspx",)
@@ -646,7 +796,7 @@ def scrapeCourt(courtID):
             todayObject = datetime.date.today()
             if VERBOSITY >= 2: print "start date: " + str(todayObject)
 
-            startDate = time.strftime('%m/%d/%Y', todayObject.timetuple())
+            startDate = strftime('%m/%d/%Y', todayObject.timetuple())
 
             if VERBOSITY >= 2:
                 print "Start date is: " + startDate
@@ -667,7 +817,7 @@ def scrapeCourt(courtID):
             data = urllib.urlencode(postValues)
             req = urllib2.Request(url, data)
             try: html = urllib2.urlopen(req).read()
-            except urllib2.HTTPError:
+            except:
                 RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
                 continue
 
@@ -701,9 +851,8 @@ def scrapeCourt(courtID):
 
                 # we begin with the caseLink field
                 caseLink = aTags[i].get('href')
-                caseLink = urljoin(url, caseLink)
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+                myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
 
                 if error:
                     # things broke, punt this iteration
@@ -759,7 +908,7 @@ def scrapeCourt(courtID):
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                    logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
@@ -769,7 +918,7 @@ def scrapeCourt(courtID):
         return
 
     elif (courtID == 6):
-        """Results are available without an HTML POST, but those results lack a
+        """Results are available without an HTML POST, but those RESULTs lack a
         date field. Hence, we must do an HTML POST.
 
         Missing a day == OK. Just need to monkey with the date POSTed.
@@ -793,7 +942,7 @@ def scrapeCourt(courtID):
             data = urllib.urlencode(postValues)
             req = urllib2.Request(url, data)
             try: html = urllib2.urlopen(req).read()
-            except urllib2.HTTPError:
+            except:
                 RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
                 continue
 
@@ -814,9 +963,8 @@ def scrapeCourt(courtID):
             while i < len(aTags):
                 # we begin with the caseLink field
                 caseLink = aTags[i].get('href')
-                caseLink = urljoin(url, caseLink)
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+                myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
 
                 if error:
                     # things broke, punt this iteration
@@ -869,7 +1017,7 @@ def scrapeCourt(courtID):
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                    logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
@@ -895,7 +1043,7 @@ def scrapeCourt(courtID):
             for dataString in dataStrings:
                 req = urllib2.Request(url, dataString)
                 try: html = urllib2.urlopen(req).read()
-                except urllib2.HTTPError:
+                except:
                     RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
                     continue
 
@@ -916,9 +1064,8 @@ def scrapeCourt(courtID):
                 while i < len(aTags):
                     # we begin with the caseLink field
                     caseLink = aTags[i].get("href")
-                    caseLink = urljoin(url, caseLink)
 
-                    myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+                    myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
 
                     if error:
                         # things broke, punt this iteration
@@ -967,7 +1114,7 @@ def scrapeCourt(courtID):
                     doc.citation = cite
                     doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                     try:
-                        logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                        logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
                             ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                     except UnicodeDecodeError:
                         pass
@@ -982,7 +1129,7 @@ def scrapeCourt(courtID):
 
         for url in urls:
             try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
+            except:
                 RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
                 continue
 
@@ -1006,9 +1153,8 @@ def scrapeCourt(courtID):
             while i < len(aTags):
                 # we begin with the caseLink field
                 caseLink = aTags[i].get('href')
-                caseLink = urljoin(url, caseLink)
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+                myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
 
                 if error:
                         # things broke, punt this iteration
@@ -1058,7 +1204,7 @@ def scrapeCourt(courtID):
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                    logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
@@ -1082,7 +1228,7 @@ def scrapeCourt(courtID):
         for url in urls:
             if VERBOSITY >= 2: print "Link is now: " + url
             try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
+            except:
                 RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
                 continue
 
@@ -1114,7 +1260,6 @@ def scrapeCourt(courtID):
             while i < len(caseLinks):
                 # we begin with the caseLink field
                 caseLink = caseLinks[i].get('href')
-                caseLink = urljoin(url, caseLink)
                 if VERBOSITY >= 2: print "CaseLink is: " + caseLink
 
                 # special case
@@ -1122,7 +1267,7 @@ def scrapeCourt(courtID):
                     i += 1
                     continue
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+                myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
 
                 if error:
                     # things broke, punt this iteration
@@ -1172,7 +1317,7 @@ def scrapeCourt(courtID):
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                    logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
@@ -1188,7 +1333,7 @@ def scrapeCourt(courtID):
 
         for url in urls:
             try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
+            except:
                 RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
                 continue
 
@@ -1222,10 +1367,9 @@ def scrapeCourt(courtID):
             while i < len(caseLinks):
                 # we begin with the caseLink field
                 caseLink = caseLinks[i].text
-                caseLink = urljoin(url, caseLink)
                 if VERBOSITY >= 2: print "Link: " + caseLink
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+                myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
 
                 if error:
                         # things broke, punt this iteration
@@ -1284,7 +1428,7 @@ def scrapeCourt(courtID):
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                    logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
@@ -1309,7 +1453,7 @@ def scrapeCourt(courtID):
         ct = Court.objects.get(courtUUID = 'ca11')
 
         for url in urls:
-            date = time.strftime('%Y-%m', datetime.date.today().timetuple())
+            date = strftime('%Y-%m', datetime.date.today().timetuple())
             if VERBOSITY >= 2: print "date: " + str(date)
 
             postValues = {
@@ -1319,7 +1463,7 @@ def scrapeCourt(courtID):
             data = urllib.urlencode(postValues)
             req = urllib2.Request(url, data)
             try: html = urllib2.urlopen(req).read()
-            except urllib2.HTTPError:
+            except:
                 RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
                 continue
 
@@ -1355,9 +1499,8 @@ def scrapeCourt(courtID):
             dupCount = 0
             while i < len(caseNumbers):
                 caseLink = caseLinks[i].get('href')
-                caseLink = urljoin(url, caseLink)
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+                myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
 
                 if error:
                     # things broke, punt this iteration
@@ -1384,7 +1527,7 @@ def scrapeCourt(courtID):
                 if VERBOSITY >= 2: print "documentType: " + str(doc.documentType)
 
                 cleanDate = clean_string(caseDates[i].text)
-                doc.dateFiled = datetime.datetime(*time.strptime(cleanDate, "%m-%d-%Y")[0:5])
+                doc.dateFiled = datetime.datetime(*strptime(cleanDate, "%m-%d-%Y")[0:5])
                 if VERBOSITY >= 2: print "dateFiled: " + str(doc.dateFiled)
 
                 caseNameShort = caseNames[i].text
@@ -1398,7 +1541,7 @@ def scrapeCourt(courtID):
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                    logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
@@ -1415,7 +1558,7 @@ def scrapeCourt(courtID):
 
         for url in urls:
             try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
+            except:
                 RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
                 continue
 
@@ -1438,9 +1581,8 @@ def scrapeCourt(courtID):
             while i < len(aTags):
                 # we begin with the caseLink field
                 caseLink = aTags[i].get('href')
-                caseLink = urljoin(url, caseLink)
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+                myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
 
                 if error:
                         # things broke, punt this iteration
@@ -1483,7 +1625,7 @@ def scrapeCourt(courtID):
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                    logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
@@ -1501,7 +1643,7 @@ def scrapeCourt(courtID):
 
         for url in urls:
             try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
+            except:
                 RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
                 continue
 
@@ -1524,7 +1666,6 @@ def scrapeCourt(courtID):
                 try:
                     caseLink = trTags[i].td.nextSibling.nextSibling.nextSibling\
                         .nextSibling.nextSibling.nextSibling.a.get('href')
-                    caseLink = urljoin(url, caseLink)
                     if 'opinion' not in caseLink:
                         # we have a non-case PDF. punt
                         i += 1
@@ -1534,7 +1675,7 @@ def scrapeCourt(courtID):
                     i += 1
                     continue
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+                myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
 
                 if error:
                         # things broke, punt this iteration
@@ -1575,7 +1716,7 @@ def scrapeCourt(courtID):
                 documentType = trTags[i].td.nextSibling.nextSibling.nextSibling\
                     .nextSibling.nextSibling.nextSibling.nextSibling.nextSibling\
                     .contents[0].strip()
-                # normalize the result for our internal purposes...
+                # normalize the RESULT for our internal purposes...
                 if documentType == "Nonprecedential":
                     documentType = "Unpublished"
                 elif documentType == "Precedential":
@@ -1589,7 +1730,7 @@ def scrapeCourt(courtID):
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                    logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
@@ -1608,7 +1749,7 @@ def scrapeCourt(courtID):
         for url in urls:
             if VERBOSITY >= 2: print "Scraping URL: " + url
             try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
+            except:
                 RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
                 continue
             tree = fromstring(html)
@@ -1643,10 +1784,9 @@ def scrapeCourt(courtID):
             while i < len(caseLinks):
                 # we begin with the caseLink field
                 caseLink = caseLinks[i].get('href')
-                caseLink = urljoin(url, caseLink)
                 if VERBOSITY >= 2: print "caseLink: " + caseLink
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+                myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
 
                 if error:
                     # things broke, punt this iteration
@@ -1700,7 +1840,7 @@ def scrapeCourt(courtID):
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+                    logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
@@ -1710,76 +1850,36 @@ def scrapeCourt(courtID):
         return
 
 
-def parseCourt(courtID):
-    '''
-    Here, we do the following:
-     1. For a given court, find all of its documents
-     2. Determine if the document has been parsed already
-     3. If it has, punt, if not, open the PDF and parse it.
-
-    returns a string containing the result
-    '''
-    if VERBOSITY >= 1: RESULT += "NOW PARSING COURT: " + str(courtID) + "\n"
-    if VERBOSITY >= 2: print "NOW PARSING COURT: " + str(courtID)
-
-    from threading import Thread
-
-    # get the court IDs from models.py
-    courts = []
-    for code in PACER_CODES:
-        courts.append(code[0])
-
-    # select all documents from this jurisdiction that lack plainText and were
-    # downloaded from the court.
-    docs = Document.objects.filter(documentPlainText = "",
-        court__courtUUID = courts[courtID-1], source="C").order_by('documentUUID')
-
-    numDocs = docs.count()
-
-    # this is a crude way to start threads, but I'm lazy, and two is a good
-    # starting point. This essentially starts two threads, each with half of the
-    # unparsed PDFs. If the -c 0 flag is used, it's likely for the next court
-    # to begin scraping before both of these have finished. This should be OK,
-    # but seems noteworthy.
-    if numDocs > 0:
-        t1 = Thread(target=getPDFContent, args=(docs[0:numDocs/2],))
-        t2 = Thread(target=getPDFContent, args=(docs[numDocs/2:numDocs],))
-        t1.start()
-        t2.start()
-    elif numDocs == 0:
-        if VERBOSITY >= 1: RESULT += "Nothing to parse for this court.\n"
-
-
 def main():
-    """
-    The master function. This will receive arguments from the user, determine
-    the actions to take, then hand it off to other functions that will handle the
-    nitty-gritty crud.
+    '''
+    The main function. This will receive arguments from the user, determine
+    the actions to take, then hand it off to other functions that will handle
+    the nitty-gritty scraping.
 
-    If the courtID is 0, then we scrape/parse all courts, one after the next.
+    If the courtID is 0, then we scrape all courts, one after the next.
 
-    returns a list containing the result
-    """
+    returns a list containing the RESULT
+    '''
 
-    # this line is used for handling SIGINT, so things can die safely.
+    # these lines are used for handling SIGINT, so things can die safely.
+    setup_logging()
+
     signal.signal(signal.SIGINT, signal_handler)
 
-    usage = "usage: %prog -d | (-c COURTID (-s | -p) [-v {1,2}])"
+    usage = "usage: %prog -d | (-c COURTID [-v {1,2}])"
     parser = OptionParser(usage)
     parser.add_option('-s', '--scrape', action="store_true", dest='scrape',
-        default=False, help="Whether to scrape")
-    parser.add_option('-p', '--parse', action="store_true", dest='parse',
-        default=False, help="Whether to parse")
+        default=False, help="Scrape a court site for audio files")
     parser.add_option('-d', '--daemon', action="store_true", dest='daemonmode',
         default=False, help="Use this flag to turn on daemon mode at a rate of 20 minutes between each scrape")
     parser.add_option('-c', '--court', dest='courtID', metavar="COURTID",
-        help="The court to scrape, parse or both")
+        help="The court to scrape.")
     parser.add_option('-v', '--verbosity', dest='verbosity', metavar="VERBOSITY",
         help="Display status messages after execution. Higher values are more verbosity.")
     (options, args) = parser.parse_args()
-    if options.daemonmode == False and (not options.courtID or (not options.scrape and not options.parse)):
-        parser.error("You must specify either daemon mode or a court and whether to scrape and/or parse it.")
 
+    if not options.daemonmode and not options.courtID:
+        parser.error("You must specify either daemon mode or a court.")
     if options.verbosity == 1 or options.verbosity == 2:
         VERBOSITY = options.verbosity
 
@@ -1790,24 +1890,21 @@ def main():
         try:
             courtID = int(options.courtID)
         except:
-            RESULT = "Error: court not found\n"
-            raise django.core.exceptions.ObjectDoesNotExist
+            parser.error("Court must be an int.")
 
         if courtID == 0:
             # we use a while loop to do all courts.
             courtID = 1
             from alertSystem.models import PACER_CODES
             while courtID <= len(PACER_CODES):
-                if options.scrape: scrapeCourt(courtID, DAEMONMODE)
-                if options.parse:  parseCourt(courtID)
+                if options.scrape: RESULT = scrapeCourt(courtID)
                 # this catches SIGINT, so the code can be killed safely.
                 if dieNow == True:
                     sys.exit(0)
                 courtID += 1
         else:
             # we're only doing one court
-            if options.scrape: scrapeCourt(courtID, DAEMONMODE)
-            if options.parse:  parseCourt(courtID)
+            if options.scrape: RESULT = scrapeCourt(courtID)
             # this catches SIGINT, so the code can be killed safely.
             if dieNow == True:
                 sys.exit(0)
@@ -1819,16 +1916,16 @@ def main():
         # of thirty minutes. When checking a court, see if its HTML has changed.
         # If so, run the scrapers. If not, check the next one.
         from alertSystem.models import PACER_CODES
+        from time import sleep
         wait = (30*60)/len(PACER_CODES)
         courtID = 1
         while courtID <= len(PACER_CODES):
-            scrapeCourt(courtID, DAEMONMODE)
-            parseCourt(courtID)
+            scrapeCourt(courtID)
             # this catches SIGINT, so the code can be killed safely.
             if dieNow == True:
                 sys.exit(0)
 
-            time.sleep(wait)
+            sleep(wait)
             if courtID == len(PACER_CODES):
                 # reset courtID
                 courtID = 1
@@ -1841,3 +1938,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
