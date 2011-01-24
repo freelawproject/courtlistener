@@ -15,7 +15,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert.alertSystem.string_utils import num_to_ascii, trunc
-from alert.audio.models import Audio
 from django.template.defaultfilters import slugify
 from django.utils.text import get_valid_filename
 from djangosphinx.models import SphinxSearch
@@ -283,10 +282,6 @@ class Document(models.Model):
         max_length=50,
         blank=True,
         choices=DOCUMENT_STATUSES)
-    audio = models.ForeignKey(Audio,
-        verbose_name="the audio recording of the case",
-        blank=True,
-        null=True)
 
     def __unicode__(self):
         if self.citation:

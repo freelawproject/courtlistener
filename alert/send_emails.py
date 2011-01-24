@@ -105,7 +105,7 @@ def emailer(rate, verbose, simulate):
                     results = queryset.set_options(
                         mode="SPH_MATCH_EXTENDED2")\
                         .filter(datefiled=dateIntsPastWeek)
-                elif RATE == 'mly' and today.day == 24:
+                elif RATE == 'mly' and today.day == 1:
                     # if it's a monthly alert and today is the first of the
                     # month
                     if verbose:
@@ -156,8 +156,9 @@ def emailer(rate, verbose, simulate):
                             query + "."
                         print "alertWithResults: " + str(alertWithResults)
                         print "hits: " + str(hits)
-            except:
+            except Exception,e:
                 print "Search barfed on this alert: " + query
+		print e
 
         if len(hits) > 0:
             # either the hits var has the value "None", or it has hits.
@@ -233,3 +234,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
