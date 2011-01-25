@@ -179,7 +179,7 @@ def getPDFContent(docs):
             RESULT += "Error saving pdf text to the db for: " + doc.citation.caseNameShort
 
 
-def scrapeCourt(courtID):
+def scrapeCourt(courtID, DAEMONMODE):
     if VERBOSITY >= 1: RESULT += "NOW SCRAPING COURT: " + str(courtID) + "\n"
     if VERBOSITY >= 2: print "NOW SCRAPING COURT: " + str(courtID)
 
