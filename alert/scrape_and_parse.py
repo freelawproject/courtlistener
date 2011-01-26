@@ -1776,6 +1776,8 @@ def main():
         # them that is long enough such that all of them are hit over the course
         # of thirty minutes. When checking a court, see if its HTML has changed.
         # If so, run the scrapers. If not, check the next one.
+        VERBOSITY = 0
+
         from alertSystem.models import PACER_CODES
         wait = (30*60)/len(PACER_CODES)
         courtID = 1
