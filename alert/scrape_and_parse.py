@@ -39,7 +39,6 @@ import logging
 import logging.handlers
 
 DAEMONMODE = False
-RESULT = ""
 VERBOSITY = 0
 LOG_FILENAME = '/var/log/scraper/daemon_log.out'
 
@@ -158,8 +157,7 @@ def hasDuplicate(caseNum, caseName):
 def getPDFContent(docs):
     """Get the contents of a list of PDF files, and add them to the DB"""
     for doc in docs:
-        if VERBOSITY >= 1: RESULT += "Parsed: " + doc.citation.caseNameShort + "\n"
-        if VERBOSITY >= 2: print "Parsing: " + doc.citation.caseNameShort + "\n"
+        if VERBOSITY >= 1: print "Extracting text from: " + doc.citation.caseNameShort
 
         path = str(doc.local_path)
         path = settings.MEDIA_ROOT + path
@@ -169,19 +167,18 @@ def getPDFContent(docs):
             ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"], shell=False,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         content, err = process.communicate()
-        if err: RESULT += "Error parsing file: " + doc.citation.caseNameShort
+        if err: print "Error extracting text from: " + doc.citation.caseNameShort
 
         # add the anonymized plain text to the DB!
         doc.documentPlainText = anonymize(smart_str(content))
         try:
             doc.save()
         except:
-            RESULT += "Error saving pdf text to the db for: " + doc.citation.caseNameShort
+            print "Error saving pdf text to the db for: " + doc.citation.caseNameShort
 
 
 def scrapeCourt(courtID, DAEMONMODE):
-    if VERBOSITY >= 1: RESULT += "NOW SCRAPING COURT: " + str(courtID) + "\n"
-    if VERBOSITY >= 2: print "NOW SCRAPING COURT: " + str(courtID)
+    if VERBOSITY >= 1: print "NOW SCRAPING COURT: " + str(courtID)
 
     if (courtID == 1):
         """
@@ -194,7 +191,7 @@ def scrapeCourt(courtID, DAEMONMODE):
         for url in urls:
             try: html = urllib2.urlopen(url).read()
             except urllib2.HTTPError:
-                RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
                 continue
 
             if DAEMONMODE:
@@ -225,12 +222,11 @@ def scrapeCourt(courtID, DAEMONMODE):
             # incredibly, this RSS feed is in cron order, so new stuff is at the
             # end. Mind blowing.
             i = len(caseLinks)-1
-            if VERBOSITY >= 2: print str(i)
+
             dupCount = 0
             while i > 0:
                 # First: docType, since we don't support them all...
                 docType = docTypes[i].text.strip()
-                if VERBOSITY >= 2: print docType
                 if "unpublished" in docType.lower():
                     documentType = "Unpublished"
                 elif "published" in docType.lower():
@@ -256,8 +252,6 @@ def scrapeCourt(courtID, DAEMONMODE):
 
                 if not created:
                     # it's an oldie, punt!
-                    if VERBOSITY >= 2:
-                        RESULT += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 8:
                         # eighth dup in a a row. BREAK!
@@ -292,6 +286,8 @@ def scrapeCourt(courtID, DAEMONMODE):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
                 try:
                     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
@@ -315,7 +311,7 @@ def scrapeCourt(courtID, DAEMONMODE):
         for url in urls:
             try: html = urllib2.urlopen(url).read()
             except urllib2.HTTPError:
-                RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
                 continue
 
             soup = BeautifulSoup(html)
@@ -352,8 +348,6 @@ def scrapeCourt(courtID, DAEMONMODE):
                 caseLink = aTags[i].get('href')
                 caseLink = aTagsRegex.search(caseLink).group(1)
                 caseLink = urljoin(url, caseLink)
-                if VERBOSITY >= 2:
-                    print str(i) + ": " + caseLink
 
                 myFile, doc, created, error = makeDocFromURL(caseLink, ct)
 
@@ -364,8 +358,6 @@ def scrapeCourt(courtID, DAEMONMODE):
 
                 if not created:
                     # it's an oldie, punt!
-                    if VERBOSITY >= 2:
-                        RESULT += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 5:
                         # fifth dup in a a row. BREAK!
@@ -377,8 +369,6 @@ def scrapeCourt(courtID, DAEMONMODE):
 
                 # using caseLink, we can get the caseNumber and documentType
                 caseNum = caseNumRegex.search(caseLink).group(1)
-                if VERBOSITY >= 2:
-                    print "caseNum: " + str(caseNum)
 
                 # and the docType
                 documentType = caseNumRegex.search(caseLink).group(2)
@@ -409,6 +399,8 @@ def scrapeCourt(courtID, DAEMONMODE):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
                 try:
                     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
@@ -436,7 +428,7 @@ def scrapeCourt(courtID, DAEMONMODE):
         for url in urls:
             try: html = urllib2.urlopen(url).read()
             except urllib2.HTTPError:
-                RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
                 continue
 
             if DAEMONMODE:
@@ -472,8 +464,6 @@ def scrapeCourt(courtID, DAEMONMODE):
 
                 if not created:
                     # it's an oldie, punt!
-                    if VERBOSITY >= 2:
-                        RESULT += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 5:
                         # fifth dup in a a row. BREAK!
@@ -512,6 +502,8 @@ def scrapeCourt(courtID, DAEMONMODE):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
                 try:
                     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
@@ -532,7 +524,7 @@ def scrapeCourt(courtID, DAEMONMODE):
         for url in urls:
             try: html = urllib2.urlopen(url).read()
             except urllib2.HTTPError:
-                RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
                 continue
 
             if DAEMONMODE:
@@ -573,8 +565,6 @@ def scrapeCourt(courtID, DAEMONMODE):
 
                 if not created:
                     # it's an oldie, punt!
-                    if VERBOSITY >= 2:
-                        RESULT += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 5:
                         # fifth dup in a a row. BREAK!
@@ -620,6 +610,8 @@ def scrapeCourt(courtID, DAEMONMODE):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
                 try:
                     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
@@ -644,12 +636,7 @@ def scrapeCourt(courtID, DAEMONMODE):
         for url in urls:
             # Use just one date, it seems to work better this way.
             todayObject = datetime.date.today()
-            if VERBOSITY >= 2: print "start date: " + str(todayObject)
-
             startDate = time.strftime('%m/%d/%Y', todayObject.timetuple())
-
-            if VERBOSITY >= 2:
-                print "Start date is: " + startDate
 
             # these are a mess because the court has a security check.
             postValues = {
@@ -668,7 +655,7 @@ def scrapeCourt(courtID, DAEMONMODE):
             req = urllib2.Request(url, data)
             try: html = urllib2.urlopen(req).read()
             except urllib2.HTTPError:
-                RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
                 continue
 
             if DAEMONMODE:
@@ -679,7 +666,6 @@ def scrapeCourt(courtID, DAEMONMODE):
                     return
 
             soup = BeautifulSoup(html)
-            #if VERBOSITY >= 2: print soup
 
             #all links ending in pdf, case insensitive
             aTagRegex = re.compile("pdf$", re.IGNORECASE)
@@ -694,8 +680,6 @@ def scrapeCourt(courtID, DAEMONMODE):
             while i < len(aTags):
                 # this page has PDFs that aren't cases, we must filter them out
                 if 'pinion' not in str(aTags[i]):
-                    # it's not an opinion, increment and punt
-                    if VERBOSITY >= 2: print "Punting non-opinion URL: " + str(aTags[i])
                     i += 1
                     continue
 
@@ -720,13 +704,10 @@ def scrapeCourt(courtID, DAEMONMODE):
                 else:
                     documentType = "Unpublished"
                     numQ += 1
-                if VERBOSITY >= 2: print "documentType: " + documentType
                 doc.documentType = documentType
 
                 if not created:
                     # it's an oldie, punt!
-                    if VERBOSITY >= 2:
-                        RESULT += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount >= 3 and numP >= 3 and numQ >= 3:
                         # third dup in a a row for both U and P.
@@ -758,6 +739,8 @@ def scrapeCourt(courtID, DAEMONMODE):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
                 try:
                     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
@@ -794,7 +777,7 @@ def scrapeCourt(courtID, DAEMONMODE):
             req = urllib2.Request(url, data)
             try: html = urllib2.urlopen(req).read()
             except urllib2.HTTPError:
-                RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
                 continue
 
             if DAEMONMODE:
@@ -825,8 +808,6 @@ def scrapeCourt(courtID, DAEMONMODE):
 
                 if not created:
                     # it's an oldie, punt!
-                    if VERBOSITY >= 2:
-                        RESULT += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 5:
                         # fifth dup in a a row. BREAK!
@@ -868,6 +849,8 @@ def scrapeCourt(courtID, DAEMONMODE):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
                 try:
                     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
@@ -896,7 +879,7 @@ def scrapeCourt(courtID, DAEMONMODE):
                 req = urllib2.Request(url, dataString)
                 try: html = urllib2.urlopen(req).read()
                 except urllib2.HTTPError:
-                    RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+                    print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
                     continue
 
                 if DAEMONMODE:
@@ -927,8 +910,6 @@ def scrapeCourt(courtID, DAEMONMODE):
 
                     if not created:
                         # it's an oldie, punt!
-                        if VERBOSITY >= 2:
-                            RESULT += "Duplicate found at " + str(i) + "\n"
                         dupCount += 1
                         if dupCount == 5:
                             # fifth dup in a a row. BREAK!
@@ -966,6 +947,8 @@ def scrapeCourt(courtID, DAEMONMODE):
                     # last, save evrything (pdf, citation and document)
                     doc.citation = cite
                     doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                    if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
+                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort
                     try:
                         logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                             ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
@@ -983,7 +966,7 @@ def scrapeCourt(courtID, DAEMONMODE):
         for url in urls:
             try: html = urllib2.urlopen(url).read()
             except urllib2.HTTPError:
-                RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
                 continue
 
             if DAEMONMODE:
@@ -1017,8 +1000,6 @@ def scrapeCourt(courtID, DAEMONMODE):
 
                 if not created:
                     # it's an oldie, punt!
-                    if VERBOSITY >= 2:
-                        RESULT += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 5:
                         # fifth dup in a a row. BREAK!
@@ -1057,6 +1038,8 @@ def scrapeCourt(courtID, DAEMONMODE):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
                 try:
                     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
@@ -1080,10 +1063,10 @@ def scrapeCourt(courtID, DAEMONMODE):
         ct = Court.objects.get(courtUUID = 'ca9')
 
         for url in urls:
-            if VERBOSITY >= 2: print "Link is now: " + url
+            if VERBOSITY >= 1: print "Link is now: " + url
             try: html = urllib2.urlopen(url).read()
             except urllib2.HTTPError:
-                RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
                 continue
 
             tree = fromstring(html)
@@ -1115,7 +1098,6 @@ def scrapeCourt(courtID, DAEMONMODE):
                 # we begin with the caseLink field
                 caseLink = caseLinks[i].get('href')
                 caseLink = urljoin(url, caseLink)
-                if VERBOSITY >= 2: print "CaseLink is: " + caseLink
 
                 # special case
                 if 'no memos filed' in caseLink.lower():
@@ -1126,14 +1108,11 @@ def scrapeCourt(courtID, DAEMONMODE):
 
                 if error:
                     # things broke, punt this iteration
-                    if VERBOSITY >= 2: print "Error creating file. Punting..."
                     i += 1
                     continue
 
                 if not created:
                     # it's an oldie, punt!
-                    if VERBOSITY >= 2:
-                        RESULT += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 5:
                         # fifth dup in a a row. BREAK!
@@ -1145,25 +1124,21 @@ def scrapeCourt(courtID, DAEMONMODE):
 
                 # next, we'll do the caseNumber
                 caseNumber = caseNumbers[i].text
-                if VERBOSITY >= 2: print "CaseNumber is: " + caseNumber
 
                 # next up: document type (static for now)
                 if 'memoranda' in url:
                     doc.documentType = "Unpublished"
                 elif 'opinions' in url:
                     doc.documentType = "Published"
-                if VERBOSITY >= 2: print "Document type is: " + doc.documentType
 
                 # next up: caseDate
                 splitDate = caseDates[i].text.split('/')
                 caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
-                if VERBOSITY >= 2: print "CaseDate is: " + str(caseDate)
 
                 #next up: caseNameShort
                 caseNameShort = titlecase(caseLinks[i].text.lower())
-                if VERBOSITY >= 2: print "CaseNameShort is: " + caseNameShort + "\n\n"
 
                 # now that we have the caseNumber and caseNameShort, we can dup check
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
@@ -1171,6 +1146,8 @@ def scrapeCourt(courtID, DAEMONMODE):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
                 try:
                     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
@@ -1189,7 +1166,7 @@ def scrapeCourt(courtID, DAEMONMODE):
         for url in urls:
             try: html = urllib2.urlopen(url).read()
             except urllib2.HTTPError:
-                RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
                 continue
 
             if DAEMONMODE:
@@ -1223,27 +1200,24 @@ def scrapeCourt(courtID, DAEMONMODE):
                 # we begin with the caseLink field
                 caseLink = caseLinks[i].text
                 caseLink = urljoin(url, caseLink)
-                if VERBOSITY >= 2: print "Link: " + caseLink
 
                 myFile, doc, created, error = makeDocFromURL(caseLink, ct)
 
                 if error:
                         # things broke, punt this iteration
-                        if VERBOSITY >= 1: print "Error creating file, punting."
                         i += 1
                         continue
 
                 if not created:
                     # it's an oldie, punt!
-                    if VERBOSITY >= 2:
-                        RESULT += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
-                    # this section is commented out because ca10 doesn't publish
-                    # their cases in any order resembling sanity. Thus, this bit
-                    # of code is moot. Ugh.
-#                    if dupCount == 5:
-#                        # fifth dup in a a row. BREAK!
-#                        break
+
+                    '''this section is commented out because ca10 doesn't publish
+                    their cases in any order resembling sanity. Thus, this bit
+                    of code is moot. Ugh.
+                    if dupCount == 5:
+                        # fifth dup in a a row. BREAK!
+                        break'''
                     i += 1
                     continue
                 else:
@@ -1266,16 +1240,13 @@ def scrapeCourt(courtID, DAEMONMODE):
                 caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
-                if VERBOSITY >= 2: print "Case date is: " + str(caseDate)
 
                 # next: caseNumber
                 caseNumber = caseNumberRegex.search(descriptions[i].text)\
                     .group(1)
-                if VERBOSITY >= 2: print "Case number is: " + caseNumber
 
                 # next: caseNameShort
                 caseNameShort = caseNames[i].text
-                if VERBOSITY >= 2: print "Case name is: " + caseNameShort
 
                 # check for dups, make the object if necessary, otherwise, get it
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
@@ -1283,6 +1254,8 @@ def scrapeCourt(courtID, DAEMONMODE):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
                 try:
                     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
@@ -1310,7 +1283,6 @@ def scrapeCourt(courtID, DAEMONMODE):
 
         for url in urls:
             date = time.strftime('%Y-%m', datetime.date.today().timetuple())
-            if VERBOSITY >= 2: print "date: " + str(date)
 
             postValues = {
                 'date'  : date,
@@ -1320,7 +1292,7 @@ def scrapeCourt(courtID, DAEMONMODE):
             req = urllib2.Request(url, data)
             try: html = urllib2.urlopen(req).read()
             except urllib2.HTTPError:
-                RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
                 continue
 
             if DAEMONMODE:
@@ -1366,8 +1338,6 @@ def scrapeCourt(courtID, DAEMONMODE):
 
                 if not created:
                     # it's an oldie, punt!
-                    if VERBOSITY >= 2:
-                        RESULT += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 5:
                         # fifth dup in a a row. BREAK!
@@ -1381,22 +1351,19 @@ def scrapeCourt(courtID, DAEMONMODE):
                     doc.documentType = "Unpublished"
                 elif 'opinion' in url:
                     doc.documentType = "Published"
-                if VERBOSITY >= 2: print "documentType: " + str(doc.documentType)
 
                 cleanDate = clean_string(caseDates[i].text)
                 doc.dateFiled = datetime.datetime(*time.strptime(cleanDate, "%m-%d-%Y")[0:5])
-                if VERBOSITY >= 2: print "dateFiled: " + str(doc.dateFiled)
 
                 caseNameShort = caseNames[i].text
                 caseNumber = caseNumbers[i].text
 
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
-                if VERBOSITY >= 2:
-                    print "caseNameShort: " + cite.caseNameShort
-                    print "caseNumber: " + cite.caseNumber + "\n"
 
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
                 try:
                     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
@@ -1416,7 +1383,7 @@ def scrapeCourt(courtID, DAEMONMODE):
         for url in urls:
             try: html = urllib2.urlopen(url).read()
             except urllib2.HTTPError:
-                RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
                 continue
 
             if DAEMONMODE:
@@ -1449,8 +1416,6 @@ def scrapeCourt(courtID, DAEMONMODE):
 
                 if not created:
                     # it's an oldie, punt!
-                    if VERBOSITY >= 2:
-                        RESULT += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 5:
                         # fifth dup in a a row. BREAK!
@@ -1482,6 +1447,8 @@ def scrapeCourt(courtID, DAEMONMODE):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
                 try:
                     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
@@ -1502,7 +1469,7 @@ def scrapeCourt(courtID, DAEMONMODE):
         for url in urls:
             try: html = urllib2.urlopen(url).read()
             except urllib2.HTTPError:
-                RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
                 continue
 
             if DAEMONMODE:
@@ -1543,8 +1510,6 @@ def scrapeCourt(courtID, DAEMONMODE):
 
                 if not created:
                     # it's an oldie, punt!
-                    if VERBOSITY >= 2:
-                        RESULT += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 5:
                         # fifth duplicate in a a row. BREAK!
@@ -1588,6 +1553,8 @@ def scrapeCourt(courtID, DAEMONMODE):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
                 try:
                     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
@@ -1606,10 +1573,10 @@ def scrapeCourt(courtID, DAEMONMODE):
         ct = Court.objects.get(courtUUID = 'scotus')
 
         for url in urls:
-            if VERBOSITY >= 2: print "Scraping URL: " + url
+            if VERBOSITY >= 1: print "Scraping URL: " + url
             try: html = urllib2.urlopen(url).read()
             except urllib2.HTTPError:
-                RESULT += "****ERROR CONNECTING TO COURT: " + str(courtID) + "****\n"
+                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
                 continue
             tree = fromstring(html)
 
@@ -1644,7 +1611,6 @@ def scrapeCourt(courtID, DAEMONMODE):
                 # we begin with the caseLink field
                 caseLink = caseLinks[i].get('href')
                 caseLink = urljoin(url, caseLink)
-                if VERBOSITY >= 2: print "caseLink: " + caseLink
 
                 myFile, doc, created, error = makeDocFromURL(caseLink, ct)
 
@@ -1655,8 +1621,6 @@ def scrapeCourt(courtID, DAEMONMODE):
 
                 if not created:
                     # it's an oldie, punt!
-                    if VERBOSITY >= 2:
-                        RESULT += "Duplicate found at " + str(i) + "\n"
                     dupCount += 1
                     if dupCount == 5:
                         # fifth dup in a a row. BREAK!
@@ -1667,10 +1631,8 @@ def scrapeCourt(courtID, DAEMONMODE):
                     dupCount = 0
 
                 caseNumber = caseNumbers[i].text
-                if VERBOSITY >= 2: print "caseNumber: " + caseNumber
 
                 caseNameShort = caseLinks[i].text
-                if VERBOSITY >= 2: print "caseNameShort: " + caseNameShort
 
                 if 'slipopinion' in url:
                     doc.documentType = "Published"
@@ -1678,7 +1640,6 @@ def scrapeCourt(courtID, DAEMONMODE):
                     doc.documentType = "In-chambers"
                 elif 'relatingtoorders' in url:
                     doc.documentType = "Relating-to"
-                if VERBOSITY >= 2: print "documentType: " + doc.documentType
 
                 try:
                     if '/' in caseDates[i].text:
@@ -1689,9 +1650,8 @@ def scrapeCourt(courtID, DAEMONMODE):
                     caseDate = datetime.date(year, int(splitDate[0]),
                         int(splitDate[1]))
                     doc.dateFiled = caseDate
-                    if VERBOSITY >= 2: print "caseDate: " + str(caseDate)
                 except:
-                    RESULT += "Error obtaining date field for " + caseLink
+                    print "Error obtaining date field for " + caseLink
 
                 # now that we have the caseNumber and caseNameShort, we can dup check
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
@@ -1699,6 +1659,8 @@ def scrapeCourt(courtID, DAEMONMODE):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
+                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
                 try:
                     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
                         ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
@@ -1719,8 +1681,7 @@ def parseCourt(courtID):
 
     returns a string containing the result
     '''
-    if VERBOSITY >= 1: RESULT += "NOW PARSING COURT: " + str(courtID) + "\n"
-    if VERBOSITY >= 2: print "NOW PARSING COURT: " + str(courtID)
+    if VERBOSITY >= 1: print "NOW PARSING COURT: " + str(courtID)
 
     from threading import Thread
 
@@ -1747,7 +1708,7 @@ def parseCourt(courtID):
         t1.start()
         t2.start()
     elif numDocs == 0:
-        if VERBOSITY >= 1: RESULT += "Nothing to parse for this court.\n"
+        if VERBOSITY >= 1: print "Nothing to parse for this court."
 
 
 def main():
@@ -1780,7 +1741,7 @@ def main():
     if options.daemonmode == False and (not options.courtID or (not options.scrape and not options.parse)):
         parser.error("You must specify either daemon mode or a court and whether to scrape and/or parse it.")
 
-    if options.verbosity == 1 or options.verbosity == 2:
+    if options.verbosity == 1:
         VERBOSITY = options.verbosity
 
     DAEMONMODE = options.daemonmode
@@ -1790,7 +1751,7 @@ def main():
         try:
             courtID = int(options.courtID)
         except:
-            RESULT = "Error: court not found\n"
+            print "Error: court not found"
             raise django.core.exceptions.ObjectDoesNotExist
 
         if courtID == 0:
@@ -1811,7 +1772,6 @@ def main():
             # this catches SIGINT, so the code can be killed safely.
             if dieNow == True:
                 sys.exit(0)
-        print str(RESULT)
 
     elif DAEMONMODE:
         # daemon mode is ON. Iterate over all the courts, with a pause between
