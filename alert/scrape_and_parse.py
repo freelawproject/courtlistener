@@ -157,8 +157,6 @@ def hasDuplicate(caseNum, caseName):
 def getPDFContent(docs):
     """Get the contents of a list of PDF files, and add them to the DB"""
     for doc in docs:
-        if VERBOSITY >= 1: print "Extracting text from: " + doc.citation.caseNameShort
-
         path = str(doc.local_path)
         path = settings.MEDIA_ROOT + path
 
@@ -177,7 +175,7 @@ def getPDFContent(docs):
             print "Error saving pdf text to the db for: " + doc.citation.caseNameShort
 
 
-def scrapeCourt(courtID, DAEMONMODE):
+def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
     if VERBOSITY >= 1: print "NOW SCRAPING COURT: " + str(courtID)
 
     if (courtID == 1):
@@ -1063,7 +1061,7 @@ def scrapeCourt(courtID, DAEMONMODE):
         ct = Court.objects.get(courtUUID = 'ca9')
 
         for url in urls:
-            if VERBOSITY >= 1: print "Link is now: " + url
+            if VERBOSITY >= 1: print "Scraping URL: " + url
             try: html = urllib2.urlopen(url).read()
             except urllib2.HTTPError:
                 print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
@@ -1741,7 +1739,7 @@ def main():
     if options.daemonmode == False and (not options.courtID or (not options.scrape and not options.parse)):
         parser.error("You must specify either daemon mode or a court and whether to scrape and/or parse it.")
 
-    if options.verbosity == 1:
+    if options.verbosity == '1' or options.verbosity == '2':
         VERBOSITY = options.verbosity
 
     DAEMONMODE = options.daemonmode
@@ -1759,7 +1757,7 @@ def main():
             courtID = 1
             from alertSystem.models import PACER_CODES
             while courtID <= len(PACER_CODES):
-                if options.scrape: scrapeCourt(courtID, DAEMONMODE)
+                if options.scrape: scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
                 if options.parse:  parseCourt(courtID)
                 # this catches SIGINT, so the code can be killed safely.
                 if dieNow == True:
@@ -1767,7 +1765,7 @@ def main():
                 courtID += 1
         else:
             # we're only doing one court
-            if options.scrape: scrapeCourt(courtID, DAEMONMODE)
+            if options.scrape: scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
             if options.parse:  parseCourt(courtID)
             # this catches SIGINT, so the code can be killed safely.
             if dieNow == True:
@@ -1782,7 +1780,7 @@ def main():
         wait = (30*60)/len(PACER_CODES)
         courtID = 1
         while courtID <= len(PACER_CODES):
-            scrapeCourt(courtID, DAEMONMODE)
+            scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
             parseCourt(courtID)
             # this catches SIGINT, so the code can be killed safely.
             if dieNow == True:
