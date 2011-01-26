@@ -81,6 +81,30 @@ a:focus, a:hover {
     color: black;
 }
 
+/* Display cases from Resources.org neatly */
+span.num {
+    position: relative;
+    color: #999999;
+}
+
+p.indent {
+    position: relative;
+    margin-left: 2em;
+    margin-top: -1.5em;
+}
+
+div.prelims {
+    background: none repeat scroll 0 0 #eeeeee;
+    border: 1px solid #dddddd;
+}
+
+div.prelims p {
+    position: relative;
+    margin-left: 2em;
+    margin-right: 2em;
+    margin-top: 0em;
+}
+
 input.wide-title {
     width: 390px;
     padding: 5px;
