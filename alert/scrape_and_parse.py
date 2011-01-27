@@ -1734,7 +1734,7 @@ def main():
     parser.add_option('-c', '--court', dest='courtID', metavar="COURTID",
         help="The court to scrape, parse or both")
     parser.add_option('-v', '--verbosity', dest='verbosity', metavar="VERBOSITY",
-        help="Display status messages after execution. Higher values are more verbosity.")
+        help="Display status messages after execution. Higher values print more verbosity.")
     (options, args) = parser.parse_args()
     if options.daemonmode == False and (not options.courtID or (not options.scrape and not options.parse)):
         parser.error("You must specify either daemon mode or a court and whether to scrape and/or parse it.")
