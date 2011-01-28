@@ -455,7 +455,7 @@ CREATE TABLE sph_counter
 EOF
     echo -e "\nWe are about to create the database $MYSQL_DB_NAME, with username
 $MYSQL_USERNAME and password $MYSQL_PWD."
-    read -p "Press any key to continue, or Ctrl+C to abort. \n" proceed
+    read -p "Press any key to continue, or Ctrl+C to abort." proceed
     echo "Please enter your root MySQL password."
     mysql -u'root' -p < install.sql
     if [ $? == "0" ]
@@ -477,7 +477,7 @@ function installFFmpeg {
 unfortunately, the version that ships in most Debian derivatives is a tad old, and
 installing from source is necessary.\n"
     read -p "Install FFmpeg from source now? (y/n): " proceed
-    if [$proceed == "n" ]
+    if [ $proceed == "n" ]
     then
         echo -e '\nYou can install this at a later date with the --ffmpeg flag.'
         return 0
@@ -513,7 +513,7 @@ installing from source is necessary.\n"
 
     # Installs lame
     echo "Downloading lame from source..."
-    wget 'http://downloads.sourceforge.net/project/lame/lame/3.98.4/lame-3.98.4.tar.gz'
+    wget 'http://softlayer.dl.sourceforge.net/project/lame/lame/3.98.4/lame-3.98.4.tar.gz'
     tar xzvf lame-3.98.4.tar.gz
     mv lame-3.98.4 lame
     cd lame
@@ -808,7 +808,7 @@ EOF
 
 
 function installDebugToolbar {
-    if INSTALL_DEBUG_TOOLBAR
+    if $INSTALL_DEBUG_TOOLBAR
     then
         echo -e '\n##################################'
         echo 'Installing django debug toolbar...'
@@ -829,7 +829,7 @@ function installDebugToolbar {
 
 
 function installDjangoExtensions {
-    if INSTALL_DJANGO_EXTENSIONS
+    if $INSTALL_DJANGO_EXTENSIONS
     then
         echo -e '\n###############################'
         echo 'Installing django-extensions...'
