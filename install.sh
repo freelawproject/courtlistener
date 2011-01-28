@@ -808,7 +808,7 @@ EOF
 
 
 function installDebugToolbar {
-    if [ $INSTALL_DEBUG_TOOLBAR -eq 'y' ]
+    if [ $INSTALL_DEBUG_TOOLBAR == 'y' ]
     then
         echo -e '\n##################################'
         echo 'Installing django debug toolbar...'
@@ -829,7 +829,7 @@ function installDebugToolbar {
 
 
 function installDjangoExtensions {
-    if [ $INSTALL_DJANGO_EXTENSIONS -eq 'y' ]
+    if [ $INSTALL_DJANGO_EXTENSIONS == 'y' ]
     then
         echo -e '\n###############################'
         echo 'Installing django-extensions...'
