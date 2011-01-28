@@ -1,10 +1,11 @@
 Install instructions for the courtlistener project
+--------------------------------------------------
 
-For debian-based computers, the install.sh script should install all dependencies
-that exist on your computer, as well as set up the software.
+For debian-based computers, simply copy the install.sh script to your computer,
+and it will install all dependencies that are required for the software.
 
-For other operating systems, it should serve as good documentation of the installation
-process and components.
+For other operating systems, where the install script will not work, the script
+should serve as good documentation of the installation process and components.
 
 If you work on the installation process, please consider updating the script or this
 documentation.
