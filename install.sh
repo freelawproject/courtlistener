@@ -130,12 +130,12 @@ EOF
     fi
 
     # this function sets some variables that will be used throughout the program
-    read -p "The default location for your django installation is /opt. Is this OK? (y/n): " proceed
+    read -p "The default location for your django installation is /usr/local/django. Is this OK? (y/n): " proceed
     if [ $proceed == "n" ]
     then
         read -p "Where shall we install django (starting at /, no trailing slash)?: " DJANGO_INSTALL_DIR
     else
-        DJANGO_INSTALL_DIR='/opt'
+        DJANGO_INSTALL_DIR='/usr/local/django'
     fi
 
     # set up the PYTHON_SITES_PACKAGES_DIR
@@ -256,7 +256,7 @@ function installDjango {
     echo -e "\n####################"
     echo "Installing django..."
     echo "####################"
-    read -p "Would you like to download and configure django? (y/n): " proceed
+    read -p "Would you like to download and configure version 1.2.x of django? (y/n): " proceed
     if [ $proceed == "n" ]
     then
         echo -e '\nGreat. Moving on.'
@@ -278,7 +278,8 @@ function installDjango {
     # get django!
     echo "Downloading django with svn..."
     cd $DJANGO_INSTALL_DIR
-    svn co http://code.djangoproject.com/svn/django/trunk/ django-trunk
+    svn co http://code.djangoproject.com/svn/django/branches/releases/1.2.X .
+
 
     # link django with python
     if [ ! -d $PYTHON_SITES_PACKAGES_DIR ]
@@ -287,7 +288,7 @@ function installDjango {
     else
         echo -n "Linking python with django..."
         sleep 0.5
-        ln -s `pwd`/django-trunk/django $PYTHON_SITES_PACKAGES_DIR/django
+        ln -s `pwd`/django $PYTHON_SITES_PACKAGES_DIR/django
         echo "Done."
     fi
     echo -e "\nDjango installed successfully."
@@ -323,17 +324,13 @@ function installCourtListener {
     echo "Downloading CourtListener with mercurial..."
     hg clone http://bitbucket.org/mlissner/legal-current-awareness court-listener
 
-    # make the log file for the scraper and install the log script
-    mkdir /var/log/scraper
-    touch /var/log/scraper/daemon_log.out
-
     # begin the harder thing: configuring it correctly...
     # We need a link between the 20-private.conf adminMedia location and the
     # location of the django installation. Else, admin templates won't work.
-    ln -s $DJANGO_INSTALL_DIR/django-trunk/django/contrib/admin/media court-listener/alert/assets/media/adminMedia
+    ln -s $DJANGO_INSTALL_DIR/django/contrib/admin/media court-listener/alert/assets/media/adminMedia
 
     # we link up the init scripts
-    echo "Installing init scripts."
+    echo "Installing init scripts in /etc/init.d/scraper"
     ln -s $CL_INSTALL_DIR/court-listener/init-scripts/scraper-init-script.sh /etc/init.d/scraper
 
     # we create the logging file and set up logrotate scripts
@@ -472,31 +469,6 @@ $MYSQL_USERNAME and password $MYSQL_PWD."
 }
 
 
-function importData {
-    echo -e "\n############################"
-    echo "Importing data into MySQL..."
-    echo "############################"
-    read -p "Would you like to set up the DB with information about the courts? (y/n): " proceed
-    if [ $proceed == "n" ]
-    then
-        echo -e '\nGreat. Moving on.'
-        return 0
-    fi
-
-    # import data using the manage.py function.
-    cd $CL_INSTALL_DIR/court-listener/alert
-    cat <<EOF > /tmp/courts.json
-[{"pk": "ca1", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca1.uscourts.gov", "courtShortName": "1st Cir."}}, {"pk": "ca10", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca10.uscourts.gov", "courtShortName": "10th Cir."}}, {"pk": "ca11", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca11.uscourts.gov", "courtShortName": "11th Cir."}}, {"pk": "ca2", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca2.uscourts.gov", "courtShortName": "2d Cir."}}, {"pk": "ca3", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca3.uscourts.gov", "courtShortName": "3rd Cir."}}, {"pk": "ca4", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca4.uscourts.gov", "courtShortName": "4th Cir."}}, {"pk": "ca5", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca5.uscourts.gov", "courtShortName": "5th Cir."}}, {"pk": "ca6", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca6.uscourts.gov", "courtShortName": "6th Cir."}}, {"pk": "ca7", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca7.uscourts.gov", "courtShortName": "7th Cir."}}, {"pk": "ca8", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca8.uscourts.gov", "courtShortName": "8th Cir."}}, {"pk": "ca9", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca9.uscourts.gov", "courtShortName": "9th Cir."}}, {"pk": "cadc", "model": "alertSystem.court", "fields": {"courtURL": "http://www.cadc.uscourts.gov", "courtShortName": "D.C. Cir."}}, {"pk": "cafc", "model": "alertSystem.court", "fields": {"courtURL": "http://www.cafc.uscourts.gov", "courtShortName": "Fed. Cir."}}, {"pk": "scotus", "model": "alertSystem.court", "fields": {"courtURL": "http://supremecourt.gov", "courtShortName": "SCOTUS"}}]
-EOF
-    python manage.py syncdb
-    python manage.py migrate
-    python manage.py loaddata /tmp/courts.json
-    rm /tmp/courts.json
-
-    echo -e '\nInformation loaded into the database successfully.'
-}
-
-
 function installFFmpeg {
     echo -e "\n####################"
     echo "Installing FFmpeg..."
@@ -511,12 +483,12 @@ installing from source is necessary.\n"
         return 0
     fi
 
-    read -p "The default location for FFmpeg is /opt/ffmpeg. Is this OK? (y/n): " proceed
+    read -p "The default location for FFmpeg is /usr/local/ffmpeg. Is this OK? (y/n): " proceed
     if [ $proceed == 'n' ]
     then
         read -p "Where shall we install FFmpeg (starting at /, no trailing slash): " FFMPEG_INSTALL_DIR
     else
-        FFMPEG_INSTALL_DIR='/opt/ffmpeg'
+        FFMPEG_INSTALL_DIR='/usr/local/ffmpeg'
     fi
 
     if [ ! -d $FFMPEG_INSTALL_DIR ]
@@ -572,6 +544,7 @@ function installSphinx {
         return 0
     fi
 
+    echo "Downloading Sphinx..."
     cd $CL_INSTALL_DIR/court-listener/Sphinx
     wget http://www.sphinxsearch.com/downloads/sphinx-0.9.9.tar.gz
     tar xzvf sphinx-0.9.9.tar.gz; rm sphinx-0.9.9.tar.gz
@@ -902,6 +875,31 @@ function installSouth {
 }
 
 
+function importData {
+    echo -e "\n############################"
+    echo "Importing data into MySQL..."
+    echo "############################"
+    read -p "Would you like to set up the DB with information about the courts? (y/n): " proceed
+    if [ $proceed == "n" ]
+    then
+        echo -e '\nGreat. Moving on.'
+        return 0
+    fi
+
+    # import data using the manage.py function.
+    cd $CL_INSTALL_DIR/court-listener/alert
+    cat <<EOF > /tmp/courts.json
+[{"pk": "ca1", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca1.uscourts.gov", "courtShortName": "1st Cir."}}, {"pk": "ca10", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca10.uscourts.gov", "courtShortName": "10th Cir."}}, {"pk": "ca11", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca11.uscourts.gov", "courtShortName": "11th Cir."}}, {"pk": "ca2", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca2.uscourts.gov", "courtShortName": "2d Cir."}}, {"pk": "ca3", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca3.uscourts.gov", "courtShortName": "3rd Cir."}}, {"pk": "ca4", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca4.uscourts.gov", "courtShortName": "4th Cir."}}, {"pk": "ca5", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca5.uscourts.gov", "courtShortName": "5th Cir."}}, {"pk": "ca6", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca6.uscourts.gov", "courtShortName": "6th Cir."}}, {"pk": "ca7", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca7.uscourts.gov", "courtShortName": "7th Cir."}}, {"pk": "ca8", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca8.uscourts.gov", "courtShortName": "8th Cir."}}, {"pk": "ca9", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca9.uscourts.gov", "courtShortName": "9th Cir."}}, {"pk": "cadc", "model": "alertSystem.court", "fields": {"courtURL": "http://www.cadc.uscourts.gov", "courtShortName": "D.C. Cir."}}, {"pk": "cafc", "model": "alertSystem.court", "fields": {"courtURL": "http://www.cafc.uscourts.gov", "courtShortName": "Fed. Cir."}}, {"pk": "scotus", "model": "alertSystem.court", "fields": {"courtURL": "http://supremecourt.gov", "courtShortName": "SCOTUS"}}]
+EOF
+    python manage.py syncdb
+    python manage.py migrate
+    python manage.py loaddata /tmp/courts.json
+    rm /tmp/courts.json
+
+    echo -e '\nInformation loaded into the database successfully.'
+}
+
+
 function finalize {
     echo -e '\n##############################'
     echo 'Finalizing the installation...'
@@ -929,12 +927,13 @@ function main {
     installDjango
     installCourtListener
     configureMySQL
-    importData
     installSphinx
     installDjangoSphinx
     installDebugToolbar
     installDjangoExtensions
     installSouth
+    importData
+    installFFmpeg
     finalize
 
     echo -e "\n\n#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#"
