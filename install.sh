@@ -49,15 +49,6 @@
 
 # It's a monster...hopefully one that works.
 
-# Notes: django-sphinx patch doesn't apply
-#        dataImport fails due to south migration failure.
-# FFMPEG fails to install with this:
-# dpkg-deb: parse error, in file
-# '/var/tmp/tmp.A1NkSYDVOT/package/DEBIAN/control' near line 3 package
-# '0--name-':
-#  newline in field name `Development/Libraries'
-# /var/tmp/tmp.A1NkSYDVOT/dpkgbuild.log (END)
-
 
 function printHelp {
 cat <<EOF
