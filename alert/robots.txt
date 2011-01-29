@@ -65,3 +65,7 @@ Disallow: /pdf/2010/07/27/Delapenia_v._MSPB.pdf
 Disallow: /ca5/aLj/united-states-v-collman/
 Disallow: /pdf/2003/10/21/USA_v._Collman.pdf
 Disallow: /ca5/aLj/usa-v-collman/
+
+# Added January 26, 2011
+Disallow: /ca8/M88/claudia-fercello-v-county-of-ramsey/
+Disallow: /pdf/2010/07/29/Claudia_Fercello_v._County_of_Ramsey.pdf
