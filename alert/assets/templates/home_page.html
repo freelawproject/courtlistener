@@ -8,8 +8,10 @@
     <script type="text/javascript">
 	    $(document).ready(function() {
 		    $('.auto-focus:first').focus();
-		    $("fieldset.collapsible").collapse();
-		    $("fieldset.collapsed").collapse( { closed: true } );
+            $(".collapsed").click(function () {
+                $('div.hidden').toggle("fast");
+                $('fieldset').toggleClass('collapsed');
+            });
 	    });
     </script>
     <link rel="search" type="application/opensearchdescription+xml" title="Court Listener" href="/media/xml/opensearch.xml">
@@ -51,66 +53,68 @@
             </form>
         </div>
         <div class="span-10 last">
-            <fieldset class="collapsed">
+            <fieldset class='collapsed' id='advanced'>
                 <legend class="pointer">Advanced</legend>
-                <table>
-                    <tr>
-                        <td>-</td>
-                        <td>Excludes words</td>
-                    </tr>
-                    <tr>
-                        <td>|</td>
-                        <td>Searches either word</td>
-                    </tr>
-                    <tr>
-                        <td>( )</td>
-                        <td>Can be used to group queries</td>
-                    </tr>
-                    <tr>
-                        <td>" "</td>
-                        <td>Creates a phrase to search</td>
-                    </tr>
-                    <tr>
-                        <td>*</td>
-                        <td>Creates a wildcard search</td>
-                    </tr>
-                    <tr>
-                        <td>~10</td>
-                        <td>Limits distance to 10 words</td>
-                    </tr>
-                    <tr>
-                        <td>/10</td>
-                        <td>Creates a quorum</td>
-                    <tr>
-                        <td>&lt;&lt;</td>
-                        <td>Defines an order</td>
-                    </tr>
-                    <tr>
-                        <td>=</td>
-                        <td>Defines an exact form of a word</td>
-                    </tr>
-                    <tr>
-                        <td>@court</td>
-                        <td>Filters to a certain court</td>
-                    </tr>
-                    <tr>
-                        <td>@caseName</td>
-                        <td>Searches only the case name field</td>
-                    </tr>
-                    <tr>
-                        <td>@caseNumber</td>
-                        <td>Searches only the case number field</td>
-                    </tr>
-                    <tr>
-                        <td>@docStatus</td>
-                        <td>Searches only the document status field</td>
-                    </tr>
-                    <tr>
-                        <td>@docText</td>
-                        <td>Searches only the body of the case</td>
-                    </tr>
-                </table>
-                <a href="/search/advanced-techniques/" class="bottom">More details</a>
+                <div class='hidden'>
+                    <table>
+                        <tr>
+                            <td>-</td>
+                            <td>Excludes words</td>
+                        </tr>
+                        <tr>
+                            <td>|</td>
+                            <td>Searches either word</td>
+                        </tr>
+                        <tr>
+                            <td>( )</td>
+                            <td>Can be used to group queries</td>
+                        </tr>
+                        <tr>
+                            <td>" "</td>
+                            <td>Creates a phrase to search</td>
+                        </tr>
+                        <tr>
+                            <td>*</td>
+                            <td>Creates a wildcard search</td>
+                        </tr>
+                        <tr>
+                            <td>~10</td>
+                            <td>Limits distance to 10 words</td>
+                        </tr>
+                        <tr>
+                            <td>/10</td>
+                            <td>Creates a quorum</td>
+                        <tr>
+                            <td>&lt;&lt;</td>
+                            <td>Defines an order</td>
+                        </tr>
+                        <tr>
+                            <td>=</td>
+                            <td>Defines an exact form of a word</td>
+                        </tr>
+                        <tr>
+                            <td>@court</td>
+                            <td>Filters to a certain court</td>
+                        </tr>
+                        <tr>
+                            <td>@caseName</td>
+                            <td>Searches only the case name field</td>
+                        </tr>
+                        <tr>
+                            <td>@caseNumber</td>
+                            <td>Searches only the case number field</td>
+                        </tr>
+                        <tr>
+                            <td>@docStatus</td>
+                            <td>Searches only the document status field</td>
+                        </tr>
+                        <tr>
+                            <td>@docText</td>
+                            <td>Searches only the body of the case</td>
+                        </tr>
+                    </table>
+                    <a href="/search/advanced-techniques/" class="bottom">More details</a>
+                </div>
             </fieldset>
             <br><br><br>
         </div>

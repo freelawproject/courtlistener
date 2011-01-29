@@ -522,9 +522,10 @@ installing from source is necessary.\n"
     make install
 
     # Installs FFmpeg from source
+    cd $FFMPEG_INSTALL_DIR
     svn checkout svn://svn.ffmpeg.org/ffmpeg/trunk ffmpeg
     cd ffmpeg
-    ./configure --enable-gpl --enable-version3 --enable-nonfree --enable-postproc --enable-libfaac --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libtheora --enable-libvorbis --enable-libmp3lame --enable-libxvid --enable-x11grab
+    ./configure --enable-gpl --enable-version3 --enable-nonfree --enable-postproc --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libtheora --enable-libvorbis --enable-libmp3lame --enable-libxvid --enable-x11grab
     make
     checkinstall --pkgname=ffmpeg --pkgversion "4:SVN-r`LANG=C svn info | grep Revision | awk '{ print $NF }'`" --backup=no --default --deldoc=yes
     hash ffmpeg ffplay
