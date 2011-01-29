@@ -49,6 +49,15 @@
 
 # It's a monster...hopefully one that works.
 
+# Notes: django-sphinx patch doesn't apply
+#        dataImport fails due to south migration failure.
+# FFMPEG fails to install with this:
+# dpkg-deb: parse error, in file
+# '/var/tmp/tmp.A1NkSYDVOT/package/DEBIAN/control' near line 3 package
+# '0--name-':
+#  newline in field name `Development/Libraries'
+# /var/tmp/tmp.A1NkSYDVOT/dpkgbuild.log (END)
+
 
 function printHelp {
 cat <<EOF
@@ -199,7 +208,7 @@ Press any key to proceed, or Ctrl+C to abort. " proceed
 function checkDeps {
     # this function checks for various dependencies that the script assumes are
     # installed for its own functionality.
-    deps=(aptitude checkinstall g++ gcc git-core ipython libmysqlclient-dev logrotate make mercurial mysql-client mysql-server poppler-utils python python python-beautifulsoup python-docutils python-mysqldb python-pip python-setuptools subversion tar wget)
+    deps=(aptitude checkinstall g++ gcc git-core ipython libmysqlclient-dev logrotate make mercurial mysql-client mysql-server poppler-utils python python-beautifulsoup python-docutils python-mysqldb python-pip python-setuptools subversion tar wget)
     echo -e "\n########################"
     echo "Checking dependencies..."
     echo "########################"
@@ -519,7 +528,7 @@ installing from source is necessary.\n"
     cd lame
     ./configure --enable-nasm --disable-shared
     make
-    checkinstall --pkgname=lame-ffmpeg --pkgversion="3.98.4" --backup=no --default --deldoc=yes
+    make install
 
     # Installs FFmpeg from source
     svn checkout svn://svn.ffmpeg.org/ffmpeg/trunk ffmpeg
@@ -777,13 +786,7 @@ index 24a1907..18abb10 100644
      elif settings.DATABASE_ENGINE.startswith('postgresql'):
          return 'pgsql'
      raise ValueError, "Only MySQL and PostgreSQL engines are supported by Sphinx."
-@@ -188,4 +188,4 @@ def generate_source_for_models(model_classes, index=None, sphinx_params={}):
 
-     c = Context(params)
-
--    return t.render(c)
-\ No newline at end of file
-+    return t.render(c)
 diff --git a/setup.py b/setup.py
 index 43b8582..c04bf9e 100755
 --- a/setup.py
