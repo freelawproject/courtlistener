@@ -111,6 +111,11 @@ input.wide-title {
     font-size:1.5em;
 }
 
+
+div.hidden {
+    display: none;
+}
+
 fieldset.collapsed {
     border-bottom-width: 0px;
     border-left-width: 0px;
@@ -120,7 +125,11 @@ fieldset.collapsed {
     padding: 0em;
 }
 
-fieldset.collapsed > legend {
+#advanced {
+    width: 370px;
+}
+
+#advanced > legend {
     font-size: 100%;
 }
 
