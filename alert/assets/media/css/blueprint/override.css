@@ -82,7 +82,7 @@ a:focus, a:hover {
 }
 
 /* Display cases from Resources.org neatly */
-span.num, a.footnote {
+span.num {
     position: relative;
     color: #999999;
 }
@@ -109,6 +109,18 @@ div.prelims p {
     margin-left: 2em;
     margin-right: 2em;
     margin-top: 0em;
+}
+
+div.footnote a.footnote {
+    /* Needs proper color use */
+    color: #000099;
+}
+
+p a.footnote {
+    /* make footnotes superscript */
+    vertical-align: text-top;
+    font-size: 70%;
+    color: #000099;
 }
 /* End Resource.org display CSS */
 
