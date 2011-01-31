@@ -101,6 +101,7 @@ div.footnotes {
 div.prelims {
     background: none repeat scroll 0 0 #eeeeee;
     border: 1px solid #dddddd;
+    padding-top: 1.5em;
 }
 
 div.prelims p {
