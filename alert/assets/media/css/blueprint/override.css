@@ -82,15 +82,20 @@ a:focus, a:hover {
 }
 
 /* Display cases from Resources.org neatly */
-span.num {
+span.num, a.footnote {
     position: relative;
     color: #999999;
 }
 
-p.indent {
+p.indent, div.footnote > p {
     position: relative;
     margin-left: 2em;
     margin-top: -1.5em;
+}
+
+div.footnotes {
+    border-top: 1px dotted black;
+    padding-top: 1em;
 }
 
 div.prelims {
@@ -104,6 +109,8 @@ div.prelims p {
     margin-right: 2em;
     margin-top: 0em;
 }
+/* End Resource.org display CSS */
+
 
 input.wide-title {
     width: 390px;
