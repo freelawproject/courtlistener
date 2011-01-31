@@ -178,7 +178,7 @@ TIME_ZONE is set to America/Los Angeles
     # set up the MySQL configs
     read -p "We will be setting up a MySQL DB. What would you like its name to be (e.g. courtListener): " MYSQL_DB_NAME
     read -p "And we will be giving it a username. What would you like that to be (e.g. courtListener): " MYSQL_USERNAME
-    MYSQL_PWD=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789!@$%^&*(-_=+)") for i in range(30)]);'`
+    MYSQL_PWD=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789") for i in range(50)]);'`
     echo -e "\nYou can set up the MySQL password manually, but we recommend a randomly
 generated password, since you should not ever need to type it in.
 "
@@ -192,7 +192,7 @@ generated password, since you should not ever need to type it in.
 Great. This is all the input we need for a while. We will now complete the
 installation process.
 
-Press any key to proceed, or Ctrl+C to abort. " proceed
+Press enter to proceed, or Ctrl+C to abort. " proceed
 }
 
 
@@ -339,7 +339,7 @@ function installCourtListener {
     ln -s $CL_INSTALL_DIR/court-listener/log-scripts/scraper /etc/logrotate.d/scraper
 
     # this generates a nice random number, as it is done by django-admin.py
-    SECRET_KEY=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)") for i in range(50)]);'`
+    SECRET_KEY=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789") for i in range(50)]);'`
 
     # this is the MEDIA_ROOT
     MEDIA_ROOT="$CL_INSTALL_DIR/court-listener/alert/assets/media/"
@@ -455,7 +455,7 @@ CREATE TABLE sph_counter
 EOF
     echo -e "\nWe are about to create the database $MYSQL_DB_NAME, with username
 $MYSQL_USERNAME and password $MYSQL_PWD."
-    read -p "Press any key to continue, or Ctrl+C to abort." proceed
+    read -p "Press enter to continue, or Ctrl+C to abort." proceed
     echo "Please enter your root MySQL password."
     mysql -u'root' -p < install.sql
     if [ $? == "0" ]
@@ -809,8 +809,8 @@ function installDebugToolbar {
         echo 'Installing django debug toolbar...'
         echo '##################################
 '
-        read -p "Is the django debug toolbar installed on this computer? (y/n): " installed
-        if [ $installed == "n" ]
+        read -p "Install djang debug toolbar on this computer? (y/n): " proceed
+        if [ $proceed == "y" ]
         then
             # we install it
             pip install django-debug-toolbar
@@ -951,7 +951,7 @@ Cron jobs such as the following might work well:
 The first updates the delta index once every 20 minutes. The second updates the main
 index every other week.
 "
-    read -p "Press any key to exit the install script, and begin hacking. Whew."
+    read -p "Press enter to exit the install script, and begin hacking. Whew."
     exit 0
 }
 
@@ -978,7 +978,7 @@ else
         --django) getUserInput; installDjango;;
         --courtListener) getUserInput; installCourtListener;;
         --importData) getUserInput; configureMySQL; importData;;
-        --debugToolbar) installDebugToolbar;;
+        --debugToolbar) getUserInput; installDebugToolbar;;
         --djangoSphinx) getUserInput; installDjangoSphinx;;
         --djangoExtensions) getUserInput; installDjangoExtensions;;
         --south) getUserInput; installSouth; finalize;;
