@@ -34,6 +34,8 @@ from lxml.html import fromstring, tostring
 from lxml import etree
 from optparse import OptionParser
 from urlparse import urljoin
+from datetime import datetime
+from time import mktime
 
 import logging
 import logging.handlers
@@ -78,7 +80,7 @@ def readURL(url, courtID):
     return html
 
 
-def makeDocFromURL(LinkToPdf, ct):
+def makeDocFromURL(LinkToDoc, ct):
     '''Receives a URL and a court as arguments, then downloads the PDF
     that's in it, and makes it into a StringIO. Generates a sha1 hash of the
     file, and tries to add it to the db. If it's a duplicate, it gets the one in
@@ -88,15 +90,15 @@ def makeDocFromURL(LinkToPdf, ct):
     whether the Document was created
     '''
 
-    # get the PDF
+    # get the Doc
     try:
-        webFile = urllib2.urlopen(LinkToPdf)
+        webFile = urllib2.urlopen(LinkToDoc)
         stringThing = StringIO.StringIO()
         stringThing.write(webFile.read())
         myFile = ContentFile(stringThing.getvalue())
         webFile.close()
     except:
-        print "ERROR DOWNLOADING FILE!: " + str(LinkToPdf)
+        print "ERROR DOWNLOADING FILE!: " + str(LinkToDoc)
         error = True
         return "Bad", "Bad", "Bad", error
 
@@ -111,7 +113,7 @@ def makeDocFromURL(LinkToPdf, ct):
     if created:
         # we only do this if it's new
         doc.documentSHA1 = sha1Hash
-        doc.download_URL = LinkToPdf
+        doc.download_URL = LinkToDoc
         doc.court = ct
         doc.source = "C"
 
@@ -172,25 +174,38 @@ def hasDuplicate(caseNum, caseName):
     return cite, created
 
 
-def getPDFContent(docs):
-    """Get the contents of a list of PDF files, and add them to the DB"""
+def getDocContent(docs):
+    """Get the contents of a list of files, and add them to the DB, sniffing
+    their mimetype."""
     for doc in docs:
         path = str(doc.local_path)
         path = settings.MEDIA_ROOT + path
 
-        # do the pdftotext work
-        process = subprocess.Popen(
-            ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"], shell=False,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        content, err = process.communicate()
-        if err: print "Error extracting text from: " + doc.citation.caseNameShort
+        mimetype = path.split('.')[-1]
+        if mimetype == 'pdf':
+            # do the pdftotext work for PDFs
+            process = subprocess.Popen(
+                ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"], shell=False,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            content, err = process.communicate()
+            if err: print "****Error extracting text from: " + doc.citation.caseNameShort + "****"
+        elif mimetype == 'txt':
+            # read the contents of text files.
+            try:
+                content = open(path).read()
+            except:
+                print "****Error extracting plain text from: " + doc.citation.caseNameShort + "****"
+                continue
+        else:
+            print "*****Unknown mimetype. Unable to parse: " + doc.citation.caseNameShort + "****"
+            continue
 
         # add the anonymized plain text to the DB!
         doc.documentPlainText = anonymize(clean_string(content))
         try:
             doc.save()
         except Exception, e:
-            print "Error saving pdf text to the db for: " + doc.citation.caseNameShort
+            print "****Error saving text to the db for: " + doc.citation.caseNameShort + "****"
 
 
 def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
@@ -641,7 +656,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         within the set. Watch closely.
         """
         urls = ("http://www.ca5.uscourts.gov/Opinions.aspx",)
-        ct = Court.objects.get(courtUUID='ca5')
+        ct = Court.objects.get(courtUUID = 'ca5')
 
         for url in urls:
             # Use just one date, it seems to work better this way.
@@ -1055,7 +1070,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
     elif (courtID == 9):
         """This court, by virtue of having a javascript laden website, was very
         hard to parse properly. BeautifulSoup couldn't handle it at all, so lxml
-        has to be used. lxml seems pretty useful, but it was a pain to learn."""
+        has to be used."""
 
         # these URLs redirect now. So much for hacking them. A new approach can probably be done using POST data.
         urls = (
@@ -1371,9 +1386,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         return
 
     elif (courtID == 12):
-        # terrible site. Code assumes that we download the opinion on the day
-        # it is released. If we miss a day, that could cause a problem.
-        urls = ("http://www.cadc.uscourts.gov/bin/opinions/allopinions.asp",)
+        # A decent RSS feed, created 2011-02-01
+        urls = ("http://www.cadc.uscourts.gov/internet/opinions.nsf/uscadcopinions.xml",)
         ct = Court.objects.get(courtUUID = 'cadc')
 
         for url in urls:
@@ -1387,30 +1401,38 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     # if not, bail. If so, continue to the scraping.
                     return
 
-            soup = BeautifulSoup(html)
+            # this code gets rid of errant ampersands - they throw big errors
+            # when parsing. We replace them later.
+            if '&' in html:
+                punctuationRegex = re.compile(" & ")
+                html = re.sub(punctuationRegex, " &amp; ", html)
+                tree = etree.fromstring(html)
+            else:
+                tree = etree.fromstring(html)
 
-            aTagsRegex = re.compile('pdf$', re.IGNORECASE)
-            aTags = soup.findAll(attrs={'href' : aTagsRegex})
-
-            caseNumRegex = re.compile("(\d{2}-\d{4})")
+            caseLinks = tree.xpath("//item/link")
+            caseNames = tree.xpath("//item/description")
+            caseNums = tree.xpath("//item/title")
+            caseDates = tree.xpath("//item/pubDate")
 
             i = 0
             dupCount = 0
-            while i < len(aTags):
+            while i < len(caseLinks):
                 # we begin with the caseLink field
-                caseLink = aTags[i].get('href')
+                caseLink = caseLinks[i].text
                 caseLink = urljoin(url, caseLink)
 
                 myFile, doc, created, error = makeDocFromURL(caseLink, ct)
 
                 if error:
-                    # things broke, punt this iteration
-                    i += 1
-                    continue
+                        # things broke, punt this iteration
+                        i += 1
+                        continue
 
                 if not created:
                     # it's an oldie, punt!
                     dupCount += 1
+
                     if dupCount == 5:
                         # fifth dup in a a row. BREAK!
                         break
@@ -1419,24 +1441,21 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 else:
                     dupCount = 0
 
-                # using caseLink, we can get the caseNumber
-                caseNumber =  caseNumRegex.search(caseLink).group(1)
-
-                # we can hard-code this b/c the D.C. Court paywalls all
-                # unpublished opinions.
+                # next: docType (this order of if statements IS correct)
                 doc.documentType = "Published"
 
-                # caseDate is next on the block
-                caseDate = datetime.date.today()
-                doc.dateFiled = caseDate
+                # next: caseDate
+                caseDateTime = time.strptime(caseDates[i].text[0:-6], "%a, %d %b %Y %H:%M:%S")
+                doc.dateFiled = datetime.fromtimestamp(mktime(caseDateTime))
 
-                caseNameShort = aTags[i].next.next.next
+                # next: caseNumber
+                caseNumber = caseNums[i].text.split('|')[0].strip()
 
-                # now that we have the caseNumber and caseNameShort, we can dup check
+                # next: caseNameShort
+                caseNameShort = caseNames[i].text
+
+                # check for dups, make the object if necessary, otherwise, get it
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
-
-                # if that goes well, we save to the DB
-                doc.citation = cite
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
@@ -1693,8 +1712,8 @@ def parseCourt(courtID, VERBOSITY):
     # to begin scraping before both of these have finished. This should be OK,
     # but seems noteworthy.
     if numDocs > 0:
-        t1 = Thread(target=getPDFContent, args=(docs[0:numDocs/2],))
-        t2 = Thread(target=getPDFContent, args=(docs[numDocs/2:numDocs],))
+        t1 = Thread(target=getDocContent, args=(docs[0:numDocs/2],))
+        t2 = Thread(target=getDocContent, args=(docs[numDocs/2:numDocs],))
         t1.start()
         t2.start()
     elif numDocs == 0:
