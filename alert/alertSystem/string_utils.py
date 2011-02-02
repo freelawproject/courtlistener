@@ -32,7 +32,7 @@ License: http://www.opensource.org/licenses/mit-license.php
 """
 
 import re
-from django.utils.encoding import smart_str
+from django.utils.encoding import smart_str, smart_unicode
 
 
 # For use in titlecase
@@ -181,11 +181,15 @@ def clean_string(string):
         .replace('&amp;', '&').replace('%20', ' ').replace('&#160;', ' ')\
         .strip().strip(';')
 
+    # if not already unicode, make it unicode, dropping invalid characters
+    # if not isinstance(string, unicode):
+    string = smart_unicode(string, encoding='utf-8', errors='ignore')
+
     # get rid of '\t\n\x0b\x0c\r ', and replace them with a single space.
     string = " ".join(string.split())
 
     # get rid of bad character encodings
-    string = smart_str(string)
+    string = smart_str(string, errors='ignore')
 
     # return something vaguely sane
     return string
