@@ -56,8 +56,26 @@ logger.addHandler(handler)
 dieNow = False
 
 def signal_handler(signal, frame):
-        print 'Exiting safely...this will finish the current court, then exit...'
-        dieNow = True
+    print 'Exiting safely...this will finish the current court, then exit...'
+    dieNow = True
+
+
+def readURL(url, courtID):
+    try: html = urllib2.urlopen(url).read()
+    except urllib2.HTTPError, e:
+        print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
+        print 'HTTPError = ' + str(e.code)
+    except urllib2.URLError, e:
+        print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
+        print 'URLError = ' + str(e.reason)
+    except httplib.HTTPException, e:
+        print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
+        print 'HTTPException'
+    except Exception:
+        import traceback
+        print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
+        print 'Generic Exception: ' + traceback.format_exc()
+    return html
 
 
 def makeDocFromURL(LinkToPdf, ct):
@@ -122,7 +140,7 @@ def courtChanged(url, contents):
         try:
             logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + ": URL: " + url)
         except UnicodeDecodeError:
-                    pass
+            pass
 
         return True
 
@@ -168,10 +186,10 @@ def getPDFContent(docs):
         if err: print "Error extracting text from: " + doc.citation.caseNameShort
 
         # add the anonymized plain text to the DB!
-        doc.documentPlainText = anonymize(smart_str(content))
+        doc.documentPlainText = anonymize(clean_string(content))
         try:
             doc.save()
-        except:
+        except Exception, e:
             print "Error saving pdf text to the db for: " + doc.citation.caseNameShort
 
 
@@ -187,10 +205,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         ct = Court.objects.get(courtUUID='ca1')
 
         for url in urls:
-            try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
-                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
-                continue
+            try: html = readURL(url, courtID)
+            except: continue
 
             if DAEMONMODE:
                 # if it's DAEMONMODE, see if the court has changed
@@ -307,15 +323,13 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         ct = Court.objects.get(courtUUID='ca2')
 
         for url in urls:
-            try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
-                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
-                continue
+            try: html = readURL(url, courtID)
+            except: continue
 
             soup = BeautifulSoup(html)
 
             aTagsRegex = re.compile('(.*?.pdf).*?', re.IGNORECASE)
-            caseNumRegex = re.compile('.*/(\d{1,2}-\d{3,4})(.*).pdf')
+            caseNumRegex = re.compile('.*/(\d{1,2}-\d{1,4})(.*).pdf')
             aTags = soup.findAll(attrs={'href' : aTagsRegex})
 
             if DAEMONMODE:
@@ -419,15 +433,15 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
         # if these URLs change, the docType identification (below) will need
         # to be updated. It's lazy, but effective.
-        urls = ("http://www.ca3.uscourts.gov/recentop/week/recprec.htm",
-            "http://www.ca3.uscourts.gov/recentop/week/recnon2day.htm",)
+        urls = (
+            "http://www.ca3.uscourts.gov/recentop/week/recprec.htm",
+            #"http://www.ca3.uscourts.gov/recentop/week/recnon2day.htm",
+            )
         ct = Court.objects.get(courtUUID='ca3')
 
         for url in urls:
-            try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
-                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
-                continue
+            try: html = readURL(url, courtID)
+            except: continue
 
             if DAEMONMODE:
                 # if it's DAEMONMODE, see if the court has changed
@@ -449,7 +463,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             i = 0
             dupCount = 0
-            while i < len(aTags):
+            while i < len(aTags) :
                 # caseLink and caseNameShort
                 caseLink = aTags[i].get('href')
 
@@ -520,10 +534,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         ct = Court.objects.get(courtUUID='ca4')
 
         for url in urls:
-            try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
-                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
-                continue
+            try: html = readURL(url, courtID)
+            except: continue
 
             if DAEMONMODE:
                 # if it's DAEMONMODE, see if the court has changed
@@ -651,10 +663,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             data = urllib.urlencode(postValues)
             req = urllib2.Request(url, data)
-            try: html = urllib2.urlopen(req).read()
-            except urllib2.HTTPError:
-                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
-                continue
+            try: html = readURL(url, courtID)
+            except: continue
 
             if DAEMONMODE:
                 # if it's DAEMONMODE, see if the court has changed
@@ -773,10 +783,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             data = urllib.urlencode(postValues)
             req = urllib2.Request(url, data)
-            try: html = urllib2.urlopen(req).read()
-            except urllib2.HTTPError:
-                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
-                continue
+            try: html = readURL(url, courtID)
+            except: continue
 
             if DAEMONMODE:
                 # if it's DAEMONMODE, see if the court has changed
@@ -875,10 +883,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             for dataString in dataStrings:
                 req = urllib2.Request(url, dataString)
-                try: html = urllib2.urlopen(req).read()
-                except urllib2.HTTPError:
-                    print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
-                    continue
+                try: html = readURL(url, courtID)
+                except: continue
 
                 if DAEMONMODE:
                     # if it's DAEMONMODE, see if the court has changed
@@ -962,10 +968,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         ct = Court.objects.get(courtUUID = 'ca8')
 
         for url in urls:
-            try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
-                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
-                continue
+            try: html = readURL(url, courtID)
+            except: continue
 
             if DAEMONMODE:
                 # if it's DAEMONMODE, see if the court has changed
@@ -1062,10 +1066,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
         for url in urls:
             if VERBOSITY >= 1: print "Scraping URL: " + url
-            try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
-                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
-                continue
+            try: html = readURL(url, courtID)
+            except: continue
 
             tree = fromstring(html)
 
@@ -1162,10 +1164,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         ct = Court.objects.get(courtUUID = 'ca10')
 
         for url in urls:
-            try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
-                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
-                continue
+            try: html = readURL(url, courtID)
+            except: continue
 
             if DAEMONMODE:
                 # if it's DAEMONMODE, see if the court has changed
@@ -1288,10 +1288,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             data = urllib.urlencode(postValues)
             req = urllib2.Request(url, data)
-            try: html = urllib2.urlopen(req).read()
-            except urllib2.HTTPError:
-                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
-                continue
+            try: html = readURL(url, courtID)
+            except: continue
 
             if DAEMONMODE:
                 # if it's DAEMONMODE, see if the court has changed
@@ -1379,10 +1377,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         ct = Court.objects.get(courtUUID = 'cadc')
 
         for url in urls:
-            try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
-                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
-                continue
+            try: html = readURL(url, courtID)
+            except: continue
 
             if DAEMONMODE:
                 # if it's DAEMONMODE, see if the court has changed
@@ -1408,9 +1404,9 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 myFile, doc, created, error = makeDocFromURL(caseLink, ct)
 
                 if error:
-                        # things broke, punt this iteration
-                        i += 1
-                        continue
+                    # things broke, punt this iteration
+                    i += 1
+                    continue
 
                 if not created:
                     # it's an oldie, punt!
@@ -1465,10 +1461,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         ct = Court.objects.get(courtUUID = "cafc")
 
         for url in urls:
-            try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
-                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
-                continue
+            try: html = readURL(url, courtID)
+            except: continue
 
             if DAEMONMODE:
                 # if it's DAEMONMODE, see if the court has changed
@@ -1572,10 +1566,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
         for url in urls:
             if VERBOSITY >= 1: print "Scraping URL: " + url
-            try: html = urllib2.urlopen(url).read()
-            except urllib2.HTTPError:
-                print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
-                continue
+            try: html = readURL(url, courtID)
+            except: continue
             tree = fromstring(html)
 
             if 'slipopinion' in url:
@@ -1670,7 +1662,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         return
 
 
-def parseCourt(courtID):
+def parseCourt(courtID, VERBOSITY):
     '''
     Here, we do the following:
      1. For a given court, find all of its documents
@@ -1758,7 +1750,7 @@ def main():
             from alertSystem.models import PACER_CODES
             while courtID <= len(PACER_CODES):
                 if options.scrape: scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
-                if options.parse:  parseCourt(courtID)
+                if options.parse:  parseCourt(courtID, VERBOSITY)
                 # this catches SIGINT, so the code can be killed safely.
                 if dieNow == True:
                     sys.exit(0)
@@ -1766,7 +1758,7 @@ def main():
         else:
             # we're only doing one court
             if options.scrape: scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
-            if options.parse:  parseCourt(courtID)
+            if options.parse:  parseCourt(courtID, VERBOSITY)
             # this catches SIGINT, so the code can be killed safely.
             if dieNow == True:
                 sys.exit(0)
@@ -1783,7 +1775,7 @@ def main():
         courtID = 1
         while courtID <= len(PACER_CODES):
             scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
-            parseCourt(courtID)
+            parseCourt(courtID, VERBOSITY)
             # this catches SIGINT, so the code can be killed safely.
             if dieNow == True:
                 sys.exit(0)

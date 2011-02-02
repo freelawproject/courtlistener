@@ -176,8 +176,8 @@ TIME_ZONE is set to America/Los Angeles
 "
 
     # set up the MySQL configs
-    read -p "We will be setting up a MySQL DB. What would you like its name to be (e.g. courtListener): " MYSQL_DB_NAME
-    read -p "And we will be giving it a username. What would you like that to be (e.g. courtListener): " MYSQL_USERNAME
+    read -p "We will be setting up a MySQL DB. What would you like its name to be (e.g. courtlistener): " MYSQL_DB_NAME
+    read -p "And we will be giving it a username which must be different than the DB name. What would you like that to be (e.g. django): " MYSQL_USERNAME
     MYSQL_PWD=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789") for i in range(50)]);'`
     echo -e "\nYou can set up the MySQL password manually, but we recommend a randomly
 generated password, since you should not ever need to type it in.
@@ -442,7 +442,7 @@ function configureMySQL {
     # first, we make a SQL script, then we execute it, then we delete it.
     # this will also set up a table for Sphinx's main+delta scheme. Kludgy.
     cat <<EOF > install.sql
-CREATE DATABASE $MYSQL_DB_NAME;
+CREATE DATABASE $MYSQL_DB_NAME CHARACTER SET utf8;
 GRANT ALL ON $MYSQL_DB_NAME.* to $MYSQL_USERNAME WITH GRANT OPTION;
 SET PASSWORD FOR $MYSQL_USERNAME = password('$MYSQL_PWD');
 FlUSH PRIVILEGES;
@@ -460,7 +460,7 @@ $MYSQL_USERNAME and password $MYSQL_PWD."
     mysql -u'root' -p < install.sql
     if [ $? == "0" ]
     then
-        rm install.sql
+        # rm install.sql
         echo -e '\nMySQL configured successfully.'
     else
         echo -e '\nError configuring MySQL. Aborting.'
@@ -928,7 +928,6 @@ function main {
     installDjangoExtensions
     installSouth
     importData
-    installFFmpeg
     finalize
 
     echo -e "\n\n#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#"
