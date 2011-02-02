@@ -200,8 +200,9 @@ def getDocContent(docs):
             print "*****Unknown mimetype. Unable to parse: " + doc.citation.caseNameShort + "****"
             continue
 
-        # add the anonymized plain text to the DB!
-        doc.documentPlainText = anonymize(clean_string(content))
+        # add the anonymized plain text to the DB. Don't run clean_string on this
+        # because that removes the white space and newlines (see r538)!
+        doc.documentPlainText = anonymize(content)
         try:
             doc.save()
         except Exception, e:
