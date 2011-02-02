@@ -15,8 +15,8 @@ Edit/delete this alert: http://courtlistener.com/alert/edit/{{ alert.alertUUID }
 {% if docs != "None" %}{{forloop.counter}}. {{doc.citation.caseNameFull}}, {{doc.citation.caseNumber}} ({{doc.court.courtShortName}})
 This document is: {{doc.get_documentType_display}}
  - View on our site: http://courtlistener.com{{doc.get_absolute_url}}
- - Download pdf from the court: {{doc.download_URL}}
- - Download pdf from our backup: http://courtlistener.com/{{doc.local_path}}
+ - Download original from the court: {{doc.download_URL}}
+ - Download original from our backup: http://courtlistener.com/{{doc.local_path}}
 
 {% endif %}{% endfor %}{% endfor %}
 
