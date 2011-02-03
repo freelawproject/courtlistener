@@ -60,8 +60,14 @@ def make_pdf_upload_path(instance, filename):
     """Return a string like pdf/2010/08/13/foo_v._var.pdf, with the date set
     as the dateFiled for the case."""
     # this code NOT cross platform. Use os.path.join or similar to fix.
-    return 'pdf/' + instance.dateFiled.strftime("%Y/%m/%d/") + \
-        get_valid_filename(filename)
+    try:
+        path = 'pdf/' + instance.dateFiled.strftime("%Y/%m/%d/") + \
+            get_valid_filename(filename)
+    except AttributeError:
+        # The date is unknown for the case. Use today's date.
+        path = 'pdf/' + instance.time_retrieved.strftime("%Y/%m/%d/") + \
+            get_valid_filename(filename)
+    return path
 
 
 # A class to hold URLs and the hash of their contents. This could be added to

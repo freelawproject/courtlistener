@@ -28,17 +28,29 @@ from django.core.exceptions import MultipleObjectsReturned
 from django.core.files import File
 from django.core.files.base import ContentFile
 
-import datetime, calendar, hashlib, re, signal, StringIO, subprocess, sys, time, urllib, urllib2
+import calendar
+import datetime
+import hashlib
+import logging
+import logging.handlers
+import re
+import signal
+import StringIO
+import subprocess
+import sys
+import time
+import traceback
+import urllib
+import urllib2
+
 from BeautifulSoup import BeautifulSoup
+#from datetime import datetime
 from lxml.html import fromstring, tostring
 from lxml import etree
 from optparse import OptionParser
-from urlparse import urljoin
-from datetime import datetime
 from time import mktime
+from urlparse import urljoin
 
-import logging
-import logging.handlers
 
 DAEMONMODE = False
 VERBOSITY = 0
@@ -59,6 +71,7 @@ dieNow = False
 
 def signal_handler(signal, frame):
     print 'Exiting safely...this will finish the current court, then exit...'
+    global dieNow
     dieNow = True
 
 
@@ -74,10 +87,23 @@ def readURL(url, courtID):
         print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
         print 'HTTPException'
     except Exception:
-        import traceback
         print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
         print 'Generic Exception: ' + traceback.format_exc()
     return html
+
+def printAndLogNewDoc(VERBOSITY, ct, cite):
+    '''
+    Simply prints the log message and then logs it.
+    '''
+    caseName = str(cite)
+    caseNumber = str(cite.caseNumber)
+    if VERBOSITY >= 1:
+        print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
+            ": Added " + ct.courtShortName + ": " + unicode(caseName, errors='ignore') + \
+            ", " + caseNumber
+    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
+        ": Added " + ct.courtShortName + ": " + unicode(caseName, errors='ignore') + \
+        ", " + caseNumber)
 
 
 def makeDocFromURL(LinkToDoc, ct):
@@ -316,13 +342,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
-                try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
-                except UnicodeDecodeError:
-                    pass
+                printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
                 i -= 1
@@ -427,13 +447,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
-                try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
-                except UnicodeDecodeError:
-                    pass
+                printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
                 i += 1
@@ -530,13 +544,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
-                try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
-                except UnicodeDecodeError:
-                    pass
+                printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
                 i += 1
@@ -636,13 +644,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
-                try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
-                except UnicodeDecodeError:
-                    pass
+                printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
                 i += 1
@@ -679,7 +681,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             data = urllib.urlencode(postValues)
             req = urllib2.Request(url, data)
-            try: html = readURL(url, courtID)
+            try: html = readURL(req, courtID)
             except: continue
 
             if DAEMONMODE:
@@ -763,13 +765,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
-                try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
-                except UnicodeDecodeError:
-                    pass
+                printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
                 i += 1
@@ -799,7 +795,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             data = urllib.urlencode(postValues)
             req = urllib2.Request(url, data)
-            try: html = readURL(url, courtID)
+            try: html = readURL(req, courtID)
             except: continue
 
             if DAEMONMODE:
@@ -871,13 +867,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
-                try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
-                except UnicodeDecodeError:
-                    pass
+                printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
                 i += 1
@@ -899,7 +889,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             for dataString in dataStrings:
                 req = urllib2.Request(url, dataString)
-                try: html = readURL(url, courtID)
+                try: html = readURL(req, courtID)
                 except: continue
 
                 if DAEMONMODE:
@@ -967,19 +957,24 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     # last, save evrything (pdf, citation and document)
                     doc.citation = cite
                     doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                    if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort
-                    try:
-                        logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                            ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
-                    except UnicodeDecodeError:
-                        pass
+                    printAndLogNewDoc(VERBOSITY, ct, cite)
                     doc.save()
 
                     i += 1
         return
 
     elif (courtID == 8):
+        '''
+        Has a search interface that can be hacked with POST data, but the
+        HTML returned from it is an utter wasteland consisting of nothing but
+        <br>, <b> and text. So we can't really use it.
+
+        Instead, we would turn to the RSS feed, but it's the same sad story.
+
+        So we go to the one page that has any semantic markup.
+
+        Missing a day == bad.
+        '''
         urls = ("http://www.ca8.uscourts.gov/cgi-bin/new/today2.pl",)
         ct = Court.objects.get(courtUUID = 'ca8')
 
@@ -1056,13 +1051,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
-                try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
-                except UnicodeDecodeError:
-                    pass
+                printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
                 i += 1
@@ -1074,9 +1063,11 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         has to be used."""
 
         # these URLs redirect now. So much for hacking them. A new approach can probably be done using POST data.
+        # If these URLs are changed, code below must be changed for the doc type and dateFiled fields
         urls = (
             "http://www.ca9.uscourts.gov/opinions/?o_mode=view&amp;o_sort_field=19&amp;o_sort_type=DESC&o_page_size=100",
-            "http://www.ca9.uscourts.gov/memoranda/?o_mode=view&amp;o_sort_field=21&amp;o_sort_type=DESC&o_page_size=100",)
+            "http://www.ca9.uscourts.gov/memoranda/?o_mode=view&amp;o_sort_field=21&amp;o_sort_type=DESC&o_page_size=100",
+            )
 
         ct = Court.objects.get(courtUUID = 'ca9')
 
@@ -1085,21 +1076,14 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             try: html = readURL(url, courtID)
             except: continue
 
-            tree = fromstring(html)
-
-            if url == urls[0]:
-                caseLinks = tree.xpath('//table[3]/tbody/tr/td/a')
-                caseNumbers = tree.xpath('//table[3]/tbody/tr/td[2]/label')
-                caseDates = tree.xpath('//table[3]/tbody/tr/td[6]/label')
-            elif url == urls[1]:
-                caseLinks = tree.xpath('//table[3]/tbody/tr/td/a')
-                caseNumbers = tree.xpath('//table[3]/tbody/tr/td[2]/label')
-                caseDates = tree.xpath('//table[3]/tbody/tr/td[7]/label')
+            parser = etree.HTMLParser()
+            tree = etree.parse(StringIO.StringIO(html), parser)
 
             if DAEMONMODE:
-                # if it's DAEMONMODE, see if the court has changed
-                # this is necessary because the 9th circuit puts random numbers
+                # if it's DAEMONMODE, see if the links in the court have changed.
+                # This is necessary because the 9th circuit puts random numbers
                 # in their HTML. This gets rid of those, so SHA1 can be generated.
+                caseLinks = tree.xpath('//table[3]/tbody/tr/td/a')
                 listofLinks = []
                 for i in caseLinks:
                     listofLinks.append(i.get('href'))
@@ -1108,23 +1092,32 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     # if not, bail. If so, continue to the scraping.
                     return
 
-            i = 0
+            # Get all the rows in the main table so that this is row centric.
+            # This fixes off-by-one problems if cells are empty.
+            rows = tree.xpath('//table[3]/tbody/tr')
+
+            # for each row in the table, skipping the first, parse the cells
             dupCount = 0
-            while i < len(caseLinks):
-                # we begin with the caseLink field
-                caseLink = caseLinks[i].get('href')
+            for row in rows[1:]:
+                # Find all the table cells in this row.
+                tableCells = row.findall('.//td')
+
+                # Next: caseLink
+                caseLink = tableCells[0].find('./a').get('href')
                 caseLink = urljoin(url, caseLink)
 
-                # special case
-                if 'no memos filed' in caseLink.lower():
-                    i += 1
+                #next up: caseNameShort
+                caseNameShort = titlecase(tableCells[0].find('./a').text.lower())
+
+                # special cases
+                noMemos = 'no memos filed' in caseLink.lower()
+                noOpinions = 'no opinions filed' in caseLink.lower()
+                if noMemos or noOpinions:
                     continue
 
                 myFile, doc, created, error = makeDocFromURL(caseLink, ct)
 
                 if error:
-                    # things broke, punt this iteration
-                    i += 1
                     continue
 
                 if not created:
@@ -1133,28 +1126,31 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     if dupCount == 5:
                         # fifth dup in a a row. BREAK!
                         break
-                    i += 1
                     continue
                 else:
                     dupCount = 0
 
-                # next, we'll do the caseNumber
-                caseNumber = caseNumbers[i].text
+                # Next: Casenumber
+                caseNumber = tableCells[1].find('./label').text
 
-                # next up: document type (static for now)
-                if 'memoranda' in url:
-                    doc.documentType = "Unpublished"
-                elif 'opinions' in url:
+                # Next: document type (static for now)
+                if 'opinions' in url:
                     doc.documentType = "Published"
+                elif 'memoranda' in url:
+                    doc.documentType = "Unpublished"
 
-                # next up: caseDate
-                splitDate = caseDates[i].text.split('/')
-                caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
-                    int(splitDate[1]))
+                # Next: caseDate
+                try:
+                    if 'opinions' in url:
+                        caseDate = tableCells[5].find('./label').text
+                    elif 'memoranda' in url:
+                        caseDate   = tableCells[6].find('./label').text
+                    splitDate = caseDate.split('/')
+                    caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
+                        int(splitDate[1]))
+                except AttributeError:
+                    caseDate = None
                 doc.dateFiled = caseDate
-
-                #next up: caseNameShort
-                caseNameShort = titlecase(caseLinks[i].text.lower())
 
                 # now that we have the caseNumber and caseNameShort, we can dup check
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
@@ -1162,16 +1158,9 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
-                try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
-                except UnicodeDecodeError:
-                    pass
+                printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
-                i += 1
         return
 
     elif (courtID == 10):
@@ -1268,25 +1257,21 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
-                try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
-                except UnicodeDecodeError:
-                    pass
+                printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
                 i += 1
         return
 
     elif (courtID == 11):
-        """Prior to rev 313 (2010-04-27), this got published documents only,
+        '''
+        Prior to rev 313 (2010-04-27), this got published documents only,
         using the court's RSS feed.
 
         Currently, it uses lxml to parse the HTML on the published and
         unpublished feeds. It can be set to do any date range desired, however
-        such modifications should likely go in back_scrape.py."""
+        such modifications should likely go in back_scrape.py.
+        '''
 
         # Missing a day == OK.
         urls = (
@@ -1304,7 +1289,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             data = urllib.urlencode(postValues)
             req = urllib2.Request(url, data)
-            try: html = readURL(url, courtID)
+            try: html = readURL(req, courtID)
             except: continue
 
             if DAEMONMODE:
@@ -1374,13 +1359,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
-                try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
-                except UnicodeDecodeError:
-                    pass
+                printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
                 i += 1
@@ -1447,7 +1426,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # next: caseDate
                 caseDateTime = time.strptime(caseDates[i].text[0:-6], "%a, %d %b %Y %H:%M:%S")
-                doc.dateFiled = datetime.fromtimestamp(mktime(caseDateTime))
+                doc.dateFiled = datetime.datetime.fromtimestamp(mktime(caseDateTime))
 
                 # next: caseNumber
                 caseNumber = caseNums[i].text.split('|')[0].strip()
@@ -1461,23 +1440,15 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
-                try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
-                except UnicodeDecodeError:
-                    pass
+                printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
                 i += 1
         return
 
     elif (courtID == 13):
-        # today's cases; missing a day not good.
-        urls = ("http://www.cafc.uscourts.gov/index.php?option=com_reports&view=report&layout=search&Itemid=12",)
         # for last seven days use:
-        #urls = ("http://www.cafc.uscourts.gov/index.php?searchword=&ordering=&date=7&type=&origin=&searchphrase=all&Itemid=12&option=com_reports",)
+        urls = ("http://www.cafc.uscourts.gov/index.php?searchword=&ordering=&date=7&type=&origin=&searchphrase=all&Itemid=12&option=com_reports",)
         ct = Court.objects.get(courtUUID = "cafc")
 
         for url in urls:
@@ -1565,13 +1536,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
-                try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
-                except UnicodeDecodeError:
-                    pass
+                printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
                 i += 1
@@ -1669,13 +1634,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
-                if VERBOSITY >= 1: print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort
-                try:
-                    logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
-                except UnicodeDecodeError:
-                    pass
+                printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
                 i += 1
@@ -1731,6 +1690,7 @@ def main():
 
     returns a list containing the result
     """
+    global dieNow
 
     # this line is used for handling SIGINT, so things can die safely.
     signal.signal(signal.SIGINT, signal_handler)
@@ -1769,8 +1729,14 @@ def main():
             courtID = 1
             from alertSystem.models import PACER_CODES
             while courtID <= len(PACER_CODES):
-                if options.scrape: scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
-                if options.parse:  parseCourt(courtID, VERBOSITY)
+                # This catches all exceptions regardless of their trigger, so
+                # if one court dies, the next isn't affected.
+                try:
+                    if options.scrape: scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
+                    if options.parse:  parseCourt(courtID, VERBOSITY)
+                except Exception:
+                    print '*****Uncaught error parsing court*****\n"' + traceback.format_exc() + "\n\n"
+                    pass
                 # this catches SIGINT, so the code can be killed safely.
                 if dieNow == True:
                     sys.exit(0)
