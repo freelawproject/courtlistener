@@ -465,7 +465,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         # to be updated. It's lazy, but effective.
         urls = (
             "http://www.ca3.uscourts.gov/recentop/week/recprec.htm",
-            #"http://www.ca3.uscourts.gov/recentop/week/recnon2day.htm",
+            "http://www.ca3.uscourts.gov/recentop/week/recnonprec.htm",
             )
         ct = Court.objects.get(courtUUID='ca3')
 
@@ -536,7 +536,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # Make a decision about the docType.
                 if "recprec.htm" in str(url):
                     doc.documentType = "Published"
-                elif "recnon2day.htm" in str(url):
+                elif "recnonprec.htm" in str(url):
                     doc.documentType = "Unpublished"
 
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
