@@ -455,12 +455,12 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         return
 
     elif (courtID == 3):
-        """
+        '''
         This URL provides the latest 25 cases, so I need to pick out the new
         ones and only get those. I can do this efficiently by trying to do each,
         and then giving up once I hit one that I've done before. This will work
         because they are in reverse chronological order.
-        """
+        '''
 
         # if these URLs change, the docType identification (below) will need
         # to be updated. It's lazy, but effective.
@@ -531,7 +531,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # next up is the caseDate
                 splitDate = caseDate.split('/')
                 caseDate = datetime.date(int("20" + splitDate[2]),int(splitDate[0]),
-                    int(splitDate[1]))
+                    int(splitDate[1])) # ack y2k1c bug!
                 doc.dateFiled = caseDate
 
                 # Make a decision about the docType.
