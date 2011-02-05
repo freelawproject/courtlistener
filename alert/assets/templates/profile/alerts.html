@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}CourtListener.com / Profile / Alerts{% endblock %}
+
+{% block content %}
+    <div class="span-24 last">
+        <h2>Settings / Alerts</h2>
+        <div class="span-6 box round header">
+            <h3 class="bottom">
+                <a href="/profile/settings/">Account</a>&nbsp;&nbsp;&nbsp;<a href="/profile/alerts/"><strong>Alerts</strong></a>&nbsp;&nbsp;&nbsp;<a href="/profile/password/change">Password</a>
+            </h3>
+        </div>
+    </div>
+    <div class="span-24 last" id="content">
+        {% if user.get_profile.alert.all %}
+            <div class="span-24 last content">
+                {% if messages %}
+                    <div class="span-18">
+                        <div class="span-10">
+                            {% for message in messages %}
+                                <p class="bottom {{message.tags}}">{{message|safe}}</p>
+                            {% endfor %}
+                        </div>
+                        <div class="span-7 last">&nbsp;</div>
+                    </div>
+                {% else %}
+                    {% if not request.user.get_profile.emailConfirmed %}
+                        <div class="span-18">
+                            <div class="span-10">
+                                <p class="bottom notice">Your email address has not been confirmed. To receive alerts, you must <a href="/email-confirmation/request/">confirm your email address</a>.</p>
+                            </div>
+                            <div class="span-7 last">&nbsp;</div>
+                        </div>
+                    {% endif %}
+                {% endif %}
+                <table>
+                    <tr>
+                        <th>Query name</th>
+                        <th>Query</th>
+                        <th>Frequency</th>
+                        <th>Last hit</th>
+                        <th>Private</th>
+                        <th>Subscribe</th>
+                    </tr>
+                    {% for alert in user.get_profile.alert.all %}
+                    <tr>
+                        <td><p class="bottom" title="{{alert.alertName}}">{{ alert.alertName|capfirst|truncatewords:"6" }}</p></td>
+                        <td><a href="/search/results/?q={{alert.alertText}}" title="{{alert.alertText}}">{{ alert.alertText|truncatewords:"14" }}</a></td>
+                        <td>{{ alert.get_alertFrequency_display }}</td>
+                        <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"Never" }}</td>
+                        <td>{{ alert.alertPrivacy|yesno:"Yes,No" }}</td>
+                        <td><a href="/feed/search/?q={{alert.alertText}}"><img src="/media/images/png/atom-feed.png" alt="atom icon"></a>
+                        <td><a href="/alert/edit/{{ alert.alertUUID }}/">edit/delete</a></td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                <form action="/" method="post">{% csrf_token %}
+                <button type="submit" class="button">Make new alert</button>
+            </div>
+        {% else %}
+            <h3>You do not have any alerts.</h3>
+            <form action="/" method="post">{% csrf_token %}
+            <button type="submit" class="button">Make new alert</button>
+        {% endif %}
+    </div>
+{% endblock %}
