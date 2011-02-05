@@ -44,8 +44,8 @@ import urllib
 import urllib2
 
 from BeautifulSoup import BeautifulSoup
-#from datetime import datetime
-from lxml.html import fromstring, tostring
+from lxml.html import fromstring
+from lxml.html import tostring
 from lxml import etree
 from optparse import OptionParser
 from time import mktime
@@ -107,7 +107,8 @@ def printAndLogNewDoc(VERBOSITY, ct, cite):
 
 
 def makeDocFromURL(LinkToDoc, ct):
-    '''Receives a URL and a court as arguments, then downloads the PDF
+    '''
+    Receives a URL and a court as arguments, then downloads the PDF
     that's in it, and makes it into a StringIO. Generates a sha1 hash of the
     file, and tries to add it to the db. If it's a duplicate, it gets the one in
     the DB. If it's a new sha1, it creates a new document.

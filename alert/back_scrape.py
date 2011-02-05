@@ -30,17 +30,34 @@ setup_environ(settings)
 
 from alertSystem.models import *
 from alertSystem.string_utils import *
-from scrape_and_parse import clean_string, makeDocFromURL, hasDuplicate, getPDFContent, parseCourt
+from scrape_and_parse import getDocContent
+from scrape_and_parse import hasDuplicate
+from scrape_and_parse import makeDocFromURL
+from scrape_and_parse import parseCourt
+from scrape_and_parse import printAndLogNewDoc
+from scrape_and_parse import readURL
 from django.core.files.base import ContentFile
 from django.core.files import File
 from django.core.exceptions import ObjectDoesNotExist
 
-import datetime, calendar, hashlib, httplib, re, subprocess, time, urllib, urllib2
+import calendar
+import datetime
+import hashlib
+import httplib
+import re
+import StringIO
+import subprocess
+import time
+import urllib
+import urllib2
+
 from BeautifulSoup import BeautifulSoup
-from lxml.html import fromstring, tostring
+from lxml.html import fromstring
+from lxml.html import tostring
 from lxml import etree
 from optparse import OptionParser
 from urlparse import urljoin
+
 
 """This is where scrapers live that can be trained on historical data with some
 tweaking.
@@ -49,7 +66,7 @@ These are generally much more hacked than those scrapers in scrape_and_parse.py,
 but they should work with some editing or updating."""
 
 
-def back_scrape_court(courtID, result, verbosity):
+def back_scrape_court(courtID, verbosity):
     if (courtID == 5):
         """Court is accessible via a HTTP Post, but requires some random fields
         in order to work. The method here, as of 2010/04/27, is to create an
@@ -194,7 +211,7 @@ def back_scrape_court(courtID, result, verbosity):
 
         return result
 
-    if courtID == '10':
+    if courtID == 10:
         '''Functional as of 2010/08/11. This court has a search form, which
         returns ten results at a time. The results are in pretty shabby form,
         hence we request then ONE AT A TIME!
@@ -453,10 +470,94 @@ def back_scrape_court(courtID, result, verbosity):
         return result
 
     if courtID == 12:
-        """This could seems to have fabulous pages such as this one:
-        http://pacer.cadc.uscourts.gov/common/opinions/201002.htm"
-        """
-        return result
+        '''
+        cadc.
+        '''
+        VERBOSITY = verbosity
+        ct = Court.objects.get(courtUUID = 'cadc')
+
+        months = [ '01', '02', '03', '04', '05', '06', '07', '08', '09', '10',
+            '11', '12']
+        years = [ '1997']
+         #~ '1998', '1999', '2000', '2001', '2002', '2003', '2004',
+            #~ '2005', '2006', '2007', '2008', '2009', '2010']
+
+        for year in years:
+            for month in months:
+                print "\n\n*****Date is now: " + year + "/" + month + "*****"
+                url = "http://www.cadc.uscourts.gov/internet/opinions.nsf/OpinionsByRDate?OpenView&count=100&SKey=" + year + month
+
+
+                try: html = readURL(url, courtID)
+                except: continue
+
+                parser = etree.HTMLParser()
+                import StringIO
+                tree = etree.parse(StringIO.StringIO(html), parser)
+
+                divs = tree.xpath('//div[@class="row-entry"]')
+
+                dupCount = 0
+                for div in divs:
+                    # Loop through the divs. If the div has an HTML anchor in column
+                    # one, then it's a case number + name in the div. Else, it's a date
+                    caseLinkAnchor = div.find('./span[@class="column-one"]/a')
+                    if caseLinkAnchor == None:
+                        caseLinkAnchor = div.find('./span[@class="column-one texticon"]/a')
+                    caseNameDiv = div.find('./span[@class="column-two"]')
+                    caseDate = div.find('./span[@class="column-two myDemphasize"]')
+
+                    if caseLinkAnchor != None:
+                        # It's a caseLink, caseName row, grab them.
+                        caseLink = caseLinkAnchor.get('href')
+                        caseLink = urljoin(url, caseLink)
+                        #print "Link: " + caseLink
+
+                        caseNumber = caseLinkAnchor.text
+                        #print "Case number: " + caseNumber
+
+                        caseNameShort = caseNameDiv.text
+                        #print "CaseName: " + caseNameShort
+                    else:
+                        # No caselink here, find the casedate instead, then do the
+                        # rest of the processing. This is ugly code, but it works
+                        # b/c the date always comes after the casename and link.
+                        caseDate = caseDate.text
+                        #print "Date: " + caseDate
+
+                        myFile, doc, created, error = makeDocFromURL(caseLink, ct)
+
+                        if error:
+                            continue
+
+                        if not created:
+                            # it's an oldie, punt!
+                            dupCount += 1
+                            if dupCount == 5:
+                                # fifth dup in a a row. BREAK!
+                                break
+                            continue
+                        else:
+                            dupCount = 0
+
+                        doc.documentType = "Published"
+
+                        splitDate = caseDate.split('/')
+                        caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
+                            int(splitDate[1]))
+                        doc.dateFiled = caseDate
+
+                        # now that we have the caseNumber and caseNameShort, we can dup check
+                        cite, created = hasDuplicate(caseNumber, caseNameShort)
+
+                        # last, save evrything (pdf, citation and document)
+                        doc.citation = cite
+                        mimetype = '.' + caseLink.split('.')[-1]
+                        doc.local_path.save(trunc(clean_string(caseNameShort), 80) + mimetype, myFile)
+                        printAndLogNewDoc(VERBOSITY, ct, cite)
+                        doc.save()
+
+        return
 
     if courtID == 14:
         """SCOTUS. This code is the same as in the scraper as of today (2010-05-05).
@@ -692,8 +793,6 @@ def main():
     returns a list containing the result
     """
 
-    result = ""
-
     usage = "usage: %prog -c COURTID (-s | -p) [-v {1,2}]"
     parser = OptionParser(usage)
     parser.add_option('-s', '--scrape', action="store_true", dest='scrape',
@@ -708,32 +807,30 @@ def main():
     if not options.courtID or (not options.scrape and not options.parse):
         parser.error("You must specify a court and whether to scrape and/or parse it")
 
+    try:
+        courtID = int(options.courtID)
+    except:
+        print "Error: court not found"
+        raise django.core.exceptions.ObjectDoesNotExist
+
+
     if options.verbosity:
         verbosity = options.verbosity
     else:
-        verbosity = 0
-
-    # some data validation, for good measure
-    try:
-        courtID = options.courtID
-    except:
-        result = "Error: court not found\n"
-        raise ObjectDoesNotExist
+        verbosity = '0'
 
     if courtID == 0:
         # we use a while loop to do all courts.
         courtID = 1
         from alertSystem.models import PACER_CODES
         while courtID <= len(PACER_CODES):
-            if options.scrape: result = back_scrape_court(courtID, result, verbosity)
-            if options.parse:  result = parseCourt(courtID, result, verbosity)
+            if options.scrape: back_scrape_court(courtID, verbosity)
+            if options.parse:  parseCourt(courtID, verbosity)
             courtID += 1
     else:
         # we're only doing one court
-        if options.scrape: result = back_scrape_court(courtID, result, verbosity)
-        if options.parse:  result = parseCourt(courtID, result, verbosity)
-
-    print str(result)
+        if options.scrape: back_scrape_court(courtID, verbosity)
+        if options.parse:  parseCourt(courtID, verbosity)
 
     return 0
 
