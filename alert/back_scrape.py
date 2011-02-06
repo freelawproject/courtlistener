@@ -33,6 +33,7 @@ from alertSystem.string_utils import *
 from scrape_and_parse import getDocContent
 from scrape_and_parse import hasDuplicate
 from scrape_and_parse import makeDocFromURL
+from scrape_and_parse import makeDocError
 from scrape_and_parse import parseCourt
 from scrape_and_parse import printAndLogNewDoc
 from scrape_and_parse import readURL
@@ -66,7 +67,183 @@ These are generally much more hacked than those scrapers in scrape_and_parse.py,
 but they should work with some editing or updating."""
 
 
-def back_scrape_court(courtID, verbosity):
+def back_scrape_court(courtID, VERBOSITY):
+    if (courtID == 1):
+        '''
+        This scrapes ca1 using an HTTP POST. The data comes back in a nice
+        tabular format, so that's easy, but it's paginated 200 per page, so we
+        have to iterate over the pages until we get all the results.
+
+        The process is thus to start at 1993/01/01, and do one month increments.
+
+        The court has docs back to 1992, but the first ones lack decent case
+        names, so we'll have to get them from resource.org.
+        '''
+        url = 'http://www.ca1.uscourts.gov/cgi-bin/opinions.pl'
+        ct = Court.objects.get(courtUUID = 'ca1')
+
+        # Build an array of every the date every 30 days from 1993-01-01 to today
+        hoy = datetime.date.today()
+        unixTimeToday = int(time.mktime(hoy.timetuple()))
+        dates = []
+        i = 0
+        while True:
+            # This is the start date + 30 days for each value of i.
+            # it's expressed in Unixtime, and can be arbitrarily set by running
+            # date --date="2010-04-19" +%s in the terminal.
+            newDate = 725875200 + (2592000 * i)
+            dates.append(datetime.datetime.fromtimestamp(newDate))
+            if newDate > unixTimeToday:
+                break
+            else:
+                i += 1
+
+        # next, iterate over these until there are no more!
+        i = 0
+        while i < (len(dates)-1):
+            startDate = time.strftime('%m/%d/%Y', dates[i].timetuple())
+            endDate = time.strftime('%m/%d/%Y', dates[i+1].timetuple())
+            i += 1
+
+            print "\n\n****Now scraping " + startDate + " to " + endDate + "****"
+
+            postValues = {
+                    'OPINNUM'  : '',
+                    'CASENUM'  : '',
+                    'TITLE'    : '',
+                    'FROMDATE' : startDate,
+                    'TODATE'   : endDate,
+                    'puid'     : '',
+                }
+
+            data = urllib.urlencode(postValues)
+            req = urllib2.Request(url, data)
+            try: html = readURL(req, courtID)
+            except: continue
+
+            parser = etree.HTMLParser()
+            import StringIO
+            tree = etree.parse(StringIO.StringIO(html), parser)
+
+            rows = tree.xpath('//table[2]/tr')
+
+            # Iterate over each row, and pull out the goods, skipping the header row.
+            for row in rows[1:]:
+                '''
+                The next large couple of blocks try to get the file as a PDF.
+                Failing that, they try as a WPD. If that fails, they extract
+                the text from the webpage.
+
+                After all this mess, we end up with a doc.
+                '''
+
+                # Start with the case number
+                rowCells = row.findall('.//td')
+                caseNumber = rowCells[1].find('./a').text
+
+                # Special cases
+                if caseNumber.strip() == '93-1017.01A':
+                    continue
+
+                # Case link, if there is a PDF
+                caseLink = 'http://www.ca1.uscourts.gov/pdf.opinions/' + caseNumber + '.pdf'
+                #print caseLink
+
+                try:
+                    # Best case scenario: There's a PDF.
+                    myFile, doc, created = makeDocFromURL(caseLink, ct)
+                    mimetype = '.pdf'
+                except makeDocError as e:
+                    if 'DownloadingError' in e.value:
+                        # The PDF didn't exist; try the WPD
+                        caseLink = 'http://www.ca1.uscourts.gov/wp.opinions/' + caseNumber
+                        mimetype = '.wpd'
+                        try:
+                            myFile, doc, created = makeDocFromURL(caseLink, ct)
+                        except makeDocError:
+                            # The WPD didn't exist either, grab the text and
+                            # clean it up.
+                            mimetype = None
+                            caseLink = rowCells[1].find('./a').get('href')
+                            caseLink = urljoin(url, caseLink)
+                            #print "Quick view's case link is: " + caseLink
+
+                            try: quickHtml = readURL(caseLink, courtID)
+                            except: continue
+
+                            # Get the useful part of the webpage.
+                            quickTree = etree.parse(StringIO.StringIO(quickHtml), parser)
+
+                            documentPlainText = quickTree.find('//pre')
+
+                            # Clean up the text
+                            documentPlainText = tostring(documentPlainText).replace('<pre>', '').replace('</pre>','')\
+                                .replace('<br>', '\n')
+                            documentPlainText = anonymize(documentPlainText)
+                            documentPlainText = removeDuplicateLines(documentPlainText)
+                            documentPlainText = removeLeftMargin(documentPlainText)
+
+                            sha1Hash = hashlib.sha1(documentPlainText).hexdigest()
+
+                            # using that, we check for a dup
+                            doc, created = Document.objects.get_or_create(documentSHA1 = sha1Hash,
+                                court = ct)
+
+                            if created:
+                                # we only do this if it's new
+                                doc.documentSHA1 = sha1Hash
+                                doc.download_URL = caseLink
+                                doc.court = ct
+                                doc.source = "C"
+
+                            doc.documentPlainText = documentPlainText
+
+                        except:
+                            print "Unanticipated error. Aborting"
+                            return 1
+
+                # The real case number (the one above is't quite right)
+                caseNumber = rowCells[2].find('./a').text
+
+                # Next: Case name.
+                caseNameShort = clean_string(rowCells[3].text)
+                if caseNameShort == 'v.':
+                    caseNameShort = 'Unknown case name'
+
+                # Next: document type
+                if 'u' in caseNumber.lower():
+                    doc.documentType = "Unpublished"
+                elif 'e' in caseNumber.lower():
+                    doc.documentType = "Errata"
+                elif 'p' in caseNumber.lower():
+                    doc.documentType = "Published"
+                else:
+                    # If it's not detected as errata or unpublished, it's published.
+                    doc.documentType = "Published"
+
+                # Next: caseDate
+                try:
+                    caseDate = rowCells[0].text.strip()
+                    splitDate = caseDate.split('/')
+                    caseDate = datetime.date(int(splitDate[0]), int(splitDate[1]),
+                        int(splitDate[2]))
+                except AttributeError:
+                    caseDate = None
+                doc.dateFiled = caseDate
+
+                # now that we have the caseNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(caseNumber, caseNameShort)
+
+                # last, save evrything (file, citation and document)
+                doc.citation = cite
+                if mimetype:
+                    doc.local_path.save(trunc(clean_string(caseNameShort), 80) + mimetype, myFile)
+                printAndLogNewDoc(VERBOSITY, ct, cite)
+                doc.save()
+
+        return
+
+
     if (courtID == 5):
         """Court is accessible via a HTTP Post, but requires some random fields
         in order to work. The method here, as of 2010/04/27, is to create an
@@ -471,7 +648,8 @@ def back_scrape_court(courtID, verbosity):
 
     if courtID == 12:
         '''
-        cadc.
+        cadc - a nice HTML page, with good data. Scraped using lxml, no major
+        tricks.
         '''
         VERBOSITY = verbosity
         ct = Court.objects.get(courtUUID = 'cadc')

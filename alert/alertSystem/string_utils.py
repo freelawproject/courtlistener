@@ -277,3 +277,47 @@ def trunc(s, length):
             end = length
         return s[0:end]
 
+
+def removeLeftMargin(s):
+    # Gets rid of left hand margin using the mode of
+    # the number of spaces before text in the doc.
+    lines = s.split('\n')
+    marginSizes = []
+    for line in lines:
+        if len(line) > 0:
+            if line[0] == ' ':
+                # if the line has length and starts with a space
+                newlength = len(line.lstrip())
+                oldlength = len(line)
+                diff = oldlength - newlength
+                if diff != 0:
+                    marginSizes.append(oldlength - newlength)
+
+    mode = max([marginSizes.count(y),y] for y in marginSizes)[1]
+
+    lines_out = []
+    for line in lines:
+        numLSpaces = len(line) - len(line.lstrip())
+        if numLSpaces < mode:
+            # Strip only that number of spaces
+            line_out = line[numLSpaces:]
+        elif numLSpaces >= mode:
+            # Strip off the mode number of spaces
+            line_out = line[mode:]
+
+        lines_out.append(line_out)
+
+    return '\n'.join(lines_out)
+
+
+def removeDuplicateLines(s):
+    # Remove duplciate lines next to each other.
+    lines = s.split('\n')
+    lines_out = []
+    previous_line = ''
+    for line in lines:
+        if line != previous_line:
+            lines_out.append(line)
+            previous_line = line
+
+    return '\n'.join(lines_out)

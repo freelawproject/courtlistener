@@ -69,6 +69,18 @@ logger.addHandler(handler)
 # for use in catching the SIGINT (Ctrl+C)
 dieNow = False
 
+
+class makeDocError(Exception):
+    '''
+    This is a simple class for errors stemming from the makeDocFromURL function.
+    It doesn't do much except to make the code a little cleaner and more precise.
+    '''
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
+
+
 def signal_handler(signal, frame):
     print 'Exiting safely...this will finish the current court, then exit...'
     global dieNow
@@ -108,7 +120,7 @@ def printAndLogNewDoc(VERBOSITY, ct, cite):
 
 def makeDocFromURL(LinkToDoc, ct):
     '''
-    Receives a URL and a court as arguments, then downloads the PDF
+    Receives a URL and a court as arguments, then downloads the Doc
     that's in it, and makes it into a StringIO. Generates a sha1 hash of the
     file, and tries to add it to the db. If it's a duplicate, it gets the one in
     the DB. If it's a new sha1, it creates a new document.
@@ -125,12 +137,17 @@ def makeDocFromURL(LinkToDoc, ct):
         myFile = ContentFile(stringThing.getvalue())
         webFile.close()
     except:
-        print "ERROR DOWNLOADING FILE!: " + str(LinkToDoc)
-        error = True
-        return "Bad", "Bad", "Bad", error
+        err = 'DownloadingError: ' + str(LinkToDoc)
+        raise makeDocError(err)
 
     # make the SHA1
     data = myFile.read()
+
+    # test for empty files (thank you CA1)
+    if len(data) == 0:
+        err = "EmptyFileError: " + str(LinkToDoc)
+        raise makeDocError(err)
+
     sha1Hash = hashlib.sha1(data).hexdigest()
 
     # using that, we check for a dup
@@ -144,9 +161,7 @@ def makeDocFromURL(LinkToDoc, ct):
         doc.court = ct
         doc.source = "C"
 
-    error = False
-
-    return myFile, doc, created, error
+    return myFile, doc, created
 
 
 def courtChanged(url, contents):
@@ -202,8 +217,10 @@ def hasDuplicate(caseNum, caseName):
 
 
 def getDocContent(docs):
-    """Get the contents of a list of files, and add them to the DB, sniffing
-    their mimetype."""
+    '''
+    Get the contents of a list of files, and add them to the DB, sniffing
+    their mimetype.
+    '''
     for doc in docs:
         path = str(doc.local_path)
         path = settings.MEDIA_ROOT + path
@@ -211,25 +228,52 @@ def getDocContent(docs):
         mimetype = path.split('.')[-1]
         if mimetype == 'pdf':
             # do the pdftotext work for PDFs
-            process = subprocess.Popen(
-                ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"], shell=False,
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            process = subprocess.Popen(["pdftotext", "-layout", "-enc", "UTF-8",
+                path, "-"], shell=False, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT)
             content, err = process.communicate()
-            if err: print "****Error extracting text from: " + doc.citation.caseNameShort + "****"
+            doc.documentPlainText = anonymize(content)
+            if err:
+                print "****Error extracting PDF text from: " + doc.citation.caseNameShort + "****"
+                continue
         elif mimetype == 'txt':
             # read the contents of text files.
             try:
                 content = open(path).read()
+                doc.documentPlainText = anonymize(content)
             except:
                 print "****Error extracting plain text from: " + doc.citation.caseNameShort + "****"
+                continue
+        elif mimetype == 'wpd':
+            # It's a Word Perfect file. Use the wpd2html converter, clean up
+            # the HTML and save the content to the HTML field.
+            process = subprocess.Popen(['wpd2html', path, '-'], shell=False,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            content, err = process.communicate()
+
+            parser = etree.HTMLParser()
+            import StringIO
+            tree = etree.parse(StringIO.StringIO(content), parser)
+            body = tree.xpath('//body')
+            content = tostring(body[0]).replace('<body>', '').replace('</body>','')
+
+            fontsizeReg = re.compile('font-size: .*;')
+            content = re.sub(fontsizeReg, '', content)
+
+            colorReg = re.compile('color: .*;')
+            content = re.sub(colorReg, '', content)
+
+            if 'not for publication' in content.lower():
+                doc.documentType = "Unpublished"
+            doc.documentHTML = anonymize(content)
+
+            if err:
+                print "****Error extracting WPD text from: " + doc.citation.caseNameShort + "****"
                 continue
         else:
             print "*****Unknown mimetype. Unable to parse: " + doc.citation.caseNameShort + "****"
             continue
 
-        # add the anonymized plain text to the DB. Don't run clean_string on this
-        # because that removes the white space and newlines (see r538)!
-        doc.documentPlainText = anonymize(content)
         try:
             doc.save()
         except Exception, e:
@@ -240,10 +284,10 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
     if VERBOSITY >= 1: print "NOW SCRAPING COURT: " + str(courtID)
 
     if (courtID == 1):
-        """
+        '''
         PDFs are available from the first circuit if you go to their RSS feed.
         So go to their RSS feed we shall.
-        """
+        '''
         urls = ("http://www.ca1.uscourts.gov/opinions/opinionrss.php",)
         ct = Court.objects.get(courtUUID='ca1')
 
@@ -300,10 +344,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseLink = urljoin(url, caseLink)
 
                 # then we download the PDF, make the hash and document
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                if error:
-                    # things broke, punt this iteration
+                try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                except makeDocError:
                     i -= 1
                     continue
 
@@ -398,10 +440,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseLink = aTagsRegex.search(caseLink).group(1)
                 caseLink = urljoin(url, caseLink)
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                if error:
-                    # things broke, punt this iteration
+                try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                except makeDocError:
                     i += 1
                     continue
 
@@ -498,10 +538,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # caseLink and caseNameShort
                 caseLink = aTags[i].get('href')
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                if error:
-                    # things broke, punt this iteration
+                try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                except makeDocError:
                     i += 1
                     continue
 
@@ -552,9 +590,11 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         return
 
     elif (courtID == 4):
-        """The fourth circuit is THE worst form of HTML I've ever seen. It's
+        '''
+        The fourth circuit is THE worst form of HTML I've ever seen. It's
         going to break a lot, but I've done my best to clean it up, and make it
-        reliable."""
+        reliable.
+        '''
         urls = ("http://pacer.ca4.uscourts.gov/opinions_today.htm",)
         ct = Court.objects.get(courtUUID='ca4')
 
@@ -591,10 +631,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseLink = aTags[i].get('href')
                 caseLink = urljoin(url, caseLink)
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                if error:
-                    # things broke, punt this iteration
+                try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                except makeDocError:
                     i += 1
                     continue
 
@@ -652,13 +690,14 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         return
 
     elif (courtID == 5):
-        """New fifth circuit scraper, which can get back versions all the way to
+        '''
+        New fifth circuit scraper, which can get back versions all the way to
         1992!
 
         This is exciting, but be warned, the search is not reliable on recent
         dates. It has been known not to bring back results that are definitely
         within the set. Watch closely.
-        """
+        '''
         urls = ("http://www.ca5.uscourts.gov/Opinions.aspx",)
         ct = Court.objects.get(courtUUID = 'ca5')
 
@@ -714,10 +753,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseLink = aTags[i].get('href')
                 caseLink = urljoin(url, caseLink)
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                if error:
-                    # things broke, punt this iteration
+                try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                except makeDocError:
                     i += 1
                     continue
 
@@ -818,10 +855,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseLink = aTags[i].get('href')
                 caseLink = urljoin(url, caseLink)
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                if error:
-                    # things broke, punt this iteration
+                try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                except makeDocError:
                     i += 1
                     continue
 
@@ -875,11 +910,13 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         return
 
     elif (courtID == 7):
-        """another court where we need to do a post. This will be a good
+        '''
+        another court where we need to do a post. This will be a good
         starting place for getting the judge field, when we're ready for that.
 
         Missing a day == OK. Queries return cases for the past week.
-        """
+        '''
+
         urls = ("http://www.ca7.uscourts.gov/fdocs/docs.fwx",)
         ct = Court.objects.get(courtUUID = 'ca7')
 
@@ -912,10 +949,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     caseLink = aTags[i].get("href")
                     caseLink = urljoin(url, caseLink)
 
-                    myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                    if error:
-                        # things broke, punt this iteration
+                    try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                    except makeDocError:
                         i += 1
                         continue
 
@@ -1005,12 +1040,10 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseLink = aTags[i].get('href')
                 caseLink = urljoin(url, caseLink)
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                if error:
-                        # things broke, punt this iteration
-                        i += 1
-                        continue
+                try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                except makeDocError:
+                    i += 1
+                    continue
 
                 if not created:
                     # it's an oldie, punt!
@@ -1116,9 +1149,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 if noMemos or noOpinions:
                     continue
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                if error:
+                try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                except makeDocError:
                     continue
 
                 if not created:
@@ -1205,12 +1237,10 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseLink = caseLinks[i].text
                 caseLink = urljoin(url, caseLink)
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                if error:
-                        # things broke, punt this iteration
-                        i += 1
-                        continue
+                try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                except makeDocError:
+                    i += 1
+                    continue
 
                 if not created:
                     # it's an oldie, punt!
@@ -1327,10 +1357,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseLink = caseLinks[i].get('href')
                 caseLink = urljoin(url, caseLink)
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                if error:
-                    # things broke, punt this iteration
+                try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                except makeDocError:
                     i += 1
                     continue
 
@@ -1403,12 +1431,10 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseLink = caseLinks[i].text
                 caseLink = urljoin(url, caseLink)
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                if error:
-                        # things broke, punt this iteration
-                        i += 1
-                        continue
+                try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                except makeDocError:
+                    i += 1
+                    continue
 
                 if not created:
                     # it's an oldie, punt!
@@ -1485,12 +1511,10 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     i += 1
                     continue
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                if error:
-                        # things broke, punt this iteration
-                        i += 1
-                        continue
+                try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                except makeDocError:
+                    i += 1
+                    continue
 
                 if not created:
                     # it's an oldie, punt!
@@ -1588,10 +1612,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseLink = caseLinks[i].get('href')
                 caseLink = urljoin(url, caseLink)
 
-                myFile, doc, created, error = makeDocFromURL(caseLink, ct)
-
-                if error:
-                    # things broke, punt this iteration
+                try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                except makeDocError:
                     i += 1
                     continue
 
