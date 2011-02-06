@@ -176,6 +176,9 @@ def back_scrape_court(courtID, VERBOSITY):
                             try: quickHtml = readURL(caseLink, courtID)
                             except: continue
 
+                            # This helps out the parser in corner cases.
+                            quickHtml = unicode(quickHtml)
+
                             # Get the useful part of the webpage.
                             quickTree = etree.parse(StringIO.StringIO(quickHtml), parser)
 
@@ -184,7 +187,7 @@ def back_scrape_court(courtID, VERBOSITY):
                             # Clean up the text
                             try:
                                 documentPlainText = tostring(documentPlainText).replace('<pre>', '').replace('</pre>','')\
-                                    .replace('<br>', '\n')
+                                    .replace('<br>', '\n').replace('_', ' ')
                             except TypeError:
                                 continue
                             documentPlainText = anonymize(documentPlainText)
