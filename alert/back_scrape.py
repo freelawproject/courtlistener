@@ -91,7 +91,12 @@ def back_scrape_court(courtID, VERBOSITY):
             # This is the start date + 30 days for each value of i.
             # it's expressed in Unixtime, and can be arbitrarily set by running
             # date --date="2010-04-19" +%s in the terminal.
-            newDate = 725875200 + (2592000 * i)
+
+	    # This is the date that was used in the original start date.
+            # newDate = 725875200 + (2592000 * i)
+
+	    # This date was used to get things moving after crawler crashes.
+	    newDate = 738831600 + (2592000 * i)
             dates.append(datetime.datetime.fromtimestamp(newDate))
             if newDate > unixTimeToday:
                 break
@@ -142,7 +147,7 @@ def back_scrape_court(courtID, VERBOSITY):
                 caseNumber = rowCells[1].find('./a').text
 
                 # Special cases
-                if caseNumber.strip() == '93-1017.01A':
+                if caseNumber.strip() == '92-2198.01A':
                     continue
 
                 # Case link, if there is a PDF
@@ -177,8 +182,11 @@ def back_scrape_court(courtID, VERBOSITY):
                             documentPlainText = quickTree.find('//pre')
 
                             # Clean up the text
-                            documentPlainText = tostring(documentPlainText).replace('<pre>', '').replace('</pre>','')\
-                                .replace('<br>', '\n')
+			    try:
+                                documentPlainText = tostring(documentPlainText).replace('<pre>', '').replace('</pre>','')\
+                                    .replace('<br>', '\n')
+			    except TypeError:
+			        continue
                             documentPlainText = anonymize(documentPlainText)
                             documentPlainText = removeDuplicateLines(documentPlainText)
                             documentPlainText = removeLeftMargin(documentPlainText)
@@ -201,6 +209,9 @@ def back_scrape_court(courtID, VERBOSITY):
                         except:
                             print "Unanticipated error. Aborting"
                             return 1
+
+                if not created:
+                    continue
 
                 # The real case number (the one above is't quite right)
                 caseNumber = rowCells[2].find('./a').text
