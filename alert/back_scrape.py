@@ -247,7 +247,14 @@ def back_scrape_court(courtID, VERBOSITY):
                     caseDate = datetime.date(int(splitDate[0]), int(splitDate[1]),
                         int(splitDate[2]))
                 except AttributeError:
+                    # No date in the field.
                     caseDate = None
+                except ValueError:
+                    # Special case...May has 31 days, not 32.
+                    if caseNumber == '95-2252':
+                        caseDate = datetime.date(1996, 05, 30)
+                    else:
+                        raise ValueError
                 doc.dateFiled = caseDate
 
                 # now that we have the caseNumber and caseNameShort, we can dup check
