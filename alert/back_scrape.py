@@ -182,11 +182,11 @@ def back_scrape_court(courtID, VERBOSITY):
                             documentPlainText = quickTree.find('//pre')
 
                             # Clean up the text
-			    try:
+                            try:
                                 documentPlainText = tostring(documentPlainText).replace('<pre>', '').replace('</pre>','')\
                                     .replace('<br>', '\n')
-			    except TypeError:
-			        continue
+                            except TypeError:
+                                continue
                             documentPlainText = anonymize(documentPlainText)
                             documentPlainText = removeDuplicateLines(documentPlainText)
                             documentPlainText = removeLeftMargin(documentPlainText)

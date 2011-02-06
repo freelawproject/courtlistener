@@ -179,7 +179,7 @@ def clean_string(string):
     string = string.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
         .replace('&ldquo;', "\"").replace('&nbsp;', ' ')\
         .replace('&amp;', '&').replace('%20', ' ').replace('&#160;', ' ')\
-        .strip().strip(';')
+        .strip().strip(';').strip(',')
 
     # if not already unicode, make it unicode, dropping invalid characters
     # if not isinstance(string, unicode):

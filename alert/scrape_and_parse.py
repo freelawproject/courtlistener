@@ -247,7 +247,7 @@ def getDocContent(docs):
         elif mimetype == 'wpd':
             # It's a Word Perfect file. Use the wpd2html converter, clean up
             # the HTML and save the content to the HTML field.
-	    print "Parsing: " + path
+            print "Parsing: " + path
             process = subprocess.Popen(['wpd2html', path, '-'], shell=False,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             content, err = process.communicate()
