@@ -1685,7 +1685,7 @@ def parseCourt(courtID, VERBOSITY):
 
     # select all documents from this jurisdiction that lack plainText and were
     # downloaded from the court.
-    docs = Document.objects.filter(documentPlainText = "",
+    docs = Document.objects.filter(documentPlainText = "", documentHTML = "",
         court__courtUUID = courts[courtID-1], source="C").order_by('documentUUID')
 
     numDocs = docs.count()
