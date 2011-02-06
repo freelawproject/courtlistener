@@ -24,6 +24,7 @@ alert/media/pdf
 # the server and laptop config
 alert/assets/media/pdf
 alert/assets/media/txt
+alert/assets/media/wpd
 alert/assets/media/sitemaps
 
 # the resource.org data
