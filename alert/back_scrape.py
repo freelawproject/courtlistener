@@ -224,15 +224,20 @@ def back_scrape_court(courtID, VERBOSITY):
                 if caseNameShort == 'v.':
                     caseNameShort = 'Unknown case name'
 
-                # Next: document type
+                # Next: Doctype
+                doc.documentType = "Published"
+                try:
+                    if 'not for publication' in documentPlainText.lower():
+                        doc.documentType = "Unpublished"
+                except NameError:
+                    pass
+
+                # documentPlainText doesn't exist.
                 if 'u' in caseNumber.lower():
                     doc.documentType = "Unpublished"
                 elif 'e' in caseNumber.lower():
                     doc.documentType = "Errata"
                 elif 'p' in caseNumber.lower():
-                    doc.documentType = "Published"
-                else:
-                    # If it's not detected as errata or unpublished, it's published.
                     doc.documentType = "Published"
 
                 # Next: caseDate
