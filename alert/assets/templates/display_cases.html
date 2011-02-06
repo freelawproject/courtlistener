@@ -45,10 +45,9 @@
             </p>
             <br>
             <h4>Document text</h4>
-            {% if doc.source == "C" or doc.source == "M" %}
+            {% if doc.documentPlainText %}
                 <pre>{{doc.documentPlainText}}</pre>
-            {% endif %}
-            {% if doc.source == "R" %}
+            {% else %}
                 {{doc.documentHTML|safe}}
             {% endif %}
 

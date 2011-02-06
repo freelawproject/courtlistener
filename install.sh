@@ -425,6 +425,9 @@ EOF
     echo "])" >> $CL_INSTALL_DIR/court-listener/alert/settings/20-private.conf #this closes off the INSTALLED_APPS var.
 
     echo -e 'Done\n\nCourtListener installed and configured successfully.'
+
+    # TODO: Add some useful aliases here. Research the best way to do this.
+
 }
 
 
