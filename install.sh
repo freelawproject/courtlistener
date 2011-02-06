@@ -199,7 +199,7 @@ Press enter to proceed, or Ctrl+C to abort. " proceed
 function checkDeps {
     # this function checks for various dependencies that the script assumes are
     # installed for its own functionality.
-    deps=(aptitude checkinstall g++ gcc git-core ipython libmysqlclient-dev logrotate make mercurial mysql-client mysql-server poppler-utils python python-beautifulsoup python-docutils python-mysqldb python-pip python-setuptools subversion tar wget)
+    deps=(aptitude checkinstall g++ gcc git-core ipython libmysqlclient-dev libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils python python-beautifulsoup python-docutils python-mysqldb python-pip python-setuptools subversion tar wget)
     echo -e "\n########################"
     echo "Checking dependencies..."
     echo "########################"
