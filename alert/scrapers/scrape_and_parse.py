@@ -21,7 +21,8 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from alertSystem.models import *
-from alertSystem.string_utils import *
+from lib.encode_decode import *
+from lib.string_utils import *
 
 from django.utils.encoding import smart_str
 from django.core.exceptions import MultipleObjectsReturned
@@ -62,7 +63,7 @@ logger.setLevel(logging.DEBUG)
 
 # Add the log message handler to the logger
 handler = logging.handlers.RotatingFileHandler(
-              LOG_FILENAME, maxBytes=512000, backupCount=1)
+              LOG_FILENAME, maxBytes=5120000, backupCount=1)
 
 logger.addHandler(handler)
 

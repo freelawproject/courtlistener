@@ -14,7 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from alert.alertSystem.string_utils import num_to_ascii, trunc
+from alert.lib.string_utils import trunc
+from alert.lib.encode_decode import num_to_ascii
 from django.template.defaultfilters import slugify
 from django.utils.text import get_valid_filename
 from djangosphinx.models import SphinxSearch
