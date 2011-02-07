@@ -25,15 +25,9 @@
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
 
-"""
-Original Perl version by: John Gruber http://daringfireball.net/ 10 May 2008
-Python version by Stuart Colville http://muffinresearch.co.uk
-License: http://www.opensource.org/licenses/mit-license.php
-"""
 
 import re
 from django.utils.encoding import smart_str, smart_unicode
-
 
 # For use in titlecase
 BIG = 'CDC|CDT|CNMI|DOJ|DVA|EFF|FCC|FTC|LLC|LLP|MSPB|RSS|SEC|USA|USC|USPS|WTO'
@@ -52,22 +46,8 @@ ALL_CAPS = re.compile(r'^[A-Z\s%s]+$' % PUNCT)
 UC_INITIALS = re.compile(r"^(?:[A-Z]{1}\.{1}|[A-Z]{1}\.{1}[A-Z]{1})+$")
 MAC_MC = re.compile(r"^([Mm]a?c)(\w+)")
 
-# For use in harmonize function
-US = 'USA|U\.S\.A\.|U\.S\.|United States of America'
-UNITED_STATES = re.compile(r'^(%s)$' % US, re.I)
-ET_AL = re.compile(',?\set\.?\sal\.?', re.IGNORECASE)
-
-# For use in anonymize function
-SSN_AND_ITIN = re.compile('(\s|^)(\d{3}-\d{2}-\d{4})(\s|$)')
-EIN = re.compile('(\s|^)(\d{2}-\d{7})(\s|$)')
-
-# alphabet used for url encoding and decoding. Omits some letters, like O0l1.
-ALPHABET = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
-
-
-
 def titlecase(text):
-    """
+    '''
     Titlecases input text
 
     This filter changes all words to Title Caps, and attempts to be clever
@@ -75,8 +55,7 @@ def titlecase(text):
 
     The list of "SMALL words" which are not capped comes from
     the New York Times Manual of Style, plus 'vs' and 'v'.
-
-    """
+    '''
 
     lines = re.split('[\r\n]+', text)
     processed = []
@@ -137,11 +116,17 @@ def titlecase(text):
         return "\n".join(processed)
 
 
+# For use in harmonize function
+US = 'USA|U\.S\.A\.|U\.S\.|United States of America'
+UNITED_STATES = re.compile(r'^(%s)$' % US, re.I)
+ET_AL = re.compile(',?\set\.?\sal\.?', re.IGNORECASE)
+
 def harmonize(text):
-    """This function fixes case names so they're cleaner. It fixes various
+    '''
+    This function fixes case names so they're cleaner. It fixes various
     ways of writing United States, gets rid of et al, and changes vs. to v.
     Lots of tests are in tests.py.
-    """
+    '''
 
     result = ''
     # replace vs. with v.
@@ -195,6 +180,11 @@ def clean_string(string):
     return string
 
 
+
+# For use in anonymize function
+SSN_AND_ITIN = re.compile('(\s|^)(\d{3}-\d{2}-\d{4})(\s|$)')
+EIN = re.compile('(\s|^)(\d{2}-\d{7})(\s|$)')
+
 def anonymize(string):
     """Convert SSNs, EIN and alienIDs to X's."""
 
@@ -221,46 +211,6 @@ def anonymize(string):
     string = re.sub(EIN, r"\1XX-XXXXXXX\3", string)
 
     return string
-
-
-def ascii_to_num(string, alphabet=ALPHABET):
-    from django.http import Http404
-    """Decode an ascii string back to the number it represents
-
-    `string`: The string to decode
-    """
-
-    base = len(alphabet)
-    strlen = len(string)
-    num = 0
-    i = 0
-    try:
-        for char in string:
-            power = (strlen - (i + 1))
-            num += alphabet.index(char) * (base ** power)
-            i += 1
-    except ValueError:
-        # happens if letters like l, 1, o, 0 are used.
-        raise Http404
-
-    return num
-
-
-def num_to_ascii(num, alphabet=ALPHABET):
-    """Encode a number in Base X
-
-    `num`: The number to encode
-    """
-    if (num <= 0):
-        return alphabet[0]
-    arr = []
-    base = len(alphabet)
-    while num:
-        rem = num % base
-        num = num // base
-        arr.append(alphabet[rem])
-    arr.reverse()
-    return ''.join(arr)
 
 
 def trunc(s, length):

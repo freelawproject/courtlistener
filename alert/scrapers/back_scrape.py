@@ -29,7 +29,8 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from alertSystem.models import *
-from alertSystem.string_utils import *
+from lib.encode_decode import *
+from lib.string_utils import *
 from scrape_and_parse import getDocContent
 from scrape_and_parse import hasDuplicate
 from scrape_and_parse import makeDocFromURL
