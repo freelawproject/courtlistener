@@ -93,10 +93,10 @@ def back_scrape_court(courtID, VERBOSITY):
             # date --date="2010-04-19" +%s in the terminal.
 
 	    # This is the date that was used in the original start date.
-            # newDate = 725875200 + (2592000 * i)
+            newDate = 725875200 + (2592000 * i)
 
 	    # This date was used to get things moving after crawler crashes.
-	    newDate = 738831600 + (2592000 * i)
+	    # newDate = 953798400 + (2592000 * i)
             dates.append(datetime.datetime.fromtimestamp(newDate))
             if newDate > unixTimeToday:
                 break
@@ -149,9 +149,13 @@ def back_scrape_court(courtID, VERBOSITY):
                 # Special cases
                 if caseNumber.strip() == '92-2198.01A':
                     continue
+		elif caseNumber.strip() == '94-2264.01A':
+		    continue
+		elif caseNumber.strip() == '97-1397.01A':
+		    continue
 
                 # Case link, if there is a PDF
-                caseLink = 'http://www.ca1.uscourts.gov/pdf.opinions/' + caseNumber + '.pdf'
+                caseLink = 'http://www.ca1.uscourts.gov/pdf.opinions/' + caseNumber.replace('.', '-') + '.pdf'
                 #print caseLink
 
                 try:
@@ -177,12 +181,20 @@ def back_scrape_court(courtID, VERBOSITY):
                             except: continue
 
                             # This helps out the parser in corner cases.
-                            quickHtml = unicode(quickHtml)
+                            quickHtml = unicode(quickHtml, errors='ignore')
 
                             # Get the useful part of the webpage.
                             quickTree = etree.parse(StringIO.StringIO(quickHtml), parser)
 
                             documentPlainText = quickTree.find('//pre')
+
+			    try:
+			        if len(documentPlainText) == 0:
+			            # These are binary files that are messed up, and cannot be parsed.
+				    continue
+		            except TypeError:
+			        # Happens when the "Can't open document" error shows up.
+			        continue
 
                             # Clean up the text
                             try:
@@ -226,11 +238,12 @@ def back_scrape_court(courtID, VERBOSITY):
 
                 # Next: Doctype
                 doc.documentType = "Published"
-                try:
-                    if 'not for publication' in documentPlainText.lower():
-                        doc.documentType = "Unpublished"
-                except NameError:
-                    pass
+                if documentPlainText != None:
+		    try:
+                        if 'not for publication' in documentPlainText.lower():
+                            doc.documentType = "Unpublished"
+                    except NameError:
+                        pass
 
                 # documentPlainText doesn't exist.
                 if 'u' in caseNumber.lower():
@@ -251,7 +264,7 @@ def back_scrape_court(courtID, VERBOSITY):
                     caseDate = None
                 except ValueError:
                     # Special case...May has 31 days, not 32.
-                    if caseNumber == '95-2252':
+                    if caseNumber.strip() == '95-2252':
                         caseDate = datetime.date(1996, 05, 30)
                     else:
                         raise ValueError
