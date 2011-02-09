@@ -31,13 +31,7 @@ setup_environ(settings)
 from alertSystem.models import *
 from lib.encode_decode import *
 from lib.string_utils import *
-from scrape_and_parse import getDocContent
-from scrape_and_parse import hasDuplicate
-from scrape_and_parse import makeDocFromURL
-from scrape_and_parse import makeDocError
-from scrape_and_parse import parseCourt
-from scrape_and_parse import printAndLogNewDoc
-from scrape_and_parse import readURL
+from lib.scrape_tools import *
 from django.core.files.base import ContentFile
 from django.core.files import File
 from django.core.exceptions import ObjectDoesNotExist
