@@ -782,7 +782,7 @@ def back_scrape_court(courtID, VERBOSITY):
         # http://www.cafc.uscourts.gov/opinions-orders/0/100/all/page-21-5.html
         countID = 0
         pageID = 0
-        while pageID <= 142:
+        while pageID <= 143:
             if pageID == 0:
                 url = "http://www.cafc.uscourts.gov/opinions-orders/0/all"
                 pageID += 1
@@ -859,7 +859,7 @@ def back_scrape_court(courtID, VERBOSITY):
                     .nextSibling.nextSibling.nextSibling.a.contents[0]\
                     .replace('[MOTION]', '').replace('[ORDER]', '').replace('(RULE 36)', '')\
                     .replace('[ERRATA]', '').replace('[CORRECTED]','').replace('[ORDER 2]', '')\
-                    .replace('[ORDER}', '').replace('[ERRATA 2]', '')
+                    .replace('[ORDER}', '').replace('[ERRATA 2]', '').replace('{ORDER]', '')
                 caseNameShort = titlecase(caseNameShort)
 
                 # next: documentType

@@ -121,6 +121,9 @@ def titlecase(text):
     # replace V. with v.
     text = re.sub(re.compile(r'\WV\.\W'), ' v. ', text)
 
+    # replace Llc. with LLC
+    text = text.replace('Llc.', 'LLC')
+
     return text
 
 
