@@ -32,6 +32,7 @@ from django.utils.encoding import smart_str, smart_unicode
 # For use in titlecase
 BIG = 'CDC|CDT|CNMI|DOJ|DVA|EFF|FCC|FTC|LLC|LLP|MSPB|UPS|RSS|SEC|USA|USC|USPS|WTO.'
 SMALL = 'a|an|and|as|at|but|by|en|for|if|in|of|on|or|the|to|v\.?|via|vs\.?'
+NUMS = '0|1|2|3|4|5|6|7|8|9'
 PUNCT = r"""!"#$%&'‘()*+,\-./:;?@[\\\]_`{|}~"""
 BIG_WORDS = re.compile(r'^(%s)$' % BIG, re.I)
 SMALL_WORDS = re.compile(r'^(%s)$' % SMALL, re.I)
@@ -42,7 +43,7 @@ SMALL_FIRST = re.compile(r'^([%s]*)(%s)\b' % (PUNCT, SMALL), re.I)
 SMALL_LAST = re.compile(r'\b(%s)[%s]?$' % (SMALL, PUNCT), re.I)
 SUBPHRASE = re.compile(r'([:.;?!][ ])(%s)' % SMALL)
 APOS_SECOND = re.compile(r"^[dol]{1}['‘]{1}[a-z]+$", re.I)
-ALL_CAPS = re.compile(r'^[A-Z\s%s]+$' % PUNCT)
+ALL_CAPS = re.compile(r'^[A-Z\s%s%s]+$' % (PUNCT, NUMS))
 UC_INITIALS = re.compile(r"^(?:[A-Z]{1}\.{1}|[A-Z]{1}\.{1}[A-Z]{1})+$")
 MAC_MC = re.compile(r"^([Mm]a?c)(\w+)")
 
@@ -79,12 +80,15 @@ def titlecase(text):
                 word = word.replace(word[2], word[2].upper())
                 tc_line.append(word)
                 continue
+
             if INLINE_PERIOD.search(word) or UC_ELSEWHERE.match(word):
                 tc_line.append(word)
                 continue
+
             if SMALL_WORDS.match(word):
                 tc_line.append(word.lower())
                 continue
+
             if BIG_WORDS.match(word):
                 tc_line.append(word.upper())
                 continue
@@ -113,6 +117,7 @@ def titlecase(text):
         result = SUBPHRASE.sub(lambda m: '%s%s' % (
             m.group(1),
             m.group(2).capitalize()), result)
+
 
         processed.append(result)
 

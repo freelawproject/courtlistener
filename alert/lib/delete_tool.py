@@ -1,16 +1,16 @@
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
@@ -61,6 +61,27 @@ def delete_data_by_time_and_court(courtID, SIMULATE, delTime=None, VERBOSITY=0):
         docs.delete()
 
 
+def delete_orphaned_citations(SIMULATE, VERBOSITY=0):
+    '''
+    Deletes all citations that don't have a document associated with them
+    '''
+    if VERBOSITY >= 1:
+        print "Deleting all citations that are not associated with a document."
+    cites = Citation.objects.all()
+
+    total = 0
+    for cite in cites:
+        docs = Document.objects.filter(citation = cite)
+        if docs.count() == 0:
+            if VERBOSITY >= 2:
+                print "Deleting orphan citation %s from the database." % cite
+            if not SIMULATE:
+                cite.delete()
+                total += 1
+    if VERBOSITY >= 1:
+        print "Deleted %s orphaned citations from the database." % total
+
+
 def main():
     '''Manipulates the database in convenient ways.
 
@@ -71,8 +92,10 @@ def main():
     and cleaner to delete things this way.
     '''
 
-    usage = "usage: %prog -c COURT [-t time] [-v VERBOSITY] [-s]"
+    usage = "usage: %prog -c COURT  (-d | -o) [-t time] [-v VERBOSITY] [-s]"
     parser = OptionParser(usage)
+    parser.add_option('-d', '--documents', action='store_true', dest='documents',
+        default=False, help="Delete documents")
     parser.add_option('-c', '--court', dest='courtID', metavar="COURTID",
         help="The court to take action upon")
     parser.add_option('-t', '--time', dest='delTime', metavar='delTime',
@@ -82,6 +105,8 @@ def main():
         help="Display status messages during execution. Higher values print more verbosity.")
     parser.add_option('-s', '--simulate', action='store_true', dest='simulate',
         default=False, help='Run in simulate mode, printing messages, but not deleting')
+    parser.add_option('-o', '--orphans', action='store_true', dest='orphans',
+        default=False, help='Delete orphaned citations from the database.')
     (options, args) = parser.parse_args()
 
 
@@ -98,33 +123,39 @@ def main():
         print "**********************************************"
         VERBOSITY = 2
 
-    try:
-        courtID = int(options.courtID)
-    except:
-        parser.error("Court number must be a valid integer")
-
-    delTime = options.delTime
-    if delTime is not None:
+    if options.documents:
+        # We delete documents
         try:
-            # Parse the date string into a datetime object
-            delTime = datetime.datetime(*time.strptime(options.delTime, "%Y-%m-%d %H:%M:%S")[0:6])
-        except ValueError:
+            courtID = int(options.courtID)
+        except:
+            parser.error("Court number must be a valid integer")
+
+        delTime = options.delTime
+        if delTime is not None:
             try:
-                delTime = datetime.datetime(*time.strptime(options.delTime, "%Y-%m-%d")[0:5])
+                # Parse the date string into a datetime object
+                delTime = datetime.datetime(*time.strptime(options.delTime, "%Y-%m-%d %H:%M:%S")[0:6])
             except ValueError:
-                parser.error("Unable to parse time. Please use format: YYYY-MM-DD HH:MM:SS or YYYY-MM-DD")
+                try:
+                    delTime = datetime.datetime(*time.strptime(options.delTime, "%Y-%m-%d")[0:5])
+                except ValueError:
+                    parser.error("Unable to parse time. Please use format: YYYY-MM-DD HH:MM:SS or YYYY-MM-DD")
 
-
-    # All options are go. Proceed!
-    if courtID == 0:
-        # All courts shall be done!
-        courtID = 1
-        while courtID <= len(PACER_CODES):
+        # All options are go. Proceed!
+        if courtID == 0:
+            # All courts shall be done!
+            courtID = 1
+            while courtID <= len(PACER_CODES):
+                delete_data_by_time_and_court(courtID, SIMULATE, delTime, VERBOSITY)
+                courtID += 1
+        else:
+            # Just one court, please.
             delete_data_by_time_and_court(courtID, SIMULATE, delTime, VERBOSITY)
-            courtID += 1
-    else:
-        # Just one court, please.
-        delete_data_by_time_and_court(courtID, SIMULATE, delTime, VERBOSITY)
+
+    elif options.orphans:
+        # We delete orphaned citations
+        delete_orphaned_citations(SIMULATE, VERBOSITY)
+
 
     return 0
 

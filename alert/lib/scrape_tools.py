@@ -222,6 +222,9 @@ def getDocContent(docs):
                 path, "-"], shell=False, stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT)
             content, err = process.communicate()
+            if content == '':
+                # probably an image PDF.
+                content = "Unable to parse document content."
             doc.documentPlainText = anonymize(content)
             if err:
                 print "****Error extracting PDF text from: " + doc.citation.caseNameShort + "****"
