@@ -30,7 +30,7 @@ import re
 from django.utils.encoding import smart_str, smart_unicode
 
 # For use in titlecase
-BIG = 'CDC|CDT|CNMI|DOJ|DVA|EFF|FCC|FTC|LLC|LLP|MSPB|RSS|SEC|USA|USC|USPS|WTO'
+BIG = 'CDC|CDT|CNMI|DOJ|DVA|EFF|FCC|FTC|LLC|LLP|MSPB|UPS|RSS|SEC|USA|USC|USPS|WTO.'
 SMALL = 'a|an|and|as|at|but|by|en|for|if|in|of|on|or|the|to|v\.?|via|vs\.?'
 PUNCT = r"""!"#$%&'‘()*+,\-./:;?@[\\\]_`{|}~"""
 BIG_WORDS = re.compile(r'^(%s)$' % BIG, re.I)
@@ -56,6 +56,9 @@ def titlecase(text):
     The list of "SMALL words" which are not capped comes from
     the New York Times Manual of Style, plus 'vs' and 'v'.
     '''
+
+    # make all input uppercase.
+    text = text.upper()
 
     lines = re.split('[\r\n]+', text)
     processed = []
@@ -113,7 +116,12 @@ def titlecase(text):
 
         processed.append(result)
 
-        return "\n".join(processed)
+        text = "\n".join(processed)
+
+    # replace V. with v.
+    text = re.sub(re.compile(r'\WV\.\W'), ' v. ', text)
+
+    return text
 
 
 # For use in harmonize function
@@ -131,6 +139,9 @@ def harmonize(text):
     result = ''
     # replace vs. with v.
     text = re.sub(re.compile(r'\Wvs\.\W'), ' v. ', text)
+
+    # replace V. with v.
+    text = re.sub(re.compile(r'\WV\.\W'), ' v. ', text)
 
     # split on all ' v. '
     text = text.split(' v. ')
