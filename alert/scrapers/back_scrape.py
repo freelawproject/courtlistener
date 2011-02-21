@@ -23,6 +23,9 @@
 #  b) You are prohibited from misrepresenting the origin of any material
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
+import sys
+sys.path.append('/var/www/court-listener/alert')
+sys.path.append('/home/mlissner/FinalProject/alert')
 
 import settings
 from django.core.management import setup_environ
@@ -33,7 +36,6 @@ from lib.encode_decode import *
 from lib.string_utils import *
 from lib.scrape_tools import *
 from django.core.files.base import ContentFile
-from django.core.files import File
 from django.core.exceptions import ObjectDoesNotExist
 
 import calendar
@@ -44,6 +46,7 @@ import re
 import StringIO
 import subprocess
 import time
+import traceback
 import urllib
 import urllib2
 
@@ -54,6 +57,7 @@ from lxml import etree
 from optparse import OptionParser
 from urlparse import urljoin
 
+DAEMONMODE = False
 
 """This is where scrapers live that can be trained on historical data with some
 tweaking.
@@ -87,11 +91,11 @@ def back_scrape_court(courtID, VERBOSITY):
             # it's expressed in Unixtime, and can be arbitrarily set by running
             # date --date="2010-04-19" +%s in the terminal.
 
-	    # This is the date that was used in the original start date.
+            # This is the date that was used in the original start date.
             newDate = 725875200 + (2592000 * i)
 
-	    # This date was used to get things moving after crawler crashes.
-	    # newDate = 953798400 + (2592000 * i)
+            # This date was used to get things moving after crawler crashes.
+            # newDate = 953798400 + (2592000 * i)
             dates.append(datetime.datetime.fromtimestamp(newDate))
             if newDate > unixTimeToday:
                 break
@@ -144,10 +148,10 @@ def back_scrape_court(courtID, VERBOSITY):
                 # Special cases
                 if caseNumber.strip() == '92-2198.01A':
                     continue
-		elif caseNumber.strip() == '94-2264.01A':
-		    continue
-		elif caseNumber.strip() == '97-1397.01A':
-		    continue
+                elif caseNumber.strip() == '94-2264.01A':
+                    continue
+                elif caseNumber.strip() == '97-1397.01A':
+                    continue
 
                 # Case link, if there is a PDF
                 caseLink = 'http://www.ca1.uscourts.gov/pdf.opinions/' + caseNumber.replace('.', '-') + '.pdf'
@@ -183,13 +187,13 @@ def back_scrape_court(courtID, VERBOSITY):
 
                             documentPlainText = quickTree.find('//pre')
 
-			    try:
-			        if len(documentPlainText) == 0:
-			            # These are binary files that are messed up, and cannot be parsed.
-				    continue
-		            except TypeError:
-			        # Happens when the "Can't open document" error shows up.
-			        continue
+                            try:
+                                if len(documentPlainText) == 0:
+                                    # These are binary files that are messed up, and cannot be parsed.
+                                    continue
+                            except TypeError:
+                                # Happens when the "Can't open document" error shows up.
+                                continue
 
                             # Clean up the text
                             try:
@@ -234,7 +238,7 @@ def back_scrape_court(courtID, VERBOSITY):
                 # Next: Doctype
                 doc.documentType = "Published"
                 if documentPlainText != None:
-		    try:
+                    try:
                         if 'not for publication' in documentPlainText.lower():
                             doc.documentType = "Unpublished"
                     except NameError:
@@ -768,6 +772,120 @@ def back_scrape_court(courtID, VERBOSITY):
                         printAndLogNewDoc(VERBOSITY, ct, cite)
                         doc.save()
 
+        return
+
+    if (courtID == 13):
+        ct = Court.objects.get(courtUUID = "cafc")
+
+        # Sample URLs for page 2 and 3 (as of 2011-02-09)
+        # http://www.cafc.uscourts.gov/opinions-orders/0/50/all/page-11-5.html
+        # http://www.cafc.uscourts.gov/opinions-orders/0/100/all/page-21-5.html
+        countID = 0
+        pageID = 0
+        while pageID <= 142:
+            if pageID == 0:
+                url = "http://www.cafc.uscourts.gov/opinions-orders/0/all"
+                pageID += 1
+            else:
+                countID = pageID * 50
+                url = "http://www.cafc.uscourts.gov/opinions-orders/0/" + str(countID) + "/all/page-" + str(pageID) + "1-5.html"
+                pageID += 1
+
+            print "\n\n*****URL Changed to: " + url + "*****"
+
+            try: html = readURL(url, courtID)
+            except: continue
+
+            if DAEMONMODE:
+                # if it's DAEMONMODE, see if the court has changed
+                changed = courtChanged(url, html)
+                if not changed:
+                    # if not, bail. If so, continue to the scraping.
+                    return
+
+            soup = BeautifulSoup(html)
+
+            aTagsRegex = re.compile('pdf$', re.IGNORECASE)
+            trTags = soup.findAll('tr')
+
+            # start on the seventh row, since the prior trTags are junk.
+            i = 6
+            dupCount = 0
+            while i < len(trTags) - 1: # The last row is the pagination, so we don't do it.
+                print str(i),
+                try:
+                    caseLink = trTags[i].td.nextSibling.nextSibling.nextSibling\
+                        .nextSibling.nextSibling.nextSibling.a.get('href')
+                    caseLink = urljoin(url, caseLink)
+                    if 'opinion' not in caseLink:
+                        # we have a non-case PDF. punt
+                        print "Opinion not in caselink. Punting."
+                        i += 1
+                        continue
+                except:
+                    # the above fails when things get funky, in that case, we punt
+                    print "caselink failure"
+                    i += 1
+                    continue
+
+                try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                except makeDocError:
+                    i += 1
+                    continue
+
+                if not created:
+                    # it's an oldie, punt!
+                    dupCount += 1
+                    if dupCount == 10:
+                        # tenth duplicate in a a row. BREAK!
+                        break
+                    i += 1
+                    continue
+                else:
+                    dupCount = 0
+
+                # next: caseNumber
+                caseNumber = trTags[i].td.nextSibling.nextSibling.contents[0]
+
+                # next: dateFiled
+                dateFiled = trTags[i].td.contents[0].strip()
+                splitDate = dateFiled.split("-")
+                dateFiled = datetime.date(int(splitDate[0]), int(splitDate[1]),
+                    int(splitDate[2]))
+                doc.dateFiled = dateFiled
+
+                # next: caseNameShort
+                caseNameShort = trTags[i].td.nextSibling.nextSibling.nextSibling\
+                    .nextSibling.nextSibling.nextSibling.a.contents[0]\
+                    .replace('[MOTION]', '').replace('[ORDER]', '').replace('(RULE 36)', '')\
+                    .replace('[ERRATA]', '').replace('[CORRECTED]','').replace('[ORDER 2]', '')\
+                    .replace('[ORDER}', '').replace('[ERRATA 2]', '')
+                caseNameShort = titlecase(caseNameShort)
+
+                # next: documentType
+                documentType = trTags[i].td.nextSibling.nextSibling.nextSibling\
+                    .nextSibling.nextSibling.nextSibling.nextSibling.nextSibling\
+                    .contents[0].strip()
+                # normalize the result for our internal purposes...
+                if documentType == "Nonprecedential":
+                    documentType = "Unpublished"
+                elif documentType == "Precedential":
+                    documentType = "Published"
+                doc.documentType = documentType
+
+                # now that we have the caseNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(caseNumber, caseNameShort)
+
+                # Set the mimetype
+                mimetype = "." + caseLink.split('.')[-1]
+
+                # last, save evrything (pdf, citation and document)
+                doc.citation = cite
+                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + mimetype, myFile)
+                printAndLogNewDoc(VERBOSITY, ct, cite)
+                doc.save()
+
+                i += 1
         return
 
     if courtID == 14:

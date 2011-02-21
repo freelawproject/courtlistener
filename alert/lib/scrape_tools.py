@@ -1,16 +1,16 @@
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
@@ -23,6 +23,7 @@
 #  b) You are prohibited from misrepresenting the origin of any material
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
+
 import sys
 sys.path.append('/var/www/court-listener/alert')
 sys.path.append('/home/mlissner/FinalProject/alert')
@@ -42,6 +43,7 @@ import logging.handlers
 import StringIO
 import subprocess
 import time
+import traceback
 import urllib2
 
 
@@ -112,6 +114,9 @@ def makeDocFromURL(LinkToDoc, ct):
     whether the Document was created
     '''
 
+    # Percent encode URLs if necessary.
+    LinkToDoc = urllib2.quote(LinkToDoc, safe="%/:=&?~#+!$,;'@()*[]")
+
     # get the Doc
     try:
         webFile = urllib2.urlopen(LinkToDoc)
@@ -121,6 +126,7 @@ def makeDocFromURL(LinkToDoc, ct):
         webFile.close()
     except:
         err = 'DownloadingError: ' + str(LinkToDoc)
+        print traceback.format_exc()
         raise makeDocError(err)
 
     # make the SHA1
@@ -129,6 +135,7 @@ def makeDocFromURL(LinkToDoc, ct):
     # test for empty files (thank you CA1)
     if len(data) == 0:
         err = "EmptyFileError: " + str(LinkToDoc)
+        print traceback.format_exc()
         raise makeDocError(err)
 
     sha1Hash = hashlib.sha1(data).hexdigest()
@@ -191,13 +198,8 @@ def hasDuplicate(caseNum, caseName):
     cite, created = Citation.objects.get_or_create(
         caseNameShort = str(caseNameShort), caseNumber = str(caseNum))
 
-    if caseNameShort == caseName:
-        # no truncation.
-        cite.caseNameFull = caseNameShort
-    else:
-        # truncation happened. Therefore, use the untruncated value as the full
-        # name.
-        cite.caseNameFull = caseName
+    cite.caseNameFull = caseName
+
     cite.save()
 
     return cite, created
@@ -212,14 +214,10 @@ def getDocContent(docs):
         path = str(doc.local_path)
         path = settings.MEDIA_ROOT + path
 
-
-
-
-
-
         mimetype = path.split('.')[-1]
         if mimetype == 'pdf':
             # do the pdftotext work for PDFs
+            print "Parsing: " + path
             process = subprocess.Popen(["pdftotext", "-layout", "-enc", "UTF-8",
                 path, "-"], shell=False, stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT)
@@ -263,6 +261,16 @@ def getDocContent(docs):
             if err:
                 print "****Error extracting WPD text from: " + doc.citation.caseNameShort + "****"
                 continue
+        elif mimetype == 'doc':
+            # read the contents of MS Doc files
+            print "Parsing: " + path
+            process = subprocess.Popen(['antiword', path, '-i', '1'], shell=False,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            content, err = process.communicate()
+            doc.documentPlainText = anonymize(content)
+            if err:
+                print "****Error extracting DOC text from: " + doc.citation.caseNameShort + "****"
+                continue
         else:
             print "*****Unknown mimetype. Unable to parse: " + doc.citation.caseNameShort + "****"
             continue
@@ -271,3 +279,43 @@ def getDocContent(docs):
             doc.save()
         except Exception, e:
             print "****Error saving text to the db for: " + doc.citation.caseNameShort + "****"
+
+
+def parseCourt(courtID, VERBOSITY):
+    '''
+    Here, we do the following:
+     1. For a given court, find all of its documents
+     2. Determine if the document has been parsed already
+     3. If it has, punt, if not, open the PDF and parse it.
+
+    returns a string containing the result
+    '''
+
+    if VERBOSITY >= 1: print "NOW PARSING COURT: " + str(courtID)
+
+    from threading import Thread
+
+    # get the court IDs from models.py
+    courts = []
+    for code in PACER_CODES:
+        courts.append(code[0])
+
+    # select all documents from this jurisdiction that lack plainText and were
+    # downloaded from the court.
+    docs = Document.objects.filter(documentPlainText = "", documentHTML = "",
+        court__courtUUID = courts[courtID-1], source="C").order_by('documentUUID')
+
+    numDocs = docs.count()
+
+    # this is a crude way to start threads, but I'm lazy, and two is a good
+    # starting point. This essentially starts two threads, each with half of the
+    # unparsed PDFs. If the -c 0 flag is used, it's likely for the next court
+    # to begin scraping before both of these have finished. This should be OK,
+    # but seems noteworthy.
+    if numDocs > 0:
+        t1 = Thread(target=getDocContent, args=(docs[0:numDocs/2],))
+        t2 = Thread(target=getDocContent, args=(docs[numDocs/2:numDocs],))
+        t1.start()
+        t2.start()
+    elif numDocs == 0:
+        if VERBOSITY >= 1: print "Nothing to parse for this court."

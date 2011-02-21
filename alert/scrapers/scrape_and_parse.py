@@ -161,7 +161,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -264,7 +264,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -359,7 +359,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -459,7 +459,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -579,7 +579,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -679,7 +679,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -769,7 +769,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                     # last, save evrything (pdf, citation and document)
                     doc.citation = cite
-                    doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                    doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
                     printAndLogNewDoc(VERBOSITY, ct, cite)
                     doc.save()
 
@@ -861,7 +861,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -869,9 +869,11 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         return
 
     elif (courtID == 9):
-        """This court, by virtue of having a javascript laden website, was very
+        '''
+        This court, by virtue of having a javascript laden website, was very
         hard to parse properly. BeautifulSoup couldn't handle it at all, so lxml
-        has to be used."""
+        has to be used.
+        '''
 
         # these URLs redirect now. So much for hacking them. A new approach can probably be done using POST data.
         # If these URLs are changed, code below must be changed for the doc type and dateFiled fields
@@ -918,7 +920,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseLink = urljoin(url, caseLink)
 
                 #next up: caseNameShort
-                caseNameShort = titlecase(tableCells[0].find('./a').text.lower())
+                caseNameShort = titlecase(tableCells[0].find('./a').text)
 
                 # special cases
                 noMemos = 'no memos filed' in caseLink.lower()
@@ -967,7 +969,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -1064,7 +1066,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -1164,7 +1166,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
 
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -1243,7 +1245,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -1318,8 +1320,9 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseNameShort = trTags[i].td.nextSibling.nextSibling.nextSibling\
                     .nextSibling.nextSibling.nextSibling.a.contents[0]\
                     .replace('[MOTION]', '').replace('[ORDER]', '').replace('(RULE 36)', '')\
-                    .replace('[ERRATA]', '').replace('[CORRECTED]','')
-                caseNameShort = titlecase(caseNameShort.lower())
+                    .replace('[ERRATA]', '').replace('[CORRECTED]','').replace('[ORDER 2]', '')\
+                    .replace('[ORDER}', '').replace('[ERRATA 2]', '')
+                caseNameShort = titlecase(caseNameShort)
 
                 # next: documentType
                 documentType = trTags[i].td.nextSibling.nextSibling.nextSibling\
@@ -1337,7 +1340,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -1433,51 +1436,12 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
                 i += 1
         return
-
-
-def parseCourt(courtID, VERBOSITY):
-    '''
-    Here, we do the following:
-     1. For a given court, find all of its documents
-     2. Determine if the document has been parsed already
-     3. If it has, punt, if not, open the PDF and parse it.
-
-    returns a string containing the result
-    '''
-    if VERBOSITY >= 1: print "NOW PARSING COURT: " + str(courtID)
-
-    from threading import Thread
-
-    # get the court IDs from models.py
-    courts = []
-    for code in PACER_CODES:
-        courts.append(code[0])
-
-    # select all documents from this jurisdiction that lack plainText and were
-    # downloaded from the court.
-    docs = Document.objects.filter(documentPlainText = "", documentHTML = "",
-        court__courtUUID = courts[courtID-1], source="C").order_by('documentUUID')
-
-    numDocs = docs.count()
-
-    # this is a crude way to start threads, but I'm lazy, and two is a good
-    # starting point. This essentially starts two threads, each with half of the
-    # unparsed PDFs. If the -c 0 flag is used, it's likely for the next court
-    # to begin scraping before both of these have finished. This should be OK,
-    # but seems noteworthy.
-    if numDocs > 0:
-        t1 = Thread(target=getDocContent, args=(docs[0:numDocs/2],))
-        t2 = Thread(target=getDocContent, args=(docs[numDocs/2:numDocs],))
-        t1.start()
-        t2.start()
-    elif numDocs == 0:
-        if VERBOSITY >= 1: print "Nothing to parse for this court."
 
 
 def main():
@@ -1511,8 +1475,12 @@ def main():
     if options.daemonmode == False and (not options.courtID or (not options.scrape and not options.parse)):
         parser.error("You must specify either daemon mode or a court and whether to scrape and/or parse it.")
 
-    if options.verbosity == '1' or options.verbosity == '2':
-        VERBOSITY = options.verbosity
+    try:
+        VERBOSITY = int(options.verbosity)
+    except:
+        # no verbosity supplied, assume 0
+        VERBOSITY = 0
+
 
     DAEMONMODE = options.daemonmode
 

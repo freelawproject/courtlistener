@@ -1,17 +1,17 @@
 #!/bin/bash
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
@@ -27,7 +27,7 @@
 
 # import the settings we need, and make some useful variables.
 INSTALL_ROOT=`python -c "import sys; sys.path.append('../alert/'); import settings; print settings.INSTALL_ROOT"`
-SCRAPER_LOCATION=$INSTALL_ROOT\alert/scrape_and_parse.py
+SCRAPER_LOCATION=$INSTALL_ROOT\alert/scrapers/scrape_and_parse.py
 
 case "${1:-''}" in
   'start')
