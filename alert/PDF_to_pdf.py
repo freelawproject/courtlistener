@@ -131,20 +131,20 @@ def update_path(doc):
     # Check if the file already exists. Fix if so.
     if os.path.exists(new_path_full):
         # Problem. Fix it. Recursion would make this less terrible.
-        new_path_full = new_path_full + '_2'
+        new_path_full = new_path_full[:-4] + '_2.pdf'
         new_path = new_path + '_2'
         doc.local_path = new_path
         doc.save()
 
         if os.path.exists(new_path_full):
-            new_path_full = new_path_full[:-2] + '_3'
-            new_path = new_path[:-2] + '_3'
+            new_path_full = new_path_full[:-6] + '_3.pdf'
+            new_path = new_path[:-6] + '_3.pdf'
             doc.local_path = new_path
             doc.save()
 
             if os.path.exists(new_path_full):
-                new_path_full = new_path_full[:-2] + '_4'
-                new_path = new_path[:-2] + '_4'
+                new_path_full = new_path_full[:-6] + '_4.pdf'
+                new_path = new_path[:-6] + '_4.pdf'
                 doc.local_path = new_path
                 doc.save()
 
@@ -163,7 +163,7 @@ def main():
     (options, args) = parser.parse_args()
 
     # run the script across the entire DB
-    queryset = queryset_iterator(Document.objects.all())
+    queryset = queryset_iterator(Document.objects.filter(local_path__endswith = 'pdf'))
     for doc in queryset:
         update_new_path(doc)
     exit(0)
