@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert.alertSystem.models import *
-from alert.alertSystem.string_utils import ascii_to_num
+from alert.lib.encode_decode import ascii_to_num
 from django.contrib.sites.models import Site
 from django.http import HttpResponsePermanentRedirect, Http404
 from django.shortcuts import render_to_response
