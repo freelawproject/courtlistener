@@ -82,10 +82,12 @@ def update_new_path(doc):
     new_path_full = os.path.join(root, new_path)
 
     old_path_full = new_path_full.replace('pdf', 'PDF')
+    print "Old Path: " + old_path_full
 
     # If the old path already exists, then it's a hit.
     # We need to move the file to a better location.
     if os.exists(old_path_full):
+        print "Old path exists."
         # Before we move it, we need to check if we can move it to a new location
         # without a collision occuring.
         if os.exists(new_path_full):
@@ -111,6 +113,7 @@ def update_new_path(doc):
                     exit(1)
 
     # Path existing problems are solved. Move the thing.
+    print "Moving file to: " + new_path_full
     os.rename(old_path_full, new_path_full)
 
 
