@@ -275,7 +275,7 @@ def getDocContent(docs):
                 print "****Error extracting DOC text from: " + doc.citation.caseNameShort + "****"
                 continue
         else:
-            print "*****Unknown mimetype. Unable to parse: " + doc.citation.caseNameShort + "****"
+            print "*****Unknown mimetype: " + mimetype + ". Unable to parse: " + doc.citation.caseNameShort + "****"
             continue
 
         try:
