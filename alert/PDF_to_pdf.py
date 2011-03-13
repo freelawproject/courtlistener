@@ -86,27 +86,24 @@ def update_new_path(doc):
 
     # If the old path already exists, then it's a hit.
     # We need to move the file to a better location.
-    if os.exists(old_path_full):
+    if os.path.exists(old_path_full):
         print "Old path exists."
         # Before we move it, we need to check if we can move it to a new location
         # without a collision occuring.
-        if os.exists(new_path_full):
+        if os.path.exists(new_path_full):
             new_path_full = new_path_full + '_2'
             new_path = new_path + '_2'
             doc.local_path = new_path
-            doc.save()
 
             if os.path.exists(new_path_full):
                 new_path_full = new_path_full[:-2] + '_3'
                 new_path = new_path[:-2] + '_3'
                 doc.local_path = new_path
-                doc.save()
 
                 if os.path.exists(new_path_full):
                     new_path_full = new_path_full[:-2] + '_4'
                     new_path = new_path[:-2] + '_4'
                     doc.local_path = new_path
-                    doc.save()
 
                     if os.path.exists(new_path_full):
                         print "Insane. The thing existed four times!"
@@ -114,7 +111,9 @@ def update_new_path(doc):
 
     # Path existing problems are solved. Move the thing.
     print "Moving file to: " + new_path_full
+    raw_input("Press any key to proceed.")
     os.rename(old_path_full, new_path_full)
+    doc.save()
 
 
 def update_path(doc):
