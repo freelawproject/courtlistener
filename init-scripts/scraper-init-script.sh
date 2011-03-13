@@ -26,7 +26,7 @@
 #  ways how any modified versions differ from the original version.
 
 # import the settings we need, and make some useful variables.
-INSTALL_ROOT=`python -c "import sys; sys.path.append('../alert/'); import settings; print settings.INSTALL_ROOT"`
+INSTALL_ROOT=`python -c "import sys; sys.path.append('/var/www/court-listener/alert/'); import settings; print settings.INSTALL_ROOT"`
 SCRAPER_LOCATION=$INSTALL_ROOT\alert/scrape_and_parse.py
 
 case "${1:-''}" in
