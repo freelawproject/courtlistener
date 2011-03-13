@@ -91,18 +91,18 @@ def update_new_path(doc):
         # Before we move it, we need to check if we can move it to a new location
         # without a collision occuring.
         if os.path.exists(new_path_full):
-            new_path_full = new_path_full + '_2'
-            new_path = new_path + '_2'
+            new_path_full = new_path_full[:-4] + '_2.pdf'
+            new_path = new_path[:-4] + '_2.pdf'
             doc.local_path = new_path
 
             if os.path.exists(new_path_full):
-                new_path_full = new_path_full[:-2] + '_3'
-                new_path = new_path[:-2] + '_3'
+                new_path_full = new_path_full[:-6] + '_3.pdf'
+                new_path = new_path[:-6] + '_3.pdf'
                 doc.local_path = new_path
 
                 if os.path.exists(new_path_full):
-                    new_path_full = new_path_full[:-2] + '_4'
-                    new_path = new_path[:-2] + '_4'
+                    new_path_full = new_path_full[:-6] + '_4.pdf'
+                    new_path = new_path[:-6] + '_4.pdf'
                     doc.local_path = new_path
 
                     if os.path.exists(new_path_full):
