@@ -109,11 +109,11 @@ def update_new_path(doc):
                         print "Insane. The thing existed four times!"
                     exit(1)
 
-    # Path existing problems are solved. Move the thing.
-    print "Moving file to: " + new_path_full
-    raw_input("Press any key to proceed.")
-    os.rename(old_path_full, new_path_full)
-    doc.save()
+        # Path existing problems are solved. Move the thing.
+        print "Moving file to: " + new_path_full
+        raw_input("Press any key to proceed.")
+        os.rename(old_path_full, new_path_full)
+        doc.save()
 
 
 def update_path(doc):
