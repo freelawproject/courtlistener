@@ -23,7 +23,7 @@ Replace these with more appropriate tests for your application.
 """
 
 from django.test import TestCase
-from string_utils import harmonize
+from lib.string_utils import harmonize
 
 class SimpleTest(TestCase):
     def test_basic_addition(self):
@@ -33,7 +33,7 @@ class SimpleTest(TestCase):
         self.failUnlessEqual(1 + 1, 2)
 
 __test__ = {"doctest": """
->>> harmo nize('U.S.A. v. Lissner')
+>>> harmonize('U.S.A. v. Lissner')
 'United States v. Lissner'
 >>> harmonize('U.S. v. Lissner')
 'United States v. Lissner'
