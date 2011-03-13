@@ -86,7 +86,7 @@ def update_new_path(doc):
 
     # If the old path already exists, then it's a hit.
     # We need to move the file to a better location.
-    if os.path.exists(old_path_full):
+    if os.path.exists(old_path_full) and (old_path_full != '/var/www/court-listener/alert/assets/media/'):
         print "Old path exists."
         # Before we move it, we need to check if we can move it to a new location
         # without a collision occuring.
