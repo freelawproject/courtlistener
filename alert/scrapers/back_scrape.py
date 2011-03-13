@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
 #
@@ -64,6 +66,104 @@ tweaking.
 
 These are generally much more hacked than those scrapers in scrape_and_parse.py,
 but they should work with some editing or updating."""
+
+
+def ca3_nextQuery(query, zoomIn):
+    '''
+    Takes a query letter, and returns the next one. Thus, if the query is a,
+    then it returns b.
+
+    If zoomIn is true, then it zooms in. For example, if the query is a, then it
+    returns aa.
+    '''
+    chars = ('a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p',
+            'q','r','s','t','u','v','w','x','y','z','1','2','3','4','5','6',
+            '7','8','9','0','.')
+
+    if zoomIn:
+        # We take the query and zoom in
+        return chars[0] + query
+
+    elif zoomIn == False:
+        '''
+        b   -->  c
+        ab  -->  bb
+        zb  -->  .b
+        .b  -->  c
+        .bb -->  cb
+        ..c -->  d
+        .   -->  None (This is the final character tested)
+        ..  -->  None
+        '''
+        # We just return the next letter, or None.
+        if query.count(chars[-1]) == len(query):
+            # The number of the last character in chars == the length of the
+            # query. Thus, we've reached the end of the alphabet; return None.
+            return None
+        else:
+            # Increment the first letter in query. If the preceeding characters
+            # are the last letter in chars, strip them off, and return the next
+            # letter. This allows .a --> b
+            stripq = query.strip(chars[-1])
+            return chars[chars.index(stripq[0]) + 1] + stripq[1:]
+
+
+def ca3_query_and_count_results(query, ct):
+    '''
+    Takes the query, and returns the number of results.
+    '''
+    if query == None:
+        # We know that we've reached the end of our letters.
+        return None
+
+    url = 'http://www.ca3.uscourts.gov/indexsearch/archives.asp?qu=%23filename+*%s&FreeText=&sc=%2Fopinarch%2F&RankBase=112&pg=1' % query
+
+    print "\n\nNow scraping: %s" % query
+
+    # Query the site.
+    try: html = readURL(url, courtID)
+    except:
+        print '****ERROR DOWNLOADING %s****' % url
+
+    parser = etree.HTMLParser()
+    import StringIO
+    tree = etree.parse(StringIO.StringIO(html), parser)
+
+    #TODO: Count results here!
+
+    # Then, depending on the number of results, we save them to the DB and
+    # increment the query, or we zoom into the next level of results and try
+    # again at that level of granularity.
+    if numResults == 0:
+        # No results for this letter. Move to the next letter.
+        ca3_query_and_count_results(ca3_nextQuery(query, False), ct)
+
+    elif numResults == 5000:
+        # We maxed out the search. Zoom in, and try again.
+        ca3_query_and_count_results(ca3_nextQuery(query, True), ct)
+
+    elif 0 < numResults < 5000:
+        '''
+        This is the ideal situation. Less than 5000 results means we have a
+        good query string. Thus, parse the results and save them to the DB
+        as we would in a 'normal' scraper.
+        '''
+
+        # Paginate through the results, and save their contents here.
+        numResultPages = (numResults / 50) + 1
+        i = 1
+        while i <= numResultPages:
+            url = 'http://www.ca3.uscourts.gov/indexsearch/archives.asp?qu=%23filename+*.%s&FreeText=&sc=%2Fopinarch%2F&RankBase=112&pg=%s' % (query, i)
+
+            # TODO Parsing code goes here. The above hits the first page of the search page 2x.
+            # Once when counting results and again when it gets here. Not ideal,
+            # but probably workable.
+
+            i +=1
+
+        # Do the next query, but don't zoom in.
+        ca3_query_and_count_results(ca3_nextQuery(query, False), ct)
+
 
 
 def back_scrape_court(courtID, VERBOSITY):
@@ -282,12 +382,181 @@ def back_scrape_court(courtID, VERBOSITY):
         return
 
 
+    if courtID == 2:
+        ct = Court.objects.get(courtUUID = 'ca2')
+        '''
+        Take the starting date, and find the last day in the month that corresponds
+        with that date.
+
+        Using those two dates, query for summaries and opinions, and parse each of the results.
+        '''
+        aTagsRegex = re.compile('(.*?.pdf).*?', re.IGNORECASE)
+        caseNumRegex = re.compile('.*/(\d{1,2}-\d{1,4})(.*).pdf')
+
+        #for each month between 2007-04-01 and 2011-01-01
+        today = datetime.date(2011, 01, 01)
+        startDate = datetime.date(2007, 04, 01)
+        dupCount = 0
+        while startDate < today:
+            numDaysInMonthMinusOne = datetime.timedelta(days=calendar.monthrange(
+                startDate.year,startDate.month)[1] - 1)
+            endDate = startDate + numDaysInMonthMinusOne
+
+            startDateStr = startDate.strftime('%Y%m%d')
+            endDateStr   = endDate.strftime('%Y%m%d')
+
+            # Build the URLs
+            urls = (
+                'http://www.ca2.uscourts.gov/decisions?IW_DATABASE=SUM&IW_FIELD_TEXT=*&IW_SORT=Date&IW_BATCHSIZE=500&IW_FILTER_DATE_AFTER=' + startDateStr + '&IW_FILTER_DATE_BEFORE=' + endDateStr,
+                'http://www.ca2.uscourts.gov/decisions?IW_DATABASE=OPN&IW_FIELD_TEXT=*&IW_SORT=Date&IW_BATCHSIZE=500&IW_FILTER_DATE_AFTER=' + startDateStr + '&IW_FILTER_DATE_BEFORE=' + endDateStr,
+            )
+            for url in urls:
+                print "\n\nNow scraping: %s" % url
+                # Query the site.
+                try: html = readURL(url, courtID)
+                except: continue
+
+                parser = etree.HTMLParser()
+                import StringIO
+                tree = etree.parse(StringIO.StringIO(html), parser)
+
+                tableRows = tree.xpath('//table[@border = "1"]')
+
+                for row in tableRows:
+                    cells = row.findall('./td')
+
+                    caseLink = cells[0].find('./b/a').get('href')
+                    caseLink = aTagsRegex.search(caseLink).group(1)
+                    caseLink = urljoin(url, caseLink)
+                    if VERBOSITY >= 2:
+                        print "CaseLink: %s" % caseLink
+
+                    try: myFile, doc, created = makeDocFromURL(caseLink, ct)
+                    except makeDocError:
+                        continue
+
+                    if not created:
+                        # it's an oldie, punt!
+                        dupCount += 1
+                        if dupCount == 10:
+                            # tenth duplicate in a a row. BREAK!
+                            break
+                        continue
+                    else:
+                        dupCount = 0
+
+                    # next: caseNumber
+                    caseNumber = caseNumRegex.search(caseLink).group(1)
+                    if VERBOSITY >= 2:
+                        print "CaseNum: %s" % caseNumber
+
+                    # next: dateFiled
+                    dateFiled = cells[2].text
+                    dateFiled = datetime.datetime(*time.strptime(dateFiled, "%m-%d-%Y")[0:5])
+                    if VERBOSITY >= 2:
+                        print "dateFiled: " + str(dateFiled)
+                    doc.dateFiled = dateFiled
+
+                    # next: caseNameShort
+                    caseNameShort = smart_unicode(cells[1].text, errors='ignore')
+                    if VERBOSITY >= 2:
+                        print "Casenameshort: " + caseNameShort
+
+                    # next: documentType
+                    if 'IW_DATABASE=SUM' in url:
+                        doc.documentType = "Unpublished"
+                    elif 'IW_DATABASE=OPN' in url:
+                        doc.documentType = "Published"
+                    if VERBOSITY >= 2:
+                        print "Doc Type: " + doc.documentType
+
+                    # now that we have the caseNumber and caseNameShort, we can dup check
+                    cite, created = hasDuplicate(caseNumber, caseNameShort)
+
+                    # Set the mimetype
+                    mimetype = "." + caseLink.split('.')[-1]
+
+                    # last, save evrything (pdf, citation and document)
+                    doc.citation = cite
+                    doc.local_path.save(trunc(clean_string(caseNameShort), 80) + mimetype, myFile)
+                    printAndLogNewDoc(VERBOSITY, ct, cite)
+                    doc.save()
+
+            # Increment the start date by one month.
+            numDaysInMonth = datetime.timedelta(days = calendar.monthrange(
+                startDate.year, startDate.month)[1])
+            startDate = startDate + numDaysInMonth
+
+
+    if (courtID == 3):
+        '''
+        This one is a little fun. They don't have their docs organized in an easy way,
+        so we have to search for them using quieries like #filename *1p.pdf,
+        then *2p.pdf. That, I believe will get us all of the precedential PDFs.
+
+        They also have unpublished docs that use the u.pdf format. And they have
+        txt files.
+
+        The algorithm is going to be recursive, as follows:
+         - query all things ending in aa
+            - if > 5000:
+                split the query, and do ones ending in aaa
+                - for aaa, if > 5000
+                    split the query, and do ones ending in aaaa
+                - if < 5000
+                    - crawl them
+            - if < 5000
+                - crawl them
+         - once *a is done, proceed to b
+         - repeat.
+
+        This algorithm should have the minimal number of queries, and will get
+        everything on the site.
+
+        Note that infix length is 2 chars. So *f fails, while *df works.
+
+        They do not have doc or wpd files.
+
+        I do not know if they have docs that end in something other than p.pdf or u.pdf.
+
+        URLs end up taking this form:
+        http://www.ca3.uscourts.gov/indexsearch/archives.asp?qu=%23filename+*.pdf&FreeText=&sc=%2Fopinarch%2F&RankBase=112&pg=1
+
+        *a.pdf --> 165
+        *b.pdf --> 1
+        *c.pdf --> 24
+        *d --> 6
+        *e --> 2
+        *j --> 7
+        *n --> 25
+        *o --> 633
+        *p --> 5000+
+            p.pdf --> ?
+        *r --> 1
+        *t --> 4
+        *u --> 1266
+        *v --> 1
+        *x --> 1
+        *0 --> 51
+        *1 --> ?
+        '''
+        ct = Court.objects.get(courtUUID = 'ca3')
+
+        seed = 'aa'
+
+        ca3_query_zoom_and_parse_results(seed, ct)
+
+
+
+
     if (courtID == 5):
-        """Court is accessible via a HTTP Post, but requires some random fields
+        '''
+        Court is accessible via a HTTP Post, but requires some random fields
         in order to work. The method here, as of 2010/04/27, is to create an
         array of each date every thirty days from the beginning if the court's
         corpus until today, and then to iterate over that array, making an HTTP
-        POST for each month."""
+        POST for each month.
+        '''
 
         # Build an array of every the date every 30 days from 1992-01-01 to today
         hoy = datetime.date.today()
@@ -795,13 +1064,6 @@ def back_scrape_court(courtID, VERBOSITY):
 
             try: html = readURL(url, courtID)
             except: continue
-
-            if DAEMONMODE:
-                # if it's DAEMONMODE, see if the court has changed
-                changed = courtChanged(url, html)
-                if not changed:
-                    # if not, bail. If so, continue to the scraping.
-                    return
 
             soup = BeautifulSoup(html)
 
