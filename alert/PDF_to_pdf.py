@@ -30,7 +30,7 @@ setup_environ(settings)
 
 from alert.alertSystem.models import Document
 from optparse import OptionParser
-import gc, errno, os, os.path, string, time
+import gc, errno, os, os.path, shutil, string, time
 
 '''
 This script finds all the documents that have PDF in their local_path field,
@@ -82,12 +82,12 @@ def update_new_path(doc):
     new_path_full = os.path.join(root, new_path)
 
     old_path_full = new_path_full.replace('pdf', 'PDF')
-    print "Old Path: " + old_path_full
+
 
     # If the old path already exists, then it's a hit.
     # We need to move the file to a better location.
     if os.path.exists(old_path_full) and (old_path_full != '/var/www/court-listener/alert/assets/media/'):
-        print "Old path exists."
+        print "Old path exists at: " + old_path_full
         # Before we move it, we need to check if we can move it to a new location
         # without a collision occuring.
         if os.path.exists(new_path_full):
@@ -112,7 +112,8 @@ def update_new_path(doc):
         # Path existing problems are solved. Move the thing.
         print "Moving file to: " + new_path_full
         raw_input("Press any key to proceed.")
-        os.rename(old_path_full, new_path_full)
+        # Cannot use os.rename here because that funcation fails across devices.
+        shutil.move(old_path_full, new_path_full)
         doc.save()
 
 
