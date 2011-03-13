@@ -71,22 +71,24 @@ def mkdir_p(path):
         else: raise
 
 
-def update_path(doc, simulate):
-    # Rename the path
-    old_path = str(doc.local_path)
-    new_path = old_path.replace('PDF', 'pdf')
-    doc.local_path = new_path
-    doc.save()
-
-    # Move the file
+def update_new_path(doc):
+    '''
+    Iterate over ALL files, and check if their local_path field corresponds
+    with a file in PDF. If so, move the file, assuming it doesn't create a
+    collision.
+    '''
     root = settings.MEDIA_ROOT
-    old_path_full = os.path.join(root, old_path)
+    new_path = str(doc.local_path)
     new_path_full = os.path.join(root, new_path)
 
-    if not simulate:
-        # Check if the file already exists. Fix if so.
-        if os.path.exists(new_path_full):
-            # Problem. Fix it. Recursion would make this less terrible.
+    old_path_full = new_path_full.replace('pdf', 'PDF')
+
+    # If the old path already exists, then it's a hit.
+    # We need to move the file to a better location.
+    if os.exists(old_path_full):
+        # Before we move it, we need to check if we can move it to a new location
+        # without a collision occuring.
+        if os.exists(new_path_full):
             new_path_full = new_path_full + '_2'
             new_path = new_path + '_2'
             doc.local_path = new_path
@@ -106,88 +108,62 @@ def update_path(doc, simulate):
 
                     if os.path.exists(new_path_full):
                         print "Insane. The thing existed four times!"
-                        exit(1)
+                    exit(1)
 
-        # Path existing problems are solved. Move the thing.
-        os.rename(old_path_full, new_path_full)
-
-
+    # Path existing problems are solved. Move the thing.
+    os.rename(old_path_full, new_path_full)
 
 
-def update_date(doc, simulate):
-    # take the doc, check its dateFiled field, make a hardlink to the PDF
-    # location, and update the database
-    if doc.dateFiled != None:
-        dateFiled = doc.dateFiled
-    else:
-        # break from this function.
-        print "\n***No dateFiled value for doc: " + str(doc.documentUUID) + ". Punting.***\n"
-        return(1)
-    if doc.local_path != "":
-        local_path = doc.local_path
-    else:
-        print "\n***No local_path value for doc: " + str(doc.documentUUID) + ". Punting.***\n"
-        return(2)
+def update_path(doc):
+    # Rename the path
+    old_path = str(doc.local_path)
+    new_path = old_path.replace('PDF', 'pdf')
+    doc.local_path = new_path
+    doc.save()
+
+    # Move the file
     root = settings.MEDIA_ROOT
+    old_path_full = os.path.join(root, old_path)
+    new_path_full = os.path.join(root, new_path)
 
-    # old link
-    old = os.path.join(root, str(local_path))
+    # Check if the file already exists. Fix if so.
+    if os.path.exists(new_path_full):
+        # Problem. Fix it. Recursion would make this less terrible.
+        new_path_full = new_path_full + '_2'
+        new_path = new_path + '_2'
+        doc.local_path = new_path
+        doc.save()
 
-    # new link
-    year, month, day = str(dateFiled).split("-")
-    filename = os.path.basename(old)
-    new = os.path.join(root, "pdf", year, month, day, filename)
-
-    # make the new hard link if needed
-    if old != new:
-        if not simulate:
-            mkdir_p(os.path.join(root, "pdf", year, month, day))
-            try:
-                os.link(old, new)
-            except OSError as exc:
-                if exc.errno == 17:
-                    # Error 17: File exists. Append "2", and move on.
-                    print "Duplicate file found, appending 2"
-                    filename = filename[0:string.rfind(filename, ".")] + "2" \
-                        + filename[string.rfind(filename, "."):]
-		    new = os.path.join(root, "pdf", year, month, day, filename)
-                    try:
-			os.link(old, new)
-		    except OSError as exc:
-		        if exc.errno == 17:
-			    print "Duplicate file found again, appending 3"
-			    filename = filename[0:string.rfind(filename, ".")] + "3" \
-			        + filename[string.rfind(filename, "."):]
-		            new = os.path.join(root, "pdf", year, month, day, filename)
-			    os.link(old, new)
-
-            doc.local_path = os.path.join("pdf", year, month, day, filename)
+        if os.path.exists(new_path_full):
+            new_path_full = new_path_full[:-2] + '_3'
+            new_path = new_path[:-2] + '_3'
+            doc.local_path = new_path
             doc.save()
-        print "***Created new hard link to " + new + " for doc: " + str(doc.documentUUID) + " ***"
-    else:
-        print 'Same. Not updating link for ' + str(doc.documentUUID)
+
+            if os.path.exists(new_path_full):
+                new_path_full = new_path_full[:-2] + '_4'
+                new_path = new_path[:-2] + '_4'
+                doc.local_path = new_path
+                doc.save()
+
+                if os.path.exists(new_path_full):
+                    print "Insane. The thing existed four times!"
+                    exit(1)
+
+    # Path existing problems are solved. Move the thing.
+    os.rename(old_path_full, new_path_full)
+
 
 
 def main():
-    usage = "usage: %prog (-b BEGIN -e END) | -a [-s]"
+    usage = "usage: %prog"
     parser = OptionParser(usage)
-    parser.add_option('-s', '--simulate', action="store_true", dest="simulate",
-        default=False, help='Run the script in simulate mode. No changes will be made.')
     (options, args) = parser.parse_args()
 
-    simulate = options.simulate
-
-    if simulate:
-        print '\n*****************************'
-        print '* Running in simulate mode! *'
-        print '*****************************\n'
-        time.sleep(1)
-
-
     # run the script across the entire DB
-    queryset = queryset_iterator(Document.objects.filter(local_path__endswith='PDF'))
+    queryset = queryset_iterator(Document.objects.all())
     for doc in queryset:
-        update_path(doc, simulate)
+        update_new_path(doc)
     exit(0)
 
 
