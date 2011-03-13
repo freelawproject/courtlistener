@@ -61,6 +61,19 @@ def delete_data_by_time_and_court(courtID, SIMULATE, delTime=None, VERBOSITY=0):
         docs.delete()
 
 
+def delete_all_citations(SIMULATE, VERBOSITY=0):
+    '''
+    Deletes all citations in the system
+    '''
+    if VERBOSITY >= 1:
+        print "Deleting all citations."
+    cites = Citation.objects.all()
+    if VERBOSITY >= 2:
+        print 'Deleting %s citations from the database.' % len(cites)
+    if not SIMULATE:
+        cites.delete()
+
+
 def delete_orphaned_citations(SIMULATE, VERBOSITY=0):
     '''
     Deletes all citations that don't have a document associated with them
@@ -107,6 +120,8 @@ def main():
         default=False, help='Run in simulate mode, printing messages, but not deleting')
     parser.add_option('-o', '--orphans', action='store_true', dest='orphans',
         default=False, help='Delete orphaned citations from the database.')
+    parser.add_option('--allcites', action='store_true', dest='cites', default=False,
+        help='Delete all citations from the DB')
     (options, args) = parser.parse_args()
 
 
@@ -155,6 +170,10 @@ def main():
     elif options.orphans:
         # We delete orphaned citations
         delete_orphaned_citations(SIMULATE, VERBOSITY)
+
+    elif options.cites:
+        # We delete all citations
+        delete_all_citations(SIMULATE, VERBOSITY)
 
 
     return 0

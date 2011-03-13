@@ -92,14 +92,14 @@ def printAndLogNewDoc(VERBOSITY, ct, cite):
     '''
     Simply prints the log message and then logs it.
     '''
-    caseName = str(cite)
+    caseName =  smart_unicode(str(cite), errors='ignore')
     caseNumber = str(cite.caseNumber)
     if VERBOSITY >= 1:
         print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-            ": Added " + ct.courtShortName + ": " + unicode(caseName, errors='ignore') + \
+            ": Added " + ct.courtShortName + ": " + caseName + \
             ", " + caseNumber
     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-        ": Added " + ct.courtShortName + ": " + unicode(caseName, errors='ignore') + \
+        ": Added " + ct.courtShortName + ": " + caseName + \
         ", " + caseNumber)
 
 

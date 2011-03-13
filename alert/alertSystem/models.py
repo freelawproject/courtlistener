@@ -18,6 +18,7 @@ from alert.lib.string_utils import trunc
 from alert.lib.encode_decode import num_to_ascii
 from django.template.defaultfilters import slugify
 from django.utils.text import get_valid_filename
+from django.utils.encoding import smart_unicode
 from djangosphinx.models import SphinxSearch
 from django.db import models
 import alert
@@ -211,7 +212,7 @@ class Citation(models.Model):
 
     def __unicode__(self):
         if self.caseNameShort:
-            return self.caseNameShort
+            return smart_unicode(self.caseNameShort)
         else:
             return str(self.citationUUID)
 

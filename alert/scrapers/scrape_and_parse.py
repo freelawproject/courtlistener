@@ -172,9 +172,12 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         """
         URL hacking FTW.
         """
+
+        # Note that for some reason, setting the IW_DATABASE to Both makes the
+        # display fail. Oh well.
         urls = (
-            "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=OPN&IW_FIELD_TEXT=OPN&IW_SORT=-Date&IW_BATCHSIZE=100",
-            "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=SUM&IW_FIELD_TEXT=SUM&IW_SORT=-Date&IW_BATCHSIZE=100",
+            "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=OPN&IW_FIELD_TEXT=*&IW_SORT=-Date&IW_BATCHSIZE=100",
+            "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=SUM&IW_FIELD_TEXT=*&IW_SORT=-Date&IW_BATCHSIZE=100",
         )
         ct = Court.objects.get(courtUUID='ca2')
 
@@ -244,7 +247,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 elif 'so' in documentType:
                     doc.documentType = "Unpublished"
 
-                # next, the caseNameShort (there's probably a better way to do this.
+                # next, the caseNameShort (there's probably a better way to do this).
                 caseNameShort = aTags[i].parent.parent.nextSibling.nextSibling\
                     .nextSibling.nextSibling.contents[0]
 
