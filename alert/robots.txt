@@ -69,3 +69,11 @@ Disallow: /ca5/aLj/usa-v-collman/
 # Added January 26, 2011
 Disallow: /ca8/M88/claudia-fercello-v-county-of-ramsey/
 Disallow: /pdf/2010/07/29/Claudia_Fercello_v._County_of_Ramsey.pdf
+
+# Added March 18, 2011
+Disallow: /ca6/WxK/brigitte-simwaka-v-eric-holder-jr/
+Disallow: /pdf/2011/01/25/Brigitte_Simwaka_v._Eric_Holder_Jr..pdf
+Disallow: /ca5/Wrq/sylvia-cabiran-v-joseph-baer/
+Disallow: /pdf/2011/01/20/Sylvia_Cabiran_v._Joseph_Baer.pdf
+Disallow: /ca8/Kbz/samir-bracic-v-eric-h-holder-jr/
+Disallow: /pdf/2010/04/29/Samir_Bracic__v.__Eric_H._Holder_Jr..pdf
