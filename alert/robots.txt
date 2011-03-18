@@ -70,10 +70,22 @@ Disallow: /ca5/aLj/usa-v-collman/
 Disallow: /ca8/M88/claudia-fercello-v-county-of-ramsey/
 Disallow: /pdf/2010/07/29/Claudia_Fercello_v._County_of_Ramsey.pdf
 
-# Added March 18, 2011
+# Added February 13, 2011
+Disallow: /ca2/UoD/stefanus-v-holder/
+Disallow: /pdf/2010/09/30/Stefanus_v._Holder.pdf
+
+# Added February 14, 2011
+Disallow: /ca7/MgG/robert-boldyrew-v-eric-holder-jr/
+Disallow: /pdf/2010/08/04/Robert_Boldyrew_v._Eric_Holder_Jr..pdf
+
+# Added February 27, 2011
 Disallow: /ca6/WxK/brigitte-simwaka-v-eric-holder-jr/
 Disallow: /pdf/2011/01/25/Brigitte_Simwaka_v._Eric_Holder_Jr..pdf
+
+# Added March 4, 2011
 Disallow: /ca5/Wrq/sylvia-cabiran-v-joseph-baer/
 Disallow: /pdf/2011/01/20/Sylvia_Cabiran_v._Joseph_Baer.pdf
+
+# Added March 18, 2011
 Disallow: /ca8/Kbz/samir-bracic-v-eric-h-holder-jr/
 Disallow: /pdf/2010/04/29/Samir_Bracic__v.__Eric_H._Holder_Jr..pdf
