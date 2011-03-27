@@ -17,6 +17,7 @@
 from alert.alertSystem.models import *
 from alert.lib.encode_decode import ascii_to_num
 from django.contrib.sites.models import Site
+from django.contrib.auth.decorators import login_required
 from django.http import HttpResponsePermanentRedirect, Http404
 from django.shortcuts import render_to_response
 from django.shortcuts import get_object_or_404, get_list_or_404
@@ -102,6 +103,18 @@ def viewCasesDeprecated(request, court, case):
     URL = "http://" + current_site.domain + "/" + court + "/" + \
         num_to_ascii(doc[0].documentUUID) + "/" + slug + "/"
     return HttpResponsePermanentRedirect(URL)
+
+
+@login_required
+def toggle_star(request, id):
+    '''Toggles the favorite status for a user/star combination.
+
+    Receives an ID and a request as arguments, and then uses those to create
+    or delete a favorite in the database for a specific user. If the user
+    already has the document starred, it removes the favorite. If not, it
+    creates it.
+    '''
+    pass
 
 
 @cache_page(60*15)

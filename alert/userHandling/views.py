@@ -39,6 +39,12 @@ def viewAlerts(request):
 
 
 @login_required
+def view_favorites(request):
+    return render_to_response('profile/favorites.html', {},
+        RequestContext(request))
+
+
+@login_required
 def viewSettings(request):
     oldEmail = request.user.email # this line has to be at the top to work.
     user = request.user

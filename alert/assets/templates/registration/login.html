@@ -2,7 +2,7 @@
 
 {% block title %}CourtListener.com / Sign in{% endblock %}
 
-{% block headers %}
+{% block head %}
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
     <script type="text/javascript">
 	    $(document).ready(function() {
@@ -23,13 +23,13 @@
                     <p class="bottom">Sorry, that is not a valid username or password.</p>
                 </div>
             {% endif %}
-            
+
             <form action="" method="post">{% csrf_token %}
                 <p>
                     <label for="username">Username</label><br>
                     <input type="text" name="username" value="" id="username" class="auto-focus">
                 </p>
-        
+
                 <p>
                     <label for="password">Password</label><br>
                     <input type="password" name="password" value="" id="password">
