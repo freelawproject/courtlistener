@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert.alertSystem.models import *
-from alert.alertSystem.string_utils import ascii_to_num
+from alert.lib.encode_decode import ascii_to_num
 from django.contrib.sites.models import Site
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponsePermanentRedirect, Http404
@@ -53,12 +53,12 @@ def redirect_short_url(request, encoded_string):
 
 @cache_page(60*5)
 def viewCase(request, court, id, casename):
-    """
+    '''
     Take a court, an ID, and a casename, and return the document.
 
     This is remarkably easy compared to old method, below. casename isn't
     used, and can be anything.
-    """
+    '''
 
     # Decode the id string back to an int
     id = ascii_to_num(id)
@@ -119,7 +119,9 @@ def toggle_star(request, id):
 
 @cache_page(60*15)
 def viewDocumentListByCourt(request, court):
-    """Show documents for a court, ten at a time"""
+    '''
+    Show documents for a court, ten at a time
+    '''
     from django.core.paginator import Paginator, InvalidPage, EmptyPage
     if court == "all":
         # we get all records, sorted by dateFiled.

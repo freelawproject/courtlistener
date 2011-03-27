@@ -129,7 +129,7 @@ def cleaner(simulate=False, verbose=False):
 
         elif results.count() == 1:
             # One hit returned make sure it's above THRESHOLD. If so, fix it.
-            THRESHOLD = 0.1
+            THRESHOLD = 0.3
             db_case_name = str(results[0])
             diff = gen_diff_ratio(db_case_name, csv_case_name)
             if diff >= THRESHOLD:
@@ -148,8 +148,9 @@ def cleaner(simulate=False, verbose=False):
 
             else:
                 # Below the threshold. Punt!
-                print "Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s" % \
-                    (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip())
+                if verbose:
+                    print "Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s" % \
+                        (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip())
                 punt_file.write("Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s\n" % \
                     (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip()))
 
