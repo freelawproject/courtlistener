@@ -1,0 +1,14 @@
+Install instructions for the courtlistener project
+--------------------------------------------------
+
+For debian-based computers:
+ - copy the install.sh script to your computer
+ - run it with the following command: sudo ./install.sh
+
+It will install all dependencies that are required for the software.
+
+For other operating systems, where the install script will not work, the script
+should serve as good documentation of the installation process and components.
+
+If you work on the installation process, please consider updating the script or this
+documentation.

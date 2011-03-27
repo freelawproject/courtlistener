@@ -1,0 +1,340 @@
+/* --------------------------------------------------------------------------
+
+Sets up all the overrides or additional CSS that the site will use.
+
+---------------------------------------------------------------------------*/
+
+.footer-item {
+    float: left;
+    margin-right: 3em;
+    margin-bottom: 3em;
+    width: auto;
+}
+
+.inline {
+    display: inline;
+}
+
+.container {
+    padding: 0px 10px;
+    padding-top: 10px;
+}
+
+.navigation {
+    padding-bottom: 3em;
+}
+
+.navigation > ul {
+    display: inline;
+    padding: 0;
+}
+
+.navigation > ul > li {
+    list-style: none outside none;
+    padding: 0em 0.7em 0em 0.0em;
+    white-space: nowrap;
+    text-align: center;
+    display: inline;
+}
+
+#sidebar {
+    margin-top: 6px;
+}
+
+#search-input-home-page, #search-input {
+    width: 500px;
+    border-color: threedface;
+    border-style: solid none solid solid;
+    border-width: 1px 0px 1px 1px;
+}
+
+#search-input {
+    width: 389px;
+    position: relative;
+    left: 3px;
+}
+
+#search-button-home-page, #search-button {
+    position: relative;
+    left: -3px;
+    top: -1px;
+    height: 33px;
+    padding: 4px 10px 5px 10px;
+    margin: 0px;
+    /*border: 2px inset buttonface;*/
+}
+
+#search-button {
+    left: 0px;
+}
+
+
+.round {
+    -moz-border-radius: 6px 6px 6px 6px;
+    -webkit-border-radius: 6px;
+}
+
+.round-bottom {
+    -moz-border-radius-bottomright: 6px;
+    -moz-border-radius-bottomleft: 6px;
+    -webkit-border-bottom-right-radius: 6px;
+    -webkit-border-bottom-left-radius: 6px;
+}
+
+.pointer {
+    cursor: pointer;
+    cursor: hand;
+}
+
+.help {
+    cursor: help;
+}
+
+a:link, a:visited {
+    text-decoration: none;
+}
+
+a:focus, a:hover {
+    text-decoration: underline;
+    color: #009;
+}
+
+.error a, .notice a, .success a {
+    text-decoration: underline;
+}
+
+.error a:focus, .error a:hover {
+    color: #8A1F11;
+}
+
+.notice a:focus, .notice a:hover, .success a:focus, .success a:hover {
+    color: #514721;
+}
+
+.errortext {
+    color: #8a1f11;
+}
+
+.header > h1 > a {
+    text-decoration: none;
+    color: black;
+}
+
+/* for the nav in the settings pages*/
+.header > h3 > a {
+    color: black;
+}
+
+/* Display cases from Resources.org neatly */
+span.num {
+    position: relative;
+    color: #999999;
+}
+
+p.indent, div.footnote > p {
+    position: relative;
+    margin-left: 2em;
+    margin-top: -1.5em;
+}
+
+div.footnotes {
+    border-top: 1px dotted black;
+    padding-top: 1em;
+}
+
+div.prelims {
+    background: none repeat scroll 0 0 #eeeeee;
+    border: 1px solid #dddddd;
+    padding-top: 1.5em;
+}
+
+div.prelims p {
+    position: relative;
+    margin-left: 2em;
+    margin-right: 2em;
+    margin-top: 0em;
+}
+
+div.footnote a.footnote {
+    /* Needs proper color use */
+    color: #000099;
+}
+
+p a.footnote {
+    /* make footnotes superscript */
+    vertical-align: text-top;
+    font-size: 70%;
+    color: #000099;
+}
+/* End Resource.org display CSS */
+
+
+input.wide-title {
+    width: 390px;
+    padding: 5px;
+    font-size:1.5em;
+}
+
+
+div.hidden {
+    display: none;
+}
+
+fieldset.collapsed {
+    border-bottom-width: 0px;
+    border-left-width: 0px;
+    border-right-width: 0px;
+    border-top-width: 0px;
+    margin-bottom: 0px;
+    padding: 0em;
+}
+
+#advanced {
+    float: right;
+}
+
+#advanced-home-page {
+    width: 542px;
+}
+
+#advanced-home-page > legend {
+    font-size: 100%;
+}
+
+#advanced-popup {
+    z-index: 100;
+    position: relative;
+    right: 0px;
+    padding: 1em;
+    border: 1px solid #DDDDDD;
+    background: white;
+}
+
+/* Sprites! */
+.sprites {
+    background-image     : url("/media/images/png/social-sprite.png");
+    background-color     : transparent;
+    background-repeat    : no-repeat;
+    display: inline;
+    float: left;
+}
+
+.collapsed-heading {
+    background-position: -130px -2px;
+    padding: 0 0 0 20px;
+    float: none;
+    display: block;
+}
+
+.expanded-heading {
+    background-position: -130px -16px;
+    padding: 0 0 0 20px;
+    float: none;
+    display: block;
+}
+
+#copy_png {
+	height               : 16px;
+	width                : 16px;
+	background-position  : -0px -16px;
+    margin: 0px 2px 0px 2px;
+ }
+
+#copy_png:hover {
+    background-position  : -0px 0px;
+}
+
+#delicious_png {
+    height               : 16px;
+	width                : 16px;
+	background-position  : -16px -16px;
+    margin: 0px 2px 0px 2px;
+}
+
+#delicious_png:hover {
+	background-position  : -16px 0px;
+}
+
+#digg_png {
+	height               : 14px;
+	width                : 16px;
+	background-position  : -32px -14px;
+    margin: 0px 2px 0px 2px;
+}
+
+#digg_png:hover {
+	background-position  : -32px 0px;
+}
+
+#email_link_png {
+	height               : 16px;
+	width                : 16px;
+	background-position  : -48px -16px;
+    margin: 0px 0px 0px 2px;
+}
+
+#email_link_png:hover {
+	background-position  : -48px 0px;
+}
+
+#facebook_png {
+    height               : 16px;
+	width                : 16px;
+    background-position  : -82px -16px;
+    margin: 0px 2px 0px 2px;
+}
+
+#facebook_png:hover {
+    background-position  : -82px 0px;
+}
+
+#reddit_png {
+	height               : 18px;
+	width                : 18px;
+
+	background-position  : -64px -18px;
+    margin: 0px 2px 0px 2px;
+}
+
+#reddit_png:hover {
+	background-position  : -64px 0px;
+}
+
+#twitter_gif {
+	height               : 16px;
+	width                : 16px;
+	background-position  : -98px -16px;
+    margin: 0px 2px 0px 2px;
+}
+
+#twitter_gif:hover {
+	background-position  : -98px 0px;
+}
+
+#favorite_off_png {
+    height               : 16px;
+	width                : 16px;
+	background-position  : -114px 0px;
+    margin: 8px 5px 0px 0px;
+}
+
+#favorite_off_png:hover {
+    height               : 16px;
+	width                : 16px;
+	background-position  : -114px -16px;
+    margin: 8px 5px 0px 0px;
+}
+
+#favorite_on_png {
+    height               : 16px;
+	width                : 16px;
+	background-position  : -114px -16px;
+    margin: 8px 5px 0px 0px;
+}
+
+#favorite_on_png:hover {
+    height               : 16px;
+	width                : 16px;
+	background-position  : -114px -0px;
+    margin: 8px 5px 0px 0px;
+}
