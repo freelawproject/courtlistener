@@ -76,6 +76,9 @@ urlpatterns = patterns('',
     (r'^profile/delete/done/$', deleteProfileDone),
     url(r'^register/$', register, name="register"),
     (r'^register/success/$', registerSuccess),
+    # Favorites pages
+    (r'^toggle/star/(.*)/$', toggle_star),
+    (r'^profile/favorites/$', view_favorites),
 
     # Registration pages
     (r'^email/confirm/([0-9a-f]{40})/$', confirmEmail),

@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{# Shown on document display pages. #}
+
 
 {% block title %}CourtListener.com / Browse / {{ title }}{% endblock %}
 
-{% block headers %}
+{% block head %}
     <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the First Circuit" href="/feed/court/ca1/">
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Second Circuit" href="/feed/court/ca2/">
@@ -23,55 +25,8 @@
     {% endif %}
 {% endblock %}
 
-{% block content %}
-    <div class="span-18 colborder">
-        {% if doc %}
-            {# if we have a hit, display what we know #}
-            <h2>{{ doc.citation.caseNameFull }}, {{ doc.citation.caseNumber }}</h2>
-            <h3>{{court}}</h3>
-            {% if doc.dateFiled %}
-                <h3 class="alt">{{doc.dateFiled|date:"l, F jS, Y"}}</h3>
-            {% else %}
-                <h3 class="alt">Unknown date</h3>
-            {% endif %}
-            <p>
-                <strong>Status: </strong>
-                    {% if doc.documentType %}
-                        {{doc.get_documentType_display}}<br>
-                    {% else %}
-                        Unknown<br>
-                    {% endif %}
-                <strong><acronym title="(digital fingerprint)">SHA1</acronym>:</strong> {{doc.documentSHA1}}
-            </p>
-            <br>
-            <h4>Document text</h4>
-            {% if doc.documentPlainText %}
-                <pre>{{doc.documentPlainText}}</pre>
-            {% else %}
-                {{doc.documentHTML|safe}}
-            {% endif %}
-
-        {% else %}
-            {# No documents found, tell the user, apologize. #}
-            <h2>No documents found</h2>
-
-            <p>We looked in the <strong>{{ court }}</strong>, but were unable to find anything that
-            had the case name of <strong>{{ title }}</strong>.</p>
-
-            <p class="bottom">Sorry about that. Would you like to try a different approach:</p>
-            <ul>
-                <li>You can try a <a href="/search/">search</a> for what you're looking for.</li>
-                <li>You can <a href="/contact/">let us know</a> that something is wrong or missing.</li>
-                <li>If you think you have found a bug, you can <a href="/contribute#bugs">file a bug</a>.</li>
-            </ul>
-
-        {% endif %}
-    </div>
-{% endblock %}
-
-
 {% block sidebar %}
-    <div class="span-5 last" id="sidebar">
+    <div class="span-5 colborder" id="sidebar">
         {# show the admin tools if applicable #}
         {% if user.is_superuser and doc %}
             <h3 class="bottom">Admin</h3>
@@ -109,7 +64,36 @@
                 <a href="http://del.icio.us/post?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="delicious" class="sprites" id="delicious_png"></a>
             </p>
         {% endif %}
-
     </div>
+{% endblock %}
 
+{% block content %}
+    <div class="span-18 last">
+        <h2>
+            <a href="toggle/favorite/{{doc.documentUUID}}/" title="Save as a favorite" class="sprites" id="favorite_off_png"></a>
+            {{ doc.citation.caseNameFull }}, {{ doc.citation.caseNumber }}
+        </h2>
+        <h3>{{court}}</h3>
+        {% if doc.dateFiled %}
+            <h3 class="alt">{{doc.dateFiled|date:"l, F jS, Y"}}</h3>
+        {% else %}
+            <h3 class="alt">Unknown date</h3>
+        {% endif %}
+        <p>
+            <strong>Status: </strong>
+                {% if doc.documentType %}
+                    {{doc.get_documentType_display}}<br>
+                {% else %}
+                    Unknown<br>
+                {% endif %}
+            <strong><acronym title="(digital fingerprint)">SHA1</acronym>:</strong> {{doc.documentSHA1}}
+        </p>
+        <br>
+        <h4>Document text</h4>
+        {% if doc.documentPlainText %}
+            <pre>{{doc.documentPlainText}}</pre>
+        {% else %}
+            {{doc.documentHTML|safe}}
+        {% endif %}
+    </div>
 {% endblock %}
