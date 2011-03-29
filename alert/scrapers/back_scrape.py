@@ -1050,7 +1050,7 @@ def back_scrape_court(courtID, VERBOSITY):
         # http://www.cafc.uscourts.gov/opinions-orders/0/50/all/page-11-5.html
         # http://www.cafc.uscourts.gov/opinions-orders/0/100/all/page-21-5.html
         countID = 0
-        pageID = 0
+        pageID = 88
         while pageID <= 143:
             if pageID == 0:
                 url = "http://www.cafc.uscourts.gov/opinions-orders/0/all"
@@ -1098,7 +1098,7 @@ def back_scrape_court(courtID, VERBOSITY):
                 if not created:
                     # it's an oldie, punt!
                     dupCount += 1
-                    if dupCount == 10:
+                    if dupCount == 50:
                         # tenth duplicate in a a row. BREAK!
                         break
                     i += 1
@@ -1143,7 +1143,11 @@ def back_scrape_court(courtID, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(caseNameShort), 80) + mimetype, myFile)
+                try:
+                    doc.local_path.save(trunc(clean_string(caseNameShort), 80) + mimetype, myFile)
+                except UnicodeDecodeError:
+                    caseNameShort = raw_input("UnicodeDecodeError. Please enter the case name: ")
+                    doc.local_path.save(trunc(clean_string(caseNameShort), 80) + mimetype, myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 

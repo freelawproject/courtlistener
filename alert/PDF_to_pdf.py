@@ -111,7 +111,7 @@ def update_new_path(doc):
 
         # Path existing problems are solved. Move the thing.
         print "Moving file to: " + new_path_full
-        raw_input("Press any key to proceed.")
+        #raw_input("Press any key to proceed.")
         # Cannot use os.rename here because that funcation fails across devices.
         shutil.move(old_path_full, new_path_full)
         doc.save()

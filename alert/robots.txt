@@ -89,3 +89,7 @@ Disallow: /pdf/2011/01/20/Sylvia_Cabiran_v._Joseph_Baer.pdf
 # Added March 18, 2011
 Disallow: /ca8/Kbz/samir-bracic-v-eric-h-holder-jr/
 Disallow: /pdf/2010/04/29/Samir_Bracic__v.__Eric_H._Holder_Jr..pdf
+
+# Added March 28, 2011
+Disallow: /ca11/gav/canma-liliana-arevalo-velasquez-v-us-atty-gen/
+Disallow: /pdf/2007/01/25/Canma_Liliana_Arevalo_Velasquez_v._U.S._Atty._Gen..pdf
