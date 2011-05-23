@@ -27,7 +27,7 @@
 #  ways how any modified versions differ from the original version.
 
 import sys
-sys.path.append('/var/www/court-listener/alert')
+sys.path.append('/var/www/court-listener-data-dumps/alert')
 
 import settings
 from django.core.management import setup_environ
@@ -63,7 +63,7 @@ class myGzipFile(gzip.GzipFile):
         self.close()
 
 
-def append_compressed_data(court_id, dump_dir, VERBOSITY):
+def append_compressed_data(court_id, VERBOSITY):
     '''Dump the court's information to a file.
 
     Given a court ID and a verbosity, query the DB and dump the contents into
@@ -72,18 +72,19 @@ def append_compressed_data(court_id, dump_dir, VERBOSITY):
 
     if court_id == 0:
         # dump everything.
-        docs_to_dump = Document.objects.all().order_by('court')
+        docs_to_dump = Document.objects.all().order_by('court').iterator()
         court_id = 'all'
     else:
         # dump just the requested court
         court_id = PACER_CODES[court_id - 1][0]
-        docs_to_dump = Document.objects.filter(court = court_id)
+        docs_to_dump = Document.objects.filter(court = court_id).iterator()
 
     # This var is needed to clear out null characters and control characters
     # (skipping newlines)
     null_map = dict.fromkeys(range(0,10) + range(11,13) + range(14,32))
 
-    os.chdir(dump_dir)
+    from settings import DUMP_DIR
+    os.chdir(DUMP_DIR)
     filename = 'latest-' + court_id + '.xml.gz.part'
     with myGzipFile(filename, mode='wb') as z_file:
         z_file.write('<?xml version="1.0" encoding="utf-8"?>\n<opinions dumpdate="' + str(date.today()) + '">\n')
@@ -187,8 +188,6 @@ def main():
     parser = OptionParser(usage)
     parser.add_option('-c', '--court', dest='court_id', metavar="COURTID",
         help="The court to dump")
-    parser.add_option('-d', '--dumpdir', dest='dump_dir', metavar="DUMPDIR",
-        help="The directory where data dumps should be created")
     parser.add_option('-v', '--verbosity', dest='verbosity', metavar="VERBOSITY",
         help="Display status messages during execution. Higher values print more verbosity.")
     (options, args) = parser.parse_args()
@@ -205,17 +204,7 @@ def main():
     except TypeError:
         parser.error("Court is a required field")
 
-    if options.dump_dir is None:
-        parser.error("A dump directory must be specified.")
-    elif not os.path.exists(options.dump_dir):
-        # The directory doesn't exist.
-        parser.error("Invalid dump directory. It may not exist, or you may not \
-            have permission to access it.")
-    else:
-        dump_dir = options.dump_dir
-
-
-    append_compressed_data(court_id, dump_dir, VERBOSITY)
+    append_compressed_data(court_id, VERBOSITY)
 
     return 0
 
