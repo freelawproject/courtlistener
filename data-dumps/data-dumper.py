@@ -150,7 +150,7 @@ def rotate_files(filename, VERBOSITY):
                 if month_created != '01':
                     # Not from January. Delete it!
                     if VERBOSITY >= 1:
-                        print dump_file + " is older than one year, and not " +
+                        print dump_file + " is older than one year, and not " + \
                             "made in January. Deleting."
                     os.unlink(dump_file)
 
