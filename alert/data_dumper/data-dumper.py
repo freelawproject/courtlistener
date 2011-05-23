@@ -35,6 +35,7 @@ setup_environ(settings)
 
 from alertSystem.models import *
 
+import gc
 import gzip
 import os
 import time
@@ -113,24 +114,29 @@ def append_compressed_data(court_id, VERBOSITY):
         z_file.write('<?xml version="1.0" encoding="utf-8"?>\n<opinions dumpdate="' + str(date.today()) + '">\n')
 
         for doc in docs_to_dump:
-            row = etree.Element("opinion",
-                dateFiled           = str(doc.dateFiled),
-                precedentialStatus  = doc.documentType,
-                local_path          = str(doc.local_path),
-                time_retrieved      = str(doc.time_retrieved),
-                download_URL        = doc.download_URL,
-                caseNumber          = doc.citation.caseNumber,
-                caseNameShort       = doc.citation.caseNameShort,
-                court               = doc.court.get_courtUUID_display(),
-                sha1                = doc.documentSHA1,
-                source              = doc.get_source_display(),
-                id                  = str(doc.documentUUID),
-            )
-            if doc.documentHTML != '':
-                row.text = doc.documentHTML
-            else:
-                row.text = doc.documentPlainText.translate(null_map)
-            z_file.write('  ' + etree.tostring(row).encode('utf-8') + '\n')
+            try:
+                row = etree.Element("opinion",
+                    dateFiled           = str(doc.dateFiled),
+                    precedentialStatus  = doc.documentType,
+                    local_path          = str(doc.local_path),
+                    time_retrieved      = str(doc.time_retrieved),
+                    download_URL        = doc.download_URL,
+                    caseNumber          = doc.citation.caseNumber,
+                    caseNameShort       = doc.citation.caseNameShort,
+                    court               = doc.court.get_courtUUID_display(),
+                    sha1                = doc.documentSHA1,
+                    source              = doc.get_source_display(),
+                    id                  = str(doc.documentUUID),
+                )
+                if doc.documentHTML != '':
+                    row.text = doc.documentHTML
+                else:
+                    row.text = doc.documentPlainText.translate(null_map)
+                z_file.write('  ' + etree.tostring(row).encode('utf-8') + '\n')
+            except ValueError:
+                if VERBOSITY >= 0:
+                    print "ERROR: Null byte found. Punting."
+                continue
 
         # Close things off
         z_file.write('</opinions>')
