@@ -43,6 +43,29 @@ from datetime import date
 from lxml import etree
 from optparse import OptionParser
 
+
+def queryset_iterator(queryset, chunksize=1000):
+    '''
+    from: http://djangosnippets.org/snippets/1949/
+    Iterate over a Django Queryset ordered by the primary key
+
+    This method loads a maximum of chunksize (default: 1000) rows in its
+    memory at the same time while django normally would load all rows in its
+    memory. Using the iterator() method only causes it to not preload all the
+    classes.
+
+    Note that the implementation of the iterator does not support ordered query sets.
+    '''
+    documentUUID = 0
+    last_pk = queryset.order_by('-documentUUID')[0].documentUUID
+    queryset = queryset.order_by('documentUUID')
+    while documentUUID < last_pk:
+        for row in queryset.filter(documentUUID__gt=documentUUID)[:chunksize]:
+            documentUUID = row.documentUUID
+            yield row
+        gc.collect()
+
+
 class myGzipFile(gzip.GzipFile):
     '''Backports Python 2.7 functionality into 2.6.
 
@@ -72,12 +95,12 @@ def append_compressed_data(court_id, VERBOSITY):
 
     if court_id == 0:
         # dump everything.
-        docs_to_dump = Document.objects.all().order_by('court').iterator()
+        docs_to_dump = queryset_iterator(Document.objects.all())
         court_id = 'all'
     else:
         # dump just the requested court
         court_id = PACER_CODES[court_id - 1][0]
-        docs_to_dump = Document.objects.filter(court = court_id).iterator()
+        docs_to_dump = queryset_iterator(Document.objects.filter(court = court_id))
 
     # This var is needed to clear out null characters and control characters
     # (skipping newlines)
