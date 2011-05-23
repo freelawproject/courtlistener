@@ -134,8 +134,12 @@ def append_compressed_data(court_id, VERBOSITY):
                     row.text = doc.documentPlainText.translate(null_map)
                 z_file.write('  ' + etree.tostring(row).encode('utf-8') + '\n')
             except ValueError:
-                if VERBOSITY >= 0:
+                if VERBOSITY >= 1:
                     print "ERROR: Null byte found. Punting."
+                continue
+            except AttributeError:
+                if VERBOSITY >= 1:
+                    print "Attribute error printing document. Punting."
                 continue
 
         # Close things off
