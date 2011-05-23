@@ -43,6 +43,25 @@ from datetime import date
 from lxml import etree
 from optparse import OptionParser
 
+class myGzipFile(gzip.GzipFile):
+    '''Backports Python 2.7 functionality into 2.6.
+
+    In order to use the 'with syntax' below, I need to subclass the gzip
+    library here. Once all of the machines are running Python 2.7, this class
+    can be removed, and the 'with' code below can simply reference the gzip
+    class rather than this one.
+
+    This line of code worked in 2.7:
+    with gzip.open(filename, mode='wb') as z_file:
+    '''
+    def __enter__(self):
+        if self.fileobj is None:
+            raise ValueError("I/O operation on closed GzipFile object")
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
 
 def append_compressed_data(court_id, dump_dir, VERBOSITY):
     '''Dump the court's information to a file.
@@ -66,7 +85,7 @@ def append_compressed_data(court_id, dump_dir, VERBOSITY):
 
     os.chdir(dump_dir)
     filename = 'latest-' + court_id + '.xml.gz.part'
-    with gzip.open(filename, mode='wb') as z_file:
+    with myGzipFile(filename, mode='wb') as z_file:
         z_file.write('<?xml version="1.0" encoding="utf-8"?>\n<opinions dumpdate="' + str(date.today()) + '">\n')
 
         for doc in docs_to_dump:
@@ -92,7 +111,7 @@ def append_compressed_data(court_id, dump_dir, VERBOSITY):
         # Close things off
         z_file.write('</opinions>')
 
-        rotate_files(filename, VERBOSITY)
+    rotate_files(filename, VERBOSITY)
 
 
 def rotate_files(filename, VERBOSITY):
@@ -203,6 +222,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
