@@ -18,7 +18,7 @@ from lxml import etree
 from optparse import OptionParser
 
 
-def append_compressed_data(court_id, VERBOSITY):
+def append_compressed_data(court_id, dump_dir, VERBOSITY):
     '''Dump the court's information to a file.
 
     Given a court ID and a verbosity, query the DB and dump the contents into
@@ -38,9 +38,10 @@ def append_compressed_data(court_id, VERBOSITY):
     # (skipping newlines)
     null_map = dict.fromkeys(range(0,10) + range(11,13) + range(14,32))
 
+    os.chdir(dump_dir)
     filename = 'latest-' + court_id + '.xml.gz.part'
     with gzip.open(filename, mode='wb') as z_file:
-        z_file.write('<?xml version="1.0" encoding="utf-8"?>\n<opinions>\n')
+        z_file.write('<?xml version="1.0" encoding="utf-8"?>\n<opinions dumpdate="' + str(date.today()) + '">\n')
 
         for doc in docs_to_dump:
             row = etree.Element("opinion",
@@ -80,11 +81,52 @@ def rotate_files(filename, VERBOSITY):
     Once that is renamed, any old dump is deleted. The dumps from January are
     always kept, but otherwise, all are deleted after 12 months.
     '''
+    # This is hacky, but easier than dealing with timedeltas.
     year  = date.today().year
     month = date.today().month
+    if month == 1:
+        year_last_month = year - 1
+        last_month = 12
+    else:
+        last_month = month -1
+        year_last_month = year
+    if VERBOSITY >= 3:
+        print "month = %02d. year = %d" % (last_month, year_last_month)
 
-
-    os.rename(filename, filename[0:-5])
+    # Rename the latest files with the year and month of one month prior
+    dump_files = os.listdir('.')
+    for dump_file in dump_files:
+        if dump_file == 'data-dumper.py':
+            # Punt, or else we self-delete!
+            continue
+        elif dump_file == filename[0:-5]:
+            # rename the file as appropriate, with zero-padded months
+            if VERBOSITY >= 1:
+                print "Renaming latest file: %s." % dump_file
+            os.rename(dump_file, dump_file.replace('latest',
+                '%d-%02d') % (year_last_month, last_month))
+        elif dump_file == filename:
+            # It's the file we just made a moment ago. Strip the .part from
+            # its name.
+            if VERBOSITY >= 1:
+                print "Renaming " + filename + " as " + filename[0:-5]
+            os.rename(filename, filename[0:-5])
+        else:
+            # Not a new file. See if it is more than a year old (and should be
+            # deleted.
+            creation_time = os.path.getctime(dump_file)
+            now = time.time()
+            difftime = now - creation_time
+            if difftime > 31556926:
+                # It's more than a year old. Was it made in a month other than
+                # January?
+                month_created = time.strftime('%m', time.gmtime(creation_time))
+                if month_created != '01':
+                    # Not from January. Delete it!
+                    if VERBOSITY >= 1:
+                        print dump_file + " is older than one year, and not " +
+                            "made in January. Deleting."
+                    os.unlink(dump_file)
 
 
 def main():
@@ -96,10 +138,12 @@ def main():
     all courts (caution!)
     '''
 
-    usage = "usage: %prog -c (courtID | all) [-v VERBOSITY]"
+    usage = "usage: %prog -c (courtID | all) -d DUMPDIR [-v VERBOSITY]"
     parser = OptionParser(usage)
     parser.add_option('-c', '--court', dest='court_id', metavar="COURTID",
         help="The court to dump")
+    parser.add_option('-d', '--dumpdir', dest='dump_dir', metavar="DUMPDIR",
+        help="The directory where data dumps should be created")
     parser.add_option('-v', '--verbosity', dest='verbosity', metavar="VERBOSITY",
         help="Display status messages during execution. Higher values print more verbosity.")
     (options, args) = parser.parse_args()
@@ -116,7 +160,17 @@ def main():
     except TypeError:
         parser.error("Court is a required field")
 
-    append_compressed_data(court_id, VERBOSITY)
+    if options.dump_dir is None:
+        parser.error("A dump directory must be specified.")
+    elif not os.path.exists(options.dump_dir):
+        # The directory doesn't exist.
+        parser.error("Invalid dump directory. It may not exist, or you may not \
+            have permission to access it.")
+    else:
+        dump_dir = options.dump_dir
+
+
+    append_compressed_data(court_id, dump_dir, VERBOSITY)
 
     return 0
 
