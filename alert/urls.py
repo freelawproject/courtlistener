@@ -103,7 +103,7 @@ urlpatterns = patterns('',
     (r'^tools/$', toolsPage),
 
     # Dump pages
-    (r'^dumps/$', display_dump_page),
+    (r'^dump-info/$', display_dump_page),
 
     # Feeds
     (r'^feed/(search)/$', searchFeed()), #lacks URL capturing b/c it will use GET queries.

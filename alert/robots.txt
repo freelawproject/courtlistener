@@ -4,6 +4,9 @@ Sitemap: http://courtlistener.com/sitemap.xml
 # Added November 20, 2010
 Disallow: /x/
 
+# Added 2011-05-23
+Disallow: /dumps/
+
 # Added May 21, 2010
 Disallow: /ca5/Fenghui-Fan-v.-Vicki-Brewer,-et-al/
 Disallow: /ca5/Fenghui-Fan-v.-Vicki-Brewer/
@@ -42,10 +45,10 @@ Disallow: /ca3/GZ/chafik-sebki-v-atty-gen-usa/
 Disallow: /ca2/LXw/united-states-v-ahmad-kanan/
 Disallow: /pdf/2010/07/21/United_States_v._Ahmad_Kanan.pdf
 Disallow: /ca2/MbE/united-states-v-ahmad-kanan/
-Disallow: /pdf/2010/08/02/United_States_v._Ahmad_Kanan_1.pdf 
-Disallow: /pdf/2010/08/02/United_States_v._Ahmad_Kanan.pdf 
+Disallow: /pdf/2010/08/02/United_States_v._Ahmad_Kanan_1.pdf
+Disallow: /pdf/2010/08/02/United_States_v._Ahmad_Kanan.pdf
 Disallow: /ca2/United-States-v.-Ahmad-Kanan/
-Disallow: /ca2/United-States-v.-Ahmad-Kanan,/ 
+Disallow: /ca2/United-States-v.-Ahmad-Kanan,/
 
 # Added November 13, 2010
 Disallow: /ca11/eXX/german-dario-rojas-iriarte-v-us-atty-gen/
@@ -58,7 +61,7 @@ Disallow: /pdf/2008/12/02/Love_et_al_v._Dell_Inc_et_al.pdf
 # Added December 1, 2010
 Disallow: /cafc/Vde/delapenia-v-merit-systems-protection-board/
 Disallow: /pdf/2010/11/09/Delapenia_v._Merit_Systems_Protection_Board.pdf
-Disallow: /cafc/M5S/delapenia-v-mspb/  
+Disallow: /cafc/M5S/delapenia-v-mspb/
 Disallow: /pdf/2010/07/27/Delapenia_v._MSPB.pdf
 
 # Added December 15, 2010
