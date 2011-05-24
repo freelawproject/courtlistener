@@ -139,7 +139,7 @@ def append_compressed_data(court_id, VERBOSITY):
                 continue
             except AttributeError:
                 if VERBOSITY >= 1:
-                    print "Attribute error printing document. Punting."
+                    print "ERROR: Document lacks attribute. Punting."
                 continue
 
         # Close things off
