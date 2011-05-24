@@ -15,7 +15,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+
+from datetime import datetime
 from django.shortcuts import render_to_response
+from django.template import RequestContext
+
+
 
 def display_dump_page(request):
     '''Builds a table of the data dumps, and then displays the page to the
@@ -31,12 +36,12 @@ def display_dump_page(request):
         # For each file, gather up the information about it
         dump = []
         # Creation date
-        dump.append(os.path.getctime(dump_file))
+        dump.append(datetime.fromtimestamp(os.path.getctime(dump_file)))
         # Filename
         dump.append(dump_file)
         dumps_info.append(dump)
+        print dumps_info
 
-    return render_to_response('dumps/dumps.html', {'over_limit': True,
-        'query': query, 'alertForm': alertForm},
+    return render_to_response('dumps/dumps.html', {'dumps_info': dumps_info},
         RequestContext(request))
 

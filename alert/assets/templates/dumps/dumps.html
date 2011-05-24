@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}CourtListener.com / Data Dumps{% endblock %}
+
+{% block content %}
+    <div class="span-18">
+        <h2 id="about">XML Data Dumps</h2>
+        <p>For hackers and legal analysts, we provide XML dumps of our data.
+        We generate these files on the first of the month, when we create
+        individual dump files for each court, and a single file containing our entire corpus
+        (<a href="/dumps/latest-all.xml.gz">latest-all.xml.gz</a>). These
+        dumps contain our entire corpus, and can thus be very large. </p>
+
+        <p>The information in the dumps should be self explanitory, and can be
+        discussed in <a href="https://groups.google.com/forum/#!forum/courtlistener-discuss">
+        our forum</a>.</p>
+
+        <p>All time stamps in these documents are Pacific Standard Time.</p>
+
+        <h3>XML Dumps</h3>
+        <table>
+            <tr>
+                <th>File name</th>
+                <th>Creation date</th>
+            </tr>
+            {% for dump_date, file_name in dumps_info %}
+                <tr><td><a href="/dumps/{{ file_name }}/">{{ file_name }}</a></td><td>{{ dump_date|date:"n/j/Y" }}</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+{% endblock %}
+
