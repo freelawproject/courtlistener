@@ -16,22 +16,21 @@
 
 import os
 
+from alert.settings import DUMP_DIR
 from datetime import datetime
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 
-
-
 def display_dump_page(request):
-    '''Builds a table of the data dumps, and then displays the page to the
-    user.
     '''
-
-    from settings import DUMP_DIR
+    Builds a table of the data dumps, and then displays the page to the user.
+    '''
     os.chdir(DUMP_DIR)
 
     dump_files = os.listdir('.')
+    dump_files.sort()
     dumps_info = []
+    latest_dumps_info = []
     for dump_file in dump_files:
         # For each file, gather up the information about it
         dump = []
@@ -39,9 +38,13 @@ def display_dump_page(request):
         dump.append(datetime.fromtimestamp(os.path.getctime(dump_file)))
         # Filename
         dump.append(dump_file)
-        dumps_info.append(dump)
-        print dumps_info
+        # Filesize
+        dump.append(os.stat(dump_file)[6])
 
-    return render_to_response('dumps/dumps.html', {'dumps_info': dumps_info},
-        RequestContext(request))
+        if 'latest' in dump_file:
+            latest_dumps_info.append(dump)
+        else:
+            dumps_info.append(dump)
 
+    return render_to_response('dumps/dumps.html', {'dumps_info': dumps_info,
+        'latest_dumps_info': latest_dumps_info}, RequestContext(request))
