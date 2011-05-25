@@ -17,16 +17,43 @@
 
         <p>All time stamps in these documents are Pacific Standard Time.</p>
 
-        <h3>XML Dumps</h3>
-        <table>
-            <tr>
-                <th>File name</th>
-                <th>Creation date</th>
-            </tr>
-            {% for dump_date, file_name in dumps_info %}
-                <tr><td><a href="/dumps/{{ file_name }}/">{{ file_name }}</a></td><td>{{ dump_date|date:"n/j/Y" }}</td></tr>
-            {% endfor %}
-        </table>
+
+        {% if latest_dumps_info|length != 0 %}
+            <h3>Latest XML Dumps</h3>
+            <table>
+                <tr>
+                    <th width="230px">File name</th>
+                    <th>Creation date</th>
+                    <th>Size</th>
+                </tr>
+                {% for dump_date, file_name, file_size in latest_dumps_info %}
+                    <tr>
+                        <td><a href="/dumps/{{ file_name }}/">{{ file_name }}</a></td>
+                        <td>{{ dump_date|date:"n/j/Y H:i" }}</td>
+                        <td>{{ file_size|filesizeformat }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+        {% endif %}
+
+
+        {% if dumps_info|length != 0 %}
+            <h3>Archived XML Dumps</h3>
+            <table>
+                <tr>
+                    <th width="230px">File name</th>
+                    <th>Creation date</th>
+                    <th>Size</th>
+                </tr>
+                {% for dump_date, file_name in dumps_info %}
+                    <tr>
+                        <td><a href="/dumps/{{ file_name }}/">{{ file_name }}</a></td>
+                        <td>{{ dump_date|date:"n/j/Y H:i" }}</td>
+                        <td>{{ file_size|filesizeformat }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+        {% endif %}
     </div>
 {% endblock %}
 

@@ -178,21 +178,24 @@ def rotate_files(filename, VERBOSITY):
         if dump_file == 'data-dumper.py':
             # Punt, or else we self-delete!
             continue
+        elif dump_file == filename:
+            # This is the file we just created. We must rename it last or else
+            # we create a race condition in which we can delete the old latest
+            # file.
+            continue
         elif dump_file == filename[0:-5]:
-            # rename the file as appropriate, with zero-padded months
+            # rename the file as appropriate, with zero-padded months,
+            # preserving modification date.
             if VERBOSITY >= 1:
                 print "Renaming latest file: %s." % dump_file
-            os.rename(dump_file, dump_file.replace('latest',
-                '%d-%02d') % (year_last_month, last_month))
-        elif dump_file == filename:
-            # It's the file we just made a moment ago. Strip the .part from
-            # its name.
-            if VERBOSITY >= 1:
-                print "Renaming " + filename + " as " + filename[0:-5]
-            os.rename(filename, filename[0:-5])
+            new_filename = dump_file.replace('latest', '%d-%02d') \
+                % (year_last_month, last_month)
+            stat = os.stat(dump_file)
+            os.rename(dump_file, new_filename)
+            os.utime(new_filename, (stat.st_atime, stat.st_mtime))
         else:
             # Not a new file. See if it is more than a year old (and should be
-            # deleted.
+            # deleted).
             creation_time = os.path.getctime(dump_file)
             now = time.time()
             difftime = now - creation_time
@@ -206,6 +209,11 @@ def rotate_files(filename, VERBOSITY):
                         print dump_file + " is older than one year, and not " + \
                             "made in January. Deleting."
                     os.unlink(dump_file)
+
+    # Last step is to rename our original file.
+    if VERBOSITY >= 1:
+        print "Renaming " + filename + " as " + filename[0:-5]
+    os.rename(filename, filename[0:-5])
 
 
 def main():
