@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import gc
+from alert.settings import *
 
 def queryset_iterator(queryset, chunksize=1000):
     '''
@@ -28,6 +29,9 @@ def queryset_iterator(queryset, chunksize=1000):
 
     Note that the implementation of the iterator does not support ordered query sets.
     '''
+    if DEVELOPMENT:
+        chunksize = 5
+
     documentUUID = 0
     last_pk = queryset.order_by('-documentUUID')[0].documentUUID
     queryset = queryset.order_by('documentUUID')
