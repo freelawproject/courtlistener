@@ -6,54 +6,42 @@
     <div class="span-18">
         <h2 id="about">XML Data Dumps</h2>
         <p>For hackers and legal analysts, we provide XML dumps of our data.
-        We generate these files on the first of the month, when we create
-        individual dump files for each court, and a single file containing our entire corpus
-        (<a href="/dumps/latest-all.xml.gz">latest-all.xml.gz</a>). These
-        dumps contain our entire corpus, and can thus be very large. </p>
+        We generate these files when they are requested, so some files may be
+        very fast, while others may need to be created for you, which can take
+        a moment. Dump files are available by the year, month and day.
+        For each time period, individual dump files are available for each court,
+        as well as a single file containing opinions from all courts.</p>
 
-        <p>The information in the dumps should be self explanitory, and can be
+        <p>The XML information in the dumps should be self-explanitory, and can be
         discussed in <a href="https://groups.google.com/forum/#!forum/courtlistener-discuss">
         our forum</a>.</p>
 
-        <p>All time stamps in these documents are Pacific Standard Time.</p>
+        <p>All time stamps are Pacific Standard Time.</p>
 
 
-        {% if latest_dumps_info|length != 0 %}
-            <h3>Latest XML Dumps</h3>
-            <table>
-                <tr>
-                    <th width="230px">File name</th>
-                    <th width="230px">Creation date</th>
-                    <th width="230px">Size</th>
-                </tr>
-                {% for dump_date, file_name, file_size in latest_dumps_info %}
-                    <tr>
-                        <td><a href="/dumps/{{ file_name }}/">{{ file_name }}</a></td>
-                        <td>{{ dump_date|date:"n/j/Y H:i" }}</td>
-                        <td>{{ file_size|filesizeformat }}</td>
-                    </tr>
-                {% endfor %}
-            </table>
-        {% endif %}
+        <h3>Using the Dumps</h3>
+        <p>Annual, monthly or daily dumps can be accessed at
+        http://courtlistener.com/dump-api/<strong>year/month/day/court</strong>.xml.gz.</p>
+        <p>For example, let's look at ways to access the Ninth Circuit of Appeals (<strong>ca9</strong>):</p>
+        <ul>
+            <li>All ca9 cases from 2009: <a href="/dump-api/2009/ca9.xml.gz">
+                http://courtlistner.com/dump-api/<strong>2009/ca9</strong>.xml.gz</a></li>
+            <li>All ca9 cases from June 2009: <a href="/dump-api/2009/06/ca9.xml.gz">
+                http://courtlistner.com/dump-api/2009/<strong>06</strong>/ca9.xml.gz</a></li>
+            <li>All ca9 cases from June 9, 2009: <a href="/dump-api/2009/06/09/ca9.xml.gz">
+                http://courtlistner.com/dump-api/2009/06/<strong>09</strong>/ca9.xml.gz</a></li></li>
+        </ul>
+        <p>If you would like <strong>all</strong> documents for a given time period,
+        you can use <strong>all</strong> for the court name. For example,
+        <a href="http://courtlistener.com/2009/06/09/all.xml.gz">
+            http://courtlistener.com/2009/06/09/<strong>all</strong>.xml.gz</a>
+            returns all of the cases from June 9, 2009 (across all courts).</p>
 
+        <h3>Feedback</h3>
+        <p>We welcome feedback and feature requests to this API. Please get in touch in
+        <a href="https://groups.google.com/forum/#!forum/courtlistener-discuss">
+        our forum</a>.</p>
 
-        {% if dumps_info|length != 0 %}
-            <h3>Archived XML Dumps</h3>
-            <table>
-                <tr>
-                    <th width="230px">File name</th>
-                    <th width="230px">Creation date</th>
-                    <th width="230px">Size</th>
-                </tr>
-                {% for dump_date, file_name in dumps_info %}
-                    <tr>
-                        <td><a href="/dumps/{{ file_name }}/">{{ file_name }}</a></td>
-                        <td>{{ dump_date|date:"n/j/Y H:i" }}</td>
-                        <td>{{ file_size|filesizeformat }}</td>
-                    </tr>
-                {% endfor %}
-            </table>
-        {% endif %}
     </div>
 {% endblock %}
 
