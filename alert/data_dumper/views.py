@@ -18,7 +18,7 @@ import calendar
 import gzip
 import os
 
-from alertSystem.models import *
+from alert.alertSystem.models import *
 from alert.lib.db_tools import *
 from alert.settings import DUMP_DIR
 
@@ -28,7 +28,6 @@ from django.shortcuts import render_to_response
 from django.template import RequestContext
 
 from datetime import date
-from datetime import datetime
 from lxml import etree
 
 
