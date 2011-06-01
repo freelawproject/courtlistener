@@ -4,13 +4,10 @@
 
 {% block content %}
     <div class="span-24 last">
-        <h2>Profile / Account</h2>
-        <div class="span-8 box round header">
+        <h2>Settings / Account</h2>
+        <div class="span-6 box round header">
             <h3 class="bottom">
-                <a href="/profile/settings/"><strong>Account</strong></a>&nbsp;&nbsp;&nbsp;
-                <a href="/profile/alerts/">Alerts</a>&nbsp;&nbsp;&nbsp;
-                <a href="/profile/favorites/">Favorites</a>&nbsp;&nbsp;&nbsp;
-                <a href="/profile/password/change">Password</a>
+                <a href="/profile/settings/"><strong>Account</strong></a>&nbsp;&nbsp;&nbsp;<a href="/profile/alerts/">Alerts</a>&nbsp;&nbsp;&nbsp;<a href="/profile/password/change">Password</a>
             </h3>
         </div>
     </div>
@@ -18,7 +15,7 @@
         {# if their email address was just changed, tell them.#}
         {% if messages %}
             <div class="span-18">
-                <div class="span-8">
+                <div class="span-10">
                     {% for message in messages %}
                         <p class="bottom {{message.tags}}">{{message|safe}}</p>
                     {% endfor %}
@@ -28,7 +25,7 @@
         {% else %}
             {% if not request.user.get_profile.emailConfirmed %}
                 <div class="span-18">
-                    <div class="span-9">
+                    <div class="span-10">
                         <p class="bottom notice">Your email address has not been confirmed. To receive alerts, you must <a href="/email-confirmation/request/">confirm your email address</a>.</p>
                     </div>
                     <div class="span-7 last">&nbsp;</div>
