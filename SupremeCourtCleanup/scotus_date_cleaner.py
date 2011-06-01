@@ -51,7 +51,6 @@ Spec/features:
 
 import sys
 sys.path.append('/var/www/court-listener/alert')
-sys.path.append('/home/mlissner/FinalProject/alert')
 
 import settings
 from django.core.management import setup_environ
@@ -68,8 +67,9 @@ import re
 def remove_words(phrase):
     # Removes words and punctuation that don't help the diff comparison.
     stop_words = 'a|an|and|as|at|but|by|en|etc|for|if|in|is|of|on|or|the|to|v\.?|via' +\
-        '|vs\.?|united|states?|et|al|appellant|defendant|administrator|plaintiffs?|error' +\
-        '|others|against|ex|parte'
+        '|vs\.?|united|states?|et|al|appellants?|defendants?|administrator|plaintiffs?|error' +\
+        '|others|against|ex|parte|complainants?|original|claimants?|devisee' + \
+        '|executrix|executor'
     stop_words_reg = re.compile(r'^(%s)$' % stop_words, re.IGNORECASE)
 
     # strips punctuation
@@ -129,11 +129,12 @@ def cleaner(simulate=False, verbose=False):
 
         elif results.count() == 1:
             # One hit returned make sure it's above THRESHOLD. If so, fix it.
-            THRESHOLD = 0.3
+            HIGH_THRESHOLD = 0.3
+            LOW_THRESHOLD  = 0.15
             db_case_name = str(results[0])
             diff = gen_diff_ratio(db_case_name, csv_case_name)
-            if diff >= THRESHOLD:
-                # Update the date in the DB
+            if diff >= HIGH_THRESHOLD:
+                # Update the date in the DB, this is a no brainer
                 if not simulate:
                     splitDate = csv_date_published.split('-')
                     results[0].dateFiled = datetime.date(int(splitDate[0]),
@@ -144,7 +145,31 @@ def cleaner(simulate=False, verbose=False):
                 if verbose: print "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s" % \
                     (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip())
                 updated_file.write("Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s\n" % \
-                    (results.count(), line_num,  diff,results[0].documentUUID, results[0], line.strip()))
+                    (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip()))
+
+            elif (diff >= LOW_THRESHOLD) and (diff <= HIGH_THRESHOLD):
+                # Ask the user if the change should be made.
+                same = raw_input(str(results[0]) + "   ==   " + csv_case_name + " ?: ")
+                if same == 'y':
+                    # Update the date in the DB. Human says to.
+                    if not simulate:
+                        splitDate = csv_date_published.split('-')
+                        results[0].dateFiled = datetime.date(int(splitDate[0]),
+                            int(splitDate[1]), int(splitDate[2]))
+                        results[0].save()
+
+                    # Log as appropriate
+                    if verbose: print "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s" % \
+                        (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip())
+                    updated_file.write("Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s\n" % \
+                        (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip()))
+                else:
+                    # Human says punt; therefore punt.
+                    if verbose:
+                        print "Results: %d. Line number %d punted by human. Diff_ratio: %f found on %d: %s; Line contents: %s" % \
+                            (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip())
+                    punt_file.write("Results: %d. Line number %d punted by human. Diff_ratio: %f found on %d: %s; Line contents: %s\n" % \
+                        (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip()))
 
             else:
                 # Below the threshold. Punt!
@@ -220,3 +245,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
