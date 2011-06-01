@@ -16,7 +16,7 @@
 
 from alert.settings import LOGIN_REDIRECT_URL
 from alert.userHandling.forms import *
-from honeypot.decorators import check_honeypot
+from alert.honeypot.decorators import check_honeypot
 
 from django.contrib import messages
 from django.contrib.auth import authenticate
