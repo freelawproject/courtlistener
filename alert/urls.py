@@ -19,6 +19,7 @@ from alert import settings
 from alert.alertSystem.models import PACER_CODES
 from alert.alertSystem.views import *
 from alert.contact.views import *
+from alert.data_dumper.views import *
 from alert.feeds.views import *
 from alert.pinger.views import *
 from alert.search.views import *
@@ -97,6 +98,12 @@ urlpatterns = patterns('',
     (r'^alert/delete/(\d{1,6})/$', deleteAlert),
     (r'^alert/delete/confirm/(\d{1,6})/$', deleteAlertConfirm),
     (r'^tools/$', toolsPage),
+
+    # Dump index and generation pages
+    (r'^dump-info/$', dump_index),
+    (r'^dump-api/(?P<year>\d{4})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
+    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
+    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
 
     # Feeds
     (r'^feed/(search)/$', searchFeed()), #lacks URL capturing b/c it will use GET queries.

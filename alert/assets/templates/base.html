@@ -14,11 +14,11 @@
     </head>
 
     <body>
-        <div class="container">            
+        <div class="container">
             <div class="span-15 header" id="header">
-                <h1 class="bottom"><a href="/">CourtListener</a></h1> 
-                <h3 class="alt top bottom">(Beta)</h3>               
-            </div>          
+                <h1 class="bottom"><a href="/">CourtListener</a></h1>
+                <h3 class="alt top bottom">(Beta)</h3>
+            </div>
 
             {% if user.is_authenticated %}
                 <div class="span-9 last">
@@ -48,21 +48,21 @@
                     </div>
                 </div>
             {% endif %}
-            
+
             <hr>
-            
+
             {% block content %}
                 <div class="span-18 colborder" id="content">
                     <p>Your content seems to be missing!</p>
                 </div>
             {% endblock %}
-            
+
             {% block sidebar %}
                 <div class="span-5 last" id="sidebar">
                 </div>
             {% endblock %}
 
-    
+
             <div class="span-24 last">
                 <hr class="space">
                 <hr>
@@ -86,10 +86,13 @@
                 <div class="span-2">
                     <a href="/contact/">Contact</a>
                 </div>
-                <div class="span-2 last">
+                <div class="span-2">
                     <a href="/tools/">Tools</a>
                 </div>
-            </div>        
+                <span class="span-2 last">
+                    <a href="/dump-info/">Data Dumps</a>
+                </span>
+            </div>
         </div>
         {% if not user.is_superuser  %}
             <!-- Piwik -->
