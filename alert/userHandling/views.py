@@ -16,6 +16,8 @@
 
 from alert.settings import LOGIN_REDIRECT_URL
 from alert.userHandling.forms import *
+from honeypot.decorators import check_honeypot
+
 from django.contrib import messages
 from django.contrib.auth import authenticate
 from django.contrib.auth.decorators import login_required
@@ -35,12 +37,6 @@ import hashlib
 @login_required
 def viewAlerts(request):
     return render_to_response('profile/alerts.html', {},
-        RequestContext(request))
-
-
-@login_required
-def view_favorites(request):
-    return render_to_response('profile/favorites.html', {},
         RequestContext(request))
 
 
@@ -140,6 +136,7 @@ def deleteProfileDone(request):
         RequestContext(request))
 
 
+@check_honeypot(field_name='skip_me_if_alive')
 def register(request):
     """allow only an anonymous user to register"""
     redirect_to = request.REQUEST.get('next', '')

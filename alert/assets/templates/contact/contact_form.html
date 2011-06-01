@@ -1,30 +1,10 @@
 {% extends "base.html" %}
+{% load honeypot %}
 
 {% block title %}CourtListener.com / Contact{% endblock %}
 
-
-{% block sidebar %}
-    <div class="span-5 colborder" id="sidebar">
-        <h3 class="bottom">Updates</h3>
-        <p>For updates, bug fixes, and status messages, follow <a href="https://twitter.com/courtlistener">@courtlistener</a> on Twitter.</p>
-        <br><br>
-
-        <h3 class="bottom">Blog / Discussion</h3>
-        <p>Visit <a href="https://groups.google.com/group/courtlistener-discuss">our forum</a>
-        to see our latest announcements or if you're interested in discussing the site with others.</p>
-        <br><br>
-
-        <h3 class="bottom">Mail</h3>
-        <p>School of Information<br>
-        University of California, Berkeley<br>
-        Attn: Brian Carver<br>
-        102 South Hall<br>
-        Berkeley, CA 94720-4600</p>
-    </div>
-{% endblock %}
-
 {% block content %}
-    <div class="span-18 last" id="content">
+    <div class="span-18 colborder" id="content">
         <h2>Contact Us</h2>
 
         {% if form.errors %}
@@ -87,7 +67,27 @@
                 {% endif %}<br>
                 {{ form.message }}
             </p>
+            {% render_honeypot_field "skip_me_if_alive" %}
           <button type="submit" class="button">Send message</button>
         </form>
+    </div>
+{% endblock %}
+
+{% block sidebar %}
+    <div class="span-5 last" id="sidebar">
+        <h3>Updates</h3>
+        <p>For updates, bug fixes, and status messages, follow <a href="https://twitter.com/courtlistener">@courtlistener</a> on Twitter.</p>
+        <br><br>
+
+        <h3>Discussion</h3>
+        <p>You can <a href="https://groups.google.com/group/courtlistener-discuss">visit our forum</a> if you're interested in discussing the site with others.</p>
+        <br><br>
+
+        <h3>Mail</h3>
+        <p>School of Information<br>
+        University of California, Berkeley<br>
+        Attn: Brian Carver<br>
+        102 South Hall<br>
+        Berkeley, CA 94720-4600</p>
     </div>
 {% endblock %}

@@ -83,9 +83,9 @@ def cachedSitemap(request, sitemaps, section=None):
         filename = os.path.join(settings.MEDIA_ROOT, "sitemaps",
                                 section + "-p" + str(page) + ".xml")
         f = open(filename, 'r')
-        xml = f.read()
-        resp = HttpResponse(xml, mimetype='application/xml')
-        f.close()
+	xml = f.read()
+	resp = HttpResponse(xml, mimetype='application/xml')
+	f.close()
         return resp
     except IOError:
         # the sitemap is not cached to disk; make it, save it, return it
@@ -115,10 +115,8 @@ def cachedSitemap(request, sitemaps, section=None):
 
 
 class LimitedGenericSitemap(GenericSitemap):
-    '''
-    This class extends the GenericSitemap, so that we can limit it to only
-    250 URLs.
-    '''
+    """This class extends the GenericSitemap, so that we can limit it to only
+    250 URLs."""
     # if this is changed, the sitemap function (below) needs updating
     limit = 250
 
@@ -135,11 +133,9 @@ class LimitedGenericSitemap(GenericSitemap):
 
 
 class MyFlatPageSitemap(FlatPageSitemap):
-    '''
-    Extends the FlatPageSitemap class so that specific priorities can be
+    """Extends the FlatPageSitemap class so that specific priorities can be
     given to various pages; prioritizes the about page, deprioritizes
-    the legal pages.
-    '''
+    the legal pages. """
     def priority(self, item):
         if 'about' in str(item.get_absolute_url).lower():
             return 0.8

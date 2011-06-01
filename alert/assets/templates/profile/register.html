@@ -1,8 +1,9 @@
 {% extends "base.html" %}
+{% load honeypot %}
 
 {% block title %}CourtListener.com / Register{% endblock %}
 
-{% block head %}
+{% block headers %}
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
     <script type="text/javascript">
 	    $(document).ready(function() {
@@ -24,6 +25,7 @@
         {% endif %}
 
         <form action="" method="post">{% csrf_token %}
+            {% render_honeypot_field "skip_me_if_alive" %}
             <p>
                 <label for="id_username">Username*</label>
                 {% if form.username.errors %}
