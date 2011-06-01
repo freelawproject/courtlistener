@@ -22,7 +22,7 @@ from django.template import RequestContext
 
 from alert.contact.forms import ContactForm
 from alert import settings
-from honeypot.decorators import check_honeypot
+from alert.honeypot.decorators import check_honeypot
 
 @check_honeypot(field_name='skip_me_if_alive')
 def contact(request):
