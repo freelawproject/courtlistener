@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset=utf-8>
+        <title>{% block title %}CourtListener.com{% endblock %}</title>
+        <link rel="stylesheet" href="/media/css/blueprint/screen.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="/media/css/blueprint/print.css" type="text/css" media="print">
+        <link rel="stylesheet" href="/media/css/blueprint/override.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="/media/css/blueprint/plugins/fancy-type/screen.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="/media/css/blueprint/plugins/buttons/screen.css" type="text/css" media="screen, projection">
+        <!--[if lt IE 8]><link rel="stylesheet" href="/media/css/blueprint/ie.css" type="text/css" media="screen, projection"><![endif]-->
+        {% block head %}{% endblock %}
+        <meta name="description" content="Create alerts, search for and browse the latest Circuit Court and Supreme Court opinions. Updated daily with the latest appeals court documents.">
+    </head>
+
+    <body>
+        <div class="container">
+            {% block header %}
+                <div class="header-container span-24">
+                    <div class="span-12 header" id="header">
+                        <img src="/media/images/png/logo.png"
+                             alt="Court listener logo"
+                             width="252"
+                             height="28"/>
+
+                        {% if user.is_authenticated %}
+                            <div class="navigation">
+                                <ul>
+                                    <li><a href="/opinions/all/">Browse</a></li>
+                                    <li><a href="/profile/settings/">Profile</a></li>
+                                    <li><a href="/sign-out/">Sign out</a></li>
+                                </ul>
+                            </div>
+                        {% else %}
+                            <div class="navigation">
+                                <ul>
+                                    <li><a href="/about/">About</a></li>
+                                    <li><a href="/opinions/all">Browse</a></li>
+                                    {% if request.path != "/sign-out/" %}
+                                        <li><a href="{%url sign-in-register%}?next={{request.path}}">Sign in / Register</a></li>
+                                    {% else %}
+                                        <li><a href="{%url sign-in-register%}">Sign in / Register</a></li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="span-12 last" id="searchform">
+                        <form action="/" method="get">
+                            <div id="search-form">
+                                <table>
+                                    <tbody>
+                                        <tr>
+                                            <td>
+                                                <input class="{% if not results.object_list or not query%}auto-focus{% endif %} wide-title"
+                                                name="q"
+                                                id="search-input"
+                                                 autocomplete="off">
+                                             </td>
+                                            <td>
+                                                <button type="submit" class="button title"
+                                                name="search" id="search-button">Search</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </form>
+
+                        <!--
+                        <form action="/" method="get">
+                            <input class="{% if not results.object_list or not query%}auto-focus{% endif %} wide-title" name="q" id="search-input" value="{{query}}">
+                            <button type="submit" class="button title" id="search-button" name="search">Search</button>
+                        </form>-->
+                    </div>
+                </div>
+                <hr>
+            {% endblock %}
+
+            {% block sidebar %}
+                <div class="span-5 colborder" id="sidebar">
+                </div>
+            {% endblock %}
+
+            {% block content %}
+                <div class="span-18 last" id="content">
+                    <p>Your content seems to be missing!</p>
+                </div>
+            {% endblock %}
+
+
+            <div class="span-24 last">
+                <hr class="space">
+                <hr>
+            </div>
+            <div class="span-24 last quiet last" id="footer">
+                <span class="footer-item">
+                    <a href="/about/">About</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/coverage/">Coverage</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/terms/">Terms &amp; Privacy</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/sitemap/">Sitemap</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/contribute/">Contribute</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/contact/">Contact</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/tools/">Tools</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/dump-info/">Data Dumps</a>
+                </span>
+            </div>
+        </div>
+        {% if not user.is_superuser  %}
+            <!-- Piwik -->
+            <script type="text/javascript">
+            var pkBaseURL = (("https:" == document.location.protocol) ? "https://piwik.courtlistener.com/" : "http://piwik.courtlistener.com/");
+            document.write(unescape("%3Cscript src='" + pkBaseURL + "piwik.js' type='text/javascript'%3E%3C/script%3E"));
+            </script><script type="text/javascript">
+            try {
+            var piwikTracker = Piwik.getTracker(pkBaseURL + "piwik.php", 1);
+            piwikTracker.trackPageView();
+            piwikTracker.enableLinkTracking();
+            } catch( err ) {}
+            </script><noscript><p><img src="http://piwik.courtlistener.com/piwik.php?idsite=1" style="border:0" alt=""/></p></noscript>
+            <!-- End Piwik Tag -->
+        {% endif %}
+    </body>
+</html>
