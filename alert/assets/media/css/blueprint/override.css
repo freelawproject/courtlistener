@@ -1,6 +1,6 @@
 /* --------------------------------------------------------------------------
 
-Sets up all the overrides or additional CSS that the site will use.
+Sets up all the overrides or additional CSS that the site uses.
 
 ---------------------------------------------------------------------------*/
 
@@ -13,6 +13,14 @@ Sets up all the overrides or additional CSS that the site will use.
 
 .inline {
     display: inline;
+}
+
+.center {
+    text-align: center;
+}
+
+.right {
+    text-align: right;
 }
 
 .container {
@@ -41,33 +49,42 @@ Sets up all the overrides or additional CSS that the site will use.
     margin-top: 6px;
 }
 
+#search-form table{
+    width: auto;
+    margin-bottom: auto;
+}
+
+#search-form td{
+    padding: 0px;
+}
+
 #search-input-home-page, #search-input {
     width: 500px;
     border-color: threedface;
     border-style: solid none solid solid;
     border-width: 1px 0px 1px 1px;
+    font-size: 16px;
+    height: 20px;
 }
 
 #search-input {
     width: 389px;
-    position: relative;
-    left: 3px;
 }
 
 #search-button-home-page, #search-button {
-    position: relative;
-    left: -3px;
-    top: -1px;
-    height: 33px;
-    padding: 4px 10px 5px 10px;
+    height: 32px;
+    padding: 4px 10px;
     margin: 0px;
-    /*border: 2px inset buttonface;*/
+    border-color: threedface;
+}
+
+#search-input-home-page:focus, #search-input:focus{
+    outline-style: none;
 }
 
 #search-button {
     left: 0px;
 }
-
 
 .round {
     -moz-border-radius: 6px 6px 6px 6px;
@@ -194,21 +211,83 @@ fieldset.collapsed {
 }
 
 #advanced-home-page {
-    width: 542px;
+    width: 545px;
 }
 
 #advanced-home-page > legend {
     font-size: 100%;
 }
 
-#advanced-popup {
-    z-index: 100;
+#modal-rel {
     position: relative;
-    right: 0px;
+}
+
+#modal-save-favorite, #modal-logged-out {
+    z-index: 10;
+    top: -10px;
+    left: 10px;
+    box-shadow: 2px 2px 5px #000000;
+    position: absolute;
     padding: 1em;
     border: 1px solid #DDDDDD;
     background: white;
 }
+
+#modal-logged-out {
+    top: -10px;
+    left: 10px;
+    padding: 2em;
+}
+
+#save-favorite-text-area {
+    height: auto;
+}
+
+.save-favorite-button {
+    margin-right: 0px;
+}
+
+#favorites-bottom-section {
+    margin-top: 4em;
+}
+
+#save-favorite-delete {
+    margin-bottom: 0.3em;
+}
+
+#favorites-buttons {
+    position: absolute;
+    right: 1em;
+    bottom: 0.3em;
+}
+
+
+/* Tags */
+ul.tags {
+    padding-left: 0px;
+    margin: 0 0 0 0;
+}
+
+li.tag {
+    background-color: #EFF2F7;
+    border: 1px solid #CCD5E4;
+    border-radius: 5px 5px 5px 5px;
+    color: #000000;
+    cursor: default;
+    float: left;
+    font-size: 11px;
+    height: auto !important;
+    margin: 3px;
+    overflow: hidden;
+    padding: 1px 3px;
+    white-space: nowrap;
+}
+
+li.tag:first-child {
+    margin-left: 0px;
+}
+
+
 
 /* Sprites! */
 .sprites {
@@ -311,30 +390,18 @@ fieldset.collapsed {
 	background-position  : -98px 0px;
 }
 
-#favorite_off_png {
+#favorite-star-png {
+    margin: 8px 5px 0px 0px;
+}
+
+.favorite-on {
+   height               : 16px;
+	width                : 16px;
+	background-position  : -114px -16px;
+}
+
+.favorite-off {
     height               : 16px;
 	width                : 16px;
 	background-position  : -114px 0px;
-    margin: 8px 5px 0px 0px;
-}
-
-#favorite_off_png:hover {
-    height               : 16px;
-	width                : 16px;
-	background-position  : -114px -16px;
-    margin: 8px 5px 0px 0px;
-}
-
-#favorite_on_png {
-    height               : 16px;
-	width                : 16px;
-	background-position  : -114px -16px;
-    margin: 8px 5px 0px 0px;
-}
-
-#favorite_on_png:hover {
-    height               : 16px;
-	width                : 16px;
-	background-position  : -114px -0px;
-    margin: 8px 5px 0px 0px;
 }

@@ -15,7 +15,7 @@
         </div>
     </div>
     <div class="span-24 last" id="content">
-        {% if user.get_profile.alert.all %}
+        {% if user.get_profile.favorite.all %}
             <div class="span-24 last content">
                 {% if messages %}
                     <div class="span-18">
@@ -38,32 +38,28 @@
                 {% endif %}
                 <table>
                     <tr>
-                        <th>Query name</th>
-                        <th>Query</th>
-                        <th>Frequency</th>
-                        <th>Last hit</th>
-                        <th>Private</th>
-                        <th>Subscribe</th>
+                        <th>Document</th>
+                        <th>Tags</th>
+                        <th>Notes</th>
                     </tr>
-                    {% for alert in user.get_profile.alert.all %}
+                    {% for favorite in user.get_profile.favorite.all %}
                     <tr>
-                        <td><p class="bottom" title="{{alert.alertName}}">{{ alert.alertName|capfirst|truncatewords:"6" }}</p></td>
-                        <td><a href="/search/results/?q={{alert.alertText}}" title="{{alert.alertText}}">{{ alert.alertText|truncatewords:"14" }}</a></td>
-                        <td>{{ alert.get_alertFrequency_display }}</td>
-                        <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"Never" }}</td>
-                        <td>{{ alert.alertPrivacy|yesno:"Yes,No" }}</td>
-                        <td><a href="/feed/search/?q={{alert.alertText}}"><img src="/media/images/png/atom-feed.png" alt="atom icon"></a>
-                        <td><a href="/alert/edit/{{ alert.alertUUID }}/">edit/delete</a></td>
+                        <td><p class="bottom" title="{{favorite.doc_id.citation.caseNameShort}}">{{favorite.doc_id.citation.caseNameShort|truncatewords:"10" }}</p></td>
+                        <td>
+                            <ul class="XXX">
+                            {% for tag in favorite.tags.all %}
+                                <li class="tag"><a href="/search/tag/{{tag.tag}}" class="tag">{{tag.tag}}</a></li>
+                            {% endfor %}
+                            </ul>
+                        </td>
+                        <td>{{ favorite.notes|truncatewords:"100" }}</td>
+                        <td><a href="/favorite/edit/{{ favorite.id }}/">edit/delete</a></td>
                     </tr>
                     {% endfor %}
                 </table>
-                <form action="/" method="post">{% csrf_token %}
-                <button type="submit" class="button">Make new alert</button>
             </div>
         {% else %}
-            <h3>You do not have any alerts.</h3>
-            <form action="/" method="post">{% csrf_token %}
-            <button type="submit" class="button">Make new alert</button>
+            <h3>You do not have any favorites.</h3>
         {% endif %}
     </div>
 {% endblock %}

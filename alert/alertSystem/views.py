@@ -15,16 +15,23 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert.alertSystem.models import *
+from alert.userHandling.forms import *
+from alert.userHandling.models import *
 from alert.lib.encode_decode import ascii_to_num
 from django.contrib.sites.models import Site
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponsePermanentRedirect, Http404
+from django.core.exceptions import ObjectDoesNotExist
+from django.http import Http404
+from django.http import HttpResponse
+from django.http import HttpResponsePermanentRedirect
 from django.shortcuts import render_to_response
 from django.shortcuts import get_object_or_404, get_list_or_404
 from django.template import RequestContext
 from django.template.defaultfilters import slugify
+from django.utils import simplejson
 from django.views.decorators.cache import cache_page
 import string
+import traceback
 
 @cache_page(60*5)
 def redirect_short_url(request, encoded_string):
@@ -54,67 +61,153 @@ def redirect_short_url(request, encoded_string):
 @cache_page(60*5)
 def viewCase(request, court, id, casename):
     '''
-    Take a court, an ID, and a casename, and return the document.
+    Take a court, an ID, and a casename, and return the document. Casename
+    isn't used, and can be anything.
 
-    This is remarkably easy compared to old method, below. casename isn't
-    used, and can be anything.
+    We also test if the document ID is a favorite for the user, and send data
+    as such. If it's a favorite, we send the bound form for the favorite, so
+    it can populate the form on the page. If it is not a favorite, we send the
+    unbound form.
     '''
 
     # Decode the id string back to an int
     id = ascii_to_num(id)
 
-    # Look up the court, document, and title
+    # Look up the court, document, title and favorite information
     doc   = get_object_or_404(Document, documentUUID = id)
     ct    = get_object_or_404(Court, courtUUID = court)
     title = doc.citation.caseNameShort
+    user  = request.user
+    try:
+        # Get the favorite, if possible
+        fave = Favorite.objects.get(doc_id = doc.documentUUID, user = request.user)
+        favorite_form = FavoriteForm(instance=fave)
+    except ObjectDoesNotExist:
+        favorite_form = FavoriteForm()
 
     return render_to_response('display_cases.html', {'title': title,
-        'doc': doc, 'court': ct}, RequestContext(request))
-
-
-@cache_page(60*5)
-def viewCasesDeprecated(request, court, case):
-    '''
-    This is a fallback view that is only used by old links that have not yet
-    been flushed from the Interwebs. It was too slow, so viewCases was
-    created to replace it.
-
-    Take a court and a caseNameShort, and display what we know about that
-    case. If the casename fails, try the case number.
-
-    It no longer will return more than one case per URL.
-    '''
-
-    # get the court information from the URL
-    ct = Court.objects.get(courtUUID = court)
-
-    # try looking it up by casename. Failing that, try the caseNumber.
-    # replace hyphens with spaces, and underscores with hyphens to undo the
-    # URLizing that the get_absolute_url in the Document model used to set up.
-    caseName = case.replace('-', ' ').replace('_', '-')
-    cites = get_list_or_404(Citation, caseNameShort = caseName)
-
-    # get any documents with this citation at that court.
-    doc = get_list_or_404(Document, court = ct, citation = cites[0])
-
-    # Construct a URL
-    current_site = Site.objects.get_current()
-    slug = doc[0].citation.slug
-    URL = "http://" + current_site.domain + "/" + court + "/" + \
-        num_to_ascii(doc[0].documentUUID) + "/" + slug + "/"
-    return HttpResponsePermanentRedirect(URL)
+        'doc': doc, 'court': ct, 'favorite_form': favorite_form},
+        RequestContext(request))
 
 
 @login_required
-def toggle_star(request, id):
-    '''Toggles the favorite status for a user/star combination.
+def save_or_update_favorite(request):
+    '''Saves or updates a favorite.
 
-    Receives an ID and a request as arguments, and then uses those to create
-    or delete a favorite in the database for a specific user. If the user
-    already has the document starred, it removes the favorite. If not, it
-    creates it.
+    Receives a request as an argument, and then uses that plus POST data to
+    create or update a favorite in the database for a specific user. If the user
+    already has the document favorited, it updates the favorite with the new
+    information. If not, it creates a new favorite.
+    '''
+    if request.is_ajax():
+        # If it's an ajax request, gather the data from the form, save it to
+        # the DB, and then return a success code.
+        up = request.user.get_profile()
+
+        try:
+            doc_id = request.POST['doc_id']
+        except:
+            return HttpResponse("Unknown doc_id")
+
+        # Clean up the values returned from the tag field so they are a list
+        # not a string.
+        local_post_data = request.POST.copy()
+        local_post_data['tags'] = local_post_data['tags'].split(',')
+
+        # For each value in the result, see if any of them are new. Set those
+        # aside for later processing.
+        new_tags_data = []
+        old_tags_data = []
+        for tag in local_post_data['tags']:
+            # New tags look like NEWTAG_tagValue_END
+            split_tag = tag.split('_')
+            if split_tag[0] == 'NEWTAG' and split_tag[-1] == 'END':
+                # New tag. Add to a list of new tag values for later processing
+                new_tags_data.append("_".join(split_tag[1:-1]))
+            else:
+                # Old tag, just append the ID
+                old_tags_data.append(tag)
+
+        # Associate the new clean list with the one that we're going to process.
+        local_post_data['tags'] = old_tags_data
+
+        # Get the user's favorites, then try to get the specific one (if it exists)
+        try:
+            fave = Favorite.objects.get(user = request.user, doc_id = doc_id)
+            form = FavoriteForm(local_post_data, instance = fave)
+        except:
+            print "No faves matched this doc_id."
+            form = FavoriteForm(local_post_data)
+
+        if form.is_valid():
+            cd = form.cleaned_data
+
+            # Add new tags to the system
+            tags = list(cd['tags'])
+            for tag in new_tags_data:
+                tag, created = Tag.objects.get_or_create(user = request.user, tag = tag)
+                tags.append(tag.id)
+
+            # Then we update it
+            fave.notes = cd['notes']
+            fave.tags = tags
+            fave.save()
+
+        else:
+            # invalid form...print errors...
+            print "Validity errors: %s" % repr(form.errors)
+
+
+        return HttpResponse("It worked")
+    else:
+        return HttpResponse("Not an ajax request.")
+
+
+@login_required
+def delete_favorite(request):
+    '''Deletes a favorite for a user using an ajax call and post data.
+
     '''
     pass
+
+
+@login_required
+def ajax_tags_typeahead(request):
+    '''Returns the top ten typeahead results for a query.
+
+    Given a query of some number of letters, returns the top ten tags containing
+    those letters, alphabetically.
+
+    Thus, if q == co, it might return "Constitutional Law".
+    '''
+    q = request.GET['q']
+    tags = Tag.objects.filter(tag__icontains = q, user = request.user)\
+        .order_by('tag')[:10]
+
+    # Allow users to create a new tag, unless there is an exact match
+    if tags.count() > 0:
+        for tag in tags:
+            if tag.tag == q:
+                exact_tag_exists = True
+                break
+            else:
+                exact_tag_exists = False
+    else:
+        exact_tag_exists = False
+
+    tagsList = []
+    keys = ['id', 'name']
+    if not exact_tag_exists:
+        # A tag of this value doesn't exist, allow the user to make it.
+        tagsList.append(dict(zip(keys, ['NEWTAG_' + q + '_END', "Create: " + q])))
+
+    # convert the tags to the right format
+    for tag in tags:
+        tagsList.append(dict(zip(keys, [str(tag.id), tag.tag])))
+
+    return HttpResponse(simplejson.dumps(tagsList), mimetype = 'application/javascript')
+
+
 
 
 @cache_page(60*15)

@@ -34,7 +34,12 @@
 {% block header %}
     <div class="header-container span-24">
         <div class="span-24 header" id="header">
-            <h1 class="bottom"><a href="/">CourtListener</a></h1>
+            <h1 class="bottom">
+                <img src="/media/images/png/logo.png"
+                     alt="Court listener logo"
+                     width="252"
+                     height="28"/>
+            </h1>
 
             {% if user.is_authenticated %}
                 <div class="navigation">
@@ -69,8 +74,18 @@
         <div class="span-17 last">
             <h4 class="bottom">Create an alert or search for opinions:</h4>
             <form action="" method="get">
-                <input class="auto-focus wide-title" name="q" id="search-input-home-page">
-                <button type="submit" class="button title" name="search" id="search-button-home-page">Search</button>
+                <div id="search-form">
+                    <table>
+                        <tbody>
+                            <tr>
+                                <td><input class="auto-focus wide-title" name="q"
+                                    id="search-input-home-page" autocomplete="off"></td>
+                                <td><button type="submit" class="button title"
+                                    name="search" id="search-button-home-page">Search</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </form>
         </div>
         <div class="span-10 last">

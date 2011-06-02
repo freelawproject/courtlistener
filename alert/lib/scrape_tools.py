@@ -154,7 +154,6 @@ def makeDocFromURL(LinkToDoc, ct):
     return myFile, doc, created
 
 
-
 def courtChanged(url, contents):
     '''
     Takes HTML contents from a court download, generates a SHA1, and then
@@ -217,7 +216,6 @@ def getDocContent(docs):
         mimetype = path.split('.')[-1]
         if mimetype == 'pdf':
             # do the pdftotext work for PDFs
-            print "Parsing: " + path
             process = subprocess.Popen(["pdftotext", "-layout", "-enc", "UTF-8",
                 path, "-"], shell=False, stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT)

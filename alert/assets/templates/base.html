@@ -18,7 +18,10 @@
             {% block header %}
                 <div class="header-container span-24">
                     <div class="span-12 header" id="header">
-                        <h1 class="bottom"><a href="/">CourtListener</a></h1>
+                        <img src="/media/images/png/logo.png"
+                             alt="Court listener logo"
+                             width="252"
+                             height="28"/>
 
                         {% if user.is_authenticated %}
                             <div class="navigation">
@@ -45,9 +48,31 @@
 
                     <div class="span-12 last" id="searchform">
                         <form action="/" method="get">
+                            <div id="search-form">
+                                <table>
+                                    <tbody>
+                                        <tr>
+                                            <td>
+                                                <input class="{% if not results.object_list or not query%}auto-focus{% endif %} wide-title"
+                                                name="q"
+                                                id="search-input"
+                                                 autocomplete="off">
+                                             </td>
+                                            <td>
+                                                <button type="submit" class="button title"
+                                                name="search" id="search-button">Search</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </form>
+
+                        <!--
+                        <form action="/" method="get">
                             <input class="{% if not results.object_list or not query%}auto-focus{% endif %} wide-title" name="q" id="search-input" value="{{query}}">
                             <button type="submit" class="button title" id="search-button" name="search">Search</button>
-                        </form>
+                        </form>-->
                     </div>
                 </div>
                 <hr>
@@ -90,6 +115,9 @@
                 </span>
                 <span class="footer-item">
                     <a href="/tools/">Tools</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/dump-info/">Data Dumps</a>
                 </span>
             </div>
         </div>

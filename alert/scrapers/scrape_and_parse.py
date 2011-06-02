@@ -161,7 +161,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -267,7 +267,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -362,7 +362,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -462,7 +462,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -582,7 +582,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -682,7 +682,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -772,7 +772,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                     # last, save evrything (pdf, citation and document)
                     doc.citation = cite
-                    doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
+                    doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
                     printAndLogNewDoc(VERBOSITY, ct, cite)
                     doc.save()
 
@@ -864,7 +864,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -972,7 +972,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -1069,7 +1069,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -1169,7 +1169,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
 
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -1248,7 +1248,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -1343,7 +1343,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 
@@ -1439,7 +1439,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80) + ".pdf", myFile)
+                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
                 printAndLogNewDoc(VERBOSITY, ct, cite)
                 doc.save()
 

@@ -51,7 +51,6 @@ urlpatterns = patterns('',
 
     # Display a case, a named URL because the get_absolute_url uses it.
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', viewCase, name="viewCase"),
-    (r'^(' + "|".join(pacer_codes) + ')/(.*)/$', viewCasesDeprecated),
     # Redirect users
     (r'^x/(.*)/$', redirect_short_url),
 
@@ -77,7 +76,9 @@ urlpatterns = patterns('',
     url(r'^register/$', register, name="register"),
     (r'^register/success/$', registerSuccess),
     # Favorites pages
-    (r'^toggle/star/(.*)/$', toggle_star),
+    (r'^favorite/create-or-update/$', save_or_update_favorite),
+    (r'^tag/typeahead/query/$', ajax_tags_typeahead),
+    (r'^favorite/delete/$', delete_favorite),
     (r'^profile/favorites/$', view_favorites),
 
     # Registration pages

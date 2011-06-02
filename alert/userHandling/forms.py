@@ -17,8 +17,10 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.forms import ModelForm
 from alert.userHandling.models import UserProfile
+from alert.userHandling.models import Favorite
 
 
 class ProfileForm(ModelForm):
@@ -73,3 +75,20 @@ class UserCreationFormExtended(UserCreationForm):
 
 class EmailConfirmationForm(forms.Form):
     email = forms.EmailField()
+
+
+# Used in the favorite forms.
+class FavoriteForm(ModelForm):
+    class Meta:
+        model = Favorite
+        widgets = {
+            'doc_id' : forms.HiddenInput,
+            'tags'   : forms.TextInput(attrs = {
+                                        'class' : 'span-10 last',
+                                        'autocomplete': 'off'}),
+            'notes'  : forms.Textarea(attrs = {
+                                        'class' : 'span-10 last',
+                                        'id' : 'save-favorite-text-area',
+                                        'class': 'bottom',
+                                        'tabindex': '1'})
+        }
