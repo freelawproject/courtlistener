@@ -405,10 +405,9 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             i = 0
             dupCount = 0
             regexII = re.compile('\d{2}/\d{2}/\d{4}')
-            #regexIII = re.compile('\d{4}(.*)')
             # finds the case name in a string of the following format:
             # USA v Holder (per curium DATE)
-            regexIII = re.compile('(.*)\((.*)\)')
+            regexIII = re.compile('(.*)\(', re.MULTILINE)
             while i < len(aTags):
                 # caseLink field, and save it
                 caseLink = aTags[i].get('href')
@@ -453,7 +452,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     # this error seems to happen upon dups...not sure why yet
                     caseDate = clean_string(regexII.search(junk).group(0))
                     caseNameShort = regexIII.search(junk).group(1)
-                except:
+                except AttributeError:
+                    print "****Unable to get casename at ca4****"
                     i += 1
                     continue
                 if VERBOSITY >= 2: print "Case name: %s" % caseNameShort
