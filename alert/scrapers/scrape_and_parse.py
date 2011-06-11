@@ -390,8 +390,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     return
 
             # sadly, beautifulsoup chokes on the lines lines of this file because
-            # the HTML is so bad. Stop laughing - the HTML IS awful, but it's not
-            # funny. Anyway, to make this thing work, we must pull out the target
+            # the HTML is so bad. To make this work, we must pull out the target
             # attributes. And so we do.
             regex = re.compile("target.*>", re.IGNORECASE)
             html = re.sub(regex, ">", html)
@@ -401,11 +400,15 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             # all links ending in pdf, case insensitive
             regex = re.compile("pdf$", re.IGNORECASE)
             aTags = soup.findAll(attrs={"href": regex})
+            if VERBOSITY >= 3: print aTags
 
             i = 0
             dupCount = 0
             regexII = re.compile('\d{2}/\d{2}/\d{4}')
-            regexIII = re.compile('\d{4}(.*)')
+            #regexIII = re.compile('\d{4}(.*)')
+            # finds the case name in a string of the following format:
+            # USA v Holder (per curium DATE)
+            regexIII = re.compile('(.*)\((.*)\)')
             while i < len(aTags):
                 # caseLink field, and save it
                 caseLink = aTags[i].get('href')
@@ -432,6 +435,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseNumber, documentType = fileName.split('.')[0:2]
                 # the caseNumber needs a hyphen inserted after the second digit
                 caseNumber = caseNumber[0:2] + "-" + caseNumber[2:]
+                if VERBOSITY >= 2: print "Case number: %s" % caseNumber
 
                 if documentType == 'U':
                     doc.documentType = 'Unpublished'
@@ -439,10 +443,12 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     doc.documentType = 'Published'
                 else:
                     doc.documentType = ""
+                if VERBOSITY >= 2: print "Precedential status: %s" % doc.documentType
 
                 # next, we do the caseDate and caseNameShort, so we can quit before
                 # we get too far along.
                 junk = aTags[i].contents[0].replace('&nbsp;', ' ').strip()
+                if VERBOSITY >= 3: print "junk: " + str(junk)
                 try:
                     # this error seems to happen upon dups...not sure why yet
                     caseDate = clean_string(regexII.search(junk).group(0))
@@ -450,12 +456,14 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 except:
                     i += 1
                     continue
+                if VERBOSITY >= 2: print "Case name: %s" % caseNameShort
 
                 # some caseDate cleanup
                 splitDate = caseDate.split('/')
                 caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
+                if VERBOSITY >= 2: print "Date filed: %s" % doc.dateFiled
 
                 # let's check for duplicates before we proceed
                 cite, created = hasDuplicate(caseNumber, caseNameShort)
