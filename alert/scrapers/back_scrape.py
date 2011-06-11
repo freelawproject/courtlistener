@@ -382,7 +382,7 @@ def back_scrape_court(courtID, VERBOSITY):
         return
 
 
-    if courtID == 2:
+    if (courtID == 2):
         ct = Court.objects.get(courtUUID = 'ca2')
         '''
         Take the starting date, and find the last day in the month that corresponds
@@ -547,7 +547,23 @@ def back_scrape_court(courtID, VERBOSITY):
         ca3_query_zoom_and_parse_results(seed, ct)
 
 
+    if (courtID == 4):
+        '''
+        Did some research on this court today. There appear to be two search
+        engines. The first seems to be the old one, and it doesn't work at all;
+        returns zero results. The second appears to work, though I can't
+        figure out how to game it to make it iterate over all documents. Further,
+        the results lack meta data about the case name. Not a fruitful search
+        engine, unfortunately. There's also an RSS feed, but it's useless.
 
+        The only hope I think that's left are the POST parameters in the new
+        search engine, which provide some useful parameters. It *might* be
+        possible to manipulate those to a good benefit.
+
+        May also be fruitful to contact the court about the old search engine,
+        which just returns no results.
+        '''
+        pass
 
     if (courtID == 5):
         '''
