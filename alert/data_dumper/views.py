@@ -152,7 +152,7 @@ def serve_or_gen_dump(request, court, year, month=None, day=None):
             # Path exists.
             pass
 
-        with myGzipFile(os.path.join(DUMP_DIR, filepath, filename + '.part'), mode='wb') as z_file:
+        with myGzipFile(os.path.join(filename), mode='wb') as z_file:
             z_file.write('<?xml version="1.0" encoding="utf-8"?>\n<opinions dumpdate="' + str(date.today()) + '">\n')
 
             try:
@@ -190,8 +190,8 @@ def serve_or_gen_dump(request, court, year, month=None, day=None):
             # Close things off
             z_file.write('</opinions>')
 
-        # Move the file so the .part is removed.
-        os.rename(os.path.join(DUMP_DIR, filepath, filename + '.part'),
+        # Move the file our of the working directory and into it's resting place.
+        os.rename(os.path.join(filename),
             os.path.join(DUMP_DIR, filepath, filename))
 
         return HttpResponseRedirect(os.path.join('/dumps', filepath, filename))
