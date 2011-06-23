@@ -151,7 +151,8 @@ def serve_or_gen_dump(request, court, year, month=None, day=None):
         except OSError:
             # Path exists.
             pass
-
+        
+        os.chdir(DUMP_DIR)
         with myGzipFile(os.path.join(filename), mode='wb') as z_file:
             z_file.write('<?xml version="1.0" encoding="utf-8"?>\n<opinions dumpdate="' + str(date.today()) + '">\n')
 
