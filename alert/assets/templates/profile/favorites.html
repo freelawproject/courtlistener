@@ -16,6 +16,13 @@
     </div>
     <div class="span-24 last" id="content">
         {% if user.get_profile.favorite.all %}
+            <p>favorite = true.</p>
+        {% endif %}
+        <!-- This is currently failing because although the relationship
+        from Favorite to user it intect, the one from user to favorite was
+        never created. Need to figure out why. Probably a problem with my
+        model. -->
+        {% if user.get_profile.favorite.all %}
             <div class="span-24 last content">
                 {% if messages %}
                     <div class="span-18">
@@ -59,7 +66,7 @@
                 </table>
             </div>
         {% else %}
-            <h3>You do not have any favorites.</h3>
+            <h3>You have not saved any favorites.</h3>
         {% endif %}
     </div>
 {% endblock %}

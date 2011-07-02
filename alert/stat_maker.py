@@ -1,16 +1,16 @@
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
@@ -34,11 +34,11 @@ from alert.alertSystem.models import Document, Court
 from alert.alertSystem.models import PACER_CODES
 
 def makeStats():
-    """
+    '''
     A function that displays some sweet (and accurate) coverage stats. Essentially,
-    we'll gather the stats here, and process them in a template, and then dump 
+    we'll gather the stats here, and process them in a template, and then dump
     the results in a flatpage.
-    
+
     The result is that the coverage page is reliably cached in the DB.
 
     Stats we want include:
@@ -50,14 +50,15 @@ def makeStats():
         1. Get the number of documents (easy)
         2. Build a nested list of the following form:
             [[oldestDocInCourt, numCasesInCourt],[oldestDocInCourt2, numCasesInCourt2]]
-    """
+    '''
 
     totalCasesQ = Document.objects.all().count()
 
     statsP = []
     # get all the courts
     for code in PACER_CODES:
-        q = Document.objects.filter(court=code[0], documentType="Published")
+        q = Document.objects.filter(court=code[0],
+            documentType="Published").exclude(dateFiled = None)
         numDocs = q.count()
         if numDocs != 0:
             doc = q.order_by('dateFiled')[0]
@@ -66,7 +67,9 @@ def makeStats():
 
     statsU = []
     for code in PACER_CODES:
-        q = Document.objects.filter(court=code[0], documentType__in=["Unpublished","Errata","In-chambers","Relating-to"])
+        q = Document.objects.filter(court=code[0],
+            documentType__in=["Unpublished","Errata","In-chambers","Relating-to"])\
+            .exclude(dateFiled = None)
         numDocs = q.count()
         if numDocs != 0:
             doc = q.order_by('dateFiled')[0]
@@ -75,7 +78,8 @@ def makeStats():
 
     statsMissingType = []
     for code in PACER_CODES:
-        q = Document.objects.filter(court=code[0], documentType="")
+        q = Document.objects.filter(court=code[0],
+            documentType="").exclude(dateFiled = None)
         numDocs = q.count()
         if numDocs != 0:
             doc = q.order_by('dateFiled')[0]
@@ -86,23 +90,23 @@ def makeStats():
 
 
 def main():
-    """
+    '''
     The master function. This will receive arguments from the user, determine
     the actions to take, then hand it off to other functions that will handle the
     nitty-gritty crud.
 
     returns an int indicating success or failure. == 0 is success. > 0 is failure.
-    """
-    
+    '''
+
     # get the values from the DB
     totalCasesQ, statsP, statsU, statsMissingType = makeStats()
-    
+
     # make them into pretty HTML
     t = loader.get_template('coverage/coverage.html')
-    c = Context({'totalCasesQ': totalCasesQ, 'statsP':statsP, 'statsU': statsU, 
+    c = Context({'totalCasesQ': totalCasesQ, 'statsP':statsP, 'statsU': statsU,
         'statsMissingType': statsMissingType})
     html = t.render(c)
-    
+
     # put that in the correct flatpage
     page = FlatPage.objects.get(url='/coverage/')
     page.content = html

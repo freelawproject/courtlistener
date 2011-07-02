@@ -389,9 +389,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     # if not, bail. If so, continue to the scraping.
                     return
 
-            # sadly, beautifulsoup chokes on the lines lines of this file because
-            # the HTML is so bad. Stop laughing - the HTML IS awful, but it's not
-            # funny. Anyway, to make this thing work, we must pull out the target
+            # sadly, beautifulsoup chokes on the lines of this file because
+            # the HTML is so bad. To make it work, we must pull out the target
             # attributes. And so we do.
             regex = re.compile("target.*>", re.IGNORECASE)
             html = re.sub(regex, ">", html)

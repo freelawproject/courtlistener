@@ -25,11 +25,16 @@ from django.contrib.auth import login
 from django.contrib.sites.models import Site
 from django.core.mail import send_mail
 from django.shortcuts import render_to_response
+from django.shortcuts import redirect
 from django.template import RequestContext
 from django.http import HttpResponseRedirect
 import datetime
 import random
 import hashlib
+
+
+def redirect_to_settings(request):
+    return redirect(viewSettings, permanent=True)
 
 
 @login_required
@@ -141,7 +146,7 @@ def deleteProfileDone(request):
 
 
 def register(request):
-    """allow only an anonymous user to register"""
+    '''allow only an anonymous user to register'''
     redirect_to = request.REQUEST.get('next', '')
     if 'sign-in' in redirect_to:
         # thus, we don't redirect people back to the sign-in form
@@ -240,8 +245,11 @@ def registerSuccess(request):
 
 
 def combined_signin_register(request):
-    """Checks that the user is anonymous, then allows them to register or
-    sign-in"""
+    '''Provides a sign-in and register page for the user.
+
+    Checks that the user is anonymous, then allows them to register or
+    sign-in
+    '''
     if request.user.is_anonymous():
         next = request.REQUEST.get('next', '')
         form = UserCreationFormExtended()
@@ -252,8 +260,12 @@ def combined_signin_register(request):
 
 
 def confirmEmail(request, activationKey):
-    """Checks if the confirmation link is valid. All code paths verified.
-    mlissner, 2010-07-22"""
+    '''Confirms email addresses for a user.
+
+    Checks if a hash in a confirmation link is valid, and if so validates the
+    user's email address as valid. All code paths verified. mlissner,
+    2010-07-22
+    '''
     try:
         user_profile = UserProfile.objects.get(activationKey=activationKey)
         if user_profile.emailConfirmed:
