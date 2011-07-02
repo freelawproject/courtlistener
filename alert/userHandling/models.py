@@ -28,18 +28,6 @@ FREQUENCY = (
 )
 
 
-def validate_tag(value):
-    ''' Blocks invalid values in tags.
-
-    Tags should not contain the following characters, or else we will have
-    issues with making urls: + | ( ) ,
-
-    These should be blocked by javascript as well, but never trust client input.
-    '''
-    if ('+' in value) or ('|' in value) or ('(' in value) or (')' in value) or (',' in value):
-        raise ValidationError(u'Tags cannot contain commas, parentheses, plus or pipe symbols')
-
-
 # a class where alerts are held/handled.
 class Alert(models.Model):
     alertUUID = models.AutoField('a unique ID for each alert', primary_key=True)
@@ -66,36 +54,14 @@ class Alert(models.Model):
         db_table = 'Alert'
 
 
-# a class where tags are held
-class Tag(models.Model):
-    tag = models.CharField('the tag value',
-        max_length=30,
-        unique = True,
-        validators = [validate_tag])
-    user = models.ForeignKey(User,
-        verbose_name = 'the user associated with the tag.')
-
-    def __unicode__(self):
-        return 'Tag ' + str(self.id) + ': ' + self.tag
-
-    class Meta:
-        db_table = 'Tag'
-
-
 # a class where favorites are held
 class Favorite(models.Model):
     doc_id = models.ForeignKey(Document,
         verbose_name='the document that is favorited')
-    user = models.ForeignKey(User,
-        verbose_name='the user that owns the favorite')
-    notes = models.TextField('a name for the alert', max_length=500)
-    tags = models.ManyToManyField(Tag,
-        verbose_name = 'tags that are associated with the favorite',
-        related_name = 'favorites',
-        blank = True,
-        null = True)
+    name  = models.TextField('a name for the alert', max_length=200)
+    notes = models.TextField('notes about the favorite', max_length=500)
     def __unicode__(self):
-        return 'Favorite ' + str(self.id)
+        return 'Favorite %s' % self.id
 
     class Meta:
         db_table = 'Favorite'
@@ -114,7 +80,6 @@ class BarMembership(models.Model):
         verbose_name = 'bar membership'
         db_table = 'BarMembership'
         ordering = ['barMembership']
-
 
 
 # a class to extend the User class with the fields we need.

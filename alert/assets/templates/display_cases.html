@@ -19,12 +19,9 @@
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the D.C. Circuit" href="/feed/court/cadc/">
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Federal Circuit" href="/feed/court/cafc/">
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Supreme Court of the U.S." href="/feed/court/scotus/">
-    <link rel="stylesheet" href="/media/css/jquery.token-input.css" type="text/css" media="screen, projection">
-    <link rel="stylesheet" href="/media/css/jquery.token-input-facebook.css" type="text/css" media="screen, projection">
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
     <script type="text/javascript" src="/media/js/jquery.tooltip.min.js"></script>
     <script type="text/javascript" src="/media/js/jquery.NobleCount.min.js"></script>
-    <script type="text/javascript" src="/media/js/jquery.tokeninput.js"></script>
     <script type="text/javascript" src="/media/js/save-favorites.js"></script>
     <script type="text/javascript">
         $(document).ready(function() {
@@ -47,40 +44,6 @@
                 on_negative: 'errortext',
                 max_chars: '500'
             });
-            {# set up the tag input box #}
-            $("#id_tags").tokenInput("/tag/typeahead/query/", {
-                hintText: "Enter a tag...",
-                theme: "facebook",
-                preventDuplicates: true
-                {% if favorite_form.instance.doc_id %}
-                    {# Show this whenever the favorite has already been saved #}
-                    , prePopulate: [
-                        {% for tag in favorite_form.instance.tags.all %}
-                            {id: {{ tag.id }}, name: "{{tag.tag}}"}{% if not forloop.last %},{% endif %}
-                        {% endfor %}
-                    ]
-                {% endif %}
-            });
-            $('li.token-input-input-token-facebook > input').attr('id', 'tag-input');
-            $('#tag-input').attr('tabindex', '2');
-            $('#tag-input').focus(function() {
-              $('.token-input-list-facebook').css('border-color',  '#666');
-            }).blur(function() {
-                    $('.token-input-list-facebook').css('border-color', '#bbb');
-            });
-            $('#tag-input').keydown(function(e) {
-                // blocks |, (, ), and + from being put into the tags box.
-                if(e.keyCode == 43){
-                    return false;
-                } else if (e.keyCode == 124) {
-                    return false;
-                } else if (e.keyCode == 40) {
-                    return false;
-                } else if (e.keyCode == 41) {
-                    return false;
-                }
-                // XXX BROKEN XXX
-            });
         });
      </script>
 {% endblock %}
@@ -96,16 +59,9 @@
 
 
         {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
-        <div class="{% if not favorite_form.instance.doc_id %}hidden{% endif %}" id="sidebar-tags-and-notes">
-            <h3 class="bottom inline">Your Tags &amp; Notes </h3>
+        <div class="{% if not favorite_form.instance.doc_id %}hidden{% endif %}" id="sidebar-notes">
+            <h3 class="bottom inline">Your Notes</h3>
             <p class="inline" id="edit-favorite">(<a href="#favorite-editor">edit</a>)</p>
-            <ul id="sidebar-tags" class="tags span-5 bottom">
-                {% if favorite_form.instance.doc_id %}
-                    {% for tag in favorite_form.instance.tags.all %}
-                        <li class="tag"><a href="/search/tag/{{tag.tag}}/" class="tag">{{tag.tag}}</a></li>
-                    {% endfor %}
-                {% endif %}
-            </ul>
             <p id="sidebar-notes">
                 {% if favorite_form.instance.notes %}
                     {{ favorite_form.instance.notes }}
@@ -180,23 +136,12 @@
                         <p class="top right"><span id="characters-remaining"></span> characters remaining</p>
                     </p>
 
-                    <p>
-                        <label for="id_favorite_tags">Tags</label>
-                        {% if favorite_form.tags.errors %}
-                            <br><span class="errortext">
-                                {% for error in favorite_form.tags.errors %}
-                                    {{ error|escape }}
-                                {% endfor %}
-                            </span>
-                        {% endif %}<br>
-                        {{ favorite_form.tags }}
-                    </p>
                     <div id='favorites-bottom-section'>
                         <p id="save-favorite-delete" class="bottom fake-link inline
-                            {% if not favorite_form.instance.doc_id %}hidden{%endif%}" tabindex="5">delete</a></p>
+                            {% if not favorite_form.instance.doc_id %}hidden{%endif%}" tabindex="4">delete</a></p>
                         <div id="favorites-buttons">
-                            <button type="submit" class="button title close-favorite-button" name="closeFavorite" id="closeFavorite" tabindex='4'>Close</button>
-                            <button type="submit" class="button title save-favorite-button" name="saveFavorite" id="saveFavorite" tabindex='3'>Save favorite</button>
+                            <button type="submit" class="button title close-favorite-button" name="closeFavorite" id="closeFavorite" tabindex='3'>Close</button>
+                            <button type="submit" class="button title save-favorite-button" name="saveFavorite" id="saveFavorite" tabindex='2'>Save favorite</button>
                         </div>
                     </div>
                 </form>
