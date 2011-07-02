@@ -18,10 +18,12 @@
             {% block header %}
                 <div class="header-container span-24">
                     <div class="span-12 header" id="header">
-                        <img src="/media/images/png/logo.png"
-                             alt="Court listener logo"
-                             width="252"
-                             height="28"/>
+                        <a href="/">
+                            <img src="/media/images/png/logo.png"
+                                 alt="Court Listener logo"
+                                 width="252"
+                                 height="28"/>
+                        </a>
 
                         {% if user.is_authenticated %}
                             <div class="navigation">
@@ -46,6 +48,7 @@
                         {% endif %}
                     </div>
 
+                    {% block search-form %}
                     <div class="span-12 last" id="searchform">
                         <form action="/" method="get">
                             <div id="search-form">
@@ -67,13 +70,8 @@
                                 </table>
                             </div>
                         </form>
-
-                        <!--
-                        <form action="/" method="get">
-                            <input class="{% if not results.object_list or not query%}auto-focus{% endif %} wide-title" name="q" id="search-input" value="{{query}}">
-                            <button type="submit" class="button title" id="search-button" name="search">Search</button>
-                        </form>-->
                     </div>
+                    {% endblock %}
                 </div>
                 <hr>
             {% endblock %}
@@ -100,6 +98,9 @@
                 </span>
                 <span class="footer-item">
                     <a href="/coverage/">Coverage</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/removal/">Removal</a>
                 </span>
                 <span class="footer-item">
                     <a href="/terms/">Terms &amp; Privacy</a>

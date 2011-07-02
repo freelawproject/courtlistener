@@ -68,7 +68,9 @@ urlpatterns = patterns('',
     (r'^favicon\.ico$', 'django.views.generic.simple.redirect_to', {'url': '/media/images/ico/favicon.ico'}),
 
     # Settings pages
-    (r'^profile/settings/$', viewSettings),
+    (r'^profile/$', redirect_to_settings),
+    url(r'^profile/settings/$', viewSettings, name='viewSettings'),
+    (r'^profile/favorites/$', view_favorites),
     (r'^profile/alerts/$', viewAlerts),
     (r'^profile/password/change/$', password_change),
     (r'^profile/delete/$', deleteProfile),
@@ -79,7 +81,6 @@ urlpatterns = patterns('',
     (r'^favorite/create-or-update/$', save_or_update_favorite),
     (r'^tag/typeahead/query/$', ajax_tags_typeahead),
     (r'^favorite/delete/$', delete_favorite),
-    (r'^profile/favorites/$', view_favorites),
 
     # Registration pages
     (r'^email/confirm/([0-9a-f]{40})/$', confirmEmail),
@@ -97,6 +98,7 @@ urlpatterns = patterns('',
     #url(r'^(alert/preview)/$', showResults, name="alertResults"),
     url(r'^search/results/$', showResults, name="searchResults"),
     (r'^search/$', showResults), #for the URL hackers in the crowd
+    (r'^search/tag/(.*)/$', view_opinions_by_tag),
     (r'^alert/edit/(\d{1,6})/$', editAlert),
     (r'^alert/delete/(\d{1,6})/$', deleteAlert),
     (r'^alert/delete/confirm/(\d{1,6})/$', deleteAlertConfirm),
@@ -121,7 +123,6 @@ urlpatterns = patterns('',
 # redirects
 urlpatterns += patterns('django.views.generic.simple',
     ('^privacy/$', 'redirect_to', {'url': '/terms/#privacy'}),
-    ('^removal/$', 'redirect_to', {'url': '/terms/#removal'}),
     ('^opinions/$', 'redirect_to', {'url': '/opinions/all/'}),
     ('^report/$', 'redirect_to', {'url': 'http://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf'}),
 )

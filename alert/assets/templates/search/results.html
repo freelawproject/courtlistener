@@ -2,9 +2,9 @@
 
 {# this could mirror the titles of yahoo, google and bing more closely, if we want. #}
 {% block title %} CourtListener.com / Results / {{ query }} /
-{% if results.paginator.num_pages %}
-Page / {{ results.number }} of {{results.paginator.num_pages}}
-{% endif %}
+    {% if results.paginator.num_pages %}
+    Page / {{ results.number }} of {{results.paginator.num_pages}}
+    {% endif %}
 {% endblock %}
 
 {% block head %}
@@ -32,7 +32,6 @@ Page / {{ results.number }} of {{results.paginator.num_pages}}
 	            fade: 250,
 	            positionLeft: true
             });
-
 	    });
      </script>
      <link rel="search" type="application/opensearchdescription+xml" title="Court Listener" href="/media/xml/opensearch.xml" />

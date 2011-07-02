@@ -96,20 +96,21 @@
 
 
         {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
-        <div class="{% if not favorite_form.instance.doc_id %}hidden{% endif %}">
+        <div class="{% if not favorite_form.instance.doc_id %}hidden{% endif %}" id="sidebar-tags-and-notes">
             <h3 class="bottom inline">Your Tags &amp; Notes </h3>
             <p class="inline" id="edit-favorite">(<a href="#favorite-editor">edit</a>)</p>
             <ul id="sidebar-tags" class="tags span-5 bottom">
-            {% if favorite_form.instance.tags %}
-                {% for tag in favorite_form.instance.tags.all %}
-                    <li class="tag"><a href="/search/tag/{{tag.tag}}/" class="tag">{{tag.tag}}</a></li>
-                {% endfor %}
-            {% endif %}
+                {% if favorite_form.instance.doc_id %}
+                    {% for tag in favorite_form.instance.tags.all %}
+                        <li class="tag"><a href="/search/tag/{{tag.tag}}/" class="tag">{{tag.tag}}</a></li>
+                    {% endfor %}
+                {% endif %}
             </ul>
             <p id="sidebar-notes">
-            {% if favorite_form.instance.notes %}
-                {{ favorite_form.instance.notes }}
-            {% endif %}
+                {% if favorite_form.instance.notes %}
+                    {{ favorite_form.instance.notes }}
+                {% endif %}
+            </p>
         </div>
 
 
@@ -162,7 +163,7 @@
                 {% if favorite_form.instance.doc_id %}
                     <h2>Edit/delete this favorite</h2>
                 {% else %}
-                    <h2>Save as a favorite</h2>
+                    <h2 id='save-favorite-title'>Save as a favorite</h2>
                 {% endif %}
                 <form action="" method="POST">{% csrf_token %}
                     {{ favorite_form.doc_id }}
@@ -191,9 +192,8 @@
                         {{ favorite_form.tags }}
                     </p>
                     <div id='favorites-bottom-section'>
-                        {% if favorite_form.instance.doc_id %}
-                            <p id="save-favorite-delete" class="bottom"><a href="/toggle/star/ID-NUMBER/" tabindex='5'>delete</a></p>
-                        {% endif %}
+                        <p id="save-favorite-delete" class="bottom fake-link inline
+                            {% if not favorite_form.instance.doc_id %}hidden{%endif%}" tabindex="5">delete</a></p>
                         <div id="favorites-buttons">
                             <button type="submit" class="button title close-favorite-button" name="closeFavorite" id="closeFavorite" tabindex='4'>Close</button>
                             <button type="submit" class="button title save-favorite-button" name="saveFavorite" id="saveFavorite" tabindex='3'>Save favorite</button>

@@ -2,6 +2,8 @@
 
 {% block title %}CourtListener.com / Profile / Alerts{% endblock %}
 
+{% block sidebar %}{% endblock %}
+
 {% block content %}
     <div class="span-24 last">
         <h2>Profile / Alerts</h2>
@@ -61,7 +63,7 @@
                 <button type="submit" class="button">Make new alert</button>
             </div>
         {% else %}
-            <h3>You do not have any alerts.</h3>
+            <h3>You have not made any alerts.</h3>
             <form action="/" method="post">{% csrf_token %}
             <button type="submit" class="button">Make new alert</button>
         {% endif %}

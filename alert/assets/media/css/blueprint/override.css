@@ -112,8 +112,19 @@ a:link, a:visited {
 }
 
 a:focus, a:hover {
+    color: #000099;
+    text-decoration: underline;
+}
+
+p.fake-link {
+    color: #009;
+}
+
+p.fake-link:hover {
     text-decoration: underline;
     color: #009;
+    cursor: pointer;
+    cursor: hand;
 }
 
 .error a, .notice a, .success a {
@@ -193,7 +204,7 @@ input.wide-title {
 }
 
 
-div.hidden {
+.hidden {
     display: none;
 }
 
@@ -287,6 +298,10 @@ li.tag:first-child {
     margin-left: 0px;
 }
 
+#title-tags li {
+    float: none;
+    margin: 0px;
+}
 
 
 /* Sprites! */
