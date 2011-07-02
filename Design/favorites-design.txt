@@ -1,9 +1,5 @@
 To do:
- - /search/tag/tag-value --> Needs to be created as a view, in URLs, as a template
  - Make a solution so that the notes can be displayed properly on the favorites page
- - Make sure that tags can't contain pluses, pipes, parentheses or commas so that URL
-    parameters are easy to parse in the future.
-    - Verify that the validator and error messages work.
  - Make the sidebar items have more vertical height between them.
  - ESC should close the modal box.
  - No search box on the sign-in-register, sign-on, or register pages (it steals focus)

@@ -79,7 +79,6 @@ urlpatterns = patterns('',
     (r'^register/success/$', registerSuccess),
     # Favorites pages
     (r'^favorite/create-or-update/$', save_or_update_favorite),
-    (r'^tag/typeahead/query/$', ajax_tags_typeahead),
     (r'^favorite/delete/$', delete_favorite),
 
     # Registration pages
@@ -98,7 +97,6 @@ urlpatterns = patterns('',
     #url(r'^(alert/preview)/$', showResults, name="alertResults"),
     url(r'^search/results/$', showResults, name="searchResults"),
     (r'^search/$', showResults), #for the URL hackers in the crowd
-    (r'^search/tag/(.*)/$', view_opinions_by_tag),
     (r'^alert/edit/(\d{1,6})/$', editAlert),
     (r'^alert/delete/(\d{1,6})/$', deleteAlert),
     (r'^alert/delete/confirm/(\d{1,6})/$', deleteAlertConfirm),
