@@ -83,9 +83,6 @@ class FavoriteForm(ModelForm):
         model = Favorite
         widgets = {
             'doc_id' : forms.HiddenInput,
-            'tags'   : forms.TextInput(attrs = {
-                                        'class' : 'span-10 last',
-                                        'autocomplete': 'off'}),
             'notes'  : forms.Textarea(attrs = {
                                         'class' : 'span-10 last',
                                         'id' : 'save-favorite-text-area',

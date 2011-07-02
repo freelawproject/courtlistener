@@ -273,37 +273,6 @@ fieldset.collapsed {
 }
 
 
-/* Tags */
-ul.tags {
-    padding-left: 0px;
-    margin: 0 0 0 0;
-}
-
-li.tag {
-    background-color: #EFF2F7;
-    border: 1px solid #CCD5E4;
-    border-radius: 5px 5px 5px 5px;
-    color: #000000;
-    cursor: default;
-    float: left;
-    font-size: 11px;
-    height: auto !important;
-    margin: 3px;
-    overflow: hidden;
-    padding: 1px 3px;
-    white-space: nowrap;
-}
-
-li.tag:first-child {
-    margin-left: 0px;
-}
-
-#title-tags li {
-    float: none;
-    margin: 0px;
-}
-
-
 /* Sprites! */
 .sprites {
     background-image     : url("/media/images/png/social-sprite.png");
