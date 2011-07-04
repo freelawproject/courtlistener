@@ -41,6 +41,7 @@
                 <table class="settings-table">
                     <thead>
                         <tr>
+                            <th></th>
                             <th>Name</th>
                             <th colspan="2">Notes</th>
                         </tr>
@@ -48,6 +49,11 @@
                     <tbody>
                         {% for favorite in user.get_profile.favorite.all %}
                             <tr>
+                                <td>
+                                    <a href="{{favorite.doc_id.get_absolute_url}}">
+                                        <img src="/media/images/png/page_go.png" title="View the opinion"/>
+                                    </a>
+                                </td>
                                 <td>
                                     {{favorite.name }}
                                 </td>
