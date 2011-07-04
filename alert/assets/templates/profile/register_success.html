@@ -2,8 +2,11 @@
 
 {% block title %}CourtListener.com / Registration complete{% endblock %}
 
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
 {% block content %}
-    <div class="span-18 colborder">
+    <div class="span-18">
         <h2>Registration complete</h2>
         <p>
             Thanks for registering with our site. Please sign in to continue.
@@ -18,8 +21,8 @@
                 <div class="span-7 last">&nbsp;</div>
             </div>
         {% else %}
-        
-        
+
+
         <form action="/sign-in/?next={{redirect_to}}" method="post">{% csrf_token %}
             {# Two hidden fields here, containing the username/password #}
             <input type="hidden" name="username" value="{{username}}" id="username">

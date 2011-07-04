@@ -5,9 +5,9 @@
 <div class="span-24 last">
     <h2>Coverage</h2>
     <h3>We currently have {{totalCasesQ|intcomma}} documents in our corpus.</h3>
-    
+
     {% if statsP != 0 %}
-        <h3>Precedential/published documents</h3>
+        <h3>Precedential documents</h3>
         <table>
             <tr>
                 <th>Court</th>
@@ -26,9 +26,9 @@
             {% endfor %}
         </table>
     {% endif %}
-    
+
     {% if statsU|length != 0 %}
-        <h3>Non-precedential/unpublished documents</h3>
+        <h3>Non-precedential documents</h3>
 	<p>Including Supreme Court <a href="http://www.supremecourt.gov/opinions/relatingtoorders.aspx">Opinions Relating to Orders</a> and <a href="http://www.supremecourt.gov/opinions/in-chambers.aspx">In-Chambers Opinions</a></p>
         <table>
             <tr>
@@ -48,7 +48,7 @@
             {% endfor %}
         </table>
     {% endif %}
-    
+
     {% if statsMissingType|length != 0 %}
         <h3>Documents with unknown status</h3>
         <table>

@@ -2,18 +2,21 @@
 
 {% block title %}CourtListener.com / Account / Delete{% endblock %}
 
+{% block sidebar %}{% endblock %}
+
 {% block content %}
-    <div class="span-18 colborder">
+    <div class="span-18">
         <h2>You are about to delete your account</h2>
-        <h3>This is forever</h3>
-        <p>While we hope that you will have no need to delete your account, we 
-        understand that it may at times be necessary.</p>
-        
-        <p>After you press the button below, your data will be deleted, and 
-        resurrecting your account will not be possible.</p>
-        
+        <h3>This <em>is</em> forever.</h3>
+        <p>While we hope that you will have no need to delete your account, we
+            understand that it may at times be necessary.</p>
+
+        <p>After you press the button below, your data will be deleted, and
+            resurrecting your account will not be possible.</p>
+
         <form action="" method="post">{% csrf_token %}
-        <button type="submit" class="button">I'm sure I want to do this. Delete my account now.</button>
+        <button type="submit" class="button">I'm sure I want to do this.
+            Delete my account now.</button>
     </div>
 {% endblock %}
 

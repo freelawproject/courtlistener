@@ -1,8 +1,9 @@
 {% extends "base.html" %}
+{# Shown on document display pages. #}
 
 {% block title %}CourtListener.com / Browse / {{ title }}{% endblock %}
 
-{% block headers %}
+{% block head %}
     <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the First Circuit" href="/feed/court/ca1/">
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Second Circuit" href="/feed/court/ca2/">
@@ -18,69 +19,36 @@
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the D.C. Circuit" href="/feed/court/cadc/">
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Federal Circuit" href="/feed/court/cafc/">
     <link rel="alternate" type="application/rss+xml" title="Atom feed for the Supreme Court of the U.S." href="/feed/court/scotus/">
-    {% if doc %}
-        <link rel="canonical" href="{{doc.get_absolute_url}}">
-    {% endif %}
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
+    <script type="text/javascript" src="/media/js/jquery.tooltip.min.js"></script>
+    <script type="text/javascript" src="/media/js/jquery.NobleCount.min.js"></script>
+    <script type="text/javascript" src="/media/js/save-favorites.js"></script>
 {% endblock %}
-
-{% block content %}
-    <div class="span-18 colborder">
-        {% if doc %}
-            {# if we have a hit, display what we know #}
-            <h2>{{ doc.citation.caseNameFull }}, {{ doc.citation.caseNumber }}</h2>
-            <h3>{{court}}</h3>
-            {% if doc.dateFiled %}
-                <h3 class="alt">{{doc.dateFiled|date:"l, F jS, Y"}}</h3>
-            {% else %}
-                <h3 class="alt">Unknown date</h3>
-            {% endif %}
-            <p>
-                <strong>Status: </strong>
-                    {% if doc.documentType %}
-                        {{doc.get_documentType_display}}<br>
-                    {% else %}
-                        Unknown<br>
-                    {% endif %}
-                <strong><acronym title="(digital fingerprint)">SHA1</acronym>:</strong> {{doc.documentSHA1}}
-            </p>
-            <br>
-            <h4>Document text</h4>
-            {% if doc.documentPlainText %}
-                <pre>{{doc.documentPlainText}}</pre>
-            {% else %}
-                {{doc.documentHTML|safe}}
-            {% endif %}
-
-        {% else %}
-            {# No documents found, tell the user, apologize. #}
-            <h2>No documents found</h2>
-
-            <p>We looked in the <strong>{{ court }}</strong>, but were unable to find anything that
-            had the case name of <strong>{{ title }}</strong>.</p>
-
-            <p class="bottom">Sorry about that. Would you like to try a different approach:</p>
-            <ul>
-                <li>You can try a <a href="/search/">search</a> for what you're looking for.</li>
-                <li>You can <a href="/contact/">let us know</a> that something is wrong or missing.</li>
-                <li>If you think you have found a bug, you can <a href="/contribute#bugs">file a bug</a>.</li>
-            </ul>
-
-        {% endif %}
-    </div>
-{% endblock %}
-
 
 {% block sidebar %}
-    <div class="span-5 last" id="sidebar">
+    <div class="span-5 colborder" id="sidebar">
         {# show the admin tools if applicable #}
         {% if user.is_superuser and doc %}
-            <h3 class="bottom">Admin</h3>
-            <p><a href="/admin/alertSystem/document/{{doc.documentUUID}}/">Document</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-            <a href="/admin/alertSystem/citation/{{doc.citation_id}}/">Citation</a></p>
+            <div class="sidebar-section">
+                <h3 class="bottom">Admin</h3>
+                <p><a href="/admin/alertSystem/document/{{doc.documentUUID}}/">Document</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+                <a href="/admin/alertSystem/citation/{{doc.citation_id}}/">Citation</a></p>
+            </div>
         {% endif %}
 
-        {% if doc %}
-            {# Download original? #}
+
+        {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
+        <div class="{% if not favorite_form.instance.doc_id %}hidden{% endif %} sidebar-section" id="sidebar-notes">
+            <h3 class="bottom inline">Your Notes</h3>
+            <p class="inline" id="edit-favorite">(<a href="#favorite-editor">edit</a>)</p>
+            <p id="sidebar-notes-text">
+                {{ favorite_form.instance.notes|default:"(none)" }}
+            </p>
+        </div>
+
+
+        {# Download original? #}
+        <div class="sidebar-section">
             <h3 class="bottom">Download Original</h3>
             {% if doc.downloadURL or doc.local_path %}
                 <p>
@@ -96,8 +64,10 @@
             {% else %}
                 <p>No downloadable versions</p>
             {% endif %}
+        </div>
 
-            {# Show the social links using sprites #}
+        {# Show the social links using sprites #}
+        <div class="sidebar-section">
             <h3 class="bottom">Share</h3>
             <p>
                 <a href="mailto:?subject={{title}} at CourtListener.com&body={{doc.get_small_url}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
@@ -108,8 +78,98 @@
                 <a href="http://reddit.com/submit?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Reddit" class="sprites" id="reddit_png"></a>
                 <a href="http://del.icio.us/post?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="delicious" class="sprites" id="delicious_png"></a>
             </p>
-        {% endif %}
+        </div>
 
     </div>
+{% endblock %}
 
+
+{% block content %}
+    <div class="span-18 last">
+        {% if favorite_form.instance.doc_id %}
+            <a href="#favorite-editor" title="Edit/delete favorite" id="favorite-star-png" class="sprites favorite-on"></a>
+        {% else %}
+            <a href="#favorite-editor" title="Save favorite" id="favorite-star-png" class="sprites favorite-off"></a>
+        {% endif %}
+        <h2>{{ doc.citation.caseNameFull }}, {{ doc.citation.caseNumber }}</h2>
+        <div id="modal-rel">
+            {# Modal box for saving the favorite #}
+            {% if user.is_authenticated %}
+            <div id="modal-save-favorite" class="hidden">
+                {% if favorite_form.instance.doc_id %}
+                    <h2>Edit/delete this favorite</h2>
+                {% else %}
+                    <h2 id='save-favorite-title'>Save a favorite</h2>
+                {% endif %}
+                <form action="" method="POST">{% csrf_token %}
+                    {{ favorite_form.doc_id }}
+                    <p class="bottom">
+                        <label for="id_name">Name</label>
+                        {% if favorite_form.name.errors %}
+                            <br><span class="errortext">
+                                {% for error in favorite_form.name.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </span>
+                        {% endif %}<br>
+                        {{ favorite_form.name }}
+                    </p>
+                    <p class="bottom">
+                        <label for="id_favorite_notes">Notes</label>
+                        {% if favorite_form.notes.errors %}
+                            <br><span class="errortext">
+                                {% for error in favorite_form.notes.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </span>
+                        {% endif %}<br>
+                        {{ favorite_form.notes }}
+                        <p class="top right"><span id="characters-remaining"></span> characters remaining</p>
+                    </p>
+
+                    <div id='favorites-bottom-section'>
+                        <p id="save-favorite-delete" class="bottom fake-link inline
+                            {% if not favorite_form.instance.doc_id %}hidden{%endif%}" tabindex="5">delete</a></p>
+                        <div id="favorites-buttons">
+                            <button type="submit" class="button title close-favorite-button" name="closeFavorite" id="closeFavorite" tabindex='4'>Close</button>
+                            <button type="submit" class="button title save-favorite-button" name="saveFavorite" id="saveFavorite" tabindex='3'>Save favorite</button>
+                        </div>
+                    </div>
+                </form>
+
+            </div>
+            {% else %}
+                {# user is not authenticated #}
+                <div id="modal-logged-out" class="hidden pointer">
+                    <h3 class="center bottom"><a href="{%url sign-in-register%}?next={{request.path}}">Sign in or register</a> to save a favorite.</h3>
+                    <p class="center bottom">(click to dismiss)</p>
+                </div>
+            {% endif %}
+        </div>
+
+
+
+        <h3>{{court}}</h3>
+        {% if doc.dateFiled %}
+            <h3 class="alt">{{doc.dateFiled|date:"l, F jS, Y"}}</h3>
+        {% else %}
+            <h3 class="alt">Unknown date</h3>
+        {% endif %}
+        <p>
+            <strong>Status: </strong>
+                {% if doc.documentType %}
+                    {{doc.get_documentType_display}}<br>
+                {% else %}
+                    Unknown<br>
+                {% endif %}
+            <strong><acronym title="(digital fingerprint)">SHA1</acronym>:</strong> {{doc.documentSHA1}}
+        </p>
+        <br>
+        <h4>Document text</h4>
+        {% if doc.documentPlainText %}
+            <pre>{{doc.documentPlainText}}</pre>
+        {% else %}
+            {{doc.documentHTML|safe}}
+        {% endif %}
+    </div>
 {% endblock %}

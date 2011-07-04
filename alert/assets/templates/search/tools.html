@@ -2,17 +2,18 @@
 
 {% block title %}CourtListener.com / Tools{% endblock %}
 
-{% block headers %}
+{% block head %}
     <script type="text/javascript" src="/media/js/addOpenSearch.js"></script>
-     <link rel="search" type="application/opensearchdescription+xml" title="Court Listener" href="/media/xml/opensearch.xml">
+    <link rel="search" type="application/opensearchdescription+xml" title="Court Listener" href="/media/xml/opensearch.xml">
 {% endblock %}
 
+{% block sidebar %}{% endblock %}
+
 {% block content %}
-    <div class="span-18 colborder">
+    <div class="span-18 last">
         <h2>Search tools for Firefox, Chrome and Internet Explorer</h2>
         <p>If you are interested in using our search engine in your browser, we have a plugin that will help.</p>
         <p>Simply click below to install.</p>
         <button type="submit" class="button title" name="install plugin" onClick="addOpenSearch();return false">Install plugin</button>
     </div>
-    <div class="span-6 last">&nbsp;</div>
 {% endblock %}

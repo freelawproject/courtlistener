@@ -10,7 +10,7 @@ CourtListener.com
 We have news regarding your alerts at CourtListener.com.
 --------------------------------------------------------
 
-{% for alert, docs in hits %}{% for doc in docs %}{% if forloop.first %}{% if alert.sendNegativeAlert and docs = "None"  %}{# it's a negative alert with no hits. #}Your {{ alert.get_alertFrequency_display|lower}} alert, "{{alert.alertText}}" had 0 hits.{% endif %}{% if docs != "None" %}Your {{alert.get_alertFrequency_display|lower}} alert, "{{alert.alertText}}" had {{docs|length}} hit{{docs|pluralize}}:{% endif %}
+{% for alert, docs in hits %}{% for doc in docs %}{% if forloop.first %}{% if alert.sendNegativeAlert and docs = "None"  %}{# it's a negative alert with no hits. #}Your {{ alert.get_alertFrequency_display|lower}} alert -- {{alert.alertText}} -- had 0 hits.{% endif %}{% if docs != "None" %}Your {{alert.get_alertFrequency_display|lower}} alert -- {{alert.alertText}} -- had {{docs|length}} hit{{docs|pluralize}}:{% endif %}
 Edit/delete this alert: http://courtlistener.com/alert/edit/{{ alert.alertUUID }}/{% endif %}
 {% if docs != "None" %}{{forloop.counter}}. {{doc.citation.caseNameFull}}, {{doc.citation.caseNumber}} ({{doc.court.courtShortName}})
 This document is: {{doc.get_documentType_display}}

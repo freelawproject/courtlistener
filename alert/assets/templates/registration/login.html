@@ -2,7 +2,7 @@
 
 {% block title %}CourtListener.com / Sign in{% endblock %}
 
-{% block headers %}
+{% block head %}
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
     <script type="text/javascript">
 	    $(document).ready(function() {
@@ -11,36 +11,41 @@
      </script>
 {% endblock %}
 
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
 {% block content %}
     <div class="span-24 last" id="content">
         <hr class="space">
         <hr class="space">
-        <div class="span-8 last">
-            {% block h2 %}<h2>Sign in</h2>{% endblock %}
-            {% block subtext %} {%endblock%}
-            {% if form.errors %}
-                <div class="span-8 error">
-                    <p class="bottom">Sorry, that is not a valid username or password.</p>
-                </div>
-            {% endif %}
-            
-            <form action="" method="post">{% csrf_token %}
-                <p>
-                    <label for="username">Username</label><br>
-                    <input type="text" name="username" value="" id="username" class="auto-focus">
-                </p>
-        
-                <p>
-                    <label for="password">Password</label><br>
-                    <input type="password" name="password" value="" id="password">
+        <div class="prepend-9 span-6 last">
+            <div class="box round">
+                {% block h2 %}<h2>Sign in</h2>{% endblock %}
+                {% if form.errors %}
+                    <div class="span-4 error">
+                        <p class="bottom">Sorry, that is not a valid username or password.</p>
+                    </div>
+                {% endif %}
 
-                </p>
-                <input type="hidden" name="next" value="{{ next|escape }}">
-                <button type="submit" class="button">Sign in</button>
-            </form>
-            <p class="bottom"><a href="/reset-password/">Forgot username/password?</a></p>
-            <p><a href="/register/">Need to register?</a></p>
+                <form action="" method="post">{% csrf_token %}
+                    <p>
+                        <label for="username">Username</label><br>
+                        <input type="text" name="username" value="" id="username" class="auto-focus span-5">
+                    </p>
+
+                    <p>
+                        <label for="password">Password</label><br>
+                        <input type="password" name="password" value="" id="password" class="span-5">
+
+                    </p>
+                    <input type="hidden" name="next" value="{{ next|escape }}">
+                    <button type="submit" class="button last">Sign in</button>
+                </form>
+                <p class="bottom"><a href="/reset-password/">Forgot username/password?</a></p>
+                <p><a href="/register/">Need to register?</a></p>
+            </div>
         </div>
     </div>
+    <hr class="space">
     <hr class="space">
 {% endblock %}

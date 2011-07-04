@@ -15,15 +15,30 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert.alertSystem.models import *
+from alert.userHandling.forms import *
+from alert.userHandling.models import *
 from alert.lib.encode_decode import ascii_to_num
+from django.contrib.auth.decorators import login_required
 from django.contrib.sites.models import Site
-from django.http import HttpResponsePermanentRedirect, Http404
+from django.contrib import messages
+from django.core.exceptions import ObjectDoesNotExist
+from django.core.paginator import EmptyPage
+from django.core.paginator import InvalidPage
+from django.core.paginator import Paginator
+from django.db import IntegrityError
+from django.http import Http404
+from django.http import HttpResponse
+from django.http import HttpResponsePermanentRedirect
 from django.shortcuts import render_to_response
+from django.shortcuts import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, get_list_or_404
 from django.template import RequestContext
 from django.template.defaultfilters import slugify
+from django.utils import simplejson
 from django.views.decorators.cache import cache_page
 import string
+import traceback
+
 
 @cache_page(60*5)
 def redirect_short_url(request, encoded_string):
@@ -53,55 +68,142 @@ def redirect_short_url(request, encoded_string):
 @cache_page(60*5)
 def viewCase(request, court, id, casename):
     '''
-    Take a court, an ID, and a casename, and return the document.
+    Take a court, an ID, and a casename, and return the document. Casename
+    isn't used, and can be anything.
 
-    This is remarkably easy compared to old method, below. casename isn't
-    used, and can be anything.
+    We also test if the document ID is a favorite for the user, and send data
+    as such. If it's a favorite, we send the bound form for the favorite, so
+    it can populate the form on the page. If it is not a favorite, we send the
+    unbound form.
     '''
 
     # Decode the id string back to an int
     id = ascii_to_num(id)
 
-    # Look up the court, document, and title
+    # Look up the court, document, title and favorite information
     doc   = get_object_or_404(Document, documentUUID = id)
     ct    = get_object_or_404(Court, courtUUID = court)
     title = doc.citation.caseNameShort
+    user  = request.user
+    try:
+        # Get the favorite, if possible
+        fave = Favorite.objects.get(doc_id = doc.documentUUID, users__user = user)
+        favorite_form = FavoriteForm(instance=fave)
+    except ObjectDoesNotExist:
+        favorite_form = FavoriteForm(initial = {'doc_id': doc.documentUUID,
+            'name' : doc.citation.caseNameFull})
 
     return render_to_response('display_cases.html', {'title': title,
-        'doc': doc, 'court': ct}, RequestContext(request))
+        'doc': doc, 'court': ct, 'favorite_form': favorite_form},
+        RequestContext(request))
 
 
-@cache_page(60*5)
-def viewCasesDeprecated(request, court, case):
+@login_required
+def save_or_update_favorite(request):
+    '''Uses ajax to save or update a favorite.
+
+    Receives a request as an argument, and then uses that plus POST data to
+    create or update a favorite in the database for a specific user. If the user
+    already has the document favorited, it updates the favorite with the new
+    information. If not, it creates a new favorite.
     '''
-    This is a fallback view that is only used by old links that have not yet
-    been flushed from the Interwebs. It was too slow, so viewCases was
-    created to replace it.
+    if request.is_ajax():
+        # If it's an ajax request, gather the data from the form, save it to
+        # the DB, and then return a success code.
+        try:
+            doc_id = request.POST['doc_id']
+        except:
+            return HttpResponse("Unknown doc_id")
 
-    Take a court and a caseNameShort, and display what we know about that
-    case. If the casename fails, try the case number.
+        doc = Document.objects.get(documentUUID = doc_id)
+        try:
+            fave = Favorite.objects.get(doc_id = doc, users__user = request.user)
+        except ObjectDoesNotExist:
+            fave = Favorite()
 
-    It no longer will return more than one case per URL.
+        f = FavoriteForm(request.POST, instance = fave)
+        if f.is_valid():
+            new_fave = f.save()
+
+            up = request.user.get_profile()
+            up.favorite.add(new_fave)
+            up.save()
+        else:
+            # TODO: How do we handle validation errors with ajax?
+            print "invalid form"
+            HttpResponse("Failure. Form invalid")
+
+        return HttpResponse("It worked")
+    else:
+        return HttpResponse("Not an ajax request.")
+
+
+
+@login_required
+def edit_favorite(request, fave_id):
+    '''Provide a form for the user to update alerts, or do so if submitted via
+    POST
     '''
 
-    # get the court information from the URL
-    ct = Court.objects.get(courtUUID = court)
+    try:
+        fave_id = int(fave_id)
+    except:
+        return HttpResponseRedirect('/')
 
-    # try looking it up by casename. Failing that, try the caseNumber.
-    # replace hyphens with spaces, and underscores with hyphens to undo the
-    # URLizing that the get_absolute_url in the Document model used to set up.
-    caseName = case.replace('-', ' ').replace('_', '-')
-    cites = get_list_or_404(Citation, caseNameShort = caseName)
+    try:
+        fave = Favorite.objects.get(id = fave_id, users__user = request.user)
+        doc = fave.doc_id
+    except ObjectDoesNotExist:
+        # User lacks access to this fave or it doesn't exist.
+        return HttpResponseRedirect('/')
 
-    # get any documents with this citation at that court.
-    doc = get_list_or_404(Document, court = ct, citation = cites[0])
+    if request.method == 'POST':
+        # TODO: Favoritize this.
+        form = FavoriteForm(request.POST, instance=fave)
+        if form.is_valid():
+            form.save()
+            messages.add_message(request, messages.SUCCESS,
+                'Your favorite was saved successfully.')
 
-    # Construct a URL
-    current_site = Site.objects.get_current()
-    slug = doc[0].citation.slug
-    URL = "http://" + current_site.domain + "/" + court + "/" + \
-        num_to_ascii(doc[0].documentUUID) + "/" + slug + "/"
-    return HttpResponsePermanentRedirect(URL)
+            # redirect to the alerts page
+            return HttpResponseRedirect('/profile/favorites/')
+
+    else:
+        # the form is loading for the first time
+        form = FavoriteForm(instance = fave)
+
+    return render_to_response('profile/edit_favorite.html', {'favorite_form': form,
+        'doc' : doc}, RequestContext(request))
+
+
+@login_required
+def delete_favorite(request):
+    '''Delete a user's favorite
+
+    Deletes a favorite for a user using an ajax call and post data.
+    '''
+    if request.is_ajax():
+        # If it's an ajax request, gather the data from the form, save it to
+        # the DB, and then return a success code.
+        try:
+            doc_id = request.POST['doc_id']
+        except:
+            return HttpResponse("Unknown doc_id")
+
+        fave = Favorite.objects.get(doc_id = doc_id, users__user = request.user)
+
+        # Finally, delete the favorite
+        fave.delete()
+
+        if request.POST['message'] == "True":
+            # used on the profile page. True is a string, not a bool.
+            messages.add_message(request, messages.SUCCESS,
+                'Your favorite was deleted successfully.')
+
+        return HttpResponse("It worked.")
+
+    else:
+        return HttpResponse("Not an ajax request.")
 
 
 @cache_page(60*15)

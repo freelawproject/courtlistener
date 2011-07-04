@@ -19,7 +19,6 @@ from alert import settings
 from alert.alertSystem.models import PACER_CODES
 from alert.alertSystem.views import *
 from alert.contact.views import *
-from alert.data_dumper.views import *
 from alert.feeds.views import *
 from alert.pinger.views import *
 from alert.search.views import *
@@ -52,7 +51,6 @@ urlpatterns = patterns('',
 
     # Display a case, a named URL because the get_absolute_url uses it.
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', viewCase, name="viewCase"),
-    (r'^(' + "|".join(pacer_codes) + ')/(.*)/$', viewCasesDeprecated),
     # Redirect users
     (r'^x/(.*)/$', redirect_short_url),
 
@@ -70,13 +68,19 @@ urlpatterns = patterns('',
     (r'^favicon\.ico$', 'django.views.generic.simple.redirect_to', {'url': '/media/images/ico/favicon.ico'}),
 
     # Settings pages
-    (r'^profile/settings/$', viewSettings),
+    (r'^profile/$', redirect_to_settings),
+    url(r'^profile/settings/$', viewSettings, name='viewSettings'),
+    (r'^profile/favorites/$', view_favorites),
     (r'^profile/alerts/$', viewAlerts),
     (r'^profile/password/change/$', password_change),
     (r'^profile/delete/$', deleteProfile),
     (r'^profile/delete/done/$', deleteProfileDone),
     url(r'^register/$', register, name="register"),
     (r'^register/success/$', registerSuccess),
+    # Favorites pages
+    (r'^favorite/create-or-update/$', save_or_update_favorite),
+    (r'^favorite/delete/$', delete_favorite),
+    (r'^favorite/edit/(\d{1,6})/$', edit_favorite),
 
     # Registration pages
     (r'^email/confirm/([0-9a-f]{40})/$', confirmEmail),
@@ -99,12 +103,6 @@ urlpatterns = patterns('',
     (r'^alert/delete/confirm/(\d{1,6})/$', deleteAlertConfirm),
     (r'^tools/$', toolsPage),
 
-    # Dump index and generation pages
-    (r'^dump-info/$', dump_index),
-    (r'^dump-api/(?P<year>\d{4})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
-    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
-    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
-
     # Feeds
     (r'^feed/(search)/$', searchFeed()), #lacks URL capturing b/c it will use GET queries.
     (r'^feed/court/all/$', allCourtsFeed()),
@@ -124,7 +122,6 @@ urlpatterns = patterns('',
 # redirects
 urlpatterns += patterns('django.views.generic.simple',
     ('^privacy/$', 'redirect_to', {'url': '/terms/#privacy'}),
-    ('^removal/$', 'redirect_to', {'url': '/terms/#removal'}),
     ('^opinions/$', 'redirect_to', {'url': '/opinions/all/'}),
     ('^report/$', 'redirect_to', {'url': 'http://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf'}),
 )

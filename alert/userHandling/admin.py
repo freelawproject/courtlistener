@@ -35,6 +35,7 @@ class UserAdmin(admin.ModelAdmin):
 
 admin.site.register(Alert)
 admin.site.register(BarMembership)
+admin.site.register(Favorite)
 
 # Unregister the built in user admin and register the custom User admin with UserProfile
 admin.site.unregister(User)

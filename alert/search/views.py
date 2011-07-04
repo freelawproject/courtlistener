@@ -150,7 +150,7 @@ def getDateFiledOrReturnZero(doc):
 
 
 def showResults(request):
-    """Show the results for a query"""
+    '''Show the results for a query'''
 
     try:
         query = request.GET['q']
