@@ -140,7 +140,6 @@ def save_or_update_favorite(request):
             up.save()
         else:
             # TODO: How do we handle validation errors with ajax?
-            print "invalid form"
             HttpResponse("Failure. Form invalid")
 
         return HttpResponse("It worked")
