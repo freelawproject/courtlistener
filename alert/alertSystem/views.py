@@ -195,10 +195,14 @@ def delete_favorite(request):
         # Finally, delete the favorite
         fave.delete()
 
-        if request.POST['message'] == "True":
-            # used on the profile page. True is a string, not a bool.
-            messages.add_message(request, messages.SUCCESS,
-                'Your favorite was deleted successfully.')
+        try:
+            if request.POST['message'] == "True":
+                # used on the profile page. True is a string, not a bool.
+                messages.add_message(request, messages.SUCCESS,
+                    'Your favorite was deleted successfully.')
+        except MultiValueDictKeyError:
+            # This happens if message isn't set.
+            pass
 
         return HttpResponse("It worked.")
 
