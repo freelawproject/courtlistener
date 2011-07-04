@@ -3,9 +3,7 @@ To do:
  - ensure that URL/POST data hacking can't edit other user's stuff
  - make sure that we're properly filtering on the users, so that favorites are
    user-specific.
- - check that deleting your last favorite shows the success deletion message properly.
  - add a link from the faves page back to the document
- - darken the star
  - add the search text to the search box on results/docs pages
 
 Tests:
