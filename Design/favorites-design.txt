@@ -3,7 +3,6 @@ To do:
  - ensure that URL/POST data hacking can't edit other user's stuff
  - make sure that we're properly filtering on the users, so that favorites are
    user-specific.
- - add a link from the faves page back to the document
 
 Tests:
  - check for print statements! check for the word tag.
