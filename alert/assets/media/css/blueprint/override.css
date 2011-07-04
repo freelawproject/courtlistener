@@ -147,14 +147,13 @@ a:focus, a:hover {
     color: #8a1f11;
 }
 
-.header > h1 > a {
-    text-decoration: none;
-    color: black;
-}
-
 /* for the nav in the settings pages*/
 .header > h3 > a {
     color: black;
+}
+
+.header {
+    float:left;
 }
 
 /* Display cases from Resources.org neatly */

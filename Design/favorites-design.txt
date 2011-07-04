@@ -1,14 +1,17 @@
 To do:
  - make sure things work as anonymous users (right now, things fail).
- - test the delete button
- - test the edit/delete button on the faves page.
  - ensure that URL/POST data hacking can't edit other user's stuff
  - make sure that we're properly filtering on the users, so that favorites are
    user-specific.
- - check for print statements! check for the word tag.
- - check for sys.path statements that can get nixed.
+ - fix wrapping issue on settings page header
+ - check that deleting your last favorite shows the success deletion message properly.
+ - add a link from the faves page back to the document
+ - darken the star
+ - add the search text to the search box on results/docs pages
 
 Tests:
+ - check for print statements! check for the word tag.
+ - check for sys.path statements that can get nixed.
  - what happens when input is too long in the form field?
  - does text get truncated properly on the profile --> favorite page?
 
