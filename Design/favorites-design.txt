@@ -6,10 +6,14 @@ To do:
  - make sure that we're properly filtering on the users, so that favorites are
    user-specific.
  - check for print statements! check for the word tag.
+ - check for sys.path statements that can get nixed.
 
 Tests:
  - what happens when input is too long in the form field?
  - does text get truncated properly on the profile --> favorite page?
+
+Post-go-live:
+ - Flat page at /remove/ needs to exist.
 
 
 Favorites spec:

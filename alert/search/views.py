@@ -220,8 +220,8 @@ def showResults(request):
     except ValueError:
         page = 1
 
-    # only allow queries up to page 1000.
-    if page > 1000:
+    # only allow queries up to page 100.
+    if page > 100:
         return render_to_response('search/results.html', {'over_limit': True,
             'query': query, 'alertForm': alertForm},
             RequestContext(request))

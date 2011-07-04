@@ -39,7 +39,7 @@
         <div class="span-12 last">
             <h2>Register for a new account</h2>
             <form action="/register/?next={{next}}" method="post">{% csrf_token %}
-                {% render_honeypot_field "skip_me_if_alive" %}
+            {% render_honeypot_field "skip_me_if_alive" %}
                 <p>
                     <label for="id_username">Username*</label><br>
                     <input id="id_username" type="text" name="username" maxlength="30">

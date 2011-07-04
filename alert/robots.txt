@@ -89,3 +89,51 @@ Disallow: /pdf/2011/01/20/Sylvia_Cabiran_v._Joseph_Baer.pdf
 # Added March 18, 2011
 Disallow: /ca8/Kbz/samir-bracic-v-eric-h-holder-jr/
 Disallow: /pdf/2010/04/29/Samir_Bracic__v.__Eric_H._Holder_Jr..pdf
+
+# Added March 28, 2011
+Disallow: /ca11/gav/canma-liliana-arevalo-velasquez-v-us-atty-gen/
+Disallow: /pdf/2007/01/25/Canma_Liliana_Arevalo_Velasquez_v._U.S._Atty._Gen..pdf
+
+# Added April 1, 2011
+Disallow: /harming/humans/
+Disallow: /ignoring/human/orders/
+Disallow: /harm/to/self/
+
+# Added April 2, 2011
+Disallow: /ca5/guA/djohan-v-ieyoub-et-al/
+Disallow: /pdf/2007/09/06/Djohan_v._Ieyoub_et_al.pdf
+
+# Added April 13, 2011
+Disallow: /ca5/7mU/storbeck-v-saks-fifth-avenue/
+Disallow: /pdf/2000/06/21/Storbeck_v._Saks_Fifth_Avenue_et_al.pdf
+
+# Added April 22, 2011
+Disallow: /ca9/26Sx/roehl-bernardino-v-eric-holder-jr/
+Disallow: /pdf/2011/04/15/Roehl_Bernardino_v._Eric_Holder_Jr..pdf
+
+# Added April 26, 2011
+Disallow: /ca4/26WU/employers-council-on-flexible-compensation-v/
+Disallow: /pdf/2011/04/20/Employers_Council_on_Flexible_Compensation_v..pdf
+Disallow: /ca4/LiA/employers-council-on-flexible-compensation-v/
+Disallow: /pdf/2010/06/21/Employers_Council_on_Flexible_Compensation_v..pdf
+
+# Added 2011-04-30
+Disallow: /cafc/25Mt/uliano-v-centers-for-medicare-and-medicaid-service/
+Disallow: /pdf/2006/06/16/Uliano_v._Centers_for_Medicare_and_Medicaid_Services.pdf
+
+# Added 2011-05-08
+Disallow: /ca10/Nt2/davis-v-us-postal-service/
+Disallow: /pdf/1998/05/06/Davis_vs._U.S._Postal_Service.pdf
+
+# Added 2011-05-15
+Disallow: /ca9/27fJ/debora-sudjana-v-eric-h-holder-jr/
+Disallow: /pdf/2011/05/04/Debora_Sudjana_v._Eric_H._Holder_Jr..pdf
+
+# Added 2011-05-24
+Disallow: /ca4/27qh/jimoh-v-charlotte-mecklenburg-housing/
+Disallow: /ca4/27qh/jimoh-v-charlotte-mecklenburg-housing-partnership/
+Disallow: /pdf/2011/05/13/Jimoh_v._Charlotte_Mecklenburg_Housing.pdf
+
+# Added 2011-05-29
+Disallow: /ca2/2fL/alers-v-human-resources-administration/
+Disallow: /pdf/2009/12/17/Alers_v._Human_Resources_Administration.pdf

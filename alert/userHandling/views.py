@@ -16,6 +16,8 @@
 
 from alert.settings import LOGIN_REDIRECT_URL
 from alert.userHandling.forms import *
+from alert.honeypot.decorators import check_honeypot
+
 from django.contrib import messages
 from django.contrib.auth import authenticate
 from django.contrib.auth.decorators import login_required
@@ -144,7 +146,7 @@ def deleteProfileDone(request):
     return render_to_response('profile/deleted.html', {},
         RequestContext(request))
 
-
+@check_honeypot(field_name='skip_me_if_alive')
 def register(request):
     '''allow only an anonymous user to register'''
     redirect_to = request.REQUEST.get('next', '')
