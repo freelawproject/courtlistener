@@ -35,6 +35,7 @@ from django.shortcuts import get_object_or_404, get_list_or_404
 from django.template import RequestContext
 from django.template.defaultfilters import slugify
 from django.utils import simplejson
+from django.utils.datastructures import MultiValueDictKeyError
 from django.views.decorators.cache import cache_page
 import string
 import traceback
