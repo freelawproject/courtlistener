@@ -38,26 +38,30 @@
                         </div>
                     {% endif %}
                 {% endif %}
-                <table>
-                    <tr>
-                        <th>Query name</th>
-                        <th>Query</th>
-                        <th>Frequency</th>
-                        <th>Last hit</th>
-                        <th>Private</th>
-                        <th>Subscribe</th>
-                    </tr>
-                    {% for alert in user.get_profile.alert.all %}
-                    <tr>
-                        <td><p class="bottom" title="{{alert.alertName}}">{{ alert.alertName|capfirst|truncatewords:"6" }}</p></td>
-                        <td><a href="/search/results/?q={{alert.alertText}}" title="{{alert.alertText}}">{{ alert.alertText|truncatewords:"14" }}</a></td>
-                        <td>{{ alert.get_alertFrequency_display }}</td>
-                        <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"Never" }}</td>
-                        <td>{{ alert.alertPrivacy|yesno:"Yes,No" }}</td>
-                        <td><a href="/feed/search/?q={{alert.alertText}}"><img src="/media/images/png/atom-feed.png" alt="atom icon"></a>
-                        <td><a href="/alert/edit/{{ alert.alertUUID }}/">edit/delete</a></td>
-                    </tr>
-                    {% endfor %}
+                <table class="settings-table">
+                    <thead>
+                        <tr>
+                            <th>Query name</th>
+                            <th>Query</th>
+                            <th>Frequency</th>
+                            <th>Last hit</th>
+                            <th>Private</th>
+                            <th colspan="2">Subscribe</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for alert in user.get_profile.alert.all %}
+                        <tr>
+                            <td><p class="bottom" title="{{alert.alertName}}">{{ alert.alertName|capfirst|truncatewords:"6" }}</p></td>
+                            <td><a href="/search/results/?q={{alert.alertText}}" title="{{alert.alertText}}">{{ alert.alertText|truncatewords:"14" }}</a></td>
+                            <td>{{ alert.get_alertFrequency_display }}</td>
+                            <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"Never" }}</td>
+                            <td>{{ alert.alertPrivacy|yesno:"Yes,No" }}</td>
+                            <td><a href="/feed/search/?q={{alert.alertText}}"><img src="/media/images/png/atom-feed.png" alt="atom icon"></a>
+                            <td><a href="/alert/edit/{{ alert.alertUUID }}/">edit/delete</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
                 </table>
                 <form action="/" method="post">{% csrf_token %}
                 <button type="submit" class="button">Make new alert</button>

@@ -1,11 +1,15 @@
 To do:
- - Make a solution so that the notes can be displayed properly on the favorites page
- - Make the sidebar items have more vertical height between them.
- - ESC should close the modal box.
- - No search box on the sign-in-register, sign-on, or register pages (it steals focus)
  - make sure things work as anonymous users (right now, things fail).
- - create a redirect from /profile/ --> /profile/settings/ (make URLs guessable).
- - auto-expand the search-tips sidebar when there are zero results. It's a teaching moment.
+ - test the delete button
+ - test the edit/delete button on the faves page.
+ - ensure that URL/POST data hacking can't edit other user's stuff
+ - make sure that we're properly filtering on the users, so that favorites are
+   user-specific.
+ - check for print statements! check for the word tag.
+
+Tests:
+ - what happens when input is too long in the form field?
+ - does text get truncated properly on the profile --> favorite page?
 
 
 Favorites spec:

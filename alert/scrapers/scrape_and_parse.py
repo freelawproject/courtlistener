@@ -18,7 +18,6 @@
 #   info here: http://docs.python.org/library/time.html#time.strptime
 import sys
 sys.path.append('/var/www/court-listener/alert')
-sys.path.append('/home/mlissner/FinalProject/alert')
 
 import settings
 from django.core.management import setup_environ
