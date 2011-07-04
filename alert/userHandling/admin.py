@@ -32,10 +32,24 @@ class UserAdmin(admin.ModelAdmin):
     inlines = [UserProfileInline, ]
     list_display = ('username', getEmailConfirmed)
 
+class DocumentAdmin(admin.ModelAdmin):
+    # ordering is brutal on MySQL. Don't put it here. Sorry.
+    #list_display = ('citation',)
+    #list_filter = ('court',)
+    fields = ('source', 'documentSHA1', 'dateFiled', 'court',
+              'excerptSummary', 'download_URL',
+              'local_path', 'documentPlainText', 'documentHTML',
+              'documentType',)
+    search_fields = ['@documentPlainText']
+
+
+class FavoriteAdmin(admin.ModelAdmin):
+    raw_id_fields = ("doc_id",)
+
 
 admin.site.register(Alert)
 admin.site.register(BarMembership)
-admin.site.register(Favorite)
+admin.site.register(Favorite, FavoriteAdmin)
 
 # Unregister the built in user admin and register the custom User admin with UserProfile
 admin.site.unregister(User)
