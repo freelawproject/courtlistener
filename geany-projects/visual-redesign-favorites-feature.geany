@@ -1,0 +1,19 @@
+
+[indentation]
+indent_width=4
+indent_type=0
+indent_hard_tab_width=8
+detect_indent=false
+indent_mode=2
+
+[project]
+name=homepage-redesign
+base_path=/var/www/court-listener-homepage-redesign
+
+[long line marker]
+long_line_behaviour=1
+long_line_column=78
+
+[files]
+current_page=0
+FILE_NAME_0=0;Python;0;16;0;1;0;/var/www/court-listener-homepage-redesign/alert/alertSystem/views.py;0;4
