@@ -4,7 +4,6 @@ To do:
  - make sure that we're properly filtering on the users, so that favorites are
    user-specific.
  - add a link from the faves page back to the document
- - add the search text to the search box on results/docs pages
 
 Tests:
  - check for print statements! check for the word tag.
