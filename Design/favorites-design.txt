@@ -14,6 +14,7 @@ Tests:
 
 Post-go-live:
  - Flat page at /remove/ needs to exist.
+ - May need to run this: grant drop on django_alerts.* to 'django-alerts'@'localhost' identified by 'asdfaiwueiocOIUCWLEiasdfjLOIiaj87a23876a&^&9';
 
 
 Favorites spec:
