@@ -98,7 +98,8 @@ def viewCase(request, court, id, casename):
         # Get the favorite, if possible
         fave = Favorite.objects.get(doc_id = doc.documentUUID, users__user = user)
         favorite_form = FavoriteForm(instance=fave)
-    except ObjectDoesNotExist:
+    except (ObjectDoesNotExist, TypeError):
+        # Not favorited or anonymous user
         favorite_form = FavoriteForm(initial = {'doc_id': doc.documentUUID,
             'name' : doc.citation.caseNameFull})
 

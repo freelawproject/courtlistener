@@ -8,7 +8,7 @@ $(document).ready(function() {
         $('#modal-logged-out').fadeToggle('slow');
     });
     $("#modal-logged-out").click(function () {
-        $('#modal-logged-out').fadeToggle('slow');
+        $('#modal-logged-out').fadeToggle('fast');
     });
     $("#closeFavorite").click(function() {
         $("#modal-save-favorite").hide();
@@ -16,6 +16,7 @@ $(document).ready(function() {
     // Close the modal box on blur
     $('html').click(function() {
         $('#modal-save-favorite').hide();
+        $('#modal-logged-out').hide();
     });
     $('#modal-save-favorite, #favorite-star-png, #edit-favorite').click(function(e) {
         e.stopPropagation();
@@ -39,6 +40,7 @@ $(document).ready(function() {
 $(document).keyup(function(e) {
     if (e.keyCode == "27") {
         $('#modal-save-favorite').hide();
+        $('#modal-logged-out').hide();
     }
 });
 

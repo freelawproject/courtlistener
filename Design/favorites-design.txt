@@ -1,5 +1,4 @@
 To do:
- - make sure things work as anonymous users (right now, things fail).
  - ensure that URL/POST data hacking can't edit other user's stuff
  - make sure that we're properly filtering on the users, so that favorites are
    user-specific.
