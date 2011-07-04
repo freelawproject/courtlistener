@@ -1,14 +1,3 @@
-To do:
- - ensure that URL/POST data hacking can't edit other user's stuff
- - make sure that we're properly filtering on the users, so that favorites are
-   user-specific.
-
-Tests:
- - check for print statements! check for the word tag.
- - check for sys.path statements that can get nixed.
- - what happens when input is too long in the form field?
- - does text get truncated properly on the profile --> favorite page?
-
 Post-go-live:
  - Flat page at /remove/ needs to exist.
  - May need to run this: grant drop on django_alerts.* to 'django-alerts'@'localhost' identified by 'asdfaiwueiocOIUCWLEiasdfjLOIiaj87a23876a&^&9';

@@ -84,7 +84,7 @@ $(function() {
 
     $("#save-favorite-delete").click(function() {
         // Send a post that deletes the favorite from the DB, and if successful
-        // remove the notes and tags from the sidebar, and toggle the star icon
+        // remove the notes from the sidebar, and toggle the star icon
         // to be blanked out.
         var csrf   = $("input[name=csrfmiddlewaretoken]").val();
         var doc_id = $("input#id_doc_id").val();
