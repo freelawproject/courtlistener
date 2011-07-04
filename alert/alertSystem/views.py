@@ -18,8 +18,9 @@ from alert.alertSystem.models import *
 from alert.userHandling.forms import *
 from alert.userHandling.models import *
 from alert.lib.encode_decode import ascii_to_num
-from django.contrib.sites.models import Site
 from django.contrib.auth.decorators import login_required
+from django.contrib.sites.models import Site
+from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import EmptyPage
 from django.core.paginator import InvalidPage
@@ -29,6 +30,7 @@ from django.http import Http404
 from django.http import HttpResponse
 from django.http import HttpResponsePermanentRedirect
 from django.shortcuts import render_to_response
+from django.shortcuts import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, get_list_or_404
 from django.template import RequestContext
 from django.template.defaultfilters import slugify
@@ -85,11 +87,11 @@ def viewCase(request, court, id, casename):
     user  = request.user
     try:
         # Get the favorite, if possible
-        # TODO: This query will fail. No user in this model anymore.
-        fave = Favorite.objects.get(doc_id = doc.documentUUID, user = request.user)
+        fave = Favorite.objects.get(doc_id = doc.documentUUID, users__user = user)
         favorite_form = FavoriteForm(instance=fave)
     except ObjectDoesNotExist:
-        favorite_form = FavoriteForm(initial = {'doc_id': doc.documentUUID})
+        favorite_form = FavoriteForm(initial = {'doc_id': doc.documentUUID,
+            'name' : doc.citation.caseNameFull})
 
     return render_to_response('display_cases.html', {'title': title,
         'doc': doc, 'court': ct, 'favorite_form': favorite_form},
@@ -113,21 +115,22 @@ def save_or_update_favorite(request):
         except:
             return HttpResponse("Unknown doc_id")
 
-        # Get the favorite, if it already exists for the user. Otherwise, create it.
         doc = Document.objects.get(documentUUID = doc_id)
-        fave, created = Favorite.objects.get_or_create(user = request.user, doc_id = doc)
-        form = FavoriteForm(request.POST, instance = fave)
+        try:
+            fave = Favorite.objects.get(doc_id = doc, users__user = request.user)
+        except ObjectDoesNotExist:
+            fave = Favorite()
 
-        if form.is_valid():
-            cd = form.cleaned_data
+        f = FavoriteForm(request.POST, instance = fave)
+        if f.is_valid():
+            new_fave = f.save()
 
-            # Then we update it
-            fave.name = cd['name']
-            fave.notes = cd['notes']
-            fave.save()
-
+            up = request.user.get_profile()
+            up.favorite.add(new_fave)
+            up.save()
         else:
-            # invalid form...print errors...
+            # TODO: How do we handle validation errors with ajax?
+            print "invalid form"
             HttpResponse("Failure. Form invalid")
 
         return HttpResponse("It worked")
@@ -135,11 +138,49 @@ def save_or_update_favorite(request):
         return HttpResponse("Not an ajax request.")
 
 
+
+@login_required
+def edit_favorite(request, fave_id):
+    '''Provide a form for the user to update alerts, or do so if submitted via
+    POST
+    '''
+
+    try:
+        fave_id = int(fave_id)
+    except:
+        return HttpResponseRedirect('/')
+
+    try:
+        fave = Favorite.objects.get(id = fave_id, users__user = request.user)
+        doc = fave.doc_id
+    except ObjectDoesNotExist:
+        # User lacks access to this fave or it doesn't exist.
+        return HttpResponseRedirect('/')
+
+    if request.method == 'POST':
+        # TODO: Favoritize this.
+        form = FavoriteForm(request.POST, instance=fave)
+        if form.is_valid():
+            form.save()
+            messages.add_message(request, messages.SUCCESS,
+                'Your favorite was saved successfully.')
+
+            # redirect to the alerts page
+            return HttpResponseRedirect('/profile/favorites/')
+
+    else:
+        # the form is loading for the first time
+        form = FavoriteForm(instance = fave)
+
+    return render_to_response('profile/edit_favorite.html', {'favorite_form': form,
+        'doc' : doc}, RequestContext(request))
+
+
 @login_required
 def delete_favorite(request):
-    '''
-    Deletes a favorite for a user using an ajax call and post data. If a tag
-    will be orphaned after the deletion, the tag is deleted as well.
+    '''Delete a user's favorite
+
+    Deletes a favorite for a user using an ajax call and post data.
     '''
     if request.is_ajax():
         # If it's an ajax request, gather the data from the form, save it to
@@ -148,15 +189,16 @@ def delete_favorite(request):
             doc_id = request.POST['doc_id']
         except:
             return HttpResponse("Unknown doc_id")
-        try:
-            fave = Favorite.objects.get(user = request.user, doc_id = doc_id)
 
-            # Finally, delete the favorite
-            fave.delete()
-        except:
-            # Couldn't find the document for some reason. Maybe they already
-            # deleted it?
-            pass
+        fave = Favorite.objects.get(doc_id = doc_id, users__user = request.user)
+
+        # Finally, delete the favorite
+        fave.delete()
+
+        if request.POST['message'] == "True":
+            # used on the profile page. True is a string, not a bool.
+            messages.add_message(request, messages.SUCCESS,
+                'Your favorite was deleted successfully.')
 
         return HttpResponse("It worked.")
 

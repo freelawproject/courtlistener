@@ -80,6 +80,7 @@ urlpatterns = patterns('',
     # Favorites pages
     (r'^favorite/create-or-update/$', save_or_update_favorite),
     (r'^favorite/delete/$', delete_favorite),
+    (r'^favorite/edit/(\d{1,6})/$', edit_favorite),
 
     # Registration pages
     (r'^email/confirm/([0-9a-f]{40})/$', confirmEmail),

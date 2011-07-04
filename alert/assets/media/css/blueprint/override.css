@@ -49,6 +49,10 @@ Sets up all the overrides or additional CSS that the site uses.
     margin-top: 6px;
 }
 
+.sidebar-section {
+    margin-bottom: 2em;
+}
+
 #search-form table{
     width: auto;
     margin-bottom: auto;
@@ -116,11 +120,11 @@ a:focus, a:hover {
     text-decoration: underline;
 }
 
-p.fake-link {
+.fake-link {
     color: #009;
 }
 
-p.fake-link:hover {
+.fake-link:hover {
     text-decoration: underline;
     color: #009;
     cursor: pointer;
@@ -208,6 +212,22 @@ input.wide-title {
     display: none;
 }
 
+button[disabled]:active, button[disabled]:hover, button[disabled] {
+    color: #bdbdbd;
+    background-color: #F5F5F5;
+    -moz-border-bottom-colors: none;
+    -moz-border-image: none;
+    -moz-border-left-colors: none;
+    -moz-border-right-colors: none;
+    -moz-border-top-colors: none;
+    background-color: #F5F5F5;
+    border-color: #EEEEEE #DEDEDE #DEDEDE #EEEEEE;
+    border-right: 1px solid #DEDEDE;
+    border-style: solid;
+    border-width: 1px;
+    cursor: default;
+}
+
 fieldset.collapsed {
     border-bottom-width: 0px;
     border-left-width: 0px;
@@ -254,7 +274,7 @@ fieldset.collapsed {
     height: auto;
 }
 
-.save-favorite-button {
+#modal-save-favorite .save-favorite-button {
     margin-right: 0px;
 }
 
@@ -272,6 +292,25 @@ fieldset.collapsed {
     bottom: 0.3em;
 }
 
+.settings-table th {
+    border-width: 0px 0px 1px 0px;
+    border-style: solid;
+    border-color: gray;
+}
+
+.settings-table td {
+    border-width: 0px 0px 1px 0px;
+    border-style: dotted;
+    border-color: gray;
+}
+
+.settings-table tr:last-child td {
+    border-width: 0px;
+}
+
+.settings-table tbody tr:hover {
+    background-color: #f0f0f0;
+}
 
 /* Sprites! */
 .sprites {

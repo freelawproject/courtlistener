@@ -23,85 +23,65 @@
     <script type="text/javascript" src="/media/js/jquery.tooltip.min.js"></script>
     <script type="text/javascript" src="/media/js/jquery.NobleCount.min.js"></script>
     <script type="text/javascript" src="/media/js/save-favorites.js"></script>
-    <script type="text/javascript">
-        $(document).ready(function() {
-            $("#favorite-star-png, #edit-favorite").click(function () {
-                $("#modal-save-favorite").toggle();
-                $("#save-favorite-text-area").focus();
-            });
-            $("#favorite-star-png").click(function () {
-                {# This only works if the user is logged out #}
-                $('#modal-logged-out').fadeToggle('slow');
-            });
-            $("#modal-logged-out").click(function () {
-                $('#modal-logged-out').fadeToggle('slow');
-            });
-            $("#closeFavorite").click(function() {
-                $("#modal-save-favorite").hide();
-            });
-            $('#save-favorite-text-area').NobleCount('#characters-remaining',{
-                {# set up the char counter #}
-                on_negative: 'errortext',
-                max_chars: '500'
-            });
-        });
-     </script>
 {% endblock %}
 
 {% block sidebar %}
     <div class="span-5 colborder" id="sidebar">
         {# show the admin tools if applicable #}
         {% if user.is_superuser and doc %}
-            <h3 class="bottom">Admin</h3>
-            <p><a href="/admin/alertSystem/document/{{doc.documentUUID}}/">Document</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-            <a href="/admin/alertSystem/citation/{{doc.citation_id}}/">Citation</a></p>
+            <div class="sidebar-section">
+                <h3 class="bottom">Admin</h3>
+                <p><a href="/admin/alertSystem/document/{{doc.documentUUID}}/">Document</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+                <a href="/admin/alertSystem/citation/{{doc.citation_id}}/">Citation</a></p>
+            </div>
         {% endif %}
 
 
         {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
-        <div class="{% if not favorite_form.instance.doc_id %}hidden{% endif %}" id="sidebar-notes">
+        <div class="{% if not favorite_form.instance.doc_id %}hidden{% endif %} sidebar-section" id="sidebar-notes">
             <h3 class="bottom inline">Your Notes</h3>
             <p class="inline" id="edit-favorite">(<a href="#favorite-editor">edit</a>)</p>
-            <p id="sidebar-notes">
-                {% if favorite_form.instance.notes %}
-                    {{ favorite_form.instance.notes }}
-                {% endif %}
+            <p id="sidebar-notes-text">
+                {{ favorite_form.instance.notes|default:"(none)" }}
             </p>
         </div>
 
 
         {# Download original? #}
-        <h3 class="bottom">Download Original</h3>
-        {% if doc.downloadURL or doc.local_path %}
-            <p>
-            {% if doc.download_URL %}
-                <a href="{{doc.download_URL}}">From the court</a>
+        <div class="sidebar-section">
+            <h3 class="bottom">Download Original</h3>
+            {% if doc.downloadURL or doc.local_path %}
+                <p>
+                {% if doc.download_URL %}
+                    <a href="{{doc.download_URL}}">From the court</a>
+                {% endif %}
+                {% if doc.download_URL and doc.local_path %}
+                    &nbsp;&nbsp;|&nbsp;&nbsp;
+                {% endif %}
+                {% if doc.local_path %}
+                    <a href="/{{doc.local_path}}">Our backup</a>
+                {% endif %}</p>
+            {% else %}
+                <p>No downloadable versions</p>
             {% endif %}
-            {% if doc.download_URL and doc.local_path %}
-                &nbsp;&nbsp;|&nbsp;&nbsp;
-            {% endif %}
-            {% if doc.local_path %}
-                <a href="/{{doc.local_path}}">Our backup</a>
-            {% endif %}</p>
-        {% else %}
-            <p>No downloadable versions</p>
-        {% endif %}
+        </div>
 
         {# Show the social links using sprites #}
-        <h3 class="bottom">Share</h3>
-        <p>
-            <a href="mailto:?subject={{title}} at CourtListener.com&body={{doc.get_small_url}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
-            <a href="{{doc.get_small_url}}" title="Copy link to clipboard" class="sprites" id="copy_png"></a>
-            <a href="http://www.facebook.com/share.php?u={{doc.get_small_url}}&t={{title}} at CourtListener.com" target="_blank" title="Facebook" class="sprites" id="facebook_png"></a>
-            <a href="http://twitter.com/home?status={{doc.get_small_url}}" target="_blank" title="Twitter" class="sprites" id="twitter_gif"></a>
-            <a href="http://digg.com/submit?phase=2&url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Digg" class="sprites" id="digg_png"></a>
-            <a href="http://reddit.com/submit?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Reddit" class="sprites" id="reddit_png"></a>
-            <a href="http://del.icio.us/post?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="delicious" class="sprites" id="delicious_png"></a>
-        </p>
+        <div class="sidebar-section">
+            <h3 class="bottom">Share</h3>
+            <p>
+                <a href="mailto:?subject={{title}} at CourtListener.com&body={{doc.get_small_url}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
+                <a href="{{doc.get_small_url}}" title="Copy link to clipboard" class="sprites" id="copy_png"></a>
+                <a href="http://www.facebook.com/share.php?u={{doc.get_small_url}}&t={{title}} at CourtListener.com" target="_blank" title="Facebook" class="sprites" id="facebook_png"></a>
+                <a href="http://twitter.com/home?status={{doc.get_small_url}}" target="_blank" title="Twitter" class="sprites" id="twitter_gif"></a>
+                <a href="http://digg.com/submit?phase=2&url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Digg" class="sprites" id="digg_png"></a>
+                <a href="http://reddit.com/submit?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Reddit" class="sprites" id="reddit_png"></a>
+                <a href="http://del.icio.us/post?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="delicious" class="sprites" id="delicious_png"></a>
+            </p>
+        </div>
 
     </div>
 {% endblock %}
-
 
 
 {% block content %}
@@ -119,10 +99,21 @@
                 {% if favorite_form.instance.doc_id %}
                     <h2>Edit/delete this favorite</h2>
                 {% else %}
-                    <h2 id='save-favorite-title'>Save as a favorite</h2>
+                    <h2 id='save-favorite-title'>Save a favorite</h2>
                 {% endif %}
                 <form action="" method="POST">{% csrf_token %}
                     {{ favorite_form.doc_id }}
+                    <p class="bottom">
+                        <label for="id_name">Name</label>
+                        {% if favorite_form.name.errors %}
+                            <br><span class="errortext">
+                                {% for error in favorite_form.name.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </span>
+                        {% endif %}<br>
+                        {{ favorite_form.name }}
+                    </p>
                     <p class="bottom">
                         <label for="id_favorite_notes">Notes</label>
                         {% if favorite_form.notes.errors %}
@@ -138,10 +129,10 @@
 
                     <div id='favorites-bottom-section'>
                         <p id="save-favorite-delete" class="bottom fake-link inline
-                            {% if not favorite_form.instance.doc_id %}hidden{%endif%}" tabindex="4">delete</a></p>
+                            {% if not favorite_form.instance.doc_id %}hidden{%endif%}" tabindex="5">delete</a></p>
                         <div id="favorites-buttons">
-                            <button type="submit" class="button title close-favorite-button" name="closeFavorite" id="closeFavorite" tabindex='3'>Close</button>
-                            <button type="submit" class="button title save-favorite-button" name="saveFavorite" id="saveFavorite" tabindex='2'>Save favorite</button>
+                            <button type="submit" class="button title close-favorite-button" name="closeFavorite" id="closeFavorite" tabindex='4'>Close</button>
+                            <button type="submit" class="button title save-favorite-button" name="saveFavorite" id="saveFavorite" tabindex='3'>Save favorite</button>
                         </div>
                     </div>
                 </form>

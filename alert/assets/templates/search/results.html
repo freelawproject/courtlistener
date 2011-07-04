@@ -19,7 +19,7 @@
                 $('#create-alert').toggleClass('collapsed-heading');
                 $('#create-alert').toggleClass('expanded-heading');
             });
-           $("#tips").click(function () {
+           $(".tips").click(function () {
                 $('#hidden-tips').toggle("fast");
                 $('#tips').toggleClass('collapsed-heading');
                 $('#tips').toggleClass('expanded-heading');
@@ -43,120 +43,126 @@
 {% block sidebar %}
     <div class="span-5 colborder" id="sidebar">
         {% if user.is_authenticated and query %}
-            <h3 id="create-alert" class="pointer collapsed-heading sprites">Create alert</h3>
+            <div class="sidebar-section">
+                <h3 id="create-alert" class="pointer collapsed-heading sprites">Create alert</h3>
                 <div id="hidden-create-alert" class="hidden">
-                {% if alertForm.errors %}
-                    <div class="span-4 error">
-                        <p class="bottom">Please fix the errors below.</p>
-                    </div>
-                {% endif %}
+                    {% if alertForm.errors %}
+                        <div class="span-4 error">
+                            <p class="bottom">Please fix the errors below.</p>
+                        </div>
+                    {% endif %}
 
-                <form action="" method="post">{% csrf_token %}
-                    <p>
-                        <label for="id_alertText">Alert query</label>
-                        {% if alertForm.alertText.errors %}
-                            <br><span class="errortext">
-                                {% for error in alertForm.alertText.errors %}
-                                    {{ error|escape }}
-                                {% endfor %}
-                            </span>
-                        {% endif %}<br>
-                        {{ alertForm.alertText }}
-                    </p>
+                    <form action="" method="post">{% csrf_token %}
+                        <p>
+                            <label for="id_alertText">Alert query</label>
+                            {% if alertForm.alertText.errors %}
+                                <br><span class="errortext">
+                                    {% for error in alertForm.alertText.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}<br>
+                            {{ alertForm.alertText }}
+                        </p>
 
-                    <p>
-                        <label for="id_alertName">Give the alert a name</label>
-                        {% if alertForm.alertName.errors %}
-                            <br><span class="errortext">
-                                {% for error in alertForm.alertName.errors %}
-                                    {{ error|escape }}
-                                {% endfor %}
-                            </span>
-                        {% endif %}
-                        {{ alertForm.alertName }}
-                    </p>
+                        <p>
+                            <label for="id_alertName">Give the alert a name</label>
+                            {% if alertForm.alertName.errors %}
+                                <br><span class="errortext">
+                                    {% for error in alertForm.alertName.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}
+                            {{ alertForm.alertName }}
+                        </p>
 
-                    <p>
-                        <label for="id_alertFrequency">How often should we notify you</label>
-                        {% if alertForm.alertFrequency.errors %}
-                            <br><span class="errortext">
-                                {% for error in alertForm.alertFrequency.errors %}
-                                    {{ error|escape }}
-                                {% endfor %}
-                            </span>
-                        {% endif %}<br>
-                        {{ alertForm.alertFrequency }}
-                    </p>
-                    <p>
-                        {{ alertForm.alertPrivacy }}
-                        <label for="id_alertPrivacy">This alert is private</label>
-                        <label style="color:#000099; font-weight:normal;" title=" - In the future, we may allow users to share their public alerts." href="#" id="q" class="help">[?]</label>
-                        {% if alertForm.alertPrivacy.errors %}
-                            <span class="errortext">
-                                {% for error in alertForm.alertPrivacy.errors %}
-                                    {{ error|escape }}
-                                {% endfor %}
-                            </span>
-                        {% endif %}<br>
+                        <p>
+                            <label for="id_alertFrequency">How often should we notify you</label>
+                            {% if alertForm.alertFrequency.errors %}
+                                <br><span class="errortext">
+                                    {% for error in alertForm.alertFrequency.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}<br>
+                            {{ alertForm.alertFrequency }}
+                        </p>
+                        <p>
+                            {{ alertForm.alertPrivacy }}
+                            <label for="id_alertPrivacy">This alert is private</label>
+                            <label style="color:#000099; font-weight:normal;" title=" - In the future, we may allow users to share their public alerts." href="#" id="q" class="help">[?]</label>
+                            {% if alertForm.alertPrivacy.errors %}
+                                <span class="errortext">
+                                    {% for error in alertForm.alertPrivacy.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}<br>
 
-                    </p>
-                    <p>
-                        {{ alertForm.sendNegativeAlert }}
-                        <label for="id_alertName">Send me alerts even when there are no hits</label>
-                        {% if alertForm.sendNegativeAlert.errors %}
-                            <span class="errortext">
-                                {% for error in alertForm.sendNegativeAlert.errors %}
-                                    {{ error|escape }}
-                                {% endfor %}
-                            </span>
-                        {% endif %}<br>
-                    </p>
-                    <button type="submit" class="button title" name="alertSave">Create alert</button>
-                </form>
+                        </p>
+                        <p>
+                            {{ alertForm.sendNegativeAlert }}
+                            <label for="id_alertName">Send me alerts even when there are no hits</label>
+                            {% if alertForm.sendNegativeAlert.errors %}
+                                <span class="errortext">
+                                    {% for error in alertForm.sendNegativeAlert.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}<br>
+                        </p>
+                        <button type="submit" class="button title" name="alertSave">Create alert</button>
+                    </form>
+                </div>
             </div>
         {% endif %}
 
         {% if not user.is_authenticated and query %}
-            <h3 id="create-alert" class="pointer collapsed-heading sprites">Create alert</h3>
-            <div id="hidden-create-alert" class="hidden">
-                <p>To get daily alerts for this search, you need to <a href="{%url sign-in%}?next={{request.path}}?q={{query}}&page={{results.number}}">sign in</a> or
-                <a href="{%url register%}?next={{request.path}}?q={{query}}&page={{results.number}}">register</a> as a new user.</p>
+            <div class="sidebar-section">
+                <h3 id="create-alert" class="pointer collapsed-heading sprites">Create alert</h3>
+                <div id="hidden-create-alert" class="hidden">
+                    <p>To get daily alerts for this search, you need to <a href="{%url sign-in%}?next={{request.path}}?q={{query}}&page={{results.number}}">sign in</a> or
+                    <a href="{%url register%}?next={{request.path}}?q={{query}}&page={{results.number}}">register</a> as a new user.</p>
+                </div>
             </div>
         {% endif %}
 
-        <h3 id="tips" class="pointer collapsed-heading sprites">Search tips</h3>
-        <div id="hidden-tips" class="hidden">
-            <dl>
-                <dt>-</dt>
-                <dd>Excludes words</dd>
-                <dt>|</dt>
-                <dd>Searches either word</dd>
-                <dt>( )</dt>
-                <dd>Can be used to group queries</dd>
-                <dt>" "</dt>
-                <dd>Creates a phrase to search</dd>
-                <dt>*</dt>
-                <dd>Creates a wildcard search</dd>
-                <dt>~10</dt>
-                <dd>Limits distance to 10 words</dd>
-                <dt>/10</dt>
-                <dd>Creates a quorum</dd>
-                <dt>&lt;&lt;</dt>
-                <dd>Defines an order</dd>
-                <dt>=</dt>
-                <dd>Defines an exact form of a word</dd>
-                <dt>@court</dt>
-                <dd>Filters to a certain court</dd>
-                <dt>@caseName</dt>
-                <dd>Searches only the case name field</dd>
-                <dt>@caseNumber</dt>
-                <dd>Searches only the case number field</dd>
-                <dt>@docStatus</dt>
-                <dd>Searches only the document status field</dd>
-                <dt>@docText</dt>
-                <dd>Searches only the body of the case</dd>
-            </table>
-            <p align="right"><a href="/search/advanced-techniques/" class="bottom">More tips!</a></p>
+        <div class="sidebar-section">
+            <h3 id="tips" class="tips pointer collapsed-heading sprites">Search tips</h3>
+            <div id="hidden-tips" class="hidden">
+                <dl>
+                    <dt>-</dt>
+                    <dd>Excludes words</dd>
+                    <dt>|</dt>
+                    <dd>Searches either word</dd>
+                    <dt>( )</dt>
+                    <dd>Can be used to group queries</dd>
+                    <dt>" "</dt>
+                    <dd>Creates a phrase to search</dd>
+                    <dt>*</dt>
+                    <dd>Creates a wildcard search</dd>
+                    <dt>~10</dt>
+                    <dd>Limits distance to 10 words</dd>
+                    <dt>/10</dt>
+                    <dd>Creates a quorum</dd>
+                    <dt>&lt;&lt;</dt>
+                    <dd>Defines an order</dd>
+                    <dt>=</dt>
+                    <dd>Defines an exact form of a word</dd>
+                    <dt>@court</dt>
+                    <dd>Filters to a certain court</dd>
+                    <dt>@caseName</dt>
+                    <dd>Searches only the case name field</dd>
+                    <dt>@caseNumber</dt>
+                    <dd>Searches only the case number field</dd>
+                    <dt>@docStatus</dt>
+                    <dd>Searches only the document status field</dd>
+                    <dt>@docText</dt>
+                    <dd>Searches only the body of the case</dd>
+                </table>
+                <p align="right"><a href="/search/advanced-techniques/" class="bottom">More tips!</a></p>
+            </div>
         </div>
     </div>
 {% endblock %}
@@ -216,7 +222,7 @@
                 <p class="bottom">Search tips:</p>
                 <ul>
                     <li>Check your spelling</li>
-                    <li>Loosen your boolean construction</li>
+                    <li>Try using our <span class="tips fake-link">boolean connectors</span></li>
                     <li>Remove quotes if possible</li>
                 </ul>
             {% endif %}

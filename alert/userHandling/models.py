@@ -18,6 +18,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.localflavor.us.models import USStateField
+from django.core.validators import MaxLengthValidator
 from alert.alertSystem.models import Document
 
 FREQUENCY = (
@@ -58,8 +59,11 @@ class Alert(models.Model):
 class Favorite(models.Model):
     doc_id = models.ForeignKey(Document,
         verbose_name='the document that is favorited')
-    name  = models.TextField('a name for the alert', max_length=200)
-    notes = models.TextField('notes about the favorite', max_length=500)
+    name  = models.CharField('a name for the alert', max_length=100)
+    notes = models.TextField('notes about the favorite',
+        validators=[MaxLengthValidator(500)],
+        max_length=500,
+        blank=True)
     def __unicode__(self):
         return 'Favorite %s' % self.id
 
