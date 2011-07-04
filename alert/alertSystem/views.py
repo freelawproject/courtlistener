@@ -43,7 +43,7 @@ import traceback
 
 @cache_page(60*5)
 def redirect_short_url(request, encoded_string):
-    """Redirect a user to the CourtListener site from the crt.li site."""
+    '''Redirect a user to the CourtListener site from the crt.li site.'''
 
     # strip any GET arguments from the string
     index = string.find(encoded_string, "&")
@@ -86,6 +86,14 @@ def viewCase(request, court, id, casename):
     ct    = get_object_or_404(Court, courtUUID = court)
     title = doc.citation.caseNameShort
     user  = request.user
+
+    try:
+        # Check if we know the user's query. Pass it onwards if so.
+        query = request.GET['q']
+    except MultiValueDictKeyError:
+        # No query parameter.
+        query = ''
+
     try:
         # Get the favorite, if possible
         fave = Favorite.objects.get(doc_id = doc.documentUUID, users__user = user)
@@ -95,7 +103,7 @@ def viewCase(request, court, id, casename):
             'name' : doc.citation.caseNameFull})
 
     return render_to_response('display_cases.html', {'title': title,
-        'doc': doc, 'court': ct, 'favorite_form': favorite_form},
+        'doc': doc, 'court': ct, 'favorite_form': favorite_form, 'query': query},
         RequestContext(request))
 
 
