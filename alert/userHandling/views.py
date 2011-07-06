@@ -246,21 +246,6 @@ def registerSuccess(request):
         {'redirect_to': redirect_to}, RequestContext(request))
 
 
-def combined_signin_register(request):
-    '''Provides a sign-in and register page for the user.
-
-    Checks that the user is anonymous, then allows them to register or
-    sign-in
-    '''
-    if request.user.is_anonymous():
-        next = request.REQUEST.get('next', '')
-        form = UserCreationFormExtended()
-        return render_to_response('profile/login_or_register.html',
-            {'form': form, 'next': next}, RequestContext(request))
-    else:
-        return HttpResponseRedirect('/profile/settings/')
-
-
 def confirmEmail(request, activationKey):
     '''Confirms email addresses for a user.
 
