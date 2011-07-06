@@ -1,16 +1,37 @@
 /* --------------------------------------------------------------------------
-
 Sets up all the overrides or additional CSS that the site uses.
-
 ---------------------------------------------------------------------------*/
 
 .footer-item {
     float: left;
     margin-right: 3em;
-    margin-bottom: 3em;
+    margin-bottom: 4em;
     width: auto;
 }
 
+/* for the nav in the settings pages*/
+.header {
+    float: left;
+}
+
+.settings-nav-item a, .settings-nav-item a:hover, .settings-nav-item a:active, .settings-nav-item a:focus {
+    color: black;
+}
+
+.settings-nav-item {
+    float: left;
+    margin-right: 1em;
+}
+
+.settings-nav-item:last-child {
+    margin-right: 0em;
+}
+
+.settings-nav-item.active {
+    font-weight: bold;
+}
+
+/* General class shortcuts */
 .inline {
     display: inline;
 }
@@ -23,6 +44,34 @@ Sets up all the overrides or additional CSS that the site uses.
     text-align: right;
 }
 
+.hidden {
+    display: none;
+}
+
+.round {
+    -moz-border-radius: 6px 6px 6px 6px;
+    -webkit-border-radius: 6px;
+}
+
+.round-bottom {
+    -moz-border-radius-bottomright: 6px;
+    -moz-border-radius-bottomleft: 6px;
+    -webkit-border-bottom-right-radius: 6px;
+    -webkit-border-bottom-left-radius: 6px;
+}
+
+.pointer {
+    cursor: pointer;
+    cursor: hand;
+}
+
+.help {
+    cursor: help;
+}
+
+
+
+/* layout */
 .container {
     padding: 0px 10px;
     padding-top: 10px;
@@ -90,27 +139,7 @@ Sets up all the overrides or additional CSS that the site uses.
     left: 0px;
 }
 
-.round {
-    -moz-border-radius: 6px 6px 6px 6px;
-    -webkit-border-radius: 6px;
-}
-
-.round-bottom {
-    -moz-border-radius-bottomright: 6px;
-    -moz-border-radius-bottomleft: 6px;
-    -webkit-border-bottom-right-radius: 6px;
-    -webkit-border-bottom-left-radius: 6px;
-}
-
-.pointer {
-    cursor: pointer;
-    cursor: hand;
-}
-
-.help {
-    cursor: help;
-}
-
+/* link formatting */
 a:link, a:visited {
     text-decoration: none;
 }
@@ -131,6 +160,7 @@ a:focus, a:hover {
     cursor: hand;
 }
 
+/* errors */
 .error a, .notice a, .success a {
     text-decoration: underline;
 }
@@ -147,14 +177,6 @@ a:focus, a:hover {
     color: #8a1f11;
 }
 
-/* for the nav in the settings pages*/
-.header > h3 > a {
-    color: black;
-}
-
-.header {
-    float:left;
-}
 
 /* Display cases from Resources.org neatly */
 span.num {
@@ -207,10 +229,7 @@ input.wide-title {
 }
 
 
-.hidden {
-    display: none;
-}
-
+/* Disabled button formatting */
 button[disabled]:active, button[disabled]:hover, button[disabled] {
     color: #bdbdbd;
     background-color: #F5F5F5;
@@ -291,6 +310,8 @@ fieldset.collapsed {
     bottom: 0.3em;
 }
 
+
+/* Tables on settings pages */
 .settings-table th {
     border-width: 0px 0px 1px 0px;
     border-style: solid;

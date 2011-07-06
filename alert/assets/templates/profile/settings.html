@@ -1,19 +1,10 @@
-{% extends "base.html" %}
+{% extends "profile/nav.html" %}
 
-{% block title %} CourtListener.com / Settings / Account {% endblock %}
+{% block title %} CourtListener.com / Profile / Account {% endblock %}
+
+{% block nav-account %}active{% endblock %}
 
 {% block content %}
-    <div class="span-24 last">
-        <h2>Profile / Account</h2>
-        <div class="box round header">
-            <h3 class="bottom">
-                <a href="/profile/settings/"><strong>Account</strong></a>&nbsp;&nbsp;&nbsp;
-                <a href="/profile/alerts/">Alerts</a>&nbsp;&nbsp;&nbsp;
-                <a href="/profile/favorites/">Favorites</a>&nbsp;&nbsp;&nbsp;
-                <a href="/profile/password/change">Password</a>
-            </h3>
-        </div>
-    </div>
     <div class="span-24 last">
         {# if their email address was just changed, tell them.#}
         {% if messages %}
