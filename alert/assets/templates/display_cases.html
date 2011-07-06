@@ -141,7 +141,7 @@
             {% else %}
                 {# user is not authenticated #}
                 <div id="modal-logged-out" class="hidden pointer">
-                    <h3 class="center bottom"><a href="{%url sign-in-register%}?next={{request.path}}">Sign in or register</a> to save a favorite.</h3>
+                    <h3 class="center bottom"><a href="{%url sign-in %}?next={{request.path}}{% if query %}?q={{ query }}{%endif%}">Sign in or register</a> to save a favorite.</h3>
                     <p class="center bottom">(click to dismiss)</p>
                 </div>
             {% endif %}

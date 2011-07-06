@@ -40,12 +40,12 @@
                                     <li><a href="/opinions/all">Browse</a></li>
                                     {% if request.path != "/sign-out/" %}
                                         <li>
-                                            <a href="{%url sign-in-register%}?next={{request.path}}{% if query %}?q={{ query }}{%endif%}">
+                                            <a href="{%url sign-in %}?next={{request.path}}{% if query %}?q={{ query }}{%endif%}">
                                                 Sign in / Register
                                             </a>
                                         </li>
                                     {% else %}
-                                        <li><a href="{%url sign-in-register%}">Sign in / Register</a></li>
+                                        <li><a href="{%url sign-in %}">Sign in / Register</a></li>
                                     {% endif %}
                                 </ul>
                             </div>
