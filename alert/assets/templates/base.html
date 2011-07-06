@@ -39,7 +39,11 @@
                                     <li><a href="/about/">About</a></li>
                                     <li><a href="/opinions/all">Browse</a></li>
                                     {% if request.path != "/sign-out/" %}
-                                        <li><a href="{%url sign-in-register%}?next={{request.path}}">Sign in / Register</a></li>
+                                        <li>
+                                            <a href="{%url sign-in-register%}?next={{request.path}}{% if query %}?q={{ query }}{%endif%}">
+                                                Sign in / Register
+                                            </a>
+                                        </li>
                                     {% else %}
                                         <li><a href="{%url sign-in-register%}">Sign in / Register</a></li>
                                     {% endif %}
@@ -94,9 +98,18 @@
                 <hr class="space">
                 <hr>
             </div>
-            <div class="span-24 last quiet" id="footer">
+            <div class="span-24 last" id="footer">
                 <span class="footer-item">
                     <a href="/about/">About</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/dump-info/">Data Dumps</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/tools/">Tools</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/contribute/">Contribute</a>
                 </span>
                 <span class="footer-item">
                     <a href="/coverage/">Coverage</a>
@@ -111,16 +124,7 @@
                     <a href="/sitemap/">Sitemap</a>
                 </span>
                 <span class="footer-item">
-                    <a href="/contribute/">Contribute</a>
-                </span>
-                <span class="footer-item">
                     <a href="/contact/">Contact</a>
-                </span>
-                <span class="footer-item">
-                    <a href="/tools/">Tools</a>
-                </span>
-                <span class="footer-item">
-                    <a href="/dump-info/">Data Dumps</a>
                 </span>
             </div>
         </div>
