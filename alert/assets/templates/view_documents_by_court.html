@@ -26,7 +26,7 @@
 {% endblock %}
 
 {% block sidebar %}
-    <div class="span-5 last" id="sidebar">
+    <div class="span-5 colborder" id="sidebar">
         <h3>Browse other courts</h3>
         <p>
             <a href="/opinions/all/">All courts</a><br>
@@ -49,7 +49,7 @@
 {% endblock %}
 
 {% block content %}
-    <div class="span-18 colborder">
+    <div class="span-18 last">
         {% if not over_limit %}
             <h2>{{ title }}</h2>
             <h3>Recent documents, page {{ documents.number|intcomma }}</h3>
