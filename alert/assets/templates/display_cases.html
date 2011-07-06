@@ -87,9 +87,9 @@
 {% block content %}
     <div class="span-18 last">
         {% if favorite_form.instance.doc_id %}
-            <a href="#favorite-editor" title="Edit/delete favorite" id="favorite-star-png" class="sprites favorite-on"></a>
+            <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-on"></a>
         {% else %}
-            <a href="#favorite-editor" title="Save favorite" id="favorite-star-png" class="sprites favorite-off"></a>
+            <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-off"></a>
         {% endif %}
         <h2>{{ doc.citation.caseNameFull }}, {{ doc.citation.caseNumber }}</h2>
         <div id="modal-rel">
@@ -162,7 +162,7 @@
                 {% else %}
                     Unknown<br>
                 {% endif %}
-            <strong><acronym title="(digital fingerprint)">SHA1</acronym>:</strong> {{doc.documentSHA1}}
+            <strong title="SHA1 Hash of the binary or text">Fingerprint:</strong> {{doc.documentSHA1}}
         </p>
         <br>
         <h4>Document text</h4>

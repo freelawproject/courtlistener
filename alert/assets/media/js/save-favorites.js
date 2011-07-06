@@ -66,7 +66,6 @@ $(function() {
                 // Fill in the star and reset its title attr
                 $('#favorite-star-png').removeClass('favorite-off');
                 $('#favorite-star-png').addClass('favorite-on');
-                $('#favorite-star-png').attr('title', 'Edit/delete favorite');
 
                 // Add the new favorites info to the sidebar.
                 if (notes == ''){
@@ -99,7 +98,6 @@ $(function() {
                 // Empty the star and reset its titles
                 $('#favorite-star-png').removeClass('favorite-on');
                 $('#favorite-star-png').addClass('favorite-off');
-                $('#favorite-star-png').attr('title', 'Save favorite');
 
                 // Hide the sidebar
                 $('#sidebar-notes').hide();
