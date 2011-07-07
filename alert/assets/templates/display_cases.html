@@ -70,7 +70,7 @@
         <div class="sidebar-section">
             <h3 class="bottom">Share</h3>
             <p>
-                <a href="mailto:?subject={{title}} at CourtListener.com&body={{doc.get_small_url}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
+                <a href="mailto:?subject={{title|urlencode}}%20at%20CourtListener.com&body={{doc.get_small_url}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
                 <a href="{{doc.get_small_url}}" title="Copy link to clipboard" class="sprites" id="copy_png"></a>
                 <a href="http://www.facebook.com/share.php?u={{doc.get_small_url}}&t={{title}} at CourtListener.com" target="_blank" title="Facebook" class="sprites" id="facebook_png"></a>
                 <a href="http://twitter.com/home?status={{doc.get_small_url}}" target="_blank" title="Twitter" class="sprites" id="twitter_gif"></a>
@@ -95,7 +95,7 @@
         <div id="modal-rel">
             {# Modal box for saving the favorite #}
             {% if user.is_authenticated %}
-            <div id="modal-save-favorite" class="hidden">
+            <div id="modal-save-favorite" class="hidden span-10">
                 {% if favorite_form.instance.doc_id %}
                     <h2>Edit/delete this favorite</h2>
                 {% else %}
@@ -140,8 +140,12 @@
             </div>
             {% else %}
                 {# user is not authenticated #}
-                <div id="modal-logged-out" class="hidden pointer">
-                    <h3 class="center bottom"><a href="{%url sign-in %}?next={{request.path}}{% if query %}?q={{ query }}{%endif%}">Sign in or register</a> to save a favorite.</h3>
+                <div id="modal-logged-out" class="hidden pointer span-7">
+                    <h3 class="center bottom">
+                        <a href="{%url sign-in %}?next={{request.path}}{% if query %}?q={{ query }}{%endif%}">
+                            Sign in or register to save a favorite.
+                        </a>
+                    </h3>
                     <p class="center bottom">(click to dismiss)</p>
                 </div>
             {% endif %}
