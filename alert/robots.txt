@@ -137,3 +137,27 @@ Disallow: /pdf/2011/05/13/Jimoh_v._Charlotte_Mecklenburg_Housing.pdf
 # Added 2011-05-29
 Disallow: /ca2/2fL/alers-v-human-resources-administration/
 Disallow: /pdf/2009/12/17/Alers_v._Human_Resources_Administration.pdf
+
+# Added 2011-06-01
+Disallow: /ca3/Txa/jhon-frey-cubides-gomez-v-atty-gen-usa/
+Disallow: /pdf/2010/08/16/Jhon_Frey_Cubides_Gomez_v._Atty_Gen_USA.pdf
+
+# Added 2011-06-04
+Disallow: /ca5/279u/united-states-v-ehab-ashoor/
+Disallow: /pdf/2011/04/29/United_States_v._Ehab_Ashoor.pdf
+
+# Added 2011-06-09
+Disallow: /ca1/271A/international-floor-crafts-v-dziemit/
+Disallow: /pdf/2011/04/21/International_Floor_Crafts_v._Dziemit_1.pdf
+Disallow: /ca1/26YQ/international-floor-crafts-v-dziemit/
+Disallow: /pdf/2011/04/21/International_Floor_Crafts_v._Dziemit.pdf
+Disallow: /ca1/27Dp/international-floor-crafts-v-dziemit/
+Disallow: /pdf/2011/05/25/International_Floor_Crafts_v._Dziemit.pdf
+
+# Added 2011-06-23
+Disallow: /ca2/VUN/lukasiewcz-kruk-v-tse/
+Disallow: /pdf/2010/12/17/Lukasiewcz-Kruk_v._Tse.pdf
+
+# Added 2011-07-06
+Disallow: /ca2/26Sj/ciu-v-holder/
+Disallow: /pdf/2011/04/15/Ciu_v._Holder.pdf
