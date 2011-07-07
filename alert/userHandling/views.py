@@ -124,12 +124,16 @@ def deleteProfile(request):
         # Gather their foreign keys, delete those, then delete their profile
         # and user info
         try:
-            # they may not have a userProfile
+            # they may not have a userProfile (old bug)
             userProfile = request.user.get_profile()
 
             alerts = userProfile.alert.all()
             for alert in alerts:
                 alert.delete()
+
+            faves = userProfile.favorite.all()
+            for fave in faves:
+                fave.delete()
 
             userProfile.delete()
         except:
