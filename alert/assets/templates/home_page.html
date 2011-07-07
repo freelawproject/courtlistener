@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}CourtListener.com / Home{% endblock %}
+
+{% block headers %}
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+    <script type="text/javascript">
+	    $(document).ready(function() {
+		    $('.auto-focus:first').focus();
+            $("legend").click(function () {
+                $('div.hidden').toggle("fast");
+                $('fieldset').toggleClass('collapsed');
+            });
+	    });
+    </script>
+    <link rel="search" type="application/opensearchdescription+xml" title="Court Listener" href="/media/xml/opensearch.xml">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for all Courts of Appeal" href="/feed/court/all/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the U.S. Supreme Court" href="/feed/court/scotus/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the First Circuit" href="/feed/court/ca1/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Second Circuit" href="/feed/court/ca2/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Third Circuit" href="/feed/court/ca3/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Fourth Circuit" href="/feed/court/ca4/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Fifth Circuit" href="/feed/court/ca5/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Sixth Circuit" href="/feed/court/ca6/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Seventh Circuit" href="/feed/court/ca7/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eighth Circuit" href="/feed/court/ca8/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Ninth Circuit" href="/feed/court/ca9/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Tenth Circuit" href="/feed/court/ca10/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eleventh Circuit" href="/feed/court/ca11/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the D.C. Circuit" href="/feed/court/cadc/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Federal Circuit" href="/feed/court/cafc/">
+{% endblock %}
+
+{% block content %}
+    <div class="span-18">
+        <h2>Use the power of search to follow the Federal Courts of Appeal</h2>
+        <br><br><br><br>
+        {% if form.errors %}
+            {# there is only one possible error #}
+            <div class="span-8">
+                <div class="error">
+                    <p class="bottom">Please be sure to make a query</p>
+                </div>
+            </div>
+            <div class="span-10 last">&nbsp;</div>
+        {% endif %}
+        <div class="span-17 last">
+            <h4 class="bottom">Create an alert by entering a search query:</h4>
+            <form action="" method="get">
+                <label for="search"></label>
+		<input class="auto-focus wide-title" name="q" id="search">&nbsp;&nbsp;
+                <button type="submit" class="button title" name="search">Search</button>
+            </form>
+        </div>
+        <div class="span-10 last">
+            <fieldset class='collapsed' id='advanced'>
+                <legend class="pointer">Advanced</legend>
+                <div class='hidden'>
+                    <table>
+                        <tr>
+                            <td>-</td>
+                            <td>Excludes words</td>
+                        </tr>
+                        <tr>
+                            <td>|</td>
+                            <td>Searches either word</td>
+                        </tr>
+                        <tr>
+                            <td>( )</td>
+                            <td>Can be used to group queries</td>
+                        </tr>
+                        <tr>
+                            <td>" "</td>
+                            <td>Creates a phrase to search</td>
+                        </tr>
+                        <tr>
+                            <td>*</td>
+                            <td>Creates a wildcard search</td>
+                        </tr>
+                        <tr>
+                            <td>~10</td>
+                            <td>Limits distance to 10 words</td>
+                        </tr>
+                        <tr>
+                            <td>/10</td>
+                            <td>Creates a quorum</td>
+                        <tr>
+                            <td>&lt;&lt;</td>
+                            <td>Defines an order</td>
+                        </tr>
+                        <tr>
+                            <td>=</td>
+                            <td>Defines an exact form of a word</td>
+                        </tr>
+                        <tr>
+                            <td>@court</td>
+                            <td>Filters to a certain court</td>
+                        </tr>
+                        <tr>
+                            <td>@caseName</td>
+                            <td>Searches only the case name field</td>
+                        </tr>
+                        <tr>
+                            <td>@caseNumber</td>
+                            <td>Searches only the case number field</td>
+                        </tr>
+                        <tr>
+                            <td>@docStatus</td>
+                            <td>Searches only the document status field</td>
+                        </tr>
+                        <tr>
+                            <td>@docText</td>
+                            <td>Searches only the body of the case</td>
+                        </tr>
+                    </table>
+                    <a href="/search/advanced-techniques/" class="bottom">More details</a>
+                </div>
+            </fieldset>
+            <br><br><br>
+        </div>
+    </div>
+{% endblock %}
