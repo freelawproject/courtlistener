@@ -19,6 +19,7 @@ from alert import settings
 from alert.alertSystem.models import PACER_CODES
 from alert.alertSystem.views import *
 from alert.contact.views import *
+from alert.data_dumper.views import *
 from alert.feeds.views import *
 from alert.pinger.views import *
 from alert.search.views import *
@@ -127,6 +128,7 @@ urlpatterns = patterns('',
 # redirects
 urlpatterns += patterns('django.views.generic.simple',
     ('^privacy/$', 'redirect_to', {'url': '/terms/#privacy'}),
+    ('^removal/$', 'redirect_to', {'url': '/terms/#removal'}),
     ('^opinions/$', 'redirect_to', {'url': '/opinions/all/'}),
     ('^report/$', 'redirect_to', {'url': 'http://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf'}),
 )
