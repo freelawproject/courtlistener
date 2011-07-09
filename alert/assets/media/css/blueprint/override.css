@@ -113,7 +113,7 @@ Sets up all the overrides or additional CSS that the site uses.
 
 #search-input-home-page, #search-input {
     width: 500px;
-    border-color: threedface;
+    border-color: threedface threedface #a6a6a6 gray;
     border-style: solid none solid solid;
     border-width: 1px 0px 1px 1px;
     font-size: 16px;
@@ -128,7 +128,7 @@ Sets up all the overrides or additional CSS that the site uses.
     height: 32px;
     padding: 4px 10px;
     margin: 0px;
-    border-color: threedface;
+    border-color: threedface threedface #a6a6a6 threedface;
 }
 
 #search-input-home-page:focus, #search-input:focus{
