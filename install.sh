@@ -344,6 +344,7 @@ function installCourtListener {
     # this is the MEDIA_ROOT
     MEDIA_ROOT="$CL_INSTALL_DIR/court-listener/alert/assets/media/"
     TEMPLATE_DIRS="$CL_INSTALL_DIR/court-listener/alert/assets/templates/"
+    DUMP_DIR="$CL_INSTALL_DIR/court-listener/alert/assets/dumps/"
 
     # convrt true and false to True and False
     if $DEVELOPMENT
@@ -388,6 +389,7 @@ ADMIN_MEDIA_PREFIX = '/media/adminMedia/'
 # system time zone.
 TIME_ZONE = 'America/Los_Angeles'
 MEDIA_ROOT = '$MEDIA_ROOT'
+DUMP_DIR = '$DUMP_DIR'
 
 DEBUG = True
 
