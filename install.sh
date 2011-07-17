@@ -322,7 +322,7 @@ function installCourtListener {
     fi
     cd $CL_INSTALL_DIR
     echo "Downloading CourtListener with mercurial..."
-    hg clone http://bitbucket.org/mlissner/legal-current-awareness court-listener
+    hg clone https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener court-listener
 
     # begin the harder thing: configuring it correctly...
     # We need a link between the 20-private.conf adminMedia location and the
