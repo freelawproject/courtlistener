@@ -23,6 +23,28 @@
     <script type="text/javascript" src="/media/js/jquery.tooltip.min.js"></script>
     <script type="text/javascript" src="/media/js/jquery.NobleCount.min.js"></script>
     <script type="text/javascript" src="/media/js/save-favorites.js"></script>
+    <script type="text/javascript">
+        // Handles the clipboard actions.
+        $(document).ready(function() {
+            $('#copy_png').click(function() {
+                console.log("clicked");
+                $('#copy_png').toggleClass('copy_png_selected');
+                $('#link-div').toggle();
+                $('#copy-input').select();
+            });
+            $('html').click(function() {
+                // Hides the input box if needed.
+                console.log('html was clicked');
+                $('#link-div').hide();
+                $('#copy_png').removeClass('copy_png_selected');
+            });
+            $('#copy-input, #copy_png').click(function(e) {
+                // Prevents the above from hiding the input box when it is clicked.
+                $('copy-input').select();
+                e.stopPropagation();
+            });
+	    });
+    </script>
 {% endblock %}
 
 {% block sidebar %}
@@ -71,13 +93,16 @@
             <h3 class="bottom">Share</h3>
             <p>
                 <a href="mailto:?subject={{title|urlencode}}%20at%20CourtListener.com&body={{doc.get_small_url}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
-                <a href="{{doc.get_small_url}}" title="Copy link to clipboard" class="sprites" id="copy_png"></a>
+                <span title="Copy link to clipboard" class="sprites copy_png_unselected" id="copy_png"></span>
                 <a href="http://www.facebook.com/share.php?u={{doc.get_small_url}}&t={{title}} at CourtListener.com" target="_blank" title="Facebook" class="sprites" id="facebook_png"></a>
                 <a href="http://twitter.com/home?status={{doc.get_small_url}}" target="_blank" title="Twitter" class="sprites" id="twitter_gif"></a>
                 <a href="http://digg.com/submit?phase=2&url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Digg" class="sprites" id="digg_png"></a>
                 <a href="http://reddit.com/submit?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Reddit" class="sprites" id="reddit_png"></a>
                 <a href="http://del.icio.us/post?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="delicious" class="sprites" id="delicious_png"></a>
             </p>
+            <div id="link-div" class="hidden">
+                <input type="text" readonly="readonly" id="copy-input" value="{{doc.get_small_url}}"></input>
+            </div>
         </div>
 
     </div>

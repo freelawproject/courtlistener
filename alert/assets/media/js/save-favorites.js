@@ -19,6 +19,7 @@ $(document).ready(function() {
         $('#modal-logged-out').hide();
     });
     $('#modal-save-favorite, #favorite-star-png, #edit-favorite').click(function(e) {
+        // Prevents the above from closing the modal when the modal is clicked.
         e.stopPropagation();
     });
     $('#save-favorite-notes-field').NobleCount('#characters-remaining',{

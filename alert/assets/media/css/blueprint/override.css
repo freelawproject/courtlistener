@@ -355,15 +355,26 @@ fieldset.collapsed {
     display: block;
 }
 
+.copy_png_unselected {
+    background-position : -0px -16px;
+}
+
+.copy_png_selected {
+    background-position : -0px 0px;
+}
+
 #copy_png {
 	height               : 16px;
 	width                : 16px;
-	background-position  : -0px -16px;
     margin: 0px 2px 0px 2px;
- }
+}
 
 #copy_png:hover {
     background-position  : -0px 0px;
+}
+
+#copy-input {
+    width: 138px;
 }
 
 #delicious_png {
