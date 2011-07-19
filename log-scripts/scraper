@@ -1,0 +1,11 @@
+/var/log/scraper/daemon_log.out {
+    rotate 36500
+    daily
+    dateext
+    notifempty    
+    noolddir
+    sharedscripts
+    postrotate
+    /etc/init.d/scraper restart 
+    endscript
+}
