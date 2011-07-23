@@ -53,7 +53,9 @@ class myGzipFile(gzip.GzipFile):
 
 def dump_index(request):
     '''Shows an index page for the dumps.'''
-    return render_to_response('dumps/dumps.html', RequestContext(request))
+    from alert.alertSystem.models import PACER_CODES
+    return render_to_response('dumps/dumps.html', {'pacer_codes' : PACER_CODES},
+        RequestContext(request))
 
 
 def get_date_range(year, month, day):
@@ -151,7 +153,7 @@ def serve_or_gen_dump(request, court, year, month=None, day=None):
         except OSError:
             # Path exists.
             pass
-        
+
         os.chdir(DUMP_DIR)
         with myGzipFile(os.path.join(filename), mode='wb') as z_file:
             z_file.write('<?xml version="1.0" encoding="utf-8"?>\n<opinions dumpdate="' + str(date.today()) + '">\n')
