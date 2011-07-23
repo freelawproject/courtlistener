@@ -37,6 +37,14 @@
             http://courtlistener.com/dump-api/2009/06/09/<strong>all</strong>.xml.gz</a>
             returns all of the cases from June 9, 2009 (across all courts).</p>
 
+        <p class="bottom">The available court names are:</p>
+        <ul>
+            {% for code in pacer_codes %}
+            <li><strong><a href="/opinions/{{code.0}}/">{{code.0}}</a></strong> - {{code.1}}</li>
+            {% endfor %}
+            <li><strong><a href="/opinions/all/">all</a></strong> - all courts</li>
+        </ul>
+
         <h3>Feedback</h3>
         <p>We welcome feedback and feature requests to this API. Please get in touch in
         <a href="https://groups.google.com/forum/#!forum/courtlistener-discuss">
