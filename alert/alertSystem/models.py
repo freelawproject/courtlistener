@@ -38,7 +38,10 @@ PACER_CODES = (
     ('ca11', 'Court of Appeals for the Eleventh Circuit'),
     ('cadc', 'Court of Appeals for the D.C. Circuit'),
     ('cafc', 'Court of Appeals for the Federal Circuit'),
+    ('ccpa', 'Court of Customs and Patent Appeals'),
+    ('eca',  'Emergency Court of Appeals'),
     ('scotus', 'Supreme Court of the United States'),
+    ('cfc', 'Court of Federal Claims'),
 )
 
 # changes here need to be mirrored in the coverage page view and the exceptions
@@ -189,16 +192,18 @@ class Citation(models.Model):
         db_index=True)
     caseNameFull =  models.TextField("full name of the case, as found on the first page of the PDF",
         blank=True)
-    caseNumber = models.CharField("the case number",
+    docketNumber = models.CharField("the case number",
         blank=True,
+        null=True,
+        max_length=50)
+    westCite = models.CharField("the citation number, as described by WestLaw",
         max_length=50,
-        db_index=True)
-    officialCitationWest = models.CharField("the citation number, as described by WestLaw",
+        blank=True,
+        null=True)
+    lexisCite = models.CharField("the citation number, as described by LexisNexis",
         max_length=50,
-        blank=True)
-    officialCitationLexis = models.CharField("the citation number, as described by LexisNexis",
-        max_length=50,
-        blank=True)
+        blank=True,
+        null=True)
 
     def save(self, *args, **kwargs):
         '''
