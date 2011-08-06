@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% load honeypot %}
+
+{% block title %}CourtListener.com / Contact{% endblock %}
+
+{% block search-form %}{% endblock %}
+
+{% block sidebar %}
+    <div class="span-5 colborder" id="sidebar">
+        <h3 class="bottom">Removal Requests</h3>
+        <p>If you are concerned about your case appearing on this site,
+            please see our <a href="/removal/">removal policy</a>.</p>
+        <br>
+
+        <h3 class="bottom">Updates</h3>
+        <p>For updates, bug fixes, and status messages, follow <a href="https://twitter.com/courtlistener">@courtlistener</a> on Twitter.</p>
+        <br>
+
+        <h3 class="bottom">Blog / Discussion</h3>
+        <p>Visit <a href="https://groups.google.com/group/courtlistener-discuss">our forum</a>
+        to see our latest announcements or if you're interested in discussing the site with others.</p>
+        <br>
+
+        <h3 class="bottom">Mail</h3>
+        <p>School of Information<br>
+        University of California, Berkeley<br>
+        Attn: Brian Carver<br>
+        102 South Hall<br>
+        Berkeley, CA 94720-4600</p>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="span-18 last" id="content">
+        <h2>Contact Us</h2>
+
+        {% if form.errors %}
+            <div class="span-18">
+                <div class="span-10 error">
+                    <p class="bottom">There were errors with your submission.</p>
+                </div>
+                <div class="span-7 last">&nbsp;</div>
+            </div>
+        {% endif %}
+
+        <form action="" method="post">{% csrf_token %}
+            {% render_honeypot_field "skip_me_if_alive" %}
+            <p>
+                <label for="id_name">Name</label>
+                {% if form.name.errors %}
+                    <span class="errortext">
+                        {% for error in form.name.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.name }}
+            </p>
+
+
+            <p>
+                <label for="id_email">Email (optional)</label>
+                {% if form.email.errors %}
+                    <span class="errortext">
+                        {% for error in form.email.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.email }}
+            </p>
+
+
+            <p>
+                <label for="id_subject">Subject</label>
+                {% if form.subject.errors %}
+                    <span class="errortext">
+                        {% for error in form.subject.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.subject }}
+            </p>
+
+
+            <p>
+                <label for="id_message">Message</label>
+                {% if form.message.errors %}
+                    <span class="errortext">
+                        {% for error in form.message.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.message }}
+            </p>
+          <button type="submit" class="button">Send message</button>
+        </form>
+    </div>
+{% endblock %}
