@@ -28,9 +28,6 @@ alert/assets/media/wpd
 alert/assets/media/sitemaps
 alert/assets/media/doc
 
-# the resource.org data
-Resource.org/
-
 # the django-sphinx code
 django-sphinx
 

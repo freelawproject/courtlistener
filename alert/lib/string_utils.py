@@ -27,7 +27,8 @@
 
 
 import re
-from django.utils.encoding import smart_str, smart_unicode
+from django.utils.encoding import smart_str
+from django.utils.encoding import smart_unicode
 
 # For use in titlecase
 BIG = 'CDC|CDT|CNMI|DOJ|DVA|EFF|FCC|FTC|LLC|LLP|MSPB|UPS|RSS|SEC|USA|USC|USPS|WTO.'
@@ -138,9 +139,14 @@ UNITED_STATES = re.compile(r'^(%s)$' % US, re.I)
 ET_AL = re.compile(',?\set\.?\sal\.?', re.IGNORECASE)
 
 def harmonize(text):
-    '''
-    This function fixes case names so they're cleaner. It fixes various
-    ways of writing United States, gets rid of et al, and changes vs. to v.
+    '''Fixes case names so they are cleaner.
+
+    Using a bunch of regex's, this function cleans up common data problems in
+    case names. The following are currently fixed:
+     - various forms of United States --> United States
+     - vs. --> v.
+     - et al --> Removed.
+
     Lots of tests are in tests.py.
     '''
 
@@ -183,7 +189,7 @@ def clean_string(string):
     string = string.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
         .replace('&ldquo;', "\"").replace('&nbsp;', ' ')\
         .replace('&amp;', '&').replace('%20', ' ').replace('&#160;', ' ')\
-        .strip().strip(';').strip(',')
+        .replace('*', '').strip().strip(';').strip(',')
 
     # if not already unicode, make it unicode, dropping invalid characters
     # if not isinstance(string, unicode):
