@@ -459,3 +459,8 @@ fieldset.collapsed {
 	width                : 16px;
 	background-position  : -114px 0px;
 }
+
+/* Highlights images that need height/width*/
+img:not([width]):not([height]) {
+  border: 2px solid red !important;
+}

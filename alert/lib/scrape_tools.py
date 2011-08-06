@@ -26,6 +26,7 @@
 
 import sys
 sys.path.append('/var/www/court-listener/alert')
+sys.path.append('/var/www/court-listener-fix-honeypot/alert')
 sys.path.append('/home/mlissner/FinalProject/alert')
 
 from alert import settings
@@ -181,21 +182,42 @@ def courtChanged(url, contents):
         return True
 
 
-def hasDuplicate(caseNum, caseName):
-    '''
-    Takes a caseName and a caseNum, and checks if the object exists in the
-    DB. If it doesn't, then it puts it in. If it does, it returns it.
+def hasDuplicate(caseName, westCite=None, docketNumber=None):
+    '''Determines if the case name and number are already in the DB.
+
+    Takes either a caseName, a westCite or a docketNumber or both, and checks
+    if the citation already exists in the database. If it exists, the citation
+    is returned. If not, then a citation is created and returned.
+
+    In no case will an existing citation get updated with additional information
+    that it previously lacked. For example, if docketNumber and westCitation
+    are provided, and there is a citation with one but not the other, that
+    citation will not be updated. Instead a new citation will be created, since
+    West citations are not unique, and neither are docket numbers.
     '''
 
     # data cleanup
     caseName = harmonize(clean_string(caseName))
-    caseNum  = clean_string(caseNum)
+    if westCite:
+        westCite = clean_string(westCite)
+    if docketNumber:
+        docketNumber = clean_string(docketNumber)
 
     caseNameShort = trunc(caseName, 100)
 
-    # check for duplicates, make the object in their absence
-    cite, created = Citation.objects.get_or_create(
-        caseNameShort = str(caseNameShort), caseNumber = str(caseNum))
+    if westCite and docketNumber:
+        # We have both the west citation and the docket number
+        cite, created = Citation.objects.get_or_create(
+            caseNameShort = str(caseNameShort), westCite = str(westCite),
+            docketNumber = str(docketNumber))
+    elif westCite and not docketNumber:
+        # Only the west citation was provided.
+        cite, created = Citation.objects.get_or_create(
+            caseNameShort = str(caseNameShort), westCite = str(westCite))
+    elif docketNumber and not westCite:
+        # Only the docketNumber was provided.
+        cite, created = Citation.objects.get_or_create(
+            caseNameShort = str(caseNameShort), docketNumber = str(docketNumber))
 
     cite.caseNameFull = caseName
 
