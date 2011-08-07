@@ -20,8 +20,8 @@ from alert.alertSystem.models import *
 
 class CitationAdmin(admin.ModelAdmin):
     # ordering is brutal on MySQL. Don't put it here. Sorry.
-    list_display = ('caseNumber','caseNameShort')
-    search_fields = ['caseNameShort', 'caseNameFull', 'caseNumber']
+    list_display = ('docketNumber','caseNameShort', 'westCite',)
+    search_fields = ['caseNameShort', 'caseNameFull', 'docketNumber', 'westCite']
 
 class DocumentAdmin(admin.ModelAdmin):
     # ordering is brutal on MySQL. Don't put it here. Sorry.
@@ -31,7 +31,7 @@ class DocumentAdmin(admin.ModelAdmin):
               'excerptSummary', 'download_URL',
               'local_path', 'documentPlainText', 'documentHTML',
               'documentType',)
-    search_fields = ['@documentPlainText']
+    search_fields = ['documentPlainText']
 
 
 admin.site.register(Court)

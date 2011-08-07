@@ -53,25 +53,39 @@
         {% endif %}
 
         <div class="span-10">
-            <h3 class="alt bottom">
-                <a href="{{doc.get_absolute_url}}">
-                    {{ doc.citation.caseNameFull }}, {{doc.citation.caseNumber}} ({{doc.court.courtShortName}})
-                </a>
-            </h3>
-            <p>
-                <strong>Published: </strong>
-                {% if doc.dateFiled %}
-                    {{doc.dateFiled|date:"l, F jS, Y"}}<br>
-                {% else %}
-                    Unknown date<br>
-                {% endif %}
-                <strong>Status: </strong>
-                {% if doc.documentType %}
-                    {{doc.get_documentType_display}}<br>
-                {% else %}
-                    Unknown<br>
-                {% endif %}
-            </p>
+            <h3 class="bottom alt">
+                    <a href="{{doc.get_absolute_url}}">
+                        {{ doc.citation.caseNameFull }},
+                        {% if doc.citation.westCite != '' %}
+                            {{doc.citation.westCite}}
+                        {% else %}
+                            {{doc.citation.docketNumber}}
+                        {% endif %}
+                        ({% if doc.court.shortName != 'SCOTUS' %}{{doc.court.shortName}} {% endif %}{{doc.dateFiled|date:"Y"}})
+                    </a>
+                </h3>
+                <p class="bottom">
+                    <strong>Date Filed:</strong>
+                    {% if doc.dateFiled %}
+                        {{doc.dateFiled|date:"l, F jS, Y"}}
+                    {% else %}
+                        Unknown date
+                    {% endif %}
+                </p>
+                <p class="bottom">
+                    <strong>Status: </strong>
+                    {% if doc.documentType %}
+                        {{doc.get_documentType_display}}
+                    {% else %}
+                        Unknown
+                    {% endif %}
+                </p>
+                <p>
+                    {% if doc.citation.westCite != '' and doc.citation.docketNumber %}
+                        <strong>Docket Number: </strong>
+                        {{ doc.citation.docketNumber }}
+                    {% endif %}
+                </p>
             <form action="" method="POST">{% csrf_token %}
                 {{ favorite_form.doc_id }}
                 <p class="bottom">

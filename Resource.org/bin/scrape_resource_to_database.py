@@ -93,7 +93,7 @@ def scrape_and_parse():
     vol_file = open('vol_file.txt', 'r+')
     case_file = open('case_file.txt', 'r+')
 
-    url = "file:///home/mlissner/Desktop/F2/index.html"
+    url = "file:///var/www/court-listener/Resource.org/F2/index.html"
     openedURL = urllib2.urlopen(url)
     content = openedURL.read()
     openedURL.close()

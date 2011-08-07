@@ -10,7 +10,7 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -53,8 +53,8 @@ class myGzipFile(gzip.GzipFile):
 
 def dump_index(request):
     '''Shows an index page for the dumps.'''
-    from alert.alertSystem.models import PACER_CODES
-    return render_to_response('dumps/dumps.html', {'pacer_codes' : PACER_CODES},
+    courts = Court.objects.all().order_by('startDate')
+    return render_to_response('dumps/dumps.html', {'courts' : courts},
         RequestContext(request))
 
 
@@ -167,7 +167,9 @@ def serve_or_gen_dump(request, court, year, month=None, day=None):
                             local_path          = str(doc.local_path),
                             time_retrieved      = str(doc.time_retrieved),
                             download_URL        = doc.download_URL,
-                            caseNumber          = doc.citation.caseNumber,
+                            docketNumber        = doc.citation.docketNumber,
+                            westCite            = doc.citation.westCite,
+                            lexisCite           = doc.citation.lexisCite,
                             caseNameShort       = doc.citation.caseNameShort,
                             court               = doc.court.get_courtUUID_display(),
                             sha1                = doc.documentSHA1,

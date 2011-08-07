@@ -597,7 +597,7 @@ cat <<'EOF' >> $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf
     sql_query_range     = SELECT min(documentUUID), max(documentUUID) from Document
     sql_range_step      = 5000
     sql_query           = \
-        SELECT Document.documentUUID, Citation.caseNameShort as caseName, Citation.caseNameFull, Citation.caseNumber as caseNumber, Citation.officialCitationWest, Citation.officialCitationLexis, Document.documentSHA1, UNIX_TIMESTAMP(Document.dateFiled) as dateFiled, UNIX_TIMESTAMP(Document.time_retrieved) as time_retrieved, Document.court_id as court, Document.documentPlainText as docText, Document.documentHTML as docHTML, Document.documentType as docStatus\
+        SELECT Document.documentUUID, Citation.caseNameShort as caseName, Citation.caseNameFull, Citation.docketNumber as docketNumber, Citation.westCite, Citation.lexisCite, Document.documentSHA1, UNIX_TIMESTAMP(Document.dateFiled) as dateFiled, UNIX_TIMESTAMP(Document.time_retrieved) as time_retrieved, Document.court_id as court, Document.documentPlainText as docText, Document.documentHTML as docHTML, Document.documentType as docStatus\
         FROM Document, Citation\
         WHERE Document.citation_id = Citation.citationUUID\
 	AND Document.documentUUID >= $start\
@@ -619,7 +619,7 @@ source delta : Document
 {
     sql_query_pre = SET NAMES utf8
     sql_query           = \
-        SELECT Document.documentUUID, Citation.caseNameShort as caseName, Citation.caseNameFull, Citation.caseNumber as caseNumber, Citation.officialCitationWest, Citation.officialCitationLexis, Document.documentSHA1, UNIX_TIMESTAMP(Document.dateFiled) as dateFiled, UNIX_TIMESTAMP(Document.time_retrieved) as time_retrieved, Document.court_id as court, Document.documentPlainText as docText, Document.documentHTML as docHTML, Document.documentType as docStatus\
+        SELECT Document.documentUUID, Citation.caseNameShort as caseName, Citation.caseNameFull, Citation.docketNumber as docketNumber, Citation.westCite, Citation.lexisCite, Document.documentSHA1, UNIX_TIMESTAMP(Document.dateFiled) as dateFiled, UNIX_TIMESTAMP(Document.time_retrieved) as time_retrieved, Document.court_id as court, Document.documentPlainText as docText, Document.documentHTML as docHTML, Document.documentType as docStatus\
         FROM Document, Citation\
         WHERE Document.citation_id = Citation.citationUUID\
 	AND Document.documentUUID >= $start\
@@ -646,9 +646,9 @@ index Document
     # DISABLED DUE TO LACK OF HD SPACE
     # these set up star searching (at a performance hit), but *test, *test* and test* all will work.
     # min_infix_len= 3
-    # infix_fields = caseName, docText, docHTML, Citation.caseNameFull, caseNumber
+    # infix_fields = caseName, docText, docHTML, Citation.caseNameFull, docketNumber, westCite, lexisCite
     min_prefix_len = 3
-    prefix_fields = caseName, docText, docHTML, Citation.caseNameFull, caseNumber
+    prefix_fields = caseName, docText, docHTML, Citation.caseNameFull, docketNumber, westCite, lexisCite
     enable_star = 1
 
     # enables exact word form searching (=cat)
@@ -887,10 +887,32 @@ function importData {
         return 0
     fi
 
-    # import data using the manage.py function.
+    # import data using the manage.py function. Data can be regenerated with:
+    # python manage.py dumpdata alertSystem.Court
     cd $CL_INSTALL_DIR/court-listener/alert
     cat <<EOF > /tmp/courts.json
-[{"pk": "ca1", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca1.uscourts.gov", "courtShortName": "1st Cir."}}, {"pk": "ca10", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca10.uscourts.gov", "courtShortName": "10th Cir."}}, {"pk": "ca11", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca11.uscourts.gov", "courtShortName": "11th Cir."}}, {"pk": "ca2", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca2.uscourts.gov", "courtShortName": "2d Cir."}}, {"pk": "ca3", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca3.uscourts.gov", "courtShortName": "3rd Cir."}}, {"pk": "ca4", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca4.uscourts.gov", "courtShortName": "4th Cir."}}, {"pk": "ca5", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca5.uscourts.gov", "courtShortName": "5th Cir."}}, {"pk": "ca6", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca6.uscourts.gov", "courtShortName": "6th Cir."}}, {"pk": "ca7", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca7.uscourts.gov", "courtShortName": "7th Cir."}}, {"pk": "ca8", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca8.uscourts.gov", "courtShortName": "8th Cir."}}, {"pk": "ca9", "model": "alertSystem.court", "fields": {"courtURL": "http://www.ca9.uscourts.gov", "courtShortName": "9th Cir."}}, {"pk": "cadc", "model": "alertSystem.court", "fields": {"courtURL": "http://www.cadc.uscourts.gov", "courtShortName": "D.C. Cir."}}, {"pk": "cafc", "model": "alertSystem.court", "fields": {"courtURL": "http://www.cafc.uscourts.gov", "courtShortName": "Fed. Cir."}}, {"pk": "scotus", "model": "alertSystem.court", "fields": {"courtURL": "http://supremecourt.gov", "courtShortName": "SCOTUS"}}]
+[{"pk": "ca1", "model": "alertSystem.court", "fields": {"URL": "http://www.ca1.uscourts.gov", "startDate": "1891-03-03", "shortName": "1st Cir.", "endDate": null}},
+{"pk": "ca10", "model": "alertSystem.court", "fields": {"URL": "http://www.ca10.uscourts.gov", "startDate": "1929-02-28", "shortName": "10th Cir.", "endDate": null}},
+{"pk": "ca11", "model": "alertSystem.court", "fields": {"URL": "http://www.ca11.uscourts.gov", "startDate": "1980-10-14", "shortName": "11th Cir.", "endDate": null}},
+{"pk": "ca2", "model": "alertSystem.court", "fields": {"URL": "http://www.ca2.uscourts.gov", "startDate": "1891-03-03", "shortName": "2d Cir.", "endDate": null}},
+{"pk": "ca3", "model": "alertSystem.court", "fields": {"URL": "http://www.ca3.uscourts.gov", "startDate": "1891-03-03", "shortName": "3rd Cir.", "endDate": null}},
+{"pk": "ca4", "model": "alertSystem.court", "fields": {"URL": "http://www.ca4.uscourts.gov", "startDate": "1891-03-03", "shortName": "4th Cir.", "endDate": null}},
+{"pk": "ca5", "model": "alertSystem.court", "fields": {"URL": "http://www.ca5.uscourts.gov", "startDate": "1891-03-03", "shortName": "5th Cir.", "endDate": null}},
+{"pk": "ca6", "model": "alertSystem.court", "fields": {"URL": "http://www.ca6.uscourts.gov", "startDate": "1891-03-03", "shortName": "6th Cir.", "endDate": null}},
+{"pk": "ca7", "model": "alertSystem.court", "fields": {"URL": "http://www.ca7.uscourts.gov", "startDate": "1891-03-03", "shortName": "7th Cir.", "endDate": null}},
+{"pk": "ca8", "model": "alertSystem.court", "fields": {"URL": "http://www.ca8.uscourts.gov", "startDate": "1891-03-03", "shortName": "8th Cir.", "endDate": null}},
+{"pk": "ca9", "model": "alertSystem.court", "fields": {"URL": "http://www.ca9.uscourts.gov", "startDate": "1891-03-03", "shortName": "9th Cir.", "endDate": null}},
+{"pk": "cadc", "model": "alertSystem.court", "fields": {"URL": "http://www.cadc.uscourts.gov", "startDate": "1893-02-09", "shortName": "D.C. Cir.", "endDate": null}},
+{"pk": "cafc", "model": "alertSystem.court", "fields": {"URL": "http://www.cafc.uscourts.gov", "startDate": "1982-04-02", "shortName": "Fed. Cir.", "endDate": null}},
+{"pk": "cc", "model": "alertSystem.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_coc.html", "startDate": "1855-02-24", "shortName": "Ct. Cl.", "endDate": "1982-04-02"}},
+{"pk": "ccpa", "model": "alertSystem.court", "fields": {"URL": "http://www.cafc.uscourts.gov/", "startDate": "1909-08-05", "shortName": "C.C.P.A.", "endDate": "1982-04-02"}},
+{"pk": "cfc", "model": "alertSystem.court", "fields": {"URL": "http://www.uscfc.uscourts.gov/", "startDate": "1982-04-02", "shortName": "Fed. Cl.", "endDate": null}},
+{"pk": "cit", "model": "alertSystem.court", "fields": {"URL": "http://www.cit.uscourts.gov", "startDate": "1980-10-10", "shortName": "Ct. Int'l Trade", "endDate": null}},
+{"pk": "com", "model": "alertSystem.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_com.html", "startDate": "1910-06-18", "shortName": "Comm. Ct.", "endDate": "1913-12-31"}},
+{"pk": "cusc", "model": "alertSystem.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_cc.html", "startDate": "1890-06-10", "shortName": "Cust. Ct.", "endDate": "1980-10-10"}},
+{"pk": "eca", "model": "alertSystem.court", "fields": {"URL": "https://secure.wikimedia.org/wikipedia/en/wiki/Emergency_Court_of_Appeals", "startDate": "1942-01-30", "shortName": "Emer. Ct. App.", "endDate": null}},
+{"pk": "scotus", "model": "alertSystem.court", "fields": {"URL": "http://supremecourt.gov", "startDate": "1789-09-24", "shortName": "SCOTUS", "endDate": null}},
+{"pk": "tecoa", "model": "alertSystem.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_tecoa.html", "startDate": "1971-12-22", "shortName": "Temp. Emer. Ct. App.", "endDate": "1993-03-29"}}]
 EOF
     python manage.py syncdb
     python manage.py migrate

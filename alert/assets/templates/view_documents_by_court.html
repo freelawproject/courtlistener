@@ -54,22 +54,20 @@
             <h2>{{ title }}</h2>
             <h3>Recent documents, page {{ documents.number|intcomma }}</h3>
             {% for doc in documents.object_list %}
-                <h3 class="alt bottom"><a href="{{doc.get_absolute_url}}">{{ doc.citation.caseNameFull }}, {{doc.citation.caseNumber}} ({{doc.court.courtShortName}})</a></h3>
-                <p>
-                    {% if doc.dateFiled %}
-                        {{doc.dateFiled|date:"l, F jS, Y"}}<br>
-                    {% else %}
-                        Unknown date<br>
-                    {% endif %}
-                    <strong>Status: </strong>
-                        {% if doc.documentType %}
-                            {{doc.get_documentType_display}}<br>
+                <h3 class="bottom alt">
+                    <a href="{{doc.get_absolute_url}}">
+                        {{ doc.citation.caseNameFull }},
+                        {% if doc.citation.westCite != '' %}
+                            {{doc.citation.westCite}}
                         {% else %}
-                            Unknown<br>
+                            {{doc.citation.docketNumber}}
                         {% endif %}
-
+                        ({% if doc.court.shortName != 'SCOTUS' %}{{doc.court.shortName}} {% endif %}{{doc.dateFiled|date:"Y"}})
+                    </a>
+                </h3>
+                <p class="bottom">
                     {% if doc.downloadURL or doc.local_path %}
-                        <strong>Download original: </strong>
+                        <strong>Download Original: </strong>
                         {% if doc.download_URL %}
                             <a href="{{doc.download_URL}}">From the court</a>
                         {% endif %}
@@ -78,11 +76,34 @@
                         {% endif %}
                         {% if doc.local_path %}
                             <a href="/{{doc.local_path}}">Our backup</a>
-                        {% endif %}<br>
+                        {% endif %}
                     {% else %}
-                        No downloadable versions.<br>
+                        No downloadable versions.
                     {% endif %}
-            {% endfor %}</p>
+                </p>
+                <p class="bottom">
+                    <strong>Date Filed:</strong>
+                    {% if doc.dateFiled %}
+                        {{doc.dateFiled|date:"l, F jS, Y"}}
+                    {% else %}
+                        Unknown date
+                    {% endif %}
+                </p>
+                <p class="bottom">
+                    <strong>Status: </strong>
+                    {% if doc.documentType %}
+                        {{doc.get_documentType_display}}
+                    {% else %}
+                        Unknown
+                    {% endif %}
+                </p>
+                <p>
+                    {% if doc.citation.westCite != '' and doc.citation.docketNumber %}
+                        <strong>Docket Number: </strong>
+                        {{ doc.citation.docketNumber }}
+                    {% endif %}
+                </p>
+            {% endfor %}
 
             <h3>
                 {% if documents.has_previous %}

@@ -27,7 +27,7 @@
 Process is as follows:
     For each row in the CSV:
         extract the case number from the row (caseNum = line.split("|")[0]
-        Search for the case number using a query such as @casenumber 107 676 @court scotus
+        Search for the case number using a query such as @westCite 107 676 @court scotus
         for each hit from this search:
             compute the difference ratio between the case name in the DB and that in the CSV
             if the max(difference_ratio) > THRESHOLD:
@@ -114,7 +114,7 @@ def cleaner(simulate=False, verbose=False):
         csv_page_num       = line.split("|")[3]
         csv_date_published = line.split("|")[4]
 
-        query = "@casenumber (" + csv_volume_num + " << " + csv_page_num + ") @court scotus"
+        query = "@westCite (" + csv_volume_num + " << " + csv_page_num + ") @court scotus"
 
         # search for the case number using Sphinx
         queryset = Document.search.query(query)

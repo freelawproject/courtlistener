@@ -67,7 +67,7 @@ class searchFeed(Feed):
         return item.court
 
     def item_author_link(self, item):
-        return item.court.courtURL
+        return item.court.URL
 
     def item_pubdate(self, item):
         import datetime
@@ -104,7 +104,7 @@ class courtFeed(Feed):
     item_author_name = "CourtListener.com"
 
     def item_author_link(self, item):
-        return item.court.courtURL
+        return item.court.URL
 
     def item_pubdate(self, item):
         import datetime
@@ -137,7 +137,7 @@ class allCourtsFeed(Feed):
     item_author_name = "CourtListener.com"
 
     def item_author_link(self, item):
-        return item.court.courtURL
+        return item.court.URL
 
     def item_pubdate(self, item):
         import datetime

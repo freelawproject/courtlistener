@@ -86,7 +86,7 @@ def messageUser(query, request):
         attributes.extend(item.strip("(").strip(")").strip().split(","))
 
     # check if the values are valid.
-    validRegex = re.compile(r'^\W?court\W?$|^\W?casename\W?$|^\W?docstatus\W?$|^\W?doctext\W?$|^\W?casenumber\W?$')
+    validRegex = re.compile(r'^\W?court\W?$|^\W?casename\W?$|^\W?docstatus\W?$|^\W?doctext\W?$|^\W?docketnumber\W?$')
 
     # if they aren't add them to a new list.
     badAttrs = []
@@ -109,11 +109,11 @@ def messageUser(query, request):
     # pluralization is a pain, but we must do it...
     if len(badAttrs) == 1:
         messageText += '<strong>' + get_text_list(badAttrs, "and") + '</strong> is not a \
-        valid field. Valid fields are @court, @caseName, @caseNumber,\
+        valid field. Valid fields are @court, @caseName, @docketNumber,\
         @docStatus and @docText.'
     elif len(badAttrs) > 1:
         messageText += '<strong>' + get_text_list(badAttrs, "and") + '</strong> are not \
-        valid fields. Valid fields are @court, @caseName, @caseNumber,\
+        valid fields. Valid fields are @court, @caseName, @docketNumber,\
         @docStatus and @docText.'
 
     if len(messageText) > 0:
