@@ -25,23 +25,28 @@ import alert
 
 # a tuple, which we'll pass to the choices argument in various places
 PACER_CODES = (
-    ('ca1',  'Court of Appeals for the First Circuit'),
-    ('ca2',  'Court of Appeals for the Second Circuit'),
-    ('ca3',  'Court of Appeals for the Third Circuit'),
-    ('ca4',  'Court of Appeals for the Fourth Circuit'),
-    ('ca5',  'Court of Appeals for the Fifth Circuit'),
-    ('ca6',  'Court of Appeals for the Sixth Circuit'),
-    ('ca7',  'Court of Appeals for the Seventh Circuit'),
-    ('ca8',  'Court of Appeals for the Eighth Circuit'),
-    ('ca9',  'Court of Appeals for the Ninth Circuit'),
-    ('ca10', 'Court of Appeals for the Tenth Circuit'),
-    ('ca11', 'Court of Appeals for the Eleventh Circuit'),
-    ('cadc', 'Court of Appeals for the D.C. Circuit'),
-    ('cafc', 'Court of Appeals for the Federal Circuit'),
-    ('ccpa', 'Court of Customs and Patent Appeals'),
-    ('eca',  'Emergency Court of Appeals'),
     ('scotus', 'Supreme Court of the United States'),
-    ('cfc', 'Court of Federal Claims'),
+    ('ca1',    'Court of Appeals for the First Circuit'),
+    ('ca2',    'Court of Appeals for the Second Circuit'),
+    ('ca3',    'Court of Appeals for the Third Circuit'),
+    ('ca4',    'Court of Appeals for the Fourth Circuit'),
+    ('ca5',    'Court of Appeals for the Fifth Circuit'),
+    ('ca6',    'Court of Appeals for the Sixth Circuit'),
+    ('ca7',    'Court of Appeals for the Seventh Circuit'),
+    ('ca8',    'Court of Appeals for the Eighth Circuit'),
+    ('ca9',    'Court of Appeals for the Ninth Circuit'),
+    ('ca10',   'Court of Appeals for the Tenth Circuit'),
+    ('ca11',   'Court of Appeals for the Eleventh Circuit'),
+    ('cadc',   'Court of Appeals for the D.C. Circuit'),
+    ('cafc',   'Court of Appeals for the Federal Circuit'),
+    ('ccpa',   'Court of Customs and Patent Appeals'),
+    ('eca',    'The Emergency Court of Appeals'),
+    ('tecoa',  'The Temporary Emergency Court of Appeals'),
+    ('cc',     'The Court of Claims'),
+    ('cfc',    'The United States Court of Federal Claims'),
+    ('cusc',   'The United States Customs Court'),
+    ('cit',    'The United States Court of International Trade'),
+    ('com',    'The Commerce Court'),
 )
 
 # changes here need to be mirrored in the coverage page view and the exceptions
@@ -103,10 +108,16 @@ class Court(models.Model):
         max_length=100,
         primary_key=True,
         choices=PACER_CODES)
-    courtURL = models.URLField("the homepage for each court")
-    courtShortName = models.CharField("the shortname for the court",
+    URL = models.URLField("the homepage for each court")
+    shortName = models.CharField("the citation abbreviation for the court",
         max_length=100,
         blank=True)
+    startDate = models.DateField("the date the court was established",
+        blank=True,
+        null=True)
+    endDate = models.DateField("the date the court was abolished",
+        blank=True,
+        null=True)
 
     # uses the choices argument in courtUUID to create a good display of the object.
     def __unicode__(self):
@@ -192,7 +203,7 @@ class Citation(models.Model):
         db_index=True)
     caseNameFull =  models.TextField("full name of the case, as found on the first page of the PDF",
         blank=True)
-    docketNumber = models.CharField("the case number",
+    docketNumber = models.CharField("the docket number",
         blank=True,
         null=True,
         max_length=50)

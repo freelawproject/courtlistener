@@ -94,14 +94,20 @@ def printAndLogNewDoc(VERBOSITY, ct, cite):
     Simply prints the log message and then logs it.
     '''
     caseName =  smart_unicode(str(cite), errors='ignore')
-    caseNumber = str(cite.caseNumber)
+    if cite.westCite != '':
+        caseNum = cite.westCite
+    elif cite.lexisCite != '':
+        caseNum = cite.lexisCite
+    elif cite.docketNumber != '':
+        caseNum = cite.docketNumber
+
     if VERBOSITY >= 1:
         print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-            ": Added " + ct.courtShortName + ": " + caseName + \
-            ", " + caseNumber
+            ": Added " + ct.shortName + ": " + caseName + \
+            ", " + caseNum
     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-        ": Added " + ct.courtShortName + ": " + caseName + \
-        ", " + caseNumber)
+        ": Added " + ct.shortName + ": " + caseName + \
+        ", " + caseNum)
 
 
 def makeDocFromURL(LinkToDoc, ct):

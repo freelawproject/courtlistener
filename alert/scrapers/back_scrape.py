@@ -243,18 +243,18 @@ def back_scrape_court(courtID, VERBOSITY):
 
                 # Start with the case number
                 rowCells = row.findall('.//td')
-                caseNumber = rowCells[1].find('./a').text
+                docketNumber = rowCells[1].find('./a').text
 
                 # Special cases
-                if caseNumber.strip() == '92-2198.01A':
+                if docketNumber.strip() == '92-2198.01A':
                     continue
-                elif caseNumber.strip() == '94-2264.01A':
+                elif docketNumber.strip() == '94-2264.01A':
                     continue
-                elif caseNumber.strip() == '97-1397.01A':
+                elif docketNumber.strip() == '97-1397.01A':
                     continue
 
                 # Case link, if there is a PDF
-                caseLink = 'http://www.ca1.uscourts.gov/pdf.opinions/' + caseNumber.replace('.', '-') + '.pdf'
+                caseLink = 'http://www.ca1.uscourts.gov/pdf.opinions/' + docketNumber.replace('.', '-') + '.pdf'
                 #print caseLink
 
                 try:
@@ -264,7 +264,7 @@ def back_scrape_court(courtID, VERBOSITY):
                 except makeDocError as e:
                     if 'DownloadingError' in e.value:
                         # The PDF didn't exist; try the WPD
-                        caseLink = 'http://www.ca1.uscourts.gov/wp.opinions/' + caseNumber
+                        caseLink = 'http://www.ca1.uscourts.gov/wp.opinions/' + docketNumber
                         mimetype = '.wpd'
                         try:
                             myFile, doc, created = makeDocFromURL(caseLink, ct)
@@ -328,7 +328,7 @@ def back_scrape_court(courtID, VERBOSITY):
                     continue
 
                 # The real case number (the one above is't quite right)
-                caseNumber = rowCells[2].find('./a').text
+                docketNumber = rowCells[2].find('./a').text
 
                 # Next: Case name.
                 caseNameShort = clean_string(rowCells[3].text)
@@ -345,11 +345,11 @@ def back_scrape_court(courtID, VERBOSITY):
                         pass
 
                 # documentPlainText doesn't exist.
-                if 'u' in caseNumber.lower():
+                if 'u' in docketNumber.lower():
                     doc.documentType = "Unpublished"
-                elif 'e' in caseNumber.lower():
+                elif 'e' in docketNumber.lower():
                     doc.documentType = "Errata"
-                elif 'p' in caseNumber.lower():
+                elif 'p' in docketNumber.lower():
                     doc.documentType = "Published"
 
                 # Next: caseDate
@@ -363,14 +363,14 @@ def back_scrape_court(courtID, VERBOSITY):
                     caseDate = None
                 except ValueError:
                     # Special case...May has 31 days, not 32.
-                    if caseNumber.strip() == '95-2252':
+                    if docketNumber.strip() == '95-2252':
                         caseDate = datetime.date(1996, 05, 30)
                     else:
                         raise ValueError
                 doc.dateFiled = caseDate
 
-                # now that we have the caseNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                # now that we have the docketNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                 # last, save evrything (file, citation and document)
                 doc.citation = cite
@@ -445,10 +445,10 @@ def back_scrape_court(courtID, VERBOSITY):
                     else:
                         dupCount = 0
 
-                    # next: caseNumber
-                    caseNumber = caseNumRegex.search(caseLink).group(1)
+                    # next: docketNumber
+                    docketNumber = caseNumRegex.search(caseLink).group(1)
                     if VERBOSITY >= 2:
-                        print "CaseNum: %s" % caseNumber
+                        print "CaseNum: %s" % docketNumber
 
                     # next: dateFiled
                     dateFiled = cells[2].text
@@ -470,8 +470,8 @@ def back_scrape_court(courtID, VERBOSITY):
                     if VERBOSITY >= 2:
                         print "Doc Type: " + doc.documentType
 
-                    # now that we have the caseNumber and caseNameShort, we can dup check
-                    cite, created = hasDuplicate(caseNumber, caseNameShort)
+                    # now that we have the docketNumber and caseNameShort, we can dup check
+                    cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                     # Set the mimetype
                     mimetype = "." + caseLink.split('.')[-1]
@@ -683,8 +683,8 @@ def back_scrape_court(courtID, VERBOSITY):
                 else:
                     dupCount = 0
 
-                # using caseLink, we can get the caseNumber and documentType
-                caseNumber = aTags[i].contents[0]
+                # using caseLink, we can get the docketNumber and documentType
+                docketNumber = aTags[i].contents[0]
 
                 # next, we do the caseDate
                 caseDate = aTags[i].next.next.contents[0].contents[0]
@@ -699,8 +699,8 @@ def back_scrape_court(courtID, VERBOSITY):
                 caseNameShort = aTags[i].next.next.next.next.next.contents[0]\
                     .contents[0]
 
-                # now that we have the caseNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                # now that we have the docketNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
@@ -773,17 +773,17 @@ def back_scrape_court(courtID, VERBOSITY):
                 dupCount = 0
 
             # split the URL on /, and get the file name, then split on ., and
-            # get the caseNumber
-            caseNumber = caseLink.split('/')[5]
-            caseNumber = caseNumber.split('.')[0]
-            if verbosity >= 2: print "caseNumber: " + caseNumber
+            # get the docketNumber
+            docketNumber = caseLink.split('/')[5]
+            docketNumber = docketNumber.split('.')[0]
+            if verbosity >= 2: print "docketNumber: " + docketNumber
 
             # caseNameShort is up next
             caseNameShort = tostring(caseLinkElements[0]).split('&#160;')[3]
             if verbosity >= 2: print "caseNameShort: " + caseNameShort
 
-            # now that we have the caseNumber and caseNameShort, we can dup check
-            cite, created = hasDuplicate(caseNumber, caseNameShort)
+            # now that we have the docketNumber and caseNameShort, we can dup check
+            cite, created = hasDuplicate(docketNumber, caseNameShort)
 
             # the first element with the class headline is the caseDate
             caseDate = tree.find_class('headline')[0].text
@@ -898,12 +898,12 @@ def back_scrape_court(courtID, VERBOSITY):
                 tree = fromstring(html)
 
                 if 'unpub' in url:
-                    caseNumbers = tree.xpath('//table[3]//table//table/tr[1]/td[2]')
+                    docketNumbers = tree.xpath('//table[3]//table//table/tr[1]/td[2]')
                     caseLinks   = tree.xpath('//table[3]//table//table/tr[3]/td[2]/a')
                     caseDates   = tree.xpath('//table[3]//table//table/tr[4]/td[2]')
                     caseNames   = tree.xpath('//table[3]//table//table/tr[6]/td[2]')
                 elif 'opinion' in url:
-                    caseNumbers = tree.xpath('//table[3]//td[3]//table/tr[1]/td[2]')
+                    docketNumbers = tree.xpath('//table[3]//td[3]//table/tr[1]/td[2]')
                     caseLinks   = tree.xpath('//table[3]//td[3]//table/tr[3]/td[2]/a')
                     caseDates   = tree.xpath('//table[3]//td[3]//table/tr[4]/td[2]')
                     caseNames   = tree.xpath('//table[3]//td[3]//table/tr[6]/td[2]')
@@ -918,7 +918,7 @@ def back_scrape_court(courtID, VERBOSITY):
 
                 i = 0
                 dupCount = 0
-                while i < len(caseNumbers):
+                while i < len(docketNumbers):
                     caseLink = caseLinks[i].get('href')
                     caseLink = urljoin(url, caseLink)
 
@@ -955,12 +955,12 @@ def back_scrape_court(courtID, VERBOSITY):
                     if verbosity >= 2: print "dateFiled: " + str(doc.dateFiled)
 
                     caseNameShort = caseNames[i].text
-                    caseNumber = caseNumbers[i].text
+                    docketNumber = docketNumbers[i].text
 
-                    cite, created = hasDuplicate(caseNumber, caseNameShort)
+                    cite, created = hasDuplicate(docketNumber, caseNameShort)
                     if verbosity >= 2:
                         print "caseNameShort: " + cite.caseNameShort
-                        print "caseNumber: " + cite.caseNumber + "\n"
+                        print "docketNumber: " + cite.docketNumber + "\n"
 
                     doc.citation = cite
                     doc.local_path.save(trunc(caseNameShort, 80) + ".pdf", myFile)
@@ -1013,8 +1013,8 @@ def back_scrape_court(courtID, VERBOSITY):
                         caseLink = urljoin(url, caseLink)
                         #print "Link: " + caseLink
 
-                        caseNumber = caseLinkAnchor.text
-                        #print "Case number: " + caseNumber
+                        docketNumber = caseLinkAnchor.text
+                        #print "Case number: " + docketNumber
 
                         caseNameShort = caseNameDiv.text
                         #print "CaseName: " + caseNameShort
@@ -1047,8 +1047,8 @@ def back_scrape_court(courtID, VERBOSITY):
                             int(splitDate[1]))
                         doc.dateFiled = caseDate
 
-                        # now that we have the caseNumber and caseNameShort, we can dup check
-                        cite, created = hasDuplicate(caseNumber, caseNameShort)
+                        # now that we have the docketNumber and caseNameShort, we can dup check
+                        cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                         # last, save evrything (pdf, citation and document)
                         doc.citation = cite
@@ -1122,8 +1122,8 @@ def back_scrape_court(courtID, VERBOSITY):
                 else:
                     dupCount = 0
 
-                # next: caseNumber
-                caseNumber = trTags[i].td.nextSibling.nextSibling.contents[0]
+                # next: docketNumber
+                docketNumber = trTags[i].td.nextSibling.nextSibling.contents[0]
 
                 # next: dateFiled
                 dateFiled = trTags[i].td.contents[0].strip()
@@ -1151,8 +1151,8 @@ def back_scrape_court(courtID, VERBOSITY):
                     documentType = "Published"
                 doc.documentType = documentType
 
-                # now that we have the caseNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                # now that we have the docketNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                 # Set the mimetype
                 mimetype = "." + caseLink.split('.')[-1]
@@ -1198,15 +1198,15 @@ def back_scrape_court(courtID, VERBOSITY):
 
             if 'slipopinion' in url:
                 caseLinks = tree.xpath('//table/tr/td[4]/a')
-                caseNumbers = tree.xpath('//table/tr/td[3]')
+                docketNumbers = tree.xpath('//table/tr/td[3]')
                 caseDates = tree.xpath('//table/tr/td[2]')
             elif 'in-chambers' in url:
                 caseLinks = tree.xpath('//table/tr/td[3]/a')
-                caseNumbers = tree.xpath('//table/tr/td[2]')
+                docketNumbers = tree.xpath('//table/tr/td[2]')
                 caseDates = tree.xpath('//table/tr/td[1]')
             elif 'relatingtoorders' in url:
                 caseLinks = tree.xpath('//table/tr/td[3]/a')
-                caseNumbers = tree.xpath('//table/tr/td[2]')
+                docketNumbers = tree.xpath('//table/tr/td[2]')
                 caseDates = tree.xpath('//table/tr/td[1]')
 
             i = 0
@@ -1239,7 +1239,7 @@ def back_scrape_court(courtID, VERBOSITY):
                 else:
                     dupCount = 0
 
-                caseNumber = caseNumbers[i].text
+                docketNumber = docketNumbers[i].text
                 caseNameShort = caseLinks[i].text
 
                 if 'slipopinion' in url:
@@ -1258,14 +1258,14 @@ def back_scrape_court(courtID, VERBOSITY):
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
 
-                # now that we have the caseNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                # now that we have the docketNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                 if verbosity >= 2:
                     print "Link: " + caseLink
                     print "Doc Status: " + doc.documentType
                     print "Case Name: " + caseNameShort
-                    print "Case number: " + caseNumber
+                    print "Case number: " + docketNumber
                     print "Date filed: " + str(caseDate)
                     print " "
 
@@ -1299,18 +1299,18 @@ def back_scrape_court(courtID, VERBOSITY):
 
             # xpath goodness
             caseLinks   = tree.xpath('/html//table[2]//tr/td[4]/a')
-            caseNumbers = tree.xpath('/html//table[2]//tr/td[3]')
+            docketNumbers = tree.xpath('/html//table[2]//tr/td[3]')
             caseDates   = tree.xpath('/html//table[2]//tr/td[2]')
 
 
             # for debugging
             """print "length: " + str(len(caseLinks))
             print str(caseLinks)
-            print str(caseNumbers)
+            print str(docketNumbers)
             print str(caseDates)
             i = 2
             while i <= (28):
-                print str(caseDates[i].text) + "  |  " + str(caseNumbers[i].text)   + "  |  " + str(urljoin(url, caseLinks[i].get('href'))) + "  |  " + str(caseLinks[i].text)
+                print str(caseDates[i].text) + "  |  " + str(docketNumbers[i].text)   + "  |  " + str(urljoin(url, caseLinks[i].get('href'))) + "  |  " + str(caseLinks[i].text)
                 i = i + 1
                 #print str(foo.text)
                 #print foo.get('href')
@@ -1325,7 +1325,7 @@ def back_scrape_court(courtID, VERBOSITY):
                 caseLink = urljoin(url, caseLink)
 
                 # set some easy ones
-                caseNumber = caseNumbers[i].text
+                docketNumber = docketNumbers[i].text
                 caseNameShort = caseLinks[i].text
 
                 # get the PDF
@@ -1380,8 +1380,8 @@ def back_scrape_court(courtID, VERBOSITY):
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
 
-                # now that we have the caseNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                # now that we have the docketNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite

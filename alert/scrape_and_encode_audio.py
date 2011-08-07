@@ -1,16 +1,16 @@
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
@@ -299,7 +299,7 @@ def hasDuplicate(caseNum, caseName):
 
     # check for duplicates, make the object in their absence
     cite, created = Citation.objects.get_or_create(
-        caseNameShort = str(caseNameShort), caseNumber = str(caseNum))
+        caseNameShort = str(caseNameShort), docketNumber = str(caseNum))
 
     if caseNameShort == caseName:
         # no truncation.
@@ -386,7 +386,7 @@ def scrapeCourt(courtID):
 
         caseDateRegex = re.compile("(\d{2}/\d{2}/\d{4})",
             re.VERBOSE | re.DOTALL)
-        caseNumberRegex = re.compile("(\d{2}-.*?\W)(.*)$")
+        docketNumberRegex = re.compile("(\d{2}-.*?\W)(.*)$")
 
         # incredibly, this RSS feed is in cron order, so new stuff is at the
         # end. Mind blowing.
@@ -429,23 +429,23 @@ def scrapeCourt(courtID):
                 int(splitDate[1]))
             doc.dateFiled = caseDate
 
-            # next: caseNumber
-            caseNumber = caseNumberRegex.search(caseNamesAndNumbers[i].text)\
+            # next: docketNumber
+            docketNumber = docketNumberRegex.search(caseNamesAndNumbers[i].text)\
                 .group(1)
 
             # next: caseNameShort
-            caseNameShort = caseNumberRegex.search(caseNamesAndNumbers[i].text)\
+            caseNameShort = docketNumberRegex.search(caseNamesAndNumbers[i].text)\
                 .group(2)
 
             # check for dups, make the object if necessary, otherwise, get it
-            cite, created = hasDuplicate(caseNumber, caseNameShort)
+            cite, created = hasDuplicate(docketNumber, caseNameShort)
 
             # last, save evrything (pdf, citation and document)
             doc.citation = cite
             doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
             try:
                 logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                    ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                    ": Added " + ct.shortName + ": " + cite.caseNameShort)
             except UnicodeDecodeError:
                 pass
             doc.save()
@@ -486,10 +486,10 @@ def scrapeCourt(courtID):
                     caseLink = i.get('href')
                     caseLink = aTagsRegex.search(caseLink).group(1)
                     try:
-                        caseNumbers = caseNumRegex.search(caseLink).group(1)
+                        docketNumbers = caseNumRegex.search(caseLink).group(1)
                     except:
-                        caseNumbers = ""
-                    aTagsEncoded.append(caseNumbers)
+                        docketNumbers = ""
+                    aTagsEncoded.append(docketNumbers)
 
                 # if it's DAEMONMODE, see if the court has changed
                 changed = courtChanged(url, str(aTagsEncoded))
@@ -526,7 +526,7 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # using caseLink, we can get the caseNumber and documentType
+                # using caseLink, we can get the docketNumber and documentType
                 caseNum = caseNumRegex.search(caseLink).group(1)
                 if VERBOSITY >= 2:
                     print "caseNum: " + str(caseNum)
@@ -562,7 +562,7 @@ def scrapeCourt(courtID):
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -636,12 +636,12 @@ def scrapeCourt(courtID):
 
                 caseNameShort = aTags[i].contents[0]
 
-                # caseDate and caseNumber
+                # caseDate and docketNumber
                 junk = aTags[i].previous.previous.previous
                 try:
                     # this error seems to happen upon dups...not sure why yet
                     caseDate = regexII.search(junk).group(0)
-                    caseNumber = regexIII.search(junk).group(0)
+                    docketNumber = regexIII.search(junk).group(0)
                 except:
                     i += 1
                     continue
@@ -658,14 +658,14 @@ def scrapeCourt(courtID):
                 elif "recnon2day.htm" in str(url):
                     doc.documentType = "Unpublished"
 
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -734,11 +734,11 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # using caselink, we can get the caseNumber and documentType
+                # using caselink, we can get the docketNumber and documentType
                 fileName = caseLink.split('/')[-1]
-                caseNumber, documentType = fileName.split('.')[0:2]
-                # the caseNumber needs a hyphen inserted after the second digit
-                caseNumber = caseNumber[0:2] + "-" + caseNumber[2:]
+                docketNumber, documentType = fileName.split('.')[0:2]
+                # the docketNumber needs a hyphen inserted after the second digit
+                docketNumber = docketNumber[0:2] + "-" + docketNumber[2:]
 
                 if documentType == 'U':
                     doc.documentType = 'Unpublished'
@@ -765,14 +765,14 @@ def scrapeCourt(courtID):
                 doc.dateFiled = caseDate
 
                 # let's check for duplicates before we proceed
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -885,8 +885,8 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # using caseLink, we can get the caseNumber and documentType
-                caseNumber = aTags[i].contents[0]
+                # using caseLink, we can get the docketNumber and documentType
+                docketNumber = aTags[i].contents[0]
 
                 # next, we do the caseDate
                 caseDate = aTags[i].next.next.contents[0].contents[0]
@@ -901,15 +901,15 @@ def scrapeCourt(courtID):
                 caseNameShort = aTags[i].next.next.next.next.next.contents[0]\
                     .contents[0]
 
-                # now that we have the caseNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                # now that we have the docketNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -984,8 +984,8 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # using caseLink, we can get the caseNumber and documentType
-                caseNumber = aTags[i].next.next.next.next.next.contents[0]
+                # using caseLink, we can get the docketNumber and documentType
+                docketNumber = aTags[i].next.next.next.next.next.contents[0]
 
                 # using the filename, we can determine the documentType...
                 fileName = aTags[i].contents[0]
@@ -1010,15 +1010,15 @@ def scrapeCourt(courtID):
                 caseNameShort = aTags[i].next.next.next.next.next.next.next.next\
                     .next.next.next
 
-                # now that we have the caseNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                # now that we have the docketNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -1085,8 +1085,8 @@ def scrapeCourt(courtID):
                     else:
                         dupCount = 0
 
-                    # using caseLink, we can get the caseNumber and documentType
-                    caseNumber = aTags[i].previous.previous.previous.previous.previous\
+                    # using caseLink, we can get the docketNumber and documentType
+                    docketNumber = aTags[i].previous.previous.previous.previous.previous\
                         .previous.previous.previous.previous.previous
 
                     # next up: caseDate
@@ -1107,15 +1107,15 @@ def scrapeCourt(courtID):
                     elif "type=Nonprecedential+Disposition" in dataString:
                         doc.documentType = "Unpublished"
 
-                    # now that we have the caseNumber and caseNameShort, we can dup check
-                    cite, created = hasDuplicate(caseNumber, caseNameShort)
+                    # now that we have the docketNumber and caseNameShort, we can dup check
+                    cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                     # last, save evrything (pdf, citation and document)
                     doc.citation = cite
                     doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                     try:
                         logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                            ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                            ": Added " + ct.shortName + ": " + cite.caseNameShort)
                     except UnicodeDecodeError:
                         pass
                     doc.save()
@@ -1174,9 +1174,9 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # using caseLink, we can get the caseNumber and documentType
+                # using caseLink, we can get the docketNumber and documentType
                 junk = aTags[i].contents[0]
-                caseNumber = caseNumRegex.search(junk).group(1) + "-" +\
+                docketNumber = caseNumRegex.search(junk).group(1) + "-" +\
                     caseNumRegex.search(junk).group(2)
 
                 documentType = caseNumRegex.search(junk).group(3).upper()
@@ -1197,15 +1197,15 @@ def scrapeCourt(courtID):
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
 
-                # now that we have the caseNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                # now that we have the docketNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -1236,11 +1236,11 @@ def scrapeCourt(courtID):
 
             if url == urls[0]:
                 caseLinks = tree.xpath('//table[3]/tbody/tr/td/a')
-                caseNumbers = tree.xpath('//table[3]/tbody/tr/td[2]/label')
+                docketNumbers = tree.xpath('//table[3]/tbody/tr/td[2]/label')
                 caseDates = tree.xpath('//table[3]/tbody/tr/td[6]/label')
             elif url == urls[1]:
                 caseLinks = tree.xpath('//table[3]/tbody/tr/td/a')
-                caseNumbers = tree.xpath('//table[3]/tbody/tr/td[2]/label')
+                docketNumbers = tree.xpath('//table[3]/tbody/tr/td[2]/label')
                 caseDates = tree.xpath('//table[3]/tbody/tr/td[7]/label')
 
             if DAEMONMODE:
@@ -1288,9 +1288,9 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # next, we'll do the caseNumber
-                caseNumber = caseNumbers[i].text
-                if VERBOSITY >= 2: print "CaseNumber is: " + caseNumber
+                # next, we'll do the docketNumber
+                docketNumber = docketNumbers[i].text
+                if VERBOSITY >= 2: print "Docket Number is: " + docketNumber
 
                 # next up: document type (static for now)
                 if 'memoranda' in url:
@@ -1310,15 +1310,15 @@ def scrapeCourt(courtID):
                 caseNameShort = titlecase(caseLinks[i].text.lower())
                 if VERBOSITY >= 2: print "CaseNameShort is: " + caseNameShort + "\n\n"
 
-                # now that we have the caseNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                # now that we have the docketNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -1360,7 +1360,7 @@ def scrapeCourt(courtID):
 
             caseDateRegex = re.compile("(\d{2}/\d{2}/\d{4})",
                 re.VERBOSE | re.DOTALL)
-            caseNumberRegex = re.compile("(\d{2}-\d{4})(.*)$")
+            docketNumberRegex = re.compile("(\d{2}-\d{4})(.*)$")
 
             i = 0
             dupCount = 0
@@ -1412,24 +1412,24 @@ def scrapeCourt(courtID):
                 doc.dateFiled = caseDate
                 if VERBOSITY >= 2: print "Case date is: " + str(caseDate)
 
-                # next: caseNumber
-                caseNumber = caseNumberRegex.search(descriptions[i].text)\
+                # next: docketNumber
+                docketNumber = docketNumberRegex.search(descriptions[i].text)\
                     .group(1)
-                if VERBOSITY >= 2: print "Case number is: " + caseNumber
+                if VERBOSITY >= 2: print "Case number is: " + docketNumber
 
                 # next: caseNameShort
                 caseNameShort = caseNames[i].text
                 if VERBOSITY >= 2: print "Case name is: " + caseNameShort
 
                 # check for dups, make the object if necessary, otherwise, get it
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -1477,12 +1477,12 @@ def scrapeCourt(courtID):
             tree = fromstring(html)
 
             if 'unpub' in url:
-                caseNumbers = tree.xpath('//table[3]//table//table/tr[1]/td[2]')
+                docketNumbers = tree.xpath('//table[3]//table//table/tr[1]/td[2]')
                 caseLinks   = tree.xpath('//table[3]//table//table/tr[3]/td[2]/a')
                 caseDates   = tree.xpath('//table[3]//table//table/tr[4]/td[2]')
                 caseNames   = tree.xpath('//table[3]//table//table/tr[6]/td[2]')
             elif 'opinion' in url:
-                caseNumbers = tree.xpath('//table[3]//td[3]//table/tr[1]/td[2]')
+                docketNumbers = tree.xpath('//table[3]//td[3]//table/tr[1]/td[2]')
                 caseLinks   = tree.xpath('//table[3]//td[3]//table/tr[3]/td[2]/a')
                 caseDates   = tree.xpath('//table[3]//td[3]//table/tr[4]/td[2]')
                 caseNames   = tree.xpath('//table[3]//td[3]//table/tr[6]/td[2]')
@@ -1497,7 +1497,7 @@ def scrapeCourt(courtID):
 
             i = 0
             dupCount = 0
-            while i < len(caseNumbers):
+            while i < len(docketNumbers):
                 caseLink = caseLinks[i].get('href')
 
                 myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
@@ -1531,18 +1531,18 @@ def scrapeCourt(courtID):
                 if VERBOSITY >= 2: print "dateFiled: " + str(doc.dateFiled)
 
                 caseNameShort = caseNames[i].text
-                caseNumber = caseNumbers[i].text
+                docketNumber = docketNumbers[i].text
 
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
                 if VERBOSITY >= 2:
                     print "caseNameShort: " + cite.caseNameShort
-                    print "caseNumber: " + cite.caseNumber + "\n"
+                    print "docketNumber: " + cite.docketNumber + "\n"
 
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -1602,8 +1602,8 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # using caseLink, we can get the caseNumber
-                caseNumber =  caseNumRegex.search(caseLink).group(1)
+                # using caseLink, we can get the docketNumber
+                docketNumber =  caseNumRegex.search(caseLink).group(1)
 
                 # we can hard-code this b/c the D.C. Court paywalls all
                 # unpublished opinions.
@@ -1615,8 +1615,8 @@ def scrapeCourt(courtID):
 
                 caseNameShort = aTags[i].next.next.next
 
-                # now that we have the caseNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                # now that we have the docketNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                 # if that goes well, we save to the DB
                 doc.citation = cite
@@ -1626,7 +1626,7 @@ def scrapeCourt(courtID):
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -1695,8 +1695,8 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # next: caseNumber
-                caseNumber = trTags[i].td.nextSibling.nextSibling.contents[0]
+                # next: docketNumber
+                docketNumber = trTags[i].td.nextSibling.nextSibling.contents[0]
 
                 # next: dateFiled
                 dateFiled = trTags[i].td.contents[0].strip()
@@ -1723,15 +1723,15 @@ def scrapeCourt(courtID):
                     documentType = "Published"
                 doc.documentType = documentType
 
-                # now that we have the caseNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                # now that we have the docketNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -1756,15 +1756,15 @@ def scrapeCourt(courtID):
 
             if 'slipopinion' in url:
                 caseLinks = tree.xpath('//table/tr/td[4]/a')
-                caseNumbers = tree.xpath('//table/tr/td[3]')
+                docketNumbers = tree.xpath('//table/tr/td[3]')
                 caseDates = tree.xpath('//table/tr/td[2]')
             elif 'in-chambers' in url:
                 caseLinks = tree.xpath('//table/tr/td[3]/a')
-                caseNumbers = tree.xpath('//table/tr/td[2]')
+                docketNumbers = tree.xpath('//table/tr/td[2]')
                 caseDates = tree.xpath('//table/tr/td[1]')
             elif 'relatingtoorders' in url:
                 caseLinks = tree.xpath('//table/tr/td[3]/a')
-                caseNumbers = tree.xpath('//table/tr/td[2]')
+                docketNumbers = tree.xpath('//table/tr/td[2]')
                 caseDates = tree.xpath('//table/tr/td[1]')
 
             if DAEMONMODE:
@@ -1806,8 +1806,8 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                caseNumber = caseNumbers[i].text
-                if VERBOSITY >= 2: print "caseNumber: " + caseNumber
+                docketNumber = docketNumbers[i].text
+                if VERBOSITY >= 2: print "docketNumber: " + docketNumber
 
                 caseNameShort = caseLinks[i].text
                 if VERBOSITY >= 2: print "caseNameShort: " + caseNameShort
@@ -1833,15 +1833,15 @@ def scrapeCourt(courtID):
                 except:
                     RESULT += "Error obtaining date field for " + caseLink
 
-                # now that we have the caseNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNumber, caseNameShort)
+                # now that we have the docketNumber and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docketNumber, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.courtShortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()

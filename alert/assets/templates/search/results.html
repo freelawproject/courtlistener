@@ -153,11 +153,13 @@
                     <dt>@court</dt>
                     <dd>Filters to a certain court</dd>
                     <dt>@caseName</dt>
-                    <dd>Searches only the case name field</dd>
-                    <dt>@caseNumber</dt>
-                    <dd>Searches only the case number field</dd>
+                    <dd>Search by case name</dd>
+                    <dt>@westCite</dt>
+                    <dd>Search be West citation</dd>
+                    <dt>@docketNumber</dt>
+                    <dd>Search by docket number</dd>
                     <dt>@docStatus</dt>
-                    <dd>Searches only the document status field</dd>
+                    <dd>Search by precedential status</dd>
                     <dt>@docText</dt>
                     <dd>Searches only the body of the case</dd>
                 </table>
@@ -228,25 +230,20 @@
             {% endif %}
 
             {% for result in results.object_list %}
-                <h3 class="alt bottom">
+                <h3 class="bottom alt">
                     <a href="{{result.get_absolute_url}}?q={{query}}">
-                        {{ result.citation.caseNameFull }}, {{result.citation.caseNumber}} ({{result.court.courtShortName}})
+                        {{ result.citation.caseNameFull }},
+                        {% if result.citation.westCite != '' %}
+                            {{result.citation.westCite}}
+                        {% else %}
+                            {{result.citation.docketNumber}}
+                        {% endif %}
+                        ({% if result.court.shortName != 'SCOTUS' %}{{result.court.shortName}} {% endif %}{{result.dateFiled|date:"Y"}})
                     </a>
                 </h3>
-                <p>
-                    {% if result.dateFiled %}
-                        {{result.dateFiled|date:"l, F jS, Y"}}<br>
-                    {% else %}
-                        Unknown date<br>
-                    {% endif %}
-                    <strong>Status: </strong>
-                        {% if result.documentType %}
-                            {{result.get_documentType_display}}<br>
-                        {% else %}
-                            Unknown<br>
-                        {% endif %}
+                <p class="bottom">
                     {% if result.downloadURL or result.local_path %}
-                        <strong>Download original: </strong>
+                        <strong>Download Original: </strong>
                         {% if result.download_URL %}
                             <a href="{{result.download_URL}}">From the court</a>
                         {% endif %}
@@ -255,12 +252,33 @@
                         {% endif %}
                         {% if result.local_path %}
                             <a href="/{{result.local_path}}">Our backup</a>
-                        {% endif %}<br>
+                        {% endif %}
                     {% else %}
-                        No downloadable versions.<br>
-                    {%endif %}
+                        No downloadable versions.
+                    {% endif %}
                 </p>
-                <br>
+                <p class="bottom">
+                    <strong>Date Filed:</strong>
+                    {% if result.dateFiled %}
+                        {{result.dateFiled|date:"l, F jS, Y"}}
+                    {% else %}
+                        Unknown date
+                    {% endif %}
+                </p>
+                <p class="bottom">
+                    <strong>Status: </strong>
+                    {% if result.documentType %}
+                        {{result.get_documentType_display}}
+                    {% else %}
+                        Unknown
+                    {% endif %}
+                </p>
+                <p>
+                    {% if result.citation.westCite != '' and result.citation.docketNumber %}
+                        <strong>Docket Number: </strong>
+                        {{ result.citation.docketNumber }}
+                    {% endif %}
+                </p>
             {% endfor %}
 
             <h3>

@@ -117,7 +117,15 @@
         {% else %}
             <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-off"></a>
         {% endif %}
-        <h2>{{ doc.citation.caseNameFull }}, {{ doc.citation.caseNumber }}</h2>
+        <h2>
+            {{ doc.citation.caseNameFull }},
+            {% if doc.citation.westCite != '' %}
+                {{doc.citation.westCite}}
+            {% else %}
+                {{doc.citation.docketNumber}}
+            {% endif %}
+            ({% if doc.court.shortName != 'SCOTUS' %}{{doc.court.shortName}} {% endif %}{{doc.dateFiled|date:"Y"}})
+        </h2>
         <div id="modal-rel">
             {# Modal box for saving the favorite #}
             {% if user.is_authenticated %}
@@ -180,22 +188,33 @@
 
 
         <h3>{{court}}</h3>
-        {% if doc.dateFiled %}
-            <h3 class="alt">{{doc.dateFiled|date:"l, F jS, Y"}}</h3>
-        {% else %}
-            <h3 class="alt">Unknown date</h3>
-        {% endif %}
-        <p>
+        <p class="bottom">
+            <strong>Date Filed:</strong>
+            {% if doc.dateFiled %}
+                {{doc.dateFiled|date:"l, F jS, Y"}}
+            {% else %}
+                Unknown date
+            {% endif %}
+        </p>
+        <p class="bottom">
             <strong>Status: </strong>
-                {% if doc.documentType %}
-                    {{doc.get_documentType_display}}<br>
-                {% else %}
-                    Unknown<br>
-                {% endif %}
+            {% if doc.documentType %}
+                {{doc.get_documentType_display}}
+            {% else %}
+                Unknown
+            {% endif %}
+        </p>
+        <p class="bottom">
+            {% if doc.citation.westCite != '' and doc.citation.docketNumber %}
+                <strong>Docket Number: </strong>
+                {{ doc.citation.docketNumber }}
+            {% endif %}
+        </p>
+        <p>
             <strong title="SHA1 Hash of the binary or text">Fingerprint:</strong> {{doc.documentSHA1}}
         </p>
         <br>
-        <h4>Document text</h4>
+
         {% if doc.documentPlainText %}
             <pre>{{doc.documentPlainText}}</pre>
         {% else %}

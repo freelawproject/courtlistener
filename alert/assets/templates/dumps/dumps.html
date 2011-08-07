@@ -37,12 +37,15 @@
             http://courtlistener.com/dump-api/2009/06/09/<strong>all</strong>.xml.gz</a>
             returns all of the cases from June 9, 2009 (across all courts).</p>
 
+        <h3>Available Courts</h3>
         <p class="bottom">The available court names are:</p>
         <ul>
-            {% for code in pacer_codes %}
-            <li><strong><a href="/opinions/{{code.0}}/">{{code.0}}</a></strong> - {{code.1}}</li>
+            <li><strong><a href="/opinions/all/">all</a></strong> - All courts</li>
+            {% for court in courts %}
+                <li>
+                    <strong><a href="/opinions/{{court.courtUUID}}/">{{court.courtUUID}}</a></strong> - {{court.get_courtUUID_display}}
+                </li>
             {% endfor %}
-            <li><strong><a href="/opinions/all/">all</a></strong> - all courts</li>
         </ul>
 
         <h3>Feedback</h3>
