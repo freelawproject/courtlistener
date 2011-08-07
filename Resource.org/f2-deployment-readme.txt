@@ -1,5 +1,6 @@
 To do:
  - Check that the citations are going to the right place in the DB.
+ - Check that the scraper still works.
 
 When deploying:
  - need to migrate data:
@@ -10,7 +11,8 @@ When deploying:
     - reindex.
     - update any saved queries from caseNumber --> docketNumber
  - dumps are updated. Need to delete old ones, and test that empty attributes
-   don't cause the entire doc not to show up. Once tested, notify mailing list
+   don't cause the entire doc not to show up. Once tested, tackle the bug about
+   bad various bad bits of data in the case names, thennotify mailing list
    and Malamud.
  - Add courts to the DB using the admin interface or manage.py loaddata
  - Add the entire f2 from resource.org, and point script at it.
