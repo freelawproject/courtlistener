@@ -19,7 +19,7 @@ os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 
 import sys
 # append these to the path to make the dev machines and the server happy (respectively)
-sys.path.append("/var/www/court-listener-resource-org-scrape")
+sys.path.append("/var/www/court-listener")
 
 from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned
@@ -236,7 +236,10 @@ def scrape_and_parse():
                     raise ValueError
             except:
                 # No date provided.
-                caseDate = check_fix_list(sha1Hash, date_fix_dict)
+                try:
+                    caseDate = datetime.datetime(*time.strptime(check_fix_list(sha1Hash, date_fix_dict), "%B %d, %Y")[0:5])
+                except:
+                    caseDate = False
                 if not caseDate:
                     print absCaseLink
                     if BROWSER:

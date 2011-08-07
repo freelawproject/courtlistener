@@ -26,8 +26,6 @@
 
 import sys
 sys.path.append('/var/www/court-listener/alert')
-sys.path.append('/var/www/court-listener-fix-honeypot/alert')
-sys.path.append('/home/mlissner/FinalProject/alert')
 
 from alert import settings
 from django.core.management import setup_environ
@@ -165,7 +163,7 @@ def courtChanged(url, contents):
     '''
     Takes HTML contents from a court download, generates a SHA1, and then
     compares that hash to a value in the DB, if there is one. If there is a value
-    and it is the same, it returns false. Else, it returns true.
+    and it is the same, it returns False. Else, it returns True.
     '''
     sha1Hash = hashlib.sha1(contents).hexdigest()
     url2Hash, created = urlToHash.objects.get_or_create(url=url)
@@ -203,7 +201,7 @@ def hasDuplicate(caseName, westCite=None, docketNumber=None):
     '''
 
     # data cleanup
-    caseName = harmonize(clean_string(caseName))
+    caseName = clean_string(harmonize(caseName))
     if westCite:
         westCite = clean_string(westCite)
     if docketNumber:

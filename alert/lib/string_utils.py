@@ -134,10 +134,12 @@ def titlecase(text):
 
 
 # For use in harmonize function
-US = 'USA|U\.S\.A\.|U\.S\.|United States of America'
+US = 'USA|U\.S\.A\.|U\.S\.|U\. S\.|United States of America'
 UNITED_STATES = re.compile(r'^(%s)$' % US, re.I)
-ET_AL = re.compile(',?\set\.?\sal\.?', re.IGNORECASE)
-
+ET_AL = re.compile(',?\set\.?\sal\.?', re.I)
+BW = 'appellants?|claimants?|complainants?|defendants?|devisee|executrix' + \
+     '|executor|petitioner|plaintiffs?'
+BAD_WORDS = re.compile(r'(%s)' % BW, re.I)
 def harmonize(text):
     '''Fixes case names so they are cleaner.
 
@@ -146,6 +148,7 @@ def harmonize(text):
      - various forms of United States --> United States
      - vs. --> v.
      - et al --> Removed.
+     - plaintiff, appellee, defendant and the like --> Removed.
 
     Lots of tests are in tests.py.
     '''
@@ -157,7 +160,7 @@ def harmonize(text):
     # replace V. with v.
     text = re.sub(re.compile(r'\WV\.\W'), ' v. ', text)
 
-    # split on all ' v. '
+    # split on all ' v. ' and then deal with United States variations.
     text = text.split(' v. ')
     i = 1
     for frag in text:
@@ -178,7 +181,11 @@ def harmonize(text):
                 result = result + frag + " v. "
         i += 1
 
+    # Remove the ET_AL words.
     result = re.sub(ET_AL, '', result)
+
+    # Remove the BAD_WORDS.
+    result = re.sub(BAD_WORDS, '', result)
 
     return result
 
@@ -189,7 +196,7 @@ def clean_string(string):
     string = string.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
         .replace('&ldquo;', "\"").replace('&nbsp;', ' ')\
         .replace('&amp;', '&').replace('%20', ' ').replace('&#160;', ' ')\
-        .replace('*', '').strip().strip(';').strip(',')
+        .replace('*', '').replace('#', '').strip().strip(';').strip(',')
 
     # if not already unicode, make it unicode, dropping invalid characters
     # if not isinstance(string, unicode):

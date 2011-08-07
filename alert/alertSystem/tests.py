@@ -17,12 +17,13 @@
 
 """
 This file demonstrates two different styles of tests (one doctest and one
-unittest). These will both pass when you run "manage.py test".
+unittest). These will both pass when you run "manage.py test alertSystem".
 
 Replace these with more appropriate tests for your application.
 """
 
 from django.test import TestCase
+from lib.string_utils import clean_string
 from lib.string_utils import harmonize
 
 class SimpleTest(TestCase):
@@ -33,69 +34,72 @@ class SimpleTest(TestCase):
         self.failUnlessEqual(1 + 1, 2)
 
 __test__ = {"doctest": """
->>> harmonize('U.S.A. v. Lissner')
+>>> clean_string(harmonize('U.S.A. v. Lissner'))
 'United States v. Lissner'
->>> harmonize('U.S. v. Lissner')
+>>> clean_string(harmonize('U.S. v. Lissner'))
 'United States v. Lissner'
->>> harmonize('United States v. Lissner')
+>>> clean_string(harmonize('U. S. v. Lissner'))
 'United States v. Lissner'
->>> harmonize('Usa v. Lissner')
+>>> clean_string(harmonize('United States v. Lissner'))
 'United States v. Lissner'
->>> harmonize('USA v. Lissner')
+>>> clean_string(harmonize('Usa v. Lissner'))
 'United States v. Lissner'
->>> harmonize('United States of America v. Lissner')
+>>> clean_string(harmonize('USA v. Lissner'))
 'United States v. Lissner'
->>> harmonize('Lissner v. United States of America')
+>>> clean_string(harmonize('United States of America v. Lissner'))
+'United States v. Lissner'
+>>> clean_string(harmonize('Lissner v. United States of America'))
 'Lissner v. United States'
->>> harmonize('V.Vivack and Associates v. US')
+>>> clean_string(harmonize('V.Vivack and Associates v. US'))
 'V.Vivack and Associates v. United States'
->>> harmonize('v.v. Hendricks & Sons v. James v. Smith')
+>>> clean_string(harmonize('v.v. Hendricks & Sons v. James v. Smith'))
 'v.v. Hendricks & Sons v. James v. Smith'
->>> harmonize('v.v. Hendricks v. James V. Smith v. US')
-'v.v. Hendricks v. James V. Smith v. United States'
->>> harmonize('U.S.A. v. Mr. v.')
+>>> clean_string(harmonize('U.S.A. v. Mr. v.'))
 'United States v. Mr. v.'
->>> harmonize('U.S.S. v. Lissner')
+>>> clean_string(harmonize('U.S.S. v. Lissner'))
 'U.S.S. v. Lissner'
->>> harmonize('USC v. Lissner')
+>>> clean_string(harmonize('USC v. Lissner'))
 'USC v. Lissner'
->>> harmonize('U.S.C. v. Lissner')
+>>> clean_string(harmonize('U.S.C. v. Lissner'))
 'U.S.C. v. Lissner'
->>> harmonize('U.S. Steel v. Colgate')
+>>> clean_string(harmonize('U.S. Steel v. Colgate'))
 'U.S. Steel v. Colgate'
->>> harmonize('papusa')
+>>> clean_string(harmonize('papusa'))
 'papusa'
->>> harmonize('CUSANO')
+>>> clean_string(harmonize('CUSANO'))
 'CUSANO'
->>> harmonize('US Steel v.  US')
+>>> clean_string(harmonize('US Steel v.  US'))
 'US Steel v. United States'
->>> harmonize('US v. V.Vivack')
+>>> clean_string(harmonize('US v. V.Vivack'))
 'United States v. V.Vivack'
->>> harmonize('US vs. Lissner')
+>>> clean_string(harmonize('US vs. Lissner'))
 'United States v. Lissner'
->>> harmonize('vs.boxer@gmail.com vs. USA')
+>>> clean_string(harmonize('vs.boxer@gmail.com vs. USA'))
 'vs.boxer@gmail.com v. United States'
->>> harmonize('US v. US')
+>>> clean_string(harmonize('US v. US'))
 'United States v. United States'
->>> harmonize('US  Steel v.  US')
+>>> clean_string(harmonize('US  Steel v.  US'))
 'US  Steel v. United States'
->>> harmonize('Lissner, et. al.')
+>>> clean_string(harmonize('Lissner, et. al.'))
 'Lissner'
->>> harmonize('Lissner, et. al')
+>>> clean_string(harmonize('Lissner, et. al'))
 'Lissner'
->>> harmonize('Lissner, et al.')
+>>> clean_string(harmonize('Lissner, et al.'))
 'Lissner'
->>> harmonize('Lissner, et al')
+>>> clean_string(harmonize('Lissner, et al'))
 'Lissner'
->>> harmonize('Lissner et. al.')
+>>> clean_string(harmonize('Lissner et. al.'))
 'Lissner'
->>> harmonize('Lissner et. al')
+>>> clean_string(harmonize('Lissner et. al'))
 'Lissner'
->>> harmonize('Lissner et al.')
+>>> clean_string(harmonize('Lissner et al.'))
 'Lissner'
->>> harmonize('Lissner et al')
+>>> clean_string(harmonize('Lissner et al'))
 'Lissner'
->>> harmonize('clarinet alibi')
+>>> clean_string(harmonize('clarinet alibi'))
 'clarinet alibi'
+>>> clean_string(harmonize('US v. Lissner, Plaintiff'))
+'United States v. Lissner'
+>>> clean_string(harmonize('US v. Lissner, Petitioner-appellant'))
+'United States v. Lissner'
 """}
-

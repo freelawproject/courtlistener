@@ -5,17 +5,23 @@ from south.v2 import SchemaMigration
 from django.db import models
 
 class Migration(SchemaMigration):
-
+    '''
+    This migration is essentially disabled b/c it was causing lots of trouble,
+    and only for the sake of adding/removing indexes on fields that don't need
+    them. mlissner - 2011-08-07.
+    '''
     def forwards(self, orm):
-        
+
         # Removing index on 'Citation', fields ['slug']
-        db.delete_index('Citation', ['slug'])
+        # db.delete_index('Citation', ['slug'])
+        pass
 
 
     def backwards(self, orm):
-        
+
         # Adding index on 'Citation', fields ['slug']
-        db.create_index('Citation', ['slug'])
+        # db.create_index('Citation', ['slug'])
+        pass
 
 
     models = {
