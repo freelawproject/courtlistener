@@ -102,4 +102,8 @@ __test__ = {"doctest": """
 'United States v. Lissner'
 >>> clean_string(harmonize('US v. Lissner, Petitioner-appellant'))
 'United States v. Lissner'
+>>> clean_string(harmonize('United States, Petitioner, v. Lissner'))
+'United States v. Lissner'
+>>> clean_string(harmonize('United States of America, Plaintiff-Appellee, v. Orlando B. Pino, Defendant-Appellant, Joseph'))
+'United States v. Orlando B. Pino, Joseph'
 """}
