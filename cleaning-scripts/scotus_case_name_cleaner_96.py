@@ -56,8 +56,8 @@ def cleaner(simulate=False, verbose=False):
                 print "Short name, replacing: '%s'" % (caseNameShortOrig)
                 print "                 with: '%s'" % (caseNameShort)
             if caseNameFullOrig != caseNameFull:
-                print "Full name, replacing: '%s'" % (caseNameFullOrig)
-                print "                with: '%s'\n" % (caseNameFull)
+                print " Full name, replacing: '%s'" % (caseNameFullOrig)
+                print "                 with: '%s'\n" % (caseNameFull)
         if not simulate:
             doc.citation.save()
 

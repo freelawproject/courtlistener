@@ -207,11 +207,11 @@ class Citation(models.Model):
         blank=True,
         null=True,
         max_length=50)
-    westCite = models.CharField("the citation number, as described by WestLaw",
+    westCite = models.CharField("WestLaw citation",
         max_length=50,
         blank=True,
         null=True)
-    lexisCite = models.CharField("the citation number, as described by LexisNexis",
+    lexisCite = models.CharField("LexisNexis citation",
         max_length=50,
         blank=True,
         null=True)
