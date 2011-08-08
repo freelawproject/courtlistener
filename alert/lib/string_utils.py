@@ -139,7 +139,8 @@ UNITED_STATES = re.compile(r'^(%s)(,|\.)?$' % US, re.I)
 ET_AL = re.compile(',?\set\.?\sal\.?', re.I)
 BW = 'appell(ee|ant)s?|claimants?|complainants?|defendants?|devisee|executrix' + \
      '|executor|petitioner|plaintiffs?|respond(e|a)nt|petitioner-appell(ee|ant)' + \
-     '|petitioner-defendant|plaintiff-appell(ee|ant)|defendant-appell(ee|ant)'
+     '|petitioner-defendant|plaintiff-appell(ee|ant)|defendant-appell(ee|ant)' + \
+     '|cross-respondent|cross-petitioner'
 BAD_WORDS = re.compile(r'^(%s)(,|\.)?$' % BW, re.I)
 def harmonize(text):
     '''Fixes case names so they are cleaner.

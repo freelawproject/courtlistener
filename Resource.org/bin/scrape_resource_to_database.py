@@ -110,6 +110,8 @@ def scrape_and_parse():
 
     if DEBUG >= 1:
         print "Number of remaining volumes is: %d" % (len(volumeLinks)-i)
+
+    saved_caseDate = None # used later, needs a default value.
     while i < len(volumeLinks):
         # we iterate over every case in the volume
         volumeURL = volumeLinks[i].text + "/index.html"
@@ -207,7 +209,8 @@ def scrape_and_parse():
                     print absCaseLink
                     if BROWSER:
                         subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
-                    court = raw_input("Unknown court. Input the court code to proceed successfully (e.g. 'ca1'): ")
+                    court = raw_input("Unknown court. Input the court code to proceed successfully [ca5]: ")
+                    court = court or 'ca5'
                     court_fix_file.write("%s|%s\n" % (sha1Hash, court))
 
             court = Court.objects.get(courtUUID = court)
@@ -217,9 +220,9 @@ def scrape_and_parse():
             # next: westCite, docketNumber and caseName. Full casename is gotten later.
             westCite = caseLinks[j].text
             docketNumber = absCaseLink.split('.')[-2]
-            caseName = smart_str(titlecase(trunc(caseLinks[j].get('title'), 100).lower()))
+            caseName = titlecase(caseLinks[j].get('title').lower())
             if DEBUG >= 4:
-                print "caseName (trunc'ed): " + caseName
+                print "caseName (raw): " + caseName
 
             # date is kinda tricky...details here:
             # http://pleac.sourceforge.net/pleac_python/datesandtimes.html
@@ -244,15 +247,14 @@ def scrape_and_parse():
                     print absCaseLink
                     if BROWSER:
                         subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
-                    rawDate = raw_input("Unknown date. Input the date to proceed in the format January 1, 2011: ")
-                    if rawDate == 'None':
-                        caseDate = None
-                    else:
-                        try:
-                            caseDate = datetime.datetime(*time.strptime(rawDate, "%Y")[0:5])
-                        except ValueError, TypeError:
-                            caseDate = datetime.datetime(*time.strptime(rawDate, "%B %d, %Y")[0:5])
-                        date_fix_file.write("%s|%s\n" % (sha1Hash, rawDate))
+                    rawDate = raw_input("Unknown date. Input the date to proceed [%s]: " % saved_caseDate)
+                    rawDate = rawDate or saved_caseDate
+
+                    caseDate = datetime.datetime(*time.strptime(rawDate, "%B %d, %Y")[0:5])
+                    date_fix_file.write("%s|%s\n" % (sha1Hash, rawDate))
+
+            # Used during the next iteration as the default value
+            saved_caseDate = caseDate.strftime("%B %d, %Y")
 
 
             if DEBUG >= 3:
@@ -277,7 +279,6 @@ def scrape_and_parse():
                 doc.source = "R"
 
                 cite, new = hasDuplicate(caseName, westCite, docketNumber)
-                cite.caseNameFull = titlecase(caseLinks[j].get('title').lower())
                 cite.save()
 
                 doc.citation = cite

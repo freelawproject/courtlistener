@@ -1,5 +1,5 @@
 To do:
- - Check that the citations are going to the right place in the DB.
+ - change the link on the case page to say Download Original > At Resource.org
  - Check that the scraper still works.
 
 When deploying:
