@@ -135,11 +135,12 @@ def titlecase(text):
 
 # For use in harmonize function
 US = 'USA|U\.S\.A\.|U\.S\.|U\. S\.|United States of America'
-UNITED_STATES = re.compile(r'^(%s)$' % US, re.I)
+UNITED_STATES = re.compile(r'^(%s)(,|\.)?$' % US, re.I)
 ET_AL = re.compile(',?\set\.?\sal\.?', re.I)
-BW = 'appellants?|claimants?|complainants?|defendants?|devisee|executrix' + \
-     '|executor|petitioner|plaintiffs?'
-BAD_WORDS = re.compile(r'(%s)' % BW, re.I)
+BW = 'appell(ee|ant)s?|claimants?|complainants?|defendants?|devisee|executrix' + \
+     '|executor|petitioner|plaintiffs?|respond(e|a)nt|petitioner-appell(ee|ant)' + \
+     '|petitioner-defendant|plaintiff-appell(ee|ant)|defendant-appell(ee|ant)'
+BAD_WORDS = re.compile(r'^(%s)(,|\.)?$' % BW, re.I)
 def harmonize(text):
     '''Fixes case names so they are cleaner.
 
@@ -159,6 +160,14 @@ def harmonize(text):
 
     # replace V. with v.
     text = re.sub(re.compile(r'\WV\.\W'), ' v. ', text)
+
+    # Remove the BAD_WORDS.
+    text = text.split()
+    cleaned_text = []
+    for word in text:
+        word = re.sub(BAD_WORDS, '', word)
+        cleaned_text.append(word)
+    text = ' '.join(cleaned_text)
 
     # split on all ' v. ' and then deal with United States variations.
     text = text.split(' v. ')
@@ -184,19 +193,41 @@ def harmonize(text):
     # Remove the ET_AL words.
     result = re.sub(ET_AL, '', result)
 
-    # Remove the BAD_WORDS.
-    result = re.sub(BAD_WORDS, '', result)
-
     return result
 
 
 def clean_string(string):
-    ''' replace evil characters with better ones, get rid of white space on
-    the ends, and get rid of semicolons on the ends.'''
+    '''Clean up strings.
+
+    Accomplishes the following:
+     - replaces HTML encoded characters with ASCII versions.
+     - removes -, ' ', #, *, ; and ',' from the end of lines
+     - converts to unicode.
+     - removes weird white space and replaces with spaces.
+    '''
+    # Get rid of HTML encoded chars
     string = string.replace('&rsquo;', '\'').replace('&rdquo;', "\"")\
         .replace('&ldquo;', "\"").replace('&nbsp;', ' ')\
-        .replace('&amp;', '&').replace('%20', ' ').replace('&#160;', ' ')\
-        .replace('*', '').replace('#', '').strip().strip(';').strip(',')
+        .replace('&amp;', '&').replace('%20', ' ').replace('&#160;', ' ')
+
+    # Get rid of weird punctuation
+    string = string.replace('*', '').replace('#', '')
+
+    # Strip bad stuff from the end of lines. Python's strip fails here because
+    # we don't know the order of the various punctuation items to be stripped.
+    # We split on the v., and handle fixes at either end of plaintiff or
+    # appellant.
+    bad_punctuation = r'(-|;|,|\s)*'
+    bad_endings = re.compile(r'%s$' % bad_punctuation)
+    bad_beginnings = re.compile(r'^%s' % bad_punctuation)
+
+    string = string.split(' v. ')
+    cleaned_string = []
+    for frag in string:
+        frag = re.sub(bad_endings, '', frag)
+        frag = re.sub(bad_beginnings, '', frag)
+        cleaned_string.append(frag)
+    string = ' v. '.join(cleaned_string)
 
     # if not already unicode, make it unicode, dropping invalid characters
     # if not isinstance(string, unicode):

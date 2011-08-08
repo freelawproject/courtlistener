@@ -41,7 +41,7 @@ import re
 
 
 def cleaner(simulate=False, verbose=False):
-    docs = Document.objects.get(source = 'R')
+    docs = queryset_iterator(Document.objects.filter(source = 'R'))
     for doc in docs:
         caseNameShortOrig = doc.citation.caseNameShort
         caseNameFullOrig = doc.citation.caseNameFull
@@ -50,8 +50,14 @@ def cleaner(simulate=False, verbose=False):
         doc.citation.caseNameShort = caseNameShort
         doc.citation.caseNameFull = caseNameFull
         if verbose:
-            print "Replacing '%s' with '%s' on document %s" % (caseNameFullOrig, caseNameFull, doc.id)
-            print "Replacing '%s' with '%s' on document %s" % (caseNameShortOrig, caseNameShort, doc.id)
+            if (caseNameShortOrig != caseNameShort) or (caseNameFullOrig != caseNameFull):
+                print "Document: %s" % (doc.documentUUID)
+            if caseNameShortOrig != caseNameShort:
+                print "Short name, replacing: '%s'" % (caseNameShortOrig)
+                print "                 with: '%s'" % (caseNameShort)
+            if caseNameFullOrig != caseNameFull:
+                print "Full name, replacing: '%s'" % (caseNameFullOrig)
+                print "                with: '%s'\n" % (caseNameFull)
         if not simulate:
             doc.citation.save()
 
