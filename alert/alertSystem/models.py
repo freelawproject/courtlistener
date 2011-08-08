@@ -234,7 +234,6 @@ class Citation(models.Model):
 
     class Meta:
         db_table = "Citation"
-        ordering = ["caseNameFull"]
 
 
 

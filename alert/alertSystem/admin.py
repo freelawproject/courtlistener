@@ -32,9 +32,9 @@ class DocumentAdminInline(admin.StackedInline):
 
 
 class CitationAdmin(admin.ModelAdmin):
-    # ordering is brutal on MySQL. Don't put it here. Sorry.
+    # This needs to be disabled for performance reasons.
+    #list_display = ('docketNumber', 'westCite', 'caseNameShort', )
     inlines = [DocumentAdminInline]
-    list_display = ('docketNumber', 'westCite', 'caseNameShort', )
     search_fields = ['caseNameShort', 'caseNameFull', 'docketNumber', 'westCite']
 
 
