@@ -33,8 +33,10 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from alertSystem.models import *
+from lib.db_tools import queryset_iterator
 
 import datetime
+import gc
 import time
 
 from optparse import OptionParser
@@ -49,16 +51,23 @@ def delete_data_by_time_and_court(courtID, SIMULATE, delTime=None, VERBOSITY=0):
     if delTime is not None:
         if VERBOSITY >= 1:
             print "Deleting data newer than %s for court %s" % (delTime, courtID)
-        docs = Document.objects.filter(time_retrieved__gt=delTime, court=courtID)
+        count = Document.objects.filter(time_retrieved__gt=delTime, court=courtID).count()
+        if count != 0:
+            docs = queryset_iterator(Document.objects.filter(time_retrieved__gt=delTime, court=courtID))
+
     else:
         if VERBOSITY >= 1:
             print "Deleting all data for court %s" % courtID
-        docs = Document.objects.filter(court = courtID)
+        count = Document.objects.filter(court = courtID).count()
+        if count != 0:
+            docs = queryset_iterator(Document.objects.filter(court = courtID))
 
     if VERBOSITY >= 1:
-        print "Deleting %s documents from the database." % len(docs)
-    if not SIMULATE:
-        docs.delete()
+        print "Deleting %s documents from the database." % (count)
+    if (not SIMULATE) and (count != 0):
+        for doc in docs:
+            doc.delete()
+
 
 
 def delete_all_citations(SIMULATE, VERBOSITY=0):
@@ -163,6 +172,7 @@ def main():
             while courtID <= len(PACER_CODES):
                 delete_data_by_time_and_court(courtID, SIMULATE, delTime, VERBOSITY)
                 courtID += 1
+                gc.collect()
         else:
             # Just one court, please.
             delete_data_by_time_and_court(courtID, SIMULATE, delTime, VERBOSITY)

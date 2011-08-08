@@ -18,26 +18,26 @@
 from django.contrib import admin
 from alert.alertSystem.models import *
 
-class CitationAdmin(admin.ModelAdmin):
-    # ordering is brutal on MySQL. Don't put it here. Sorry.
-    list_display = ('docketNumber','caseNameShort', 'westCite',)
-    search_fields = ['caseNameShort', 'caseNameFull', 'docketNumber', 'westCite']
-
-class DocumentAdmin(admin.ModelAdmin):
+class DocumentAdminInline(admin.StackedInline):
     # ordering is brutal on MySQL. Don't put it here. Sorry.
     #list_display = ('citation',)
     #list_filter = ('court',)
-    fields = ('source', 'documentSHA1', 'dateFiled', 'court',
+    model = Document
+    fields = ('citation', 'source', 'documentSHA1', 'dateFiled', 'court',
               'excerptSummary', 'download_URL',
               'local_path', 'documentPlainText', 'documentHTML',
               'documentType',)
+    raw_id_fields = ('citation',)
     search_fields = ['documentPlainText']
 
 
+class CitationAdmin(admin.ModelAdmin):
+    # ordering is brutal on MySQL. Don't put it here. Sorry.
+    inlines = [DocumentAdminInline]
+    list_display = ('docketNumber', 'westCite', 'caseNameShort', )
+    search_fields = ['caseNameShort', 'caseNameFull', 'docketNumber', 'westCite']
+
+
 admin.site.register(Court)
-admin.site.register(Party)
-admin.site.register(Judge)
-admin.site.register(JudgeAlias)
-admin.site.register(Document, DocumentAdmin)
 admin.site.register(Citation, CitationAdmin)
-admin.site.register(ExcerptSummary)
+
