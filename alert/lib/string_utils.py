@@ -31,8 +31,8 @@ from django.utils.encoding import smart_str
 from django.utils.encoding import smart_unicode
 
 # For use in titlecase
-BIG = 'CDC|CDT|CNMI|DOJ|DVA|EFF|FCC|FTC|LLC|LLP|MSPB|UPS|RSS|SEC|USA|USC|USPS|WTO.'
-SMALL = 'a|an|and|as|at|but|by|en|for|if|in|of|on|or|the|to|v\.?|via|vs\.?'
+BIG = 'AKA|A/K/A|CDC|CDT|CNMI|D/B/A|DOJ|DVA|EFF|FCC|FTC|II|III|IV|LLC|LLP|MCI|MSPB|UPS|RSS|SEC|USA|USC|USPS|WTO'
+SMALL = 'a|an|and|as|at|but|by|en|for|if|in|is|of|on|or|the|to|v\.?|via|vs\.?'
 NUMS = '0|1|2|3|4|5|6|7|8|9'
 PUNCT = r"""!"#$%&'‘()*+,\-./:;?@[\\\]_`{|}~"""
 BIG_WORDS = re.compile(r'^(%s)$' % BIG, re.I)
@@ -45,7 +45,7 @@ SMALL_LAST = re.compile(r'\b(%s)[%s]?$' % (SMALL, PUNCT), re.I)
 SUBPHRASE = re.compile(r'([:.;?!][ ])(%s)' % SMALL)
 APOS_SECOND = re.compile(r"^[dol]{1}['‘]{1}[a-z]+$", re.I)
 ALL_CAPS = re.compile(r'^[A-Z\s%s%s]+$' % (PUNCT, NUMS))
-UC_INITIALS = re.compile(r"^(?:[A-Z]{1}\.{1}|[A-Z]{1}\.{1}[A-Z]{1})+$")
+UC_INITIALS = re.compile(r"^(?:[A-Z]{1}\.{1}|[A-Z]{1}\.{1}[A-Z]{1})+,?$")
 MAC_MC = re.compile(r"^([Mm]a?c)(\w+)")
 
 def titlecase(text):
@@ -95,7 +95,7 @@ def titlecase(text):
                 continue
 
             match = MAC_MC.match(word)
-            if match:
+            if match and (word != 'mack'):
                 tc_line.append("%s%s" % (match.group(1).capitalize(),
                                       match.group(2).capitalize()))
                 continue
@@ -134,13 +134,13 @@ def titlecase(text):
 
 
 # For use in harmonize function
-US = 'USA|U\.S\.A\.|U\.S\.|U\. S\.|United States of America'
+US = 'USA|U\.S\.A\.|U\.S\.?|U\. S\.?|United States of America'
 UNITED_STATES = re.compile(r'^(%s)(,|\.)?$' % US, re.I)
 ET_AL = re.compile(',?\set\.?\sal\.?', re.I)
-BW = 'appell(ee|ant)s?|claimants?|complainants?|defendants?|devisee|executrix' + \
-     '|executor|petitioner|plaintiffs?|respond(e|a)nt|petitioner-appell(ee|ant)' + \
-     '|petitioner-defendant|plaintiff-appell(ee|ant)|defendant-appell(ee|ant)' + \
-     '|cross-respondent|cross-petitioner'
+BW = 'appell(ee|ant)s?|claimants?|complainants?|defendants?|defendants?(--?|/)appell(ee|ant)s?' + \
+     '|devisee|executor|executrix|petitioners?|petitioners?(--?|/)appell(ee|ant)s?' + \
+     '|petitioners?(--?|/)defendants?|plaintiffs?|plaintiffs?(--?|/)appell(ee|ant)s?|respond(e|a)nts?' + \
+     '|respond(e|a)nts?(--?|/)appell(ee|ant)s?|cross(--?|/)respondents?|crosss?(--?|/)petitioners?'
 BAD_WORDS = re.compile(r'^(%s)(,|\.)?$' % BW, re.I)
 def harmonize(text):
     '''Fixes case names so they are cleaner.
@@ -194,7 +194,7 @@ def harmonize(text):
     # Remove the ET_AL words.
     result = re.sub(ET_AL, '', result)
 
-    return result
+    return clean_string(result)
 
 
 def clean_string(string):
@@ -212,7 +212,7 @@ def clean_string(string):
         .replace('&amp;', '&').replace('%20', ' ').replace('&#160;', ' ')
 
     # Get rid of weird punctuation
-    string = string.replace('*', '').replace('#', '')
+    string = string.replace('*', '').replace('#', '').replace(';', '')
 
     # Strip bad stuff from the end of lines. Python's strip fails here because
     # we don't know the order of the various punctuation items to be stripped.

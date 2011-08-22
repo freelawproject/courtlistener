@@ -201,7 +201,7 @@ def hasDuplicate(caseName, westCite=None, docketNumber=None):
     '''
 
     # data cleanup
-    caseName = clean_string(harmonize(caseName))
+    caseName = titlecase(harmonize(clean_string(caseName)))
     if westCite:
         westCite = clean_string(westCite)
     if docketNumber:
