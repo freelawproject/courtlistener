@@ -72,20 +72,28 @@ def delete_data_by_time_and_court(courtID, SIMULATE, delTime=None, VERBOSITY=0):
 
 def delete_all_citations(SIMULATE, VERBOSITY=0):
     '''
-    Deletes all citations in the system
+    Deletes all citations and their associated documents.
     '''
     if VERBOSITY >= 1:
-        print "Deleting all citations."
+        print "Deleting all citations and associated documents."
     cites = Citation.objects.all()
     if VERBOSITY >= 2:
-        print 'Deleting %s citations from the database.' % len(cites)
+        print 'Deleting %s citations and documents from the database.' % len(cites)
     if not SIMULATE:
+        try:
+            input = raw_input('\nPress enter to continue or Ctrl+C to exit. ')
+        except KeyboardInterrupt:
+            print "\nAborted by user."
+            exit(2)
         cites.delete()
 
 
 def delete_orphaned_citations(SIMULATE, VERBOSITY=0):
     '''
-    Deletes all citations that don't have a document associated with them
+    Deletes all citations that don't have a document associated with them.
+
+    This is brutally inefficient, iterating over ALL citations in the DB, and
+    performing one query per citation.
     '''
     if VERBOSITY >= 1:
         print "Deleting all citations that are not associated with a document."
@@ -130,7 +138,7 @@ def main():
     parser.add_option('-o', '--orphans', action='store_true', dest='orphans',
         default=False, help='Delete orphaned citations from the database.')
     parser.add_option('--allcites', action='store_true', dest='cites', default=False,
-        help='Delete all citations from the DB')
+        help='Delete all citations and their associated documents from the DB')
     (options, args) = parser.parse_args()
 
 
