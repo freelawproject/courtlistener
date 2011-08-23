@@ -31,10 +31,11 @@ from django.utils.encoding import smart_str
 from django.utils.encoding import smart_unicode
 
 # For use in titlecase
-BIG = 'AKA|A/K/A|CDC|CDT|CNMI|D/B/A|DOJ|DVA|EFF|FCC|FTC|II|III|IV|LLC|LLP|MCI|MSPB|UPS|RSS|SEC|USA|USC|USPS|WTO'
+BIG = 'AFL|AKA|A/K/A|CDC|CDT|CEO|CIO|CNMI|D/B/A|DOJ|DVA|EFF|FCC|FTC|II|III|IV|LLC|LLP|MCI|MSPB|UPS|RSS|SEC|USA|USC|USPS|WTO'
 SMALL = 'a|an|and|as|at|but|by|en|for|if|in|is|of|on|or|the|to|v\.?|via|vs\.?'
 NUMS = '0|1|2|3|4|5|6|7|8|9'
-PUNCT = r"""!"#$%&'‘()*+,\-./:;?@[\\\]_`{|}~"""
+PUNCT = r"""!"#$¢%&'‘()*+,\-./:;?@[\\\]_—`{|}~"""
+WEIRD_CHARS = r"""¼½äâæéñü§"""
 BIG_WORDS = re.compile(r'^(%s)$' % BIG, re.I)
 SMALL_WORDS = re.compile(r'^(%s)$' % SMALL, re.I)
 INLINE_PERIOD = re.compile(r'[a-z][.][a-z]', re.I)
@@ -44,11 +45,11 @@ SMALL_FIRST = re.compile(r'^([%s]*)(%s)\b' % (PUNCT, SMALL), re.I)
 SMALL_LAST = re.compile(r'\b(%s)[%s]?$' % (SMALL, PUNCT), re.I)
 SUBPHRASE = re.compile(r'([:.;?!][ ])(%s)' % SMALL)
 APOS_SECOND = re.compile(r"^[dol]{1}['‘]{1}[a-z]+$", re.I)
-ALL_CAPS = re.compile(r'^[A-Z\s%s%s]+$' % (PUNCT, NUMS))
+ALL_CAPS = re.compile(r'^[A-Z\s%s%s%s]+$' % (PUNCT, WEIRD_CHARS, NUMS))
 UC_INITIALS = re.compile(r"^(?:[A-Z]{1}\.{1}|[A-Z]{1}\.{1}[A-Z]{1})+,?$")
 MAC_MC = re.compile(r"^([Mm]a?c)(\w+)")
 
-def titlecase(text):
+def titlecase(text, DEBUG=False):
     '''
     Titlecases input text
 
@@ -69,11 +70,17 @@ def titlecase(text):
         words = re.split('[\t ]', line)
         tc_line = []
         for word in words:
+            if DEBUG:
+                print "Word: " + word
             if all_caps:
                 if UC_INITIALS.match(word):
+                    if DEBUG:
+                        print "UC_INITIALS match for: " + word
                     tc_line.append(word)
                     continue
                 else:
+                    if DEBUG:
+                        print "Not initials. Lowercasing: " + word
                     word = word.lower()
 
             if APOS_SECOND.match(word):
