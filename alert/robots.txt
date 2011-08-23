@@ -161,3 +161,26 @@ Disallow: /pdf/2010/12/17/Lukasiewcz-Kruk_v._Tse.pdf
 # Added 2011-07-06
 Disallow: /ca2/26Sj/ciu-v-holder/
 Disallow: /pdf/2011/04/15/Ciu_v._Holder.pdf
+
+# Added 2011-07-17
+Disallow: /pdf/2010/04/23/Chafik_Sebki_v._Atty_Gen_USA_SEALED.pdf
+Disallow: /pdf/2010/04/23/Chafik_Sebki_v._Atty_Gen_USA_SEALED.txt
+
+# Added 2011-08-02
+Disallow: /ca9/28Jo/elisonguo-lyimo-v-eric-h-holder-jr/
+Disallow: /pdf/2011/07/15/Elisonguo_Lyimo_v._Eric_H._Holder_Jr.pdf
+
+Disallow: /ca11/m4t/jaceta-anya-streeter-v-usa/
+Disallow: /pdf/2009/06/30/Jaceta_Anya_Streeter_v._USA.pdf
+Disallow: /ca11/gdC/usa-v-jaceta-anya-streeter/
+Disallow: /pdf/2007/01/16/USA_v._Jaceta_Anya_Streeter_1.pdf
+Disallow: /ca11/ei2/usa-v-jaceta-anya-streeter/
+Disallow: /pdf/2006/12/07/USA_v._Jaceta_Anya_Streeter.pdf
+
+# Added 2011-08-06
+Disallow: /ca6/3i/larry-green-v-fidelity-investment/
+Disallow: /pdf/2010/03/15/Larry_Green_v._Fidelity_Investment.pdf
+
+# Added 2011-08-22
+Disallow: /ca11/f35/shana-dominguez-v-metropolitan-miami-dade/
+Disallow: /pdf/2006/02/14/Shana_Dominguez_v._Metropolitan_Miami-Dade.pdf
