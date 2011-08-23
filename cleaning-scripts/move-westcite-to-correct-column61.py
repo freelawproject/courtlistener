@@ -59,7 +59,7 @@ def db_corrector(simulate, verbose):
         if not simulate:
             doc.citation.save()
 
-    print "***DATA LOSS WARNING - DO NOT RUN THIS SCRIPT TWICE***
+    print "***DATA LOSS WARNING - DO NOT RUN THIS SCRIPT TWICE***"
 
 
 def main():
@@ -80,7 +80,7 @@ def main():
         print "* SIMULATE MODE - NO CHANGES WILL BE MADE *"
         print "*******************************************"
 
-    print "***DATA LOSS WARNING - DO NOT RUN THIS SCRIPT TWICE***
+    print "***DATA LOSS WARNING - DO NOT RUN THIS SCRIPT TWICE***"
 
     return db_corrector(simulate, verbose)
     exit(0)
