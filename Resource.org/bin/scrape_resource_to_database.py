@@ -158,7 +158,7 @@ def scrape_and_parse():
     DEBUG = 4
     # Set to False to disable automatic browser usage. Else, set to the
     # command you want to run, e.g. 'firefox'
-    BROWSER = 'firefox'
+    BROWSER = False 
     court_fix_file = open('f2_court_fix_file.txt', 'a')
     date_fix_file = open('f2_date_fix_file.txt', 'a')
     case_name_short_fix_file = open('f2_short_case_name_fix_file.txt', 'a')
