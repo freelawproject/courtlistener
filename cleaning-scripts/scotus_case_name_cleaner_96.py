@@ -36,6 +36,7 @@ from alertSystem.models import Document, Citation
 from lib.db_tools import queryset_iterator
 from lib.string_utils import clean_string
 from lib.string_utils import harmonize
+from lib.string_utils import titlecase
 from optparse import OptionParser
 import re
 
@@ -45,8 +46,8 @@ def cleaner(simulate=False, verbose=False):
     for doc in docs:
         caseNameShortOrig = doc.citation.caseNameShort
         caseNameFullOrig = doc.citation.caseNameFull
-        caseNameShort = clean_string(harmonize(caseNameShortOrig))
-        caseNameFull  = clean_string(harmonize(caseNameFullOrig))
+        caseNameShort = titlecase(harmonize(clean_string(caseNameShortOrig)))
+        caseNameFull  = titlecase(harmonize(clean_string(caseNameFullOrig)))
         doc.citation.caseNameShort = caseNameShort
         doc.citation.caseNameFull = caseNameFull
         if verbose:
