@@ -18,15 +18,13 @@ syntax: glob
 # ignore the django directory
 django
 
-# the desktop config
-alert/media/pdf
-
 # the server and laptop config
 alert/assets/media/pdf
 alert/assets/media/txt
 alert/assets/media/wpd
 alert/assets/media/sitemaps
 alert/assets/media/doc
+alert/assets/media/dumps
 
 # the django-sphinx code
 django-sphinx
@@ -35,8 +33,7 @@ django-sphinx
 Piwik
 
 # the FederalReports
-Resource.org/F2
-Resource.org/US
+Resource.org/data
 
 # Sphinx
 Sphinx/data
