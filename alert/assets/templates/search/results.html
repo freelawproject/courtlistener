@@ -233,7 +233,7 @@
                 <h3 class="bottom alt">
                     <a href="{{result.get_absolute_url}}?q={{query}}">
                         {{ result.citation.caseNameFull }},
-                        {% if result.citation.westCite != '' and result.citation.westCite != None% }
+                        {% if result.citation.westCite != '' and result.citation.westCite != None %}
                             {{result.citation.westCite}}
                         {% else %}
                             {{result.citation.docketNumber}}
