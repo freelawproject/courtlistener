@@ -1,12 +1,12 @@
 To do:
  - fix resource.org links (see bug)
     - then: change the link on the case page to say Download Original > At Resource.org
+    - then: fix dumps
  - check out the outliars in the DB by date
  - fix @casename "unpublished disposition" cases (bug 182)
  - recreate the stat_maker.py script (see bug)
  - create queue for parser (or similar, see bug)
  - Apply <span class="alt"> to all 'v.' in document titles
- - What's happening with this dump; http://courtlistener.com/dump-api/1968/ca1.xml.gz
  - Investigate adding document back to the admin site for Brian
  - Check the dates/courts in Brians list of citation-less docs, and see if we
    missed any docs.
@@ -17,8 +17,7 @@ To do:
 When deploying:
  - all dumps are updated with docket numbers rather than case numbers. Need to
    delete old ones, and test that empty attributes don't cause the entire doc
-   not to show up. Once tested, tackle the bug about various bad bits of
-   data in the case names, then notify mailing list and Malamud.
+   not to show up (Done). Once tested, notify mailing list and Malamud.
  - Run MySQL optimize command
 
 
