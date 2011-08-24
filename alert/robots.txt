@@ -183,4 +183,8 @@ Disallow: /pdf/2010/03/15/Larry_Green_v._Fidelity_Investment.pdf
 
 # Added 2011-08-22
 Disallow: /ca11/f35/shana-dominguez-v-metropolitan-miami-dade/
-Disallow: /pdf/2006/02/14/Shana_Dominguez_v._Metropolitan_Miami-Dade.pdf
+Disallow: /pdf/2006/02/14/Shana_Dominguez_v._Metropolitan_Miami-Dade.pduf
+
+# Added 2011-08-23
+Disallow: /ca6/29gq/christine-monateri-v-commissioner-of-social-securi/
+Disallow: /pdf/2011/08/11/Christine_Monateri_v._Commissioner_of_Social_Security.pdf
