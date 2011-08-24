@@ -233,12 +233,12 @@
                 <h3 class="bottom alt">
                     <a href="{{result.get_absolute_url}}?q={{query}}">
                         {{ result.citation.caseNameFull }},
-                        {% if result.citation.westCite != '' %}
+                        {% if result.citation.westCite != '' and result.citation.westCite != None% }
                             {{result.citation.westCite}}
                         {% else %}
                             {{result.citation.docketNumber}}
                         {% endif %}
-                        ({% if result.court.shortName != 'SCOTUS' %}{{result.court.shortName}} {% endif %}{{result.dateFiled|date:"Y"}})
+                        ({% if result.court.shortName != 'SCOTUS' %}{{result.court.shortName}}&nbsp;{% endif %}{{result.dateFiled|date:"Y"}})
                     </a>
                 </h3>
                 <p class="bottom">
@@ -274,7 +274,7 @@
                     {% endif %}
                 </p>
                 <p>
-                    {% if result.citation.westCite != '' and result.citation.docketNumber %}
+                    {% if result.citation.westCite != '' and result.citation.westCite != None and result.citation.docketNumber %}
                         <strong>Docket Number: </strong>
                         {{ result.citation.docketNumber }}
                     {% endif %}

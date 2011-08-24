@@ -1,11 +1,16 @@
 To do:
- - change the link on the case page to say Download Original > At Resource.org
- - add width/height attributes to images in profile pages
- - use nbsp; in citations
+ - fix resource.org links (see bug)
+    - then: change the link on the case page to say Download Original > At Resource.org
  - check out the outliars in the DB by date
- - recreate the stat_maker.py script
- - Update flatpage for the sitemap, and update the list of courts on the browse
-   page and anywhere else
+ - fix @casename "unpublished disposition" cases (bug 182)
+ - recreate the stat_maker.py script (see bug)
+ - create queue for parser (or similar, see bug)
+ - Apply <span class="alt"> to all 'v.' in document titles
+ - What's happening with this dump; http://courtlistener.com/dump-api/1968/ca1.xml.gz
+ - Investigate adding document back to the admin site for Brian
+ - Check the dates/courts in Brians list of citation-less docs, and see if we
+   missed any docs.
+ - announce the changes on the "blog"
 
 
 
@@ -32,3 +37,9 @@ Done:
     - update the SQL lines and infix fields manually --> Done
     - reindex. --> Done.
     - update any saved queries from caseNumber --> docketNumber --> Done
+ - use nbsp; in citations --> Done
+ - sort out why docket numbers aren't appearing correctly --> Done
+ - add width/height attributes to images in profile pages --> Done
+ - Update flatpage for the sitemap, and update the list of courts on the browse
+   page and anywhere else
+ - Remove border on error "Woah" page.

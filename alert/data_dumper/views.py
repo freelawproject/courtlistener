@@ -160,33 +160,67 @@ def serve_or_gen_dump(request, court, year, month=None, day=None):
 
             try:
                 for doc in docs_to_dump:
+                    row = etree.Element("opinion")
                     try:
-                        row = etree.Element("opinion",
-                            dateFiled           = str(doc.dateFiled),
-                            precedentialStatus  = doc.documentType,
-                            local_path          = str(doc.local_path),
-                            time_retrieved      = str(doc.time_retrieved),
-                            download_URL        = doc.download_URL,
-                            docketNumber        = doc.citation.docketNumber,
-                            westCite            = doc.citation.westCite,
-                            lexisCite           = doc.citation.lexisCite,
-                            caseNameShort       = doc.citation.caseNameShort,
-                            court               = doc.court.get_courtUUID_display(),
-                            sha1                = doc.documentSHA1,
-                            source              = doc.get_source_display(),
-                            id                  = str(doc.documentUUID),
-                        )
+                        # These are required by the DB, and thus are safe
+                        # without the try/except blocks
+                        row.set('id', str(doc.documentUUID))
+                        row.set('sha1', doc.documentSHA1)
+                        row.set('court', doc.court.get_courtUUID_display())
+                        row.set('download_URL', doc.download_URL)
+                        row.set('time_retrieved', str(doc.time_retrieved))
+                        try:
+                            row.set('dateFiled', str(doc.dateFiled))
+                        except:
+                            # Value not found.
+                            row.set('dateFiled', '')
+                        try:
+                            row.set('precedentialStatus', doc.documentType)
+                        except:
+                            # Value not found.
+                            row.set('precedentialStatus', '')
+                        try:
+                            row.set('local_path', str(doc.local_path))
+                        except:
+                            # Value not found.
+                            row.set('local_path', '')
+                        try:
+                            row.set('docketNumber', doc.citation.docketNumber)
+                        except:
+                            # Value not found.
+                            row.set('docketNumber', '')
+                        try:
+                            row.set('westCite', doc.citation.westCite)
+                        except:
+                            # Value not found.
+                            row.set('westCite', '')
+                        try:
+                            row.set('lexisCite', doc.citation.lexisCite)
+                        except:
+                            # Value not found.
+                            row.set('lexisCite', '')
+                        try:
+                            row.set('caseNameFull', doc.citation.caseNameFull)
+                        except:
+                            # Value not found.
+                            row.set('caseNameFull', '')
+                        try:
+                            row.set('source', doc.get_source_display())
+                        except:
+                            # Value not found.
+                            row.set('source', '')
+
+                        # Gather the doc text
                         if doc.documentHTML != '':
                             row.text = doc.documentHTML
                         else:
                             row.text = doc.documentPlainText.translate(null_map)
-                        z_file.write('  ' + etree.tostring(row).encode('utf-8') + '\n')
                     except ValueError:
                         # Null byte found. Punt.
                         continue
-                    except AttributeError:
-                        # Document lacks attribute. Punt.
-                        continue
+
+                    z_file.write('  ' + etree.tostring(row).encode('utf-8') + '\n')
+
             except IndexError:
                 return HttpResponseBadRequest('<h2>Error 400: No cases found for this \
                     time period.</h2>')

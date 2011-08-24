@@ -23,7 +23,8 @@ from djangosphinx.models import SphinxSearch
 from django.db import models
 import alert
 
-# a tuple, which we'll pass to the choices argument in various places
+# a tuple, which we'll pass to the choices argument in various places.
+# Items are commented out until we have data/scrapers for them.
 PACER_CODES = (
     ('scotus', 'Supreme Court of the United States'),
     ('ca1',    'Court of Appeals for the First Circuit'),
@@ -40,13 +41,13 @@ PACER_CODES = (
     ('cadc',   'Court of Appeals for the D.C. Circuit'),
     ('cafc',   'Court of Appeals for the Federal Circuit'),
     ('ccpa',   'Court of Customs and Patent Appeals'),
-    ('eca',    'The Emergency Court of Appeals'),
-    ('tecoa',  'The Temporary Emergency Court of Appeals'),
-    ('cc',     'The Court of Claims'),
-    ('cfc',    'The United States Court of Federal Claims'),
-    ('cusc',   'The United States Customs Court'),
-    ('cit',    'The United States Court of International Trade'),
-    ('com',    'The Commerce Court'),
+    ('eca',    'Emergency Court of Appeals'),
+    #('tecoa',  'Temporary Emergency Court of Appeals'),
+    #('cc',     'Court of Claims'),
+    ('cfc',    'United States Court of Federal Claims'),
+    #('cusc',   'United States Customs Court'),
+    #('cit',    'United States Court of International Trade'),
+    #('com',    'Commerce Court'),
 )
 
 # changes here need to be mirrored in the coverage page view and the exceptions

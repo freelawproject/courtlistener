@@ -50,7 +50,11 @@
                             <td>{{ alert.get_alertFrequency_display }}</td>
                             <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"Never" }}</td>
                             <td>{{ alert.alertPrivacy|yesno:"Yes,No" }}</td>
-                            <td><a href="/feed/search/?q={{alert.alertText}}"><img src="/media/images/png/atom-feed.png" alt="atom icon"></a>
+                            <td>
+                                <a href="/feed/search/?q={{alert.alertText}}">
+                                    <img src="/media/images/png/atom-feed.png" alt="atom icon" height="12px" width="12px">
+                                </a>
+                            </td>
                             <td><a href="/alert/edit/{{ alert.alertUUID }}/">edit/delete</a></td>
                         </tr>
                         {% endfor %}
