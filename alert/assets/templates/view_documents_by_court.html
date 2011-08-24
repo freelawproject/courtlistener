@@ -8,26 +8,15 @@
 {% endblock %}
 
 {% block head %}
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for all Courts of Appeal" href="/feed/court/all/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the U.S. Supreme Court" href="/feed/court/scotus/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the First Circuit" href="/feed/court/ca1/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Second Circuit" href="/feed/court/ca2/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Third Circuit" href="/feed/court/ca3/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Fourth Circuit" href="/feed/court/ca4/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Fifth Circuit" href="/feed/court/ca5/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Sixth Circuit" href="/feed/court/ca6/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Seventh Circuit" href="/feed/court/ca7/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eighth Circuit" href="/feed/court/ca8/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Ninth Circuit" href="/feed/court/ca9/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Tenth Circuit" href="/feed/court/ca10/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eleventh Circuit" href="/feed/court/ca11/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the D.C. Circuit" href="/feed/court/cadc/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Federal Circuit" href="/feed/court/cafc/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for all Federal Courts of Appeal" href="/feed/court/all/">
+    {% for court in courts %}
+        <link rel="alternate" type="application/rss+xml" title="Atom feed for the {{ court.get_courtUUID_display }}" href="/feed/court/{{court.courtUUID}}/">
+    {% endfor %}
 {% endblock %}
 
 {% block sidebar %}
     <div class="span-5 colborder" id="sidebar">
-        <h3>Browse other courts</h3>
+        <h3>Browse by court</h3>
         <p>
             <a href="/opinions/all/">All courts</a><br>
             <a href="/opinions/scotus/">U.S. Supreme Court</a><br>
@@ -44,6 +33,9 @@
             <a href="/opinions/ca11/">Eleventh Circuit</a><br>
             <a href="/opinions/cadc/">D.C. Circuit</a><br>
             <a href="/opinions/cafc/">Federal Circuit</a><br>
+            <a href="/opinions/ccpa/">Customs and Patent Appeals</a><br>
+            <a href="/opinions/cfc/">Court of Federal Claims</a><br>
+            <a href="/opinions/eca/">Emergency Court of Appeals</a>
         </p>
     </div>
 {% endblock %}
@@ -57,12 +49,12 @@
                 <h3 class="bottom alt">
                     <a href="{{doc.get_absolute_url}}">
                         {{ doc.citation.caseNameFull }},
-                        {% if doc.citation.westCite != '' %}
+                        {% if doc.citation.westCite != '' and doc.citation.westCite != None %}
                             {{doc.citation.westCite}}
                         {% else %}
                             {{doc.citation.docketNumber}}
                         {% endif %}
-                        ({% if doc.court.shortName != 'SCOTUS' %}{{doc.court.shortName}} {% endif %}{{doc.dateFiled|date:"Y"}})
+                        ({% if doc.court.shortName != 'SCOTUS' %}{{doc.court.shortName}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
                     </a>
                 </h3>
                 <p class="bottom">
@@ -98,7 +90,7 @@
                     {% endif %}
                 </p>
                 <p>
-                    {% if doc.citation.westCite != '' and doc.citation.docketNumber %}
+                    {% if doc.citation.westCite != '' and doc.citation.westCite != None and doc.citation.docketNumber %}
                         <strong>Docket Number: </strong>
                         {{ doc.citation.docketNumber }}
                     {% endif %}

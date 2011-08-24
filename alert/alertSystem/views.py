@@ -253,5 +253,6 @@ def viewDocumentListByCourt(request, court):
     except (EmptyPage, InvalidPage):
         documents = paginator.page(paginator.num_pages)
 
-    return render_to_response('view_documents_by_court.html', {'title': ct,
-        "documents": documents}, RequestContext(request))
+    courts = Court.objects.all()
+    return render_to_response('view_documents_by_court.html', { 'title': ct,
+        "documents": documents, 'courts': courts }, RequestContext(request))
