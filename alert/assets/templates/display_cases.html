@@ -71,11 +71,17 @@
 
         {# Download original? #}
         <div class="sidebar-section">
-            <h3 class="bottom">Download Original</h3>
-            {% if doc.downloadURL or doc.local_path %}
+            <h3 class="bottom">View Original</h3>
+            {% if doc.download_URL or doc.local_path %}
                 <p>
                 {% if doc.download_URL %}
-                    <a href="{{doc.download_URL}}">From the court</a>
+                    <a href="{{doc.download_URL}}">
+                        {% if doc.source == 'R' %}
+                            From Resource.org
+                        {% else %}
+                            From the court
+                        {% endif %}
+                    </a>
                 {% endif %}
                 {% if doc.download_URL and doc.local_path %}
                     &nbsp;&nbsp;|&nbsp;&nbsp;

@@ -1,7 +1,8 @@
 To do:
- - fix resource.org links (see bug)
-    - then: change the link on the case page to say Download Original > At Resource.org
-    - then: fix dumps
+ - fix resource.org links (see bug) --> Done.
+    - then: change the link on the case page to say Download Original > At Resource.org --> Done.
+    - then: fix dumps --> Done.
+        - then: notify mailing list and Malamud.
  - check out the outliars in the DB by date
  - fix @casename "unpublished disposition" cases (bug 182)
  - recreate the stat_maker.py script (see bug)
@@ -11,14 +12,11 @@ To do:
  - Check the dates/courts in Brians list of citation-less docs, and see if we
    missed any docs.
  - announce the changes on the "blog"
-
-
-
-When deploying:
- - all dumps are updated with docket numbers rather than case numbers. Need to
-   delete old ones, and test that empty attributes don't cause the entire doc
-   not to show up (Done). Once tested, notify mailing list and Malamud.
  - Run MySQL optimize command
+ - Emails:
+    - Remove the download original link from emails. It's just not needed --> Done.
+    - Make the Your Alert -- blah -- has x results line stand out more in txt emails --> Done.
+ - valid fields error needs to be updated --> Done.
 
 
 Done:

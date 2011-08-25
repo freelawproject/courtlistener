@@ -158,7 +158,7 @@ def scrape_and_parse():
     DEBUG = 4
     # Set to False to disable automatic browser usage. Else, set to the
     # command you want to run, e.g. 'firefox'
-    BROWSER = False 
+    BROWSER = False
     court_fix_file = open('f2_court_fix_file.txt', 'a')
     date_fix_file = open('f2_date_fix_file.txt', 'a')
     case_name_short_fix_file = open('f2_short_case_name_fix_file.txt', 'a')
@@ -454,8 +454,8 @@ def scrape_and_parse():
                 # we only do this if it's new
                 doc.documentHTML = body
                 doc.documentSHA1 = sha1Hash
-                doc.download_URL = "http://bulk.resource.org/courts.gov/c/US/"\
-                    + str(i+1) + "/" + caseLink
+                doc.download_URL = "http://bulk.resource.org/courts.gov/c/F2/"\
+                    + str(i+178) + "/" + caseLink
                 doc.dateFiled = caseDate
                 doc.source = "R"
 
