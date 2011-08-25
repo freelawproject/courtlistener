@@ -242,10 +242,16 @@
                     </a>
                 </h3>
                 <p class="bottom">
-                    {% if result.downloadURL or result.local_path %}
-                        <strong>Download Original: </strong>
+                    {% if result.download_URL or result.local_path %}
+                        <strong>View Original: </strong>
                         {% if result.download_URL %}
-                            <a href="{{result.download_URL}}">From the court</a>
+                            <a href="{{doc.download_URL}}">
+                                {% if doc.source == 'R' %}
+                                    From Resource.org
+                                {% else %}
+                                    From the court
+                                {% endif %}
+                            </a>
                         {% endif %}
                         {% if result.download_URL and result.local_path %}
                             &nbsp;&nbsp;|&nbsp;&nbsp;
