@@ -96,7 +96,7 @@ def emailer(rate, verbose, simulate):
                     queryset = Document.search.query(query)
                     results = queryset.set_options(
                         mode="SPH_MATCH_EXTENDED2")\
-                        .filter(datefiled=todayInt)
+                        .filter(dateFiled=todayInt)
                 elif RATE == 'wly' and today.weekday() == 6:
                     # if it's a weekly alert and today is Sunday
                     if verbose:
@@ -104,7 +104,7 @@ def emailer(rate, verbose, simulate):
                     queryset = Document.search.query(query)
                     results = queryset.set_options(
                         mode="SPH_MATCH_EXTENDED2")\
-                        .filter(datefiled=dateIntsPastWeek)
+                        .filter(dateFiled=dateIntsPastWeek)
                 elif RATE == 'mly' and today.day == 1:
                     # if it's a monthly alert and today is the first of the
                     # month
@@ -113,7 +113,7 @@ def emailer(rate, verbose, simulate):
                     queryset = Document.search.query(query)
                     results = queryset.set_options(
                         mode="SPH_MATCH_EXTENDED2")\
-                        .filter(datefiled=dateIntsPastMonth)
+                        .filter(dateFiled=dateIntsPastMonth)
                 elif RATE == "off":
                     pass
             except:
