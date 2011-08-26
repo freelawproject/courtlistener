@@ -72,20 +72,25 @@
         {# Download original? #}
         <div class="sidebar-section">
             <h3 class="bottom">View Original</h3>
-            {% if doc.download_URL or doc.local_path %}
-                <p>
-                {% if doc.download_URL and result.source != 'R' %}
-                    <a href="{{doc.download_URL}}">From the court</a>
+            <p>
+                {% if doc.download_URL or doc.local_path %}
+                    {% if doc.source != 'R' %}
+                        {% if doc.download_URL and result.source != 'R' %}
+                            <a href="{{doc.download_URL}}">From the court</a>
+                        {% endif %}
+                        {% if doc.download_URL and result.source != 'R' and doc.local_path %}
+                            &nbsp;&nbsp;|&nbsp;&nbsp;
+                        {% endif %}
+                        {% if doc.local_path %}
+                            <a href="/{{doc.local_path}}">Our backup</a>
+                        {% endif %}
+                    {% else %}
+                        No downloadable versions
+                    {% endif %}
+                {% else %}
+                    No downloadable versions
                 {% endif %}
-                {% if doc.download_URL and result.source != 'R' and doc.local_path %}
-                    &nbsp;&nbsp;|&nbsp;&nbsp;
-                {% endif %}
-                {% if doc.local_path %}
-                    <a href="/{{doc.local_path}}">Our backup</a>
-                {% endif %}</p>
-            {% else %}
-                <p>No downloadable versions</p>
-            {% endif %}
+            </p>
         </div>
 
         {# Show the social links using sprites #}
