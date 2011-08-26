@@ -243,15 +243,19 @@
                 </h3>
                 <p class="bottom">
                     {% if result.download_URL or result.local_path %}
-                        <strong>View Original: </strong>
-                        {% if result.download_URL and result.source != 'R' %}
-                            <a href="{{result.download_URL}}">From the court</a>
-                        {% endif %}
-                        {% if result.download_URL and result.source != 'R' and result.local_path %}
-                            &nbsp;&nbsp;|&nbsp;&nbsp;
-                        {% endif %}
-                        {% if result.local_path %}
-                            <a href="/{{result.local_path}}">Our backup</a>
+                        {% if result.source != 'R' %}
+                            <strong>View Original:</strong>
+                            {% if result.download_URL %}
+                                <a href="{{result.download_URL}}">From the court</a>
+                            {% endif %}
+                            {% if result.download_URL and result.local_path %}
+                                &nbsp;&nbsp;|&nbsp;&nbsp;
+                            {% endif %}
+                            {% if result.local_path %}
+                                <a href="/{{result.local_path}}">Our backup</a>
+                            {% endif %}
+                        {% else %}
+                            No downloadable versions.
                         {% endif %}
                     {% else %}
                         No downloadable versions.

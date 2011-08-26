@@ -9,7 +9,6 @@ To do:
    missed any docs.
  - Run MySQL optimize command
  - Fix display of  information on Resource.org HTML display (CSS)
- - Figure out why result links are wrong.
  - Do F3
  - Import resource.org/robots.txt (see bug 187)
 
@@ -48,3 +47,4 @@ Done:
  - Change sitemap so it says original versions rather than PDFs, since we aren't
    exclusively dealing with PDFs
  - Remove resource.org links.
+ - Figure out why result links are wrong.
