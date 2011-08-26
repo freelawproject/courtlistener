@@ -15,7 +15,7 @@
 {% endblock %}
 
 {% block sidebar %}
-    <div class="span-5 colborder" id="sidebar">
+    <div class="span-5 append-1" id="sidebar">
         <h3>Browse by court</h3>
         <p>
             <a href="/opinions/all/">All courts</a><br>
@@ -60,16 +60,10 @@
                 <p class="bottom">
                     {% if doc.download_URL or doc.local_path %}
                         <strong>View Original: </strong>
-                        {% if doc.download_URL %}
-                            <a href="{{doc.download_URL}}">
-                                {% if doc.source == 'R' %}
-                                    At Resource.org
-                                {% else %}
-                                    From the court
-                                {% endif %}
-                            </a>
+                        {% if doc.download_URL and result.source != 'R' %}
+                            <a href="{{doc.download_URL}}">From the court</a>
                         {% endif %}
-                        {% if doc.download_URL and doc.local_path %}
+                        {% if doc.download_URL and result.source != 'R' and doc.local_path %}
                             &nbsp;&nbsp;|&nbsp;&nbsp;
                         {% endif %}
                         {% if doc.local_path %}
