@@ -1,8 +1,4 @@
 To do:
- - fix resource.org links (see bug) --> Done.
-    - then: change the link on the case page to say Download Original > At Resource.org --> Done.
-    - then: fix dumps --> Done.
-        - then: notify mailing list and Malamud.
  - check out the outliars in the DB by date
  - fix @casename "unpublished disposition" cases (bug 182)
  - recreate the stat_maker.py script (see bug)
@@ -11,12 +7,11 @@ To do:
  - Investigate adding document back to the admin site for Brian
  - Check the dates/courts in Brians list of citation-less docs, and see if we
    missed any docs.
- - announce the changes on the "blog"
  - Run MySQL optimize command
- - Emails:
-    - Remove the download original link from emails. It's just not needed --> Done.
-    - Make the Your Alert -- blah -- has x results line stand out more in txt emails --> Done.
- - valid fields error needs to be updated --> Done.
+ - Fix display of  information on Resource.org HTML display (CSS)
+ - Figure out why result links are wrong.
+ - Do F3
+ - Import resource.org/robots.txt (see bug 187)
 
 
 Done:
@@ -40,3 +35,16 @@ Done:
  - Update flatpage for the sitemap, and update the list of courts on the browse
    page and anywhere else
  - Remove border on error "Woah" page.
+ - Emails:
+    - Remove the download original link from emails. It's just not needed --> Done.
+    - Make the Your Alert -- blah -- has x results line stand out more in txt emails --> Done.
+ - valid fields error needs to be updated --> Done.
+ - fix resource.org links (see bug) --> Done.
+    - then: change the link on the case page to say Download Original > At Resource.org --> Done.
+    - then: fix dumps --> Done.
+        - then: notify mailing list and Malamud. --> Done.
+ - announce the changes on the "blog"
+ - remove all colborders, and replace with append-1
+ - Change sitemap so it says original versions rather than PDFs, since we aren't
+   exclusively dealing with PDFs
+ - Remove resource.org links.

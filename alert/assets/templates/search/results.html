@@ -41,7 +41,7 @@
 
 
 {% block sidebar %}
-    <div class="span-5 colborder" id="sidebar">
+    <div class="span-5 append-1" id="sidebar">
         {% if user.is_authenticated and query %}
             <div class="sidebar-section">
                 <h3 id="create-alert" class="pointer collapsed-heading sprites">Create alert</h3>
@@ -244,16 +244,10 @@
                 <p class="bottom">
                     {% if result.download_URL or result.local_path %}
                         <strong>View Original: </strong>
-                        {% if result.download_URL %}
-                            <a href="{{doc.download_URL}}">
-                                {% if doc.source == 'R' %}
-                                    At Resource.org
-                                {% else %}
-                                    From the court
-                                {% endif %}
-                            </a>
+                        {% if result.download_URL and result.source != 'R' %}
+                            <a href="{{result.download_URL}}">From the court</a>
                         {% endif %}
-                        {% if result.download_URL and result.local_path %}
+                        {% if result.download_URL and result.source != 'R' and result.local_path %}
                             &nbsp;&nbsp;|&nbsp;&nbsp;
                         {% endif %}
                         {% if result.local_path %}
@@ -272,7 +266,7 @@
                     {% endif %}
                 </p>
                 <p class="bottom">
-                    <strong>Status: </strong>
+                    <strong>Status:</strong>
                     {% if result.documentType %}
                         {{result.get_documentType_display}}
                     {% else %}
@@ -281,7 +275,7 @@
                 </p>
                 <p>
                     {% if result.citation.westCite != '' and result.citation.westCite != None and result.citation.docketNumber %}
-                        <strong>Docket Number: </strong>
+                        <strong>Docket Number:</strong>
                         {{ result.citation.docketNumber }}
                     {% endif %}
                 </p>
