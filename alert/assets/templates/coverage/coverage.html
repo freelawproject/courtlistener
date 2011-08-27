@@ -20,7 +20,7 @@
                     {% if court.courtUUID == "scotus" %}
                         <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>09/01/1754</td><td>Missing 545 U.S.</td>
                     {% else %}
-                        <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td><td>No known gaps</td>
+                        <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td><td>Some gaps</td>
                     {% endif %}
                 </tr>
             {% endfor %}
@@ -42,7 +42,7 @@
                     {% if court.courtUUID == "scotus" %}
                         <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td><td>Missing 545 U.S.</td>
                     {% else %}
-                        <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td><td>No known gaps</td>
+                        <td>{{document.court.get_courtUUID_display}}</td><td>{{numCases|intcomma}}</td><td>{{ document.dateFiled|date:"n/j/Y" }}</td><td>Some gaps</td>
                     {% endif %}
                 </tr>
             {% endfor %}

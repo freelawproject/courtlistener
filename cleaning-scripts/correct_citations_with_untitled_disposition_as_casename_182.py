@@ -32,8 +32,11 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
+from django.template.defaultfilters import slugify
+
 from alertSystem.models import Document, Citation
 from lib.db_tools import queryset_iterator
+from lib.string_utils import trunc
 from optparse import OptionParser
 
 
@@ -49,15 +52,25 @@ def cleaner(simulate=False, verbose=False):
     '''
     #docs = queryset_iterator(Document.objects.filter(source = 'R', time_retrieved__gt = '2011-06-01'))
     queryset = Document.search.query('@casename "unpublished disposition"')
-    docs = queryset.set_options(mode="SPH_MATCH_EXTENDED2")
-    for doc in docs:
-        print doc.download_URL
-        casename = raw_input("Case name: ")
-        doc.citation.caseNameFull = casename
-        doc.citation.caseNameShort = trunc(casename)
-        doc.citation.slug = slugify(casename)
-        if not simulate:
-            doc.save()
+    docs = queryset.set_options(mode="SPH_MATCH_EXTENDED2").order_by('-dateFiled')
+    if verbose:
+        print "%s results found." % (docs.count())
+
+    # Must slice here, or else only get top 20 results
+    for doc in docs[0:docs.count()]:
+	if doc.citation.caseNameFull.lower() == "unpublished disposition":
+            # Only do each case once, since the index isn't updated until 
+            # later, and I may run this script many times.
+            print doc.download_URL
+            casename = raw_input("Case name: ")
+            doc.citation.caseNameFull = casename
+            doc.citation.caseNameShort = trunc(casename, 100)
+            doc.citation.slug = trunc(slugify(casename), 50)
+            doc.documentType = "Unpublished"
+            if not simulate:
+                doc.citation.save()
+                doc.save()
+            print ""
 
 
 def main():
