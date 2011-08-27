@@ -36,6 +36,10 @@ Sets up all the overrides or additional CSS that the site uses.
     display: inline;
 }
 
+span.bold {
+    font-weight: bold;
+}
+
 .center {
     text-align: center;
 }

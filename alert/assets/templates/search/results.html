@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% load text_filters %}
+
 
 {# this could mirror the titles of yahoo, google and bing more closely, if we want. #}
 {% block title %} CourtListener.com / Results / {{ query }} /
@@ -238,7 +240,7 @@
                         {% else %}
                             {{result.citation.docketNumber}}
                         {% endif %}
-                        ({% if result.court.shortName != 'SCOTUS' %}{{result.court.shortName}}&nbsp;{% endif %}{{result.dateFiled|date:"Y"}})
+                        ({% if result.court.shortName != 'SCOTUS' %}{{result.court.shortName|nbsp}}&nbsp;{% endif %}{{result.dateFiled|date:"Y"}})
                     </a>
                 </h3>
                 <p class="bottom">

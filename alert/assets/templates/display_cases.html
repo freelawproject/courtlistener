@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% load text_filters %}
+
 {# Shown on document display pages. #}
 
 {% block title %}CourtListener.com / Browse / {{ title }}{% endblock %}
@@ -122,13 +124,13 @@
             <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-off"></a>
         {% endif %}
         <h2>
-            {{ doc.citation.caseNameFull }},
+            {{ doc.citation.caseNameFull|v_wrapper }},
             {% if doc.citation.westCite != '' and doc.citation.westCite != None %}
                 {{doc.citation.westCite}}
             {% else %}
                 {{doc.citation.docketNumber}}
             {% endif %}
-            ({% if doc.court.shortName != 'SCOTUS' %}{{doc.court.shortName}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
+            ({% if doc.court.shortName != 'SCOTUS' %}{{doc.court.shortName|nbsp}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
         </h2>
         <div id="modal-rel">
             {# Modal box for saving the favorite #}
