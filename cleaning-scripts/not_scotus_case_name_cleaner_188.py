@@ -32,44 +32,35 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from django.template.defaultfilters import slugify
-
 from alertSystem.models import Document, Citation
 from lib.db_tools import queryset_iterator
-from lib.string_utils import trunc
+from lib.string_utils import clean_string
+from lib.string_utils import harmonize
+from lib.string_utils import titlecase
 from optparse import OptionParser
+import re
 
 
 def cleaner(simulate=False, verbose=False):
-    '''Fixes the titles of cases where the name is untitle disposition.
-
-    Basically, the algorithm here is to find all cases with the error, then
-    open each in Firefox one by one. After each case is opened, a prompt will
-    allow the case name to be typed in, and it will be corrected on the site.
-
-    These corrections will go live immediately, but will require a reindex to
-    be live in the search system.
-    '''
-    queryset = Document.search.query('@casename "unpublished disposition"')
-    docs = queryset.set_options(mode="SPH_MATCH_EXTENDED2").order_by('-dateFiled')
-    if verbose:
-        print "%s results found." % (docs.count())
-
-    # Must slice here, or else only get top 20 results
-    for doc in docs[0:docs.count()]:
-	if doc.citation.caseNameFull.lower() == "unpublished disposition":
-            # Only do each case once, since the index isn't updated until
-            # later, and I may run this script many times.
-            print doc.download_URL
-            casename = raw_input("Case name: ")
-            doc.citation.caseNameFull = casename
-            doc.citation.caseNameShort = trunc(casename, 100)
-            doc.citation.slug = trunc(slugify(casename), 50)
-            doc.documentType = "Unpublished"
-            if not simulate:
-                doc.citation.save()
-                doc.save()
-            print ""
+    docs = queryset_iterator(Document.objects.filter(dateFiled__gt = '1993-08-02'))
+    for doc in docs:
+        caseNameShortOrig = doc.citation.caseNameShort
+        caseNameFullOrig = doc.citation.caseNameFull
+        caseNameShort = titlecase(harmonize(clean_string(caseNameShortOrig)))
+        caseNameFull  = titlecase(harmonize(clean_string(caseNameFullOrig)))
+        doc.citation.caseNameShort = caseNameShort
+        doc.citation.caseNameFull = caseNameFull
+        if verbose:
+            if (caseNameShortOrig != caseNameShort) or (caseNameFullOrig != caseNameFull):
+                print "Document: %s" % (doc.documentUUID)
+            if caseNameShortOrig != caseNameShort:
+                print "Short name, replacing: '%s'" % (caseNameShortOrig)
+                print "                 with: '%s'" % (caseNameShort)
+            if caseNameFullOrig != caseNameFull:
+                print " Full name, replacing: '%s'" % (caseNameFullOrig)
+                print "                 with: '%s'\n" % (caseNameFull)
+        if not simulate:
+            doc.citation.save()
 
 
 def main():
@@ -96,3 +87,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
