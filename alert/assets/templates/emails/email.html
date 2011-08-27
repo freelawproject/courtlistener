@@ -1,3 +1,5 @@
+{% load text_filters %}
+
 <!DOCTYPE html>
 <html style="font-size: 100.01%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">
     <head>
@@ -35,7 +37,7 @@
                             {% else %}
                                 {{doc.citation.docketNumber}}
                             {% endif %}
-                            ({% if doc.court.shortName != 'SCOTUS' %}{{doc.court.shortName}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
+                            ({% if doc.court.shortName != 'SCOTUS' %}{{doc.court.shortName|nbsp}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
                         </a>
                     </h3>
                     <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;"><strong style="font-weight: bold;">Status:</strong> {{doc.get_documentType_display}}<br>

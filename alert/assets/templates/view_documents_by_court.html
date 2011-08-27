@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% load humanize %}
+{% load text_filters %}
+
 
 {% block title %}CourtListener.com / Opinions / {{ title }}
     {% if documents.paginator.num_pages %}
@@ -54,7 +56,7 @@
                         {% else %}
                             {{doc.citation.docketNumber}}
                         {% endif %}
-                        ({% if doc.court.shortName != 'SCOTUS' %}{{doc.court.shortName}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
+                        ({% if doc.court.shortName != 'SCOTUS' %}{{doc.court.shortName|nbsp}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
                     </a>
                 </h3>
                 <p class="bottom">
