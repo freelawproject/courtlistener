@@ -184,19 +184,23 @@ a:focus, a:hover {
 
 /* Display cases from Resources.org neatly */
 span.num {
-    position: relative;
+    position: absolute;
     color: #999999;
 }
 
-p.indent, div.footnote > p {
+p.indent {
     position: relative;
     margin-left: 2em;
-    margin-top: -1.5em;
+    margin-top: 1.5em;
 }
 
 div.footnotes {
     border-top: 1px dotted black;
     padding-top: 1em;
+}
+
+div.footnote > p {
+    margin-left: 2em;
 }
 
 div.prelims {
@@ -215,6 +219,7 @@ div.prelims p {
 div.footnote a.footnote {
     /* Needs proper color use */
     color: #000099;
+    position: absolute;
 }
 
 p a.footnote {
