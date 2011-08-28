@@ -1,6 +1,5 @@
 To do:
  - check out the outliars in the DB by date
- - fix @casename "unpublished disposition" cases (bug 182)
  - recreate the stat_maker.py script (see bug)
  - create queue for parser (or similar, see bug)
  - Investigate adding document back to the admin site for Brian
@@ -49,3 +48,4 @@ Done:
  - Figure out why result links are wrong.
  - create a nbsp filter
  - Apply <span class="alt"> to all 'v.' in document titles
+ - fix @casename "unpublished disposition" cases (bug 182)

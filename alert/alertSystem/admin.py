@@ -38,6 +38,18 @@ class CitationAdmin(admin.ModelAdmin):
     search_fields = ['caseNameShort', 'caseNameFull', 'docketNumber', 'westCite']
 
 
+class DocumentAdmin(admin.ModelAdmin):
+    # ordering is brutal on MySQL. Don't put it here. Sorry.
+    #list_display = ('citation',)
+    #list_filter = ('court',)
+    fields = ('source', 'documentSHA1', 'dateFiled', 'court',
+              'excerptSummary', 'download_URL',
+              'local_path', 'documentPlainText', 'documentHTML',
+              'documentType',)
+    search_fields = ['documentPlainText']
+
+
+admin.site.register(Document, DocumentAdmin)
 admin.site.register(Court)
 admin.site.register(Citation, CitationAdmin)
 
