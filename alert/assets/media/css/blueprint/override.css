@@ -1,0 +1,479 @@
+/* --------------------------------------------------------------------------
+Sets up all the overrides or additional CSS that the site uses.
+---------------------------------------------------------------------------*/
+
+.footer-item {
+    float: left;
+    margin-right: 3em;
+    margin-bottom: 4em;
+    width: auto;
+}
+
+/* for the nav in the settings pages*/
+.header {
+    float: left;
+}
+
+.settings-nav-item a, .settings-nav-item a:hover, .settings-nav-item a:active, .settings-nav-item a:focus {
+    color: black;
+}
+
+.settings-nav-item {
+    float: left;
+    margin-right: 1em;
+}
+
+.settings-nav-item:last-child {
+    margin-right: 0em;
+}
+
+.settings-nav-item.active {
+    font-weight: bold;
+}
+
+/* General class shortcuts */
+.inline {
+    display: inline;
+}
+
+span.bold {
+    font-weight: bold;
+}
+
+.center {
+    text-align: center;
+}
+
+.right {
+    text-align: right;
+}
+
+.hidden {
+    display: none;
+}
+
+.round {
+    -moz-border-radius: 6px 6px 6px 6px;
+    -webkit-border-radius: 6px;
+}
+
+.round-bottom {
+    -moz-border-radius-bottomright: 6px;
+    -moz-border-radius-bottomleft: 6px;
+    -webkit-border-bottom-right-radius: 6px;
+    -webkit-border-bottom-left-radius: 6px;
+}
+
+.pointer {
+    cursor: pointer;
+    cursor: hand;
+}
+
+.help {
+    cursor: help;
+}
+
+
+
+/* layout */
+.container {
+    padding: 0px 10px;
+    padding-top: 10px;
+}
+
+.navigation {
+    padding-bottom: 3em;
+}
+
+.navigation > ul {
+    display: inline;
+    padding: 0;
+}
+
+.navigation > ul > li {
+    list-style: none outside none;
+    padding: 0em 0.7em 0em 0.0em;
+    white-space: nowrap;
+    text-align: center;
+    display: inline;
+}
+
+#sidebar {
+    margin-top: 6px;
+}
+
+.sidebar-section {
+    margin-bottom: 2em;
+}
+
+#search-form table{
+    width: auto;
+    margin-bottom: auto;
+}
+
+#search-form td{
+    padding: 0px;
+}
+
+#search-input-home-page, #search-input {
+    width: 500px;
+    border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
+    border-style: solid none solid solid;
+    border-width: 1px 0px 1px 1px;
+    font-size: 16px;
+    height: 20px;
+}
+
+#search-input {
+    width: 389px;
+}
+
+#search-button-home-page, #search-button {
+    height: 32px;
+    padding: 4px 10px;
+    margin: 0px;
+    border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
+}
+
+#search-input-home-page:focus, #search-input:focus{
+    outline-style: none;
+}
+
+#search-button {
+    left: 0px;
+}
+
+/* link formatting */
+a:link, a:visited {
+    text-decoration: none;
+}
+
+a:focus, a:hover {
+    color: #000099;
+    text-decoration: underline;
+}
+
+.fake-link {
+    color: #009;
+}
+
+.fake-link:hover {
+    text-decoration: underline;
+    color: #009;
+    cursor: pointer;
+    cursor: hand;
+}
+
+/* errors */
+.error a, .notice a, .success a {
+    text-decoration: underline;
+}
+
+.error a:focus, .error a:hover {
+    color: #8A1F11;
+}
+
+.notice a:focus, .notice a:hover, .success a:focus, .success a:hover {
+    color: #514721;
+}
+
+.errortext {
+    color: #8a1f11;
+}
+
+
+/* Display cases from Resources.org neatly */
+span.num {
+    position: absolute;
+    color: #999999;
+}
+
+p.indent {
+    position: relative;
+    margin-left: 2em;
+    margin-top: 1.5em;
+}
+
+div.footnotes {
+    border-top: 1px dotted black;
+    padding-top: 1em;
+}
+
+div.footnote > p {
+    margin-left: 2em;
+}
+
+div.prelims {
+    background: none repeat scroll 0 0 #eeeeee;
+    border: 1px solid #dddddd;
+    padding-top: 1.5em;
+}
+
+div.prelims p {
+    position: relative;
+    margin-left: 2em;
+    margin-right: 2em;
+    margin-top: 0em;
+}
+
+p.parties {
+    text-align: center;
+}
+
+div.footnote a.footnote {
+    /* Needs proper color use */
+    color: #000099;
+    position: absolute;
+}
+
+p a.footnote {
+    /* make footnotes superscript */
+    vertical-align: text-top;
+    font-size: 70%;
+    color: #000099;
+}
+/* End Resource.org display CSS */
+
+
+input.wide-title {
+    width: 390px;
+    padding: 5px;
+    font-size:1.5em;
+}
+
+
+/* Disabled button formatting */
+button[disabled]:active, button[disabled]:hover, button[disabled] {
+    color: #bdbdbd;
+    background-color: #F5F5F5;
+    -moz-border-bottom-colors: none;
+    -moz-border-image: none;
+    -moz-border-left-colors: none;
+    -moz-border-right-colors: none;
+    -moz-border-top-colors: none;
+    background-color: #F5F5F5;
+    border-color: #EEEEEE #DEDEDE #DEDEDE #EEEEEE;
+    border-right: 1px solid #DEDEDE;
+    border-style: solid;
+    border-width: 1px;
+    cursor: default;
+}
+
+fieldset.collapsed {
+    border-bottom-width: 0px;
+    border-left-width: 0px;
+    border-right-width: 0px;
+    border-top-width: 0px;
+    margin-bottom: 0px;
+    padding: 0em;
+}
+
+#advanced {
+    float: right;
+}
+
+#advanced-home-page {
+    width: 545px;
+}
+
+#advanced-home-page > legend {
+    font-size: 100%;
+}
+
+#modal-rel {
+    position: relative;
+}
+
+#modal-save-favorite, #modal-logged-out {
+    z-index: 10;
+    top: -10px;
+    left: 10px;
+    box-shadow: 2px 2px 5px #000000;
+    position: absolute;
+    padding: 1em;
+    border: 1px solid #DDDDDD;
+    background: white;
+}
+
+#modal-logged-out {
+    top: -10px;
+    left: 10px;
+    padding: 2em;
+}
+
+#save-favorite-text-area {
+    height: auto;
+}
+
+#modal-save-favorite .save-favorite-button {
+    margin-right: 0px;
+}
+
+#favorites-bottom-section {
+    margin-top: 4em;
+}
+
+#save-favorite-delete {
+    margin-bottom: 0.3em;
+}
+
+#favorites-buttons {
+    position: absolute;
+    right: 1em;
+    bottom: 0.3em;
+}
+
+
+/* Tables on settings pages */
+.settings-table th {
+    border-width: 0px 0px 1px 0px;
+    border-style: solid;
+    border-color: gray;
+}
+
+.settings-table td {
+    border-width: 0px 0px 1px 0px;
+    border-style: dotted;
+    border-color: gray;
+}
+
+.settings-table tr:last-child td {
+    border-width: 0px;
+}
+
+.settings-table tbody tr:hover {
+    background-color: #f0f0f0;
+}
+
+/* Sprites! */
+.sprites {
+    background-image     : url("/media/images/png/social-sprite.png");
+    background-color     : transparent;
+    background-repeat    : no-repeat;
+    display: inline;
+    float: left;
+}
+
+.collapsed-heading {
+    background-position: -130px -2px;
+    padding: 0 0 0 20px;
+    float: none;
+    display: block;
+}
+
+.expanded-heading {
+    background-position: -130px -16px;
+    padding: 0 0 0 20px;
+    float: none;
+    display: block;
+}
+
+.copy_png_unselected {
+    background-position : -0px -16px;
+}
+
+.copy_png_selected {
+    background-position : -0px 0px;
+}
+
+#copy_png {
+	height               : 16px;
+	width                : 16px;
+    margin: 0px 2px 0px 2px;
+}
+
+#copy_png:hover {
+    background-position  : -0px 0px;
+}
+
+#copy-input {
+    width: 138px;
+}
+
+#delicious_png {
+    height               : 16px;
+	width                : 16px;
+	background-position  : -16px -16px;
+    margin: 0px 2px 0px 2px;
+}
+
+#delicious_png:hover {
+	background-position  : -16px 0px;
+}
+
+#digg_png {
+	height               : 14px;
+	width                : 16px;
+	background-position  : -32px -14px;
+    margin: 0px 2px 0px 2px;
+}
+
+#digg_png:hover {
+	background-position  : -32px 0px;
+}
+
+#email_link_png {
+	height               : 16px;
+	width                : 16px;
+	background-position  : -48px -16px;
+    margin: 0px 0px 0px 2px;
+}
+
+#email_link_png:hover {
+	background-position  : -48px 0px;
+}
+
+#facebook_png {
+    height               : 16px;
+	width                : 16px;
+    background-position  : -82px -16px;
+    margin: 0px 2px 0px 2px;
+}
+
+#facebook_png:hover {
+    background-position  : -82px 0px;
+}
+
+#reddit_png {
+	height               : 18px;
+	width                : 18px;
+
+	background-position  : -64px -18px;
+    margin: 0px 2px 0px 2px;
+}
+
+#reddit_png:hover {
+	background-position  : -64px 0px;
+}
+
+#twitter_gif {
+	height               : 16px;
+	width                : 16px;
+	background-position  : -98px -16px;
+    margin: 0px 2px 0px 2px;
+}
+
+#twitter_gif:hover {
+	background-position  : -98px 0px;
+}
+
+#favorite-star-png {
+    margin: 8px 5px 0px 0px;
+}
+
+.favorite-on {
+   height               : 16px;
+	width                : 16px;
+	background-position  : -114px -16px;
+}
+
+.favorite-off {
+    height               : 16px;
+	width                : 16px;
+	background-position  : -114px 0px;
+}
+
+/* Highlights images that need height/width*/
+img:not([width]):not([height]) {
+  border: 2px solid red !important;
+}
