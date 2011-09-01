@@ -8,6 +8,7 @@ To do:
     -
  - Import resource.org/robots.txt (see bug 187)
  - Why don't I get logs from the scraper daemon emailed?
+ - Add harmonize code and test case for "The United States"
 
 
 Done:
