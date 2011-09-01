@@ -46,8 +46,8 @@ def cleaner(simulate=False, verbose=False):
     for doc in docs:
         caseNameShortOrig = doc.citation.caseNameShort
         caseNameFullOrig = doc.citation.caseNameFull
-        caseNameShort = titlecase(harmonize(clean_string(caseNameShortOrig)))
-        caseNameFull  = titlecase(harmonize(clean_string(caseNameFullOrig)))
+        caseNameShort = harmonize(clean_string(caseNameShortOrig))
+        caseNameFull  = harmonize(clean_string(caseNameFullOrig))
         doc.citation.caseNameShort = caseNameShort
         doc.citation.caseNameFull = caseNameFull
         if verbose:
