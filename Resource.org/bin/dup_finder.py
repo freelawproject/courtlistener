@@ -73,7 +73,8 @@ def load_stopwords():
     Pulls in Sphinx's stopwords file and returns the words as an array to the
     calling function.
     '''
-    stopwords_file = open('/var/www/court-listener/Sphinx/conf/stopwords.txt', 'r')
+    #  /usr/local/sphinx/bin/indexer -c sphinx-scraped-only.conf scraped-document --buildstops word_freq.txt 1000 --buildfreqs
+    stopwords_file = open('/var/www/court-listener/Resource.org/bin/word_freq.txt', 'r')
     stopwords = []
     for word in stopwords:
         stopwords.append(word)
@@ -94,21 +95,19 @@ def extract_words(content, count=15):
     words = content.split()
     length = len(words)
     gap = int(length/(count + 1))
-    word1 = gap + 1
-    word2 = gap + 1 + gap + 1
-    i = 0
+    i = 1
     query_words = []
-    while i < count:
+    while i <= count:
         stopwords_hit_count = 0
         onwards = True
         while onwards:
             # checks that the new_word isn't a stopword, and moves forward
             # until a non-stopword is found.
             loc = ((gap + 1) * i) + stopwords_hit_count
-            new_word = words[(gap + 1) * i]
+            new_word = words[loc]
             if new_word in stopwords:
                 stopwords_hit_count += 1
-                if stopwords_hit_count > length:
+                if (loc + 1) > length:
                     # we've passed the end of the doc.
                     return query_words
                 else:
