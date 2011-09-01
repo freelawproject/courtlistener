@@ -145,6 +145,68 @@ def exceptional_cleaner(caseName):
     return caseName, documentType
 
 
+def check_dup(court, date, casename, content):
+    '''Checks for a duplicate that already exists in the DB
+
+    This is the only major difference (so far) from the F2 import process. This
+    function will take various pieces of meta data from the F3 scrape, and will
+    compare them to what's already known in the database.
+
+    Returns True or False, depending on whether there's a dup.
+    '''
+    '''
+    Known data at runtime:
+        - content of case
+            - pick three phrases from F3. If they're in the search index, that
+              probably means a match.
+                - q: how to pick these so that rare terms are selected?
+                  a: pick them from the middle, 1/5 of the way and 4/5 of the
+                     way through.
+        - casename
+            - Using the similarity matching algo we used to clean up SCOTUS
+              dates, we can see how similar two casenames are.
+            - need to determine a good threshold here.
+        - date
+            - Using this as a limiter could be useful. A one-month range on
+              either side of the case should wean down the results.
+        - docket number
+            - Could be useful, but not available in all courts, nor consistent
+              within F3.
+        - west citation
+            - Useless - we lack these in the DB.
+        - sha1 of the case text
+            - useless. We lack textual sha1s in our DB.
+        - court
+           - high certainty
+           - excellent limiter
+        - document type
+            - medium certainty - is often correct in each case, but not always.
+            - could serve as a useful signal, but not good enough.
+
+    Process:
+        1 find all cases from $court within a one month range of $date
+        2 place three queries from 2/5, 3/5 and 4/5 of the way through, and
+          gather the intersection of their results. Need to remove stopwords.
+          If the words in the three selections are ever the same, find new ones.
+          If there are fewer than 19 non-stopwords, then don't bother finding new
+          words, since the words will have to overlap.
+        3 intersect the results from step 1 and 2.
+        4 of the remaining values, see if any have matching case names. If so,
+          consider it a match.
+        5 check the docket number. If it matches, up the probability of a match.
+
+
+    Test doc:
+      - http://courtlistener.com/ca1/23hD/ramallo-brothers-v-el-dia-inc/
+      - http://bulk.resource.org/courts.gov/c/F3/490/490.F3d.86.06-2512.html
+    '''
+
+
+
+    pass
+
+
+
 def scrape_and_parse():
     '''Traverses the dumps from resource.org, and puts them in the DB.
 
@@ -451,7 +513,9 @@ def scrape_and_parse():
                 doc.save()
 
             if not created:
-                # something is afoot. Throw a big error.
+                # This happens if we have a match on the sha1, which really
+                # shouldn't happen, since F3 sha's come from the text, and ours
+                # come from the binary.
                 print "Duplicate found at volume " + str(i+1) + \
                     " and row " + str(j+1) + "!!!!"
                 print "Found document %s in the database with doc id of %d!" % (doc, doc.documentUUID)
