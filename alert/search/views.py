@@ -190,9 +190,6 @@ def showResults(request):
     query = adjustQueryForUser(query)
     internalQuery = preparseQuery(query)
 
-    # OLD SEARCH METHOD (crude, slow, powerless)
-    # results = Document.objects.filter(documentPlainText__icontains=query).order_by("-dateFiled")
-
     # NEW SEARCH METHOD
     try:
         queryset = Document.search.query(internalQuery)
