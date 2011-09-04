@@ -110,4 +110,6 @@ __test__ = {"doctest": """
 'Herring v. United States'
 >>> harmonize(clean_string('Test v. U.S'))
 'Test v. United States'
+>>> harmonize(clean_string('The United States v. Lissner'))
+'United States v. Lissner'
 """}
