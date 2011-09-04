@@ -30,8 +30,10 @@ from django.template.defaultfilters import slugify
 from django.utils.encoding import smart_str, smart_unicode
 from alert.alertSystem.models import Court, Citation, Document
 from alert.lib.parse_dates import parse_dates
-from alert.lib.string_utils import trunc
+from alert.lib.encode_decode import num_to_ascii
+from alert.lib.string_utils import clean_string, harmonize, titlecase, trunc
 from alert.lib.scrape_tools import hasDuplicate
+from dup_finder import check_dup
 
 from lxml.html import fromstring, tostring
 from urlparse import urljoin
@@ -44,6 +46,7 @@ import urllib2
 # Set to False to disable automatic browser usage. Else, set to the
 # command you want to run, e.g. 'firefox'
 BROWSER = 'firefox'
+SIMULATE = True
 
 
 def load_fix_files():
@@ -83,7 +86,7 @@ def check_fix_list(sha1, fix_dict):
         return False
 
 
-def exceptional_cleaner(caseName):
+def unpublished_cleaner(caseName):
     '''Cleans common Resource.org special cases off of case names, and
     sets the documentType for a document.
 
@@ -145,67 +148,94 @@ def exceptional_cleaner(caseName):
     return caseName, documentType
 
 
-def check_dup(court, date, casename, content):
-    '''Checks for a duplicate that already exists in the DB
+def write_dups(source, dups, DEBUG=False):
+    '''Writes duplicates to a file so they are logged.
 
-    This is the only major difference (so far) from the F2 import process. This
-    function will take various pieces of meta data from the F3 scrape, and will
-    compare them to what's already known in the database.
-
-    Returns True or False, depending on whether there's a dup.
+    This function recieves a queryset and then writes out the values to a log.
     '''
+    log = open('dup_log.txt', 'a')
+    if dups[0] != None:
+        log.write(source)
+        print "Logging match: " + source,
+        for dup in dups:
+            # write out each doc
+            log.write('|' + str(dup.pk) + " - " + num_to_ascii(dup.pk))
+            if DEBUG:
+                print '|' + str(dup.pk) + ' - ' + num_to_ascii(dup.pk),
+    else:
+        log.write("%s" % source)
+        if DEBUG:
+            print "No dups found for %s" % source,
+    print ""
+    log.write('\n')
+    log.close()
+
+
+def need_dup_check_in_date_and_court(dateFiled, court):
+    '''Checks whether a case needs duplicate checking.
+
+    Performs a simple check for whether we have scraped any documents for the
+    date and court specified, using known dates of when scraping started at a
+    court.
+
+    The following MySQL is from the server, and indicates the earliest scraped
+    documents in each court:
+
+        mysql> select court_id, min(dateFiled)
+               from Document
+               where source = 'C'
+               group by court_id;
+        +----------+----------------+
+        | court_id | min(dateFiled) |
+        +----------+----------------+
+        | ca1      | 1993-01-05     |
+        | ca10     | 1995-09-01     |
+        | ca11     | 1994-12-09     |
+        | ca2      | 2003-04-08     |
+        | ca3      | 2009-07-02     |
+        | ca4      | 2010-03-12     |
+        | ca5      | 1992-05-14     |
+        | ca6      | 2010-03-15     |
+        | ca7      | 2010-03-12     |
+        | ca8      | 2010-03-12     |
+        | ca9      | 2010-03-10     |
+        | cadc     | 1997-09-12     |
+        | cafc     | 2004-11-30     |
+        | scotus   | 2005-10-07     |
+        +----------+----------------+
+        14 rows in set (51.65 sec)
+
+    We'll ues these values to filter out cases that can't possibly have a dup.
+
+    Returns True if a duplicate check should be run. Else: False.
     '''
-    Known data at runtime:
-        - content of case
-            - pick three phrases from F3. If they're in the search index, that
-              probably means a match.
-                - q: how to pick these so that rare terms are selected?
-                  a: pick them from the middle, 1/5 of the way and 4/5 of the
-                     way through.
-        - casename
-            - Using the similarity matching algo we used to clean up SCOTUS
-              dates, we can see how similar two casenames are.
-            - need to determine a good threshold here.
-        - date
-            - Using this as a limiter could be useful. A one-month range on
-              either side of the case should wean down the results.
-        - docket number
-            - Could be useful, but not available in all courts, nor consistent
-              within F3.
-        - west citation
-            - Useless - we lack these in the DB.
-        - sha1 of the case text
-            - useless. We lack textual sha1s in our DB.
-        - court
-           - high certainty
-           - excellent limiter
-        - document type
-            - medium certainty - is often correct in each case, but not always.
-            - could serve as a useful signal, but not good enough.
 
-    Process:
-        1 find all cases from $court within a one month range of $date
-        2 place three queries from 2/5, 3/5 and 4/5 of the way through, and
-          gather the intersection of their results. Need to remove stopwords.
-          If the words in the three selections are ever the same, find new ones.
-          If there are fewer than 19 non-stopwords, then don't bother finding new
-          words, since the words will have to overlap.
-        3 intersect the results from step 1 and 2.
-        4 of the remaining values, see if any have matching case names. If so,
-          consider it a match.
-        5 check the docket number. If it matches, up the probability of a match.
-
-
-    Test doc:
-      - http://courtlistener.com/ca1/23hD/ramallo-brothers-v-el-dia-inc/
-      - http://bulk.resource.org/courts.gov/c/F3/490/490.F3d.86.06-2512.html
-    '''
-
-
-
-
-    pass
-
+    earliest_dates = {
+        'ca1': datetime.datetime(1993, 1, 5),
+        'ca2': datetime.datetime(2003, 4, 8),
+        'ca3': datetime.datetime(2009, 7, 2),
+        'ca4': datetime.datetime(2010, 3, 12),
+        'ca5': datetime.datetime(1992, 5, 14),
+        'ca6': datetime.datetime(2010, 3, 15),
+        'ca7': datetime.datetime(2010, 3, 12),
+        'ca8': datetime.datetime(2010, 3, 12),
+        'ca9': datetime.datetime(2010, 3, 10),
+        'ca10': datetime.datetime(1995, 9, 1),
+        'ca11': datetime.datetime(1994, 12, 9),
+        'cadc': datetime.datetime(1997, 9, 12),
+        'cafc': datetime.datetime(2004, 11, 30)
+        }
+    try:
+        if dateFiled <= earliest_dates[court.pk]:
+            # Doc was filed before court was scraped. No need for check.
+            return False
+        else:
+            # Doc was filed after court was scraped. Need dup check. Alas.
+            return True
+    except KeyError:
+        # The court was never scraped - thus we get an exception. No need for
+        # check.
+        return False
 
 
 def scrape_and_parse():
@@ -275,18 +305,32 @@ def scrape_and_parse():
             # iterate over each case, throwing it in the DB
             if DEBUG >= 1:
                 print ''
-            # like the scraper, we begin with the caseLink field (relative for
-            # now, not absolute)
-            caseLink = caseLinks[j].get('href')
 
-            # sha1 is easy
+            ############
+            ### SHA1 ###
+            ############
             sha1Hash = sha1Hashes[j].text
             if DEBUG >= 4:
                 print "SHA1 is: %s" % sha1Hash
 
-            # using the caselink from above, and the volumeURL, we can get the
-            # documentHTML
+
+            ################
+            ### caseLink ###
+            ################
+            caseLink = caseLinks[j].get('href')
             absCaseLink = urljoin(volumeURL, caseLink)
+
+
+            ####################
+            ### download_URL ###
+            ####################
+            download_URL = "http://bulk.resource.org/courts.gov/c/F3/" \
+                + str(i+1) + "/" + caseLink
+
+
+            ############
+            ### HTML ###
+            ############
             html = urllib2.urlopen(absCaseLink).read()
             htmlTree = fromstring(html)
             bodyContents = htmlTree.xpath('//body/*[not(@id="footer")]')
@@ -304,7 +348,10 @@ def scrape_and_parse():
                 print body
                 print bodyText
 
-            # need to figure out the court ID
+
+            ##############
+            ### Court ####
+            ##############
             try:
                 courtPs = htmlTree.xpath('//p[@class = "court"]')
                 # Often the court ends up in the parties field.
@@ -383,42 +430,10 @@ def scrape_and_parse():
             if DEBUG >= 4:
                 print "Court is: %s" % court
 
-            # next: westCite, docketNumber and caseName. Full casename is gotten later.
-            westCite = caseLinks[j].text
-            docketNumber = absCaseLink.split('.')[-2]
-            caseName = caseLinks[j].get('title')
 
-            caseName, documentType = exceptional_cleaner(caseName)
-            cite, new = hasDuplicate(caseName, westCite, docketNumber)
-            if cite.caseNameShort == '' or cite.caseNameShort == 'unpublished disposition':
-                # No luck getting the case name
-                savedCaseNameShort = check_fix_list(sha1Hash, case_name_short_dict)
-                if not savedCaseNameShort:
-                    print absCaseLink
-                    if BROWSER:
-                        subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
-                    caseName = raw_input("Short casename: ")
-                    cite.caseNameShort = trunc(caseName, 100)
-                    cite.caseNameFull  = caseName
-                    case_name_short_fix_file.write("%s|%s\n" % (sha1Hash, caseName))
-                else:
-                    # We got both the values from the save files. Use 'em.
-                    cite.caseNameShort = trunc(savedCaseNameShort, 100)
-                    cite.caseNameFull = savedCaseNameShort
-
-                # The slug needs to be done here, b/c it is only done automatically
-                # the first time the citation is saved, and this will be
-                # at least the second.
-                cite.slug = trunc(slugify(cite.caseNameShort), 50)
-                cite.save()
-
-            if DEBUG >= 4:
-                print "documentType: " + documentType
-                print "westCite: " + cite.westCite
-                print "docketNumber: " + cite.docketNumber
-                print "caseName: " + cite.caseNameFull
-
-            # date is kinda tricky...details here:
+            ##################
+            ### dateFiled ####
+            ##################
             # http://pleac.sourceforge.net/pleac_python/datesandtimes.html
             rawDate = caseDates[j].find('a')
             try:
@@ -488,39 +503,104 @@ def scrape_and_parse():
             # Used during the next iteration as the default value
             saved_caseDate = caseDate
 
-
             if DEBUG >= 3:
                 print "caseDate is: %s" % (caseDate)
 
-            try:
-                doc, created = Document.objects.get_or_create(
-                    documentSHA1 = sha1Hash, court = court)
-            except MultipleObjectsReturned:
-                # this shouldn't happen now that we're using SHA1 as the dup
-                # check, but the old data is problematic, so we must catch this.
-                created = False
 
-            if created:
-                # we only do this if it's new
-                doc.documentHTML = body
-                doc.documentSHA1 = sha1Hash
-                doc.download_URL = "http://bulk.resource.org/courts.gov/c/F3/"\
-                    + str(i+1) + "/" + caseLink
-                doc.dateFiled = caseDate
-                doc.source = "R"
+            ############################################
+            ### westCite, docketNumber and CaseName ####
+            ############################################
+            # Full casename is gotten later.
+            westCite = caseLinks[j].text
+            docketNumber = absCaseLink.split('.')[-2]
+            caseName = caseLinks[j].get('title')
 
-                doc.documentType = documentType
-                doc.citation = cite
-                doc.save()
+            # data cleanup.
+            caseName, documentType = unpublished_cleaner(caseName)
+            caseName = titlecase(harmonize(clean_string(caseName)))
 
-            if not created:
-                # This happens if we have a match on the sha1, which really
-                # shouldn't happen, since F3 sha's come from the text, and ours
-                # come from the binary.
-                print "Duplicate found at volume " + str(i+1) + \
-                    " and row " + str(j+1) + "!!!!"
-                print "Found document %s in the database with doc id of %d!" % (doc, doc.documentUUID)
-                exit(1)
+            if caseName == '' or caseName == 'unpublished disposition':
+                # No luck getting the case name
+                savedCaseNameShort = check_fix_list(sha1Hash, case_name_short_dict)
+                if not savedCaseNameShort:
+                    print absCaseLink
+                    if BROWSER:
+                        subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
+                    caseName = raw_input("Short casename: ")
+                    case_name_short_fix_file.write("%s|%s\n" % (sha1Hash, caseName))
+                else:
+                    # We got both the values from the save files. Use 'em.
+                    caseName = savedCaseNameShort
+
+            if DEBUG >= 4:
+                print "documentType: " + documentType
+                print "westCite: " + westCite
+                print "docketNumber: " + docketNumber
+                print "caseName: " + caseName
+
+
+            ##########################
+            ### Duplicate checking ###
+            ##########################
+            if need_dup_check_in_date_and_court(caseDate, court):
+                print "Running complex dup check."
+                # There exist scraped cases in this court and date.
+                # Strip HTML.
+                entities = re.compile(r'&(([a-z]{1,5})|(#\d{1,4}));')
+                content = entities.sub('', body)
+                br = re.compile(r'<br/?>')
+                content = br.sub(' ', content)
+                p = re.compile(r'<.*?>')
+                content = p.sub('', content)
+                dups = check_dup(court.pk, caseDate, caseName, content, docketNumber, DEBUG=True)
+                if len(dups) == 0:
+                    # No dups found. Move on.
+                    pass
+                elif len(dups) == 1:
+                    # Duplicate found.
+                    write_dups(sha1Hash, dups, DEBUG=True)
+                elif len(dups) > 1:
+                    # Multiple dups found. Seek human review.
+                    write_dups(sha1Hash, dups, DEBUG=True)
+            else:
+                print "No complex check needed."
+
+            if not SIMULATE:
+                cite, new = hasDuplicate(caseName, westCite, docketNumber)
+
+
+            #################################
+            ### Document saving routines ####
+            #################################
+            if not SIMULATE:
+                try:
+                    doc, created = Document.objects.get_or_create(
+                        documentSHA1 = sha1Hash, court = court)
+                except MultipleObjectsReturned:
+                    # this shouldn't happen now that we're using SHA1 as the dup
+                    # check, but the old data is problematic, so we must catch this.
+                    created = False
+
+                if created:
+                    # we only do this if it's new
+                    doc.documentHTML = body
+                    doc.documentSHA1 = sha1Hash
+                    doc.download_URL = download_URL
+                    doc.dateFiled = caseDate
+                    doc.source = "R"
+
+                    doc.documentType = documentType
+                    doc.citation = cite
+                    doc.save()
+
+                if not created:
+                    # This happens if we have a match on the sha1, which really
+                    # shouldn't happen, since F3 sha's come from the text, and ours
+                    # come from the binary.
+                    print "Duplicate found at volume " + str(i+1) + \
+                        " and row " + str(j+1) + "!!!!"
+                    print "Found document %s in the database with doc id of %d!" % (doc, doc.documentUUID)
+                    exit(1)
 
             # save our location within the volume.
             j += 1

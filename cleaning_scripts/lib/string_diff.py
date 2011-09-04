@@ -49,19 +49,19 @@ def remove_words(phrase):
     return ''.join(result)
 
 
-def gen_diff_ratio(case_name_left, case_name_right):
+def gen_diff_ratio(left, right):
     '''
-    Genrates a difference between two strings, in this case case_names.
+    Genrates a difference between two strings
     Returns a value between 0 and 1. 0 means the strings are totally diffferent.
     1 means they are identical.
     '''
     # Remove common strings from all case names /before/ comparison.
     # Doing so lowers the opportunity for false positives.
-    case_name_left = remove_words(case_name_left)
-    case_name_right = remove_words(case_name_right)
+    left = remove_words(left)
+    right = remove_words(right)
 
     # compute the difference value
-    diff = difflib.SequenceMatcher(None, case_name_left.strip(), case_name_right.strip()).ratio()
+    diff = difflib.SequenceMatcher(None, left.strip(), right.strip()).ratio()
 
     return diff
 
@@ -95,7 +95,7 @@ def find_best_match(results, case_name):
     elif results.count() == 1:
         # One hit returned make sure it's above THRESHOLD.
         HIGH_THRESHOLD = 0.3
-        candidate_case_name = str(results[0])
+        candidate_case_name = results[0].citation.caseNameFull
         diff = gen_diff_ratio(candidate_case_name, case_name)
         if diff >= HIGH_THRESHOLD:
             return results[0], diff
@@ -109,8 +109,8 @@ def find_best_match(results, case_name):
         diff_ratios = []
         for result in results:
             # Calculate its diff_ratio, and add it to an array
-            candidate_case_name = str(result)
-            diff = gen_diff_ratio(candidate_case_name, csv_case_name)
+            candidate_case_name = result.citation.caseNameFull
+            diff = gen_diff_ratio(candidate_case_name, case_name)
             diff_ratios.append(diff)
 
         # Find the max ratio, and grab the corresponding result
@@ -123,3 +123,52 @@ def find_best_match(results, case_name):
         else:
             # Below the threshold. Punt!
             return None, 0
+
+
+def find_good_matches(results, case_name):
+    '''Returns all matches above a threshold.
+
+    This is nearly identical to find_best_match, but returns any good matches
+    in an array, and returns their confidence thresholds in a second array.
+    '''
+    if results.count() == 0:
+        # No good candidates.
+        return [None], [0]
+
+    elif results.count() == 1:
+        # One hit returned make sure it's above THRESHOLD.
+        HIGH_THRESHOLD = 0.3
+        candidate_case_name = results[0].citation.caseNameFull
+        diff = gen_diff_ratio(candidate_case_name, case_name)
+        if diff >= HIGH_THRESHOLD:
+            return [results[0]], [diff]
+        else:
+            return [None], [diff]
+
+    elif results.count() > 1:
+        # More than one hit. Find the best one using diff_lib
+        THRESHOLD = 0.65
+
+        diff_ratios = []
+        for result in results:
+            # Calculate its diff_ratio, and add it to an array
+            candidate_case_name = result.citation.caseNameFull
+            diff = gen_diff_ratio(candidate_case_name, case_name)
+            diff_ratios.append(diff)
+
+        confidences = []
+        good_results = []
+        i = 0
+        while i < len(diff_ratios):
+            if diff_ratios[i] >= THRESHOLD:
+                confidences.append(diff_ratios[i])
+                good_results.append(results[i])
+
+            i += 1
+
+        if len(good_results) > 0:
+            return good_results, confidences
+
+        else:
+            # No good hits.
+            return [None], [0]

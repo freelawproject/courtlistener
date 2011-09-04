@@ -141,7 +141,7 @@ def titlecase(text, DEBUG=False):
 
 
 # For use in harmonize function
-US = 'USA|U\.S\.A\.|U\.S\.?|U\. S\.?|United States of America'
+US = 'USA|U\.S\.A\.|U\.S\.?|U\. S\.?|(The )?United States of America|The United States'
 UNITED_STATES = re.compile(r'^(%s)(,|\.)?$' % US, re.I)
 ET_AL = re.compile(',?\set\.?\sal\.?', re.I)
 BW = 'appell(ee|ant)s?|claimants?|complainants?|defendants?|defendants?(--?|/)appell(ee|ant)s?' + \

@@ -31,14 +31,17 @@ from django.utils.encoding import smart_str, smart_unicode
 from alert.alertSystem.models import Court, Citation, Document
 from alert.lib.parse_dates import parse_dates
 from alert.lib.string_utils import trunc
+from alert.lib.encode_decode import num_to_ascii
 from alert.lib.scrape_tools import hasDuplicate
-from cleaning_scripts.lib.string_diff import find_best_match
+from cleaning_scripts.lib.string_diff import find_good_matches
 
 from lxml.html import fromstring, tostring
 from urlparse import urljoin
 import datetime
+from datetime import date
 from random import randint
 import re
+import string
 import subprocess
 import time
 import urllib2
@@ -70,7 +73,8 @@ def build_date_range(dateFiled, range=5):
         i += 1
 
     if DEBUG:
-        print "dateRange: %s" % dateRange
+        print "dateRange: %s to %s" % (date.fromordinal(dateRange[0] - 365),\
+            date.fromordinal(dateRange[range*2] - 365))
     return dateRange
 
 
@@ -81,7 +85,7 @@ def load_stopwords():
     an array to the  calling function.
     '''
     #  /usr/local/sphinx/bin/indexer -c sphinx-scraped-only.conf scraped-document --buildstops word_freq.txt 10000 --buildfreqs
-    stopwords_file = open('/var/www/court-listener/Resource.org/bin/word_freq.10000.txt', 'r')
+    stopwords_file = open('/var/www/court-listener/Resource.org/bin/word_freq.5000.txt', 'r')
     stopwords = []
     for word in stopwords_file:
         try:
@@ -93,7 +97,7 @@ def load_stopwords():
     return stopwords
 
 
-def extract_words(content, count=15):
+def make_good_query(content, caseName, court, count=5, DEBUG=False):
     '''Grab words from the content and returns them to the caller.
 
     This function attempts to choose words from the content that the calling
@@ -108,141 +112,180 @@ def extract_words(content, count=15):
     query_words = []
     while i <= count and i <= length:
         stopwords_hit_count = 0
-        onwards = True
-        while onwards:
-            # checks that the new_word isn't a stopword, and moves forward
-            # until a non-stopword is found.
-            loc = i + stopwords_hit_count
-            if loc >= length:
-                return query_words
-            new_word = words[loc].encode('utf-8').lower()
+        new_word = words[i].encode('utf-8').lower()
 
-            # Clean the input a tad
+        # Clean the input a tad
+        cleaner = re.compile(r'\'s')
+        new_word = cleaner.sub('', new_word)
+        new_word = new_word.strip('*').strip(',').strip('(').strip(')').strip(':').strip('"')
+
+        # Boolean conditions
+        stop = new_word in stopwords
+        dup = new_word in query_words
+        bad_stuff = re.search('[0-9./()!]', new_word)
+        too_short = True if len(new_word) == 1 else False
+        if stop or dup or bad_stuff or too_short:
+            i += 1
+            continue
+        else:
+            query_words.append(new_word)
+
+    if len(query_words) > 0:
+        # Set up an exact word query using the found words
+        query = '=' + ' << ='.join(query_words)
+        query = query + ' @court %s' % court
+
+    else:
+        # Either it's a short case, or no good words within it...or both.
+        # Try the casename instead.
+        for word in caseName.split():
+            # Clean up
             cleaner = re.compile(r'\'s')
-            new_word = cleaner.sub('', new_word)
-            punct_string = r"""!\"#$¢%&'‘()*+,\-./:;?@[\\\]_—`{|}~"""
+            word = cleaner.sub('', word)
+            word = word.strip('*').strip(',').strip('(').strip(')').strip(':').strip('"')
 
             # Boolean conditions
-            stop = new_word in stopwords
-            dup = new_word in query_words
-            num = re.search('[0-9]', new_word)
-            punct = re.search('[' + punct_string + ']', new_word)
-            if stop or dup or num or punct:
-                stopwords_hit_count += 1
-                if (loc + 1) > length:
-                    # we've passed the end of the doc.
-                    return query_words
-                else:
-                    onwards = True
+            dup = word in query_words
+            bad_stuff = re.search('[0-9./()!]', word)
+            too_short = True if len(word) == 1 else False
+            if dup or bad_stuff or too_short:
+                continue
             else:
-                onwards = False
-        i += 1
-        query_words.append(new_word)
+                query_words.append(word)
+
+        query = '@casename =' + ' << ='.join(query_words) + ' @court %s' % court
 
     if DEBUG:
-        print "query_words: %s" % query_words
+        print "Query: %s" % query
 
-    return query_words
+    return query
 
 
-def check_dup(court, dateFiled, caseName, content):
+def check_dup(court, dateFiled, caseName, content, docketNumber, DEBUG=False):
     '''Checks for a duplicate that already exists in the DB
 
     This is the only major difference (so far) from the F2 import process. This
     function will take various pieces of meta data from the F3 scrape, and will
     compare them to what's already known in the database.
 
-    Returns the duplicates as a queryset or None, depending on whether there's
-    a dup.
-    '''
-    '''
-    Known data at runtime:
-        - content of case
-            - pick three phrases from F3. If they're in the search index, that
-              probably means a match.
-                - q: how to pick these so that rare terms are selected?
-                  a: pick them from the middle, 1/5 of the way and 4/5 of the
-                     way through.
-        - casename
-            - Using the similarity matching algo we used to clean up SCOTUS
-              dates, we can see how similar two casenames are.
-            - need to determine a good threshold here.
-        - date
-            - Using this as a limiter could be useful. A one-month range on
-              either side of the case should wean down the results.
-        - docket number
-            - Could be useful, but not available in all courts, nor consistent
-              within F3.
-        - west citation
-            - Useless - we lack these in the DB.
-        - sha1 of the case text
-            - useless. We lack textual sha1s in our DB.
-        - court
-           - high certainty
-           - excellent limiter
-        - document type
-            - medium certainty - is often correct in each case, but not always.
-            - could serve as a useful signal, but not good enough.
-
     Process:
-        1 find all cases from $court within a one month range of $date and with
-          15 non-duplicated, non-punctuated non-stopwords. If 15 isn't enough,
-          add another five until there are no more words in the doc or enough
+        1 find all cases from $court within a 5 day range of $date and with
+          5 non-duplicated, non-punctuated, non-stemmed, non-stopwords in the
+          correct order. If 5 isn't enough to have a small result set, add
+          another one until there are no more words in the doc or enough
           words have been used.
         2 of the remaining values, see if any have matching case names. If so,
           consider it a match.
-        3 check the docket number. If it matches, up the probability of a match.
 
-
-    Test doc:
-      - http://courtlistener.com/ca1/23hD/ramallo-brothers-v-el-dia-inc/
-      - http://bulk.resource.org/courts.gov/c/F3/490/490.F3d.86.06-2512.html
+    Returns the duplicates as a queryset or None, depending on whether there's
+    a dup.
     '''
-    # Phase 1:
-    # Find all cases within a five day range at the court that contain 15
-    # non-stemmed non-stopwords
-    num_words = 15
 
-    # Add five words until either you run out of words or you get less than
-    # 100 results.
-    result_count = 101
+    ###############################################
+    ### Phase 1: Refine by court, date and words ###
+    ###############################################
+    num_words = 5
+
+    # Add one word until either you run out of words or you get less than
+    # 50 results.
+    result_count = 51
     word_count = len(content.split())
-    while result_count > 100 and num_words <= word_count:
-        words = extract_words(content, num_words)
-        # Set up an exact word query
-        query = '=' + ' ='.join(words)
-        query = query + ' @court %s' % court
-        if DEBUG:
-            print "Query: %s" % query
+    while result_count > 50 and num_words <= word_count:
+        query = make_good_query(content, caseName, court, num_words, DEBUG)
         queryset = Document.search.query(query)
         docs_by_word_query = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
             .filter(dateFiled=build_date_range(dateFiled))
         result_count = docs_by_word_query.count()
         if DEBUG:
             for result in docs_by_word_query:
-                print "Primary key of result is: %s" % result.pk
-        num_words += 5
+                print "After searching, found: %s" % result.pk
+        num_words += 1
 
     if DEBUG:
-        print "results count: %s" % result_count
+        print "Search results count: %s" % result_count
 
-    # Phase 2: Find the best case name
-    result, confidence = find_best_match(docs_by_word_query)
+    ########################################
+    ### Phase 2: Find the best case name ###
+    ########################################
+    results, confidences = find_good_matches(docs_by_word_query, caseName)
     if DEBUG:
-        print "Best result is document %s with a confidence of %s" % result.pk, confidence
+        print "After casename comparison, found %s candidate(s)" % len(results)
+        print "Results: %s" % results
+        print "Confidences: %s" % confidences
+        if results[0] != None:
+            for result, confidence in zip(results, confidences):
+                print "Result document %s has confidence %s" % \
+                    (result.pk, confidence)
+
+    ####################################
+    ### Phase 3: Check docket number ###
+    ####################################
+    if results[0] != None:
+        phase_three_results = []
+        for result in results:
+            if result.citation.docketNumber in docketNumber or docketNumber in result.citation.docketNumber:
+                # Definitely a duplicate.
+                phase_three_results.append(result)
+    else:
+        return results
+
+    ####################################################
+    ### Phase 4: Check content length and similarity ###
+    ####################################################
+    if len(phase_three_results) > 0:
+        phase_four_results = []
+        spaces = re.compile(r' ')
+        for result in phase_three_results:
+            result_content_stripped = spaces.sub('', result.documentPlainText)
+            content_stripped = spaces.sub('', content)
+
+            # Check if lengths are within tolerance
+            length = len(content_stripped)
+            tolerance = length * 0.5
+            lower_bound = length - tolerance
+            upper_bound = length + tolerance
+            if  lower_bound < len(result_content_stripped) < upper_bound:
+                # The length of the result is within tolerance. Check that the
+                # text is similar
+                diff = gen_diff_ratio(result_content_stripped, content_stripped)
+                if diff > 0.75:
+                    # The documents are very similar. Must be a dup.
+                    phase_four_results.append(result)
+
+    else:
+        return phase_three_results
+
+    '''
+    Any duplicate here has the following characteristics:
+     - it is in the same court within five days
+     - a precise search finds it.
+     - the case name is similar
+     - it may have the same docket number
+     - it's length is within 5% of the original, and the content is similar
+    '''
+    return phase_four_results
 
 
-def write_dups(source, dups):
+def write_dups(source, dups, DEBUG=False):
     '''Writes duplicates to a file so they are logged.
 
     This function recieves a queryset and then writes out the values to a log.
     '''
     log = open('dup_log.txt', 'a')
-    for dup in dups:
-        # write out each doc
-        log.write(str(source.pk) + '|' + str(dup.pk) + '\n')
+    if dups[0] != None:
+        log.write(str(source.pk))
+        print "Logging match: " + str(source.pk),
+        for dup in dups:
+            # write out each doc
+            log.write('|' + str(dup.pk) + " - " + num_to_ascii(dup.pk))
+            if DEBUG:
+                print '|' + str(dup.pk) + ' - ' + num_to_ascii(dup.pk),
+    else:
+        log.write("No dups found for %s" % source.pk)
         if DEBUG:
-            print "Logging: " + str(sourt.pk) + '|' + str(dup.pk)
+            print "No dups found for %s" % source.pk
+    print ''
+    log.write('\n')
     log.close()
 
 
@@ -253,14 +296,12 @@ def import_and_report_records():
     the sphinx index. This simulates the duplicate detection we will need to
     do when importing from other sources, and allows us to test it.
     '''
-    count = Document.objects.count()
+
+    #docs = Document.objects.all()[:1000]
+    docs = Document.objects.filter(pk = 985184)
 
     # do this 1000 times
-    for _ in range(1):
-        id = 985867 # randint(0, count)
-        # doc = Document.objects.all()[id]
-        doc = Document.objects.get(pk = id)
-
+    for doc in docs:
         court = doc.court_id
         date = doc.dateFiled
         casename = doc.citation.caseNameFull
@@ -268,19 +309,24 @@ def import_and_report_records():
         if content == "":
             # HTML content!
             content = doc.documentHTML
+            br = re.compile(r'<br/?>')
+            content = br.sub(' ', content)
             p = re.compile(r'<.*?>')
             content = p.sub('', content)
 
         dups = check_dup(court, date, casename, content)
 
-        if dups != None:
+        if dups[0] != None:
             # duplicate(s) were found, write them out to a log
             write_dups(doc, dups)
 
+        if DEBUG:
+            print ''
         # Clear query cache, as it presents a memory leak when in dev mode
         db.reset_queries()
 
-    return 0
+    exit(0)
+
 
 def main():
     print import_and_report_records()
