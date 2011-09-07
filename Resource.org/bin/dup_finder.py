@@ -122,13 +122,13 @@ def make_good_query(content, caseName, court, count=5, DEBUG=False):
         # Boolean conditions
         stop = new_word in stopwords
         dup = new_word in query_words
-        bad_stuff = re.search('[0-9./()!]', new_word)
+        bad_stuff = re.search('[0-9./()!:]', new_word)
         too_short = True if len(new_word) == 1 else False
         if stop or dup or bad_stuff or too_short:
             i += 1
             continue
         else:
-            query_words.append(new_word)
+            query_words.append(unicode(new_word, 'utf-8'))
 
     if len(query_words) > 0:
         # Set up an exact word query using the found words
@@ -146,12 +146,12 @@ def make_good_query(content, caseName, court, count=5, DEBUG=False):
 
             # Boolean conditions
             dup = word in query_words
-            bad_stuff = re.search('[0-9./()!]', word)
+            bad_stuff = re.search('[0-9./()!:]', word)
             too_short = True if len(word) == 1 else False
             if dup or bad_stuff or too_short:
                 continue
             else:
-                query_words.append(word)
+                query_words.append(unicode(word, 'utf-8'))
 
         query = '@casename =' + ' << ='.join(query_words) + ' @court %s' % court
 

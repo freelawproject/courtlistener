@@ -95,6 +95,7 @@ def unpublished_cleaner(caseName):
     caseName = caseName.lower()
     ca1regex = re.compile('(unpublished disposition )?notice: first circuit local rule 36.2\(b\)6 states unpublished opinions may be cited only in related cases.?')
     ca2regex = re.compile('(unpublished disposition )?notice: second circuit local rule 0.23 states unreported opinions shall not be cited or otherwise used in unrelated cases.?')
+    ca2regex2 = re.compile('(unpublished disposition )?notice: this summary order may not be cited as precedential authority, but may be called to the attention of the court in a subsequent stage of this case, in a related case, or in any case for purposes of collateral estoppel or res judicata. see second circuit rule 0.23.?')
     ca3regex = re.compile('(unpublished disposition )?notice: third circuit rule 21\(i\) states citations to federal decisions which have not been formally reported should identify the court, docket number and date.?')
     ca4regex = re.compile('(unpublished disposition )?notice: fourth circuit (local rule 36\(c\)|i.o.p. 36.6) states that citation of unpublished dispositions is disfavored except for establishing res judicata, estoppel, or the law of the case and requires service of copies of cited unpublished dispositions of the fourth circuit.?')
     ca5regex = re.compile('(unpublished disposition )?notice: fifth circuit local rule 47.5.3 states that unpublished opinions should normally be cited only when they establish the law of the case, are relied upon as a basis for res judicata or collateral estoppel, or involve related facts. if an unpublished opinion is cited, a copy shall be attached to each copy of the brief.?')
@@ -111,6 +112,7 @@ def unpublished_cleaner(caseName):
         documentType = 'Unpublished'
     elif 'second circuit' in caseName:
         caseName = re.sub(ca2regex, '', caseName)
+        caseName = re.sub(ca2regex2, '', caseName)
         documentType = 'Unpublished'
     elif 'third circuit' in caseName:
         caseName = re.sub(ca3regex, '', caseName)
@@ -223,7 +225,8 @@ def need_dup_check_in_date_and_court(dateFiled, court):
         'ca10': datetime.datetime(1995, 9, 1),
         'ca11': datetime.datetime(1994, 12, 9),
         'cadc': datetime.datetime(1997, 9, 12),
-        'cafc': datetime.datetime(2004, 11, 30)
+        'cafc': datetime.datetime(2004, 11, 30),
+        'scotus': datetime.datetime(1600, 1, 1),
         }
     try:
         if dateFiled <= earliest_dates[court.pk]:
