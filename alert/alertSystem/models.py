@@ -48,6 +48,7 @@ PACER_CODES = (
     #('cusc',   'United States Customs Court'),
     #('cit',    'United States Court of International Trade'),
     #('com',    'Commerce Court'),
+    ('fiscr',   'Foreign Intelligence Surveillance Court of Review'),
 )
 
 # changes here need to be mirrored in the coverage page view and the exceptions
