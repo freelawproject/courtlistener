@@ -45,7 +45,7 @@ import urllib2
 
 # Set to False to disable automatic browser usage. Else, set to the
 # command you want to run, e.g. 'firefox'
-BROWSER = 'firefox'
+BROWSER = False 
 SIMULATE = True
 
 

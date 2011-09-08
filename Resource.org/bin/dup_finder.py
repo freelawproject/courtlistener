@@ -33,7 +33,7 @@ from alert.lib.parse_dates import parse_dates
 from alert.lib.string_utils import trunc
 from alert.lib.encode_decode import num_to_ascii
 from alert.lib.scrape_tools import hasDuplicate
-from cleaning_scripts.lib.string_diff import find_good_matches
+from cleaning_scripts.lib.string_diff import find_good_matches, gen_diff_ratio
 
 from lxml.html import fromstring, tostring
 from urlparse import urljoin
@@ -110,8 +110,7 @@ def make_good_query(content, caseName, court, count=5, DEBUG=False):
     length = len(words)
     i = 1
     query_words = []
-    while i <= count and i <= length:
-        stopwords_hit_count = 0
+    while i <= count and i < length:
         new_word = words[i].encode('utf-8').lower()
 
         # Clean the input a tad
@@ -123,7 +122,7 @@ def make_good_query(content, caseName, court, count=5, DEBUG=False):
         stop = new_word in stopwords
         dup = new_word in query_words
         bad_stuff = re.search('[0-9./()!:]', new_word)
-        too_short = True if len(new_word) == 1 else False
+        too_short = True if len(new_word) <= 1 else False
         if stop or dup or bad_stuff or too_short:
             i += 1
             continue
@@ -132,8 +131,8 @@ def make_good_query(content, caseName, court, count=5, DEBUG=False):
 
     if len(query_words) > 0:
         # Set up an exact word query using the found words
-        query = '=' + ' << ='.join(query_words)
-        query = query + ' @court %s' % court
+	print query_words
+        query = '=' + ' << ='.join(query_words) + ' @court %s' % court
 
     else:
         # Either it's a short case, or no good words within it...or both.
@@ -147,7 +146,7 @@ def make_good_query(content, caseName, court, count=5, DEBUG=False):
             # Boolean conditions
             dup = word in query_words
             bad_stuff = re.search('[0-9./()!:]', word)
-            too_short = True if len(word) == 1 else False
+            too_short = True if len(word) <= 1 else False
             if dup or bad_stuff or too_short:
                 continue
             else:
@@ -181,9 +180,9 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, DEBUG=False):
     a dup.
     '''
 
-    ###############################################
+    ################################################
     ### Phase 1: Refine by court, date and words ###
-    ###############################################
+    ################################################
     num_words = 5
 
     # Add one word until either you run out of words or you get less than
@@ -199,10 +198,17 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, DEBUG=False):
         if DEBUG:
             for result in docs_by_word_query:
                 print "After searching, found: %s" % result.pk
-        num_words += 1
+        
+        if DEBUG:
+            print "Search results count: %s" % result_count
 
-    if DEBUG:
-        print "Search results count: %s" % result_count
+        if not query.startswith('@casename'):
+            num_words += 1
+        else:
+            # We've exhausted the possibilities for this case. Need to move on
+            # regardless of count.
+            break
+
 
     ########################################
     ### Phase 2: Find the best case name ###
