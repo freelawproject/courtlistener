@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}CourtListener.com / Server Error 500{% endblock %}
+
+{% block content %}
+    <div class="span-18 append-1">
+        <h2>400 Bad Request</h2>
+        <p>Honey Pot Error ({{fieldname}}). Request aborted.</p>
+        <p class="bottom">We believe that you're a spam bot, but the following may help:</p>
+        <ul>
+            <li>Try filling out the form on the previous page more carefully.</li>
+            <li><a href="/contact/">Notify us</a> that you're not a spam bot (you'll need to prove you're not a spam bot to do so).</li>
+            <li>Try something else, like a new <a href="/search/">search</a> or <a href="https://groups.google.com/forum/#!forum/courtlistener-discuss">a post on our forum</a>.</li>
+        </ul>
+
+        <p>Sorry about this. If you continue having problems, please do let us know.</p>
+    </div>
+{% endblock %}
