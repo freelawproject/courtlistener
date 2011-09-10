@@ -51,9 +51,9 @@ SIMULATE = True
 
 def load_fix_files():
     '''Loads the fix files into memory so they can be accessed efficiently.'''
-    court_fix_file = open('f3_court_fix_file.txt', 'r')
-    date_fix_file  = open('f3_date_fix_file.txt', 'r')
-    case_name_short_fix_file = open('f3_short_case_name_fix_file.txt', 'r')
+    court_fix_file = open('../logs/f3_court_fix_file.txt', 'r')
+    date_fix_file  = open('../logs/f3_date_fix_file.txt', 'r')
+    case_name_short_fix_file = open('../logs/f3_short_case_name_fix_file.txt', 'r')
     court_fix_dict = {}
     date_fix_dict = {}
     case_name_short_dict = {}
@@ -155,7 +155,7 @@ def write_dups(source, dups, DEBUG=False):
 
     This function recieves a queryset and then writes out the values to a log.
     '''
-    log = open('dup_log.txt', 'a')
+    log = open('../logs/dup_log.txt', 'a')
     if dups[0] != None:
         log.write(source)
         print "Logging match: " + source,
@@ -256,11 +256,11 @@ def scrape_and_parse():
 
     results = []
     DEBUG = 4
-    court_fix_file = open('f3_court_fix_file.txt', 'a')
-    date_fix_file = open('f3_date_fix_file.txt', 'a')
-    case_name_short_fix_file = open('f3_short_case_name_fix_file.txt', 'a')
-    vol_file = open('vol_file.txt', 'r+')
-    case_file = open('case_file.txt', 'r+')
+    court_fix_file = open('../logs/f3_court_fix_file.txt', 'a')
+    date_fix_file = open('../logs/f3_date_fix_file.txt', 'a')
+    case_name_short_fix_file = open('../logs/f3_short_case_name_fix_file.txt', 'a')
+    vol_file = open('../logs/vol_file.txt', 'r+')
+    case_file = open('../logs/case_file.txt', 'r+')
 
     url = "file:///var/www/court-listener/Resource.org/data/F3/index.html"
     openedURL = urllib2.urlopen(url)
@@ -607,13 +607,13 @@ def scrape_and_parse():
 
             # save our location within the volume.
             j += 1
-            case_file = open('case_file.txt', 'w')
+            case_file = open('../logs/case_file.txt', 'w')
             case_file.write(str(j))
             case_file.close()
 
         # save the last volume completed.
         i += 1
-        vol_file = open('vol_file.txt', 'w')
+        vol_file = open('../logs/vol_file.txt', 'w')
         vol_file.write(str(i))
         vol_file.close()
 
