@@ -44,9 +44,9 @@ import urllib2
 
 def load_fix_files():
     '''Loads the fix files into memory so they can be accessed efficiently.'''
-    court_fix_file = open('f2_court_fix_file.txt', 'r')
-    date_fix_file  = open('f2_date_fix_file.txt', 'r')
-    case_name_short_fix_file = open('f2_short_case_name_fix_file.txt', 'r')
+    court_fix_file = open('../logs/f2_court_fix_file.txt', 'r')
+    date_fix_file  = open('../logs/f2_date_fix_file.txt', 'r')
+    case_name_short_fix_file = open('../logs/f2_short_case_name_fix_file.txt', 'r')
     court_fix_dict = {}
     date_fix_dict = {}
     case_name_short_dict = {}
@@ -159,11 +159,11 @@ def scrape_and_parse():
     # Set to False to disable automatic browser usage. Else, set to the
     # command you want to run, e.g. 'firefox'
     BROWSER = False
-    court_fix_file = open('f2_court_fix_file.txt', 'a')
-    date_fix_file = open('f2_date_fix_file.txt', 'a')
-    case_name_short_fix_file = open('f2_short_case_name_fix_file.txt', 'a')
-    vol_file = open('vol_file.txt', 'r+')
-    case_file = open('case_file.txt', 'r+')
+    court_fix_file = open('../logs/f2_court_fix_file.txt', 'a')
+    date_fix_file = open('../logs/f2_date_fix_file.txt', 'a')
+    case_name_short_fix_file = open('../logs/f2_short_case_name_fix_file.txt', 'a')
+    vol_file = open('../logs/vol_file.txt', 'r+')
+    case_file = open('../logs/case_file.txt', 'r+')
 
     url = "file:///var/www/court-listener/Resource.org/F2/index.html"
     openedURL = urllib2.urlopen(url)
@@ -472,13 +472,13 @@ def scrape_and_parse():
 
             # save our location within the volume.
             j += 1
-            case_file = open('case_file.txt', 'w')
+            case_file = open('../logs/case_file.txt', 'w')
             case_file.write(str(j))
             case_file.close()
 
         # save the last volume completed.
         i += 1
-        vol_file = open('vol_file.txt', 'w')
+        vol_file = open('../logs/vol_file.txt', 'w')
         vol_file.write(str(i))
         vol_file.close()
 
