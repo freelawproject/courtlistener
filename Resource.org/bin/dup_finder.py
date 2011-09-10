@@ -110,8 +110,9 @@ def make_good_query(content, caseName, court, count=5, DEBUG=False):
     words = content.split()
     length = len(words)
     i = 1
+    max_sphinx_q_len = 15
     query_words = []
-    while i <= count and i < length:
+    while i <= count and i < length and len(query_words) < max_sphinx_q_len:
         new_word = words[i].encode('utf-8').lower()
 
         # Clean the input a tad
@@ -122,13 +123,16 @@ def make_good_query(content, caseName, court, count=5, DEBUG=False):
         # Boolean conditions
         stop = new_word in stopwords
         dup = new_word in query_words
-        bad_stuff = re.search('[0-9./()!:]', new_word)
+        bad_stuff = re.search('[0-9./()!:&\']', new_word)
         too_short = True if len(new_word) <= 1 else False
         if stop or dup or bad_stuff or too_short:
             i += 1
             continue
         else:
-            query_words.append(unicode(new_word, 'utf-8'))
+            if isinstance(new_word, unicode):
+                query_words.append(new_word)
+            else:
+                query_words.append(unicode(new_word, 'utf-8'))
 
     if len(query_words) > 0:
         # Set up an exact word query using the found words
@@ -138,7 +142,7 @@ def make_good_query(content, caseName, court, count=5, DEBUG=False):
     else:
         # Either it's a short case, or no good words within it...or both.
         # Try the casename instead.
-        for word in caseName.split():
+        for word in caseName.split()[:max_sphinx_q_len]:
             # Clean up
             cleaner = re.compile(r'\'s')
             word = cleaner.sub('', word)
@@ -146,12 +150,15 @@ def make_good_query(content, caseName, court, count=5, DEBUG=False):
 
             # Boolean conditions
             dup = word in query_words
-            bad_stuff = re.search('[0-9./()!:]', word)
+            bad_stuff = re.search('[0-9./()!:&\']', word)
             too_short = True if len(word) <= 1 else False
             if dup or bad_stuff or too_short:
                 continue
             else:
-                query_words.append(unicode(word, 'utf-8'))
+                if isinstance(word, unicode):
+                    query_words.append(word)
+                else:
+                    query_words.append(unicode(word, 'utf-8'))
 
         query = '@casename =' + ' << ='.join(query_words) + ' @court %s' % court
 
@@ -190,6 +197,7 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, DEBUG=False):
     # 50 results.
     result_count = 51
     word_count = len(content.split())
+    print "num_words: " + str(num_words)
     while result_count > 50 and num_words <= word_count:
         query = make_good_query(content, caseName, court, num_words, DEBUG)
         queryset = Document.search.query(query)
@@ -210,6 +218,8 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, DEBUG=False):
             # regardless of count.
             break
 
+    p1_result_count = result_count
+
 
     ########################################
     ### Phase 2: Find the best case name ###
@@ -219,22 +229,27 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, DEBUG=False):
         print "After casename comparison, found %s candidate(s)" % len(results)
         print "Results: %s" % results
         print "Confidences: %s" % confidences
-        if results[0] != None:
+        if len(results) > 0:
             for result, confidence in zip(results, confidences):
                 print "Result document %s has confidence %s" % \
                     (result.pk, confidence)
 
+    p2_result_count = len(results)
+
     ####################################
     ### Phase 3: Check docket number ###
     ####################################
-    if results[0] != None:
+    if len(results) > 0:
         phase_three_results = []
         for result in results:
             if result.citation.docketNumber in docketNumber or docketNumber in result.citation.docketNumber:
                 # Definitely a duplicate.
                 phase_three_results.append(result)
     else:
-        return results
+        # If no results from prior phase, just pass those results forward.
+        phase_three_results = results
+
+    p3_result_count = len(phase_three_results)
 
     ####################################################
     ### Phase 4: Check content length and similarity ###
@@ -244,11 +259,22 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, DEBUG=False):
         spaces = re.compile(r' ')
         for result in phase_three_results:
             result_content_stripped = spaces.sub('', result.documentPlainText)
+            if len(result_content_stripped) == 0:
+                # It's probably an HTML file. Try that field instead.
+                result_content_stripped = result.documentHTML
+                br = re.compile(r'<br/?>')
+                result_content_stripped = br.sub(' ', result_content_stripped)
+                p = re.compile(r'<.*?>')
+                result_content_stripped = p.sub('', result_content_stripped)
+                result_content_stripped = spaces.sub('', result_content_stripped)
+
             content_stripped = spaces.sub('', content)
 
             # Check if lengths are within tolerance
             length = len(content_stripped)
-            tolerance = length * 0.5
+            print "Length of new content: %s" % length
+            print "Length of old content: %s" % len(result_content_stripped)
+            tolerance = length * 0.05
             lower_bound = length - tolerance
             upper_bound = length + tolerance
             if  lower_bound < len(result_content_stripped) < upper_bound:
@@ -260,7 +286,15 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, DEBUG=False):
                     phase_four_results.append(result)
 
     else:
-        return phase_three_results
+        phase_four_results = phase_three_results
+
+    p4_result_count = len(phase_four_results)
+
+    # Write result stats to a log
+    result_stats = open('result_stats.csv', 'a')
+    result_stats.write(",".join(['%s', '%s', '%s', '%s']) % (p1_result_count, p2_result_count, p3_result_count, p4_result_count) + '\n')
+    result_stats.close()
+
 
     '''
     Any duplicate here has the following characteristics:
@@ -297,15 +331,15 @@ def write_dups(source, dups, DEBUG=False):
 
 
 def import_and_report_records():
-    '''Traverses the first 1000 records and find their dups.
+    '''Traverses the first 500 records and find their dups.
 
     This script is used to find dups within the database by comparing it to
     the sphinx index. This simulates the duplicate detection we will need to
     do when importing from other sources, and allows us to test it.
     '''
 
-    #docs = Document.objects.all()[:1000]
-    docs = Document.objects.filter(pk = 985184)
+    docs = Document.objects.filter(court = 'ca1')[:5000]
+    #docs = Document.objects.filter(pk = 985184)
 
     # do this 1000 times
     for doc in docs:
@@ -324,7 +358,7 @@ def import_and_report_records():
 
         dups = check_dup(court, date, casename, content, docketNumber, True)
 
-        if dups[0] != None:
+        if len(dups) > 0:
             # duplicate(s) were found, write them out to a log
             write_dups(doc, dups, True)
 
@@ -333,12 +367,12 @@ def import_and_report_records():
         # Clear query cache, as it presents a memory leak when in dev mode
         db.reset_queries()
 
-    exit(0)
+    return
 
 
 def main():
     print import_and_report_records()
-    print "Completed 1000 records successfully. Exiting."
+    print "Completed 500 records successfully. Exiting."
     exit(0)
 
 

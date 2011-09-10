@@ -133,7 +133,7 @@ def find_good_matches(results, case_name):
     '''
     if results.count() == 0:
         # No good candidates.
-        return [None], [0]
+        return [], [0]
 
     elif results.count() == 1:
         # One hit returned make sure it's above THRESHOLD.
@@ -143,7 +143,7 @@ def find_good_matches(results, case_name):
         if diff >= HIGH_THRESHOLD:
             return [results[0]], [diff]
         else:
-            return [None], [diff]
+            return [], [diff]
 
     elif results.count() > 1:
         # More than one hit. Find the best one using diff_lib
@@ -171,4 +171,4 @@ def find_good_matches(results, case_name):
 
         else:
             # No good hits.
-            return [None], [0]
+            return [], [0]
