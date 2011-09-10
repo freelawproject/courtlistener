@@ -168,7 +168,7 @@ def make_good_query(content, caseName, court, count=5, DEBUG=False):
     return query
 
 
-def check_dup(court, dateFiled, caseName, content, docketNumber, DEBUG=False):
+def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG=False):
     '''Checks for a duplicate that already exists in the DB
 
     This is the only major difference (so far) from the F2 import process. This
@@ -242,7 +242,9 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, DEBUG=False):
     if len(results) > 0:
         phase_three_results = []
         for result in results:
-            if result.citation.docketNumber in docketNumber or docketNumber in result.citation.docketNumber:
+            result_docket_number = re.sub("\D", "", result.citation.docketNumber)
+            new_docket_number = re.sub("\D", "", docketNumber)
+            if result_docket_number == new_docket_number:
                 # Definitely a duplicate.
                 phase_three_results.append(result)
     else:
@@ -292,7 +294,7 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, DEBUG=False):
 
     # Write result stats to a log
     result_stats = open('result_stats.csv', 'a')
-    result_stats.write(",".join(['%s', '%s', '%s', '%s']) % (p1_result_count, p2_result_count, p3_result_count, p4_result_count) + '\n')
+    result_stats.write('%s,' % id + ",".join(['%s', '%s', '%s', '%s']) % (p1_result_count, p2_result_count, p3_result_count, p4_result_count) + '\n')
     result_stats.close()
 
 
@@ -348,6 +350,7 @@ def import_and_report_records():
         casename = doc.citation.caseNameFull
         docketNumber = doc.citation.docketNumber
         content = doc.documentPlainText
+        id = num_to_ascii(doc.pk)
         if content == "":
             # HTML content!
             content = doc.documentHTML
@@ -356,7 +359,7 @@ def import_and_report_records():
             p = re.compile(r'<.*?>')
             content = p.sub('', content)
 
-        dups = check_dup(court, date, casename, content, docketNumber, True)
+        dups = check_dup(court, date, casename, content, docketNumber, id, True)
 
         if len(dups) > 0:
             # duplicate(s) were found, write them out to a log

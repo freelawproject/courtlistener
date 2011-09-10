@@ -555,7 +555,7 @@ def scrape_and_parse():
                 content = br.sub(' ', content)
                 p = re.compile(r'<.*?>')
                 content = p.sub('', content)
-                dups = check_dup(court.pk, caseDate, caseName, content, docketNumber, DEBUG=True)
+                dups = check_dup(court.pk, caseDate, caseName, content, docketNumber, sha1Hash, DEBUG=True)
                 if len(dups) == 0:
                     # No dups found. Move on.
                     pass
