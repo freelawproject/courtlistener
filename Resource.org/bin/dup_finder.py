@@ -258,9 +258,9 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG=False
 
     p3_result_count = len(phase_three_results)
 
-    ####################################################
-    ### Phase 4: Check content length and similarity ###
-    ####################################################
+    #####################################
+    ### Phase 4: Check content length ###
+    #####################################
     if len(phase_three_results) > 0:
         phase_four_results = []
         spaces = re.compile(r' ')
@@ -273,15 +273,15 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG=False
                 result_content_stripped = br.sub(' ', result_content_stripped)
                 p = re.compile(r'<.*?>')
                 result_content_stripped = p.sub('', result_content_stripped)
-                result_content_stripped = spaces.sub('', result_content_stripped)
+                result_content_stripped = spaces.sub('', result_content_stripped).lower()
 
-            content_stripped = spaces.sub('', content)
+            content_stripped = spaces.sub('', content).lower()
 
             # Check if lengths are within tolerance
             length = len(content_stripped)
             print "Length of new content: %s" % length
             print "Length of old content: %s" % len(result_content_stripped)
-            tolerance = length * 0.05
+            tolerance = length * 0.075
             lower_bound = length - tolerance
             upper_bound = length + tolerance
             if  lower_bound < len(result_content_stripped) < upper_bound:
@@ -289,15 +289,8 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG=False
                 # text is similar
                 if DEBUG:
                     print "Word length is within tolerance."
-                diff = gen_diff_ratio(result_content_stripped, content_stripped)
-                if diff > 0.6:
-                    # The documents are very similar. Must be a dup.
-                    if DEBUG:
-                        print "Docs have sufficient difference of: %s" % diff
-                    phase_four_results.append(result)
-                else:
-                    if DEBUG:
-                        print "Docs have insufficient difference of: %s" % diff
+                phase_four_results.append(result)
+
             else:
                 if DEBUG:
                     print "Word length is NOT within tolerance."
@@ -319,7 +312,7 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG=False
      - a precise search finds it.
      - the case name is similar
      - it may have the same docket number
-     - it's length is within 5% of the original, and the content is similar
+     - it's length is within 5% of the original
     '''
     return phase_four_results
 
