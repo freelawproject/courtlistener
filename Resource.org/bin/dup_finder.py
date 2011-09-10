@@ -244,8 +244,13 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG=False
         for result in results:
             result_docket_number = re.sub("\D", "", result.citation.docketNumber)
             new_docket_number = re.sub("\D", "", docketNumber)
+            if DEBUG:
+                print "Docket numbers are (new - old): %s - %s" % (new_docket_number, result_docket_number)
             if result_docket_number == new_docket_number:
                 # Definitely a duplicate.
+                phase_three_results.append(result)
+            elif result_docket_number == '' or new_docket_number == '':
+                # We must punt this test
                 phase_three_results.append(result)
     else:
         # If no results from prior phase, just pass those results forward.

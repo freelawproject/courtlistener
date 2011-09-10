@@ -147,7 +147,7 @@ def find_good_matches(results, case_name):
 
     elif results.count() > 1:
         # More than one hit. Find the best one using diff_lib
-        THRESHOLD = 0.65
+        THRESHOLD = 0.6
 
         diff_ratios = []
         for result in results:
