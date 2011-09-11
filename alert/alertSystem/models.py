@@ -129,66 +129,6 @@ class Court(models.Model):
         ordering = ["courtUUID"] #this reinforces the default
 
 
-# A class to represent each party that is extracted from a document
-class Party(models.Model):
-    partyUUID = models.AutoField("a unique ID for each party", primary_key = True)
-    partyExtracted = models.CharField("a party name", max_length = 100)
-
-    def __unicode__(self):
-        if self.partyExtracted:
-            return self.partyExtracted
-        else:
-            return str(self.partyUUID)
-
-    class Meta:
-        verbose_name_plural = "parties"
-        db_table = "Party"
-        ordering = ["partyExtracted"]
-
-
-
-# A class to represent each judge that is extracted from a document
-class Judge(models.Model):
-    judgeUUID = models.AutoField("a unique ID for each judge", primary_key = True)
-    court = models.ForeignKey(Court, verbose_name = "the court where the judge served during this time period")
-    canonicalName = models.CharField("the official name of the judge: fname, mname, lname",
-        max_length = 150)
-    judgeAvatar = models.ImageField("the judge's face",
-        upload_to = "avatars/judges/%Y/%m/%d",
-        blank = True)
-    startDate = models.DateField("the start date that the judge is on the bench")
-    endDate = models.DateField("the end date that the judge is on the bench")
-
-    def __unicode__(self):
-        if self.canonicalName:
-            return self.canonicalName
-        else:
-            return str(self.judgeUUID)
-
-    class Meta:
-        db_table = "Judge"
-        ordering = ["court", "canonicalName"]
-
-
-# A class to hold the various aliases that a judge may have, such as M. Lissner,
-# Michael Jay Lissner, Michael Lissner, etc.
-class JudgeAlias (models.Model):
-    aliasUUID = models.AutoField("a unique ID for each alias", primary_key = True)
-    judgeUUID = models.ForeignKey(Judge, verbose_name = "the judge for whom we are assigning an alias")
-    alias = models.CharField("a name under which the judge appears in a document", max_length = 100)
-
-    # should return something like 'Mike is mapped to Michael Lissner'
-    def __unicode__(self):
-        return u'%s is mapped to %s' % (self.alias, self.judgeUUID.canonicalName)
-
-    class Meta:
-        verbose_name = "judge alias"
-        verbose_name_plural = "judge aliases"
-        db_table = "JudgeAlias"
-        ordering = ["alias"]
-
-
-
 class Citation(models.Model):
     search = SphinxSearch()
     citationUUID = models.AutoField("a unique ID for each citation",
@@ -236,24 +176,6 @@ class Citation(models.Model):
         db_table = "Citation"
 
 
-class ExcerptSummary(models.Model):
-    excerptUUID = models.AutoField("a unique ID for each excerpt",
-        primary_key = True)
-    autoExcerpt = models.TextField("the first 100 words of the PDF file",
-        blank = True)
-    courtSummary = models.TextField("a summary of the document, as provided by the court itself",
-        blank = True)
-
-    def __unicode__(self):
-        return self.excerptUUID
-
-    class Meta:
-        verbose_name = "excerpt summary"
-        verbose_name_plural = "excerpt summaries"
-        db_table = "ExcerptSummary"
-
-
-
 # A class which holds the bulk of the information regarding documents. This must
 # go last, since it references the above classes
 class Document(models.Model):
@@ -274,20 +196,8 @@ class Document(models.Model):
     court = models.ForeignKey(Court,
         verbose_name = "the court where the document was filed",
         db_index = True)
-    judge = models.ManyToManyField(Judge,
-        verbose_name = "the judges that heard the case",
-        blank = True,
-        null = True)
-    party = models.ManyToManyField(Party,
-        verbose_name = "the parties that were in the case",
-        blank = True,
-        null = True)
     citation = models.ForeignKey(Citation,
         verbose_name = "the citation information for the document",
-        blank = True,
-        null = True)
-    excerptSummary = models.ForeignKey(ExcerptSummary,
-        verbose_name = "the excerpt information for the document",
         blank = True,
         null = True)
     download_URL = models.URLField("the URL on the court website where the document was originally scraped",
@@ -306,6 +216,9 @@ class Document(models.Model):
         max_length = 50,
         blank = True,
         choices = DOCUMENT_STATUSES)
+    blocked = models.BooleanField('Is this document blocked?',
+        db_index = True,
+        default = False)
 
     def __unicode__(self):
         if self.citation:
@@ -322,6 +235,30 @@ class Document(models.Model):
     def get_small_url(self):
         ascii = num_to_ascii(self.documentUUID)
         return "http://crt.li/x/" + ascii
+
+    def save(self, *args, **kwargs):
+        '''
+        If the value of blocked changed to True, invalidate the sitemap cache 
+        where that value was stored. Google can later pick it up properly. 
+        '''
+        # Run the standard save function.
+        super(Document, self).save(*args, **kwargs)
+        # Then delete the cached sitemap using celery if the item is blocked.
+        if self.blocked:
+            # TODO: Delete sitemap using celery.
+            pass
+
+    def delete(self, *args, **kwargs):
+        '''
+        If the item is deleted, we need to update the sitemap that previously 
+        contained it. Note that this doesn't get called when an entire queryset
+        is deleted, but that should be OK.
+        '''
+        # Delete the item.
+        super(Document, self).delete(*args, **kwargs)
+        # TODO: Test the above by deleting something.
+        # Then delete the cached sitemap using celery
+        # TODO: Delete using celery.
 
     class Meta:
         db_table = "Document"
