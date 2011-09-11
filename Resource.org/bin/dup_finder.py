@@ -48,7 +48,7 @@ import urllib2
 
 DEBUG = True
 
-def build_date_range(dateFiled, range=5):
+def build_date_range(dateFiled, range = 5):
     '''Build a date range to be handed off to a sphinx query
 
     This builds an array that can be handed off to Sphinx in order to complete
@@ -73,8 +73,8 @@ def build_date_range(dateFiled, range=5):
         i += 1
 
     if DEBUG:
-        print "dateRange: %s to %s" % (date.fromordinal(dateRange[0] - 365),\
-            date.fromordinal(dateRange[range*2] - 365))
+        print "dateRange: %s to %s" % (date.fromordinal(dateRange[0] - 365), \
+            date.fromordinal(dateRange[range * 2] - 365))
     return dateRange
 
 
@@ -97,7 +97,7 @@ def load_stopwords():
     return stopwords
 
 
-def make_good_query(content, caseName, court, count=5, DEBUG=False):
+def make_good_query(content, caseName, court, count = 5, DEBUG = False):
     '''Grab words from the content and returns them to the caller.
 
     This function attempts to choose words from the content that would return
@@ -168,7 +168,7 @@ def make_good_query(content, caseName, court, count=5, DEBUG=False):
     return query
 
 
-def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG=False):
+def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG = False):
     '''Checks for a duplicate that already exists in the DB
 
     This is the only major difference (so far) from the F2 import process. This
@@ -201,8 +201,8 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG=False
     while result_count > 50 and num_words <= word_count:
         query = make_good_query(content, caseName, court, num_words, DEBUG)
         queryset = Document.search.query(query)
-        docs_by_word_query = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
-            .filter(dateFiled=build_date_range(dateFiled))
+        docs_by_word_query = queryset.set_options(mode = "SPH_MATCH_EXTENDED2")\
+            .filter(dateFiled = build_date_range(dateFiled))
         result_count = docs_by_word_query.count()
         if DEBUG:
             for result in docs_by_word_query:
@@ -235,6 +235,7 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG=False
                     (result.pk, confidence)
 
     p2_result_count = len(results)
+
 
     ####################################
     ### Phase 3: Check docket number ###
@@ -305,7 +306,6 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG=False
     result_stats.write('%s,' % id + ",".join(['%s', '%s', '%s', '%s']) % (p1_result_count, p2_result_count, p3_result_count, p4_result_count) + '\n')
     result_stats.close()
 
-
     '''
     Any duplicate here has the following characteristics:
      - it is in the same court within five days
@@ -317,7 +317,7 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG=False
     return phase_four_results
 
 
-def write_dups(source, dups, DEBUG=False):
+def write_dups(source, dups, DEBUG = False):
     '''Writes duplicates to a file so they are logged.
 
     This function recieves a queryset and then writes out the values to a log.
@@ -344,7 +344,7 @@ def import_and_report_records():
     '''Traverses the first 500 records and find their dups.
 
     This script is used to find dups within the database by comparing it to
-    the sphinx index. This simulates the duplicate detection we will need to
+    the Sphinx index. This simulates the duplicate detection we will need to
     do when importing from other sources, and allows us to test it.
     '''
 
