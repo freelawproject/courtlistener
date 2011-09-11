@@ -12,7 +12,6 @@ To do:
  - Why don't I get logs from the scraper daemon emailed?
  
  Robots:
-  - set up celery and create tasks for deleting sitemaps when docs are saved/deleted
   - On deploy:
     - migrate models
     - delete all sitemaps

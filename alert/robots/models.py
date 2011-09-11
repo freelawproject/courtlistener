@@ -23,6 +23,3 @@
 #  b) You are prohibited from misrepresenting the origin of any material
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
-from django.db import models
-
-# Create your models here.

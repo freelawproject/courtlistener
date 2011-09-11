@@ -1,8 +1,14 @@
 User-agent: *
 Sitemap: http://courtlistener.com/sitemap.xml
 
-# Added November 20, 2010
 Disallow: /x/
+Disallow: /doc/
+Disallow: /dumps/
+Disallow: /pdf/
+Disallow: /txt/
+Disallow: /wpd/
+
+Disallow: /assets/
 
 {% for doc in docs %}
 Disallow: {{doc.get_absolute_url}}

@@ -27,8 +27,7 @@
 
 from alert.alertSystem.models import Document
 from django.http import HttpResponse
-from django.shortcuts import render_to_response
-from django.template import RequestContext, loader, Context
+from django.template import loader, Context
 from django.views.decorators.cache import cache_page
 
 
