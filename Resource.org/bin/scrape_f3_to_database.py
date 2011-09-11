@@ -74,7 +74,7 @@ def load_fix_files():
 
 
 def check_fix_list(sha1, fix_dict):
-    ''' Given a sha1, return the correction for a case. Return false if no values.
+    '''Given a sha1, return the correction for a case. Return false if no values.
 
     Corrections are strings that the parser can interpret as needed. Items are
     written to this file the first time the cases are imported, and this file

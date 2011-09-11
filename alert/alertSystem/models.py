@@ -21,34 +21,33 @@ from django.utils.text import get_valid_filename
 from django.utils.encoding import smart_unicode
 from djangosphinx.models import SphinxSearch
 from django.db import models
-import alert
 
 # a tuple, which we'll pass to the choices argument in various places.
 # Items are commented out until we have data/scrapers for them.
 PACER_CODES = (
     ('scotus', 'Supreme Court of the United States'),
-    ('ca1',    'Court of Appeals for the First Circuit'),
-    ('ca2',    'Court of Appeals for the Second Circuit'),
-    ('ca3',    'Court of Appeals for the Third Circuit'),
-    ('ca4',    'Court of Appeals for the Fourth Circuit'),
-    ('ca5',    'Court of Appeals for the Fifth Circuit'),
-    ('ca6',    'Court of Appeals for the Sixth Circuit'),
-    ('ca7',    'Court of Appeals for the Seventh Circuit'),
-    ('ca8',    'Court of Appeals for the Eighth Circuit'),
-    ('ca9',    'Court of Appeals for the Ninth Circuit'),
-    ('ca10',   'Court of Appeals for the Tenth Circuit'),
-    ('ca11',   'Court of Appeals for the Eleventh Circuit'),
-    ('cadc',   'Court of Appeals for the D.C. Circuit'),
-    ('cafc',   'Court of Appeals for the Federal Circuit'),
-    ('ccpa',   'Court of Customs and Patent Appeals'),
-    ('eca',    'Emergency Court of Appeals'),
+    ('ca1', 'Court of Appeals for the First Circuit'),
+    ('ca2', 'Court of Appeals for the Second Circuit'),
+    ('ca3', 'Court of Appeals for the Third Circuit'),
+    ('ca4', 'Court of Appeals for the Fourth Circuit'),
+    ('ca5', 'Court of Appeals for the Fifth Circuit'),
+    ('ca6', 'Court of Appeals for the Sixth Circuit'),
+    ('ca7', 'Court of Appeals for the Seventh Circuit'),
+    ('ca8', 'Court of Appeals for the Eighth Circuit'),
+    ('ca9', 'Court of Appeals for the Ninth Circuit'),
+    ('ca10', 'Court of Appeals for the Tenth Circuit'),
+    ('ca11', 'Court of Appeals for the Eleventh Circuit'),
+    ('cadc', 'Court of Appeals for the D.C. Circuit'),
+    ('cafc', 'Court of Appeals for the Federal Circuit'),
+    ('ccpa', 'Court of Customs and Patent Appeals'),
+    ('eca', 'Emergency Court of Appeals'),
     #('tecoa',  'Temporary Emergency Court of Appeals'),
     #('cc',     'Court of Claims'),
-    ('cfc',    'United States Court of Federal Claims'),
+    ('cfc', 'United States Court of Federal Claims'),
     #('cusc',   'United States Customs Court'),
     #('cit',    'United States Court of International Trade'),
     #('com',    'Commerce Court'),
-    ('fiscr',   'Foreign Intelligence Surveillance Court of Review'),
+    ('fiscr', 'Foreign Intelligence Surveillance Court of Review'),
 )
 
 # changes here need to be mirrored in the coverage page view and the exceptions
@@ -87,15 +86,15 @@ def make_pdf_upload_path(instance, filename):
 # A class to hold URLs and the hash of their contents. This could be added to
 # the Court table, except that courts often have more than one URL they parse.
 class urlToHash(models.Model):
-    hashUUID = models.AutoField("a unique ID for each hash/url pairing", primary_key=True)
+    hashUUID = models.AutoField("a unique ID for each hash/url pairing", primary_key = True)
     url = models.CharField("the URL that is hashed",
-        max_length=300,
-        blank=True,
-        editable=False)
+        max_length = 300,
+        blank = True,
+        editable = False)
     SHA1 = models.CharField("a SHA1 of the court's website HTML",
-        max_length=40,
-        blank=True,
-        editable=False)
+        max_length = 40,
+        blank = True,
+        editable = False)
 
     def __unicode__(self):
         return self.url
@@ -107,19 +106,19 @@ class urlToHash(models.Model):
 # A class to represent some information about each court, can be extended as needed.
 class Court(models.Model):
     courtUUID = models.CharField("a unique ID for each court",
-        max_length=100,
-        primary_key=True,
-        choices=PACER_CODES)
+        max_length = 100,
+        primary_key = True,
+        choices = PACER_CODES)
     URL = models.URLField("the homepage for each court")
     shortName = models.CharField("the citation abbreviation for the court",
-        max_length=100,
-        blank=True)
+        max_length = 100,
+        blank = True)
     startDate = models.DateField("the date the court was established",
-        blank=True,
-        null=True)
+        blank = True,
+        null = True)
     endDate = models.DateField("the date the court was abolished",
-        blank=True,
-        null=True)
+        blank = True,
+        null = True)
 
     # uses the choices argument in courtUUID to create a good display of the object.
     def __unicode__(self):
@@ -133,8 +132,8 @@ class Court(models.Model):
 
 # A class to represent each party that is extracted from a document
 class Party(models.Model):
-    partyUUID = models.AutoField("a unique ID for each party", primary_key=True)
-    partyExtracted = models.CharField("a party name", max_length=100)
+    partyUUID = models.AutoField("a unique ID for each party", primary_key = True)
+    partyExtracted = models.CharField("a party name", max_length = 100)
 
     def __unicode__(self):
         if self.partyExtracted:
@@ -151,13 +150,13 @@ class Party(models.Model):
 
 # A class to represent each judge that is extracted from a document
 class Judge(models.Model):
-    judgeUUID = models.AutoField("a unique ID for each judge", primary_key=True)
-    court = models.ForeignKey(Court, verbose_name="the court where the judge served during this time period")
+    judgeUUID = models.AutoField("a unique ID for each judge", primary_key = True)
+    court = models.ForeignKey(Court, verbose_name = "the court where the judge served during this time period")
     canonicalName = models.CharField("the official name of the judge: fname, mname, lname",
-        max_length=150)
+        max_length = 150)
     judgeAvatar = models.ImageField("the judge's face",
-        upload_to="avatars/judges/%Y/%m/%d",
-        blank=True)
+        upload_to = "avatars/judges/%Y/%m/%d",
+        blank = True)
     startDate = models.DateField("the start date that the judge is on the bench")
     endDate = models.DateField("the end date that the judge is on the bench")
 
@@ -175,9 +174,9 @@ class Judge(models.Model):
 # A class to hold the various aliases that a judge may have, such as M. Lissner,
 # Michael Jay Lissner, Michael Lissner, etc.
 class JudgeAlias (models.Model):
-    aliasUUID = models.AutoField("a unique ID for each alias", primary_key=True)
-    judgeUUID = models.ForeignKey(Judge, verbose_name="the judge for whom we are assigning an alias")
-    alias = models.CharField("a name under which the judge appears in a document", max_length=100)
+    aliasUUID = models.AutoField("a unique ID for each alias", primary_key = True)
+    judgeUUID = models.ForeignKey(Judge, verbose_name = "the judge for whom we are assigning an alias")
+    alias = models.CharField("a name under which the judge appears in a document", max_length = 100)
 
     # should return something like 'Mike is mapped to Michael Lissner'
     def __unicode__(self):
@@ -194,29 +193,29 @@ class JudgeAlias (models.Model):
 class Citation(models.Model):
     search = SphinxSearch()
     citationUUID = models.AutoField("a unique ID for each citation",
-        primary_key=True)
+        primary_key = True)
     slug = models.SlugField("URL that the document should map to",
-        max_length=50,
-        db_index=False,
-        null=True)
+        max_length = 50,
+        db_index = False,
+        null = True)
     caseNameShort = models.CharField("short name, as it is usually found on the court website",
-        max_length=100,
-        blank=True,
-        db_index=True)
-    caseNameFull =  models.TextField("full name of the case, as found on the first page of the PDF",
-        blank=True)
+        max_length = 100,
+        blank = True,
+        db_index = True)
+    caseNameFull = models.TextField("full name of the case, as found on the first page of the PDF",
+        blank = True)
     docketNumber = models.CharField("the docket number",
-        blank=True,
-        null=True,
-        max_length=50)
+        blank = True,
+        null = True,
+        max_length = 50)
     westCite = models.CharField("WestLaw citation",
-        max_length=50,
-        blank=True,
-        null=True)
+        max_length = 50,
+        blank = True,
+        null = True)
     lexisCite = models.CharField("LexisNexis citation",
-        max_length=50,
-        blank=True,
-        null=True)
+        max_length = 50,
+        blank = True,
+        null = True)
 
     def save(self, *args, **kwargs):
         '''
@@ -241,11 +240,11 @@ class Citation(models.Model):
 
 class ExcerptSummary(models.Model):
     excerptUUID = models.AutoField("a unique ID for each excerpt",
-        primary_key=True)
+        primary_key = True)
     autoExcerpt = models.TextField("the first 100 words of the PDF file",
-        blank=True)
+        blank = True)
     courtSummary = models.TextField("a summary of the document, as provided by the court itself",
-        blank=True)
+        blank = True)
 
     def __unicode__(self):
         return self.excerptUUID
@@ -260,55 +259,55 @@ class ExcerptSummary(models.Model):
 # A class which holds the bulk of the information regarding documents. This must
 # go last, since it references the above classes
 class Document(models.Model):
-    search = SphinxSearch(index="Document delta")
+    search = SphinxSearch(index = "Document delta")
     documentUUID = models.AutoField("a unique ID for each document",
-        primary_key=True)
+        primary_key = True)
     source = models.CharField("the source of the document",
-        max_length=3,
-        choices=DOCUMENT_SOURCES,
-        blank=True)
+        max_length = 3,
+        choices = DOCUMENT_SOURCES,
+        blank = True)
     documentSHA1 = models.CharField("unique ID for the document, as generated via sha1 on the PDF",
-        max_length=40,
-        db_index=True)
+        max_length = 40,
+        db_index = True)
     dateFiled = models.DateField("the date filed by the court",
-        blank=True,
-        null=True,
-        db_index=True)
+        blank = True,
+        null = True,
+        db_index = True)
     court = models.ForeignKey(Court,
-        verbose_name="the court where the document was filed",
-        db_index=True)
+        verbose_name = "the court where the document was filed",
+        db_index = True)
     judge = models.ManyToManyField(Judge,
-        verbose_name="the judges that heard the case",
-        blank=True,
-        null=True)
+        verbose_name = "the judges that heard the case",
+        blank = True,
+        null = True)
     party = models.ManyToManyField(Party,
-        verbose_name="the parties that were in the case",
-        blank=True,
-        null=True)
+        verbose_name = "the parties that were in the case",
+        blank = True,
+        null = True)
     citation = models.ForeignKey(Citation,
-        verbose_name="the citation information for the document",
-        blank=True,
-        null=True)
+        verbose_name = "the citation information for the document",
+        blank = True,
+        null = True)
     excerptSummary = models.ForeignKey(ExcerptSummary,
-        verbose_name="the excerpt information for the document",
-        blank=True,
-        null=True)
+        verbose_name = "the excerpt information for the document",
+        blank = True,
+        null = True)
     download_URL = models.URLField("the URL on the court website where the document was originally scraped",
-        verify_exists=False)
+        verify_exists = False)
     time_retrieved = models.DateTimeField("the exact date and time stamp that the document was placed into our database",
-        auto_now_add=True,
-        editable=False)
+        auto_now_add = True,
+        editable = False)
     local_path = models.FileField("the location, relative to MEDIA_ROOT, where the files are stored",
-        upload_to=make_pdf_upload_path,
-        blank=True)
+        upload_to = make_pdf_upload_path,
+        blank = True)
     documentPlainText = models.TextField("plain text of the document after extraction from the PDF",
-        blank=True)
+        blank = True)
     documentHTML = models.TextField("HTML of the document",
-        blank=True)
+        blank = True)
     documentType = models.CharField("the type of document, as described by document_types.txt",
-        max_length=50,
-        blank=True,
-        choices=DOCUMENT_STATUSES)
+        max_length = 50,
+        blank = True,
+        choices = DOCUMENT_STATUSES)
 
     def __unicode__(self):
         if self.citation:

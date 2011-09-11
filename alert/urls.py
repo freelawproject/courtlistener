@@ -17,21 +17,45 @@
 # imports of local settings and views
 from alert import settings
 from alert.alertSystem.models import PACER_CODES
-from alert.alertSystem.views import *
-from alert.contact.views import *
-from alert.data_dumper.views import *
-from alert.feeds.views import *
-from alert.pinger.views import *
-from alert.search.views import *
-from alert.userHandling.views import *
+from alert.alertSystem.views import delete_favorite
+from alert.alertSystem.views import edit_favorite
+from alert.alertSystem.views import redirect_short_url
+from alert.alertSystem.views import save_or_update_favorite
+from alert.alertSystem.views import viewCase
+from alert.alertSystem.views import viewDocumentListByCourt
+from alert.contact.views import contact, thanks
+from alert.data_dumper.views import dump_index, serve_or_gen_dump
+from alert.feeds.views import allCourtsFeed, courtFeed, searchFeed
+from alert.pinger.views import validateForBing, validateForGoogle, validateForYahoo
+from alert.search.views import deleteAlert
+from alert.search.views import deleteAlertConfirm
+from alert.search.views import editAlert
+from alert.search.views import home
+from alert.search.views import showResults
+from alert.search.views import toolsPage
+from alert.userHandling.views import confirmEmail
+from alert.userHandling.views import deleteProfile
+from alert.userHandling.views import deleteProfileDone
+from alert.userHandling.views import emailConfirmSuccess
+from alert.userHandling.views import password_change
+from alert.userHandling.views import redirect_to_settings
+from alert.userHandling.views import register
+from alert.userHandling.views import registerSuccess
+from alert.userHandling.views import requestEmailConfirmation
+from alert.userHandling.views import view_favorites
+from alert.userHandling.views import viewAlerts
+from alert.userHandling.views import viewSettings
+
 # this imports a variable that can be handed to the sitemap index generator function.
 from alert.alertSystem.sitemap import all_sitemaps as sitemaps
 from django.conf.urls.defaults import *
 
 # for the flatfiles in the sitemap
-from django.contrib.auth.views import login as signIn, logout as signOut,\
-    password_reset, password_reset_done, password_reset_confirm,\
-    password_reset_complete
+from django.contrib.auth.views import login as signIn
+from django.contrib.auth.views import logout as signOut
+from django.contrib.auth.views import password_reset
+from django.contrib.auth.views import password_reset_done
+from django.contrib.auth.views import password_reset_confirm
 
 # enables the admin:
 from django.contrib import admin
@@ -51,7 +75,7 @@ urlpatterns = patterns('',
     (r'^opinions/(' + "|".join(pacer_codes) + '|all)/$', viewDocumentListByCourt),
 
     # Display a case, a named URL because the get_absolute_url uses it.
-    url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', viewCase, name="viewCase"),
+    url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', viewCase, name = "viewCase"),
     # Redirect users
     (r'^x/(.*)/$', redirect_short_url),
 
@@ -60,7 +84,7 @@ urlpatterns = patterns('',
     (r'^contact/thanks/$', thanks),
 
     # Various sign in/out etc. functions as provided by django
-    url(r'^sign-in/$', signIn, name="sign-in"),
+    url(r'^sign-in/$', signIn, name = "sign-in"),
     (r'^sign-out/$', signOut),
 
     # Homepage and favicon
@@ -69,13 +93,13 @@ urlpatterns = patterns('',
 
     # Settings pages
     (r'^profile/$', redirect_to_settings),
-    url(r'^profile/settings/$', viewSettings, name='viewSettings'),
+    url(r'^profile/settings/$', viewSettings, name = 'viewSettings'),
     (r'^profile/favorites/$', view_favorites),
     (r'^profile/alerts/$', viewAlerts),
     (r'^profile/password/change/$', password_change),
     (r'^profile/delete/$', deleteProfile),
     (r'^profile/delete/done/$', deleteProfileDone),
-    url(r'^register/$', register, name="register"),
+    url(r'^register/$', register, name = "register"),
     (r'^register/success/$', registerSuccess),
     # Favorites pages
     (r'^favorite/create-or-update/$', save_or_update_favorite),
@@ -96,7 +120,7 @@ urlpatterns = patterns('',
     # Alert/search pages
     # These URLs support either GET requests or things like /alert/preview/searchterm.
     #url(r'^(alert/preview)/$', showResults, name="alertResults"),
-    url(r'^search/results/$', showResults, name="searchResults"),
+    url(r'^search/results/$', showResults, name = "searchResults"),
     (r'^search/$', showResults), #for the URL hackers in the crowd
     (r'^alert/edit/(\d{1,6})/$', editAlert),
     (r'^alert/delete/(\d{1,6})/$', deleteAlert),

@@ -14,9 +14,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from alert.alertSystem.models import *
-from alert.userHandling.forms import *
-from alert.userHandling.models import *
+from alert.alertSystem.models import Court, Document
+from alert.userHandling.forms import FavoriteForm
+from alert.userHandling.models import Favorite
 from alert.lib.encode_decode import ascii_to_num
 from django.contrib.auth.decorators import login_required
 from django.contrib.sites.models import Site
@@ -25,23 +25,18 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import EmptyPage
 from django.core.paginator import InvalidPage
 from django.core.paginator import Paginator
-from django.db import IntegrityError
-from django.http import Http404
 from django.http import HttpResponse
 from django.http import HttpResponsePermanentRedirect
 from django.shortcuts import render_to_response
 from django.shortcuts import HttpResponseRedirect
-from django.shortcuts import get_object_or_404, get_list_or_404
+from django.shortcuts import get_object_or_404
 from django.template import RequestContext
-from django.template.defaultfilters import slugify
-from django.utils import simplejson
 from django.utils.datastructures import MultiValueDictKeyError
 from django.views.decorators.cache import cache_page
 import string
-import traceback
 
 
-@cache_page(60*5)
+@cache_page(60 * 5)
 def redirect_short_url(request, encoded_string):
     '''Redirect a user to the CourtListener site from the crt.li site.'''
 
@@ -66,11 +61,9 @@ def redirect_short_url(request, encoded_string):
     return HttpResponsePermanentRedirect(URL)
 
 
-@cache_page(60*5)
-def viewCase(request, court, id, casename):
-    '''
-    Take a court, an ID, and a casename, and return the document. Casename
-    isn't used, and can be anything.
+@cache_page(60 * 5)
+def viewCase(request, court, pk, casename):
+    '''Take a court and an ID, and return the document.
 
     We also test if the document ID is a favorite for the user, and send data
     as such. If it's a favorite, we send the bound form for the favorite, so
@@ -79,13 +72,13 @@ def viewCase(request, court, id, casename):
     '''
 
     # Decode the id string back to an int
-    id = ascii_to_num(id)
+    pk = ascii_to_num(pk)
 
     # Look up the court, document, title and favorite information
-    doc   = get_object_or_404(Document, documentUUID = id)
-    ct    = get_object_or_404(Court, courtUUID = court)
+    doc = get_object_or_404(Document, documentUUID = pk)
+    ct = get_object_or_404(Court, courtUUID = court)
     title = doc.citation.caseNameShort
-    user  = request.user
+    user = request.user
 
     try:
         # Check if we know the user's query. Pass it onwards if so.
@@ -97,7 +90,7 @@ def viewCase(request, court, id, casename):
     try:
         # Get the favorite, if possible
         fave = Favorite.objects.get(doc_id = doc.documentUUID, users__user = user)
-        favorite_form = FavoriteForm(instance=fave)
+        favorite_form = FavoriteForm(instance = fave)
     except (ObjectDoesNotExist, TypeError):
         # Not favorited or anonymous user
         favorite_form = FavoriteForm(initial = {'doc_id': doc.documentUUID,
@@ -139,7 +132,7 @@ def save_or_update_favorite(request):
             up.favorite.add(new_fave)
             up.save()
         else:
-            # TODO: How do we handle validation errors with ajax?
+            # Validation errors fail silently. Probably could be better.
             HttpResponse("Failure. Form invalid")
 
         return HttpResponse("It worked")
@@ -167,8 +160,7 @@ def edit_favorite(request, fave_id):
         return HttpResponseRedirect('/')
 
     if request.method == 'POST':
-        # TODO: Favoritize this.
-        form = FavoriteForm(request.POST, instance=fave)
+        form = FavoriteForm(request.POST, instance = fave)
         if form.is_valid():
             form.save()
             messages.add_message(request, messages.SUCCESS,
@@ -219,12 +211,11 @@ def delete_favorite(request):
         return HttpResponse("Not an ajax request.")
 
 
-@cache_page(60*15)
+@cache_page(60 * 15)
 def viewDocumentListByCourt(request, court):
     '''
     Show documents for a court, ten at a time
     '''
-    from django.core.paginator import Paginator, InvalidPage, EmptyPage
     if court == "all":
         # we get all records, sorted by dateFiled.
         docs = Document.objects.order_by("-dateFiled")
