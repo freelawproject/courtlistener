@@ -129,7 +129,6 @@ class Court(models.Model):
         ordering = ["courtUUID"] #this reinforces the default
 
 
-
 # A class to represent each party that is extracted from a document
 class Party(models.Model):
     partyUUID = models.AutoField("a unique ID for each party", primary_key = True)
@@ -235,7 +234,6 @@ class Citation(models.Model):
 
     class Meta:
         db_table = "Citation"
-
 
 
 class ExcerptSummary(models.Model):
