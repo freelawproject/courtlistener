@@ -233,7 +233,7 @@
 
             {% for result in results.object_list %}
                 <h3 class="bottom alt">
-                    <a href="{{result.get_absolute_url}}?q={{query}}">
+                    <a href="{{result.get_absolute_url}}?q={{query}}" class="visitable">
                         {{ result.citation.caseNameFull }},
                         {% if result.citation.westCite != '' and result.citation.westCite != None %}
                             {{result.citation.westCite}}
@@ -248,13 +248,13 @@
                         {% if result.source != 'R' %}
                             <strong>View Original:</strong>
                             {% if result.download_URL %}
-                                <a href="{{result.download_URL}}">From the court</a>
+                                <a href="{{result.download_URL}}" class="visitable">From the court</a>
                             {% endif %}
                             {% if result.download_URL and result.local_path %}
                                 &nbsp;&nbsp;|&nbsp;&nbsp;
                             {% endif %}
                             {% if result.local_path %}
-                                <a href="/{{result.local_path}}">Our backup</a>
+                                <a href="/{{result.local_path}}" class="visitable">Our backup</a>
                             {% endif %}
                         {% else %}
                             No downloadable versions.

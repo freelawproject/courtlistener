@@ -148,6 +148,10 @@ a:link, a:visited {
     text-decoration: none;
 }
 
+a:visited.visitable {
+    color: #9d11b3;	
+}
+
 a:focus, a:hover {
     color: #000099;
     text-decoration: underline;
