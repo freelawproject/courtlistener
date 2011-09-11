@@ -16,7 +16,7 @@
 
 
 from django.contrib import admin
-from alert.alertSystem.models import *
+from alert.alertSystem.models import Citation, Court, Document
 
 class DocumentAdminInline(admin.StackedInline):
     # ordering is brutal on MySQL. Don't put it here. Sorry.
@@ -24,9 +24,8 @@ class DocumentAdminInline(admin.StackedInline):
     #list_filter = ('court',)
     model = Document
     fields = ('citation', 'source', 'documentSHA1', 'dateFiled', 'court',
-              'excerptSummary', 'download_URL',
-              'local_path', 'documentPlainText', 'documentHTML',
-              'documentType',)
+              'download_URL', 'local_path', 'documentPlainText', 'documentHTML',
+              'documentType', 'blocked')
     raw_id_fields = ('citation',)
     search_fields = ['documentPlainText']
 
@@ -43,9 +42,8 @@ class DocumentAdmin(admin.ModelAdmin):
     #list_display = ('citation',)
     #list_filter = ('court',)
     fields = ('source', 'documentSHA1', 'dateFiled', 'court',
-              'excerptSummary', 'download_URL',
-              'local_path', 'documentPlainText', 'documentHTML',
-              'documentType',)
+              'download_URL', 'local_path', 'documentPlainText', 'documentHTML',
+              'documentType', 'blocked')
     search_fields = ['documentPlainText']
 
 

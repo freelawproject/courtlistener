@@ -27,6 +27,7 @@ from alert.contact.views import contact, thanks
 from alert.data_dumper.views import dump_index, serve_or_gen_dump
 from alert.feeds.views import allCourtsFeed, courtFeed, searchFeed
 from alert.pinger.views import validateForBing, validateForGoogle, validateForYahoo
+from alert.robots.views import robots
 from alert.search.views import deleteAlert
 from alert.search.views import deleteAlertConfirm
 from alert.search.views import editAlert
@@ -147,6 +148,7 @@ urlpatterns = patterns('',
         {'sitemaps': sitemaps}),
     # this uses a custom sitemap generator that has a file-based cache.
     (r'^sitemap-(?P<section>.+)\.xml$', 'alert.alertSystem.sitemap.cachedSitemap', {'sitemaps': sitemaps}),
+    (r'^robots.txt$', robots)
 )
 
 # redirects

@@ -1,0 +1,10 @@
+User-agent: *
+Sitemap: http://courtlistener.com/sitemap.xml
+
+# Added November 20, 2010
+Disallow: /x/
+
+{% for doc in docs %}
+Disallow: {{doc.get_absolute_url}}
+{% if doc.local_path%}Disallow: {{doc.local_path}}{% endif %}
+{% endfor %}
