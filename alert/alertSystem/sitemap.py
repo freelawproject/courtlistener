@@ -127,10 +127,10 @@ class LimitedGenericSitemap(GenericSitemap):
         self.priority = priority
         self.changefreq = changefreq
         # convert datetimes to dates, where necessary
-        foo = info_dict.get('date_field', None)
-        if type(foo).__name__ == 'datetime':
-            foo = foo.date()
-        self.date_field = foo
+        date_filed = info_dict.get('date_field', None)
+        if type(date_filed).__name__ == 'datetime':
+            date_filed = date_filed.date()
+        self.date_field = date_filed
 
 
 class MyFlatPageSitemap(FlatPageSitemap):

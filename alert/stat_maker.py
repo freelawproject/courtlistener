@@ -28,9 +28,8 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from django.contrib.flatpages.models import FlatPage
-from django.template import RequestContext, loader, Context
-from django.views.decorators.cache import cache_page
-from alert.alertSystem.models import Document, Court
+from django.template import loader, Context
+from alert.alertSystem.models import Document
 from alert.alertSystem.models import PACER_CODES
 
 def makeStats():
@@ -57,8 +56,8 @@ def makeStats():
     statsP = []
     # get all the courts
     for code in PACER_CODES:
-        q = Document.objects.filter(court=code[0],
-            documentType="Published").exclude(dateFiled = None)
+        q = Document.objects.filter(court = code[0],
+            documentType = "Published").exclude(dateFiled = None)
         numDocs = q.count()
         if numDocs != 0:
             doc = q.order_by('dateFiled')[0]
@@ -67,8 +66,8 @@ def makeStats():
 
     statsU = []
     for code in PACER_CODES:
-        q = Document.objects.filter(court=code[0],
-            documentType__in=["Unpublished","Errata","In-chambers","Relating-to"])\
+        q = Document.objects.filter(court = code[0],
+            documentType__in = ["Unpublished", "Errata", "In-chambers", "Relating-to"])\
             .exclude(dateFiled = None)
         numDocs = q.count()
         if numDocs != 0:
@@ -78,8 +77,8 @@ def makeStats():
 
     statsMissingType = []
     for code in PACER_CODES:
-        q = Document.objects.filter(court=code[0],
-            documentType="").exclude(dateFiled = None)
+        q = Document.objects.filter(court = code[0],
+            documentType = "").exclude(dateFiled = None)
         numDocs = q.count()
         if numDocs != 0:
             doc = q.order_by('dateFiled')[0]
@@ -108,7 +107,7 @@ def main():
     html = t.render(c)
 
     # put that in the correct flatpage
-    page = FlatPage.objects.get(url='/coverage/')
+    page = FlatPage.objects.get(url = '/coverage/')
     page.content = html
     page.save()
 

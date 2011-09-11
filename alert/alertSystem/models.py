@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from alert import settings
 from alert.lib.string_utils import trunc
 from alert.lib.encode_decode import num_to_ascii
 from django.template.defaultfilters import slugify
@@ -21,6 +22,7 @@ from django.utils.text import get_valid_filename
 from django.utils.encoding import smart_unicode
 from djangosphinx.models import SphinxSearch
 from django.db import models
+import glob, os
 
 # a tuple, which we'll pass to the choices argument in various places.
 # Items are commented out until we have data/scrapers for them.
@@ -83,9 +85,26 @@ def make_pdf_upload_path(instance, filename):
     return path
 
 
-# A class to hold URLs and the hash of their contents. This could be added to
-# the Court table, except that courts often have more than one URL they parse.
+def invalidate_sitemap_cache_by_court(court):
+    '''Deletes sitemaps for a given court
+    
+    Recieves a court ID as a string, and deletes all sitemaps that are cached on
+    disk for that court. Could be optimized to delete the correct sitemap file, 
+    but remember that this is a disk-based cache, so we should be OK with 
+    deleting it from time to time.
+    '''
+    os.chdir(os.path.join(settings.MEDIA_ROOT, 'sitemaps'))
+    sitemaps = glob.glob('%s*' % court)
+
+    for sitemap in sitemaps:
+        os.remove(sitemap)
+
+
 class urlToHash(models.Model):
+    '''A class to hold URLs and the hash of their contents. This could be added 
+    to the Court table, except that courts often have more than one URL they 
+    parse.
+    '''
     hashUUID = models.AutoField("a unique ID for each hash/url pairing", primary_key = True)
     url = models.CharField("the URL that is hashed",
         max_length = 300,
@@ -103,8 +122,9 @@ class urlToHash(models.Model):
         db_table = "urlToHash"
 
 
-# A class to represent some information about each court, can be extended as needed.
 class Court(models.Model):
+    '''A class to represent some information about each court, can be extended
+    as needed.'''
     courtUUID = models.CharField("a unique ID for each court",
         max_length = 100,
         primary_key = True,
@@ -176,9 +196,9 @@ class Citation(models.Model):
         db_table = "Citation"
 
 
-# A class which holds the bulk of the information regarding documents. This must
-# go last, since it references the above classes
 class Document(models.Model):
+    '''A class which holds the bulk of the information regarding documents. This 
+    must go last, since it references the above classes'''
     search = SphinxSearch(index = "Document delta")
     documentUUID = models.AutoField("a unique ID for each document",
         primary_key = True)
@@ -216,7 +236,7 @@ class Document(models.Model):
         max_length = 50,
         blank = True,
         choices = DOCUMENT_STATUSES)
-    blocked = models.BooleanField('Is this document blocked?',
+    blocked = models.BooleanField('block crawlers for this document',
         db_index = True,
         default = False)
 
@@ -238,27 +258,24 @@ class Document(models.Model):
 
     def save(self, *args, **kwargs):
         '''
-        If the value of blocked changed to True, invalidate the sitemap cache 
-        where that value was stored. Google can later pick it up properly. 
+        If the value of blocked changed to True, invalidate the sitemap cache
+        where that value was stored. Google can later pick it up properly.
         '''
         # Run the standard save function.
         super(Document, self).save(*args, **kwargs)
-        # Then delete the cached sitemap using celery if the item is blocked.
+        # Then delete the cached sitemap if the item is blocked.
         if self.blocked:
-            # TODO: Delete sitemap using celery.
-            pass
+            invalidate_sitemap_cache_by_court(self.court_id)
 
     def delete(self, *args, **kwargs):
         '''
-        If the item is deleted, we need to update the sitemap that previously 
+        If the item is deleted, we need to update the sitemap that previously
         contained it. Note that this doesn't get called when an entire queryset
         is deleted, but that should be OK.
         '''
         # Delete the item.
         super(Document, self).delete(*args, **kwargs)
-        # TODO: Test the above by deleting something.
-        # Then delete the cached sitemap using celery
-        # TODO: Delete using celery.
+        invalidate_sitemap_cache_by_court(self.court_id)
 
     class Meta:
         db_table = "Document"
