@@ -24,7 +24,7 @@ setup_environ(settings)
 from alert.alertSystem.models import Document
 from difflib import Differ
 from optparse import OptionParser
-import re
+import os, re
 import urllib2
 
 
@@ -83,6 +83,9 @@ def update_db_from_resource_org(simulate, verbose):
     Gets the latest file and finds any new or removed lines within it. Documents
     are then updated with these findings by toggling their 'block' flag. 
     '''
+    # Set up our working directory
+    os.chdir(os.path.join(settings.INSTALL_ROOT, 'alert'))
+
     # Get the latest file
     new_file_content = get_file_from_resource_org()
 
@@ -111,6 +114,7 @@ def update_db_from_resource_org(simulate, verbose):
 
     # Finally, write the new file to disk so that it may become the old file
     # next time.
+    print os.getcwd()
     old_file = open('robots/cached_file.txt', 'w')
     for line in new_file_content:
         old_file.write(line)
