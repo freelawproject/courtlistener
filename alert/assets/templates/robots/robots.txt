@@ -12,5 +12,5 @@ Disallow: /assets/
 
 {% for doc in docs %}
 Disallow: {{doc.get_absolute_url}}
-{% if doc.local_path%}Disallow: {{doc.local_path}}{% endif %}
+{% if doc.local_path%}Disallow: /{{doc.local_path}}{% endif %}
 {% endfor %}
