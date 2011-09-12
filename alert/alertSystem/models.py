@@ -93,11 +93,17 @@ def invalidate_sitemap_cache_by_court(court):
     but remember that this is a disk-based cache, so we should be OK with 
     deleting it from time to time.
     '''
+    # Get the original location so we can return to it at the end.
+    original_dir = os.getcwd()
+
     os.chdir(os.path.join(settings.MEDIA_ROOT, 'sitemaps'))
     sitemaps = glob.glob('%s*' % court)
 
     for sitemap in sitemaps:
         os.remove(sitemap)
+
+    # Go back to the original location.
+    os.chdir(original_dir)
 
 
 class urlToHash(models.Model):
@@ -221,7 +227,8 @@ class Document(models.Model):
         blank = True,
         null = True)
     download_URL = models.URLField("the URL on the court website where the document was originally scraped",
-        verify_exists = False)
+        verify_exists = False,
+        db_index = True)
     time_retrieved = models.DateTimeField("the exact date and time stamp that the document was placed into our database",
         auto_now_add = True,
         editable = False)
