@@ -114,7 +114,6 @@ def update_db_from_resource_org(simulate, verbose):
 
     # Finally, write the new file to disk so that it may become the old file
     # next time.
-    print os.getcwd()
     old_file = open('robots/cached_file.txt', 'w')
     for line in new_file_content:
         old_file.write(line)
