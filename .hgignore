@@ -41,3 +41,6 @@ Sphinx/log
 
 # pdfdisplay
 pdfdisplay
+
+syntax: regexp
+^\.settings$

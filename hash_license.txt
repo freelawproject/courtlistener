@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
 # 
