@@ -36,7 +36,7 @@ def robots(request):
     '''Generate the robots.txt file'''
     response = HttpResponse(mimetype = 'text/plain')
 
-    docs = Document.objects.filter(blocked = True)
+    docs = Document.objects.filter(blocked = True).order_by('date_blocked')
 
     # make them into pretty HTML
     t = loader.get_template('robots/robots.txt')
