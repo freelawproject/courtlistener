@@ -11,6 +11,7 @@ Disallow: /wpd/
 Disallow: /assets/
 
 {% for doc in docs %}
+# Added: {{doc.date_blocked|default_if_none:"Unknown"}}
 Disallow: {{doc.get_absolute_url}}
 {% if doc.local_path%}Disallow: /{{doc.local_path}}{% endif %}
 {% endfor %}

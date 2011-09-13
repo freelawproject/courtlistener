@@ -25,7 +25,7 @@ class DocumentAdminInline(admin.StackedInline):
     model = Document
     fields = ('citation', 'source', 'documentSHA1', 'dateFiled', 'court',
               'download_URL', 'local_path', 'documentPlainText', 'documentHTML',
-              'documentType', 'blocked')
+              'documentType', 'blocked', 'date_blocked')
     raw_id_fields = ('citation',)
     search_fields = ['documentPlainText']
 
@@ -43,7 +43,7 @@ class DocumentAdmin(admin.ModelAdmin):
     #list_filter = ('court',)
     fields = ('source', 'documentSHA1', 'dateFiled', 'court',
               'download_URL', 'local_path', 'documentPlainText', 'documentHTML',
-              'documentType', 'blocked')
+              'documentType', 'blocked', 'date_blocked')
     search_fields = ['documentPlainText']
 
 

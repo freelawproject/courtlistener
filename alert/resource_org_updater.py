@@ -24,7 +24,7 @@ setup_environ(settings)
 from alert.alertSystem.models import Document
 from difflib import Differ
 from optparse import OptionParser
-import os, re
+import datetime, os, re
 import urllib2
 
 
@@ -45,10 +45,12 @@ def toggle_blocked_status(url, block_or_unblock, simulate, verbose):
             if verbose:
                 print "Blocking: %s" % (url)
             doc.blocked = True
+            doc.date_blocked = datetime.date.today()
         elif block_or_unblock == "unblock":
             if verbose:
                 print "Unblocking: %s" % (url)
             doc.blocked = False
+            doc.date_blocked = None
         if not simulate:
             doc.save()
 
