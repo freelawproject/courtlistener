@@ -24,7 +24,7 @@
 #  b) You are prohibited from misrepresenting the origin of any material
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
-# encoding: utf-8
+
 import datetime
 from south.db import db
 from south.v2 import SchemaMigration
@@ -33,7 +33,7 @@ from django.db import models
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        
+
         # Removing index on 'Citation', fields ['slug']
         #db.delete_index('Citation', ['slug'])
 
@@ -42,7 +42,7 @@ class Migration(SchemaMigration):
 
 
     def backwards(self, orm):
-        
+
         # Adding index on 'Citation', fields ['slug']
         #db.create_index('Citation', ['slug'])
 

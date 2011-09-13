@@ -23,7 +23,7 @@
 #  b) You are prohibited from misrepresenting the origin of any material
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
-# encoding: utf-8
+
 import datetime
 from south.db import db
 from south.v2 import SchemaMigration
@@ -32,36 +32,36 @@ from django.db import models
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        
+
         # Adding model 'urlToHash'
         db.create_table('urlToHash', (
-            ('hashUUID', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('url', self.gf('django.db.models.fields.CharField')(max_length=300, blank=True)),
-            ('SHA1', self.gf('django.db.models.fields.CharField')(max_length=40, blank=True)),
+            ('hashUUID', self.gf('django.db.models.fields.AutoField')(primary_key = True)),
+            ('url', self.gf('django.db.models.fields.CharField')(max_length = 300, blank = True)),
+            ('SHA1', self.gf('django.db.models.fields.CharField')(max_length = 40, blank = True)),
         ))
         db.send_create_signal('alertSystem', ['urlToHash'])
 
         # Adding model 'Court'
         db.create_table('Court', (
-            ('courtUUID', self.gf('django.db.models.fields.CharField')(max_length=100, primary_key=True)),
-            ('courtURL', self.gf('django.db.models.fields.URLField')(max_length=200)),
-            ('courtShortName', self.gf('django.db.models.fields.CharField')(max_length=100, blank=True)),
+            ('courtUUID', self.gf('django.db.models.fields.CharField')(max_length = 100, primary_key = True)),
+            ('courtURL', self.gf('django.db.models.fields.URLField')(max_length = 200)),
+            ('courtShortName', self.gf('django.db.models.fields.CharField')(max_length = 100, blank = True)),
         ))
         db.send_create_signal('alertSystem', ['Court'])
 
         # Adding model 'Party'
         db.create_table('Party', (
-            ('partyUUID', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('partyExtracted', self.gf('django.db.models.fields.CharField')(max_length=100)),
+            ('partyUUID', self.gf('django.db.models.fields.AutoField')(primary_key = True)),
+            ('partyExtracted', self.gf('django.db.models.fields.CharField')(max_length = 100)),
         ))
         db.send_create_signal('alertSystem', ['Party'])
 
         # Adding model 'Judge'
         db.create_table('Judge', (
-            ('judgeUUID', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('court', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['alertSystem.Court'])),
-            ('canonicalName', self.gf('django.db.models.fields.CharField')(max_length=150)),
-            ('judgeAvatar', self.gf('django.db.models.fields.files.ImageField')(max_length=100, blank=True)),
+            ('judgeUUID', self.gf('django.db.models.fields.AutoField')(primary_key = True)),
+            ('court', self.gf('django.db.models.fields.related.ForeignKey')(to = orm['alertSystem.Court'])),
+            ('canonicalName', self.gf('django.db.models.fields.CharField')(max_length = 150)),
+            ('judgeAvatar', self.gf('django.db.models.fields.files.ImageField')(max_length = 100, blank = True)),
             ('startDate', self.gf('django.db.models.fields.DateField')()),
             ('endDate', self.gf('django.db.models.fields.DateField')()),
         ))
@@ -69,69 +69,69 @@ class Migration(SchemaMigration):
 
         # Adding model 'JudgeAlias'
         db.create_table('JudgeAlias', (
-            ('aliasUUID', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('judgeUUID', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['alertSystem.Judge'])),
-            ('alias', self.gf('django.db.models.fields.CharField')(max_length=100)),
+            ('aliasUUID', self.gf('django.db.models.fields.AutoField')(primary_key = True)),
+            ('judgeUUID', self.gf('django.db.models.fields.related.ForeignKey')(to = orm['alertSystem.Judge'])),
+            ('alias', self.gf('django.db.models.fields.CharField')(max_length = 100)),
         ))
         db.send_create_signal('alertSystem', ['JudgeAlias'])
 
         # Adding model 'Citation'
         db.create_table('Citation', (
-            ('citationUUID', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('slug', self.gf('django.db.models.fields.SlugField')(max_length=50, null=True)),
-            ('caseNameShort', self.gf('django.db.models.fields.CharField')(db_index=True, max_length=100, blank=True)),
-            ('caseNameFull', self.gf('django.db.models.fields.TextField')(blank=True)),
-            ('caseNumber', self.gf('django.db.models.fields.CharField')(db_index=True, max_length=50, blank=True)),
-            ('officialCitationWest', self.gf('django.db.models.fields.CharField')(max_length=50, blank=True)),
-            ('officialCitationLexis', self.gf('django.db.models.fields.CharField')(max_length=50, blank=True)),
+            ('citationUUID', self.gf('django.db.models.fields.AutoField')(primary_key = True)),
+            ('slug', self.gf('django.db.models.fields.SlugField')(max_length = 50, null = True)),
+            ('caseNameShort', self.gf('django.db.models.fields.CharField')(db_index = True, max_length = 100, blank = True)),
+            ('caseNameFull', self.gf('django.db.models.fields.TextField')(blank = True)),
+            ('caseNumber', self.gf('django.db.models.fields.CharField')(db_index = True, max_length = 50, blank = True)),
+            ('officialCitationWest', self.gf('django.db.models.fields.CharField')(max_length = 50, blank = True)),
+            ('officialCitationLexis', self.gf('django.db.models.fields.CharField')(max_length = 50, blank = True)),
         ))
         db.send_create_signal('alertSystem', ['Citation'])
 
         # Adding model 'ExcerptSummary'
         db.create_table('ExcerptSummary', (
-            ('excerptUUID', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('autoExcerpt', self.gf('django.db.models.fields.TextField')(blank=True)),
-            ('courtSummary', self.gf('django.db.models.fields.TextField')(blank=True)),
+            ('excerptUUID', self.gf('django.db.models.fields.AutoField')(primary_key = True)),
+            ('autoExcerpt', self.gf('django.db.models.fields.TextField')(blank = True)),
+            ('courtSummary', self.gf('django.db.models.fields.TextField')(blank = True)),
         ))
         db.send_create_signal('alertSystem', ['ExcerptSummary'])
 
         # Adding model 'Document'
         db.create_table('Document', (
-            ('documentUUID', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('source', self.gf('django.db.models.fields.CharField')(max_length=3, blank=True)),
-            ('documentSHA1', self.gf('django.db.models.fields.CharField')(max_length=40, db_index=True)),
-            ('dateFiled', self.gf('django.db.models.fields.DateField')(db_index=True, null=True, blank=True)),
-            ('court', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['alertSystem.Court'])),
-            ('citation', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['alertSystem.Citation'], null=True, blank=True)),
-            ('excerptSummary', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['alertSystem.ExcerptSummary'], null=True, blank=True)),
-            ('download_URL', self.gf('django.db.models.fields.URLField')(max_length=200)),
-            ('time_retrieved', self.gf('django.db.models.fields.DateTimeField')(auto_now_add=True, blank=True)),
-            ('local_path', self.gf('django.db.models.fields.files.FileField')(max_length=100, blank=True)),
-            ('documentPlainText', self.gf('django.db.models.fields.TextField')(blank=True)),
-            ('documentHTML', self.gf('django.db.models.fields.TextField')(blank=True)),
-            ('documentType', self.gf('django.db.models.fields.CharField')(max_length=50, blank=True)),
+            ('documentUUID', self.gf('django.db.models.fields.AutoField')(primary_key = True)),
+            ('source', self.gf('django.db.models.fields.CharField')(max_length = 3, blank = True)),
+            ('documentSHA1', self.gf('django.db.models.fields.CharField')(max_length = 40, db_index = True)),
+            ('dateFiled', self.gf('django.db.models.fields.DateField')(db_index = True, null = True, blank = True)),
+            ('court', self.gf('django.db.models.fields.related.ForeignKey')(to = orm['alertSystem.Court'])),
+            ('citation', self.gf('django.db.models.fields.related.ForeignKey')(to = orm['alertSystem.Citation'], null = True, blank = True)),
+            ('excerptSummary', self.gf('django.db.models.fields.related.ForeignKey')(to = orm['alertSystem.ExcerptSummary'], null = True, blank = True)),
+            ('download_URL', self.gf('django.db.models.fields.URLField')(max_length = 200)),
+            ('time_retrieved', self.gf('django.db.models.fields.DateTimeField')(auto_now_add = True, blank = True)),
+            ('local_path', self.gf('django.db.models.fields.files.FileField')(max_length = 100, blank = True)),
+            ('documentPlainText', self.gf('django.db.models.fields.TextField')(blank = True)),
+            ('documentHTML', self.gf('django.db.models.fields.TextField')(blank = True)),
+            ('documentType', self.gf('django.db.models.fields.CharField')(max_length = 50, blank = True)),
         ))
         db.send_create_signal('alertSystem', ['Document'])
 
         # Adding M2M table for field judge on 'Document'
         db.create_table('Document_judge', (
-            ('id', models.AutoField(verbose_name='ID', primary_key=True, auto_created=True)),
-            ('document', models.ForeignKey(orm['alertSystem.document'], null=False)),
-            ('judge', models.ForeignKey(orm['alertSystem.judge'], null=False))
+            ('id', models.AutoField(verbose_name = 'ID', primary_key = True, auto_created = True)),
+            ('document', models.ForeignKey(orm['alertSystem.document'], null = False)),
+            ('judge', models.ForeignKey(orm['alertSystem.judge'], null = False))
         ))
         db.create_unique('Document_judge', ['document_id', 'judge_id'])
 
         # Adding M2M table for field party on 'Document'
         db.create_table('Document_party', (
-            ('id', models.AutoField(verbose_name='ID', primary_key=True, auto_created=True)),
-            ('document', models.ForeignKey(orm['alertSystem.document'], null=False)),
-            ('party', models.ForeignKey(orm['alertSystem.party'], null=False))
+            ('id', models.AutoField(verbose_name = 'ID', primary_key = True, auto_created = True)),
+            ('document', models.ForeignKey(orm['alertSystem.document'], null = False)),
+            ('party', models.ForeignKey(orm['alertSystem.party'], null = False))
         ))
         db.create_unique('Document_party', ['document_id', 'party_id'])
 
 
     def backwards(self, orm):
-        
+
         # Deleting model 'urlToHash'
         db.delete_table('urlToHash')
 

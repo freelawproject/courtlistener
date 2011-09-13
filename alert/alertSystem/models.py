@@ -161,7 +161,6 @@ class Citation(models.Model):
         primary_key = True)
     slug = models.SlugField("URL that the document should map to",
         max_length = 50,
-        db_index = False,
         null = True)
     caseNameShort = models.CharField("short name, as it is usually found on the court website",
         max_length = 100,
@@ -243,6 +242,9 @@ class Document(models.Model):
         max_length = 50,
         blank = True,
         choices = DOCUMENT_STATUSES)
+    date_blocked = models.DateField('original block date',
+        blank = True,
+        null = True)
     blocked = models.BooleanField('block crawlers for this document',
         db_index = True,
         default = False)
