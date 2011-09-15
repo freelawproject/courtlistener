@@ -10,3 +10,6 @@ To do:
     - add fiscr to the various places on the site where it's needed...
  - Import resource.org/robots.txt (see bug 187)
  - Why don't I get logs from the scraper daemon emailed?
+ 
+ Install
+ - The sphinx config is out of date
