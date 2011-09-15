@@ -32,7 +32,7 @@ class Migration(SchemaMigration):
     def forwards(self, orm):
 
         # Removing index on 'Citation', fields ['slug']
-        db.delete_index('Citation', ['slug'])
+        #db.delete_index('Citation', ['slug'])
 
         # Adding index on 'Document', fields ['blocked']
         db.create_index('Document', ['blocked'])
