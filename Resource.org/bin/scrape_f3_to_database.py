@@ -52,7 +52,7 @@ SIMULATE = True
 def load_fix_files():
     '''Loads the fix files into memory so they can be accessed efficiently.'''
     court_fix_file = open('../logs/f3_court_fix_file.txt', 'r')
-    date_fix_file  = open('../logs/f3_date_fix_file.txt', 'r')
+    date_fix_file = open('../logs/f3_date_fix_file.txt', 'r')
     case_name_short_fix_file = open('../logs/f3_short_case_name_fix_file.txt', 'r')
     court_fix_dict = {}
     date_fix_dict = {}
@@ -150,7 +150,7 @@ def unpublished_cleaner(caseName):
     return caseName, documentType
 
 
-def write_dups(source, dups, DEBUG=False):
+def write_dups(source, dups, DEBUG = False):
     '''Writes duplicates to a file so they are logged.
 
     This function recieves a queryset and then writes out the values to a log.
@@ -278,7 +278,7 @@ def scrape_and_parse():
     vol_file.close()
 
     if DEBUG >= 1:
-        print "Number of remaining volumes is: %d" % (len(volumeLinks)-i)
+        print "Number of remaining volumes is: %d" % (len(volumeLinks) - i)
 
     # used later, needs a default value.
     saved_caseDate = None
@@ -294,8 +294,8 @@ def scrape_and_parse():
         content = openedVolumeURL.read()
         volumeTree = fromstring(content)
         openedVolumeURL.close()
-        caseLinks  = volumeTree.xpath('//table/tbody/tr/td[1]/a')
-        caseDates  = volumeTree.xpath('//table/tbody/tr/td[2]')
+        caseLinks = volumeTree.xpath('//table/tbody/tr/td[1]/a')
+        caseDates = volumeTree.xpath('//table/tbody/tr/td[2]')
         sha1Hashes = volumeTree.xpath('//table/tbody/tr/td[3]/a')
 
         # The following loads a serialized placeholder from disk.
@@ -328,7 +328,7 @@ def scrape_and_parse():
             ### download_URL ###
             ####################
             download_URL = "http://bulk.resource.org/courts.gov/c/F3/" \
-                + str(i+1) + "/" + caseLink
+                + str(i + 1) + "/" + caseLink
 
 
             ############
@@ -343,7 +343,7 @@ def scrape_and_parse():
             for element in bodyContents:
                 body += tostring(element)
                 try:
-                    bodyText += tostring(element, method='text')
+                    bodyText += tostring(element, method = 'text')
                 except UnicodeEncodeError:
                     # Happens with odd characters. Simply pass this iteration.
                     pass
@@ -369,7 +369,7 @@ def scrape_and_parse():
                 if not court:
                     print absCaseLink
                     if BROWSER:
-                        subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
+                        subprocess.Popen([BROWSER, absCaseLink], shell = False).communicate()
                     court = raw_input("Please input court name (e.g. \"First Circuit of Appeals\"): ").lower()
                     court_fix_file.write("%s|%s\n" % (sha1Hash, court))
             if ('first' in court) or ('ca1' == court):
@@ -402,8 +402,8 @@ def scrape_and_parse():
                 court = 'ccpa'
             elif (('emergency' in court) and ('temporary' not in court)) or ('eca' == court):
                 court = 'eca'
-            elif ('claims' in court) or ('cfc' == court):
-                court = 'cfc'
+            elif ('claims' in court) or ('uscfc' == court):
+                court = 'uscfc'
             else:
                 # No luck extracting the court name. Try the fix file.
                 court = check_fix_list(sha1Hash, court_fix_dict)
@@ -423,7 +423,7 @@ def scrape_and_parse():
                         # the fix file.
                         print absCaseLink
                         if BROWSER:
-                            subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
+                            subprocess.Popen([BROWSER, absCaseLink], shell = False).communicate()
                         court = raw_input("Unknown court. Input the court code to proceed successfully [%s]: " % saved_court)
                         court = court or saved_court
                     court_fix_file.write("%s|%s\n" % (sha1Hash, court))
@@ -474,7 +474,7 @@ def scrape_and_parse():
                     else:
                         print absCaseLink
                         if BROWSER:
-                            subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
+                            subprocess.Popen([BROWSER, absCaseLink], shell = False).communicate()
                         print "Unknown date. Possible options are:"
                         try:
                             print "  1) %s" % saved_caseDate.strftime("%B %d, %Y")
@@ -495,7 +495,7 @@ def scrape_and_parse():
                         if str(choice) == '1':
                             # The user chose the default. Use the saved value from the last case
                             caseDate = saved_caseDate
-                        elif choice in ['2','3','4','5']:
+                        elif choice in ['2', '3', '4', '5']:
                             # The user chose an option between 2 and 5. Use it.
                             caseDate = dates[int(choice) - 2]
                         else:
@@ -528,7 +528,7 @@ def scrape_and_parse():
                 if not savedCaseNameShort:
                     print absCaseLink
                     if BROWSER:
-                        subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
+                        subprocess.Popen([BROWSER, absCaseLink], shell = False).communicate()
                     caseName = raw_input("Short casename: ")
                     case_name_short_fix_file.write("%s|%s\n" % (sha1Hash, caseName))
                 else:
@@ -555,16 +555,16 @@ def scrape_and_parse():
                 content = br.sub(' ', content)
                 p = re.compile(r'<.*?>')
                 content = p.sub('', content)
-                dups = check_dup(court.pk, caseDate, caseName, content, docketNumber, sha1Hash, DEBUG=True)
+                dups = check_dup(court.pk, caseDate, caseName, content, docketNumber, sha1Hash, DEBUG = True)
                 if len(dups) == 0:
                     # No dups found. Move on.
                     pass
                 elif len(dups) == 1:
                     # Duplicate found.
-                    write_dups(sha1Hash, dups, DEBUG=True)
+                    write_dups(sha1Hash, dups, DEBUG = True)
                 elif len(dups) > 1:
                     # Multiple dups found. Seek human review.
-                    write_dups(sha1Hash, dups, DEBUG=True)
+                    write_dups(sha1Hash, dups, DEBUG = True)
             else:
                 print "No complex check needed."
 
@@ -600,8 +600,8 @@ def scrape_and_parse():
                     # This happens if we have a match on the sha1, which really
                     # shouldn't happen, since F3 sha's come from the text, and ours
                     # come from the binary.
-                    print "Duplicate found at volume " + str(i+1) + \
-                        " and row " + str(j+1) + "!!!!"
+                    print "Duplicate found at volume " + str(i + 1) + \
+                        " and row " + str(j + 1) + "!!!!"
                     print "Found document %s in the database with doc id of %d!" % (doc, doc.documentUUID)
                     exit(1)
 

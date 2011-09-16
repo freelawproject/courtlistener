@@ -45,7 +45,7 @@ PACER_CODES = (
     ('eca', 'Emergency Court of Appeals'),
     #('tecoa',  'Temporary Emergency Court of Appeals'),
     #('cc',     'Court of Claims'),
-    ('cfc', 'United States Court of Federal Claims'),
+    ('uscfc', 'United States Court of Federal Claims'),
     #('cusc',   'United States Customs Court'),
     #('cit',    'United States Court of International Trade'),
     #('com',    'Commerce Court'),

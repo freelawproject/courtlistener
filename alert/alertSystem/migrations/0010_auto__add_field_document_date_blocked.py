@@ -25,10 +25,9 @@
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
 # encoding: utf-8
-import datetime
+
 from south.db import db
 from south.v2 import SchemaMigration
-from django.db import models
 
 class Migration(SchemaMigration):
 

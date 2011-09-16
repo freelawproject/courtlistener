@@ -37,7 +37,6 @@ from lib.string_utils import *
 from django.core.files.base import ContentFile
 
 import hashlib
-import logging
 import logging.handlers
 import StringIO
 import subprocess
@@ -54,7 +53,7 @@ logger.setLevel(logging.DEBUG)
 
 # Add the log message handler to the logger
 handler = logging.handlers.RotatingFileHandler(
-              LOG_FILENAME, maxBytes=5120000, backupCount=1)
+              LOG_FILENAME, maxBytes = 5120000, backupCount = 1)
 
 logger.addHandler(handler)
 
@@ -91,7 +90,7 @@ def printAndLogNewDoc(VERBOSITY, ct, cite):
     '''
     Simply prints the log message and then logs it.
     '''
-    caseName =  smart_unicode(str(cite), errors='ignore')
+    caseName = smart_unicode(str(cite), errors = 'ignore')
     if (cite.westCite != '') and (cite.westCite != None):
         caseNum = cite.westCite
     elif (cite.lexisCite != '') and (cite.lexisCite != None):
@@ -120,7 +119,7 @@ def makeDocFromURL(LinkToDoc, ct):
     '''
 
     # Percent encode URLs if necessary.
-    LinkToDoc = urllib2.quote(LinkToDoc, safe="%/:=&?~#+!$,;'@()*[]")
+    LinkToDoc = urllib2.quote(LinkToDoc, safe = "%/:=&?~#+!$,;'@()*[]")
 
     # get the Doc
     try:
@@ -166,7 +165,7 @@ def courtChanged(url, contents):
     and it is the same, it returns False. Else, it returns True.
     '''
     sha1Hash = hashlib.sha1(contents).hexdigest()
-    url2Hash, created = urlToHash.objects.get_or_create(url=url)
+    url2Hash, created = urlToHash.objects.get_or_create(url = url)
 
     if not created and url2Hash.SHA1 == sha1Hash:
         # it wasn't created, and it has the same SHA --> not changed.
@@ -186,7 +185,7 @@ def courtChanged(url, contents):
         return True
 
 
-def hasDuplicate(caseName, westCite=None, docketNumber=None):
+def hasDuplicate(caseName, westCite = None, docketNumber = None):
     '''Determines if the case name and number are already in the DB.
 
     Takes either a caseName, a westCite or a docketNumber or both, and checks
@@ -243,8 +242,8 @@ def getDocContent(docs):
         if mimetype == 'pdf':
             # do the pdftotext work for PDFs
             process = subprocess.Popen(["pdftotext", "-layout", "-enc", "UTF-8",
-                path, "-"], shell=False, stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT)
+                path, "-"], shell = False, stdout = subprocess.PIPE,
+                stderr = subprocess.STDOUT)
             content, err = process.communicate()
             if content == '':
                 # probably an image PDF.
@@ -265,15 +264,15 @@ def getDocContent(docs):
             # It's a Word Perfect file. Use the wpd2html converter, clean up
             # the HTML and save the content to the HTML field.
             print "Parsing: " + path
-            process = subprocess.Popen(['wpd2html', path, '-'], shell=False,
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            process = subprocess.Popen(['wpd2html', path, '-'], shell = False,
+                stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
             content, err = process.communicate()
 
             parser = etree.HTMLParser()
             import StringIO
             tree = etree.parse(StringIO.StringIO(content), parser)
             body = tree.xpath('//body')
-            content = tostring(body[0]).replace('<body>', '').replace('</body>','')
+            content = tostring(body[0]).replace('<body>', '').replace('</body>', '')
 
             fontsizeReg = re.compile('font-size: .*;')
             content = re.sub(fontsizeReg, '', content)
@@ -291,8 +290,8 @@ def getDocContent(docs):
         elif mimetype == 'doc':
             # read the contents of MS Doc files
             print "Parsing: " + path
-            process = subprocess.Popen(['antiword', path, '-i', '1'], shell=False,
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            process = subprocess.Popen(['antiword', path, '-i', '1'], shell = False,
+                stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
             content, err = process.communicate()
             doc.documentPlainText = anonymize(content)
             if err:
@@ -330,7 +329,7 @@ def parseCourt(courtID, VERBOSITY):
     # select all documents from this jurisdiction that lack plainText and were
     # downloaded from the court.
     docs = Document.objects.filter(documentPlainText = "", documentHTML = "",
-        court__courtUUID = courts[courtID-1], source="C").order_by('documentUUID')
+        court__courtUUID = courts[courtID - 1], source = "C").order_by('documentUUID')
 
     numDocs = docs.count()
 
@@ -340,8 +339,8 @@ def parseCourt(courtID, VERBOSITY):
     # to begin scraping before both of these have finished. This should be OK,
     # but seems noteworthy.
     if numDocs > 0:
-        t1 = Thread(target=getDocContent, args=(docs[0:numDocs/2],))
-        t2 = Thread(target=getDocContent, args=(docs[numDocs/2:numDocs],))
+        t1 = Thread(target = getDocContent, args = (docs[0:numDocs / 2],))
+        t2 = Thread(target = getDocContent, args = (docs[numDocs / 2:numDocs],))
         t1.start()
         t2.start()
     elif numDocs == 0:
