@@ -1,0 +1,10 @@
+/var/log/sphinx/*.log {
+  weekly
+  rotate 12
+  compress
+  delaycompress
+  create 640 root root
+  postrotate
+	killall -SIGUSR1 searchd
+  endscript
+}

@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% load text_filters %}
+
+{# Shown on document display pages. #}
+
+{% block title %}CourtListener.com / Browse / {{ title }}{% endblock %}
+
+{% block head %}
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the First Circuit" href="/feed/court/ca1/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Second Circuit" href="/feed/court/ca2/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Third Circuit" href="/feed/court/ca3/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Fourth Circuit" href="/feed/court/ca4/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Fifth Circuit" href="/feed/court/ca5/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Sixth Circuit" href="/feed/court/ca6/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Seventh Circuit" href="/feed/court/ca7/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eighth Circuit" href="/feed/court/ca8/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Ninth Circuit" href="/feed/court/ca9/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Tenth Circuit" href="/feed/court/ca10/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eleventh Circuit" href="/feed/court/ca11/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the D.C. Circuit" href="/feed/court/cadc/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Federal Circuit" href="/feed/court/cafc/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Supreme Court of the U.S." href="/feed/court/scotus/">
+    <link rel="shortlink" type="text/html" href="{{doc.get_small_url}}">
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
+    <script type="text/javascript" src="/media/js/jquery.tooltip.min.js"></script>
+    <script type="text/javascript" src="/media/js/jquery.NobleCount.min.js"></script>
+    <script type="text/javascript" src="/media/js/save-favorites.js"></script>
+    <script type="text/javascript">
+        // Handles the clipboard actions.
+        $(document).ready(function() {
+            $('#copy_png').click(function() {
+                console.log("clicked");
+                $('#copy_png').toggleClass('copy_png_selected');
+                $('#link-div').toggle();
+                $('#copy-input').select();
+            });
+            $('html').click(function() {
+                // Hides the input box if needed.
+                console.log('html was clicked');
+                $('#link-div').hide();
+                $('#copy_png').removeClass('copy_png_selected');
+            });
+            $('#copy-input, #copy_png').click(function(e) {
+                // Prevents the above from hiding the input box when it is clicked.
+                $('copy-input').select();
+                e.stopPropagation();
+            });
+	    });
+    </script>
+{% endblock %}
+
+{% block sidebar %}
+    <div class="span-5 append-1" id="sidebar">
+        {# show the admin tools if applicable #}
+        {% if user.is_superuser and doc %}
+            <div class="sidebar-section">
+                <h3 class="bottom">Admin</h3>
+                <p><a href="/admin/alertSystem/citation/{{doc.citation_id}}/">Document & Citation</a></p>
+            </div>
+        {% endif %}
+
+
+        {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
+        <div class="{% if not favorite_form.instance.doc_id %}hidden{% endif %} sidebar-section" id="sidebar-notes">
+            <h3 class="bottom inline">Your Notes</h3>
+            <p class="inline" id="edit-favorite">(<a href="#favorite-editor">edit</a>)</p>
+            <p id="sidebar-notes-text">
+                {{ favorite_form.instance.notes|default:"(none)" }}
+            </p>
+        </div>
+
+
+        {# Download original? #}
+        <div class="sidebar-section">
+            <h3 class="bottom">View Original</h3>
+            <p>
+                {% if doc.download_URL or doc.local_path %}
+                    {% if doc.source != 'R' %}
+                        {% if doc.download_URL and result.source != 'R' %}
+                            <a href="{{doc.download_URL}}" class="visitable">From the court</a>
+                        {% endif %}
+                        {% if doc.download_URL and result.source != 'R' and doc.local_path %}
+                            &nbsp;&nbsp;|&nbsp;&nbsp;
+                        {% endif %}
+                        {% if doc.local_path %}
+                            <a href="/{{doc.local_path}}" class="visitable">Our backup</a>
+                        {% endif %}
+                    {% else %}
+                        No downloadable versions
+                    {% endif %}
+                {% else %}
+                    No downloadable versions
+                {% endif %}
+            </p>
+        </div>
+
+        {# Show the social links using sprites #}
+        <div class="sidebar-section">
+            <h3 class="bottom">Share</h3>
+            <p>
+                <a href="mailto:?subject={{title|urlencode}}%20at%20CourtListener.com&body={{doc.get_small_url}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
+                <span title="Copy link to clipboard" class="sprites copy_png_unselected" id="copy_png"></span>
+                <a href="http://www.facebook.com/share.php?u={{doc.get_small_url}}&t={{title}} at CourtListener.com" target="_blank" title="Facebook" class="sprites" id="facebook_png"></a>
+                <a href="http://twitter.com/home?status={{doc.get_small_url}}" target="_blank" title="Twitter" class="sprites" id="twitter_gif"></a>
+                <a href="http://digg.com/submit?phase=2&url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Digg" class="sprites" id="digg_png"></a>
+                <a href="http://reddit.com/submit?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Reddit" class="sprites" id="reddit_png"></a>
+                <a href="http://del.icio.us/post?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="delicious" class="sprites" id="delicious_png"></a>
+            </p>
+            <div id="link-div" class="hidden">
+                <input type="text" readonly="readonly" id="copy-input" value="{{doc.get_small_url}}"></input>
+            </div>
+        </div>
+
+    </div>
+{% endblock %}
+
+
+{% block content %}
+    <div class="span-18 last">
+        {% if favorite_form.instance.doc_id %}
+            <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-on"></a>
+        {% else %}
+            <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-off"></a>
+        {% endif %}
+        <h2>
+            {{ doc.citation.caseNameFull|v_wrapper }},
+            {% if doc.citation.westCite != '' and doc.citation.westCite != None %}
+                {{doc.citation.westCite}}
+            {% else %}
+                {{doc.citation.docketNumber}}
+            {% endif %}
+            ({% if doc.court.shortName != 'SCOTUS' %}{{doc.court.shortName|nbsp}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
+        </h2>
+        <div id="modal-rel">
+            {# Modal box for saving the favorite #}
+            {% if user.is_authenticated %}
+            <div id="modal-save-favorite" class="hidden span-10">
+                {% if favorite_form.instance.doc_id %}
+                    <h2>Edit/delete this favorite</h2>
+                {% else %}
+                    <h2 id='save-favorite-title'>Save a favorite</h2>
+                {% endif %}
+                <form action="" method="POST">{% csrf_token %}
+                    {{ favorite_form.doc_id }}
+                    <p class="bottom">
+                        <label for="id_name">Name</label>
+                        {% if favorite_form.name.errors %}
+                            <br><span class="errortext">
+                                {% for error in favorite_form.name.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </span>
+                        {% endif %}<br>
+                        {{ favorite_form.name }}
+                    </p>
+                    <p class="bottom">
+                        <label for="id_favorite_notes">Notes</label>
+                        {% if favorite_form.notes.errors %}
+                            <br><span class="errortext">
+                                {% for error in favorite_form.notes.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </span>
+                        {% endif %}<br>
+                        {{ favorite_form.notes }}
+                        <p class="top right"><span id="characters-remaining"></span> characters remaining</p>
+                    </p>
+
+                    <div id='favorites-bottom-section'>
+                        <p id="save-favorite-delete" class="bottom fake-link inline
+                            {% if not favorite_form.instance.doc_id %}hidden{%endif%}" tabindex="5">delete</a></p>
+                        <div id="favorites-buttons">
+                            <button type="submit" class="button title close-favorite-button" name="closeFavorite" id="closeFavorite" tabindex='4'>Close</button>
+                            <button type="submit" class="button title save-favorite-button" name="saveFavorite" id="saveFavorite" tabindex='3'>Save favorite</button>
+                        </div>
+                    </div>
+                </form>
+
+            </div>
+            {% else %}
+                {# user is not authenticated #}
+                <div id="modal-logged-out" class="hidden pointer span-7">
+                    <h3 class="center bottom">
+                        <a href="{%url sign-in %}?next={{request.path}}{% if query %}?q={{ query }}{%endif%}">
+                            Sign in or register to save a favorite.
+                        </a>
+                    </h3>
+                    <p class="center bottom">(click to dismiss)</p>
+                </div>
+            {% endif %}
+        </div>
+
+
+
+        <h3>{{court}}</h3>
+        <p class="bottom">
+            <strong>Date Filed:</strong>
+            {% if doc.dateFiled %}
+                {{doc.dateFiled|date:"l, F jS, Y"}}
+            {% else %}
+                Unknown date
+            {% endif %}
+        </p>
+        <p class="bottom">
+            <strong>Status: </strong>
+            {% if doc.documentType %}
+                {{doc.get_documentType_display}}
+            {% else %}
+                Unknown
+            {% endif %}
+        </p>
+        <p class="bottom">
+            {% if doc.citation.westCite != '' and doc.citation.westCite != None and doc.citation.docketNumber %}
+                <strong>Docket Number: </strong>
+                {{ doc.citation.docketNumber }}
+            {% endif %}
+        </p>
+        <p>
+            <strong title="SHA1 Hash of the binary or text">Fingerprint:</strong> {{doc.documentSHA1}}
+        </p>
+        <br>
+
+        {% if doc.documentPlainText %}
+            <pre>{{doc.documentPlainText}}</pre>
+        {% else %}
+            {{doc.documentHTML|safe}}
+        {% endif %}
+    </div>
+{% endblock %}
