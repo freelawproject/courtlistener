@@ -16,6 +16,7 @@
 
 #TODO: Use of the time.strptime function would improve this code here and there.
 #   info here: http://docs.python.org/library/time.html#time.strptime
+
 import sys
 sys.path.append('/var/www/court-listener/alert')
 
@@ -23,28 +24,33 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alertSystem.models import *
-from lib.string_utils import *
-from lib.scrape_tools import *
+from alert.alertSystem.models import Court
+from alert.alertSystem.models import PACER_CODES
+from alert.lib.string_utils import clean_string
+from alert.lib.string_utils import titlecase
+from alert.lib.scrape_tools import courtChanged
+from alert.lib.scrape_tools import makeDocError
+from alert.lib.scrape_tools import makeDocFromURL
+from alert.lib.scrape_tools import readURL
+from alert.lib.scrape_tools import save_all
 
-from django.core.exceptions import MultipleObjectsReturned
+from django.core.exceptions import ObjectDoesNotExist
 
 import datetime
 import re
 import signal
+import time
 import traceback
 import urllib
+import urllib2
 
 from BeautifulSoup import BeautifulSoup
 from lxml.html import fromstring
-from lxml.html import tostring
 from lxml import etree
 from optparse import OptionParser
+from StringIO import StringIO
 from time import mktime
 from urlparse import urljoin
-
-DAEMONMODE = False
-VERBOSITY = 0
 
 # for use in catching the SIGINT (Ctrl+C)
 dieNow = False
@@ -60,16 +66,16 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
     if VERBOSITY >= 1: print "NOW SCRAPING COURT: " + str(courtID)
 
     if (courtID == 1):
-        '''
-        PDFs are available from the first circuit if you go to their RSS feed.
-        So go to their RSS feed we shall.
-        '''
+        # PDFs are available from the first circuit if you go to their RSS feed.
+        # So go to their RSS feed we shall.
+
         urls = ("http://www.ca1.uscourts.gov/opinions/opinionrss.php",)
-        ct = Court.objects.get(courtUUID='ca1')
+        ct = Court.objects.get(courtUUID = 'ca1')
 
         for url in urls:
             try: html = readURL(url, courtID)
-            except: continue
+            except:
+                continue
 
             if DAEMONMODE:
                 # if it's DAEMONMODE, see if the court has changed
@@ -98,7 +104,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             # incredibly, this RSS feed is in cron order, so new stuff is at the
             # end. Mind blowing.
-            i = len(caseLinks)-1
+            i = len(caseLinks) - 1
 
             dupCount = 0
             while i > 0:
@@ -155,22 +161,14 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseNameShort = docketNumberRegex.search(caseNamesAndNumbers[i].text)\
                     .group(2)
 
-                # check for dups, make the object if necessary, otherwise, get it
-                cite, created = hasDuplicate(caseNameShort, None, docketNumber)
-
-                # last, save evrything (pdf, citation and document)
-                doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
-                printAndLogNewDoc(VERBOSITY, ct, cite)
-                doc.save()
+                # last, save everything (pdf, citation and document)
+                save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY)
 
                 i -= 1
         return
 
     elif (courtID == 2):
-        """
-        URL hacking FTW.
-        """
+        #  URL hacking FTW.
 
         # Note that for some reason, setting the IW_DATABASE to Both makes the
         # display fail. Oh well.
@@ -178,7 +176,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=OPN&IW_FIELD_TEXT=*&IW_SORT=-Date&IW_BATCHSIZE=100",
             "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=SUM&IW_FIELD_TEXT=*&IW_SORT=-Date&IW_BATCHSIZE=100",
         )
-        ct = Court.objects.get(courtUUID='ca2')
+        ct = Court.objects.get(courtUUID = 'ca2')
 
         for url in urls:
             try: html = readURL(url, courtID)
@@ -188,7 +186,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             aTagsRegex = re.compile('(.*?.pdf).*?', re.IGNORECASE)
             docketNumRegex = re.compile('.*/(\d{1,2}-\d{1,4})(.*).pdf')
-            aTags = soup.findAll(attrs={'href' : aTagsRegex})
+            aTags = soup.findAll(attrs = {'href' : aTagsRegex})
 
             if DAEMONMODE:
                 # this mess is necessary because the court puts random
@@ -236,7 +234,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     dupCount = 0
 
                 # using caseLink, we can get the docketNumber and documentType
-                docketNum = docketNumRegex.search(caseLink).group(1)
+                docketNumber = docketNumRegex.search(caseLink).group(1)
 
                 # and the docType
                 documentType = docketNumRegex.search(caseLink).group(2)
@@ -257,29 +255,21 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # some caseDate cleanup
                 splitDate = caseDate.split('-')
-                caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
+                caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
 
-                # check for duplicates, make the object in their absence
-                cite, created = hasDuplicate(caseNameShort, None, docketNum)
-
-                # last, save evrything (pdf, citation and document)
-                doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
-                printAndLogNewDoc(VERBOSITY, ct, cite)
-                doc.save()
+                # last, save everything (pdf, citation and document)
+                save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY)
 
                 i += 1
         return
 
     elif (courtID == 3):
-        '''
-        This URL provides the latest 25 cases, so I need to pick out the new
-        ones and only get those. I can do this efficiently by trying to do each,
-        and then giving up once I hit one that I've done before. This will work
-        because they are in reverse chronological order.
-        '''
+        #  This URL provides the latest 25 cases, so I need to pick out the new
+        # ones and only get those. I can do this efficiently by trying to do each,
+        # and then giving up once I hit one that I've done before. This will work
+        # because they are in reverse chronological order.        
 
         # if these URLs change, the docType identification (below) will need
         # to be updated. It's lazy, but effective.
@@ -287,7 +277,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             "http://www.ca3.uscourts.gov/recentop/week/recprec.htm",
             "http://www.ca3.uscourts.gov/recentop/week/recnonprec.htm",
             )
-        ct = Court.objects.get(courtUUID='ca3')
+        ct = Court.objects.get(courtUUID = 'ca3')
 
         for url in urls:
             try: html = readURL(url, courtID)
@@ -304,7 +294,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             # all links ending in pdf, case insensitive
             regex = re.compile("pdf$", re.IGNORECASE)
-            aTags = soup.findAll(attrs={"href": regex})
+            aTags = soup.findAll(attrs = {"href": regex})
 
             # we will use these vars in our while loop, better not to compile them
             # each time
@@ -347,7 +337,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # next up is the caseDate
                 splitDate = caseDate.split('/')
-                caseDate = datetime.date(int("20" + splitDate[2]),int(splitDate[0]),
+                caseDate = datetime.date(int("20" + splitDate[2]), int(splitDate[0]),
                     int(splitDate[1])) # ack y2k1c bug!
                 doc.dateFiled = caseDate
 
@@ -357,25 +347,19 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 elif "recnonprec.htm" in str(url):
                     doc.documentType = "Unpublished"
 
-                cite, created = hasDuplicate(caseNameShort, None, docketNumber)
-
-                # last, save evrything (pdf, citation and document)
-                doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
-                printAndLogNewDoc(VERBOSITY, ct, cite)
-                doc.save()
+                # last, save everything (pdf, citation and document)
+                save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY)
 
                 i += 1
         return
 
     elif (courtID == 4):
-        '''
-        The fourth circuit is THE worst form of HTML I've ever seen. It's
-        going to break a lot, but I've done my best to clean it up, and make it
-        reliable.
-        '''
+        # The fourth circuit is THE worst form of HTML I've ever seen. It's
+        # going to break a lot, but I've done my best to clean it up, and make it
+        # reliable.
+
         urls = ("http://pacer.ca4.uscourts.gov/opinions_today.htm",)
-        ct = Court.objects.get(courtUUID='ca4')
+        ct = Court.objects.get(courtUUID = 'ca4')
 
         for url in urls:
             try: html = readURL(url, courtID)
@@ -398,7 +382,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             # all links ending in pdf, case insensitive
             regex = re.compile("pdf$", re.IGNORECASE)
-            aTags = soup.findAll(attrs={"href": regex})
+            aTags = soup.findAll(attrs = {"href": regex})
             if VERBOSITY >= 3: print aTags
 
             i = 0
@@ -459,32 +443,25 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # some caseDate cleanup
                 splitDate = caseDate.split('/')
-                caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
+                caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
                 if VERBOSITY >= 2: print "Date filed: %s" % doc.dateFiled
 
-                # let's check for duplicates before we proceed
-                cite, created = hasDuplicate(caseNameShort, None, docketNumber)
-
-                # last, save evrything (pdf, citation and document)
-                doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
-                printAndLogNewDoc(VERBOSITY, ct, cite)
-                doc.save()
+                # last, save everything (pdf, citation and document)
+                save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY)
 
                 i += 1
         return
 
     elif (courtID == 5):
-        '''
-        New fifth circuit scraper, which can get back versions all the way to
-        1992!
+        # New fifth circuit scraper, which can get back versions all the way to
+        # 1992!
 
-        This is exciting, but be warned, the search is not reliable on recent
-        dates. It has been known not to bring back results that are definitely
-        within the set. Watch closely.
-        '''
+        # This is exciting, but be warned, the search is not reliable on recent
+        # dates. It has been known not to bring back results that are definitely
+        # within the set. Watch closely.
+
         urls = ("http://www.ca5.uscourts.gov/Opinions.aspx",)
         ct = Court.objects.get(courtUUID = 'ca5')
 
@@ -522,7 +499,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             #all links ending in pdf, case insensitive
             aTagRegex = re.compile("pdf$", re.IGNORECASE)
-            aTags = soup.findAll(attrs={"href": aTagRegex})
+            aTags = soup.findAll(attrs = {"href": aTagRegex})
 
             unpubRegex = re.compile(r"pinions.*unpub")
 
@@ -576,7 +553,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # some caseDate cleanup
                 splitDate = caseDate.split('/')
-                caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
+                caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
 
@@ -584,30 +561,24 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseNameShort = aTags[i].next.next.next.next.next.contents[0]\
                     .contents[0]
 
-                # now that we have the docketNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNameShort, None, docketNumber)
-
-                # last, save evrything (pdf, citation and document)
-                doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
-                printAndLogNewDoc(VERBOSITY, ct, cite)
-                doc.save()
+                # last, save everything (pdf, citation and document)
+                save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY)
 
                 i += 1
         return
 
     elif (courtID == 6):
-        """Results are available without an HTML POST, but those results lack a
-        date field. Hence, we must do an HTML POST.
+        # Results are available without an HTML POST, but those results lack a
+        # date field. Hence, we must do an HTML POST.
 
-        Missing a day == OK. Just need to monkey with the date POSTed.
-        """
+        # Missing a day == OK. Just need to monkey with the date POSTed.
+
         urls = ("http://www.ca6.uscourts.gov/cgi-bin/opinions.pl",)
         ct = Court.objects.get(courtUUID = 'ca6')
 
         for url in urls:
             today = datetime.date.today()
-            formattedToday = str(today.month) + '/' + str(today.day) + '/' +\
+            formattedToday = str(today.month) + '/' + str(today.day) + '/' + \
                 str(today.year)
 
             postValues = {
@@ -633,7 +604,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             soup = BeautifulSoup(html)
 
             aTagsRegex = re.compile('pdf$', re.IGNORECASE)
-            aTags = soup.findAll(attrs={'href' : aTagsRegex})
+            aTags = soup.findAll(attrs = {'href' : aTagsRegex})
 
             i = 0
             dupCount = 0
@@ -676,7 +647,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # some caseDate cleanup
                 splitDate = caseDate.split('/')
-                caseDate = datetime.date(int(splitDate[0]),int(splitDate[1]),
+                caseDate = datetime.date(int(splitDate[0]), int(splitDate[1]),
                     int(splitDate[2]))
                 doc.dateFiled = caseDate
 
@@ -684,25 +655,17 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseNameShort = aTags[i].next.next.next.next.next.next.next.next\
                     .next.next.next
 
-                # now that we have the docketNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNameShort, None, docketNumber)
-
-                # last, save evrything (pdf, citation and document)
-                doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
-                printAndLogNewDoc(VERBOSITY, ct, cite)
-                doc.save()
+                # last, save everything (pdf, citation and document)
+                save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY)
 
                 i += 1
         return
 
     elif (courtID == 7):
-        '''
-        another court where we need to do a post. This will be a good
-        starting place for getting the judge field, when we're ready for that.
+        # another court where we need to do a post. This will be a good
+        # starting place for getting the judge field, when we're ready for that.
 
-        Missing a day == OK. Queries return cases for the past week.
-        '''
+        # Missing a day == OK. Queries return cases for the past week.
 
         urls = ("http://www.ca7.uscourts.gov/fdocs/docs.fwx",)
         ct = Court.objects.get(courtUUID = 'ca7')
@@ -719,7 +682,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 if DAEMONMODE:
                     # if it's DAEMONMODE, see if the court has changed
-                    changed = courtChanged(url+dataString, html)
+                    changed = courtChanged(url + dataString, html)
                     if not changed:
                         # if not, bail. If so, continue to the scraping.
                         return
@@ -727,7 +690,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 soup = BeautifulSoup(html)
 
                 aTagsRegex = re.compile('pdf$', re.IGNORECASE)
-                aTags = soup.findAll(attrs={'href' : aTagsRegex})
+                aTags = soup.findAll(attrs = {'href' : aTagsRegex})
 
                 i = 0
                 dupCount = 0
@@ -774,30 +737,23 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     elif "type=Nonprecedential+Disposition" in dataString:
                         doc.documentType = "Unpublished"
 
-                    # now that we have the docketNumber and caseNameShort, we can dup check
-                    cite, created = hasDuplicate(caseNameShort, None, docketNumber)
-
-                    # last, save evrything (pdf, citation and document)
-                    doc.citation = cite
-                    doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
-                    printAndLogNewDoc(VERBOSITY, ct, cite)
-                    doc.save()
+                    # last, save everything (pdf, citation and document)
+                    save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY)
 
                     i += 1
         return
 
     elif (courtID == 8):
-        '''
-        Has a search interface that can be hacked with POST data, but the
-        HTML returned from it is an utter wasteland consisting of nothing but
-        <br>, <b> and text. So we can't really use it.
+        # Has a search interface that can be hacked with POST data, but the
+        # HTML returned from it is an utter wasteland consisting of nothing but
+        # <br>, <b> and text. So we can't really use it.
 
-        Instead, we would turn to the RSS feed, but it's the same sad story.
+        # Instead, we would turn to the RSS feed, but it's the same sad story.
 
-        So we go to the one page that has any semantic markup.
+        # So we go to the one page that has any semantic markup.
 
-        Missing a day == bad.
-        '''
+        # Missing a day == bad.
+
         urls = ("http://www.ca8.uscourts.gov/cgi-bin/new/today2.pl",)
         ct = Court.objects.get(courtUUID = 'ca8')
 
@@ -815,7 +771,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             soup = BeautifulSoup(html)
 
             aTagsRegex = re.compile('pdf$', re.IGNORECASE)
-            aTags = soup.findAll(attrs={'href' : aTagsRegex})
+            aTags = soup.findAll(attrs = {'href' : aTagsRegex})
 
             docketNumRegex = re.compile('(\d{2})(\d{4})(u|p)', re.IGNORECASE)
             caseDateRegex = re.compile('(\d{2}/\d{2}/\d{4})(.*)(</b>)')
@@ -845,7 +801,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # using caseLink, we can get the docketNumber and documentType
                 junk = aTags[i].contents[0]
-                docketNumber = docketNumRegex.search(junk).group(1) + "-" +\
+                docketNumber = docketNumRegex.search(junk).group(1) + "-" + \
                     docketNumRegex.search(junk).group(2)
 
                 documentType = docketNumRegex.search(junk).group(3).upper()
@@ -862,28 +818,20 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
                 # some caseDate cleanup
                 splitDate = caseDate.split('/')
-                caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
+                caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
 
-                # now that we have the docketNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNameShort, None, docketNumber)
-
                 # last, save evrything (pdf, citation and document)
-                doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
-                printAndLogNewDoc(VERBOSITY, ct, cite)
-                doc.save()
+                save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY)
 
                 i += 1
         return
 
     elif (courtID == 9):
-        '''
-        This court, by virtue of having a javascript laden website, was very
-        hard to parse properly. BeautifulSoup couldn't handle it at all, so lxml
-        has to be used.
-        '''
+        # This court, by virtue of having a javascript laden website, was very
+        # hard to parse properly. BeautifulSoup couldn't handle it at all, so lxml
+        # has to be used.
 
         # these URLs redirect now. So much for hacking them. A new approach can probably be done using POST data.
         # If these URLs are changed, code below must be changed for the doc type and dateFiled fields
@@ -900,7 +848,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             except: continue
 
             parser = etree.HTMLParser()
-            tree = etree.parse(StringIO.StringIO(html), parser)
+            tree = etree.parse(StringIO(html), parser)
 
             if DAEMONMODE:
                 # if it's DAEMONMODE, see if the links in the court have changed.
@@ -966,7 +914,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     if 'opinions' in url:
                         caseDate = tableCells[5].find('./label').text
                     elif 'memoranda' in url:
-                        caseDate   = tableCells[6].find('./label').text
+                        caseDate = tableCells[6].find('./label').text
                     splitDate = caseDate.split('/')
                     caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                         int(splitDate[1]))
@@ -974,14 +922,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     caseDate = None
                 doc.dateFiled = caseDate
 
-                # now that we have the docketNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNameShort, None, docketNumber)
-
                 # last, save evrything (pdf, citation and document)
-                doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
-                printAndLogNewDoc(VERBOSITY, ct, cite)
-                doc.save()
+                save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY)
 
         return
 
@@ -1071,27 +1013,19 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # next: caseNameShort
                 caseNameShort = caseNames[i].text
 
-                # check for dups, make the object if necessary, otherwise, get it
-                cite, created = hasDuplicate(caseNameShort, None, docketNumber)
-
-                # last, save evrything (pdf, citation and document)
-                doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
-                printAndLogNewDoc(VERBOSITY, ct, cite)
-                doc.save()
+                # last, save everything (pdf, citation and document)
+                save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY)
 
                 i += 1
         return
 
     elif (courtID == 11):
-        '''
-        Prior to rev 313 (2010-04-27), this got published documents only,
-        using the court's RSS feed.
+        # Prior to rev 313 (2010-04-27), this got published documents only,
+        # using the court's RSS feed.
 
-        Currently, it uses lxml to parse the HTML on the published and
-        unpublished feeds. It can be set to do any date range desired, however
-        such modifications should likely go in back_scrape.py.
-        '''
+        # Currently, it uses lxml to parse the HTML on the published and
+        # unpublished feeds. It can be set to do any date range desired, however
+        # such modifications should likely go in back_scrape.py.
 
         # Missing a day == OK.
         urls = (
@@ -1123,14 +1057,14 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             if 'unpub' in url:
                 docketNumbers = tree.xpath('//table[3]//table//table/tr[1]/td[2]')
-                caseLinks     = tree.xpath('//table[3]//table//table/tr[3]/td[2]/a')
-                caseDates     = tree.xpath('//table[3]//table//table/tr[4]/td[2]')
-                caseNames     = tree.xpath('//table[3]//table//table/tr[6]/td[2]')
+                caseLinks = tree.xpath('//table[3]//table//table/tr[3]/td[2]/a')
+                caseDates = tree.xpath('//table[3]//table//table/tr[4]/td[2]')
+                caseNames = tree.xpath('//table[3]//table//table/tr[6]/td[2]')
             elif 'opinion' in url:
                 docketNumbers = tree.xpath('//table[3]//td[3]//table/tr[1]/td[2]')
-                caseLinks     = tree.xpath('//table[3]//td[3]//table/tr[3]/td[2]/a')
-                caseDates     = tree.xpath('//table[3]//td[3]//table/tr[4]/td[2]')
-                caseNames     = tree.xpath('//table[3]//td[3]//table/tr[6]/td[2]')
+                caseLinks = tree.xpath('//table[3]//td[3]//table/tr[3]/td[2]/a')
+                caseDates = tree.xpath('//table[3]//td[3]//table/tr[4]/td[2]')
+                caseNames = tree.xpath('//table[3]//td[3]//table/tr[6]/td[2]')
 
             '''
             # for debugging
@@ -1173,12 +1107,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseNameShort = caseNames[i].text
                 docketNumber = docketNumbers[i].text
 
-                cite, created = hasDuplicate(caseNameShort, None, docketNumber)
-
-                doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
-                printAndLogNewDoc(VERBOSITY, ct, cite)
-                doc.save()
+                # Save everything
+                save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY)
 
                 i += 1
         return
@@ -1208,10 +1138,10 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             else:
                 tree = etree.fromstring(html)
 
-            caseLinks  = tree.xpath("//item/link")
-            caseNames  = tree.xpath("//item/description")
+            caseLinks = tree.xpath("//item/link")
+            caseNames = tree.xpath("//item/description")
             docketNums = tree.xpath("//item/title")
-            caseDates  = tree.xpath("//item/pubDate")
+            caseDates = tree.xpath("//item/pubDate")
 
             i = 0
             dupCount = 0
@@ -1250,14 +1180,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # next: caseNameShort
                 caseNameShort = caseNames[i].text
 
-                # check for dups, make the object if necessary, otherwise, get it
-                cite, created = hasDuplicate(caseNameShort, None, docketNumber)
-
-                # last, save evrything (pdf, citation and document)
-                doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
-                printAndLogNewDoc(VERBOSITY, ct, cite)
-                doc.save()
+                # last, save everything (pdf, citation and document)
+                save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY)
 
                 i += 1
         return
@@ -1330,7 +1254,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 caseNameShort = trTags[i].td.nextSibling.nextSibling.nextSibling\
                     .nextSibling.nextSibling.nextSibling.a.contents[0]\
                     .replace('[MOTION]', '').replace('[ORDER]', '').replace('(RULE 36)', '')\
-                    .replace('[ERRATA]', '').replace('[CORRECTED]','').replace('[ORDER 2]', '')\
+                    .replace('[ERRATA]', '').replace('[CORRECTED]', '').replace('[ORDER 2]', '')\
                     .replace('[ORDER}', '').replace('[ERRATA 2]', '')
                 caseNameShort = titlecase(caseNameShort)
 
@@ -1345,14 +1269,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     documentType = "Published"
                 doc.documentType = documentType
 
-                # now that we have the docketNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNameShort, None, docketNumber)
-
                 # last, save evrything (pdf, citation and document)
-                doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
-                printAndLogNewDoc(VERBOSITY, ct, cite)
-                doc.save()
+                save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY)
 
                 i += 1
         return
@@ -1441,14 +1359,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 except:
                     print "Error obtaining date field for " + caseLink
 
-                # now that we have the docketNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(caseNameShort, None, docketNumber)
-
                 # last, save evrything (pdf, citation and document)
-                doc.citation = cite
-                doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
-                printAndLogNewDoc(VERBOSITY, ct, cite)
-                doc.save()
+                save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY)
 
                 i += 1
         return
@@ -1458,9 +1370,9 @@ def main():
     """
     The master function. This will receive arguments from the user, determine
     the actions to take, then hand it off to other functions that will handle the
-    nitty-gritty crud.
+    nitty-gritty work.
 
-    If the courtID is 0, then we scrape/parse all courts, one after the next.
+    If the courtID is 0, then we scrape/extract all courts, one after the next.
 
     returns a list containing the result
     """
@@ -1469,21 +1381,19 @@ def main():
     # this line is used for handling SIGINT, so things can die safely.
     signal.signal(signal.SIGINT, signal_handler)
 
-    usage = "usage: %prog -d | (-c COURTID (-s | -p) [-v {1,2}])"
+    usage = "usage: %prog -d | (-c COURTID -s [-v {1,2}])"
     parser = OptionParser(usage)
-    parser.add_option('-s', '--scrape', action="store_true", dest='scrape',
-        default=False, help="Whether to scrape")
-    parser.add_option('-p', '--parse', action="store_true", dest='parse',
-        default=False, help="Whether to parse")
-    parser.add_option('-d', '--daemon', action="store_true", dest='daemonmode',
-        default=False, help="Use this flag to turn on daemon mode at a rate of 20 minutes between each scrape")
-    parser.add_option('-c', '--court', dest='courtID', metavar="COURTID",
-        help="The court to scrape, parse or both")
-    parser.add_option('-v', '--verbosity', dest='verbosity', metavar="VERBOSITY",
-        help="Display status messages after execution. Higher values print more verbosity.")
+    parser.add_option('-s', '--scrape', action = "store_true", dest = 'scrape',
+        default = False, help = "Whether to scrape")
+    parser.add_option('-d', '--daemon', action = "store_true", dest = 'daemonmode',
+        default = False, help = "Use this flag to turn on daemon mode at a rate of 20 minutes between each scrape")
+    parser.add_option('-c', '--court', dest = 'courtID', metavar = "COURTID",
+        help = "The court to scrape and extract")
+    parser.add_option('-v', '--verbosity', dest = 'verbosity', metavar = "VERBOSITY",
+        help = "Display status messages after execution. Higher values print more verbosity.")
     (options, args) = parser.parse_args()
-    if options.daemonmode == False and (not options.courtID or (not options.scrape and not options.parse)):
-        parser.error("You must specify either daemon mode or a court and whether to scrape and/or parse it.")
+    if options.daemonmode == False and (not options.courtID or not options.scrape):
+        parser.error("You must specify either daemon mode or a court and whether to scrape and/or extract it.")
 
     try:
         VERBOSITY = int(options.verbosity)
@@ -1500,21 +1410,18 @@ def main():
             courtID = int(options.courtID)
         except:
             print "Error: court not found"
-            raise django.core.exceptions.ObjectDoesNotExist
+            raise ObjectDoesNotExist
 
         if courtID == 0:
             # we use a while loop to do all courts.
             courtID = 1
-            from alertSystem.models import PACER_CODES
             while courtID <= len(PACER_CODES):
                 # This catches all exceptions regardless of their trigger, so
                 # if one court dies, the next isn't affected.
                 try:
                     if options.scrape: scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
-                    if options.parse:  parseCourt(courtID, VERBOSITY)
                 except Exception:
-                    print '*****Uncaught error parsing court*****\n"' + traceback.format_exc() + "\n\n"
-                    pass
+                    print '*****Uncaught error scraping court*****\n"' + traceback.format_exc() + "\n\n"
                 # this catches SIGINT, so the code can be killed safely.
                 if dieNow == True:
                     sys.exit(0)
@@ -1522,7 +1429,6 @@ def main():
         else:
             # we're only doing one court
             if options.scrape: scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
-            if options.parse:  parseCourt(courtID, VERBOSITY)
             # this catches SIGINT, so the code can be killed safely.
             if dieNow == True:
                 sys.exit(0)
@@ -1534,12 +1440,10 @@ def main():
         # If so, run the scrapers. If not, check the next one.
         VERBOSITY = 0
 
-        from alertSystem.models import PACER_CODES
-        wait = (30*60)/len(PACER_CODES)
+        wait = (30 * 60) / len(PACER_CODES)
         courtID = 1
         while courtID <= len(PACER_CODES):
             scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
-            parseCourt(courtID, VERBOSITY)
             # this catches SIGINT, so the code can be killed safely.
             if dieNow == True:
                 sys.exit(0)
