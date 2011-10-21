@@ -64,7 +64,7 @@ DAEMONMODE = False
 """This is where scrapers live that can be trained on historical data with some
 tweaking.
 
-These are generally much more hacked than those scrapers in scrape_and_parse.py,
+These are generally much more hacked than those scrapers in scrape_and_extract.py,
 but they should work with some editing or updating."""
 
 
@@ -76,9 +76,9 @@ def ca3_nextQuery(query, zoomIn):
     If zoomIn is true, then it zooms in. For example, if the query is a, then it
     returns aa.
     '''
-    chars = ('a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p',
-            'q','r','s','t','u','v','w','x','y','z','1','2','3','4','5','6',
-            '7','8','9','0','.')
+    chars = ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
+            'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '1', '2', '3', '4', '5', '6',
+            '7', '8', '9', '0', '.')
 
     if zoomIn:
         # We take the query and zoom in
@@ -159,7 +159,7 @@ def ca3_query_and_count_results(query, ct):
             # Once when counting results and again when it gets here. Not ideal,
             # but probably workable.
 
-            i +=1
+            i += 1
 
         # Do the next query, but don't zoom in.
         ca3_query_and_count_results(ca3_nextQuery(query, False), ct)
@@ -204,9 +204,9 @@ def back_scrape_court(courtID, VERBOSITY):
 
         # next, iterate over these until there are no more!
         i = 0
-        while i < (len(dates)-1):
+        while i < (len(dates) - 1):
             startDate = time.strftime('%m/%d/%Y', dates[i].timetuple())
-            endDate = time.strftime('%m/%d/%Y', dates[i+1].timetuple())
+            endDate = time.strftime('%m/%d/%Y', dates[i + 1].timetuple())
             i += 1
 
             print "\n\n****Now scraping " + startDate + " to " + endDate + "****"
@@ -280,7 +280,7 @@ def back_scrape_court(courtID, VERBOSITY):
                             except: continue
 
                             # This helps out the parser in corner cases.
-                            quickHtml = unicode(quickHtml, errors='ignore')
+                            quickHtml = unicode(quickHtml, errors = 'ignore')
 
                             # Get the useful part of the webpage.
                             quickTree = etree.parse(StringIO.StringIO(quickHtml), parser)
@@ -297,7 +297,7 @@ def back_scrape_court(courtID, VERBOSITY):
 
                             # Clean up the text
                             try:
-                                documentPlainText = tostring(documentPlainText).replace('<pre>', '').replace('</pre>','')\
+                                documentPlainText = tostring(documentPlainText).replace('<pre>', '').replace('</pre>', '')\
                                     .replace('<br>', '\n').replace('_', ' ')
                             except TypeError:
                                 continue
@@ -398,12 +398,12 @@ def back_scrape_court(courtID, VERBOSITY):
         startDate = datetime.date(2007, 04, 01)
         dupCount = 0
         while startDate < today:
-            numDaysInMonthMinusOne = datetime.timedelta(days=calendar.monthrange(
-                startDate.year,startDate.month)[1] - 1)
+            numDaysInMonthMinusOne = datetime.timedelta(days = calendar.monthrange(
+                startDate.year, startDate.month)[1] - 1)
             endDate = startDate + numDaysInMonthMinusOne
 
             startDateStr = startDate.strftime('%Y%m%d')
-            endDateStr   = endDate.strftime('%Y%m%d')
+            endDateStr = endDate.strftime('%Y%m%d')
 
             # Build the URLs
             urls = (
@@ -458,7 +458,7 @@ def back_scrape_court(courtID, VERBOSITY):
                     doc.dateFiled = dateFiled
 
                     # next: caseNameShort
-                    caseNameShort = smart_unicode(cells[1].text, errors='ignore')
+                    caseNameShort = smart_unicode(cells[1].text, errors = 'ignore')
                     if VERBOSITY >= 2:
                         print "Casenameshort: " + caseNameShort
 
@@ -591,15 +591,15 @@ def back_scrape_court(courtID, VERBOSITY):
                 i += 1
 
         url = "http://www.ca5.uscourts.gov/Opinions.aspx"
-        ct = Court.objects.get(courtUUID='ca5')
+        ct = Court.objects.get(courtUUID = 'ca5')
 
         if verbosity >= 2: print "dates: " + str(dates)
 
         # next, iterate over these until there are no more!
         j = 0
-        while j < (len(dates)-1):
+        while j < (len(dates) - 1):
             startDate = time.strftime('%m/%d/%Y', dates[j].timetuple())
-            endDate = time.strftime('%m/%d/%Y', dates[j+1].timetuple())
+            endDate = time.strftime('%m/%d/%Y', dates[j + 1].timetuple())
 
             if verbosity >= 2:
                 print "startDate: " + startDate
@@ -629,7 +629,7 @@ def back_scrape_court(courtID, VERBOSITY):
 
             #all links ending in pdf, case insensitive
             aTagRegex = re.compile("pdf$", re.IGNORECASE)
-            aTags = soup.findAll(attrs={"href": aTagRegex})
+            aTags = soup.findAll(attrs = {"href": aTagRegex})
 
             unpubRegex = re.compile(r"pinions.*unpub")
 
@@ -691,7 +691,7 @@ def back_scrape_court(courtID, VERBOSITY):
 
                 # some caseDate cleanup
                 splitDate = caseDate.split('/')
-                caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
+                caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
 
@@ -812,8 +812,8 @@ def back_scrape_court(courtID, VERBOSITY):
 
             # do the pdftotext work
             process = subprocess.Popen(
-                ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"], shell=False,
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"], shell = False,
+                stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
             content, err = process.communicate()
             if err: result += "Error parsing file: " + doc.citation.caseNameShort
 
@@ -866,7 +866,7 @@ def back_scrape_court(courtID, VERBOSITY):
                             month = "0" + str(j)
                         else:
                             month = str(j)
-                        years.append(str(2008+i) + "-" + month)
+                        years.append(str(2008 + i) + "-" + month)
                         j += 1
                     i += 1
                 if verbosity >= 2: print "years: " + str(years)
@@ -880,7 +880,7 @@ def back_scrape_court(courtID, VERBOSITY):
                             month = "0" + str(j)
                         else:
                             month = str(j)
-                        years.append(str(2010+i) + "-" + month)
+                        years.append(str(2010 + i) + "-" + month)
                         j += 1
                     i += 1
                 if verbosity >= 2: print "years: " + str(years)
@@ -899,14 +899,14 @@ def back_scrape_court(courtID, VERBOSITY):
 
                 if 'unpub' in url:
                     docketNumbers = tree.xpath('//table[3]//table//table/tr[1]/td[2]')
-                    caseLinks   = tree.xpath('//table[3]//table//table/tr[3]/td[2]/a')
-                    caseDates   = tree.xpath('//table[3]//table//table/tr[4]/td[2]')
-                    caseNames   = tree.xpath('//table[3]//table//table/tr[6]/td[2]')
+                    caseLinks = tree.xpath('//table[3]//table//table/tr[3]/td[2]/a')
+                    caseDates = tree.xpath('//table[3]//table//table/tr[4]/td[2]')
+                    caseNames = tree.xpath('//table[3]//table//table/tr[6]/td[2]')
                 elif 'opinion' in url:
                     docketNumbers = tree.xpath('//table[3]//td[3]//table/tr[1]/td[2]')
-                    caseLinks   = tree.xpath('//table[3]//td[3]//table/tr[3]/td[2]/a')
-                    caseDates   = tree.xpath('//table[3]//td[3]//table/tr[4]/td[2]')
-                    caseNames   = tree.xpath('//table[3]//td[3]//table/tr[6]/td[2]')
+                    caseLinks = tree.xpath('//table[3]//td[3]//table/tr[3]/td[2]/a')
+                    caseDates = tree.xpath('//table[3]//td[3]//table/tr[4]/td[2]')
+                    caseNames = tree.xpath('//table[3]//td[3]//table/tr[6]/td[2]')
 
                 '''
                 # for debugging
@@ -1136,7 +1136,7 @@ def back_scrape_court(courtID, VERBOSITY):
                 caseNameShort = trTags[i].td.nextSibling.nextSibling.nextSibling\
                     .nextSibling.nextSibling.nextSibling.a.contents[0]\
                     .replace('[MOTION]', '').replace('[ORDER]', '').replace('(RULE 36)', '')\
-                    .replace('[ERRATA]', '').replace('[CORRECTED]','').replace('[ORDER 2]', '')\
+                    .replace('[ERRATA]', '').replace('[CORRECTED]', '').replace('[ORDER 2]', '')\
                     .replace('[ORDER}', '').replace('[ERRATA 2]', '').replace('{ORDER]', '')
                 caseNameShort = titlecase(caseNameShort)
 
@@ -1293,14 +1293,14 @@ def back_scrape_court(courtID, VERBOSITY):
             import StringIO
             data = StringIO.StringIO(data)
             import gzip
-            gzipper = gzip.GzipFile(fileobj=data)
+            gzipper = gzip.GzipFile(fileobj = data)
             html = gzipper.read()
             tree = fromstring(html)
 
             # xpath goodness
-            caseLinks   = tree.xpath('/html//table[2]//tr/td[4]/a')
+            caseLinks = tree.xpath('/html//table[2]//tr/td[4]/a')
             docketNumbers = tree.xpath('/html//table[2]//tr/td[3]')
-            caseDates   = tree.xpath('/html//table[2]//tr/td[2]')
+            caseDates = tree.xpath('/html//table[2]//tr/td[2]')
 
 
             # for debugging
@@ -1332,7 +1332,7 @@ def back_scrape_court(courtID, VERBOSITY):
                 try:
                     request = urllib2.Request("http://web.archive.org/web/20051222044311/" + caseLink)
                     request.add_header('User-agent', 'Mozilla/5.0(Windows; U; Windows NT 5.2; rv:1.9.2) Gecko/20100101 Firefox/3.6')
-                    h = urllib2.HTTPHandler(debuglevel=1)
+                    h = urllib2.HTTPHandler(debuglevel = 1)
                     opener = urllib2.build_opener(h)
                     webFile = opener.open(request).read()
                     stringThing = StringIO.StringIO()
@@ -1406,14 +1406,14 @@ def main():
 
     usage = "usage: %prog -c COURTID (-s | -p) [-v {1,2}]"
     parser = OptionParser(usage)
-    parser.add_option('-s', '--scrape', action="store_true", dest='scrape',
-        default=False, help="Whether to scrape")
-    parser.add_option('-p', '--parse', action="store_true", dest='parse',
-        default=False, help="Whether to parse")
-    parser.add_option('-c', '--court', dest='courtID', metavar="COURTID",
-        help="The court to scrape, parse or both")
-    parser.add_option('-v', '--verbosity', dest='verbosity', metavar="VERBOSITY",
-        help="Display status messages after execution. Higher values are more verbosity.")
+    parser.add_option('-s', '--scrape', action = "store_true", dest = 'scrape',
+        default = False, help = "Whether to scrape")
+    parser.add_option('-p', '--parse', action = "store_true", dest = 'parse',
+        default = False, help = "Whether to parse")
+    parser.add_option('-c', '--court', dest = 'courtID', metavar = "COURTID",
+        help = "The court to scrape, parse or both")
+    parser.add_option('-v', '--verbosity', dest = 'verbosity', metavar = "VERBOSITY",
+        help = "Display status messages after execution. Higher values are more verbosity.")
     (options, args) = parser.parse_args()
     if not options.courtID or (not options.scrape and not options.parse):
         parser.error("You must specify a court and whether to scrape and/or parse it")
