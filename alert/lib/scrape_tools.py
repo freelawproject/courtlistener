@@ -43,7 +43,7 @@ from django.core.files.base import ContentFile
 from django.utils.encoding import smart_unicode
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
-from scrapers.tasks import extract_doc_contents
+from scrapers.tasks import extract_doc_content
 
 import hashlib
 import httplib
@@ -250,8 +250,8 @@ def save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY):
     doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
     printAndLogNewDoc(VERBOSITY, ct, cite)
     doc.save()
-    result = extract_doc_contents.delay(doc.pk)
-    if not result.successful():
-        print "***Error extracting text from document: %s" % (doc.pk)
+
+    # Extract the contents asynchronously.
+    extract_doc_content.delay(doc.pk)
 
     return doc
