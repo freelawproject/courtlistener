@@ -1381,10 +1381,8 @@ def main():
     # this line is used for handling SIGINT, so things can die safely.
     signal.signal(signal.SIGINT, signal_handler)
 
-    usage = "usage: %prog -d | (-c COURTID -s [-v {1,2}])"
+    usage = "usage: %prog -d | (-c COURTID [-v {1,2}])"
     parser = OptionParser(usage)
-    parser.add_option('-s', '--scrape', action = "store_true", dest = 'scrape',
-        default = False, help = "Whether to scrape")
     parser.add_option('-d', '--daemon', action = "store_true", dest = 'daemonmode',
         default = False, help = "Use this flag to turn on daemon mode at a rate of 20 minutes between each scrape")
     parser.add_option('-c', '--court', dest = 'courtID', metavar = "COURTID",
@@ -1392,17 +1390,16 @@ def main():
     parser.add_option('-v', '--verbosity', dest = 'verbosity', metavar = "VERBOSITY",
         help = "Display status messages after execution. Higher values print more verbosity.")
     (options, args) = parser.parse_args()
-    if options.daemonmode == False and (not options.courtID or not options.scrape):
-        parser.error("You must specify either daemon mode or a court and whether to scrape and/or extract it.")
+
+    DAEMONMODE = options.daemonmode
+    if not DAEMONMODE and not options.courtID:
+        parser.error("You must specify either daemon mode or a court to scrape and extract.")
 
     try:
         VERBOSITY = int(options.verbosity)
     except:
         # no verbosity supplied, assume 0
         VERBOSITY = 0
-
-
-    DAEMONMODE = options.daemonmode
 
     if not DAEMONMODE:
         # some data validation, for good measure
@@ -1419,7 +1416,7 @@ def main():
                 # This catches all exceptions regardless of their trigger, so
                 # if one court dies, the next isn't affected.
                 try:
-                    if options.scrape: scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
+                    scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
                 except Exception:
                     print '*****Uncaught error scraping court*****\n"' + traceback.format_exc() + "\n\n"
                 # this catches SIGINT, so the code can be killed safely.
@@ -1428,7 +1425,7 @@ def main():
                 courtID += 1
         else:
             # we're only doing one court
-            if options.scrape: scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
+            scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
             # this catches SIGINT, so the code can be killed safely.
             if dieNow == True:
                 sys.exit(0)

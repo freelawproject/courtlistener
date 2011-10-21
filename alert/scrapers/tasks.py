@@ -43,24 +43,27 @@ import subprocess
 
 
 @task
-def extract_doc_contents(pk):
+def extract_doc_content(pk):
     '''
     Given a document, we extract it, sniffing its mimetype, then store its 
     contents in the database. 
     
-    This implementation cannot be distributed due to using local paths.
+    TODO: this implementation cannot be distributed due to using local paths.
     '''
+    logger = extract_doc_content.get_logger()
+    logger.info("Extracting contents of document %s" % (pk,))
+
     doc = Document.objects.get(pk = pk)
 
     path = str(doc.local_path)
     path = settings.MEDIA_ROOT + path
 
+    DEVNULL = open('/dev/null', 'w')
     mimetype = path.split('.')[-1]
     if mimetype == 'pdf':
         # do the pdftotext work for PDFs
         process = subprocess.Popen(["pdftotext", "-layout", "-enc", "UTF-8",
-            path, "-"], shell = False, stdout = subprocess.PIPE,
-            stderr = subprocess.STDOUT)
+            path, "-"], shell = False, stdout = subprocess.PIPE, stderr = DEVNULL)
         content, err = process.communicate()
         if content == '':
             # probably an image PDF. TODO: Add code here to create OCR task in 
@@ -69,6 +72,7 @@ def extract_doc_contents(pk):
         doc.documentPlainText = anonymize(content)
         if err:
             print "****Error extracting PDF text from: " + doc.citation.caseNameShort + "****"
+            return 1
     elif mimetype == 'txt':
         # read the contents of text files.
         try:
@@ -76,11 +80,12 @@ def extract_doc_contents(pk):
             doc.documentPlainText = anonymize(content)
         except:
             print "****Error extracting plain text from: " + doc.citation.caseNameShort + "****"
+            return 1
     elif mimetype == 'wpd':
         # It's a Word Perfect file. Use the wpd2html converter, clean up
         # the HTML and save the content to the HTML field.
         process = subprocess.Popen(['wpd2html', path, '-'], shell = False,
-            stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+            stdout = subprocess.PIPE, stderr = DEVNULL)
         content, err = process.communicate()
 
         parser = etree.HTMLParser()
@@ -100,18 +105,25 @@ def extract_doc_contents(pk):
 
         if err:
             print "****Error extracting WPD text from: " + doc.citation.caseNameShort + "****"
+            return 1
     elif mimetype == 'doc':
         # read the contents of MS Doc files
         process = subprocess.Popen(['antiword', path, '-i', '1'], shell = False,
-            stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+            stdout = subprocess.PIPE, stderr = DEVNULL)
         content, err = process.communicate()
         doc.documentPlainText = anonymize(content)
         if err:
             print "****Error extracting DOC text from: " + doc.citation.caseNameShort + "****"
+            return 1
     else:
         print "*****Unknown mimetype: " + mimetype + ". Unable to extract content from: " + doc.citation.caseNameShort + "****"
+        return 2
 
     try:
         doc.save()
     except Exception, e:
         print "****Error saving text to the db for: " + doc.citation.caseNameShort + "****"
+        return 3
+
+    logger.info("Successfully extracted contents of document %s" % (pk,))
+    return 0
