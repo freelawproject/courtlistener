@@ -1,6 +1,7 @@
 User-agent: *
 Sitemap: http://courtlistener.com/sitemap.xml
 
+Disallow: /robots.txt
 Disallow: /x/
 Disallow: /doc/
 Disallow: /dumps/
