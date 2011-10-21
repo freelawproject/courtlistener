@@ -27,8 +27,7 @@
 #  ways how any modified versions differ from the original version.
 
 # This script is designed to install the CourtListener project on a Linux
-# machine. It was written for Ubuntu Lucid Linux - v. 10.04, but should work on
-# most debian derivatives.
+# machine. It has been tested on Ubuntu 10.04, 10.10, 11.04 and 11.10.
 #
 # This script should also serve as the documentation for the installation
 # process.
@@ -42,6 +41,7 @@
 # - install & configure Sphinx
 # - install django-sphinx
 # - configure mysql & courtlistener
+# - install django-celery, celery and rabbitmq
 # - install the django-debug toolbar
 # - install the south DB migration tool
 # - sync the django configuration with the database
@@ -56,7 +56,7 @@ NAME
     install.sh
 
 SYNOPSIS
-    install.sh --help | --install
+    install.sh --help | --install | --lightlyTestedOption
 
 OPTIONS
     This program will install the courtlistener software on your computer. It
@@ -67,7 +67,7 @@ OPTIONS
     --help      Print this help file
     --install   Install all components of the courtlistener software
 
-    Untested Options
+    Lightly Tested Options
     --checkdeps
             Verify that the required dependencies are installed.
     --mysql
@@ -84,6 +84,8 @@ OPTIONS
             import some basic data into the DB, setting up the courts
     --debugToolbar
             install the django debug toolbar
+    --djangoCelery
+            install django-celery to handle task queues
     --djangoSphinx
             install the django-sphinx connector
     --djangoExtensions
@@ -99,14 +101,14 @@ EXIT STATUS
         1   Unknown error
         2   Invalid usage
         3   Missing critical dependency
-        4   Errors installing django from source
+        4   Error installing django from source
         5   Error getting user input
         6   Error installing Sphinx
         7   Error configuring MySQL
 
 AUTHOR AND COPYRIGHT
     This script was authored by Michael Lissner and is released under the same
-    permissive license as the remainder of the courtlistener program.
+    permissive license as the remainder of the CourtListener program.
 
 EOF
 }
@@ -114,7 +116,7 @@ EOF
 
 function getUserInput {
 cat<<EOF
-Welcome to the install script. This script will install the courtlistener system
+Welcome to the install script. This script will install the CourtListener system
 on your Debian-based Linux computer. We will begin by gathering several pieces
 of input from you, and then we will install django, courtlistener, sphinx,
 django-sphinx, django-debug toolbar, MySQL, and all their dependencies.
@@ -185,8 +187,20 @@ generated password, since you should not ever need to type it in.
     read -p "Use the following random password: '$MYSQL_PWD'? (y/n): " proceed
     if [ $proceed == 'n' ]
     then
-        read -p "Very well. What would you like the password to be (do not include the # symbol): " MYSQL_PWD
+        read -p "Very well. What would you like the password to be (do not use the # symbol): " MYSQL_PWD
     fi
+
+    CELERY_PWD=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789") for i in range(50)]);'`
+    echo -e "\nFinally, we will be installing Celery, which requires a password as well.
+You can set up the Celery password manually, but we recommend a randomly
+generated one, since you should not ever need to type it in.
+"
+    read -p "Use the following random password: '$CELERY_PWD'? (y/n): " proceed
+    if [ $proceed == 'n' ]
+    then
+        read -p "Very well. What would you like the password to be (do not use the # symbol): " CELERY_PWD
+    fi
+
 
     read -p "
 Great. This is all the input we need for a while. We will now complete the
@@ -199,7 +213,7 @@ Press enter to proceed, or Ctrl+C to abort. " proceed
 function checkDeps {
     # this function checks for various dependencies that the script assumes are
     # installed for its own functionality.
-    deps=(aptitude antiword checkinstall g++ gcc git-core ipython libmysqlclient-dev libmysql++-dev libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-setuptools subversion tar wget)
+    deps=(aptitude antiword checkinstall g++ gcc git-core ipython libmysqlclient-dev libmysql++-dev libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget)
     echo -e "\n########################"
     echo "Checking dependencies..."
     echo "########################"
@@ -346,7 +360,7 @@ function installCourtListener {
     TEMPLATE_DIRS="$CL_INSTALL_DIR/court-listener/alert/assets/templates/"
     DUMP_DIR="$CL_INSTALL_DIR/court-listener/alert/assets/dumps/"
 
-    # convrt true and false to True and False
+    # convert true and false (bash) to True and False (Python)
     if $DEVELOPMENT
     then
         DEVELOPMENT="True"
@@ -412,6 +426,10 @@ INSTALL_ROOT = '$CL_INSTALL_DIR/court-listener/'
 
 INTERNAL_IPS = ('127.0.0.1',)
 DEBUG_TOOLBAR_CONFIG = {'INTERCEPT_REDIRECTS': False}
+
+# Celery settings
+BROKER_USER = 'celery'
+BROKER_PASSWORD = '$CELERY_PWD'
 
 INSTALLED_APPS.extend([
 EOF
@@ -553,7 +571,7 @@ function installSphinx {
 
     echo "Downloading Sphinx..."
     cd $CL_INSTALL_DIR/court-listener/Sphinx
-    wget http://www.sphinxsearch.com/downloads/sphinx-0.9.9.tar.gz
+    wget http://sphinxsearch.com/downloads/sphinx-0.9.9.tar.gz
     tar xzvf sphinx-0.9.9.tar.gz; rm sphinx-0.9.9.tar.gz
     cd sphinx-0.9.9
     ./configure --with-prefix=/usr/local/sphinx
@@ -597,12 +615,12 @@ cat <<'EOF' >> $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf
     sql_query_range     = SELECT min(documentUUID), max(documentUUID) from Document
     sql_range_step      = 5000
     sql_query           = \
-        SELECT Document.documentUUID, Citation.caseNameShort as caseName, Citation.caseNameFull, Citation.docketNumber as docketNumber, Citation.westCite, Citation.lexisCite, Document.documentSHA1, UNIX_TIMESTAMP(Document.dateFiled) as dateFiled, UNIX_TIMESTAMP(Document.time_retrieved) as time_retrieved, Document.court_id as court, Document.documentPlainText as docText, Document.documentHTML as docHTML, Document.documentType as docStatus\
+        SELECT Document.documentUUID, Citation.caseNameShort, Citation.caseNameFull as casename, Citation.docketNumber as docketNumber, Citation.westCite, Citation.lexisCite, Document.documentSHA1, TO_DAYS(Document.dateFiled) as dateFiled, TO_DAYS(Document.time_retrieved) as time_retrieved, Document.court_id as court, Document.documentPlainText as docText, Document.documentHTML as docHTML, Document.documentType as docStatus\
         FROM Document, Citation\
         WHERE Document.citation_id = Citation.citationUUID\
-	AND Document.documentUUID >= $start\
-	AND Document.documentUUID <= $end\
-	AND Document.documentUUID <= (SELECT max_doc_id FROM sph_counter WHERE counter_id=1);
+            AND Document.documentUUID >= $start\
+            AND Document.documentUUID <= $end\
+            AND Document.documentUUID <= (SELECT max_doc_id FROM sph_counter WHERE counter_id=1);
 
     sql_query_info      = SELECT * FROM `Document` WHERE `documentUUID` = $id
 
@@ -619,7 +637,7 @@ source delta : Document
 {
     sql_query_pre = SET NAMES utf8
     sql_query           = \
-        SELECT Document.documentUUID, Citation.caseNameShort as caseName, Citation.caseNameFull, Citation.docketNumber as docketNumber, Citation.westCite, Citation.lexisCite, Document.documentSHA1, UNIX_TIMESTAMP(Document.dateFiled) as dateFiled, UNIX_TIMESTAMP(Document.time_retrieved) as time_retrieved, Document.court_id as court, Document.documentPlainText as docText, Document.documentHTML as docHTML, Document.documentType as docStatus\
+        SELECT Document.documentUUID, Citation.caseNameShort, Citation.caseNameFull as casename, Citation.docketNumber as docketNumber, Citation.westCite, Citation.lexisCite, Document.documentSHA1, TO_DAYS(Document.dateFiled) as dateFiled, TO_DAYS(Document.time_retrieved) as time_retrieved, Document.court_id as court, Document.documentPlainText as docText, Document.documentHTML as docHTML, Document.documentType as docStatus\
         FROM Document, Citation\
         WHERE Document.citation_id = Citation.citationUUID\
 	AND Document.documentUUID >= $start\
@@ -640,13 +658,14 @@ index Document
     docinfo = extern
 
     # sets the minimum word length to index
-    min_word_len = 2
+    min_word_len = 1
     charset_type = utf-8
 
-    # DISABLED DUE TO LACK OF HD SPACE
     # these set up star searching (at a performance hit), but *test, *test* and test* all will work.
+    # Also note that infix enables *start end* and *middle*, while prefix just enables end*. Thus,
+    # an error will be thrown by the indexer if you try to set both of these configs!
     # min_infix_len= 3
-    # infix_fields = caseName, docText, docHTML, Citation.caseNameFull, docketNumber, westCite, lexisCite
+    # infix_fields = caseName, docText, docHTML, Citation.caseNameFull, caseNumber
     min_prefix_len = 3
     prefix_fields = caseName, docText, docHTML, Citation.caseNameFull, docketNumber, westCite, lexisCite
     enable_star = 1
@@ -676,7 +695,7 @@ indexer
 {
 	# memory limit, in bytes, kiloytes (16384K) or megabytes (256M)
 	# optional, default is 32M, max is 2047M, recommended is 256M to 1024M
-	mem_limit = 100M
+	mem_limit = 512M
 
 	# maximum IO calls per second (for I/O throttling)
 	# optional, default is 0 (unlimited)
@@ -808,6 +827,31 @@ EOF
 }
 
 
+function installDjangoCelery {
+    echo -e '\n##################################'
+    echo 'Installing django-celery and Celery...'
+    echo '##################################
+'
+    read -p "Install django-celery and Celery on this computer? (y/n): " proceed
+    if [ $proceed == "y" ]
+    then
+        # we install them
+        pip install django-celery
+
+        # create a system user account
+        echo "Adding celery to rabbitmq..."
+        rabbitmqctl add_vhost "/celery"
+        sudo rabbitmqctl add_user celery "$CELERY_PWD"
+        sudo rabbitmqctl set_permissions -p "/celery" "celery" ".*" ".*" ".*"
+
+        echo -e '\nDjango-celery and Celery installed successfully.'
+    else
+        echo -e '\nGreat. Moving on.'
+        return 0
+    fi
+}
+
+
 function installDebugToolbar {
     if [ $INSTALL_DEBUG_TOOLBAR == 'y' ]
     then
@@ -815,7 +859,7 @@ function installDebugToolbar {
         echo 'Installing django debug toolbar...'
         echo '##################################
 '
-        read -p "Install djang debug toolbar on this computer? (y/n): " proceed
+        read -p "Install django debug toolbar on this computer? (y/n): " proceed
         if [ $proceed == "y" ]
         then
             # we install it
@@ -877,6 +921,7 @@ function installSouth {
 
 
 function importData {
+    # TODO: replace with an API call (once the API exists)
     echo -e "\n############################"
     echo "Importing data into MySQL..."
     echo "############################"
@@ -931,6 +976,7 @@ function main {
     configureMySQL
     installSphinx
     installDjangoSphinx
+    installDjangoCelery
     installDebugToolbar
     installDjangoExtensions
     installSouth
@@ -985,6 +1031,7 @@ else
         --courtListener) getUserInput; installCourtListener;;
         --importData) getUserInput; configureMySQL; importData;;
         --debugToolbar) getUserInput; installDebugToolbar;;
+        --djangoCelery) getUserInput; installDjangoCelery;;
         --djangoSphinx) getUserInput; installDjangoSphinx;;
         --djangoExtensions) getUserInput; installDjangoExtensions;;
         --south) getUserInput; installSouth; finalize;;

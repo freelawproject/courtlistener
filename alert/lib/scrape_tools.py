@@ -31,15 +31,24 @@ from alert import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alertSystem.models import *
-from lib.string_utils import *
+from alert.alertSystem.models import Citation
+from alert.alertSystem.models import Document
+from alert.alertSystem.models import urlToHash
+from alert.lib.string_utils import clean_string
+from alert.lib.string_utils import harmonize
+from alert.lib.string_utils import titlecase
+from alert.lib.string_utils import trunc
 
 from django.core.files.base import ContentFile
+from django.utils.encoding import smart_unicode
+
+# adding alert to the front of this breaks celery. Ignore pylint error.
+from scrapers.tasks import extract_doc_contents
 
 import hashlib
+import httplib
 import logging.handlers
 import StringIO
-import subprocess
 import time
 import traceback
 import urllib2
@@ -228,120 +237,21 @@ def hasDuplicate(caseName, westCite = None, docketNumber = None):
 
     return cite, created
 
+def save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY):
+    '''Runs standard finishing code on a document
 
-def getDocContent(docs):
     '''
-    Get the contents of a list of files, and add them to the DB, sniffing
-    their mimetype.
-    '''
-    for doc in docs:
-        path = str(doc.local_path)
-        path = settings.MEDIA_ROOT + path
+    # now that we have the docketNumber and caseNameShort, we can dup check
+    cite, _ = hasDuplicate(caseNameShort, None, docketNumber)
 
-        mimetype = path.split('.')[-1]
-        if mimetype == 'pdf':
-            # do the pdftotext work for PDFs
-            process = subprocess.Popen(["pdftotext", "-layout", "-enc", "UTF-8",
-                path, "-"], shell = False, stdout = subprocess.PIPE,
-                stderr = subprocess.STDOUT)
-            content, err = process.communicate()
-            if content == '':
-                # probably an image PDF.
-                content = "Unable to parse document content."
-            doc.documentPlainText = anonymize(content)
-            if err:
-                print "****Error extracting PDF text from: " + doc.citation.caseNameShort + "****"
-                continue
-        elif mimetype == 'txt':
-            # read the contents of text files.
-            try:
-                content = open(path).read()
-                doc.documentPlainText = anonymize(content)
-            except:
-                print "****Error extracting plain text from: " + doc.citation.caseNameShort + "****"
-                continue
-        elif mimetype == 'wpd':
-            # It's a Word Perfect file. Use the wpd2html converter, clean up
-            # the HTML and save the content to the HTML field.
-            print "Parsing: " + path
-            process = subprocess.Popen(['wpd2html', path, '-'], shell = False,
-                stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
-            content, err = process.communicate()
+    # Associate the cite with the doc
+    doc.citation = cite
 
-            parser = etree.HTMLParser()
-            import StringIO
-            tree = etree.parse(StringIO.StringIO(content), parser)
-            body = tree.xpath('//body')
-            content = tostring(body[0]).replace('<body>', '').replace('</body>', '')
+    doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
+    printAndLogNewDoc(VERBOSITY, ct, cite)
+    doc.save()
+    result = extract_doc_contents.delay(doc.pk)
+    if not result.successful():
+        print "***Error extracting text from document: %s" % (doc.pk)
 
-            fontsizeReg = re.compile('font-size: .*;')
-            content = re.sub(fontsizeReg, '', content)
-
-            colorReg = re.compile('color: .*;')
-            content = re.sub(colorReg, '', content)
-
-            if 'not for publication' in content.lower():
-                doc.documentType = "Unpublished"
-            doc.documentHTML = anonymize(content)
-
-            if err:
-                print "****Error extracting WPD text from: " + doc.citation.caseNameShort + "****"
-                continue
-        elif mimetype == 'doc':
-            # read the contents of MS Doc files
-            print "Parsing: " + path
-            process = subprocess.Popen(['antiword', path, '-i', '1'], shell = False,
-                stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
-            content, err = process.communicate()
-            doc.documentPlainText = anonymize(content)
-            if err:
-                print "****Error extracting DOC text from: " + doc.citation.caseNameShort + "****"
-                continue
-        else:
-            print "*****Unknown mimetype: " + mimetype + ". Unable to parse: " + doc.citation.caseNameShort + "****"
-            continue
-
-        try:
-            doc.save()
-        except Exception, e:
-            print "****Error saving text to the db for: " + doc.citation.caseNameShort + "****"
-
-
-def parseCourt(courtID, VERBOSITY):
-    '''
-    Here, we do the following:
-     1. For a given court, find all of its documents
-     2. Determine if the document has been parsed already
-     3. If it has, punt, if not, open the PDF and parse it.
-
-    returns a string containing the result
-    '''
-
-    if VERBOSITY >= 1: print "NOW PARSING COURT: " + str(courtID)
-
-    from threading import Thread
-
-    # get the court IDs from models.py
-    courts = []
-    for code in PACER_CODES:
-        courts.append(code[0])
-
-    # select all documents from this jurisdiction that lack plainText and were
-    # downloaded from the court.
-    docs = Document.objects.filter(documentPlainText = "", documentHTML = "",
-        court__courtUUID = courts[courtID - 1], source = "C").order_by('documentUUID')
-
-    numDocs = docs.count()
-
-    # this is a crude way to start threads, but I'm lazy, and two is a good
-    # starting point. This essentially starts two threads, each with half of the
-    # unparsed PDFs. If the -c 0 flag is used, it's likely for the next court
-    # to begin scraping before both of these have finished. This should be OK,
-    # but seems noteworthy.
-    if numDocs > 0:
-        t1 = Thread(target = getDocContent, args = (docs[0:numDocs / 2],))
-        t2 = Thread(target = getDocContent, args = (docs[numDocs / 2:numDocs],))
-        t1.start()
-        t2.start()
-    elif numDocs == 0:
-        if VERBOSITY >= 1: print "Nothing to parse for this court."
+    return doc

@@ -31,7 +31,7 @@ from django.utils.encoding import smart_str
 from django.utils.encoding import smart_unicode
 
 # For use in titlecase
-BIG = 'AFL|AKA|A/K/A|CDC|CDT|CEO|CIO|CNMI|D/B/A|DOJ|DVA|EFF|FCC|FTC|IBM|II|III|IV|LLC|LLP|MCI|MJL|MSPB|UPS|RSS|SEC|USA|USC|USPS|WTO'
+BIG = 'AFL|AKA|A/K/A|BMG|CDC|CDT|CEO|CIO|CNMI|D/B/A|DOJ|DVA|EFF|FCC|FTC|IBM|II|III|IV|LLC|LLP|MCI|MJL|MSPB|UPS|RSS|SEC|USA|USC|USPS|WTO'
 SMALL = 'a|an|and|as|at|but|by|en|for|if|in|is|of|on|or|the|to|v\.?|via|vs\.?'
 NUMS = '0|1|2|3|4|5|6|7|8|9'
 PUNCT = r"""!"#$¢%&'‘()*+,\-./:;?@[\\\]_—`{|}~"""
@@ -49,7 +49,7 @@ ALL_CAPS = re.compile(r'^[A-Z\s%s%s%s]+$' % (PUNCT, WEIRD_CHARS, NUMS))
 UC_INITIALS = re.compile(r"^(?:[A-Z]{1}\.{1}|[A-Z]{1}\.{1}[A-Z]{1})+,?$")
 MAC_MC = re.compile(r"^([Mm]a?c)(\w+)")
 
-def titlecase(text, DEBUG=False):
+def titlecase(text, DEBUG = False):
     '''
     Titlecases input text
 
@@ -239,13 +239,13 @@ def clean_string(string):
 
     # if not already unicode, make it unicode, dropping invalid characters
     # if not isinstance(string, unicode):
-    string = smart_unicode(string, encoding='utf-8', errors='ignore')
+    string = smart_unicode(string, encoding = 'utf-8', errors = 'ignore')
 
     # get rid of '\t\n\x0b\x0c\r ', and replace them with a single space.
     string = " ".join(string.split())
 
     # get rid of bad character encodings
-    string = smart_str(string, errors='ignore')
+    string = smart_str(string, errors = 'ignore')
 
     # return something vaguely sane
     return string
@@ -314,7 +314,7 @@ def removeLeftMargin(s):
                 if diff != 0:
                     marginSizes.append(oldlength - newlength)
 
-    mode = max([marginSizes.count(y),y] for y in marginSizes)[1]
+    mode = max([marginSizes.count(y), y] for y in marginSizes)[1]
 
     lines_out = []
     for line in lines:
