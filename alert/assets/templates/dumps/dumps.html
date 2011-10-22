@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}CourtListener.com / Data Dumps{% endblock %}
+
+{% block content %}
+    <div class="span-18">
+        <h2 id="about">XML Data Dumps</h2>
+        <p>For hackers and legal analysts, we provide XML dumps of our data.
+        We generate these files the first time they are requested, so some files 
+        may be very fast, while others may need to be created for you, which 
+        can take a moment. Dump files are available by the year, month and day.
+        For each time period, individual dump files are available for each court,
+        as well as a single file containing opinions from all courts.</p>
+
+        <p>The XML information in the dumps should be self-explanatory, and can be
+        discussed in <a href="https://groups.google.com/forum/#!forum/courtlistener-discuss">
+        our forum</a>.</p>
+
+        <p>All time stamps are Pacific Standard Time.</p>
+
+
+        <h3>Using the Dumps</h3>
+        <p>Annual, monthly or daily dumps can be accessed at
+        http://courtlistener.com/dump-api/<strong>year/month/day/court</strong>.xml.gz.</p>
+        <p>For example, let's look at ways to access the First Circuit of Appeals (<strong>ca1</strong>):</p>
+        <ul>
+            <li>All ca1 cases from 2009: <a href="/dump-api/2009/ca1.xml.gz">
+                http://courtlistner.com/dump-api/<strong>2009/ca1</strong>.xml.gz</a></li>
+            <li>All ca1 cases from June 2009: <a href="/dump-api/2009/06/ca1.xml.gz">
+                http://courtlistner.com/dump-api/2009/<strong>06</strong>/ca1.xml.gz</a></li>
+            <li>All ca1 cases from June 9, 2009: <a href="/dump-api/2009/06/09/ca1.xml.gz">
+                http://courtlistner.com/dump-api/2009/06/<strong>09</strong>/ca1.xml.gz</a></li>
+        </ul>
+        
+        <p>If you would like <strong>all</strong> documents for a given time period,
+        you can use <strong>all</strong> for the court name. For example,
+        <a href="http://courtlistener.com/dump-api/2009/06/09/all.xml.gz">
+        http://courtlistener.com/dump-api/2009/06/09/<strong>all</strong>.xml.gz</a>
+        returns all of the cases from June 9, 2009 (across all courts).</p>
+        
+        <p>We also provide a dump of all cases up through the last day
+        of the previous month. To obtain this dump, simply omit the date 
+        in your query, and use <strong>all</strong> for the court name: 
+        <a href="/dump-api/all.xml.gz">http://courtlistener.com/dump-api/all.xml.gz</a>. 
+        It's currently not possible to obtain complete dumps for individual 
+        courts.</p>    
+
+        <h3>Available Courts</h3>
+        <p class="bottom">The available court names, in order of start date, are:</p>
+        <ul>
+            <li><strong><a href="/opinions/all/">all</a></strong> - All courts</li>
+            {% for court in courts %}
+                <li>
+                    <strong><a href="/opinions/{{court.courtUUID}}/">{{court.courtUUID}}</a></strong> - {{court.get_courtUUID_display}}
+                </li>
+            {% endfor %}
+        </ul>
+        
+        <h3>Copyright</h3>
+        <p>
+            <a rel="license" href="http://creativecommons.org/publicdomain/mark/1.0/">
+                <img src="http://i.creativecommons.org/p/mark/1.0/88x31.png" alt="Public Domain Mark" height="31" width="88"/>
+            </a>
+            <br />Our dumps are free of known copyright restrictions.
+        </p>
+        
+        <h3>Feedback</h3>
+        <p>We welcome feedback and feature requests to this API. Please get in touch in
+        <a href="https://groups.google.com/forum/#!forum/courtlistener-discuss">our forum</a>.</p>
+
+    </div>
+{% endblock %}
