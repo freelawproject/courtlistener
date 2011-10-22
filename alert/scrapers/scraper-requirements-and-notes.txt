@@ -9,7 +9,11 @@ Goals:
 
 Non-goals:
  - Audio/Video scrapers
- 
+
+
+Nice to have:
+ - multi-threaded fetching (Twisted framework?)
+
 Layout: 
     Scrapers/
         Video/

@@ -18,8 +18,9 @@ import calendar
 import gzip
 import os
 
-from alert.alertSystem.models import *
-from alert.lib.db_tools import *
+from alert.alertSystem.models import Court
+from alert.alertSystem.models import Document
+from alert.lib.db_tools import queryset_iterator
 from alert.settings import DUMP_DIR
 
 from django.http import HttpResponseBadRequest
@@ -67,21 +68,21 @@ def get_date_range(year, month, day):
     are provided.
     '''
     # Sort out the start dates
-    if day == None:
-        start_day = 1
-    else:
-        start_day = int(day)
     if month == None:
         start_month = 1
     else:
         start_month = int(month)
+    if day == None:
+        start_day = 1
+    else:
+        start_day = int(day)
 
     start_year = int(year)
     start_date = '%d-%02d-%02d' % (start_year, start_month, start_day)
 
-    annual  = False
+    annual = False
     monthly = False
-    daily   = False
+    daily = False
     # Sort out the end dates
     if day == None and month == None:
         # it's an annual query
@@ -105,23 +106,40 @@ def get_date_range(year, month, day):
     return start_date, end_date, annual, monthly, daily
 
 
-def serve_or_gen_dump(request, court, year, month=None, day=None):
-    start_date, end_date, annual, monthly, daily = get_date_range(year, month, day)
+def serve_or_gen_dump(request, court, year = None, month = None, day = None):
+    if year is None:
+        if court != 'all':
+            # Sanity check
+            return HttpResponseBadRequest('<h2>Error 400: Complete dumps are \
+                not available for individual courts.</h2>')
+        else:
+            # Serve the dump for all cases.
+            today = date.today()
+            end_date = '%d-%02d-%02d' % (today.year, today.month, today.day)
+            all_dates = True
 
-    # Ensure that it's a valid request.
-    today = date.today()
-    today_str  = '%d-%02d-%02d' % (today.year, today.month, today.day)
-    if (today_str < end_date) and (today_str < start_date):
-        # It's the future. They fail.
-        return HttpResponseBadRequest('<h2>Error 400: Requested date is in the future. \
-            Please try again later.</h2>')
-    elif today_str <= end_date:
-        # Some of the data is in the past, some could be in the future.
-        return HttpResponseBadRequest('<h2>Error 400: Requested date is partially in the \
-            future. Please try again later.</h2>')
+    else:
+        # Date-based dump
+        all_dates = False
+        start_date, end_date, annual, monthly, daily = get_date_range(
+            year, month, day)
+
+        # Ensure that it's a valid request.
+        today = date.today()
+        today_str = '%d-%02d-%02d' % (today.year, today.month, today.day)
+        if (today_str < end_date) and (today_str < start_date):
+            # It's the future. They fail.
+            return HttpResponseBadRequest('<h2>Error 400: Requested date is in\
+                the future. Please try again later.</h2>')
+        elif today_str <= end_date:
+            # Some of the data is in the past, some could be in the future.
+            return HttpResponseBadRequest('<h2>Error 400: Requested date is \
+                partially in the future. Please try again later.</h2>')
 
     filename = court + '.xml.gz'
-    if daily:
+    if all_dates:
+        filepath = ''
+    elif daily:
         filepath = os.path.join(year, month, day)
     elif monthly:
         filepath = os.path.join(year, month)
@@ -130,23 +148,29 @@ def serve_or_gen_dump(request, court, year, month=None, day=None):
 
     # See if we already have it cached.
     try:
-        f = open(os.path.join(DUMP_DIR, filepath, filename), 'rb')
+        _ = open(os.path.join(DUMP_DIR, filepath, filename), 'rb')
         return HttpResponseRedirect(os.path.join('/dumps', filepath, filename))
 
     except IOError:
         # We don't have it cached on disk. Make it, save it and redirect to it.
-        if court == 'all':
-            # dump everything.
+        if all_dates:
             docs_to_dump = queryset_iterator(Document.objects.filter(
-                dateFiled__gte = start_date, dateFiled__lte = end_date))
+                dateFiled__lte = end_date))
         else:
-            # dump just the requested court
-            docs_to_dump = queryset_iterator(Document.objects.filter(
-               dateFiled__gte = start_date, dateFiled__lte = end_date, court = court))
+            # Time-based dump
+            if court == 'all':
+                # dump everything.
+                docs_to_dump = queryset_iterator(Document.objects.filter(
+                    dateFiled__gte = start_date, dateFiled__lte = end_date))
+            else:
+                # dump just the requested court
+                docs_to_dump = queryset_iterator(Document.objects.filter(
+                   dateFiled__gte = start_date, dateFiled__lte = end_date,
+                   court = court))
 
         # This var is needed to clear out null characters and control characters
         # (skipping newlines)
-        null_map = dict.fromkeys(range(0,10) + range(11,13) + range(14,32))
+        null_map = dict.fromkeys(range(0, 10) + range(11, 13) + range(14, 32))
 
         try:
             os.makedirs(os.path.join(DUMP_DIR, filepath))
@@ -155,8 +179,9 @@ def serve_or_gen_dump(request, court, year, month=None, day=None):
             pass
 
         os.chdir(DUMP_DIR)
-        with myGzipFile(os.path.join(filename), mode='wb') as z_file:
-            z_file.write('<?xml version="1.0" encoding="utf-8"?>\n<opinions dumpdate="' + str(date.today()) + '">\n')
+        with myGzipFile(os.path.join(filename), mode = 'wb') as z_file:
+            z_file.write('<?xml version="1.0" encoding="utf-8"?>\n' +
+                         '<opinions dumpdate="' + str(date.today()) + '">\n')
 
             try:
                 for doc in docs_to_dump:
@@ -219,18 +244,19 @@ def serve_or_gen_dump(request, court, year, month=None, day=None):
                         # Null byte found. Punt.
                         continue
 
-                    z_file.write('  ' + etree.tostring(row).encode('utf-8') + '\n')
+                    z_file.write('  %s\n' % etree.tostring(row).encode('utf-8'))
 
             except IndexError:
-                return HttpResponseBadRequest('<h2>Error 400: No cases found for this \
-                    time period.</h2>')
+                return HttpResponseBadRequest('<h2>Error 400: No cases found \
+                    for this time period.</h2>')
 
 
             # Close things off
             z_file.write('</opinions>')
 
-        # Move the file our of the working directory and into it's resting place.
+        # Move the file from our of the working directory and into it's resting
+        # place.
         os.rename(os.path.join(filename),
-            os.path.join(DUMP_DIR, filepath, filename))
+                  os.path.join(DUMP_DIR, filepath, filename))
 
         return HttpResponseRedirect(os.path.join('/dumps', filepath, filename))
