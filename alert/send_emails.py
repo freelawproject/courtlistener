@@ -60,11 +60,11 @@ def emailer(rate, verbose, simulate):
         i += 1
 
     EMAIL_SUBJECT = 'New hits for your alert at CourtListener.com'
-    EMAIL_SENDER = 'no-reply@courtlistener.com'
+    EMAIL_SENDER = 'alerts@courtlistener.com'
 
     # query all users with alerts of the desired frequency
     # use the distinct method to only return one instance of each person.
-    userProfiles = UserProfile.objects.filter(alert__alertFrequency = RATE)\
+    userProfiles = UserProfile.objects.filter(alert__alertFrequency=RATE)\
         .distinct()
 
     if verbose:
@@ -76,7 +76,7 @@ def emailer(rate, verbose, simulate):
     # for each user with a daily, weekly or monthly alert...
     for userProfile in userProfiles:
         #...get their alerts...
-        alerts = userProfile.alert.filter(alertFrequency = RATE)
+        alerts = userProfile.alert.filter(alertFrequency=RATE)
         if verbose:
             print "\n\n" + rate + " alerts for user " + userProfile.user\
                 .email + ": " + str(alerts)
@@ -156,9 +156,9 @@ def emailer(rate, verbose, simulate):
                             query + "."
                         print "alertWithResults: " + str(alertWithResults)
                         print "hits: " + str(hits)
-            except Exception,e:
+            except Exception, e:
                 print "Search barfed on this alert: " + query
-		print e
+                print e
 
         if len(hits) > 0:
             # either the hits var has the value "None", or it has hits.
@@ -214,7 +214,7 @@ def main():
     parser.add_option('-v', '--verbose', action="store_true", dest='verbose',
         default=False, help="Display variable values during execution")
     parser.add_option('-s', '--simulate', action="store_true",
-        dest='simulate', default=False, help="Simulate the emails that " +\
+        dest='simulate', default=False, help="Simulate the emails that " + \
         "would be sent, using the console backend")
     (options, args) = parser.parse_args()
     if not options.rate:
