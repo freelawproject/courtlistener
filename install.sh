@@ -145,7 +145,7 @@ EOF
     read -p "The default location for your CourtListener installation is /var/www. Is this OK? (y/n): " proceed
     if [ $proceed == 'n' ]
     then
-        read -p "Where shall we install CourtListener (starting at /, no trailing slash): " CL_INSTALL_DIR
+        read -p "You will need to update the init scripts manually to point to this location. Where shall we install CourtListener (starting at /, no trailing slash): " CL_INSTALL_DIR
     else
         CL_INSTALL_DIR='/var/www'
     fi
@@ -843,6 +843,22 @@ function installDjangoCelery {
         rabbitmqctl add_vhost "/celery"
         sudo rabbitmqctl add_user celery "$CELERY_PWD"
         sudo rabbitmqctl set_permissions -p "/celery" "celery" ".*" ".*" ".*"
+        
+        # Create an account for celery, and link up the init script
+        
+        TODO - Create the celery user account/group
+        
+        echo "Installing init scripts in /etc/init.d/celeryd"
+        ln -s $CL_INSTALL_DIR/court-listener/init-scripts/celeryd /etc/init.d/celeryd
+        
+        # Make an unprivileged, non-password-enabled user and group to run celery
+        useradd celery
+        
+        # make a spot for the logs and the pid files
+        mkdir /var/log/celery
+        mkdir /var/run/celery
+        chown celery:celery /var/log/celery
+        chown celery:celery /var/run/celery
 
         echo -e '\nDjango-celery and Celery installed successfully.'
     else
