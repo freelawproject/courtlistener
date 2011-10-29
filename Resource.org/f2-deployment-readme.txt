@@ -17,8 +17,6 @@ CLEANUP
     - Move views to favorites app
     - Move models and admin to search app
         - Fix links in HTML to citations
-    - Move redirection code to its own app, including robots.txt
-        - Fix anything that uses encode_decode, ascii_to_num or num_to_ascii
     - Move template/display_cases.html to display_case.html
     - Rename as simply alerts
     - remove migrations, and reset the south config (live and dev)
@@ -61,3 +59,4 @@ SOLR DEPLOYMENT:
     - remove Sphinx logs
     - remove Sphinx indexes
     - remove Sphinx configs
+    - remove database table: drop table sph_counter;
