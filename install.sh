@@ -358,7 +358,7 @@ function installCourtListener {
     # this is the MEDIA_ROOT
     MEDIA_ROOT="$CL_INSTALL_DIR/court-listener/alert/assets/media/"
     TEMPLATE_DIRS="$CL_INSTALL_DIR/court-listener/alert/assets/templates/"
-    DUMP_DIR="$CL_INSTALL_DIR/court-listener/alert/assets/dumps/"
+    DUMP_DIR="$CL_INSTALL_DIR/court-listener/alert/assets/media/dumps/"
 
     # convert true and false (bash) to True and False (Python)
     if $DEVELOPMENT
@@ -846,7 +846,7 @@ function installDjangoCelery {
         
         
         echo "Installing init scripts in /etc/init.d/celeryd"
-        ln -s $CL_INSTALL_DIR/init-scripts/celeryd /etc/init.d/celeryd
+        ln -s $CL_INSTALL_DIR/court-listener/init-scripts/celeryd /etc/init.d/celeryd
         
         # Make an unprivileged, non-password-enabled user and group to run celery
         useradd celery
