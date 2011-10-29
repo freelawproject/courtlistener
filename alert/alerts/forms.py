@@ -14,7 +14,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from django import forms
+from django.forms import ModelForm
+from alert.userHandling.models import Alert
 
-class SearchForm(forms.Form):
-    q = forms.CharField()
+class CreateAlertForm(ModelForm):
+    # things can be overridden here, if desired. E.g:
+    # alertText = forms.TextField(required=True)
+    class Meta:
+        model = Alert
+        exclude = ('lastHitDate',)

@@ -25,10 +25,10 @@ CLEANUP
     - Move alert views to the alerts app <-- Done.
     - Remove the tools view - make it a flat page...if possible. <-- just moved it. 
  - URLs
-    - move the huge URLs file to various smaller ones
+    - move the huge URLs file to various smaller ones <-- later.
  - userHandling
-    - move favorites and favorite forms to favorites app
-    - ditto for alerts
+    - move favorites and favorite forms to favorites app <-- done
+    - ditto for alerts <-- done.
     
 QA:
  - Check for proper alert deletion and editing functionality, since code rewritten. Tests:
@@ -36,6 +36,7 @@ QA:
     - what happens if I try to hack the URL bar with non-ints?
         - if OK, try it without the int check in the delete_alert and edit_alert functions
  - Check that the tools page works
+ - Test that length of the search isn't limited
  
     
  

@@ -25,7 +25,7 @@
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
 
-from alert.search.forms import CreateAlertForm
+from alert.alerts.forms import CreateAlertForm
 from alert.userHandling.models import Alert
 
 from django.contrib import messages
