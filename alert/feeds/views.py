@@ -21,7 +21,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import feedgenerator
 from django.utils.feedgenerator import Atom1Feed
 
-from alert.alertSystem.models import Court, Document
+from alert.alerts.models import Court, Document
 from alert.search.views import preparseQuery
 
 

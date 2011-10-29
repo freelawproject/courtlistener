@@ -24,8 +24,8 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alert.alertSystem.models import Court
-from alert.alertSystem.models import PACER_CODES
+from alert.alerts.models import Court
+from alert.alerts.models import PACER_CODES
 from alert.lib.string_utils import clean_string
 from alert.lib.string_utils import titlecase
 from alert.lib.scrape_tools import courtChanged

@@ -1895,7 +1895,7 @@ def main():
         if courtID == 0:
             # we use a while loop to do all courts.
             courtID = 1
-            from alertSystem.models import PACER_CODES
+            from alerts.models import PACER_CODES
             while courtID <= len(PACER_CODES):
                 if options.scrape: RESULT = scrapeCourt(courtID)
                 # this catches SIGINT, so the code can be killed safely.
@@ -1915,7 +1915,7 @@ def main():
         # them that is long enough such that all of them are hit over the course
         # of thirty minutes. When checking a court, see if its HTML has changed.
         # If so, run the scrapers. If not, check the next one.
-        from alertSystem.models import PACER_CODES
+        from alerts.models import PACER_CODES
         from time import sleep
         wait = (30*60)/len(PACER_CODES)
         courtID = 1

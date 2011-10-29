@@ -16,13 +16,13 @@
 
 # imports of local settings and views
 from alert import settings
-from alert.alertSystem.models import PACER_CODES
-from alert.alertSystem.views import delete_favorite
-from alert.alertSystem.views import edit_favorite
-from alert.alertSystem.views import redirect_short_url
-from alert.alertSystem.views import save_or_update_favorite
-from alert.alertSystem.views import viewCase
-from alert.alertSystem.views import viewDocumentListByCourt
+from alert.alerts.models import PACER_CODES
+from alert.alerts.views import delete_favorite
+from alert.alerts.views import edit_favorite
+from alert.alerts.views import redirect_short_url
+from alert.alerts.views import save_or_update_favorite
+from alert.alerts.views import viewCase
+from alert.alerts.views import viewDocumentListByCourt
 from alert.contact.views import contact, thanks
 from alert.data_dumper.views import dump_index, serve_or_gen_dump
 from alert.feeds.views import allCourtsFeed, courtFeed, searchFeed
@@ -48,7 +48,7 @@ from alert.userHandling.views import viewAlerts
 from alert.userHandling.views import viewSettings
 
 # this imports a variable that can be handed to the sitemap index generator function.
-from alert.alertSystem.sitemap import all_sitemaps as sitemaps
+from alert.alerts.sitemap import all_sitemaps as sitemaps
 from django.conf.urls.defaults import *
 
 # for the flatfiles in the sitemap
@@ -145,10 +145,10 @@ urlpatterns = patterns('',
     (r'^LiveSearchSiteAuth.xml$', validateForBing),
     (r'^googleef3d845637ccb353.html$', validateForGoogle),
     # Sitemap index generator
-    (r'^sitemap\.xml$', 'alert.alertSystem.sitemap.indexCopy',
+    (r'^sitemap\.xml$', 'alert.alerts.sitemap.indexCopy',
         {'sitemaps': sitemaps}),
     # this uses a custom sitemap generator that has a file-based cache.
-    (r'^sitemap-(?P<section>.+)\.xml$', 'alert.alertSystem.sitemap.cachedSitemap', {'sitemaps': sitemaps}),
+    (r'^sitemap-(?P<section>.+)\.xml$', 'alert.alerts.sitemap.cachedSitemap', {'sitemaps': sitemaps}),
     (r'^robots.txt$', robots)
 )
 
