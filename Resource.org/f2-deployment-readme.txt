@@ -67,6 +67,25 @@ SOLR DEPLOYMENT:
  - reindex <-- How big will our index be? Space on disk, or do we need to remove Sphinx first? 
  - hg pull -u
     - adjust the apache config to point to the new robots.txt location (tinyurl/robots.txt)
+ - Synchronize the database for the refactoring changes:
+    
+    update django_content_type set app_label = 'alerts' where name='alert';
+    update django_content_type set app_label = 'favorites' where name='favorite';
+    update django_content_type set app_label = 'scrapers' where name='url to hash';
+    update django_content_type set app_label = 'search' where name='court';
+    update django_content_type set app_label = 'search' where name='citation';
+    update django_content_type set app_label = 'search' where name='document';
+ 
+    python manage.py convert_to_south alerts
+    python manage.py convert_to_south userHandling
+    python manage.py convert_to_south favorites
+    python manage.py convert_to_south search
+    python manage.py convert_to_south scrapers
+    
+    
+ - python manage.py syncdb
+    
+ 
  - uninstall Sphinx!
     - remove Sphinx logs
     - remove Sphinx indexes
