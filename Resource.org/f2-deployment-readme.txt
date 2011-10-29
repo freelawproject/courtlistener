@@ -10,7 +10,23 @@ To do:
  
 Install
  - The sphinx config is out of date
+
+
+CLEANUP
+ - alertSystem
+    - Move views to favorites app
+    - Move models and admin to search app
+    - Move redirection code to its own app, including robots.txt
+    - Move template/display_cases.html to display_case.html
+    - Rename as simply alerts
+    - remove migrations, and reset the south config (live and dev)
+ - search
+    - Move alert views to the alerts app
+    - Remove the tools view - make it a flat page...if possible. 
+ - URLs
+    - move the huge URLs file to various smaller ones
  
+    
  
 SOLR + Haystack!
  - update restart command in log file

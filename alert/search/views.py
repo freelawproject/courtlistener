@@ -122,22 +122,6 @@ def messageUser(query, request):
     return True
 
 
-def home(request):
-    """Show the homepage"""
-    if "q" in request.GET:
-        # using get because that way users can email queries (a good thing)
-        form = SearchForm(request.GET)
-        if form.is_valid():
-            cd = form.cleaned_data
-            query = cd['q']
-            return HttpResponseRedirect('/search/results/?q=' + query)
-    else:
-        # the form is loading for the first time
-        form = SearchForm()
-    return render_to_response('home_page.html', {'form': form},
-        RequestContext(request))
-
-
 def getDateFiledOrReturnZero(doc):
     """Used for sorting dates. Returns the date field or the earliest date
     possible in Python. With this done, items without dates will be listed
@@ -146,7 +130,7 @@ def getDateFiledOrReturnZero(doc):
         return doc.dateFiled
     else:
         import datetime
-        return datetime.date(1,1,1)
+        return datetime.date(1, 1, 1)
 
 
 def showResults(request):
@@ -181,7 +165,7 @@ def showResults(request):
     else:
         # the form is loading for the first time, load it, then load the rest
         # of the page!
-        alertForm = CreateAlertForm(initial = {'alertText': query, 'alertFrequency': "dly"})
+        alertForm = CreateAlertForm(initial={'alertText': query, 'alertFrequency': "dly"})
 
     # alert the user if there are any errors in their query
     messageUser(query, request)
@@ -251,7 +235,7 @@ def editAlert(request, alertID):
             # they can edit it
             canEdit = True
             # pull it from the DB
-            alert = Alert.objects.get(alertUUID = alertID)
+            alert = Alert.objects.get(alertUUID=alertID)
             break
         else:
             canEdit = False
@@ -278,7 +262,7 @@ def editAlert(request, alertID):
 
         else:
             # the form is loading for the first time
-            form = CreateAlertForm(instance = alert)
+            form = CreateAlertForm(instance=alert)
 
         return render_to_response('profile/edit_alert.html', {'form': form, 'alertID': alertID}, RequestContext(request))
 
@@ -298,7 +282,7 @@ def deleteAlert(request, alertID):
             # they can edit it
             canEdit = True
             # pull it from the DB
-            alert = Alert.objects.get(alertUUID = alertID)
+            alert = Alert.objects.get(alertUUID=alertID)
             break
         else:
             canEdit = False
