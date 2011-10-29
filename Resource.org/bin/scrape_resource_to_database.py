@@ -28,7 +28,7 @@ from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned
 from django.template.defaultfilters import slugify
 from django.utils.encoding import smart_str, smart_unicode
-from alert.alertSystem.models import Court, Citation, Document
+from alert.alerts.models import Court, Citation, Document
 from alert.lib.parse_dates import parse_dates
 from alert.lib.string_utils import trunc
 from alert.lib.scrape_tools import hasDuplicate

@@ -29,8 +29,8 @@ setup_environ(settings)
 
 from django.contrib.flatpages.models import FlatPage
 from django.template import loader, Context
-from alert.alertSystem.models import Document
-from alert.alertSystem.models import PACER_CODES
+from alert.alerts.models import Document
+from alert.alerts.models import PACER_CODES
 
 def makeStats():
     '''

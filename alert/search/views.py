@@ -21,7 +21,7 @@ from django.shortcuts import render_to_response, HttpResponseRedirect
 from django.template import RequestContext
 from django.utils.text import get_text_list
 from alert.search.forms import SearchForm, CreateAlertForm
-from alert.alertSystem.models import Document
+from alert.alerts.models import Document
 from alert.userHandling.models import Alert, UserProfile
 import re
 

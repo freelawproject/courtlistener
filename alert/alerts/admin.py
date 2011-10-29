@@ -16,7 +16,7 @@
 
 
 from django.contrib import admin
-from alert.alertSystem.models import Citation, Court, Document
+from alert.alerts.models import Citation, Court, Document
 
 class DocumentAdminInline(admin.StackedInline):
     # ordering is brutal on MySQL. Don't put it here. Sorry.

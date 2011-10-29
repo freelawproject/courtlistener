@@ -21,7 +21,7 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alertSystem.models import Document, Citation
+from alerts.models import Document, Citation
 from alert.lib.db_tools import *
 
 from optparse import OptionParser

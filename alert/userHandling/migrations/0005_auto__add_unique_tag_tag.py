@@ -18,7 +18,7 @@ class Migration(SchemaMigration):
         db.delete_unique('Tag', ['tag'])
 
     models = {
-        'alertSystem.citation': {
+        'alerts.citation': {
             'Meta': {'ordering': "['caseNameFull']", 'object_name': 'Citation', 'db_table': "'Citation'"},
             'caseNameFull': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
             'caseNameShort': ('django.db.models.fields.CharField', [], {'db_index': 'True', 'max_length': '100', 'blank': 'True'}),
@@ -28,16 +28,16 @@ class Migration(SchemaMigration):
             'officialCitationWest': ('django.db.models.fields.CharField', [], {'max_length': '50', 'blank': 'True'}),
             'slug': ('django.db.models.fields.SlugField', [], {'max_length': '50', 'null': 'True', 'db_index': 'False'})
         },
-        'alertSystem.court': {
+        'alerts.court': {
             'Meta': {'ordering': "['courtUUID']", 'object_name': 'Court', 'db_table': "'Court'"},
             'courtShortName': ('django.db.models.fields.CharField', [], {'max_length': '100', 'blank': 'True'}),
             'courtURL': ('django.db.models.fields.URLField', [], {'max_length': '200'}),
             'courtUUID': ('django.db.models.fields.CharField', [], {'max_length': '100', 'primary_key': 'True'})
         },
-        'alertSystem.document': {
+        'alerts.document': {
             'Meta': {'ordering': "['-time_retrieved']", 'object_name': 'Document', 'db_table': "'Document'"},
-            'citation': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['alertSystem.Citation']", 'null': 'True', 'blank': 'True'}),
-            'court': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['alertSystem.Court']"}),
+            'citation': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['alerts.Citation']", 'null': 'True', 'blank': 'True'}),
+            'court': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['alerts.Court']"}),
             'dateFiled': ('django.db.models.fields.DateField', [], {'db_index': 'True', 'null': 'True', 'blank': 'True'}),
             'documentHTML': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
             'documentPlainText': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
@@ -45,29 +45,29 @@ class Migration(SchemaMigration):
             'documentType': ('django.db.models.fields.CharField', [], {'max_length': '50', 'blank': 'True'}),
             'documentUUID': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'download_URL': ('django.db.models.fields.URLField', [], {'max_length': '200'}),
-            'excerptSummary': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['alertSystem.ExcerptSummary']", 'null': 'True', 'blank': 'True'}),
-            'judge': ('django.db.models.fields.related.ManyToManyField', [], {'symmetrical': 'False', 'to': "orm['alertSystem.Judge']", 'null': 'True', 'blank': 'True'}),
+            'excerptSummary': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['alerts.ExcerptSummary']", 'null': 'True', 'blank': 'True'}),
+            'judge': ('django.db.models.fields.related.ManyToManyField', [], {'symmetrical': 'False', 'to': "orm['alerts.Judge']", 'null': 'True', 'blank': 'True'}),
             'local_path': ('django.db.models.fields.files.FileField', [], {'max_length': '100', 'blank': 'True'}),
-            'party': ('django.db.models.fields.related.ManyToManyField', [], {'symmetrical': 'False', 'to': "orm['alertSystem.Party']", 'null': 'True', 'blank': 'True'}),
+            'party': ('django.db.models.fields.related.ManyToManyField', [], {'symmetrical': 'False', 'to': "orm['alerts.Party']", 'null': 'True', 'blank': 'True'}),
             'source': ('django.db.models.fields.CharField', [], {'max_length': '3', 'blank': 'True'}),
             'time_retrieved': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'})
         },
-        'alertSystem.excerptsummary': {
+        'alerts.excerptsummary': {
             'Meta': {'object_name': 'ExcerptSummary', 'db_table': "'ExcerptSummary'"},
             'autoExcerpt': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
             'courtSummary': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
             'excerptUUID': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'})
         },
-        'alertSystem.judge': {
+        'alerts.judge': {
             'Meta': {'ordering': "['court', 'canonicalName']", 'object_name': 'Judge', 'db_table': "'Judge'"},
             'canonicalName': ('django.db.models.fields.CharField', [], {'max_length': '150'}),
-            'court': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['alertSystem.Court']"}),
+            'court': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['alerts.Court']"}),
             'endDate': ('django.db.models.fields.DateField', [], {}),
             'judgeAvatar': ('django.db.models.fields.files.ImageField', [], {'max_length': '100', 'blank': 'True'}),
             'judgeUUID': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'startDate': ('django.db.models.fields.DateField', [], {})
         },
-        'alertSystem.party': {
+        'alerts.party': {
             'Meta': {'ordering': "['partyExtracted']", 'object_name': 'Party', 'db_table': "'Party'"},
             'partyExtracted': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
             'partyUUID': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'})
@@ -125,7 +125,7 @@ class Migration(SchemaMigration):
         },
         'userHandling.favorite': {
             'Meta': {'object_name': 'Favorite', 'db_table': "'Favorite'"},
-            'doc_id': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['alertSystem.Document']"}),
+            'doc_id': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['alerts.Document']"}),
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'notes': ('django.db.models.fields.CharField', [], {'max_length': '500'}),
             'tags': ('django.db.models.fields.related.ManyToManyField', [], {'symmetrical': 'False', 'to': "orm['userHandling.Tag']", 'null': 'True', 'blank': 'True'})

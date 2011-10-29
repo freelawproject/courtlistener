@@ -16,6 +16,7 @@ CLEANUP
  - alertSystem
     - Move views to favorites app
     - Move models and admin to search app
+        - Fix links in HTML to citations
     - Move redirection code to its own app, including robots.txt
     - Move template/display_cases.html to display_case.html
     - Rename as simply alerts

@@ -14,8 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from alert.alertSystem.models import Document
-from alert.alertSystem.models import PACER_CODES
+from alert.alerts.models import Document
+from alert.alerts.models import PACER_CODES
 from alert import settings
 from django.contrib.sitemaps import GenericSitemap
 from django.contrib.sitemaps import FlatPageSitemap
@@ -45,7 +45,7 @@ def indexCopy(request, sitemaps):
             pages = site().paginator.num_pages
         else:
             pages = site.paginator.num_pages
-        sitemap_url = urlresolvers.reverse('alert.alertSystem.sitemap.cachedSitemap', kwargs = {'section': section})
+        sitemap_url = urlresolvers.reverse('alert.alerts.sitemap.cachedSitemap', kwargs = {'section': section})
         sites.append('%s://%s%s' % (protocol, current_site.domain, sitemap_url))
         if pages > 1:
             for page in range(2, pages + 1):
