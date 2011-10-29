@@ -18,7 +18,7 @@ from alert.search.models import Court
 from alert.search.models import Document
 from alert.tinyurl.encode_decode import ascii_to_num
 from alert.userHandling.forms import FavoriteForm
-from alert.userHandling.models import Favorite
+from alert.favorites.models import Favorite
 from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import render_to_response
 from django.shortcuts import get_object_or_404

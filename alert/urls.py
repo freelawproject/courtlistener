@@ -52,7 +52,7 @@ from alert.userHandling.views import viewAlerts
 from alert.userHandling.views import viewSettings
 
 # this imports a variable that can be handed to the sitemap index generator function.
-from alert.alerts.sitemap import all_sitemaps as sitemaps
+from alert.casepage.sitemap import all_sitemaps as sitemaps
 from django.conf.urls.defaults import *
 
 # for the flatfiles in the sitemap
@@ -119,11 +119,12 @@ urlpatterns = patterns('',
     (r'^confirm-password/(?P<uidb36>.*)/(?P<token>.*)/$', password_reset_confirm, {'post_reset_redirect': '/reset-password/complete/'}),
     (r'^reset-password/complete/$', signIn, {'template_name': 'registration/password_reset_complete.html'}),
 
-    # Alert/search pages
+    # Search pages
     # These URLs support either GET requests or things like /alert/preview/searchterm.
-    #url(r'^(alert/preview)/$', showResults, name="alertResults"),
     url(r'^search/results/$', showResults, name="searchResults"),
     (r'^search/$', showResults), #for the URL hackers in the crowd
+
+    # Alert pages
     (r'^alert/edit/(\d{1,6})/$', edit_alert),
     (r'^alert/delete/(\d{1,6})/$', delete_alert),
     (r'^alert/delete/confirm/(\d{1,6})/$', delete_alert_confirm),
