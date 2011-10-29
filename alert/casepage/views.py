@@ -61,6 +61,6 @@ def view_case(request, court, pk, casename):
         favorite_form = FavoriteForm(initial={'doc_id': doc.documentUUID,
             'name' : doc.citation.caseNameFull})
 
-    return render_to_response('display_cases.html', {'title': title,
+    return render_to_response('view_case.html', {'title': title,
         'doc': doc, 'court': ct, 'favorite_form': favorite_form, 'query': query},
         RequestContext(request))
