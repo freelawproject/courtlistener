@@ -38,8 +38,8 @@
 # - install django from source
 # - install CourtListener from source
 # - put some basic data in the database
-# - install & configure Sphinx
-# - install django-sphinx
+# - install & configure Solr
+# - install haystack
 # - configure mysql & courtlistener
 # - install django-celery, celery and rabbitmq
 # - install the django-debug toolbar
@@ -74,8 +74,8 @@ OPTIONS
             Configure the MySQL database
     --ffmpeg
             install the FFmpeg audio transcoding library from source
-    --sphinx
-            install the Sphinx search engine
+    --solr
+            install the Solr search engine
     --django
             install Django
     --courtListener
@@ -86,8 +86,8 @@ OPTIONS
             install the django debug toolbar
     --djangoCelery
             install django-celery to handle task queues
-    --djangoSphinx
-            install the django-sphinx connector
+    --haystack
+            install the Haystack connector
     --djangoExtensions
             install the django-extensions package from github
     --south
@@ -103,7 +103,7 @@ EXIT STATUS
         3   Missing critical dependency
         4   Error installing django from source
         5   Error getting user input
-        6   Error installing Sphinx
+        6   Error installing Solr
         7   Error configuring MySQL
 
 AUTHOR AND COPYRIGHT
@@ -118,8 +118,7 @@ function getUserInput {
 cat<<EOF
 Welcome to the install script. This script will install the CourtListener system
 on your Debian-based Linux computer. We will begin by gathering several pieces
-of input from you, and then we will install django, courtlistener, sphinx,
-django-sphinx, django-debug toolbar, MySQL, and all their dependencies.
+of input from you, and then we will install everything that's needed.
 
 EOF
     read -p "Shall we continue? (y/n): " proceed
@@ -464,18 +463,11 @@ function configureMySQL {
 
     # create and configure the db.
     # first, we make a SQL script, then we execute it, then we delete it.
-    # this will also set up a table for Sphinx's main+delta scheme. Kludgy.
     cat <<EOF > install.sql
 CREATE DATABASE $MYSQL_DB_NAME CHARACTER SET utf8;
 GRANT ALL ON $MYSQL_DB_NAME.* to $MYSQL_USERNAME WITH GRANT OPTION;
 SET PASSWORD FOR $MYSQL_USERNAME = password('$MYSQL_PWD');
 FlUSH PRIVILEGES;
-USE $MYSQL_DB_NAME;
-CREATE TABLE sph_counter
-(
-    counter_id INTEGER PRIMARY KEY NOT NULL,
-    max_doc_id INTEGER NOT NULL
-);
 EOF
     echo -e "\nWe are about to create the database $MYSQL_DB_NAME, with username
 $MYSQL_USERNAME and password $MYSQL_PWD."
@@ -484,7 +476,7 @@ $MYSQL_USERNAME and password $MYSQL_PWD."
     mysql -u'root' -p < install.sql
     if [ $? == "0" ]
     then
-        # rm install.sql
+        rm install.sql
         echo -e '\nMySQL configured successfully.'
     else
         echo -e '\nError configuring MySQL. Aborting.'
@@ -493,6 +485,10 @@ $MYSQL_USERNAME and password $MYSQL_PWD."
 }
 
 
+#############################################################################
+# This function lives on only because eventually we'll want it. For now, it #
+# does nothing. I have often wanted to delete it...yet somehow it survives. #
+#############################################################################
 function installFFmpeg {
     echo -e "\n####################"
     echo "Installing FFmpeg..."
@@ -558,18 +554,18 @@ installing from source is necessary.\n"
 }
 
 
-function installSphinx {
+function installSolr {
     echo -e "\n####################"
     echo "Installing Sphinx..."
     echo "####################"
-    read -p "Would you like to install Sphinx? (y/n): " proceed
+    read -p "Would you like to install Solr? (y/n): " proceed
     if [ $proceed == "n" ]
     then
         echo -e '\nGreat. Moving on.'
         return 0
     fi
 
-    echo "Downloading Sphinx..."
+    echo "Downloading Solr..."
     cd $CL_INSTALL_DIR/court-listener/Sphinx
     wget http://sphinxsearch.com/downloads/sphinx-0.9.9.tar.gz
     tar xzvf sphinx-0.9.9.tar.gz; rm sphinx-0.9.9.tar.gz
