@@ -16,7 +16,7 @@
 
 from alert import settings
 from alert.lib.string_utils import trunc
-from alert.lib.encode_decode import num_to_ascii
+from alert.tinyurl.encode_decode import num_to_ascii
 from django.template.defaultfilters import slugify
 from django.utils.text import get_valid_filename
 from django.utils.encoding import smart_unicode

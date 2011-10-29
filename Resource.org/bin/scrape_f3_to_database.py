@@ -30,7 +30,7 @@ from django.template.defaultfilters import slugify
 from django.utils.encoding import smart_str, smart_unicode
 from alert.alerts.models import Court, Citation, Document
 from alert.lib.parse_dates import parse_dates
-from alert.lib.encode_decode import num_to_ascii
+from alert.tinyurl.encode_decode import num_to_ascii
 from alert.lib.string_utils import clean_string, harmonize, titlecase, trunc
 from alert.lib.scrape_tools import hasDuplicate
 from dup_finder import check_dup
