@@ -17,23 +17,27 @@
 # imports of local settings and views
 from alert import settings
 from alert.alerts.models import PACER_CODES
-from alert.alerts.views import delete_favorite
-from alert.alerts.views import edit_favorite
-from alert.alerts.views import redirect_short_url
-from alert.alerts.views import save_or_update_favorite
-from alert.alerts.views import viewCase
-from alert.alerts.views import viewDocumentListByCourt
-from alert.contact.views import contact, thanks
-from alert.data_dumper.views import dump_index, serve_or_gen_dump
-from alert.feeds.views import allCourtsFeed, courtFeed, searchFeed
-from alert.pinger.views import validateForBing, validateForGoogle, validateForYahoo
+from alert.casepage.views import view_case
+from alert.contact.views import contact
+from alert.contact.views import thanks
+from alert.data_dumper.views import dump_index
+from alert.data_dumper.views import serve_or_gen_dump
+from alert.favorites.views import delete_favorite
+from alert.favorites.views import edit_favorite
+from alert.favorites.views import save_or_update_favorite
+from alert.feeds.views import allCourtsFeed
+from alert.feeds.views import courtFeed
+from alert.feeds.views import searchFeed
+from alert.pinger.views import validateForBing
+from alert.pinger.views import validateForGoogle
+from alert.pinger.views import validateForYahoo
 from alert.robots.views import robots
 from alert.search.views import deleteAlert
 from alert.search.views import deleteAlertConfirm
 from alert.search.views import editAlert
-from alert.search.views import home
 from alert.search.views import showResults
 from alert.search.views import toolsPage
+from alert.tinyurl.views import redirect_short_url
 from alert.userHandling.views import confirmEmail
 from alert.userHandling.views import deleteProfile
 from alert.userHandling.views import deleteProfileDone
@@ -76,7 +80,7 @@ urlpatterns = patterns('',
     (r'^opinions/(' + "|".join(pacer_codes) + '|all)/$', viewDocumentListByCourt),
 
     # Display a case, a named URL because the get_absolute_url uses it.
-    url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', viewCase, name = "viewCase"),
+    url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case, name="viewCase"),
     # Redirect users
     (r'^x/(.*)/$', redirect_short_url),
 
@@ -85,7 +89,7 @@ urlpatterns = patterns('',
     (r'^contact/thanks/$', thanks),
 
     # Various sign in/out etc. functions as provided by django
-    url(r'^sign-in/$', signIn, name = "sign-in"),
+    url(r'^sign-in/$', signIn, name="sign-in"),
     (r'^sign-out/$', signOut),
 
     # Homepage and favicon
@@ -94,13 +98,13 @@ urlpatterns = patterns('',
 
     # Settings pages
     (r'^profile/$', redirect_to_settings),
-    url(r'^profile/settings/$', viewSettings, name = 'viewSettings'),
+    url(r'^profile/settings/$', viewSettings, name='viewSettings'),
     (r'^profile/favorites/$', view_favorites),
     (r'^profile/alerts/$', viewAlerts),
     (r'^profile/password/change/$', password_change),
     (r'^profile/delete/$', deleteProfile),
     (r'^profile/delete/done/$', deleteProfileDone),
-    url(r'^register/$', register, name = "register"),
+    url(r'^register/$', register, name="register"),
     (r'^register/success/$', registerSuccess),
     # Favorites pages
     (r'^favorite/create-or-update/$', save_or_update_favorite),
@@ -121,7 +125,7 @@ urlpatterns = patterns('',
     # Alert/search pages
     # These URLs support either GET requests or things like /alert/preview/searchterm.
     #url(r'^(alert/preview)/$', showResults, name="alertResults"),
-    url(r'^search/results/$', showResults, name = "searchResults"),
+    url(r'^search/results/$', showResults, name="searchResults"),
     (r'^search/$', showResults), #for the URL hackers in the crowd
     (r'^alert/edit/(\d{1,6})/$', editAlert),
     (r'^alert/delete/(\d{1,6})/$', deleteAlert),
