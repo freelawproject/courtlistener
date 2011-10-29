@@ -106,28 +106,6 @@ def invalidate_sitemap_cache_by_court(court):
     os.chdir(original_dir)
 
 
-class urlToHash(models.Model):
-    '''A class to hold URLs and the hash of their contents. This could be added 
-    to the Court table, except that courts often have more than one URL they 
-    parse.
-    '''
-    hashUUID = models.AutoField("a unique ID for each hash/url pairing", primary_key=True)
-    url = models.CharField("the URL that is hashed",
-        max_length=300,
-        blank=True,
-        editable=False)
-    SHA1 = models.CharField("a SHA1 of the court's website HTML",
-        max_length=40,
-        blank=True,
-        editable=False)
-
-    def __unicode__(self):
-        return self.url
-
-    class Meta:
-        db_table = "urlToHash"
-
-
 class Court(models.Model):
     '''A class to represent some information about each court, can be extended
     as needed.'''
