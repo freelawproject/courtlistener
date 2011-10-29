@@ -50,7 +50,7 @@ def redirect_short_url(request, encoded_string):
     num = ascii_to_num(encoded_string)
 
     # Get the document or throw a 404
-    doc = get_object_or_404(Document, documentUUID = num)
+    doc = get_object_or_404(Document, documentUUID=num)
 
     # Construct the URL
     slug = doc.citation.slug
@@ -75,8 +75,8 @@ def viewCase(request, court, pk, casename):
     pk = ascii_to_num(pk)
 
     # Look up the court, document, title and favorite information
-    doc = get_object_or_404(Document, documentUUID = pk)
-    ct = get_object_or_404(Court, courtUUID = court)
+    doc = get_object_or_404(Document, documentUUID=pk)
+    ct = get_object_or_404(Court, courtUUID=court)
     title = doc.citation.caseNameShort
     user = request.user
 
@@ -89,11 +89,11 @@ def viewCase(request, court, pk, casename):
 
     try:
         # Get the favorite, if possible
-        fave = Favorite.objects.get(doc_id = doc.documentUUID, users__user = user)
-        favorite_form = FavoriteForm(instance = fave)
+        fave = Favorite.objects.get(doc_id=doc.documentUUID, users__user=user)
+        favorite_form = FavoriteForm(instance=fave)
     except (ObjectDoesNotExist, TypeError):
         # Not favorited or anonymous user
-        favorite_form = FavoriteForm(initial = {'doc_id': doc.documentUUID,
+        favorite_form = FavoriteForm(initial={'doc_id': doc.documentUUID,
             'name' : doc.citation.caseNameFull})
 
     return render_to_response('display_cases.html', {'title': title,
@@ -118,13 +118,13 @@ def save_or_update_favorite(request):
         except:
             return HttpResponse("Unknown doc_id")
 
-        doc = Document.objects.get(documentUUID = doc_id)
+        doc = Document.objects.get(documentUUID=doc_id)
         try:
-            fave = Favorite.objects.get(doc_id = doc, users__user = request.user)
+            fave = Favorite.objects.get(doc_id=doc, users__user=request.user)
         except ObjectDoesNotExist:
             fave = Favorite()
 
-        f = FavoriteForm(request.POST, instance = fave)
+        f = FavoriteForm(request.POST, instance=fave)
         if f.is_valid():
             new_fave = f.save()
 
@@ -153,14 +153,14 @@ def edit_favorite(request, fave_id):
         return HttpResponseRedirect('/')
 
     try:
-        fave = Favorite.objects.get(id = fave_id, users__user = request.user)
+        fave = Favorite.objects.get(id=fave_id, users__user=request.user)
         doc = fave.doc_id
     except ObjectDoesNotExist:
         # User lacks access to this fave or it doesn't exist.
         return HttpResponseRedirect('/')
 
     if request.method == 'POST':
-        form = FavoriteForm(request.POST, instance = fave)
+        form = FavoriteForm(request.POST, instance=fave)
         if form.is_valid():
             form.save()
             messages.add_message(request, messages.SUCCESS,
@@ -171,7 +171,7 @@ def edit_favorite(request, fave_id):
 
     else:
         # the form is loading for the first time
-        form = FavoriteForm(instance = fave)
+        form = FavoriteForm(instance=fave)
 
     return render_to_response('profile/edit_favorite.html', {'favorite_form': form,
         'doc' : doc}, RequestContext(request))
@@ -191,7 +191,7 @@ def delete_favorite(request):
         except:
             return HttpResponse("Unknown doc_id")
 
-        fave = Favorite.objects.get(doc_id = doc_id, users__user = request.user)
+        fave = Favorite.objects.get(doc_id=doc_id, users__user=request.user)
 
         # Finally, delete the favorite
         fave.delete()
@@ -209,41 +209,3 @@ def delete_favorite(request):
 
     else:
         return HttpResponse("Not an ajax request.")
-
-
-@cache_page(60 * 15)
-def viewDocumentListByCourt(request, court):
-    '''
-    Show documents for a court, ten at a time
-    '''
-    if court == "all":
-        # we get all records, sorted by dateFiled.
-        docs = Document.objects.order_by("-dateFiled")
-        ct = "All courts"
-    else:
-        ct = Court.objects.get(courtUUID = court)
-        docs = Document.objects.filter(court = ct).order_by("-dateFiled")
-
-    # we will show ten docs/page
-    paginator = Paginator(docs, 10)
-
-    # Make sure page request is an int. If not, deliver first page.
-    try:
-        page = int(request.GET.get('page', '1'))
-    except ValueError:
-        page = 1
-
-    # only allow queries up to page 100.
-    if page > 100:
-        return render_to_response('view_documents_by_court.html',
-            {'over_limit': True}, RequestContext(request))
-
-    # If page request is out of range, deliver last page of results.
-    try:
-        documents = paginator.page(page)
-    except (EmptyPage, InvalidPage):
-        documents = paginator.page(paginator.num_pages)
-
-    courts = Court.objects.all()
-    return render_to_response('view_documents_by_court.html', { 'title': ct,
-        "documents": documents, 'courts': courts }, RequestContext(request))
