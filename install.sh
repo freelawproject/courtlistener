@@ -50,7 +50,7 @@
 # It's a monster...hopefully one that works.
 
 
-function printHelp {
+function print_help {
 cat <<EOF
 NAME
     install.sh
@@ -68,7 +68,7 @@ OPTIONS
     --install   Install all components of the courtlistener software
 
     Lightly Tested Options
-    --checkdeps
+    --check_deps
             Verify that the required dependencies are installed.
     --mysql
             Configure the MySQL database
@@ -78,17 +78,17 @@ OPTIONS
             install the Solr search engine
     --django
             install Django
-    --courtListener
+    --courtlistener
             set up the CL repository, and configure it with django
-    --importData
+    --importdata
             import some basic data into the DB, setting up the courts
-    --debugToolbar
+    --debugtoolbar
             install the django debug toolbar
-    --djangoCelery
+    --djangocelery
             install django-celery to handle task queues
     --haystack
             install the Haystack connector
-    --djangoExtensions
+    --djangoextensions
             install the django-extensions package from github
     --south
             install the South DB migration tool from mercurial
@@ -114,7 +114,7 @@ EOF
 }
 
 
-function getUserInput {
+function get_user_input {
 cat<<EOF
 Welcome to the install script. This script will install the CourtListener system
 on your Debian-based Linux computer. We will begin by gathering several pieces
@@ -209,7 +209,7 @@ Press enter to proceed, or Ctrl+C to abort. " proceed
 }
 
 
-function checkDeps {
+function check_deps {
     # this function checks for various dependencies that the script assumes are
     # installed for its own functionality.
     deps=(aptitude antiword checkinstall g++ gcc git-core ipython libmysqlclient-dev libmysql++-dev libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget)
@@ -264,7 +264,7 @@ function checkDeps {
 }
 
 
-function installDjango {
+function install_django {
     # this process simply installs django. Configuration is done later.
     echo -e "\n####################"
     echo "Installing django..."
@@ -308,7 +308,7 @@ function installDjango {
 }
 
 
-function installCourtListener {
+function install_court_listener {
     # this is probably the most tricky part of the operation. We get the courtlistener
     # code, place it in the correct location, and then configure the heck out of
     # it.
@@ -450,7 +450,7 @@ EOF
 }
 
 
-function configureMySQL {
+function configure_mysql {
     echo -e "\n####################"
     echo "Configuring MySQL..."
     echo "####################"
@@ -489,7 +489,7 @@ $MYSQL_USERNAME and password $MYSQL_PWD."
 # This function lives on only because eventually we'll want it. For now, it #
 # does nothing. I have often wanted to delete it...yet somehow it survives. #
 #############################################################################
-function installFFmpeg {
+function install_ffmpeg {
     echo -e "\n####################"
     echo "Installing FFmpeg..."
     echo "####################"
@@ -554,9 +554,9 @@ installing from source is necessary.\n"
 }
 
 
-function installSolr {
+function install_solr {
     echo -e "\n####################"
-    echo "Installing Sphinx..."
+    echo "Installing Solr..."
     echo "####################"
     read -p "Would you like to install Solr? (y/n): " proceed
     if [ $proceed == "n" ]
@@ -566,264 +566,42 @@ function installSolr {
     fi
 
     echo "Downloading Solr..."
-    cd $CL_INSTALL_DIR/court-listener/Sphinx
-    wget http://sphinxsearch.com/downloads/sphinx-0.9.9.tar.gz
-    tar xzvf sphinx-0.9.9.tar.gz; rm sphinx-0.9.9.tar.gz
-    cd sphinx-0.9.9
-    ./configure --with-prefix=/usr/local/sphinx
-    make
-    if [ $? == "0" ]
-    then
-        make install
-        if [ $? == '0' ]
-        then
-            cd ../
-            rm -r sphinx-0.9.9
-        fi
-    else
-        echo "Error building Sphinx. Aborting."
-        exit 6
-    fi
-
+    cd $CL_INSTALL_DIR/court-listener/Solr
+    
+    # download Solr
+    TODO
+    
     # make a directory where logs will be created and set up the logger
-    mkdir /var/log/sphinx/
-    ln -s $CL_INSTALL_DIR/court-listener/log-scripts/sphinx /etc/logrotate.d/sphinx
+    mkdir /var/log/solr/
+    ln -s $CL_INSTALL_DIR/court-listener/log-scripts/solr /etc/logrotate.d/solr
 
     # next we configure the thing...this is going to be ugly.
-    # note: EOF without quotes interprets variables and backslashes. To preserve
-    # things with either \ or $foo, use 'EOF'
-cat <<EOF > $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf
-source Document
-{
-    type                = mysql
-    sql_host            = localhost
-    sql_user            = $MYSQL_USERNAME
-    sql_pass            = $MYSQL_PWD
-    sql_db              = $MYSQL_DB_NAME
-    sql_port            =
-EOF
-
-# In this section, we need the $variables to not get interpreted by bash...
-cat <<'EOF' >> $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf
-    sql_query_pre       = SET NAMES utf8
-    sql_query_pre       = REPLACE INTO sph_counter SELECT 1, MAX(documentUUID) FROM Document
-    sql_query_post      =
-    sql_query_range     = SELECT min(documentUUID), max(documentUUID) from Document
-    sql_range_step      = 5000
-    sql_query           = \
-        SELECT Document.documentUUID, Citation.caseNameShort, Citation.caseNameFull as casename, Citation.docketNumber as docketNumber, Citation.westCite, Citation.lexisCite, Document.documentSHA1, TO_DAYS(Document.dateFiled) as dateFiled, TO_DAYS(Document.time_retrieved) as time_retrieved, Document.court_id as court, Document.documentPlainText as docText, Document.documentHTML as docHTML, Document.documentType as docStatus\
-        FROM Document, Citation\
-        WHERE Document.citation_id = Citation.citationUUID\
-            AND Document.documentUUID >= $start\
-            AND Document.documentUUID <= $end\
-            AND Document.documentUUID <= (SELECT max_doc_id FROM sph_counter WHERE counter_id=1);
-
-    sql_query_info      = SELECT * FROM `Document` WHERE `documentUUID` = $id
-
-    # ForeignKey's
-    sql_attr_uint       = Document.citation_id
-    sql_attr_uint       = Document.excerptSummary_id
-
-    # DateField's and DateTimeField's
-    sql_attr_timestamp   = dateFiled
-    sql_attr_timestamp   = time_retrieved
-}
-
-source delta : Document
-{
-    sql_query_pre = SET NAMES utf8
-    sql_query           = \
-        SELECT Document.documentUUID, Citation.caseNameShort, Citation.caseNameFull as casename, Citation.docketNumber as docketNumber, Citation.westCite, Citation.lexisCite, Document.documentSHA1, TO_DAYS(Document.dateFiled) as dateFiled, TO_DAYS(Document.time_retrieved) as time_retrieved, Document.court_id as court, Document.documentPlainText as docText, Document.documentHTML as docHTML, Document.documentType as docStatus\
-        FROM Document, Citation\
-        WHERE Document.citation_id = Citation.citationUUID\
-	AND Document.documentUUID >= $start\
-	AND Document.documentUUID <= $end\
-	AND Document.documentUUID > (SELECT max_doc_id FROM sph_counter WHERE counter_id=1);
-}
-EOF
-
-# in this section, we need the $variables to be interpreted...
-cat <<EOF >> $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf
-index Document
-{
-    source = Document
-    path = $CL_INSTALL_DIR/court-listener/Sphinx/data/Document
-    wordforms = $CL_INSTALL_DIR/court-listener/Sphinx/conf/wordforms.txt
-    stopwords = $CL_INSTALL_DIR/court-listener/Sphinx/conf/stopwords.txt
-    exceptions = $CL_INSTALL_DIR/court-listener/Sphinx/conf/exceptions.txt
-    docinfo = extern
-
-    # sets the minimum word length to index
-    min_word_len = 1
-    charset_type = utf-8
-
-    # these set up star searching (at a performance hit), but *test, *test* and test* all will work.
-    # Also note that infix enables *start end* and *middle*, while prefix just enables end*. Thus,
-    # an error will be thrown by the indexer if you try to set both of these configs!
-    # min_infix_len= 3
-    # infix_fields = caseName, docText, docHTML, Citation.caseNameFull, caseNumber
-    min_prefix_len = 3
-    prefix_fields = caseName, docText, docHTML, Citation.caseNameFull, docketNumber, westCite, lexisCite
-    enable_star = 1
-
-    # enables exact word form searching (=cat)
-    index_exact_words = 1
-
-    # enables stemming of english words longer than 3 characters
-    morphology      = stem_en
-    min_stemming_len = 4
-
-    # the default character set, with the addition of the hyphen and the removal of the Cryllic set.
-    charset_table = 0..9, A..Z->a..z, _, -, U+00A7, a..z
-
-    # Enable HTML stripping
-    html_strip = 1
-}
-
-index delta : Document
-{
-    source = delta
-    path = $CL_INSTALL_DIR/court-listener/Sphinx/data/Delta
-}
-
-
-indexer
-{
-	# memory limit, in bytes, kiloytes (16384K) or megabytes (256M)
-	# optional, default is 32M, max is 2047M, recommended is 256M to 1024M
-	mem_limit = 512M
-
-	# maximum IO calls per second (for I/O throttling)
-	# optional, default is 0 (unlimited)
-	max_iops = 0
-}
-
-searchd
-{
-	# IP address to bind on
-	# optional, default is 0.0.0.0 (ie. listen on all interfaces)
-	#
-	# address = 127.0.0.1
-	# address = 192.168.0.1
-
-
-	# searchd TCP port number
-	# mandatory, default is 3312
-	port = 3312
-
-	# log file, searchd run info is logged here
-	# optional, default is 'searchd.log'
-	log = /var/log/sphinx/searchd.log
-
-	# query log file, all search queries are logged here
-	# optional, default is empty (do not log queries)
-	query_log = /var/log/sphinx/query.log
-
-	# client read timeout, seconds
-	# optional, default is 5
-	read_timeout = 5
-
-	# maximum amount of children to fork (concurrent searches to run)
-	# optional, default is 0 (unlimited)
-	max_children = 30
-
-	# PID file, searchd process ID file name
-	# mandatory
-	pid_file = /var/log/sphinx/searchd.pid
-
-	# max amount of matches the daemon ever keeps in RAM, per-index
-	# WARNING, THERE'S ALSO PER-QUERY LIMIT, SEE SetLimits() API CALL
-	# default is 1000 (just like Google)
-	max_matches = 1000
-
-	# seamless rotate, prevents rotate stalls if precaching huge datasets
-	# optional, default is 1
-	seamless_rotate	= 1
-
-	# whether to forcibly preopen all indexes on startup
-	# optional, default is 0 (do not preopen)
-	preopen_indexes	= 0
-
-	# whether to unlink .old index copies on succesful rotation.
-	# optional, default is 1 (do unlink)
-	unlink_old = 1
-}
-EOF
-
+    TODO, if config can't go into Hg.
+    
     # and hopefully that worked...
-    echo -e "\nSphinx installed successfully."
+    echo -e "\nSolr installed successfully."
 }
 
 
-function installDjangoSphinx {
+function install_haystack {
     echo -e "\n###########################"
-    echo "Installing django-sphinx..."
+    echo "Installing Haystack..."
     echo "###########################"
-    read -p "Would you like to install django-sphinx? (y/n): " proceed
+    read -p "Would you like to install Haystack? (y/n): " proceed
     if [ $proceed == "n" ]
     then
         echo -e '\nGreat. Moving on.'
         return 0
     fi
 
-    # we install django-sphinx, and patch it per bug #X
-    cd $DJANGO_INSTALL_DIR
-    git clone git://github.com/dcramer/django-sphinx.git django-sphinx
-    cd django-sphinx
-
-    echo -e "\nPatching django-sphinx, since bug fixes aren't handled by its author..."
-
-    git apply << 'EOF'
-From a3c8c847d1ba6742f0a8e2ae9c69de3d30db42c1 Mon Sep 17 00:00:00 2001
-From: root <mike@courtlistener.com>
-Date: Mon, 12 Jul 2010 15:20:01 -0700
-Subject: [PATCH] Fix for stupid bugs.
-
----
- djangosphinx/utils/config.py |    6 +++---
- setup.py                     |    1 -
- 2 files changed, 3 insertions(+), 4 deletions(-)
-
-diff --git a/djangosphinx/utils/config.py b/djangosphinx/utils/config.py
-index 24a1907..18abb10 100644
---- a/djangosphinx/utils/config.py
-+++ b/djangosphinx/utils/config.py
-@@ -11,8 +11,8 @@ import djangosphinx.apis.current as sphinxapi
- __all__ = ('generate_config_for_model', 'generate_config_for_models')
-
- def _get_database_engine():
--    if settings.DATABASE_ENGINE == 'mysql':
--        return settings.DATABASE_ENGINE
-+    if settings.DATABASES['default']['ENGINE'] == 'mysql':
-+        return settings.DATABASES['default']['ENGINE']
-     elif settings.DATABASE_ENGINE.startswith('postgresql'):
-         return 'pgsql'
-     raise ValueError, "Only MySQL and PostgreSQL engines are supported by Sphinx."
-
-diff --git a/setup.py b/setup.py
-index 43b8582..c04bf9e 100755
---- a/setup.py
-+++ b/setup.py
-@@ -10,7 +10,6 @@ setup(
-     author='David Cramer',
-     author_email='dcramer@gmail.com',
-     url='http://github.com/dcramer/django-sphinx',
--    install_requires=['django'],
-     description = 'An integration layer bringing Django and Sphinx Search together.',
-     packages=find_packages(),
-     include_package_data=True,
---
-1.7.0.4
-
-EOF
-
-    python setup.py install
-
-    echo -e '\ndjango-sphinx installed successfully.'
+    # we install Haystack
+    easy_install django-haystack==1.2.5
+    
+    echo -e '\nHaystack installed successfully.'
 }
 
 
-function installDjangoCelery {
+function install_django_celery {
     echo -e '\n##################################'
     echo 'Installing django-celery and Celery...'
     echo '##################################
@@ -864,7 +642,7 @@ function installDjangoCelery {
 }
 
 
-function installDebugToolbar {
+function install_debug_toolbar {
     if [ $INSTALL_DEBUG_TOOLBAR == 'y' ]
     then
         echo -e '\n##################################'
@@ -885,7 +663,7 @@ function installDebugToolbar {
 }
 
 
-function installDjangoExtensions {
+function install_django_extensions {
     if [ $INSTALL_DJANGO_EXTENSIONS == 'y' ]
     then
         echo -e '\n###############################'
@@ -910,7 +688,7 @@ function installDjangoExtensions {
 }
 
 
-function installSouth {
+function install_south {
     echo -e '\n###################'
     echo 'Installing South...'
     echo '###################'
@@ -932,7 +710,7 @@ function installSouth {
 }
 
 
-function importData {
+function import_data {
     # TODO: replace with an API call (once the API exists)
     echo -e "\n############################"
     echo "Importing data into MySQL..."
@@ -981,13 +759,13 @@ function finalize {
 
 function main {
     # run the program!
-    getUserInput
-    checkDeps
+    get_user_input
+    check_deps
     installDjango
     installCourtListener
-    configureMySQL
-    installSphinx
-    installDjangoSphinx
+    configure_mysql
+    installSolr
+    installHaystack
     installDjangoCelery
     installDebugToolbar
     installDjangoExtensions
@@ -1004,16 +782,7 @@ and running the command:
 If that works, you should be able to see the CourtListener website in your browser
 at http://localhost:8000.
 
-If you would like Sphinx to start at bootup, add this line to the root's cron file:
-@reboot /usr/local/bin/searchd -c $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf
 
-That will enable you to search, but your content will also need to be indexed regularly.
-Cron jobs such as the following might work well:
-20	*	*	*	1-5	/usr/local/bin/indexer -c $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf delta --rotate > /dev/null
-45	1	1	*/2	*	/usr/local/bin/indexer -c $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf Document --rotate
-
-The first updates the delta index once every 20 minutes. The second updates the main
-index every other week.
 "
     read -p "Press enter to exit the install script, and begin hacking. Whew."
     exit 0
@@ -1033,21 +802,21 @@ then
     exit 2
 else
     case $1 in
-        --help) printHelp;;
+        --help) print_help;;
         --install) main;;
-        --checkdeps) checkDeps;;
-        --mysql) getUserInput; configureMySQL;;
-        --ffmpeg) getUserInput; installFFmpeg;;
-        --sphinx) getUserInput; installSphinx;;
-        --django) getUserInput; installDjango;;
-        --courtListener) getUserInput; installCourtListener;;
-        --importData) getUserInput; configureMySQL; importData;;
-        --debugToolbar) getUserInput; installDebugToolbar;;
-        --djangoCelery) getUserInput; installDjangoCelery;;
-        --djangoSphinx) getUserInput; installDjangoSphinx;;
-        --djangoExtensions) getUserInput; installDjangoExtensions;;
-        --south) getUserInput; installSouth; finalize;;
-        --finalize) getUserInput; finalize;;
+        --checkdeps) check_deps;;
+        --mysql) get_user_input; configure_mysql;;
+        --ffmpeg) get_user_input; install_ffmpeg;;
+        --solr) get_user_input; install_solr;;
+        --django) get_user_input; install_django;;
+        --courtlistener) get_user_input; install_court_listener;;
+        --importdata) get_user_input; configure_mysql; import_data;;
+        --debugtoolbar) get_user_input; install_debug_toolbar;;
+        --djangocelery) get_user_input; install_django_celery;;
+        --djangosolr) get_user_input; install_haystack;;
+        --djangoExtensions) get_user_input; install_django_extensions;;
+        --south) get_user_input; install_south; finalize;;
+        --finalize) get_user_input; finalize;;
         *) echo "install.sh: Invalid argument. Try the --help argument."
            exit 2;
     esac

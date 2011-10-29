@@ -13,9 +13,10 @@ Install
  
  
 SOLR + Haystack!
- - set up logging
+ - update restart command in log file
  - remove all sphinx references
  - install haystack and Solr - update the installer as needed
+    - update the installer cronjobs notes
  - create celery task for indexing cases as they come in
  - create database crawler to import entire thing into Solr
  - build faceted search
@@ -34,7 +35,7 @@ SOLR + Haystack!
 
 SOLR DEPLOYMENT:
  - install Solr
- - update Sphinx/Solr cron jobs
+ - update Sphinx/Solr cron jobs <-- this should match the installer cron jobs.
  - reindex <-- How big will our index be? Space on disk, or do we need to remove Sphinx first? 
  - hg pull -u
  - uninstall Sphinx!
