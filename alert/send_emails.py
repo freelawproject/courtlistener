@@ -21,7 +21,7 @@ setup_environ(settings)
 from userHandling.models import UserProfile
 from userHandling.models import FREQUENCY
 from search.views import preparseQuery
-from alerts.models import Document
+from search.models import Document
 from django.template import loader, Context
 from django.core.mail import send_mail, EmailMultiAlternatives
 

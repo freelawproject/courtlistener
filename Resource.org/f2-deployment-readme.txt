@@ -15,16 +15,24 @@ Install
 CLEANUP
  - alertSystem
     - Move views to favorites app <-- Done.
-    - Move models and admin to search app
-        - Fix links in HTML to citations
+    - Move models and admin to search app 
+        - Fix links in HTML to citations <-- Done.
+        - Move urlToHash to scraper module. <-- Done.
     - Move template/display_cases.html to display_case.html <-- Done.
     - Rename as simply alerts <-- Done.
     - remove migrations, and reset the south config (live and dev)
  - search
-    - Move alert views to the alerts app
-    - Remove the tools view - make it a flat page...if possible. 
+    - Move alert views to the alerts app <-- Done.
+    - Remove the tools view - make it a flat page...if possible. <-- just moved it. 
  - URLs
     - move the huge URLs file to various smaller ones
+    
+QA:
+ - Check for proper alert deletion and editing functionality, since code rewritten. Tests:
+    - can I delete/edit YOUR alert?
+    - what happens if I try to hack the URL bar with non-ints?
+        - if OK, try it without the int check in the delete_alert and edit_alert functions
+ - Check that the tools page works
  
     
  

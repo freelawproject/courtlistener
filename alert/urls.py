@@ -16,7 +16,7 @@
 
 # imports of local settings and views
 from alert import settings
-from alert.alerts.models import PACER_CODES
+from alert.search.models import PACER_CODES
 from alert.casepage.views import view_case
 from alert.contact.views import contact
 from alert.contact.views import thanks
@@ -32,9 +32,9 @@ from alert.pinger.views import validateForBing
 from alert.pinger.views import validateForGoogle
 from alert.pinger.views import validateForYahoo
 from alert.robots.views import robots
-from alert.search.views import deleteAlert
-from alert.search.views import deleteAlertConfirm
-from alert.search.views import editAlert
+from alert.alerts.views import delete_alert
+from alert.alerts.views import delete_alert_confirm
+from alert.alerts.views import edit_alert
 from alert.search.views import showResults
 from alert.search.views import toolsPage
 from alert.tinyurl.views import redirect_short_url
@@ -75,9 +75,6 @@ urlpatterns = patterns('',
     # Admin docs and site
     (r'^admin/doc/', include('django.contrib.admindocs.urls')),
     (r'^admin/', include(admin.site.urls)),
-
-    # Court listing pages
-    (r'^opinions/(' + "|".join(pacer_codes) + '|all)/$', viewDocumentListByCourt),
 
     # Display a case, a named URL because the get_absolute_url uses it.
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case, name="viewCase"),
@@ -127,9 +124,9 @@ urlpatterns = patterns('',
     #url(r'^(alert/preview)/$', showResults, name="alertResults"),
     url(r'^search/results/$', showResults, name="searchResults"),
     (r'^search/$', showResults), #for the URL hackers in the crowd
-    (r'^alert/edit/(\d{1,6})/$', editAlert),
-    (r'^alert/delete/(\d{1,6})/$', deleteAlert),
-    (r'^alert/delete/confirm/(\d{1,6})/$', deleteAlertConfirm),
+    (r'^alert/edit/(\d{1,6})/$', edit_alert),
+    (r'^alert/delete/(\d{1,6})/$', delete_alert),
+    (r'^alert/delete/confirm/(\d{1,6})/$', delete_alert_confirm),
     (r'^tools/$', toolsPage),
 
     # Dump index and generation pages

@@ -25,7 +25,7 @@
 #  ways how any modified versions differ from the original version.
 from django.db import models
 from django.utils.text import get_valid_filename
-# from alerts.models import Document
+# from search.models import Document
 
 
 # Flash is a jerk about only accepting these three rates.

@@ -32,7 +32,7 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alerts.models import *
+from search.models import *
 from lib.db_tools import queryset_iterator
 
 import datetime

@@ -31,9 +31,9 @@ from alert import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alert.alerts.models import Citation
-from alert.alerts.models import Document
-from alert.alerts.models import urlToHash
+from alert.search.models import Citation
+from alert.search.models import Document
+from alert.search.models import urlToHash
 from alert.lib.string_utils import clean_string
 from alert.lib.string_utils import harmonize
 from alert.lib.string_utils import titlecase

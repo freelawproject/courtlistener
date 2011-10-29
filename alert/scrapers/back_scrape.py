@@ -33,7 +33,7 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alerts.models import *
+from search.models import *
 from tinyurl.encode_decode import *
 from lib.string_utils import *
 from lib.scrape_tools import *
@@ -1433,7 +1433,7 @@ def main():
     if courtID == 0:
         # we use a while loop to do all courts.
         courtID = 1
-        from alerts.models import PACER_CODES
+        from search.models import PACER_CODES
         while courtID <= len(PACER_CODES):
             if options.scrape: back_scrape_court(courtID, verbosity)
             if options.parse:  parseCourt(courtID, verbosity)
