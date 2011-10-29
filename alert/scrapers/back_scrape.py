@@ -34,7 +34,7 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from alerts.models import *
-from lib.encode_decode import *
+from tinyurl.encode_decode import *
 from lib.string_utils import *
 from lib.scrape_tools import *
 from django.core.files.base import ContentFile

@@ -18,6 +18,7 @@ CLEANUP
     - Move models and admin to search app
         - Fix links in HTML to citations
     - Move redirection code to its own app, including robots.txt
+        - Fix anything that uses encode_decode, ascii_to_num or num_to_ascii
     - Move template/display_cases.html to display_case.html
     - Rename as simply alerts
     - remove migrations, and reset the south config (live and dev)
@@ -55,6 +56,7 @@ SOLR DEPLOYMENT:
  - update Sphinx/Solr cron jobs <-- this should match the installer cron jobs.
  - reindex <-- How big will our index be? Space on disk, or do we need to remove Sphinx first? 
  - hg pull -u
+    - adjust the apache config to point to the new robots.txt location (tinyurl/robots.txt)
  - uninstall Sphinx!
     - remove Sphinx logs
     - remove Sphinx indexes
