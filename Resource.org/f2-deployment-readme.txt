@@ -14,11 +14,11 @@ Install
 
 CLEANUP
  - alertSystem
-    - Move views to favorites app
+    - Move views to favorites app <-- Done.
     - Move models and admin to search app
         - Fix links in HTML to citations
-    - Move template/display_cases.html to display_case.html
-    - Rename as simply alerts
+    - Move template/display_cases.html to display_case.html <-- Done.
+    - Rename as simply alerts <-- Done.
     - remove migrations, and reset the south config (live and dev)
  - search
     - Move alert views to the alerts app
