@@ -26,12 +26,12 @@ from django.http import HttpResponse, Http404
 from django.template import loader
 from django.utils.encoding import smart_str
 from django.views.decorators.cache import never_cache
-import os
-from string import count
 
+from string import count
+import os
 
 @never_cache
-def indexCopy(request, sitemaps):
+def index_copy(request, sitemaps):
     '''
     Copied from django.contrib.sitemaps.index. Had to, because it has the
     urlresolver hardcoded. Grr. Only difference is the urlresolvers.reverse
@@ -45,17 +45,17 @@ def indexCopy(request, sitemaps):
             pages = site().paginator.num_pages
         else:
             pages = site.paginator.num_pages
-        sitemap_url = urlresolvers.reverse('alert.alerts.sitemap.cachedSitemap', kwargs = {'section': section})
+        sitemap_url = urlresolvers.reverse('alert.alerts.sitemap.cachedSitemap', kwargs={'section': section})
         sites.append('%s://%s%s' % (protocol, current_site.domain, sitemap_url))
         if pages > 1:
             for page in range(2, pages + 1):
                 sites.append('%s://%s%s?p=%s' % (protocol, current_site.domain, sitemap_url, page))
     xml = loader.render_to_string('sitemap_index.xml', {'sitemaps': sites})
-    return HttpResponse(xml, mimetype = 'application/xml')
+    return HttpResponse(xml, mimetype='application/xml')
 
 
 @never_cache
-def cachedSitemap(request, sitemaps, section = None):
+def cached_sitemap(request, sitemaps, section=None):
     '''Copied from django.contrib.sitemaps.view, and modified to add a
     file-based cache.'''
 
@@ -84,7 +84,7 @@ def cachedSitemap(request, sitemaps, section = None):
             section + "-p" + str(page) + ".xml")
         f = open(filename, 'r')
         xml = f.read()
-        resp = HttpResponse(xml, mimetype = 'application/xml')
+        resp = HttpResponse(xml, mimetype='application/xml')
         f.close()
         return resp
     except IOError:
@@ -110,7 +110,7 @@ def cachedSitemap(request, sitemaps, section = None):
             sitemap.write(xml)
             sitemap.close()
 
-        return HttpResponse(xml, mimetype = 'application/xml')
+        return HttpResponse(xml, mimetype='application/xml')
 
 
 class LimitedGenericSitemap(GenericSitemap):
@@ -121,7 +121,7 @@ class LimitedGenericSitemap(GenericSitemap):
     # if this is changed, the sitemap function (below) needs updating
     limit = 250
 
-    def __init__(self, info_dict, priority = None, changefreq = None):
+    def __init__(self, info_dict, priority=None, changefreq=None):
         # Extend the GenericSitemap __init__ method
         GenericSitemap.__init__(self, info_dict)
         self.priority = priority
@@ -161,11 +161,11 @@ class MyFlatPageSitemap(FlatPageSitemap):
 all_sitemaps = {}
 for courtTuple in PACER_CODES:
     info_dict = {
-        'queryset'  : Document.objects.filter(court = courtTuple[0], blocked = False),
+        'queryset'  : Document.objects.filter(court=courtTuple[0], blocked=False),
         'date_field': 'time_retrieved',
     }
 
-    sitemap = LimitedGenericSitemap(info_dict, priority = 0.5, changefreq = "never")
+    sitemap = LimitedGenericSitemap(info_dict, priority=0.5, changefreq="never")
 
     # dict key is provided as 'section' in sitemap index view
     all_sitemaps[courtTuple[0]] = sitemap

@@ -26,6 +26,9 @@ CLEANUP
     - Remove the tools view - make it a flat page...if possible. <-- just moved it. 
  - URLs
     - move the huge URLs file to various smaller ones
+ - userHandling
+    - move favorites and favorite forms to favorites app
+    - ditto for alerts
     
 QA:
  - Check for proper alert deletion and editing functionality, since code rewritten. Tests:
