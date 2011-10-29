@@ -14,16 +14,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from alert.alerts.forms import CreateAlertForm
+from alert.search.forms import SearchForm
+from alert.search.models import Document
+from alert.userHandling.models import UserProfile
+
 from django.contrib import messages
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
 from django.shortcuts import render_to_response
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
 from django.utils.text import get_text_list
-from alert.search.forms import SearchForm
-from alert.search.forms import CreateAlertForm
-from alert.search.models import Document
-from alert.userHandling.models import UserProfile
+
 import re
 
 
