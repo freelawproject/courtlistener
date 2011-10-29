@@ -14,8 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from alert.alerts.models import Document
-from alert.alerts.models import PACER_CODES
+from alert.search.models import Document
+from alert.search.models import PACER_CODES
 from alert import settings
 from django.contrib.sitemaps import GenericSitemap
 from django.contrib.sitemaps import FlatPageSitemap

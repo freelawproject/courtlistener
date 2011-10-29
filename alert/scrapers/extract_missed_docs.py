@@ -33,8 +33,8 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alert.alerts.models import Document
-from alert.alerts.models import PACER_CODES
+from alert.search.models import Document
+from alert.search.models import PACER_CODES
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
 from scrapers.tasks import extract_doc_content

@@ -14,8 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from alert.alerts.models import Court
-from alert.alerts.models import Document
+from alert.search.models import Court
+from alert.search.models import Document
 from alert.tinyurl.encode_decode import ascii_to_num
 from alert.userHandling.forms import FavoriteForm
 from alert.userHandling.models import Favorite

@@ -19,7 +19,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.localflavor.us.models import USStateField
 from django.core.validators import MaxLengthValidator
-from alert.alerts.models import Document
+from alert.search.models import Document
 
 FREQUENCY = (
     ('dly', 'Daily'),

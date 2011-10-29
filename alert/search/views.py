@@ -14,15 +14,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
-from django.shortcuts import render_to_response, HttpResponseRedirect
+from django.shortcuts import render_to_response
+from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
 from django.utils.text import get_text_list
-from alert.search.forms import SearchForm, CreateAlertForm
-from alert.alerts.models import Document
-from alert.userHandling.models import Alert, UserProfile
+from alert.search.forms import SearchForm
+from alert.search.forms import CreateAlertForm
+from alert.search.models import Document
+from alert.userHandling.models import UserProfile
 import re
 
 
@@ -220,93 +221,5 @@ def showResults(request):
         RequestContext(request))
 
 
-@login_required
-def editAlert(request, alertID):
-    user = request.user.get_profile()
-
-    try:
-        alertID = int(alertID)
-    except:
-        return HttpResponseRedirect('/')
-
-    # check if the user can edit this, or if they are url hacking...
-    for alert in user.alert.all():
-        if alertID == alert.alertUUID:
-            # they can edit it
-            canEdit = True
-            # pull it from the DB
-            alert = Alert.objects.get(alertUUID=alertID)
-            break
-        else:
-            canEdit = False
-
-    if canEdit == False:
-        # we just send them home, they can continue playing
-        return HttpResponseRedirect('/')
-
-    elif canEdit:
-        # they can edit the item, therefore, we load the form.
-        if request.method == 'POST':
-            form = CreateAlertForm(request.POST)
-            if form.is_valid():
-                cd = form.cleaned_data
-
-                # save the changes
-                a = CreateAlertForm(cd, instance=alert)
-                a.save() # this method saves it and returns it
-                messages.add_message(request, messages.SUCCESS,
-                    'Your alert was saved successfully.')
-
-                # redirect to the alerts page
-                return HttpResponseRedirect('/profile/alerts/')
-
-        else:
-            # the form is loading for the first time
-            form = CreateAlertForm(instance=alert)
-
-        return render_to_response('profile/edit_alert.html', {'form': form, 'alertID': alertID}, RequestContext(request))
-
-
-@login_required
-def deleteAlert(request, alertID):
-    user = request.user.get_profile()
-
-    try:
-        alertID = int(alertID)
-    except:
-        return HttpResponseRedirect('/')
-
-    # check if the user can edit this, or if they are url hacking...
-    for alert in user.alert.all():
-        if alertID == alert.alertUUID:
-            # they can edit it
-            canEdit = True
-            # pull it from the DB
-            alert = Alert.objects.get(alertUUID=alertID)
-            break
-        else:
-            canEdit = False
-
-    if canEdit == False:
-        # we send them home
-        return HttpResponseRedirect('/')
-
-    elif canEdit:
-        # Then we delete it, and redirect them.
-        alert.delete()
-        messages.add_message(request, messages.SUCCESS,
-            'Your alert was deleted successfully.')
-        return HttpResponseRedirect('/profile/alerts/')
-
-
-@login_required
-def deleteAlertConfirm(request, alertID):
-    try:
-        alertID = int(alertID)
-    except:
-        return HttpResponseRedirect('/')
-    return render_to_response('profile/delete_confirm.html', {'alertID': alertID}, RequestContext(request))
-
-
 def toolsPage(request):
-    return render_to_response('search/tools.html', {}, RequestContext(request))
+    return render_to_response('tools.html', {}, RequestContext(request))

@@ -26,7 +26,7 @@
 #  ways how any modified versions differ from the original version.
 # Create your views here.
 
-from alert.alerts.models import Document
+from alert.search.models import Document
 from alert.tinyurl.encode_decode import ascii_to_num
 from django.contrib.sites.models import Site
 from django.http import HttpResponsePermanentRedirect

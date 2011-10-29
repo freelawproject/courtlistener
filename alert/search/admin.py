@@ -14,9 +14,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from alert.search.models import Citation
+from alert.search.models import Court
+from alert.search.models import Document
 
 from django.contrib import admin
-from alert.alerts.models import Citation, Court, Document
 
 class DocumentAdminInline(admin.StackedInline):
     # ordering is brutal on MySQL. Don't put it here. Sorry.
