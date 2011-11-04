@@ -30,26 +30,9 @@ import re
 
 
 def preparseQuery(query):
-    query = query.lower()
-
-    # @doctext needs to become @(doctext,dochtml).
-    # @(doctext) needs to become @(doctext, dochtml).
-    # @(doctext,court) needs to be come @(doctext,dochtml,court)
-    query = re.sub('doctext', 'doctext,dochtml', query)
-    # @doctext now is @doctext,dochtml --> BAD
-    # @(doctext) is now @(doctext,dochtml) --> GOOD
-    # @(doctext,court) is now @(doctext,dochtml,court) --> GOOD
-    query = re.sub('@doctext,dochtml', '@(doctext,dochtml)', query)
-    # All are now good.
-
     return query
 
 def adjustQueryForUser(query):
-    """This is where the "Did you mean" type of thing lives, for example,
-    where we correct the user's input if needed.
-
-    Currently, though, it's not implemented.
-    """
     return query
 
 
@@ -134,6 +117,9 @@ def getDateFiledOrReturnZero(doc):
     else:
         import datetime
         return datetime.date(1, 1, 1)
+
+def home(request):
+    return render_to_response('tools.html', {}, RequestContext(request))
 
 
 def showResults(request):

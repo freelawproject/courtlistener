@@ -25,41 +25,56 @@
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
 
+start () {
+    echo -n "Starting the scraper...."
+    daemon --command="/usr/bin/python /var/www/court-listener/alert/scrapers/scrape_and_extract.py -d" --respawn --output=/var/log/scraper/daemon_log.out --name=scraper --user=www-data --verbose
+    RETVAL=$?
+    
+    if [ $RETVAL = 0 ]
+    then
+        echo "done."
+    else
+        echo "failed. See error code for more information."
+    fi
+    return $RETVAL
+}
 
-SCRAPER_LOCATION=/var/www/court-listener/alert/scrapers/scrape_and_extract.py
+stop () {
+    echo -n "Killing the scraper..."
+    daemon --stop --name='scraper'
+    RETVAL=$?
+    
+    if [ $RETVAL = 0 ]
+    then
+        echo "done."
+    else
+        echo "failed. See error code for more information."
+    fi
+    return $RETVAL
+}
 
+status () {
+    # report on the status of the daemon
+    daemon --running --verbose --name=scraper
+    return $?
+}
 
 case "${1:-''}" in
-  'start')
-           echo -n "Starting the scraper...."
-           su - www-data -c "/usr/bin/python $SCRAPER_LOCATION -d" &
-           echo $$ > /tmp/scraper.pid
-           sleep 1
-           echo "Done"
-        ;;
-  'stop')
-           echo -n "Killing the scraper..."
-           sleep 1
-           # this is a mess. Basically, it finds the scraper's pid, and feeds that to kill with signal 2.
-           kill -2 `ps -eo pid,command | grep 'scrape_and_extract.py -d' | grep -v 'grep' | awk -F' ' '{print $1}';`
-           rm /tmp/scraper.pid
-           echo "Done"
-        ;;
-  'restart')
-           # Kill, then start it again.
-           echo -n "Killing the scraper..."
-           kill -2 `ps -eo pid,command | grep 'scrape_and_extract.py -d' | grep -v 'grep' | awk -F' ' '{print $1}';`
-           rm /tmp/scraper.pid
-           sleep 1
-           echo "Dead"
-           echo -n "Restarting the scraper...."
-           su - www-data -c "/usr/bin/python $SCRAPER_LOCATION -d" &
-           echo $$ > /tmp/scraper.pid
-           sleep 1
-           echo "Done"
-        ;;
-  *)      # no parameter specified
-        echo "Usage: $SELF start|stop|restart"
+    'start')
+        start
+    ;;
+    'stop')
+        stop
+    ;;
+    'restart')
+        stop
+        start
+    ;;
+    'status')
+        status
+    ;;
+    *)
+        echo "Usage: $SELF start|stop|kill|restart|status"
         exit 1
-        ;;
+    ;;
 esac

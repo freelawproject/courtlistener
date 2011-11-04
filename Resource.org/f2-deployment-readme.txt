@@ -7,84 +7,78 @@ To do:
     - Fix the "change this doc" docs in F3
     - export/import the latest court db, and update the install script.
     - add fiscr to the various places on the site where it's needed...
- 
-Install
- - The sphinx config is out of date
 
 
-CLEANUP
- - alertSystem
-    - Move views to favorites app <-- Done.
-    - Move models and admin to search app 
-        - Fix links in HTML to citations <-- Done.
-        - Move urlToHash to scraper module. <-- Done.
-    - Move template/display_cases.html to display_case.html <-- Done.
-    - Rename as simply alerts <-- Done.
-    - remove migrations, and reset the south config (live and dev)
- - search
-    - Move alert views to the alerts app <-- Done.
-    - Remove the tools view - make it a flat page...if possible. <-- just moved it. 
- - URLs
-    - move the huge URLs file to various smaller ones <-- later.
- - userHandling
-    - move favorites and favorite forms to favorites app <-- done
-    - ditto for alerts <-- done.
     
 QA:
  - Check for proper alert deletion and editing functionality, since code rewritten. Tests:
     - can I delete/edit YOUR alert?
     - what happens if I try to hack the URL bar with non-ints?
         - if OK, try it without the int check in the delete_alert and edit_alert functions
- - Check that the tools page works
+ - Check that the tools page works (code moved but untested)
  - Test that length of the search isn't limited
+ - Test that Univ. and other v's are fixed so they are only italicized when necessary
+ - Ensure that the rabbit-mq, celery and solr will start up at reboot
  
     
  
 SOLR + Haystack!
- - update restart command in log file
- - remove all sphinx references
+ - update restart command in Solr logrotate config file to use init script
  - install haystack and Solr - update the installer as needed
     - update the installer cronjobs notes
  - create celery task for indexing cases as they come in
  - create database crawler to import entire thing into Solr
  - build faceted search
-    - remove homepage!
-    - remove browse code!
+    - remove homepage! <-- Done
+    - remove browse code! <-- Done
     - get Haystack talking to Solr to perform a basic search
+        - Research: what does multicore mean - do we need it?
     - get results sorted out so they look good
     - build up the facets/sort fields etc.
  - update all places that search can be performed in the project
     - RSS feeds
     - Alerts
+        - There were X new results for your Alert. Here are the first 15.
+        - TOC at top of alerts with HTML anchors.
     - Front end
  - update flat advanced search page
  - add xxx-xx-xxxx etc to the stopwords list (#190)
+ - change case title from Courtlistener.com / Browse / Foo --> / Cases / Foo
+ - consider/resolve old URL support. What does /opinions/all/ do? What about /opinions/ca2/, etc? 
 
 
 SOLR DEPLOYMENT:
- - install Solr
- - update Sphinx/Solr cron jobs <-- this should match the installer cron jobs.
- - reindex <-- How big will our index be? Space on disk, or do we need to remove Sphinx first? 
+ - install Solr (see script)
+ - install daemon
+ - remove Sphinx @restart cron job <-- this should match the installer cron jobs.
+ - add any Solr indexing cron jobs
+ - Run:
+    sudo update-rc.d solr defaults
+    sudo update-rc.d celeryd defaults
+    # Fix the init.d link for the scraper:
+    sudo rm /etc/init.d/scraper
+    sudo ln -s /var/www/court-listener/init-scripts/scraper /etc/init.d/scraper
+    sudo update-rc.d scraper defaults
+    
  - hg pull -u
     - adjust the apache config to point to the new robots.txt location (tinyurl/robots.txt)
+ - reindex <-- How big will our index be? Space on disk, or do we need to remove Sphinx first? 
  - Synchronize the database for the refactoring changes:
-    
-    update django_content_type set app_label = 'alerts' where name='alert';
-    update django_content_type set app_label = 'favorites' where name='favorite';
-    update django_content_type set app_label = 'scrapers' where name='url to hash';
-    update django_content_type set app_label = 'search' where name='court';
-    update django_content_type set app_label = 'search' where name='citation';
-    update django_content_type set app_label = 'search' where name='document';
- 
-    python manage.py convert_to_south alerts
-    python manage.py convert_to_south userHandling
-    python manage.py convert_to_south favorites
-    python manage.py convert_to_south search
-    python manage.py convert_to_south scrapers
-    
-    
- - python manage.py syncdb
-    
+        update django_content_type set app_label = 'alerts' where name='alert';
+        update django_content_type set app_label = 'favorites' where name='favorite';
+        update django_content_type set app_label = 'scrapers' where name='url to hash';
+        update django_content_type set app_label = 'search' where name='court';
+        update django_content_type set app_label = 'search' where name='citation';
+        update django_content_type set app_label = 'search' where name='document';
+        
+        python manage.py reset south
+        python manage.py convert_to_south alerts
+        python manage.py convert_to_south userHandling
+        python manage.py convert_to_south favorites
+        python manage.py convert_to_south search
+        python manage.py convert_to_south scrapers
+      
+        python manage.py syncdb
  
  - uninstall Sphinx!
     - remove Sphinx logs

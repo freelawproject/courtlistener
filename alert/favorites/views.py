@@ -1,5 +1,5 @@
 from alert.search.models import Document
-from alert.userHandling.forms import FavoriteForm
+from alert.favorites.forms import FavoriteForm
 from alert.favorites.models import Favorite
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
