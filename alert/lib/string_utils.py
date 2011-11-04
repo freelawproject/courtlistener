@@ -31,7 +31,7 @@ from django.utils.encoding import smart_str
 from django.utils.encoding import smart_unicode
 
 # For use in titlecase
-BIG = 'AFL|AKA|A/K/A|BMG|CDC|CDT|CEO|CIO|CNMI|D/B/A|DOJ|DVA|EFF|FCC|FTC|IBM|II|III|IV|LLC|LLP|MCI|MJL|MSPB|UPS|RSS|SEC|USA|USC|USPS|WTO'
+BIG = '3D|AFL|AKA|A/K/A|BMG|CDC|CDT|CEO|CIO|CNMI|D/B/A|DOJ|DVA|EFF|FCC|FTC|IBM|II|III|IV|LLC|LLP|MCI|MJL|MSPB|UPS|RSS|SEC|USA|USC|USPS|WTO'
 SMALL = 'a|an|and|as|at|but|by|en|for|if|in|is|of|on|or|the|to|v\.?|via|vs\.?'
 NUMS = '0|1|2|3|4|5|6|7|8|9'
 PUNCT = r"""!"#$¢%&'‘()*+,\-./:;?@[\\\]_—`{|}~"""
@@ -48,8 +48,7 @@ APOS_SECOND = re.compile(r"^[dol]{1}['‘]{1}[a-z]+$", re.I)
 ALL_CAPS = re.compile(r'^[A-Z\s%s%s%s]+$' % (PUNCT, WEIRD_CHARS, NUMS))
 UC_INITIALS = re.compile(r"^(?:[A-Z]{1}\.{1}|[A-Z]{1}\.{1}[A-Z]{1})+,?$")
 MAC_MC = re.compile(r"^([Mm]a?c)(\w+)")
-
-def titlecase(text, DEBUG = False):
+def titlecase(text, DEBUG=False):
     '''
     Titlecases input text
 
@@ -239,13 +238,13 @@ def clean_string(string):
 
     # if not already unicode, make it unicode, dropping invalid characters
     # if not isinstance(string, unicode):
-    string = smart_unicode(string, encoding = 'utf-8', errors = 'ignore')
+    string = smart_unicode(string, encoding='utf-8', errors='ignore')
 
     # get rid of '\t\n\x0b\x0c\r ', and replace them with a single space.
     string = " ".join(string.split())
 
     # get rid of bad character encodings
-    string = smart_str(string, errors = 'ignore')
+    string = smart_str(string, errors='ignore')
 
     # return something vaguely sane
     return string
@@ -255,7 +254,6 @@ def clean_string(string):
 # For use in anonymize function
 SSN_AND_ITIN = re.compile('(\s|^)(\d{3}-\d{2}-\d{4})(\s|$)')
 EIN = re.compile('(\s|^)(\d{2}-\d{7})(\s|$)')
-
 def anonymize(string):
     """Convert SSNs, EIN and alienIDs to X's."""
 
@@ -292,7 +290,7 @@ def trunc(s, length):
         return s
     else:
         # find the rightmost space
-        end = s.rfind(' ', 0 , length)
+        end = s.rfind(' ', 0, length)
         if end == -1:
             # no spaces found, just use max position
             end = length

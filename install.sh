@@ -212,7 +212,7 @@ Press enter to proceed, or Ctrl+C to abort. " proceed
 function check_deps {
     # this function checks for various dependencies that the script assumes are
     # installed for its own functionality.
-    deps=(aptitude antiword checkinstall g++ gcc git-core ipython libmysqlclient-dev libmysql++-dev libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget)
+    deps=(aptitude antiword checkinstall daemon g++ gcc git-core ipython libmysqlclient-dev libmysql++-dev libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget)
     echo -e "\n########################"
     echo "Checking dependencies..."
     echo "########################"
@@ -344,7 +344,8 @@ function install_court_listener {
 
     # we link up the init scripts
     echo "Installing init scripts in /etc/init.d/scraper"
-    ln -s $CL_INSTALL_DIR/court-listener/init-scripts/scraper-init-script.sh /etc/init.d/scraper
+    ln -s $CL_INSTALL_DIR/court-listener/init-scripts/scraper /etc/init.d/scraper
+    update-rc.d scraper defaults
 
     # we create the logging file and set up logrotate scripts
     mkdir -p "/var/log/scraper"
@@ -565,16 +566,26 @@ function install_solr {
         return 0
     fi
 
-    echo "Downloading Solr..."
-    cd $CL_INSTALL_DIR/court-listener/Solr
+    # install pysolr
+    echo "Installing pysolr..."
+    easy_install pysolr
     
-    # download Solr
-    TODO
+    cd /usr/local
+    echo "Downloading Solr 4.0 development snapshot from 2011-11-04..."
+    wget https://builds.apache.org/job/Solr-trunk/lastBuild/artifact/artifacts/apache-solr-4.0-2011-11-04_09-29-42.tgz
+    
+    echo "Unpacking Solr to /usr/local/solr..."
+    tar -x -f apache-solr-4.0-2011-11-04_09-29-42.tgz
+    mv apache-solr-4.0-2011-11-04_09-29-42 solr 
+    rm apache-solr-4.0-2011-11-04_09-29-42.tgz 
     
     # make a directory where logs will be created and set up the logger
-    mkdir /var/log/solr/
     ln -s $CL_INSTALL_DIR/court-listener/log-scripts/solr /etc/logrotate.d/solr
-
+    
+    # Enable Solr at startup
+    ln -s $CL_INSTALL_DIR/court-listener/init-scripts/solr /etc/init.d/solr
+    update-rc.d solr defaults
+    
     # next we configure the thing...this is going to be ugly.
     TODO, if config can't go into Hg.
     
@@ -617,11 +628,7 @@ function install_django_celery {
         rabbitmqctl add_vhost "/celery"
         sudo rabbitmqctl add_user celery "$CELERY_PWD"
         sudo rabbitmqctl set_permissions -p "/celery" "celery" ".*" ".*" ".*"
-        
-        
-        echo "Installing init scripts in /etc/init.d/celeryd"
-        ln -s $CL_INSTALL_DIR/court-listener/init-scripts/celeryd /etc/init.d/celeryd
-        
+
         # Make an unprivileged, non-password-enabled user and group to run celery
         useradd celery
         
@@ -633,7 +640,11 @@ function install_django_celery {
         
         # set up the logger
         ln -s $CL_INSTALL_DIR/court-listener/log-scripts/celery /etc/logrotate.d/celery
-
+        
+        echo "Installing init scripts in /etc/init.d/celeryd"
+        ln -s $CL_INSTALL_DIR/court-listener/init-scripts/celeryd /etc/init.d/celeryd
+        update-rc.d celeryd defaults
+              
         echo -e '\nDjango-celery and Celery installed successfully.'
     else
         echo -e '\nGreat. Moving on.'
@@ -677,7 +688,7 @@ function install_django_extensions {
             return 0
         fi
 
-        # install the mo'
+        # install it
         cd $DJANGO_INSTALL_DIR
         git clone git://github.com/django-extensions/django-extensions.git django-extensions
         cd django-extensions
@@ -726,7 +737,7 @@ function import_data {
     # python manage.py dumpdata alerts.Court
     cd $CL_INSTALL_DIR/court-listener/alert
     cat <<EOF > /tmp/courts.json
-[{"pk": "ca1", "model": "alerts.court", "fields": {"URL": "http://www.ca1.uscourts.gov", "startDate": "1891-03-03", "shortName": "1st Cir.", "endDate": null}}, {"pk": "ca10", "model": "alerts.court", "fields": {"URL": "http://www.ca10.uscourts.gov", "startDate": "1929-02-28", "shortName": "10th Cir.", "endDate": null}}, {"pk": "ca11", "model": "alerts.court", "fields": {"URL": "http://www.ca11.uscourts.gov", "startDate": "1980-10-14", "shortName": "11th Cir.", "endDate": null}}, {"pk": "ca2", "model": "alerts.court", "fields": {"URL": "http://www.ca2.uscourts.gov", "startDate": "1891-03-03", "shortName": "2d Cir.", "endDate": null}}, {"pk": "ca3", "model": "alerts.court", "fields": {"URL": "http://www.ca3.uscourts.gov", "startDate": "1891-03-03", "shortName": "3rd Cir.", "endDate": null}}, {"pk": "ca4", "model": "alerts.court", "fields": {"URL": "http://www.ca4.uscourts.gov", "startDate": "1891-03-03", "shortName": "4th Cir.", "endDate": null}}, {"pk": "ca5", "model": "alerts.court", "fields": {"URL": "http://www.ca5.uscourts.gov", "startDate": "1891-03-03", "shortName": "5th Cir.", "endDate": null}}, {"pk": "ca6", "model": "alerts.court", "fields": {"URL": "http://www.ca6.uscourts.gov", "startDate": "1891-03-03", "shortName": "6th Cir.", "endDate": null}}, {"pk": "ca7", "model": "alerts.court", "fields": {"URL": "http://www.ca7.uscourts.gov", "startDate": "1891-03-03", "shortName": "7th Cir.", "endDate": null}}, {"pk": "ca8", "model": "alerts.court", "fields": {"URL": "http://www.ca8.uscourts.gov", "startDate": "1891-03-03", "shortName": "8th Cir.", "endDate": null}}, {"pk": "ca9", "model": "alerts.court", "fields": {"URL": "http://www.ca9.uscourts.gov", "startDate": "1891-03-03", "shortName": "9th Cir.", "endDate": null}}, {"pk": "cadc", "model": "alerts.court", "fields": {"URL": "http://www.cadc.uscourts.gov", "startDate": "1893-02-09", "shortName": "D.C. Cir.", "endDate": null}}, {"pk": "cafc", "model": "alerts.court", "fields": {"URL": "http://www.cafc.uscourts.gov", "startDate": "1982-04-02", "shortName": "Fed. Cir.", "endDate": null}}, {"pk": "cc", "model": "alerts.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_coc.html", "startDate": "1855-02-24", "shortName": "Ct. Cl.", "endDate": "1982-04-02"}}, {"pk": "ccpa", "model": "alerts.court", "fields": {"URL": "http://www.cafc.uscourts.gov/", "startDate": "1909-08-05", "shortName": "C.C.P.A.", "endDate": "1982-04-02"}}, {"pk": "uscfc", "model": "alerts.court", "fields": {"URL": "http://www.uscfc.uscourts.gov/", "startDate": "1982-04-02", "shortName": "Fed. Cl.", "endDate": null}}, {"pk": "cit", "model": "alerts.court", "fields": {"URL": "http://www.cit.uscourts.gov", "startDate": "1980-10-10", "shortName": "Ct. Int'l Trade", "endDate": null}}, {"pk": "com", "model": "alerts.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_com.html", "startDate": "1910-06-18", "shortName": "Comm. Ct.", "endDate": "1913-12-31"}}, {"pk": "cusc", "model": "alerts.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_cc.html", "startDate": "1890-06-10", "shortName": "Cust. Ct.", "endDate": "1980-10-10"}}, {"pk": "eca", "model": "alerts.court", "fields": {"URL": "https://secure.wikimedia.org/wikipedia/en/wiki/Emergency_Court_of_Appeals", "startDate": "1942-01-30", "shortName": "Emer. Ct. App.", "endDate": "1962-04-18"}}, {"pk": "scotus", "model": "alerts.court", "fields": {"URL": "http://supremecourt.gov", "startDate": "1789-09-24", "shortName": "SCOTUS", "endDate": null}}, {"pk": "tecoa", "model": "alerts.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_tecoa.html", "startDate": "1971-12-22", "shortName": "Temp. Emer. Ct. App.", "endDate": "1993-03-29"}}]
+[{"pk": "ca1", "model": "search.court", "fields": {"URL": "http://www.ca1.uscourts.gov", "startDate": "1891-03-03", "shortName": "1st Cir.", "endDate": null}}, {"pk": "ca10", "model": "search.court", "fields": {"URL": "http://www.ca10.uscourts.gov", "startDate": "1929-02-28", "shortName": "10th Cir.", "endDate": null}}, {"pk": "ca11", "model": "search.court", "fields": {"URL": "http://www.ca11.uscourts.gov", "startDate": "1980-10-14", "shortName": "11th Cir.", "endDate": null}}, {"pk": "ca2", "model": "search.court", "fields": {"URL": "http://www.ca2.uscourts.gov", "startDate": "1891-03-03", "shortName": "2d Cir.", "endDate": null}}, {"pk": "ca3", "model": "search.court", "fields": {"URL": "http://www.ca3.uscourts.gov", "startDate": "1891-03-03", "shortName": "3rd Cir.", "endDate": null}}, {"pk": "ca4", "model": "search.court", "fields": {"URL": "http://www.ca4.uscourts.gov", "startDate": "1891-03-03", "shortName": "4th Cir.", "endDate": null}}, {"pk": "ca5", "model": "search.court", "fields": {"URL": "http://www.ca5.uscourts.gov", "startDate": "1891-03-03", "shortName": "5th Cir.", "endDate": null}}, {"pk": "ca6", "model": "search.court", "fields": {"URL": "http://www.ca6.uscourts.gov", "startDate": "1891-03-03", "shortName": "6th Cir.", "endDate": null}}, {"pk": "ca7", "model": "search.court", "fields": {"URL": "http://www.ca7.uscourts.gov", "startDate": "1891-03-03", "shortName": "7th Cir.", "endDate": null}}, {"pk": "ca8", "model": "search.court", "fields": {"URL": "http://www.ca8.uscourts.gov", "startDate": "1891-03-03", "shortName": "8th Cir.", "endDate": null}}, {"pk": "ca9", "model": "search.court", "fields": {"URL": "http://www.ca9.uscourts.gov", "startDate": "1891-03-03", "shortName": "9th Cir.", "endDate": null}}, {"pk": "cadc", "model": "search.court", "fields": {"URL": "http://www.cadc.uscourts.gov", "startDate": "1893-02-09", "shortName": "D.C. Cir.", "endDate": null}}, {"pk": "cafc", "model": "search.court", "fields": {"URL": "http://www.cafc.uscourts.gov", "startDate": "1982-04-02", "shortName": "Fed. Cir.", "endDate": null}}, {"pk": "cc", "model": "search.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_coc.html", "startDate": "1855-02-24", "shortName": "Ct. Cl.", "endDate": "1982-04-02"}}, {"pk": "ccpa", "model": "search.court", "fields": {"URL": "http://www.cafc.uscourts.gov/", "startDate": "1909-08-05", "shortName": "C.C.P.A.", "endDate": "1982-04-02"}}, {"pk": "uscfc", "model": "search.court", "fields": {"URL": "http://www.uscfc.uscourts.gov/", "startDate": "1982-04-02", "shortName": "Fed. Cl.", "endDate": null}}, {"pk": "cit", "model": "search.court", "fields": {"URL": "http://www.cit.uscourts.gov", "startDate": "1980-10-10", "shortName": "Ct. Int'l Trade", "endDate": null}}, {"pk": "com", "model": "search.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_com.html", "startDate": "1910-06-18", "shortName": "Comm. Ct.", "endDate": "1913-12-31"}}, {"pk": "cusc", "model": "search.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_cc.html", "startDate": "1890-06-10", "shortName": "Cust. Ct.", "endDate": "1980-10-10"}}, {"pk": "eca", "model": "search.court", "fields": {"URL": "https://secure.wikimedia.org/wikipedia/en/wiki/Emergency_Court_of_Appeals", "startDate": "1942-01-30", "shortName": "Emer. Ct. App.", "endDate": "1962-04-18"}}, {"pk": "scotus", "model": "search.court", "fields": {"URL": "http://supremecourt.gov", "startDate": "1789-09-24", "shortName": "SCOTUS", "endDate": null}}, {"pk": "tecoa", "model": "search.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_tecoa.html", "startDate": "1971-12-22", "shortName": "Temp. Emer. Ct. App.", "endDate": "1993-03-29"}}]
 EOF
     python manage.py syncdb
     python manage.py migrate

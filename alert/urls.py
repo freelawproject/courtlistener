@@ -35,6 +35,7 @@ from alert.robots.views import robots
 from alert.alerts.views import delete_alert
 from alert.alerts.views import delete_alert_confirm
 from alert.alerts.views import edit_alert
+from alert.search.views import home
 from alert.search.views import showResults
 from alert.search.views import toolsPage
 from alert.tinyurl.views import redirect_short_url
@@ -147,10 +148,11 @@ urlpatterns = patterns('',
     (r'^LiveSearchSiteAuth.xml$', validateForBing),
     (r'^googleef3d845637ccb353.html$', validateForGoogle),
     # Sitemap index generator
-    (r'^sitemap\.xml$', 'alert.alerts.sitemap.indexCopy',
+    (r'^sitemap\.xml$', 'alert.casepage.sitemap.index_copy',
         {'sitemaps': sitemaps}),
     # this uses a custom sitemap generator that has a file-based cache.
-    (r'^sitemap-(?P<section>.+)\.xml$', 'alert.alerts.sitemap.cachedSitemap', {'sitemaps': sitemaps}),
+    (r'^sitemap-(?P<section>.+)\.xml$', 'alert.casepage.sitemap.cached_sitemap',
+        {'sitemaps': sitemaps}),
     (r'^robots.txt$', robots)
 )
 

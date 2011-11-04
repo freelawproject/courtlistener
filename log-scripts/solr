@@ -1,10 +1,10 @@
-/var/log/sphinx/*.log {
+/var/log/solr/*.log {
   weekly
   rotate 12
   compress
   delaycompress
   create 640 root root
   postrotate
-	killall -SIGUSR1 searchd
+	/etc/init.d/solr restart
   endscript
 }
