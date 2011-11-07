@@ -1,0 +1,4 @@
+{{ object.documentSHA1 }}
+{{ object.title }}
+{{ object.user.get_full_name }}
+{{ object.body }}

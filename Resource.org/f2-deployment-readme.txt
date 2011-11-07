@@ -23,9 +23,7 @@ QA:
     
  
 SOLR + Haystack!
- - update restart command in Solr logrotate config file to use init script
- - install haystack and Solr - update the installer as needed
-    - update the installer cronjobs notes
+ - Finish the configuration of solr in the installer
  - create celery task for indexing cases as they come in
  - create database crawler to import entire thing into Solr
  - build faceted search
