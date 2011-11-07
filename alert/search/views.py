@@ -141,7 +141,7 @@ def showResults(request):
 
             # save the alert
             a = CreateAlertForm(cd)
-            alert = a.save() # this method saves it and returns it
+            alert = a.save()
 
             # associate the user with the alert
             up = request.user.get_profile()

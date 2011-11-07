@@ -55,7 +55,7 @@
         <div class="container">
 
                 <div class="header-container span-24">
-                    <div class="span-12 header" id="header">
+                    <div class="span-7 header" id="header">
                         <a href="/">
                             <img src="/var/www/court-listener/alert/assets/media/images/png/logo.png"
                                  alt="Court Listener logo"
@@ -75,7 +75,7 @@
                     </div>
 
 
-                    <div class="span-12 last" id="searchform">
+                    <div class="span-17 last" id="searchform">
                         <form action="/" method="get">
                             <div id="search-form">
                                 <table>
@@ -86,11 +86,20 @@
                                                 name="q"
                                                 id="search-input"
                                                 value="michael"
-                                                autocomplete="off">
+                                                autocomplete="off"
+                                                style="width: 592px;">
                                              </td>
                                             <td>
                                                 <button type="submit" class="button title"
                                                 name="search" id="search-button">Search</button>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="2">
+                                                <div style="float: right;">
+                                                    <input type="radio" name='group1' value="new">New search
+                                                    <input type="radio" name='group1' value='old'>In current results
+                                                </div>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -104,7 +113,7 @@
 
 
 
-    <div class="span-5 append-1" id="sidebar">
+    <div class="span-5 append-2" id="sidebar">
 
             <div class="sidebar-section">
                 <h3 id="create-alert" class="pointer collapsed-heading sprites">Create alert</h3>
@@ -162,6 +171,7 @@
     <input type="text" class="span-5">
     <hr class="space">
     <h4 class="bottom">Federal Courts</h4>
+    <input type="checkbox"><label>All Federal Courts </label><span class="gray small">(122323)</span></label><br>
     <input type="checkbox"><label>Supreme Court <span class="gray small">(2238)</span></label><br>
     <input type="checkbox"><label>First Circuit <span class="gray small">(1823)</span></label><br>
     <input type="checkbox"><label>Second Circuit <span class="gray small">(238)</span></label><br>
@@ -199,20 +209,20 @@
 
 
 
-    <div class="span-18 last">
+    <div class="span-17 last">
+
+
         <h2 style="float:left">
-            Search results, page 1 of 1,239
+            12,383 Results
         </h2>
+
         <select style="float:right;">
             <option>Relevance</option>
-            <option>Date (ascending)</option>
-            <option>date (descending)</option>
+            <option>Date: newest first</option>
+            <option>Date: oldest first</option>
         </select>
 
         <p style="clear:both;">
-
-                12,383 results
-
 
         </p>
 
@@ -639,17 +649,24 @@
 
                 </p>
 
-
-            <h3>
-
-
-                    Page 1 of 100
-
-                            &nbsp;&nbsp;<a href="/search/results/?page=2&q=michael">next ›</a>
-                            &nbsp;&nbsp;<a href="/search/results/?page=100&q=michael">last »</a>
-
-
-            </h3>
+                <!-- Add images here for the left and right arrows. Use a sprite. --->
+                <div style="width: 100%;" class="box">
+                    <div style="float:left; width: 200px;">
+                        <h3 class="bottom">
+                            <a href="/search/results/?page=2&q=michael" style="color: black">« Previous</a>
+                        </h3>
+                    </div>
+                    <div style="float:right; width:200px; text-align:right;">
+                        <h3 class="bottom">
+                            <a href="/search/results/?page=4&q=michael" style="color: black">Next »</a>
+                        </h3>
+                    </div>
+                    <div style="margin:auto; text-align:center;">
+                        <h3 class="bottom">
+                            Page 3 of 100
+                        </h3>
+                    </div>
+                </div>
 
     </div>
 
