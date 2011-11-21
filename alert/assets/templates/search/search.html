@@ -1,0 +1,242 @@
+{% extends 'base.html' %}
+{% load text_filters %}
+{% load humanize %}
+{% load highlight %}
+
+{# this could mirror the titles of yahoo, google and bing more closely, if we want. #}
+{% block title %} CourtListener.com / Results / {{ query }} /
+    {% if results.paginator.num_pages %}
+    Page / {{ results.number }} of {{results.paginator.num_pages}}
+    {% endif %}
+    {# TODO: Make sure that this section is updated #}
+{% endblock %}
+
+{% block head %}
+	<link rel="stylesheet" href="/media/css/jquery.tooltip.css" type="text/css" media="screen, projection">
+	<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+	<script type="text/javascript" src="/media/js/jquery.tooltip.min.js"></script>
+	<script type="text/javascript">
+	   $(document).ready(function() {
+	       $('.auto-focus:first').focus();
+	       $(".sidebar-section").click(function () {
+	    	   $(this).find('.hidden').toggle('fast');
+	    	   $(this).find('.shown').toggle('fast');
+	           $(this).children('h3').toggleClass('collapsed-heading');
+	           $(this).children('h3').toggleClass('expanded-heading');
+	       });
+	       $('#q').tooltip({
+	           track: false,
+	           delay: 1,
+	           showURL: false,
+	           showBody: " - ",
+	           fade: 250,
+	           positionLeft: true
+	       });
+	   });
+	</script>
+	<link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?q={{query}}" />
+	<link rel="canonical" href="http://courtlistener.com/search/results/{%if query%}?q={{query}}{%endif%}" />
+{% endblock %}
+
+
+{% block sidebar %}
+    <div class="span-5 append-2" id="sidebar">
+        {% if user.is_authenticated and query %}
+            <div class="sidebar-section">
+                <h3 class="pointer collapsed-heading sprites">Create alert</h3>
+                <div id="hidden-create-alert" class="hidden">
+                    {% if alertForm.errors %}
+                        <div class="span-4 error">
+                            <p class="bottom">Please fix the errors below.</p>
+                        </div>
+                    {% endif %}
+
+                    <form action="" method="post">{% csrf_token %}
+                        <p>
+                            <label for="id_alertText">Alert query</label>
+                            {% if alertForm.alertText.errors %}
+                                <br><span class="errortext">
+                                    {% for error in alertForm.alertText.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}<br>
+                            {{ alertForm.alertText }}
+                        </p>
+
+                        <p>
+                            <label for="id_alertName">Give the alert a name</label>
+                            {% if alertForm.alertName.errors %}
+                                <br><span class="errortext">
+                                    {% for error in alertForm.alertName.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}
+                            {{ alertForm.alertName }}
+                        </p>
+
+                        <p>
+                            <label for="id_alertFrequency">How often should we notify you</label>
+                            {% if alertForm.alertFrequency.errors %}
+                                <br><span class="errortext">
+                                    {% for error in alertForm.alertFrequency.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}<br>
+                            {{ alertForm.alertFrequency }}
+                        </p>
+                        <p>
+                            {{ alertForm.alertPrivacy }}
+                            <label for="id_alertPrivacy">This alert is private</label>
+                            <label style="color:#000099; font-weight:normal;" title=" - In the future, we may allow users to share their public alerts." href="#" id="q" class="help">[?]</label>
+                            {% if alertForm.alertPrivacy.errors %}
+                                <span class="errortext">
+                                    {% for error in alertForm.alertPrivacy.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}<br>
+
+                        </p>
+                        <p>
+                            {{ alertForm.sendNegativeAlert }}
+                            <label for="id_alertName">Send me alerts even when there are no hits</label>
+                            {% if alertForm.sendNegativeAlert.errors %}
+                                <span class="errortext">
+                                    {% for error in alertForm.sendNegativeAlert.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}<br>
+                        </p>
+                        <button type="submit" class="button title" name="alertSave">Create alert</button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if not user.is_authenticated and query %}
+            <div class="sidebar-section">
+                <h3 class="pointer collapsed-heading sprites">Create alert</h3>
+                <div id="hidden-create-alert" class="hidden">
+                    <p>To get daily alerts for this search, <a href="{%url sign-in%}?next={{request.path}}?q={{query}}&page={{results.number}}">sign in</a> or
+                    <a href="{%url register%}?next={{request.path}}?q={{query}}&page={{results.number}}">register</a> as a new user.</p>
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="sidebar-section">
+            <h3 class="pointer expanded-heading sprites">Refine your search</h3>
+            <div class="shown">
+                <h4 class="bottom">Federal Courts</h4>
+                {% for court in facets.fields.court %}
+                    <p class="bottom">
+                        <a href="{{ request.get_full_path }}&amp;selected_facets=court_exact:{{ court.0|urlencode }}">
+                            {{ court.0 }}
+                        </a>
+                        <span class="gray small">({{ court.1 }})</span>
+                    </p>
+                {% endfor %}
+                <hr class="space">
+                
+                <h4 class="bottom">Status</h4>
+                {% for status in facets.fields.status %}
+                    <p class="bottom">
+                        <a href="{{ request.get_full_path }}&amp;selected_facets=status_exact:{{ status.0|urlencode }}">
+                            {{ status.0 }}
+                        </a>
+                        <span class="gray small">({{ status.1 }})</span>
+                    </p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+
+{% block content %}
+    <div class="span-17 last">
+        {% if messages %}
+            {# TODO: Make sure this works and looks right #}
+            <div class="span-17 last">
+                {% for message in messages %}
+                    <p class="bottom {{message.tags}}">{{message|safe}}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+    
+        <h2>{{ count|intcomma }} Result{{ count|pluralize }}</h2>
+       
+        {% for result in page.object_list %}
+            <h3 class="bottom alt">
+                <a href="{{result.get_absolute_url}}?q={{query}}" class="visitable">
+                    {{ result.caseName }},
+                    {% if result.westCite != '' and result.westCite != None %}
+                        {{result.westCite}}
+                    {% else %}
+                        {{result.docketNumber}}
+                    {% endif %}
+                    ({% if result.court != 'SCOTUS' %}{{result.court|nbsp}}&nbsp;{% endif %}{{result.dateFiled|date:"Y"}})
+                </a>
+            </h3>
+            <p class="bottom">
+                {% if result.object.download_URL or result.object.local_path %}
+                    {% if result.object.source != 'R' %}
+                        <strong>View Original:</strong>
+                        {% if result.object.download_URL %}
+                            <a href="{{result.object.download_URL}}" class="visitable">From the court</a>
+                        {% endif %}
+                        {% if result.object.download_URL and result.object.local_path %}
+                            &nbsp;&nbsp;|&nbsp;&nbsp;
+                        {% endif %}
+                        {% if result.object.local_path %}
+                            <a href="/{{result.object.local_path}}" class="visitable">Our backup</a>
+                        {% endif %}
+                    {% else %}
+                        No downloadable versions.
+                    {% endif %}
+                {% else %}
+                    No downloadable versions.
+                {% endif %}
+            </p>
+            <p class="bottom">
+                <strong>Date Filed:</strong>
+                {% if result.dateFiled %}
+                    {{result.dateFiled|date:"l, F jS, Y"}}
+                {% else %}
+                    Unknown date
+                {% endif %}
+            </p>
+            <p class="bottom">
+                <strong>Status:</strong>
+                {% if result.object.documentType %}
+                    {{result.object.get_documentType_display}}
+                {% else %}
+                    Unknown
+                {% endif %}
+            </p>
+            <p class="bottom">
+                {% if result.westCite != '' and result.westCite != None and result.docketNumber %}
+                    <strong>Docket Number:</strong>
+                    {{ result.docketNumber }}
+                {% endif %}
+            </p>
+            <p>
+                {% highlight result.summary with request.GET.q %}
+            </p>
+        {% empty %}
+            <p>No results found.</p>
+        {% endfor %}
+
+        {% if page.has_previous or page.has_next %}
+            <div>
+                {% if page.has_previous %}<a href="?q={{ query }}&amp;page={{ page.previous_page_number }}">{% endif %}&laquo; Previous{% if page.has_previous %}</a>{% endif %}
+                |
+                {% if page.has_next %}<a href="?q={{ query }}&amp;page={{ page.next_page_number }}">{% endif %}Next &raquo;{% if page.has_next %}</a>{% endif %}
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
+

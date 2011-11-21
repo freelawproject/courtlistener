@@ -12,6 +12,10 @@
     Site: http://michaeljaylissner.com
     Twitter: @mlissner
     Location: Oakland, CA
+    
+    Funded in part by: public.resource.org
+    Site: public.resource.org
+    Twitter: @carlmalamud
 
 
 /* SITE */
@@ -20,7 +24,7 @@
         Text Extraction: Antiword, libwpd-tools, pdf2text
         Code: BeautifulSoup, Celery, Django, jQuery (NobelCount, tooltip), lxml,
               Mercurial, RabbitMQ, titlecase, Python
-        Infrastructure: Apache2, Linux, MySQL, Sphinx
+        Infrastructure: Apache2, Linux, MySQL, Solr
   Source: https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/overview
 
 

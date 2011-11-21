@@ -4,8 +4,9 @@
         <meta charset=utf-8>
         <meta http-equiv="Content-Language" content="en"/>
         <meta name="language" content="en_us"/>
-        <meta name="description" content="Create alerts, search for and browse the latest Circuit Court and Supreme Court opinions. Updated daily with the latest appeals court documents.">
-        <meta name="keywords" content="court states district appeals united cir claim sentence circuit defendant evidence motion judgment plaintiffs filed judge review law conviction government"/>
+        <meta name="description" content="Create alerts, search for and browse the latest Court opinions. Updated automatically with the latest court documents.">
+        <link rel="search" type="application/opensearchdescription+xml" title="CourtListener" href="/media/xml/opensearch.xml" />
+        
         <title>{% block title %}CourtListener.com{% endblock %}</title>
         <link rel="author" href="humans.txt" type="text/plain"/>
         <link rel="stylesheet" href="/media/css/blueprint/screen.css" type="text/css" media="screen, projection">
@@ -58,12 +59,13 @@
 
                     {% block search-form %}
                     <div class="span-17 last" id="searchform">
-                        <form action="/" method="get">
+                        <form action="." method="get">
                             <div id="search-form">
                                 <table>
                                     <tbody>
                                         <tr>
                                             <td>
+                                                {# TODO: Make sure this works #}
                                                 <input class="{% if not results.object_list or not query%}auto-focus{% endif %} wide-title"
                                                 name="q"
                                                 id="search-input"
@@ -90,10 +92,11 @@
                 </div>
             {% endblock %}
 
+            {# TODO: Is this block being used somewhere? #}
             {% block nav %}{% endblock %}
             {% block content %}
                 <div class="span-17 last" id="content">
-                    <p>Your content seems to be missing!</p>
+                    <p>Your content seems to be missing! This is never good.</p>
                 </div>
             {% endblock %}
 

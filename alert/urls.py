@@ -35,9 +35,9 @@ from alert.robots.views import robots
 from alert.alerts.views import delete_alert
 from alert.alerts.views import delete_alert_confirm
 from alert.alerts.views import edit_alert
-from alert.search.views import home
-from alert.search.views import showResults
-from alert.search.views import toolsPage
+from alert.search.views import ParallelFacetedSearchView
+from alert.search.views import show_results
+from alert.search.views import tools_page
 from alert.tinyurl.views import redirect_short_url
 from alert.userHandling.views import confirmEmail
 from alert.userHandling.views import deleteProfile
@@ -51,6 +51,8 @@ from alert.userHandling.views import requestEmailConfirmation
 from alert.userHandling.views import view_favorites
 from alert.userHandling.views import viewAlerts
 from alert.userHandling.views import viewSettings
+from haystack.forms import FacetedSearchForm
+from haystack.query import SearchQuerySet
 
 # this imports a variable that can be handed to the sitemap index generator function.
 from alert.casepage.sitemap import all_sitemaps as sitemaps
@@ -77,8 +79,14 @@ urlpatterns = patterns('',
     (r'^admin/doc/', include('django.contrib.admindocs.urls')),
     (r'^admin/', include(admin.site.urls)),
 
+    # favicon
+    (r'^favicon\.ico$', 'django.views.generic.simple.redirect_to',
+            {'url': '/media/images/ico/favicon.ico'}),
+
     # Display a case, a named URL because the get_absolute_url uses it.
-    url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case, name="viewCase"),
+    url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case,
+            name="viewCase"),
+
     # Redirect users
     (r'^x/(.*)/$', redirect_short_url),
 
@@ -90,10 +98,6 @@ urlpatterns = patterns('',
     url(r'^sign-in/$', signIn, name="sign-in"),
     (r'^sign-out/$', signOut),
 
-    # Homepage and favicon
-    (r'^$', home),
-    (r'^favicon\.ico$', 'django.views.generic.simple.redirect_to', {'url': '/media/images/ico/favicon.ico'}),
-
     # Settings pages
     (r'^profile/$', redirect_to_settings),
     url(r'^profile/settings/$', viewSettings, name='viewSettings'),
@@ -104,6 +108,7 @@ urlpatterns = patterns('',
     (r'^profile/delete/done/$', deleteProfileDone),
     url(r'^register/$', register, name="register"),
     (r'^register/success/$', registerSuccess),
+
     # Favorites pages
     (r'^favorite/create-or-update/$', save_or_update_favorite),
     (r'^favorite/delete/$', delete_favorite),
@@ -114,22 +119,26 @@ urlpatterns = patterns('',
     (r'^email-confirmation/request/$', requestEmailConfirmation),
     (r'^email-confirmation/success/$', emailConfirmSuccess),
 
-    #Reset password pages
+    # Reset password pages
     (r'^reset-password/$', password_reset),
     (r'^reset-password/instructions-sent/$', password_reset_done),
-    (r'^confirm-password/(?P<uidb36>.*)/(?P<token>.*)/$', password_reset_confirm, {'post_reset_redirect': '/reset-password/complete/'}),
-    (r'^reset-password/complete/$', signIn, {'template_name': 'registration/password_reset_complete.html'}),
+    (r'^confirm-password/(?P<uidb36>.*)/(?P<token>.*)/$',
+            password_reset_confirm,
+            {'post_reset_redirect': '/reset-password/complete/'}),
+    (r'^reset-password/complete/$', signIn,
+            {'template_name': 'registration/password_reset_complete.html'}),
 
     # Search pages
     # These URLs support either GET requests or things like /alert/preview/searchterm.
-    url(r'^search/results/$', showResults, name="searchResults"),
-    (r'^search/$', showResults), #for the URL hackers in the crowd
+    url(r'^search/results/$', show_results, name="searchResults"),
+    #(r'^search/$', show_results), #for the URL hackers in the crowd
+    (r'^$', show_results), # the home page
 
     # Alert pages
     (r'^alert/edit/(\d{1,6})/$', edit_alert),
     (r'^alert/delete/(\d{1,6})/$', delete_alert),
     (r'^alert/delete/confirm/(\d{1,6})/$', delete_alert_confirm),
-    (r'^tools/$', toolsPage),
+    (r'^tools/$', tools_page),
 
     # Dump index and generation pages
     (r'^dump-info/$', dump_index),
@@ -165,6 +174,11 @@ urlpatterns += patterns('django.views.generic.simple',
     ('^report/$', 'redirect_to', {'url': 'http://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf'}),
 )
 
+# Haystack
+sqs = SearchQuerySet().facet('court').facet('status')
+urlpatterns += patterns('haystack.views',
+    url(r'^search/$', ParallelFacetedSearchView(form_class=FacetedSearchForm, searchqueryset=sqs), name='haystack_search'),
+)
 
 # if it's not the production site, serve the static files this way.
 if settings.DEVELOPMENT:

@@ -60,7 +60,12 @@ SOLR DEPLOYMENT:
     
  - hg pull -u
     - adjust the apache config to point to the new robots.txt location (tinyurl/robots.txt)
- - reindex <-- How big will our index be? Space on disk, or do we need to remove Sphinx first? 
+ - reindex 
+    - How big will our index be? Space on disk, or do we need to remove Sphinx first?
+        - Should be OK. There are 736 docs on my local system, which require 22MB.
+        - There are 815 times more docs on the live system, which means they will take 17.5GB
+        - SSD Disk has ~50GB free.  
+    - python manage.py rebuild_index -k 4 -b 1000 -v 2
  - Synchronize the database for the refactoring changes:
         update django_content_type set app_label = 'alerts' where name='alert';
         update django_content_type set app_label = 'favorites' where name='favorite';
