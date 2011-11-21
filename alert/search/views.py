@@ -25,82 +25,19 @@ from django.shortcuts import render_to_response
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
 from django.utils.text import get_text_list
-
-import re
-
-
-def preparseQuery(query):
-    return query
-
-def adjustQueryForUser(query):
-    return query
+from haystack.views import SearchView
+from haystack.forms import FacetedSearchForm
 
 
-def messageUser(query, request):
-    # before searching, check that all fieldnames are valid. Create message if not.
-    # Alter the query string if needed so that it will return the correct results.
-    # this thread has a solution using pyparsing which is probably a better approach to investigate:
-    # http://stackoverflow.com/questions/2677713/regex-for-finding-valid-sphinx-fields
-    # for testing: @court @casename foo,bar @(doctext, courthouse, docstatus) @(docstatus, casename) @(casename) @courtname (court | doctext)
-    # this catches simple fields such as @court, @field and puts them in a list
-    attributes = re.findall('(?:@)([^\( ]*)', query)
+def message_user(query, request):
+    '''Check that the user's query is valid in a number of ways:
+      1. Are they using any invalid fields?
+      2. ? 
+    
+    '''
 
-    # this catches more complicated ones, like @(court), and @(court, test)
-    regex0 = re.compile('''
-        @               # at sign
-        (?:             # start non-capturing group
-            \w+             # non-whitespace, one or more
-            \b              # a boundary character (i.e. no more \w)
-            |               # OR
-            (               # capturing group
-                \(              # left paren
-                [^@(),]+        # not an @(),
-                (?:                 # another non-caputing group
-                    , *             # a comma, then some spaces
-                    [^@(),]+        # not @(),
-                )*              # some quantity of this non-capturing group
-                \)              # a right paren
-            )               # end of non-capuring group
-        )           # end of non-capturing group
-        ''', re.VERBOSE)
-
-
-    messageText = ""
-    # and this puts them into the attributes list.
-    groupedAttributes = re.findall(regex0, query)
-    for item in groupedAttributes:
-        attributes.extend(item.strip("(").strip(")").strip().split(","))
-
-    # check if the values are valid.
-    validRegex = re.compile(r'^\W?court\W?$|^\W?casename\W?$|^\W?westcite\W?$|^\W?docketnumber\W?$|^\W?docstatus\W?$|^\W?doctext\W?$')
-
-    # if they aren't add them to a new list.
-    badAttrs = []
-    for attribute in attributes:
-        if len(attribute) == 0:
-            # if it's a zero length attribute, we punt
-            continue
-        if validRegex.search(attribute.lower()) == None:
-            # if the attribute from the search isn't in the valid list
-            if attribute not in badAttrs:
-                # and the attribute isn't already in the list
-                badAttrs.append(attribute)
-        if " " in attribute:
-            # if there is a space in the item
-            if "Multiple" not in messageText:
-                # we only add this warning once.
-                messageText += "Mutiple field searches cannot contain spaces.<br>"
-
-
-    # pluralization is a pain, but we must do it...
-    if len(badAttrs) == 1:
-        messageText += '<strong>' + get_text_list(badAttrs, "and") + '</strong> is not a \
-        valid field. Valid fields are @court, @caseName, @westCite, @docketNumber,\
-        @docStatus and @docText.'
-    elif len(badAttrs) > 1:
-        messageText += '<strong>' + get_text_list(badAttrs, "and") + '</strong> are not \
-        valid fields. Valid fields are @court, @caseName, @westCite, @docketNumber,\
-        @docStatus and @docText.'
+    # TODO: Write the regexes to process this. Import from the search class 
+    #       when doing so.
 
     if len(messageText) > 0:
         messages.add_message(request, messages.INFO, messageText)
@@ -108,7 +45,7 @@ def messageUser(query, request):
     return True
 
 
-def getDateFiledOrReturnZero(doc):
+def get_date_filed_or_return_zero(doc):
     """Used for sorting dates. Returns the date field or the earliest date
     possible in Python. With this done, items without dates will be listed
     last without throwing errors to the sort function."""
@@ -118,11 +55,46 @@ def getDateFiledOrReturnZero(doc):
         import datetime
         return datetime.date(1, 1, 1)
 
-def home(request):
-    return render_to_response('tools.html', {}, RequestContext(request))
 
 
-def showResults(request):
+class ParallelFacetedSearchView(SearchView):
+    """Provides facet counts that do not change based on the results.
+    
+    In a parallel faceted search system, we do not show the counts for each 
+    facet decreasing after we select one. If we do, we select facet 'foo', and 
+    then facet 'baz' shows a count of zero (since when 'foo' is selected it has
+    no results).
+    """
+    __name__ = 'ParallelFacetedSearchView'
+
+    def __init__(self, *args, **kwargs):
+        # Needed to switch out the default form class.
+        if kwargs.get('form_class') is None:
+            kwargs['form_class'] = FacetedSearchForm
+
+        super(ParallelFacetedSearchView, self).__init__(*args, **kwargs)
+
+    def build_form(self, form_kwargs=None):
+        if form_kwargs is None:
+            form_kwargs = {}
+
+        # This way the form can always receive a list containing zero or more
+        # facet expressions:
+        form_kwargs['selected_facets'] = self.request.GET.getlist("selected_facets")
+
+        return super(ParallelFacetedSearchView, self).build_form(form_kwargs)
+
+    def extra_context(self):
+        extra = super(ParallelFacetedSearchView, self).extra_context()
+        extra['request'] = self.request
+        extra['facets'] = self.form.search().facet_counts()
+        extra['count'] = self.form.search().count()
+
+        return extra
+
+
+
+def show_results(request):
     '''Show the results for a query'''
 
     try:
@@ -157,11 +129,10 @@ def showResults(request):
         alertForm = CreateAlertForm(initial={'alertText': query, 'alertFrequency': "dly"})
 
     # alert the user if there are any errors in their query
-    messageUser(query, request)
+    message_user(query, request)
 
     # adjust the query if need be for the search to happen correctly.
-    query = adjustQueryForUser(query)
-    internalQuery = preparseQuery(query)
+    query = adjust_query_for_user(query)
 
     # NEW SEARCH METHOD
     try:
@@ -209,5 +180,5 @@ def showResults(request):
         RequestContext(request))
 
 
-def toolsPage(request):
+def tools_page(request):
     return render_to_response('tools.html', {}, RequestContext(request))

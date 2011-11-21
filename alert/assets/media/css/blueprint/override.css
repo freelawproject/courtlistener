@@ -115,8 +115,7 @@ span.bold {
     padding: 0px;
 }
 
-#search-input-home-page, #search-input {
-    width: 500px;
+#search-input {
     border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
     border-style: solid none solid solid;
     border-width: 1px 0px 1px 1px;
@@ -125,7 +124,7 @@ span.bold {
 }
 
 #search-input {
-    width: 389px;
+    width: 592px;
 }
 
 #search-button-home-page, #search-button {

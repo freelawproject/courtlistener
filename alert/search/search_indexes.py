@@ -1,54 +1,25 @@
-import datetime
-from haystack.indexes import
+from haystack.indexes import CharField
+from haystack.indexes import DateField
+from haystack.indexes import RealTimeSearchIndex
 from haystack import site
-from alert.search.models import Citation
 from alert.search.models import Document
 
-class DocumentIndex(SearchIndex):
+class DocumentIndex(RealTimeSearchIndex):
     text = CharField(document=True, use_template=True)
-    dateFiled =
-    author = CharField(model_attr='user')
-    pub_date = DateTimeField(model_attr='pub_date')
+    dateFiled = DateField(model_attr='dateFiled', null=True)
+    court = CharField(model_attr='court__shortName', faceted=True)
+    caseName = CharField(model_attr='citation__caseNameFull', boost=1.25)
+    docketNumber = CharField(model_attr='citation__docketNumber', null=True)
+    westCite = CharField(model_attr='citation__westCite', null=True)
+    lexisCite = CharField(model_attr='citation__lexisCite', null=True)
+    status = CharField(model_attr='documentType', faceted=True, boost=1.25)
+    caseNumber = CharField(use_template=True, null=True, boost=1.25)
 
     def index_queryset(self):
         """Used when the entire index for model is updated."""
+
+        # TODO: Does this work on LARGE sets of documents? 
         return Document.objects.all()
 
 
 site.register(Document, DocumentIndex)
-
-
-    dateFiled = models.DateField("the date filed by the court",
-        blank=True,
-        null=True,
-        db_index=True)
-    court = models.ForeignKey(Court,
-        verbose_name="the court where the document was filed",
-        db_index=True)
-    citation = models.ForeignKey(Citation,
-        verbose_name="the citation information for the document",
-        blank=True,
-        null=True)
-    download_URL = models.URLField("the URL on the court website where the document was originally scraped",
-        verify_exists=False,
-        db_index=True)
-    time_retrieved = models.DateTimeField("the exact date and time stamp that the document was placed into our database",
-        auto_now_add=True,
-        editable=False)
-    local_path = models.FileField("the location, relative to MEDIA_ROOT, where the files are stored",
-        upload_to=make_pdf_upload_path,
-        blank=True)
-    documentPlainText = models.TextField("plain text of the document after extraction from the PDF",
-        blank=True)
-    documentHTML = models.TextField("HTML of the document",
-        blank=True)
-    documentType = models.CharField("the type of document, as described by document_types.txt",
-        max_length=50,
-        blank=True,
-        choices=DOCUMENT_STATUSES)
-    date_blocked = models.DateField('original block date',
-        blank=True,
-        null=True)
-    blocked = models.BooleanField('block crawlers for this document',
-        db_index=True,
-        default=False)
