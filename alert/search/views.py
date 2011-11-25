@@ -15,18 +15,17 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert.alerts.forms import CreateAlertForm
-from alert.search.forms import SearchForm
+from alert.search.forms import ParallelFacetedSearchForm
 from alert.search.models import Document
-from alert.userHandling.models import UserProfile
 
 from django.contrib import messages
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
 from django.shortcuts import render_to_response
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
-from django.utils.text import get_text_list
 from haystack.views import SearchView
-from haystack.forms import FacetedSearchForm
+from haystack.views import FacetedSearchView
+
 
 
 def message_user(query, request):
@@ -57,7 +56,7 @@ def get_date_filed_or_return_zero(doc):
 
 
 
-class ParallelFacetedSearchView(SearchView):
+class ParallelFacetedSearchView(FacetedSearchView):
     """Provides facet counts that do not change based on the results.
     
     In a parallel faceted search system, we do not show the counts for each 
@@ -70,7 +69,7 @@ class ParallelFacetedSearchView(SearchView):
     def __init__(self, *args, **kwargs):
         # Needed to switch out the default form class.
         if kwargs.get('form_class') is None:
-            kwargs['form_class'] = FacetedSearchForm
+            kwargs['form_class'] = ParallelFacetedSearchForm
 
         super(ParallelFacetedSearchView, self).__init__(*args, **kwargs)
 
@@ -85,10 +84,18 @@ class ParallelFacetedSearchView(SearchView):
         return super(ParallelFacetedSearchView, self).build_form(form_kwargs)
 
     def extra_context(self):
+        print self.request.GET
         extra = super(ParallelFacetedSearchView, self).extra_context()
         extra['request'] = self.request
+        print self.form
         extra['facets'] = self.form.search().facet_counts()
-        extra['count'] = self.form.search().count()
+
+        '''
+        extra = super(FacetedSearchView, self).extra_context()
+        extra['request'] = self.request
+        extra['facets'] = self.results.facet_counts()
+        '''
+
 
         return extra
 
