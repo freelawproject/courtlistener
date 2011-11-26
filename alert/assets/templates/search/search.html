@@ -171,7 +171,7 @@
         
         {% if paginator.count > 0 %}
             <h2 id="result-count">{{ paginator.count|intcomma }} Result{{ paginator.count|pluralize }}</h2>
-            <select style="float:right;">
+            <select id="result-order-chooser">
 	            <option>Relevance</option>
 	            <option>Date: newest first</option>
 	            <option>Date: oldest first</option>
@@ -189,8 +189,8 @@
                 {% endif %}
      
 	            <h3 class="bottom serif">
-	                <a href="{{result.get_absolute_url}}?q={{query}}" class="visitable">
-	                    {% highlight result.caseName with query %},
+	                <a href="{{result.object.get_absolute_url}}?q={{query}}" class="visitable">
+	                    {% highlight result.caseName with query max_length 200000000000000 %},
 	                    {% if result.westCite != '' and result.westCite != None %}
 	                        {{ result.westCite }}
 	                    {% else %}

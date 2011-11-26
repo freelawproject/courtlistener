@@ -175,7 +175,7 @@ urlpatterns += patterns('django.views.generic.simple',
 )
 
 # Haystack
-sqs = SearchQuerySet().facet('court').facet('status').highlight()
+sqs = SearchQuerySet()
 urlpatterns += patterns('haystack.views',
     url(r'^search/$', ParallelFacetedSearchView(form_class=ParallelFacetedSearchForm, searchqueryset=sqs), name='haystack_search'),
 )

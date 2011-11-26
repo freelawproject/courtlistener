@@ -31,7 +31,7 @@
                         </a>
 
                         {% if user.is_authenticated %}
-                            <div class="navigation">
+                            <div id="navigation">
                                 <ul>
                                     <li><a href="/opinions/all/">Browse</a></li>
                                     <li><a href="/profile/alerts/">Profile</a></li>
@@ -39,7 +39,7 @@
                                 </ul>
                             </div>
                         {% else %}
-                            <div class="navigation">
+                            <div id="navigation">
                                 <ul>
                                     <li><a href="/about/">About</a></li>
                                     <li><a href="/opinions/all">Browse</a></li>
@@ -67,14 +67,22 @@
                                             <td>
                                                 {# TODO: Make sure this works #}
                                                 <input class="{% if count == 0 or not query  %}auto-focus{% endif %} wide-title"
-                                                name="q"
-                                                id="search-input"
-                                                value="{{query}}"
-                                                autocomplete="off">
+	                                                name="q"
+	                                                id="search-input"
+	                                                value="{{query}}"
+	                                                autocomplete="off">
                                              </td>
                                             <td>
                                                 <button type="submit" class="button title"
                                                 name="search" id="search-button">Search</button>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="2">
+                                                <div class="right">
+                                                    <input type="radio" value="new" name="group1">New search
+                                                    <input type="radio" value="old" name="group1">In current results
+                                                </div>
                                             </td>
                                         </tr>
                                     </tbody>
