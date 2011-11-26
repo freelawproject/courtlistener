@@ -31,7 +31,7 @@ from django.utils.encoding import smart_str
 from django.utils.encoding import smart_unicode
 
 # For use in titlecase
-BIG = '3D|AFL|AKA|A/K/A|BMG|CDC|CDT|CEO|CIO|CNMI|D/B/A|DOJ|DVA|EFF|FCC|FTC|IBM|II|III|IV|LLC|LLP|MCI|MJL|MSPB|UPS|RSS|SEC|USA|USC|USPS|WTO'
+BIG = '3D|AFL|AKA|A/K/A|BMG|CDC|CDT|CEO|CIO|CNMI|D/B/A|DOJ|DVA|EFF|FCC|FTC|IBM|II|III|IV|LLC|LLP|MCI|MJL|MSPB|NLRB|UPS|RSS|SEC|USA|USC|USPS|WTO'
 SMALL = 'a|an|and|as|at|but|by|en|for|if|in|is|of|on|or|the|to|v\.?|via|vs\.?'
 NUMS = '0|1|2|3|4|5|6|7|8|9'
 PUNCT = r"""!"#$¢%&'‘()*+,\-./:;?@[\\\]_—`{|}~"""

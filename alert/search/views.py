@@ -84,18 +84,10 @@ class ParallelFacetedSearchView(FacetedSearchView):
         return super(ParallelFacetedSearchView, self).build_form(form_kwargs)
 
     def extra_context(self):
-        print self.request.GET
         extra = super(ParallelFacetedSearchView, self).extra_context()
         extra['request'] = self.request
-        print self.form
+
         extra['facets'] = self.form.search().facet_counts()
-
-        '''
-        extra = super(FacetedSearchView, self).extra_context()
-        extra['request'] = self.request
-        extra['facets'] = self.results.facet_counts()
-        '''
-
 
         return extra
 
