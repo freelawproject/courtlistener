@@ -9,6 +9,28 @@ To do:
     - add fiscr to the various places on the site where it's needed...
 
 
+Features:
+ - Boosting of status, casename, and casenumber
+ - Result counts
+ - Faceted search
+    - facet counts with parallel selection
+        - court
+        - status
+    - field filtering
+        - filed date
+        - casename
+        - west citation
+        - docket number
+ - Result ordering
+ - New/previous search radio buttons
+ - Realtime indexing via Celery
+ - DB to index script
+ - Homepage shows all results
+ - Snippets with multiple fragments
+ - Highlighting on all returned fields
+ - 
+ 
+
     
 QA:
  - Check for proper alert deletion and editing functionality, since code rewritten. Tests:
@@ -16,9 +38,12 @@ QA:
     - what happens if I try to hack the URL bar with non-ints?
         - if OK, try it without the int check in the delete_alert and edit_alert functions
  - Check that the tools page works (code moved but untested)
- - Test that length of the search isn't limited
+ - Test that length of the search isn't limited (length of what? The query or the number of results?)
  - Test that Univ. and other v's are fixed so they are only italicized when necessary
  - Ensure that the rabbit-mq, celery and solr will start up at reboot
+ - Test whether q='' works
+ - Test proper pluralization of results
+ - Test with and without JS
  
     
  
