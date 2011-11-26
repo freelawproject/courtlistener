@@ -35,8 +35,6 @@ from alert.robots.views import robots
 from alert.alerts.views import delete_alert
 from alert.alerts.views import delete_alert_confirm
 from alert.alerts.views import edit_alert
-from alert.search.forms import ParallelFacetedSearchForm
-from alert.search.views import ParallelFacetedSearchView
 from alert.search.views import show_results
 from alert.search.views import tools_page
 from alert.tinyurl.views import redirect_short_url
@@ -52,7 +50,6 @@ from alert.userHandling.views import requestEmailConfirmation
 from alert.userHandling.views import view_favorites
 from alert.userHandling.views import viewAlerts
 from alert.userHandling.views import viewSettings
-from haystack.query import SearchQuerySet
 
 # this imports a variable that can be handed to the sitemap index generator function.
 from alert.casepage.sitemap import all_sitemaps as sitemaps
@@ -172,12 +169,6 @@ urlpatterns += patterns('django.views.generic.simple',
     ('^browse/$', 'redirect_to', {'url': '/opinions/all/'}),
     ('^opinions/$', 'redirect_to', {'url': '/opinions/all/'}),
     ('^report/$', 'redirect_to', {'url': 'http://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf'}),
-)
-
-# Haystack
-sqs = SearchQuerySet()
-urlpatterns += patterns('haystack.views',
-    url(r'^search/$', ParallelFacetedSearchView(form_class=ParallelFacetedSearchForm, searchqueryset=sqs), name='haystack_search'),
 )
 
 # if it's not the production site, serve the static files this way.

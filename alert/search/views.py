@@ -23,9 +23,6 @@ from django.core.paginator import Paginator, InvalidPage, EmptyPage
 from django.shortcuts import render_to_response
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
-from haystack.views import SearchView
-from haystack.views import FacetedSearchView
-
 
 
 def message_user(query, request):

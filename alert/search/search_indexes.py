@@ -20,6 +20,3 @@ class DocumentIndex(RealTimeSearchIndex):
 
         # TODO: Does this work on LARGE sets of documents? 
         return Document.objects.all()
-
-
-site.register(Document, DocumentIndex)

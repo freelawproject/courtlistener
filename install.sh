@@ -38,8 +38,7 @@
 # - install django from source
 # - install CourtListener from source
 # - put some basic data in the database
-# - install & configure Solr
-# - install haystack
+# - install & configure Solr & pysolr
 # - configure mysql & courtlistener
 # - install django-celery, celery and rabbitmq
 # - install the django-debug toolbar
@@ -75,7 +74,7 @@ OPTIONS
     --ffmpeg
             install the FFmpeg audio transcoding library from source
     --solr
-            install the Solr search engine
+            install the Solr search engine and pysolr connector
     --django
             install Django
     --courtlistener
@@ -86,8 +85,6 @@ OPTIONS
             install the django debug toolbar
     --djangocelery
             install django-celery to handle task queues
-    --haystack
-            install the Haystack connector
     --djangoextensions
             install the django-extensions package from github
     --south
@@ -594,24 +591,6 @@ function install_solr {
 }
 
 
-function install_haystack {
-    echo -e "\n###########################"
-    echo "Installing Haystack..."
-    echo "###########################"
-    read -p "Would you like to install Haystack? (y/n): " proceed
-    if [ $proceed == "n" ]
-    then
-        echo -e '\nGreat. Moving on.'
-        return 0
-    fi
-
-    # we install Haystack
-    easy_install django-haystack==1.2.5
-    
-    echo -e '\nHaystack installed successfully.'
-}
-
-
 function install_django_celery {
     echo -e '\n##################################'
     echo 'Installing django-celery and Celery...'
@@ -772,16 +751,15 @@ function main {
     # run the program!
     get_user_input
     check_deps
-    installDjango
-    installCourtListener
+    install_django
+    install_court_listener
     configure_mysql
-    installSolr
-    installHaystack
-    installDjangoCelery
-    installDebugToolbar
-    installDjangoExtensions
-    installSouth
-    importData
+    install_solr
+    install_django_celery
+    install_debug_toolbar
+    install_django_extensions
+    install_south
+    import_data
     finalize
 
     echo -e "\n\n#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#"
@@ -824,7 +802,7 @@ else
         --importdata) get_user_input; configure_mysql; import_data;;
         --debugtoolbar) get_user_input; install_debug_toolbar;;
         --djangocelery) get_user_input; install_django_celery;;
-        --djangosolr) get_user_input; install_haystack;;
+        --djangosolr) get_user_input; install_solr;;
         --djangoExtensions) get_user_input; install_django_extensions;;
         --south) get_user_input; install_south; finalize;;
         --finalize) get_user_input; finalize;;
