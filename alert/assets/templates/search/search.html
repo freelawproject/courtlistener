@@ -1,15 +1,15 @@
 {% extends 'base.html' %}
 {% load text_filters %}
 {% load humanize %}
-{% load highlight %}
 
 {# this could mirror the titles of yahoo, google and bing more closely, if we want. #}
 {% block title %} CourtListener.com / Results / {{ query }} /
     {% if results.paginator.num_pages %}
-    Page / {{ results.number }} of {{results.paginator.num_pages}}
+    Page / {{ results.number }} of {{ results.paginator.num_pages }}
     {% endif %}
-    {# TODO: Make sure that this section is updated #}
 {% endblock %}
+
+
 
 {% block head %}
 	<link rel="stylesheet" href="/media/css/jquery.tooltip.css" type="text/css" media="screen, projection">
@@ -36,8 +36,8 @@
 	       });
 	   });
 	</script>
-	<link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?q={{query}}" />
-	<link rel="canonical" href="http://courtlistener.com/search/results/{%if query%}?q={{query}}{%endif%}" />
+	<link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?q={{ query }}" />
+	<link rel="canonical" href="http://courtlistener.com/search/results/{% if query %}?q={{ query }}{% endif %}" />
 {% endblock %}
 
 
@@ -117,10 +117,8 @@
 
 			        {% else %}
 			            {# User is not authenticated #}
-		                <div id="hidden-create-alert" class="hidden">
-		                    <p>To get daily alerts for this search, <a href="{%url sign-in%}?next={{request.path}}?q={{query}}&page={{results.number}}">sign in</a> or
-		                    <a href="{%url register%}?next={{request.path}}?q={{query}}&page={{results.number}}">register</a> as a new user.</p>
-		                </div>
+	                    <p>To get daily alerts for this search, <a href="{%url sign-in%}?next={{request.path}}?q={{query}}&page={{results.number}}">sign in</a> or
+	                    <a href="{%url register%}?next={{request.path}}?q={{query}}&page={{results.number}}">register</a> as a new user.</p>
 			        {% endif %}
 	            {% else %}
 	                {# no query was placed #}
@@ -131,8 +129,8 @@
 	        <div class="sidebar-section">
 	            <h3 class="pointer expanded-heading arrow-down-before">Refine your search</h3>
 	            <div class="shown">
-	                <h4 class="bottom">Federal Courts</h4>
-	                {% for court in facets.fields.court %}
+	                <h4 class="bottom">Federal Appeals Courts</h4>
+	                {% for court in facet_fields.court_exact %}
 	                    <p class="bottom">
 	                        <a href="{{ request.get_full_path }}&amp;selected_facets=court_exact:{{ court.0|urlencode }}">
 	                            {{ court.0 }}
@@ -143,7 +141,7 @@
 	                <hr class="space">
 	                
 	                <h4 class="bottom">Status</h4>
-	                {% for status in facets.fields.status %}
+	                {% for status in facet_fields.status_exact %}
 	                    <p class="bottom">
 	                        <a href="{{ request.get_full_path }}&amp;selected_facets=status_exact:{{ status.0|urlencode }}">
 	                            {{ status.0 }}
@@ -169,28 +167,28 @@
             </div>
         {% endif %}
         
-        {% if paginator.count > 0 %}
-            <h2 id="result-count">{{ paginator.count|intcomma }} Result{{ paginator.count|pluralize }}</h2>
+        {% if results.paginator.count > 0 %}
+            <h2 id="result-count">{{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }}</h2>
             <select id="result-order-chooser">
 	            <option>Relevance</option>
 	            <option>Date: newest first</option>
 	            <option>Date: oldest first</option>
 	        </select>
 	        <hr class="space"/>
-            {% for result in page.object_list %}
-	            {% if result.object.documentType = "Published" %}
-                    <div class="green-circle" title="This is a {{result.object.get_documentType_display}} opinion"></div>
+            {% for result in results.object_list %}
+	            {% if result.documentType = "Published" %}
+                    <div class="green-circle" title="This is a {{result.get_documentType_display}} opinion"></div>
                 {% else %} 
-                    {% if result.object.documentType = "Unpublished" or result.object.documentType = "Errata" or result.object.documentType = "In-chambers" or result.object.documentType = "Relating-to" %}
-                        <div class="red-circle" title="This is a {{result.object.get_documentType_display}} opinion"></div>
+                    {% if result.documentType = "Unpublished" or result.documentType = "Errata" or result.documentType = "In-chambers" or result.documentType = "Relating-to" %}
+                        <div class="red-circle" title="This is a {{result.get_documentType_display}} opinion"></div>
                     {% else %}
                         <div class="orange-circle" title="The status of this opinion is unknown"></div>
                     {% endif %}
                 {% endif %}
      
 	            <h3 class="bottom serif">
-	                <a href="{{result.object.get_absolute_url}}?q={{query}}" class="visitable">
-	                    {% highlight result.caseName with query max_length 200000000000000 %},
+	                <a href="{{ result.get_absolute_url}}?q={{query}}" class="visitable">
+	                    {{ result.caseName|safe }},
 	                    {% if result.westCite != '' and result.westCite != None %}
 	                        {{ result.westCite }}
 	                    {% else %}
@@ -199,26 +197,27 @@
 	                    ({% if result.court != 'SCOTUS' %}{{ result.court|nbsp }}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
 	                </a>
 	            </h3>
+
 	            <p class="bottom">
-	                {% if result.object.download_URL or result.object.local_path %}
-	                    {% if result.object.source != 'R' %}
+	                {% if result.download_URL or result.local_path %}
+	                    {% if result.source != 'R' %}
 	                        <span class="meta-data-header">View Original:</span>
 	                        <span class="meta-data-value">
-		                        {% if result.object.download_URL %}
-		                            <a href="{{result.object.download_URL}}" class="visitable">From the court</a>
+		                        {% if result.download_URL %}
+		                            <a href="{{result.download_URL}}" class="visitable">From the court</a>
 		                        {% endif %}
-		                        {% if result.object.download_URL and result.object.local_path %}
+		                        {% if result.download_URL and result.local_path %}
 		                            &nbsp;&nbsp;|&nbsp;&nbsp;
 		                        {% endif %}
-		                        {% if result.object.local_path %}
-		                            <a href="/{{result.object.local_path}}" class="visitable">Our backup</a>
+		                        {% if result.local_path %}
+		                            <a href="/{{result.local_path}}" class="visitable">Our backup</a>
 		                        {% endif %}
 	                        </span>
 	                    {% else %}
-	                        <span class="meta-data-value">No downloadable versions.</span>
+	                        <span class="meta-data-value"><strong>No downloadable versions.</strong></span>
 	                    {% endif %}
 	                {% else %}
-	                    <span class="meta-data-value">No downloadable versions.</span>
+	                    <span class="meta-data-value"><strong>No downloadable versions.</strong></span>
 	                {% endif %}
 	           
 	                <span class="meta-data-header">Date Filed:</span>
@@ -237,11 +236,14 @@
                     {% endif %}
 	            </p>
 	            <p>
-	                {% highlight result.text with query max_length 400 %}
+	                &hellip;{% for frag in result.text %}
+	                   {{ frag|safe }}&hellip;
+	                {% endfor %}
 	            </p>
+
             {% endfor %}      
         {% else %}
-            <h2 class="alt">Your search &mdash; <strong>{{query}}</strong> &mdash; had no results.</h2>
+            <h2 class="alt">Your search &mdash; <strong>{{ query }}</strong> &mdash; had no results.</h2>
             <h4 class="bottom">Search tips:</h4>
             <ul>
                 <li>Check your spelling</li>
@@ -251,21 +253,21 @@
             <p>Did you expect more results than this? If so, <a href="/contact/">let us know</a>! We value your feedback.</p>
         {% endif %}
         
-        {% if page.has_previous or page.has_next %}
+        {% if results.has_previous or results.has_next %}
             <div class="box">
                 <div id="pagination-left">
                     <h3 class="bottom arrow-left-before">
-                        {% if page.has_previous %}<a href="?q={{ query }}&amp;page={{ page.previous_page_number }}">{% endif %}Previous{% if page.has_previous %}</a>{% endif %}
+                        {% if results.has_previous %}<a href="?q={{ query }}&amp;page={{ results.previous_page_number }}">{% endif %}Previous{% if results.has_previous %}</a>{% endif %}
                     </h3>
                 </div>
                 <div id="pagination-right">
                     <h3 class="bottom arrow-right-after">
-                        {% if page.has_next %}<a href="?q={{ query }}&amp;page={{ page.next_page_number }}">{% endif %}Next{% if page.has_next %}</a>{% endif %}
+                        {% if results.has_next %}<a href="?q={{ query }}&amp;page={{ results.next_page_number }}">{% endif %}Next{% if results.has_next %}</a>{% endif %}
                     </h3>
                 </div>
                 <div id="pagination-center">
                     <h3 class="bottom">
-                        Page {{ page.number }} of {{ page.paginator.num_pages }}
+                        Page {{ results.number }} of {{ results.paginator.num_pages }}
                     </h3>
                 </div>
             </div>
