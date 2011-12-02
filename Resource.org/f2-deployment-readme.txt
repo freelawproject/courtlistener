@@ -28,7 +28,8 @@ Features:
  - Homepage shows all results
  - Snippets with multiple fragments
  - Highlighting on all returned fields
- - 
+ - Multicore should be investigated/implemented
+ - RAM tuning should be investigated/implemented
  
 
     
@@ -44,20 +45,15 @@ QA:
  - Test whether q='' works
  - Test proper pluralization of results
  - Test with and without JS
+ - Test where items are placed when they lack a date and date sorting is used
+ - Is there a limit to the number of results? Do we handle it? 
  
     
  
 SOLR + Haystack!
  - Finish the configuration of solr in the installer
- - create celery task for indexing cases as they come in
  - create database crawler to import entire thing into Solr
- - build faceted search
-    - remove homepage! <-- Done
-    - remove browse code! <-- Done
-    - get Haystack talking to Solr to perform a basic search
-        - Research: what does multicore mean - do we need it?
-    - get results sorted out so they look good
-    - build up the facets/sort fields etc.
+
  - update all places that search can be performed in the project
     - RSS feeds
     - Alerts

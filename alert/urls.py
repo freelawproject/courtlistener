@@ -126,9 +126,6 @@ urlpatterns = patterns('',
             {'template_name': 'registration/password_reset_complete.html'}),
 
     # Search pages
-    # These URLs support either GET requests or things like /alert/preview/searchterm.
-    url(r'^search/results/$', show_results, name="searchResults"),
-    #(r'^search/$', show_results), #for the URL hackers in the crowd
     (r'^$', show_results), # the home page
 
     # Alert pages

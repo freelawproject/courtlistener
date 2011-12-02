@@ -15,14 +15,20 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert.alerts.forms import CreateAlertForm
-from alert.search.forms import ParallelFacetedSearchForm
 from alert.search.models import Document
 
 from django.contrib import messages
-from django.core.paginator import Paginator, InvalidPage, EmptyPage
+from django.core.paginator import Paginator
+from django.core.paginator import PageNotAnInteger
+from django.core.paginator import EmptyPage
+from django.conf import settings
 from django.shortcuts import render_to_response
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
+from math import ceil
+
+import sunburnt
+conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
 
 
 def message_user(query, request):
@@ -32,12 +38,14 @@ def message_user(query, request):
     
     '''
 
+
+    '''
     # TODO: Write the regexes to process this. Import from the search class 
     #       when doing so.
 
     if len(messageText) > 0:
         messages.add_message(request, messages.INFO, messageText)
-
+    '''
     return True
 
 
@@ -52,60 +60,21 @@ def get_date_filed_or_return_zero(doc):
         return datetime.date(1, 1, 1)
 
 
-
-class ParallelFacetedSearchView(FacetedSearchView):
-    """Provides facet counts that do not change based on the results.
-    
-    In a parallel faceted search system, we do not show the counts for each 
-    facet decreasing after we select one. If we do, we select facet 'foo', and 
-    then facet 'baz' shows a count of zero (since when 'foo' is selected it has
-    no results).
-    """
-    __name__ = 'ParallelFacetedSearchView'
-
-    def __init__(self, *args, **kwargs):
-        # Needed to switch out the default form class.
-        if kwargs.get('form_class') is None:
-            kwargs['form_class'] = ParallelFacetedSearchForm
-
-        super(ParallelFacetedSearchView, self).__init__(*args, **kwargs)
-
-    def build_form(self, form_kwargs=None):
-        if form_kwargs is None:
-            form_kwargs = {}
-
-        # This way the form can always receive a list containing zero or more
-        # facet expressions:
-        form_kwargs['selected_facets'] = self.request.GET.getlist("selected_facets")
-
-        return super(ParallelFacetedSearchView, self).build_form(form_kwargs)
-
-    def extra_context(self):
-        extra = super(ParallelFacetedSearchView, self).extra_context()
-        extra['request'] = self.request
-
-        extra['facets'] = self.form.search().facet_counts()
-
-        return extra
-
-
-
 def show_results(request):
-    '''Show the results for a query'''
+    '''Show the results for a query
+    
+    Implements a parallel faceted search interface with Solr as the backend.
+    '''
 
-    try:
-        query = request.GET['q']
-    except:
-        # if somebody is URL hacking at /search/results/
-        query = ""
+    query = request.GET.get('q', '')
 
     # this handles the alert creation form.
     if request.method == 'POST':
         from alert.userHandling.models import Alert
         # an alert has been created
-        alertForm = CreateAlertForm(request.POST)
-        if alertForm.is_valid():
-            cd = alertForm.cleaned_data
+        alert_form = CreateAlertForm(request.POST)
+        if alert_form.is_valid():
+            cd = alert_form.cleaned_data
 
             # save the alert
             a = CreateAlertForm(cd)
@@ -122,58 +91,85 @@ def show_results(request):
     else:
         # the form is loading for the first time, load it, then load the rest
         # of the page!
-        alertForm = CreateAlertForm(initial={'alertText': query, 'alertFrequency': "dly"})
+        alert_form = CreateAlertForm(initial={'alertText': query, 'alertFrequency': "dly"})
 
     # alert the user if there are any errors in their query
     message_user(query, request)
 
-    # adjust the query if need be for the search to happen correctly.
-    query = adjust_query_for_user(query)
+    # Build up all the queries needed
+    results_si = conn.search(q="query")
+    facet_si = conn.search(q='query')
+    highlight_si = conn.search(q='query')
 
-    # NEW SEARCH METHOD
+    '''
+    q_frags = query.split()
+    results_si = conn.query(q_frags[0])
+    facet_si = conn.query(q_frags[0])
+    highlight_si = conn.query(q_frags[0])
+    for frag in q_frags[1:]:
+        results_si = results_si.query(frag)
+        facet_si = facet_si.query(frag)
+        highlight_si = highlight_si.query(frag)
+    '''
+
+    # Set up facet counts
+    facet_fields = facet_si.facet_by('court_exact', mincount=1).facet_by('status_exact').execute().facet_counts.facet_fields
+
+    # Set up highlighting
+    hl_results = highlight_si.highlight('text', snippets=5).highlight('status')\
+        .highlight('caseName').highlight('westCite').highlight('docketNumber')\
+        .highlight('lexisCite').highlight('westCite').execute()
+    #import pprint
+    #pprint.pprint(hl_results)
+
+    results = []
+    for result in results_si.execute():
+        #type(result['id'])
+        #results_si[result['id']]['highlighted_text'] = result.highlighting['text']
+        #results_si[hl_results.highlighting['search.document.464']]['highlighted_text'] = 'foo'
+        temp_dict = {}
+        try:
+            temp_dict['caseName'] = hl_results.highlighting[result['id']]['caseName'][0]
+        except KeyError:
+            temp_dict['caseName'] = result['caseName']
+        try:
+            temp_dict['text'] = hl_results.highlighting[result['id']]['text']
+        except KeyError:
+            # No highlighting in the text for this result. Just assign the 
+            # default unhighlighted value
+            temp_dict['text'] = result['text']
+
+        results.append(temp_dict)
+
+    print results
+
+    '''
+    Goal:
+     [doc1: {caseName: 'foo', text: 'bar', status:'baz'}]
+    '''
+
+    '''
+    for d in r:
+        d['highlighted_name'] = r.highlighting[d['id']]['name']
+    book_list = r
+    '''
+
+    # Set up pagination
+    paginator = Paginator(results, 20)
+    page = request.GET.get('page', 1)
     try:
-        queryset = Document.search.query(internalQuery)
-        results = queryset.set_options(mode="SPH_MATCH_EXTENDED2").order_by('-dateFiled')
-    except:
-        results = []
+        paged_results = paginator.page(page)
+    except PageNotAnInteger:
+        # If page is not an integer, deliver first page.
+        paged_results = paginator.page(1)
+    except EmptyPage:
+        # If page is out of range (e.g. 9999), deliver last page of results.
+        paged_results = paginator.page(paginator.num_pages)
 
-    # Put the results in order by dateFiled. Fixes issue 124
-    # From: http://wiki.python.org/moin/HowTo/Sorting/
-    # Need to do the [0:results.count()] business, else returns only first 20.
-    # results = sorted(results[0:results.count()], key=getDateFiledOrReturnZero, reverse=True)
-
-    # next, we paginate we will show ten results/page
-    paginator = Paginator(results, 10)
-
-    # this will fail when the search fails, so try/except is needed.
-    try:
-        numResults = paginator.count
-    except:
-        numResults = 0
-
-    # Make sure page request is an int. If not, deliver first page.
-    try:
-        page = int(request.GET.get('page', '1'))
-    except ValueError:
-        page = 1
-
-    # only allow queries up to page 100.
-    if page > 100:
-        return render_to_response('search/results.html', {'over_limit': True,
-            'query': query, 'alertForm': alertForm},
-            RequestContext(request))
-
-    # If page request is out of range, deliver last page of results.
-    try:
-        results = paginator.page(page)
-    except (EmptyPage, InvalidPage):
-        results = paginator.page(paginator.num_pages)
-    except:
-        results = []
-
-    return render_to_response('search/results.html', {'results': results,
-        'numResults': numResults, 'query': query, 'alertForm': alertForm},
-        RequestContext(request))
+    return render_to_response('search/search.html', {'query': query,
+                              'alert_form': alert_form, 'results': paged_results,
+                              'hl_results': hl_results, 'facet_fields': facet_fields},
+                              RequestContext(request))
 
 
 def tools_page(request):

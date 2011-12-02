@@ -73,7 +73,7 @@ span.bold {
     cursor: help;
 }
 
-.highlighted {
+mark {
     font-weight: bold;
     background-color: #ffffbf;	
 }
