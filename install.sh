@@ -562,19 +562,6 @@ function install_solr {
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-
-    # Install sunburnt
-    git clone http://github.com/tow/sunburnt.git
-    cd sunburnt
-    # Ensure we're on the correct revision globally. This revision is arbitrary, but we need consistency if we're going to be on head.
-    git revert --no-edit 64d8331d62
-    # Apply patches to sunburnt to make it work with django see this link for possible bug resolutions:
-    # https://github.com/tow/sunburnt/issues/26
-    patch -p1 < $CL_INSTALL_DIR/court-listener/patches/sunburnt-remove-mx-datetime-dependancy.patch
-    
-    # Finally, install the now-Frankensteinian code
-    python ./setup.py install
-    
     
     cd /usr/local
     echo "Downloading Solr 4.0 development snapshot from 2011-11-04..."

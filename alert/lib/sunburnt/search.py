@@ -63,7 +63,7 @@ class LuceneQuery(object):
             else:
                 raise ValueError
             for subquery in self.subqueries:
-                subquery.serialize_debug(indent+2)
+                subquery.serialize_debug(indent + 2)
         print '%s%s' % (indentspace, '}')
 
     # Below, we sort all our value_sets - this is for predictability when testing.
@@ -184,7 +184,7 @@ class LuceneQuery(object):
             # Clone and rewrite to effect the boosts.
             newself = self.clone()
             newself.boosts = []
-            boost_queries = [self.Q(**kwargs)**boost_score
+            boost_queries = [self.Q(**kwargs) ** boost_score
                              for kwargs, boost_score in self.boosts]
             newself = newself | (newself & reduce(operator.or_, boost_queries))
             newself, _ = newself.normalize()
@@ -197,9 +197,9 @@ class LuceneQuery(object):
             for q in self.subqueries:
                 op_ = u'OR' if self._or else u'AND'
                 if self.child_needs_parens(q):
-                    u.append(u"(%s)"%q.__unicode__(level=level+1, op=op_))
+                    u.append(u"(%s)" % q.__unicode__(level=level + 1, op=op_))
                 else:
-                    u.append(u"%s"%q.__unicode__(level=level+1, op=op_))
+                    u.append(u"%s" % q.__unicode__(level=level + 1, op=op_))
             if self._and:
                 return u' AND '.join(u)
             elif self._or:
@@ -207,12 +207,12 @@ class LuceneQuery(object):
             elif self._not:
                 assert len(u) == 1
                 if level == 0 or (level == 1 and op == "AND"):
-                    return u'NOT %s'%u[0]
+                    return u'NOT %s' % u[0]
                 else:
-                    return u'(*:* AND NOT %s)'%u[0]
+                    return u'(*:* AND NOT %s)' % u[0]
             elif self._pow is not False:
                 assert len(u) == 1
-                return u"%s^%s"%(u[0], self._pow)
+                return u"%s^%s" % (u[0], self._pow)
             else:
                 raise ValueError
 
@@ -264,7 +264,7 @@ class LuceneQuery(object):
         q._and = False
         q._pow = value
         return q
-        
+
     def add(self, args, kwargs):
         self.normalized = False
         _args = []
@@ -584,6 +584,29 @@ class SolrSearch(BaseSearch):
         return self.transform_result(result, constructor)
 
 
+class RawSolrSearch(BaseSearch):
+    '''Provides an interface for querying Solr directly.'''
+    def __init__(self, interface, original=None):
+        self.interface = interface
+        self.schema = interface.schema
+        self.more_like_this = MoreLikeThisOptions(self.schema)
+        self._init_common_modules()
+        if original is None:
+            self.more_like_this = MoreLikeThisOptions(self.schema)
+            self._init_common_modules()
+        else:
+            for opt in self.option_modules:
+                setattr(self, opt, getattr(original, opt).clone())
+
+    def query(self, args, **kwargs):
+        self.query = args
+        return self
+
+    def execute(self, constructor=dict):
+        result = self.interface.search(**self.options())
+        return self.transform_result(result, constructor)
+
+
 class MltSolrSearch(BaseSearch):
     """Manage parameters to build a MoreLikeThisHandler query"""
     trivial_encodings = ["utf_8", "u8", "utf", "utf8", "ascii", "646", "us_ascii"]
@@ -701,10 +724,10 @@ class Options(object):
         for field_name, field_opts in self.fields.items():
             if not field_name:
                 for field_opt, v in field_opts.items():
-                    opts['%s.%s'%(self.option_name, field_opt)] = v
+                    opts['%s.%s' % (self.option_name, field_opt)] = v
             else:
                 for field_opt, v in field_opts.items():
-                    opts['f.%s.%s.%s'%(field_name, self.option_name, field_opt)] = v
+                    opts['f.%s.%s.%s' % (field_name, self.option_name, field_opt)] = v
         return opts
 
 
@@ -745,7 +768,7 @@ class HighlightOptions(Options):
             "simple.pre":unicode,
             "simple.post":unicode,
             "fragmenter":unicode,
-            "useFastVectorHighlighter":bool,	# available as of Solr 3.1
+            "useFastVectorHighlighter":bool, 	# available as of Solr 3.1
             "usePhraseHighlighter":bool,
             "highlightMultiTerm":bool,
             "regex.slop":float,
@@ -797,12 +820,12 @@ class MoreLikeThisOptions(Options):
         if query_fields is not None:
             for k, v in query_fields.items():
                 if k not in self.fields:
-                    raise SolrError("'%s' specified in query_fields but not fields"% k)
+                    raise SolrError("'%s' specified in query_fields but not fields" % k)
                 if v is not None:
                     try:
                         v = float(v)
                     except ValueError:
-                        raise SolrError("'%s' has non-numerical boost value"% k)
+                        raise SolrError("'%s' has non-numerical boost value" % k)
             self.query_fields.update(query_fields)
 
         checked_kwargs = self.check_opts(kwargs)

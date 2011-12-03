@@ -15,8 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert.alerts.forms import CreateAlertForm
-from alert.search.models import Document
-
+from alert.lib import sunburnt
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.core.paginator import PageNotAnInteger
@@ -25,9 +24,7 @@ from django.conf import settings
 from django.shortcuts import render_to_response
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
-from math import ceil
 
-import sunburnt
 conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
 
 
@@ -91,15 +88,28 @@ def show_results(request):
     else:
         # the form is loading for the first time, load it, then load the rest
         # of the page!
-        alert_form = CreateAlertForm(initial={'alertText': query, 'alertFrequency': "dly"})
+        alert_form = CreateAlertForm(initial={'alertText': query,
+                                              'alertFrequency': "dly"})
 
     # alert the user if there are any errors in their query
     message_user(query, request)
 
     # Build up all the queries needed
-    results_si = conn.search(q="query")
-    facet_si = conn.search(q='query')
-    highlight_si = conn.search(q='query')
+    results_si = conn.raw_query()
+    print type(results_si)
+    results_si.query('court -newell')
+    print results_si
+    print type(results_si)
+    assert False
+    #facet_si = conn.query()
+    #facet_si = facet_si.query(facet_si.Q(query))
+    highlight_si = conn.query()
+    highlight_si = highlight_si.query(highlight_si.Q({'q':'court -newell'}))
+    #INFO: [] webapp=/solr path=/select/ params={q=q} hits=35 status=0 QTime=1 
+
+    #INFO: [] webapp=/solr path=/select/ params={q=court+-newell} hits=733 status=0 QTime=2 
+    #INFO: [] webapp=/solr path=/select/ params={q=court\+\-newell} hits=0 status=0 QTime=1
+
 
     '''
     q_frags = query.split()
@@ -113,7 +123,8 @@ def show_results(request):
     '''
 
     # Set up facet counts
-    facet_fields = facet_si.facet_by('court_exact', mincount=1).facet_by('status_exact').execute().facet_counts.facet_fields
+    facet_fields = {}
+    #facet_fields = facet_si.facet_by('court_exact', mincount=1).facet_by('status_exact').execute().facet_counts.facet_fields
 
     # Set up highlighting
     hl_results = highlight_si.highlight('text', snippets=5).highlight('status')\
