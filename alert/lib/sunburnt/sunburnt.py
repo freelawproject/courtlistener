@@ -9,7 +9,7 @@ import warnings
 
 
 from .schema import SolrSchema, SolrError
-from .search import LuceneQuery, MltSolrSearch, SolrSearch, params_from_dict
+from .search import LuceneQuery, MltSolrSearch, RawSolrSearch, SolrSearch, params_from_dict
 
 MAX_LENGTH_GET_URL = 2048
 # Jetty default is 4096; Tomcat default is 8192; picking 2048 to be conservative.
@@ -134,7 +134,7 @@ class SolrInterface(object):
     readable = True
     writeable = True
     remote_schema_file = "admin/file/?file=schema.xml"
-    def __init__(self, url, schemadoc=None, http_connection=None, mode='', retry_timeout=-1, max_length_get_url=MAX_LENGTH_GET_URL):
+    def __init__(self, url, schemadoc=None, http_connection=None, mode='', retry_timeout= -1, max_length_get_url=MAX_LENGTH_GET_URL):
         self.conn = SolrConnection(url, http_connection, retry_timeout, max_length_get_url)
         self.schemadoc = schemadoc
         if mode == 'r':
@@ -210,6 +210,16 @@ class SolrInterface(object):
             return q.query(*args, **kwargs)
         else:
             return q
+
+    def raw_query(self, **kwargs):
+        # Accepts a query, and builds a RawSolrSearch object from it.
+        if not self.readable:
+            raise TypeError("This Solr instance is only for writing")
+        r = RawSolrSearch(self)
+        if len(kwargs) > 0:
+            return r.query(**kwargs)
+        else:
+            return r
 
     def mlt_search(self, content=None, **kwargs):
         if not self.readable:
