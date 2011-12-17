@@ -480,17 +480,22 @@ class BaseSearch(object):
     def count(self):
         # get the total count for the current query without retrieving any results 
         # cache it, since it may be needed multiple times when used with django paginator
+        print "Entering search.BaseSearch.count function."
+        print "search.BaseSearch.count _count: %s" % self._count
+        print "search.BaseSearch.count self.paginator.rows: %s" % self.paginator.rows
         if self._count is None:
             # are we already paginated? then we'll behave as if that's
             # defined our result set already.
             if self.paginator.rows is not None:
                 total_results = self.paginator.rows
             else:
+                print "Creating a paginated response...."
                 response = self.paginate(rows=0).execute()
                 total_results = response.result.numFound
                 if self.paginator.start is not None:
                     total_results -= self.paginator.start
             self._count = total_results
+        print "search.BaseSearch.count _count: %s" % self._count
         return self._count
 
     __len__ = count
@@ -589,22 +594,49 @@ class RawSolrSearch(BaseSearch):
     def __init__(self, interface, original=None):
         self.interface = interface
         self.schema = interface.schema
-        self.more_like_this = MoreLikeThisOptions(self.schema)
-        self._init_common_modules()
+
+        self.paginator = PaginateOptions(self.schema)
         if original is None:
+            self.q = {}
             self.more_like_this = MoreLikeThisOptions(self.schema)
             self._init_common_modules()
         else:
+            self.q = original.q
             for opt in self.option_modules:
                 setattr(self, opt, getattr(original, opt).clone())
+        print "search.RawSolrSearch.__init__ paginator.start: %s" % self.paginator.start
+        print "search.RawSolrSearch.__init__ paginator.rows: %s" % self.paginator.rows
 
-    def query(self, args, **kwargs):
-        self.query = args
+    def query(self, *args, **kwargs):
+        print "search.RawSolrSearch.query args: " + str(args)
+        print "search.RawSolrSearch.query kwargs: " + str(kwargs)
+        self.q = kwargs
         return self
 
     def execute(self, constructor=dict):
-        result = self.interface.search(**self.options())
+        print "search.RawSolrSearch.execute self.q: " + str(self.q)
+        print "search.RawSolrSearch.execute self.paginator.start: %s" % self.paginator.start
+        print "search.RawSolrSearch.execute self.paginator.rows: %s" % self.paginator.rows
+        start = self.paginator.start
+        rows = self.paginator.rows
+        if start is not None and rows > 0:
+            self.q['start'] = start
+            self.q['rows'] = rows
+        print str(self.q)
+
+        result = self.interface.search(**self.q)
         return self.transform_result(result, constructor)
+
+    '''
+    Commented out because I don't understand what's wrong with the super method.
+    def paginate(self, start=None, rows=None):
+        print "search.RawSolrSearch.paginate start: %s" % start
+        print "search.RawSolrSearch.paginate rows: %s" % rows
+        self.q['start'] = self.paginator.start
+        self.q['rows'] = self.paginator.rows
+        return self
+    '''
+
 
 
 class MltSolrSearch(BaseSearch):
@@ -900,6 +932,9 @@ class PaginateOptions(Options):
             if rows < 0:
                 raise SolrError("paginator rows must be 0 or greater")
             self.rows = rows
+        print "Updating sunburnt paginator..."
+        print "Sunburnt paginator start: %s" % start
+        print "Sunburnt paginator rows: %s" % rows
 
     def options(self):
         opts = {}

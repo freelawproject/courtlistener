@@ -14,8 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from alert.search.models import Court
 from alert.search.models import Document
-from alert.search.models import PACER_CODES
 from alert import settings
 from django.contrib.sitemaps import GenericSitemap
 from django.contrib.sitemaps import FlatPageSitemap
@@ -159,16 +159,17 @@ class MyFlatPageSitemap(FlatPageSitemap):
 # generates a variable, all_sitemaps, which can be handed to the sitemap index
 # generator on the urls.py file. One sitemap per court + flatpages.
 all_sitemaps = {}
-for courtTuple in PACER_CODES:
+pacer_codes = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
+for pacer_code in pacer_codes:
     info_dict = {
-        'queryset'  : Document.objects.filter(court=courtTuple[0], blocked=False),
+        'queryset'  : Document.objects.filter(court=pacer_code, blocked=False),
         'date_field': 'time_retrieved',
     }
 
     sitemap = LimitedGenericSitemap(info_dict, priority=0.5, changefreq="never")
 
     # dict key is provided as 'section' in sitemap index view
-    all_sitemaps[courtTuple[0]] = sitemap
+    all_sitemaps[pacer_code] = sitemap
 
 # finally, we add the flatpages sitemap to the end
 all_sitemaps["Flatfiles"] = MyFlatPageSitemap

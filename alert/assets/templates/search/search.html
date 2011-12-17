@@ -235,11 +235,13 @@
                         <span class="meta-data-value">{{ result.docketNumber }}</span>
                     {% endif %}
 	            </p>
+	            {% comment %}
 	            <p>
 	                &hellip;{% for frag in result.text %}
 	                   {{ frag|safe }}&hellip;
 	                {% endfor %}
 	            </p>
+	            {% endcomment %}
 
             {% endfor %}      
         {% else %}

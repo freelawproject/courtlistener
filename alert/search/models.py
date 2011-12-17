@@ -24,34 +24,6 @@ from django.db import models
 import glob
 import os
 
-# a tuple, which we'll pass to the choices argument in various places.
-# Items are commented out until we have data/scrapers for them.
-PACER_CODES = (
-    ('scotus', 'Supreme Court of the United States'),
-    ('ca1', 'Court of Appeals for the First Circuit'),
-    ('ca2', 'Court of Appeals for the Second Circuit'),
-    ('ca3', 'Court of Appeals for the Third Circuit'),
-    ('ca4', 'Court of Appeals for the Fourth Circuit'),
-    ('ca5', 'Court of Appeals for the Fifth Circuit'),
-    ('ca6', 'Court of Appeals for the Sixth Circuit'),
-    ('ca7', 'Court of Appeals for the Seventh Circuit'),
-    ('ca8', 'Court of Appeals for the Eighth Circuit'),
-    ('ca9', 'Court of Appeals for the Ninth Circuit'),
-    ('ca10', 'Court of Appeals for the Tenth Circuit'),
-    ('ca11', 'Court of Appeals for the Eleventh Circuit'),
-    ('cadc', 'Court of Appeals for the D.C. Circuit'),
-    ('cafc', 'Court of Appeals for the Federal Circuit'),
-    ('ccpa', 'Court of Customs and Patent Appeals'),
-    ('eca', 'Emergency Court of Appeals'),
-    #('tecoa',  'Temporary Emergency Court of Appeals'),
-    #('cc',     'Court of Claims'),
-    ('uscfc', 'United States Court of Federal Claims'),
-    #('cusc',   'United States Customs Court'),
-    #('cit',    'United States Court of International Trade'),
-    #('com',    'Commerce Court'),
-    ('fiscr', 'Foreign Intelligence Surveillance Court of Review'),
-)
-
 # changes here need to be mirrored in the coverage page view and the exceptions
 # list for sphinx
 DOCUMENT_STATUSES = (
@@ -109,28 +81,39 @@ def invalidate_sitemap_cache_by_court(court):
 class Court(models.Model):
     '''A class to represent some information about each court, can be extended
     as needed.'''
-    courtUUID = models.CharField("a unique ID for each court",
-        max_length=100,
-        primary_key=True,
-        choices=PACER_CODES)
+    courtUUID = models.CharField("a unique ID for each court as used in URLs",
+                                 max_length=6,
+                                 primary_key=True)
+    in_use = models.BooleanField('this court is in use in CourtListener',
+                                 default=False)
+    position = models.FloatField('a float that can be used to order the courts',
+                                 null=True,
+                                 db_index=True,
+                                 unique=True)
+    citation_string = models.CharField("the citation abbreviation for the court",
+                                  max_length=100,
+                                  blank=True)
+    short_name = models.CharField('the short name of the court',
+                                  max_length=100,
+                                  blank=False)
+    full_name = models.CharField('the full name of the court',
+                                 max_length='200',
+                                 blank=False)
     URL = models.URLField("the homepage for each court")
-    shortName = models.CharField("the citation abbreviation for the court",
-        max_length=100,
-        blank=True)
-    startDate = models.DateField("the date the court was established",
-        blank=True,
-        null=True)
-    endDate = models.DateField("the date the court was abolished",
-        blank=True,
-        null=True)
+    start_date = models.DateField("the date the court was established",
+                                  blank=True,
+                                  null=True)
+    end_date = models.DateField("the date the court was abolished",
+                                blank=True,
+                                null=True)
 
     # uses the choices argument in courtUUID to create a good display of the object.
     def __unicode__(self):
-        return self.get_courtUUID_display()
+        return self.full_name
 
     class Meta:
         db_table = "Court"
-        ordering = ["courtUUID"] #this reinforces the default
+        ordering = ["position"]
 
 
 class Citation(models.Model):

@@ -97,6 +97,7 @@ class SolrConnection(object):
             raise SolrError(r, c)
 
     def select(self, params):
+        print "sunburnt.SolrConnection.select params: %s" % str(params)
         qs = urllib.urlencode(params)
         url = "%s?%s" % (self.select_url, qs)
         if len(url) > self.max_length_get_url:
@@ -211,13 +212,13 @@ class SolrInterface(object):
         else:
             return q
 
-    def raw_query(self, **kwargs):
+    def raw_query(self, *args, **kwargs):
         # Accepts a query, and builds a RawSolrSearch object from it.
         if not self.readable:
             raise TypeError("This Solr instance is only for writing")
         r = RawSolrSearch(self)
-        if len(kwargs) > 0:
-            return r.query(**kwargs)
+        if len(args) + len(kwargs) > 0:
+            return r.query(*args, **kwargs)
         else:
             return r
 
