@@ -33,8 +33,8 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
+from alert.search.models import Court
 from alert.search.models import Document
-from alert.search.models import PACER_CODES
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
 from scrapers.tasks import extract_doc_content
@@ -53,17 +53,12 @@ def extract_all_docs(court):
     returns a string containing the result
     '''
 
-    print "NOW PARSING COURT: " + str(court)
-
-    # get the court IDs from models.py
-    courts = []
-    for code in PACER_CODES:
-        courts.append(code[0])
+    print "NOW PARSING COURT: %s" % (court,)
 
     # select all documents from this jurisdiction that lack plainText and were
     # downloaded from the court.
-    docs = Document.objects.filter(documentPlainText = "", documentHTML = "",
-        court__courtUUID = courts[court - 1], source = "C")
+    docs = Document.objects.filter(documentPlainText="", documentHTML="",
+        court__courtUUID=court, source="C")
 
     num_docs = docs.count()
     if num_docs == 0:
@@ -77,27 +72,22 @@ def extract_all_docs(court):
 def main():
     usage = "usage: %prog -c COURTID"
     parser = OptionParser(usage)
-    parser.add_option('-c', '--court', dest = 'court_id', metavar = "COURTID",
-        help = "The court to extract. Use 0 to extract all courts.")
+    parser.add_option('-c', '--court', dest='court_id', metavar="COURTID",
+        help="The court to extract. Use 0 to extract all courts.")
     options, _ = parser.parse_args()
 
-    try:
-        court = int(options.court_id)
-    except ValueError:
-        print "Court must be a valid int value."
-        exit(1)
+    court = options.court_id
 
-    if court == 0:
-        # We use a while loop to do all courts.
-        court = 1
-        while court <= len(PACER_CODES):
+    if court == 'all':
+        # get the court IDs from models.py
+        courts = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
+        for court in courts:
             # This catches all exceptions regardless of their trigger, so
             # if one court dies, the next isn't affected.
             try:
                 extract_all_docs(court)
             except Exception:
                 print '*****Uncaught error parsing court*****\n"' + traceback.format_exc() + "\n\n"
-            court += 1
     else:
         # We just do the court requested
         extract_all_docs(court)

@@ -96,12 +96,15 @@ SOLR DEPLOYMENT:
         update django_content_type set app_label = 'search' where name='document';
         
         python manage.py reset south
-        python manage.py convert_to_south alerts
-        python manage.py convert_to_south userHandling
-        python manage.py convert_to_south favorites
-        python manage.py convert_to_south search
-        python manage.py convert_to_south scrapers
-      
+        
+        mysql> insert into south_migrationhistory set app_name='alerts', migration='0001_initial', applied='2011-12-01'; -- fakes the convert_to_south command
+        mysql> insert into south_migrationhistory set app_name='userHandling', migration='0001_initial', applied='2011-12-01'; -- fakes the convert_to_south command
+        mysql> insert into south_migrationhistory set app_name='favorites', migration='0001_initial', applied='2011-12-01'; -- fakes the convert_to_south command
+        mysql> insert into south_migrationhistory set app_name='scrapers', migration='0001_initial', applied='2011-12-01'; -- fakes the convert_to_south command
+        mysql> insert into south_migrationhistory set app_name='search', migration='0001_initial', applied='2011-12-01'; # fakes the convert_to_south command
+        python manage.py migrate search --auto #runs the migration needed on this model
+        
+        # Don't think this is necessary. Not sure why it's here.
         python manage.py syncdb
  
  - uninstall Sphinx!

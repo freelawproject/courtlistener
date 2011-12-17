@@ -16,7 +16,6 @@
 
 # imports of local settings and views
 from alert import settings
-from alert.search.models import PACER_CODES
 from alert.casepage.views import view_case
 from alert.contact.views import contact
 from alert.contact.views import thanks
@@ -35,6 +34,7 @@ from alert.robots.views import robots
 from alert.alerts.views import delete_alert
 from alert.alerts.views import delete_alert_confirm
 from alert.alerts.views import edit_alert
+from alert.search.models import Court
 from alert.search.views import show_results
 from alert.search.views import tools_page
 from alert.tinyurl.views import redirect_short_url
@@ -67,9 +67,7 @@ from django.contrib import admin
 admin.autodiscover()
 
 # creates a list of the first element of the choices variable for the courts field
-pacer_codes = []
-for code in PACER_CODES:
-    pacer_codes.append(code[0])
+pacer_codes = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
 
 urlpatterns = patterns('',
     # Admin docs and site

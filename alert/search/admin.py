@@ -49,7 +49,10 @@ class DocumentAdmin(admin.ModelAdmin):
     search_fields = ['documentPlainText']
 
 
+class CourtAdmin(admin.ModelAdmin):
+    list_display = ('full_name', 'short_name', 'position', 'in_use')
+
 admin.site.register(Document, DocumentAdmin)
-admin.site.register(Court)
+admin.site.register(Court, CourtAdmin)
 admin.site.register(Citation, CitationAdmin)
 

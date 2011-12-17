@@ -58,6 +58,11 @@ def get_date_filed_or_return_zero(doc):
 
 
 def show_results(request):
+    solr_log = open('/var/log/solr/solr.log', 'a')
+    solr_log.write('\n\n')
+    solr_log.close()
+    print
+    print
     '''Show the results for a query
     
     Implements a parallel faceted search interface with Solr as the backend.
@@ -95,16 +100,49 @@ def show_results(request):
     message_user(query, request)
 
     # Build up all the queries needed
-    results_si = conn.raw_query()
-    print type(results_si)
-    results_si.query('court -newell')
-    print results_si
-    print type(results_si)
-    assert False
-    #facet_si = conn.query()
-    #facet_si = facet_si.query(facet_si.Q(query))
-    highlight_si = conn.query()
-    highlight_si = highlight_si.query(highlight_si.Q({'q':'court -newell'}))
+    params = {}
+    params['q'] = query
+    params['facet'] = 'true'
+    params['facet.field'] = ['status_exact', 'court_exact']
+    #try:
+    print "alert.search.views request.GET['selected_facets']: %s" % request.GET['selected_facets']
+    params['selected_facets'] = request.GET['selected_facets']
+    #except
+
+    results_si = conn.raw_query(**params)
+    facet_fields = results_si.execute().facet_counts.facet_fields
+
+    # Set up pagination
+    paginator = Paginator(results_si, 20)
+    page = request.GET.get('page', 1)
+    try:
+        paged_results = paginator.page(page)
+    except PageNotAnInteger:
+        # If page is not an integer, deliver first page.
+        paged_results = paginator.page(1)
+    except EmptyPage:
+        # If page is out of range (e.g. 9999), deliver last page of results.
+        paged_results = paginator.page(paginator.num_pages)
+    print "alert.search.views facet_fields.facet_counts: %s" % facet_fields
+
+    return render_to_response('search/search.html', {'query': query,
+                              'alert_form': alert_form, 'results': paged_results,
+                              'facet_fields': facet_fields},
+                              RequestContext(request))
+
+    #############
+    # SCRAPS
+    #############
+    #results_foo = results_si.execute()
+    #print results_foo[0]['caseName']
+
+    #                            &facet=true     facet.field=status_exact                      &q=court+-newell
+    #                            &facet=true     facet.field=court_exact&facet.field=status_exact&q=court+-newell
+    #facet_si = conn.raw_query(**{'facet':'true', 'facet.field':['court_exact', 'status_exact'], 'q':query}).execute()
+    #print facet_si
+    #facet_si = facet_si.facet_by('court_exact')
+    #highlight_si = conn.query()
+    #highlight_si = highlight_si.query(highlight_si.Q({'q':'court -newell'}))
     #INFO: [] webapp=/solr path=/select/ params={q=q} hits=35 status=0 QTime=1 
 
     #INFO: [] webapp=/solr path=/select/ params={q=court+-newell} hits=733 status=0 QTime=2 
@@ -123,16 +161,17 @@ def show_results(request):
     '''
 
     # Set up facet counts
-    facet_fields = {}
+    #facet_fields = {}
     #facet_fields = facet_si.facet_by('court_exact', mincount=1).facet_by('status_exact').execute().facet_counts.facet_fields
 
     # Set up highlighting
-    hl_results = highlight_si.highlight('text', snippets=5).highlight('status')\
-        .highlight('caseName').highlight('westCite').highlight('docketNumber')\
-        .highlight('lexisCite').highlight('westCite').execute()
+    #hl_results = highlight_si.highlight('text', snippets=5).highlight('status')\
+    #    .highlight('caseName').highlight('westCite').highlight('docketNumber')\
+    #    .highlight('lexisCite').highlight('westCite').execute()
     #import pprint
     #pprint.pprint(hl_results)
 
+    '''
     results = []
     for result in results_si.execute():
         #type(result['id'])
@@ -151,8 +190,7 @@ def show_results(request):
             temp_dict['text'] = result['text']
 
         results.append(temp_dict)
-
-    print results
+    '''
 
     '''
     Goal:
@@ -164,23 +202,6 @@ def show_results(request):
         d['highlighted_name'] = r.highlighting[d['id']]['name']
     book_list = r
     '''
-
-    # Set up pagination
-    paginator = Paginator(results, 20)
-    page = request.GET.get('page', 1)
-    try:
-        paged_results = paginator.page(page)
-    except PageNotAnInteger:
-        # If page is not an integer, deliver first page.
-        paged_results = paginator.page(1)
-    except EmptyPage:
-        # If page is out of range (e.g. 9999), deliver last page of results.
-        paged_results = paginator.page(paginator.num_pages)
-
-    return render_to_response('search/search.html', {'query': query,
-                              'alert_form': alert_form, 'results': paged_results,
-                              'hl_results': hl_results, 'facet_fields': facet_fields},
-                              RequestContext(request))
 
 
 def tools_page(request):
