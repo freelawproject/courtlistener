@@ -74,9 +74,19 @@ urlpatterns = patterns('',
     (r'^admin/doc/', include('django.contrib.admindocs.urls')),
     (r'^admin/', include(admin.site.urls)),
 
-    # favicon
+    # favicon and apple touch icons
     (r'^favicon\.ico$', 'django.views.generic.simple.redirect_to',
             {'url': '/media/images/ico/favicon.ico'}),
+    (r'^apple-touch-icon\.png$', 'django.views.generic.simple.redirect_to',
+            {'url': '/media/images/png/apple-touch-icon.png'}),
+    (r'^apple-touch-icon-57x57-precomposed\.png$', 'django.views.generic.simple.redirect_to',
+            {'url': '/media/images/png/apple-touch-icon-57x57-precomposed.png'}),
+    (r'^apple-touch-icon-72x72-precomposed\.png$', 'django.views.generic.simple.redirect_to',
+            {'url': '/media/images/png/apple-touch-icon-72x72-precomposed.png'}),
+    (r'^apple-touch-icon-114x114-precomposed\.png$', 'django.views.generic.simple.redirect_to',
+            {'url': '/media/images/png/apple-touch-icon-114x114-precomposed.png'}),
+    (r'^apple-touch-icon-precomposed\.png$', 'django.views.generic.simple.redirect_to',
+            {'url': '/media/images/png/apple-touch-icon-precomposed.png'}),
 
     # Display a case, a named URL because the get_absolute_url uses it.
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case,

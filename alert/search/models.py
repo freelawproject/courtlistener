@@ -118,28 +118,28 @@ class Court(models.Model):
 
 class Citation(models.Model):
     citationUUID = models.AutoField("a unique ID for each citation",
-        primary_key=True)
+                                    primary_key=True)
     slug = models.SlugField("URL that the document should map to",
-        max_length=50,
-        null=True)
+                            max_length=50,
+                            null=True)
     caseNameShort = models.CharField("short name, as it is usually found on the court website",
-        max_length=100,
-        blank=True,
-        db_index=True)
+                                     max_length=100,
+                                     blank=True,
+                                     db_index=True)
     caseNameFull = models.TextField("full name of the case, as found on the first page of the PDF",
-        blank=True)
+                                    blank=True)
     docketNumber = models.CharField("the docket number",
-        blank=True,
-        null=True,
-        max_length=50)
+                                    blank=True,
+                                    null=True,
+                                    max_length=50)
     westCite = models.CharField("WestLaw citation",
-        max_length=50,
-        blank=True,
-        null=True)
+                                max_length=50,
+                                blank=True,
+                                null=True)
     lexisCite = models.CharField("LexisNexis citation",
-        max_length=50,
-        blank=True,
-        null=True)
+                                 max_length=50,
+                                 blank=True,
+                                 null=True)
 
     def save(self, *args, **kwargs):
         '''
@@ -165,48 +165,48 @@ class Document(models.Model):
     '''A class which holds the bulk of the information regarding documents. This 
     must go last, since it references the above classes'''
     documentUUID = models.AutoField("a unique ID for each document",
-        primary_key=True)
+                                    primary_key=True)
     source = models.CharField("the source of the document",
-        max_length=3,
-        choices=DOCUMENT_SOURCES,
-        blank=True)
+                              max_length=3,
+                              choices=DOCUMENT_SOURCES,
+                              blank=True)
     documentSHA1 = models.CharField("unique ID for the document, as generated via sha1 on the PDF",
-        max_length=40,
-        db_index=True)
+                                    max_length=40,
+                                    db_index=True)
     dateFiled = models.DateField("the date filed by the court",
-        blank=True,
-        null=True,
-        db_index=True)
+                                 blank=True,
+                                 null=True,
+                                 db_index=True)
     court = models.ForeignKey(Court,
-        verbose_name="the court where the document was filed",
-        db_index=True)
+                              verbose_name="the court where the document was filed",
+                              db_index=True)
     citation = models.ForeignKey(Citation,
-        verbose_name="the citation information for the document",
-        blank=True,
-        null=True)
+                                 verbose_name="the citation information for the document",
+                                 blank=True,
+                                 null=True)
     download_URL = models.URLField("the URL on the court website where the document was originally scraped",
-        verify_exists=False,
-        db_index=True)
+                                   verify_exists=False,
+                                   db_index=True)
     time_retrieved = models.DateTimeField("the exact date and time stamp that the document was placed into our database",
-        auto_now_add=True,
-        editable=False)
+                                          auto_now_add=True,
+                                          editable=False)
     local_path = models.FileField("the location, relative to MEDIA_ROOT, where the files are stored",
-        upload_to=make_pdf_upload_path,
-        blank=True)
+                                  upload_to=make_pdf_upload_path,
+                                  blank=True)
     documentPlainText = models.TextField("plain text of the document after extraction from the PDF",
-        blank=True)
+                                         blank=True)
     documentHTML = models.TextField("HTML of the document",
-        blank=True)
+                                    blank=True)
     documentType = models.CharField("the type of document, as described by document_types.txt",
-        max_length=50,
-        blank=True,
-        choices=DOCUMENT_STATUSES)
+                                    max_length=50,
+                                    blank=True,
+                                    choices=DOCUMENT_STATUSES)
     date_blocked = models.DateField('original block date',
-        blank=True,
-        null=True)
+                                    blank=True,
+                                    null=True)
     blocked = models.BooleanField('block crawlers for this document',
-        db_index=True,
-        default=False)
+                                  db_index=True,
+                                  default=False)
 
     def __unicode__(self):
         if self.citation:
