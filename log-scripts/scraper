@@ -6,6 +6,6 @@
     noolddir
     sharedscripts
     postrotate
-    /etc/init.d/scraper restart 
+        /etc/init.d/scraper restart 
     endscript
 }

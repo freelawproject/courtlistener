@@ -31,9 +31,9 @@ from alert import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alert.alertSystem.models import Citation
-from alert.alertSystem.models import Document
-from alert.alertSystem.models import urlToHash
+from alert.search.models import Citation
+from alert.search.models import Document
+from alert.scrapers.models import urlToHash
 from alert.lib.string_utils import clean_string
 from alert.lib.string_utils import harmonize
 from alert.lib.string_utils import titlecase
@@ -62,7 +62,7 @@ logger.setLevel(logging.DEBUG)
 
 # Add the log message handler to the logger
 handler = logging.handlers.RotatingFileHandler(
-              LOG_FILENAME, maxBytes = 5120000, backupCount = 1)
+              LOG_FILENAME, maxBytes=5120000, backupCount=1)
 
 logger.addHandler(handler)
 
@@ -99,7 +99,7 @@ def printAndLogNewDoc(VERBOSITY, ct, cite):
     '''
     Simply prints the log message and then logs it.
     '''
-    caseName = smart_unicode(str(cite), errors = 'ignore')
+    caseName = smart_unicode(str(cite), errors='ignore')
     if (cite.westCite != '') and (cite.westCite != None):
         caseNum = cite.westCite
     elif (cite.lexisCite != '') and (cite.lexisCite != None):
@@ -128,7 +128,7 @@ def makeDocFromURL(LinkToDoc, ct):
     '''
 
     # Percent encode URLs if necessary.
-    LinkToDoc = urllib2.quote(LinkToDoc, safe = "%/:=&?~#+!$,;'@()*[]")
+    LinkToDoc = urllib2.quote(LinkToDoc, safe="%/:=&?~#+!$,;'@()*[]")
 
     # get the Doc
     try:
@@ -154,8 +154,8 @@ def makeDocFromURL(LinkToDoc, ct):
     sha1Hash = hashlib.sha1(data).hexdigest()
 
     # using that, we check for a dup
-    doc, created = Document.objects.get_or_create(documentSHA1 = sha1Hash,
-        court = ct)
+    doc, created = Document.objects.get_or_create(documentSHA1=sha1Hash,
+        court=ct)
 
     if created:
         # we only do this if it's new
@@ -174,7 +174,7 @@ def courtChanged(url, contents):
     and it is the same, it returns False. Else, it returns True.
     '''
     sha1Hash = hashlib.sha1(contents).hexdigest()
-    url2Hash, created = urlToHash.objects.get_or_create(url = url)
+    url2Hash, created = urlToHash.objects.get_or_create(url=url)
 
     if not created and url2Hash.SHA1 == sha1Hash:
         # it wasn't created, and it has the same SHA --> not changed.
@@ -194,7 +194,7 @@ def courtChanged(url, contents):
         return True
 
 
-def hasDuplicate(caseName, westCite = None, docketNumber = None):
+def hasDuplicate(caseName, westCite=None, docketNumber=None):
     '''Determines if the case name and number are already in the DB.
 
     Takes either a caseName, a westCite or a docketNumber or both, and checks
@@ -220,16 +220,16 @@ def hasDuplicate(caseName, westCite = None, docketNumber = None):
     if westCite and docketNumber:
         # We have both the west citation and the docket number
         cite, created = Citation.objects.get_or_create(
-            caseNameShort = str(caseNameShort), westCite = str(westCite),
-            docketNumber = str(docketNumber))
+            caseNameShort=str(caseNameShort), westCite=str(westCite),
+            docketNumber=str(docketNumber))
     elif westCite and not docketNumber:
         # Only the west citation was provided.
         cite, created = Citation.objects.get_or_create(
-            caseNameShort = str(caseNameShort), westCite = str(westCite))
+            caseNameShort=str(caseNameShort), westCite=str(westCite))
     elif docketNumber and not westCite:
         # Only the docketNumber was provided.
         cite, created = Citation.objects.get_or_create(
-            caseNameShort = str(caseNameShort), docketNumber = str(docketNumber))
+            caseNameShort=str(caseNameShort), docketNumber=str(docketNumber))
 
     cite.caseNameFull = caseName
 

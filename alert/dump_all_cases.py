@@ -30,7 +30,7 @@ setup_environ(settings)
 
 from datetime import date
 
-from alert.alertSystem.models import Document
+from alert.search.models import Document
 from alert.lib.dump_lib import make_dump_file
 from alert.lib.db_tools import queryset_iterator
 from alert.settings import DUMP_DIR

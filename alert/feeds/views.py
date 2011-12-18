@@ -21,8 +21,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import feedgenerator
 from django.utils.feedgenerator import Atom1Feed
 
-from alert.alertSystem.models import Court, Document
-from alert.search.views import preparseQuery
+from alert.search.models import Court, Document
 
 
 class searchFeed(Feed):
@@ -48,10 +47,10 @@ class searchFeed(Feed):
     author_email = "feeds@courtlistener.com"
 
     def items(self, obj):
-        # Do a Sphinx query here. Return the first 20 results that aren't too
+        '''# Do a Sphinx query here. Return the first 20 results that aren't too
         # old (fixes issue 110)
         import datetime
-        obj = preparseQuery(obj)
+        # TODO: Replace this line.
         queryset = Document.search.query(obj)
         results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
             .order_by('-dateFiled')
@@ -61,7 +60,8 @@ class searchFeed(Feed):
         for result in results:
             if (result.dateFiled > datetime.date(1900, 1, 1)):
                 parsedResults.append(result)
-        return parsedResults
+        return parsedResults'''
+        pass
 
     def item_author_name(self, item):
         return item.court
@@ -74,7 +74,7 @@ class searchFeed(Feed):
         return datetime.datetime.combine(item.dateFiled, datetime.time())
 
     def item_categories(self, item):
-        cat = [item.get_documentType_display(),]
+        cat = [item.get_documentType_display(), ]
         return cat
 
     description_template = 'feeds/template.html'
@@ -99,7 +99,7 @@ class courtFeed(Feed):
     author_email = "feeds@courtlistener.com"
 
     def items(self, obj):
-        return Document.objects.filter(court = obj.courtUUID).order_by("-dateFiled")[:20]
+        return Document.objects.filter(court=obj.courtUUID).order_by("-dateFiled")[:20]
 
     item_author_name = "CourtListener.com"
 
@@ -111,7 +111,7 @@ class courtFeed(Feed):
         return datetime.datetime.combine(item.dateFiled, datetime.time())
 
     def item_categories(self, item):
-        cat = [item.get_documentType_display(),]
+        cat = [item.get_documentType_display(), ]
         return cat
 
     description_template = 'feeds/template.html'
@@ -144,7 +144,7 @@ class allCourtsFeed(Feed):
         return datetime.datetime.combine(item.dateFiled, datetime.time())
 
     def item_categories(self, item):
-        cat = [item.get_documentType_display(),]
+        cat = [item.get_documentType_display(), ]
         return cat
 
     description_template = 'feeds/template.html'

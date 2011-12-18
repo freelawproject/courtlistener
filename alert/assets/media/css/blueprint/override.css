@@ -1,6 +1,10 @@
 /* --------------------------------------------------------------------------
 Sets up all the overrides or additional CSS that the site uses.
 ---------------------------------------------------------------------------*/
+/* Some good stuff from h4pl.com */
+::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
+::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
+
 
 .footer-item {
     float: left;
@@ -49,7 +53,8 @@ span.bold {
 }
 
 .hidden {
-    display: none;
+    display: none !important;
+    visibility: hidden;
 }
 
 .round {
@@ -73,6 +78,25 @@ span.bold {
     cursor: help;
 }
 
+mark {
+	/* Needs extra declarations for old browsers */
+    font-weight: bold;
+    background-color: #ffffbf;
+    color: #000;	
+    font-style: italic;
+}
+
+.serif {
+    font-family: "Warnock Pro","Goudy Old Style","Palatino","Book Antiqua",Georgia,serif;
+}
+
+.meta-data-header {
+    font-weight: bold;
+}
+.meta-data-value {
+    margin-right: 2em;	
+}
+
 
 
 /* layout */
@@ -81,29 +105,21 @@ span.bold {
     padding-top: 10px;
 }
 
-.navigation {
+#navigation {
     padding-bottom: 3em;
 }
 
-.navigation > ul {
+#navigation ul {
     display: inline;
     padding: 0;
 }
 
-.navigation > ul > li {
+#navigation ul li {
     list-style: none outside none;
     padding: 0em 0.7em 0em 0.0em;
     white-space: nowrap;
     text-align: center;
     display: inline;
-}
-
-#sidebar {
-    margin-top: 6px;
-}
-
-.sidebar-section {
-    margin-bottom: 2em;
 }
 
 #search-form table{
@@ -115,8 +131,7 @@ span.bold {
     padding: 0px;
 }
 
-#search-input-home-page, #search-input {
-    width: 500px;
+#search-input {
     border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
     border-style: solid none solid solid;
     border-width: 1px 0px 1px 1px;
@@ -125,23 +140,60 @@ span.bold {
 }
 
 #search-input {
-    width: 389px;
+    width: 592px;
 }
 
-#search-button-home-page, #search-button {
+#search-button {
     height: 32px;
     padding: 4px 10px;
     margin: 0px;
     border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
 }
 
-#search-input-home-page:focus, #search-input:focus{
+#search-input:focus{
     outline-style: none;
 }
 
 #search-button {
     left: 0px;
 }
+
+#new-search-chooser {
+    float: right;
+}
+
+#sidebar {
+    margin-top: 6px;
+}
+
+.sidebar-section {
+    margin-bottom: 2em;
+}
+
+#result-count {
+    float: left;    
+}
+
+#result-order-chooser {
+    float: right;
+}
+
+#pagination-left {
+    float: left;
+    width: 200px;	
+}
+
+#pagination-center {
+	margin: auto;
+	text-align: center;
+}
+
+#pagination-right {
+	float: right;
+	width: 200px;
+	text-align: right;
+}
+
 
 /* link formatting */
 a:link, a:visited {
@@ -349,7 +401,7 @@ fieldset.collapsed {
     background-color: #f0f0f0;
 }
 
-/* Sprites! */
+/* Sprites and arrows */
 .sprites {
     background-image     : url("/media/images/png/social-sprite.png");
     background-color     : transparent;
@@ -358,18 +410,82 @@ fieldset.collapsed {
     float: left;
 }
 
-.collapsed-heading {
-    background-position: -130px -2px;
-    padding: 0 0 0 20px;
-    float: none;
-    display: block;
+
+
+
+.arrow-down-before:before { 
+    content: '';
+    display: inline-block;  
+    border-color: #6683B7 transparent transparent transparent; 
+    border-style: solid;
+    border-width: 8px 5px 5px 5px;
+    height: 0;
+    margin: 2px 5px 0 0;
+    width: 0;
 }
 
-.expanded-heading {
-    background-position: -130px -16px;
-    padding: 0 0 0 20px;
-    float: none;
-    display: block;
+.arrow-right-before:before { 
+    content: '';
+    display: inline-block;  
+    border-color: transparent transparent transparent #6683B7; 
+    border-style: solid;
+    border-width: 5px 5px 5px 8px;
+    height: 0;
+    margin: 0 2px 4px 0;
+    width: 0;
+}
+
+.arrow-left-before:before { 
+    content: '';
+    display: inline-block;  
+    border-color: transparent #6683B7 transparent transparent; 
+    border-style: solid;
+    border-width: 5px 8px 5px 5px;
+    height: 0;
+    margin: 0 2px 2px 0;
+    width: 0;
+}
+
+.arrow-right-after:after { 
+    content: '';
+    display: inline-block;  
+    border-color: transparent transparent transparent #6683B7; 
+    border-style: solid;
+    border-width: 5px 5px 5px 8px;
+    height: 0;
+    margin: 0 0 2px 2px;
+    width: 0;
+}
+
+/* TODO: Make these circles cross browser as possible. Test in friggin' IE. */
+.red-circle {
+    background: none repeat scroll 0 0 #E45843;
+    border-radius: 6px;
+    content: "";
+    float: left;
+    height: 12px;
+    margin: 2px 12px 0 0;
+    width: 12px;
+}
+
+.orange-circle {
+    background: none repeat scroll 0 0 orange;
+    border-radius: 6px;
+    content: "";
+    float: left;
+    height: 12px;
+    margin: 2px 12px 0 0;
+    width: 12px;
+}
+
+.green-circle {
+    background: none repeat scroll 0 0 #62A66A;
+    border-radius: 6px;
+    content: "";
+    float: left;
+    height: 12px;
+    margin: 2px 12px 0 0;
+    width: 12px;
 }
 
 .copy_png_unselected {

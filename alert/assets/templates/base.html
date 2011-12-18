@@ -1,36 +1,46 @@
 <!DOCTYPE html>
-<html lang="en">
+<!--[if lt IE 7]> <html class="no-js ie6 lt8 lt7 oldie" lang="en"> <![endif]-->
+<!--[if IE 7]>    <html class="no-js ie7 lt8 oldie" lang="en"> <![endif]-->
+<!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en"> <!--<![endif]-->
     <head>
-        <meta charset=utf-8>
+        <meta charset="utf-8"/>
         <meta http-equiv="Content-Language" content="en"/>
         <meta name="language" content="en_us"/>
-        <meta name="description" content="Create alerts, search for and browse the latest Circuit Court and Supreme Court opinions. Updated daily with the latest appeals court documents.">
-        <meta name="keywords" content="court states district appeals united cir claim sentence circuit defendant evidence motion judgment plaintiffs filed judge review law conviction government"/>
-        <title>{% block title %}CourtListener.com{% endblock %}</title>
+        <meta name="description" content="Create alerts, search for and browse the latest court opinions. Updated automatically with the latest court documents."/>
         <link rel="author" href="humans.txt" type="text/plain"/>
-        <link rel="stylesheet" href="/media/css/blueprint/screen.css" type="text/css" media="screen, projection">
-        <link rel="stylesheet" href="/media/css/blueprint/print.css" type="text/css" media="print">
+        
+        <meta name="viewport" content="width=device-width,initial-scale=1"/>
+        <link rel="shortlink" href="crt.li">
+        <link rel="search" type="application/opensearchdescription+xml" title="CourtListener" href="/media/xml/opensearch.xml" />
+        <meta name="application-name" content="CourtListener"/>
+        <meta name="msapplication-tooltip" content="Create alerts, search for and browse the latest court opinions."/>
+        <meta name="msapplication-starturl" content="http://courtlistener.com"/>
+        <meta name="msapplication-navbutton-color" content="#6683B7"/>
+    
+        <link rel="stylesheet" href="/media/css/blueprint/style.css" type="text/css" media="screen, projection">
         <link rel="stylesheet" href="/media/css/blueprint/override.css" type="text/css" media="screen, projection">
         <link rel="stylesheet" href="/media/css/blueprint/plugins/fancy-type/screen.css" type="text/css" media="screen, projection">
         <link rel="stylesheet" href="/media/css/blueprint/plugins/buttons/screen.css" type="text/css" media="screen, projection">
-        <!--[if lt IE 8]><link rel="stylesheet" href="/media/css/blueprint/ie.css" type="text/css" media="screen, projection"><![endif]-->
+        <script src="js/libs/modernizr-2.0.6.min.js"></script>
+        <title>{% block title %}CourtListener.com{% endblock %}</title>
         {% block head %}{% endblock %}
     </head>
 
-    <body>
+    <body> 
         <div class="container">
             {% block header %}
-                <div class="header-container span-24">
-                    <div class="span-12 header" id="header">
+                <header class="header-container span-24">
+                    <div class="span-7 header" id="header">
                         <a href="/">
                             <img src="/media/images/png/logo.png"
-                                 alt="Court Listener logo"
+                                 alt="CourtListener logo"
                                  width="252"
                                  height="28"/>
                         </a>
 
                         {% if user.is_authenticated %}
-                            <div class="navigation">
+                            <div id="navigation">
                                 <ul>
                                     <li><a href="/opinions/all/">Browse</a></li>
                                     <li><a href="/profile/alerts/">Profile</a></li>
@@ -38,7 +48,7 @@
                                 </ul>
                             </div>
                         {% else %}
-                            <div class="navigation">
+                            <div id="navigation">
                                 <ul>
                                     <li><a href="/about/">About</a></li>
                                     <li><a href="/opinions/all">Browse</a></li>
@@ -57,43 +67,24 @@
                     </div>
 
                     {% block search-form %}
-                    <div class="span-12 last" id="searchform">
-                        <form action="/" method="get">
-                            <div id="search-form">
-                                <table>
-                                    <tbody>
-                                        <tr>
-                                            <td>
-                                                <input class="{% if not results.object_list or not query%}auto-focus{% endif %} wide-title"
-                                                name="q"
-                                                id="search-input"
-                                                value="{{query}}"
-                                                autocomplete="off">
-                                             </td>
-                                            <td>
-                                                <button type="submit" class="button title"
-                                                name="search" id="search-button">Search</button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </form>
+                    <div class="span-17 last" id="searchform">
+                        {% include "search/search_form_snippet.html" %}
                     </div>
                     {% endblock %}
-                </div>
+                </header>
                 <hr>
             {% endblock %}
 
             {% block sidebar %}
-                <div class="span-5 append-1" id="sidebar">
+                <div class="span-5 append-2" id="sidebar">
                 </div>
             {% endblock %}
 
+            {# TODO: Is this block being used somewhere? #}
             {% block nav %}{% endblock %}
             {% block content %}
-                <div class="span-18 last" id="content">
-                    <p>Your content seems to be missing!</p>
+                <div class="span-17 last" id="content">
+                    <p>Your content seems to be missing! This is never good.</p>
                 </div>
             {% endblock %}
 
@@ -102,7 +93,7 @@
                 <hr class="space">
                 <hr>
             </div>
-            <div class="span-24 last" id="footer">
+            <footer class="span-24 last">
                 <span class="footer-item">
                     <a href="/about/">About</a>
                 </span>
@@ -130,7 +121,7 @@
                 <span class="footer-item">
                     <a href="/contact/">Contact / Engage</a>
                 </span>
-            </div>
+            </footer>
         </div>
         {% if not user.is_superuser  %}
             <!-- Piwik -->
@@ -146,5 +137,10 @@
             </script><noscript><p><img src="http://piwik.courtlistener.com/piwik.php?idsite=1" style="border:0" alt=""/></p></noscript>
             <!-- End Piwik Tag -->
         {% endif %}
+        <!--[if lt IE 7 ]>
+		    <script src="//ajax.googleapis.com/ajax/libs/chrome-frame/1.0.3/CFInstall.min.js"></script>
+		    <script>window.attachEvent('onload',function(){CFInstall.check({mode:'inline', url:'/bad-browser/', cssText: 'width: 100%; height: 200px;' })})</script>
+	    <![endif]-->
+        {% block footer-scripts %}{% endblock %}
     </body>
 </html>

@@ -31,12 +31,6 @@ def validateForBing(request):
 def validateForGoogle(request):
     return HttpResponse('google-site-verification: googleef3d845637ccb353.html')
 
-def validateForGoogle2(request):
-    return HttpResponse('google-site-verification: google646349975c2495b6.html')
-
-def validateForGoogle3(request):
-    return HttpResponse('google-site-verification: google646349975c2495b6.html')
-
 def robots(request):
     robots = "User-agent: *\
 Disallow: "
