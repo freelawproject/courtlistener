@@ -24,8 +24,7 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alert.alertSystem.models import Court
-from alert.alertSystem.models import PACER_CODES
+from alert.search.models import Court
 from alert.lib.string_utils import clean_string
 from alert.lib.string_utils import titlecase
 from alert.lib.scrape_tools import courtChanged
@@ -65,12 +64,12 @@ def signal_handler(signal, frame):
 def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
     if VERBOSITY >= 1: print "NOW SCRAPING COURT: " + str(courtID)
 
-    if (courtID == 1):
+    if (courtID == 'ca1'):
         # PDFs are available from the first circuit if you go to their RSS feed.
         # So go to their RSS feed we shall.
 
         urls = ("http://www.ca1.uscourts.gov/opinions/opinionrss.php",)
-        ct = Court.objects.get(courtUUID = 'ca1')
+        ct = Court.objects.get(courtUUID=courtID)
 
         for url in urls:
             try: html = readURL(url, courtID)
@@ -99,7 +98,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             caseNamesAndNumbers = tree.xpath("//item/title")
 
             caseDateRegex = re.compile("(\d{2}/\d{2}/\d{4})",
-                re.VERBOSE | re.DOTALL)
+                                       re.VERBOSE | re.DOTALL)
             docketNumberRegex = re.compile("(\d{2}-.*?\W)(.*)$")
 
             # incredibly, this RSS feed is in cron order, so new stuff is at the
@@ -167,7 +166,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 i -= 1
         return
 
-    elif (courtID == 2):
+    elif (courtID == 'ca2'):
         #  URL hacking FTW.
 
         # Note that for some reason, setting the IW_DATABASE to Both makes the
@@ -176,7 +175,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=OPN&IW_FIELD_TEXT=*&IW_SORT=-Date&IW_BATCHSIZE=100",
             "http://www.ca2.uscourts.gov/decisions?IW_DATABASE=SUM&IW_FIELD_TEXT=*&IW_SORT=-Date&IW_BATCHSIZE=100",
         )
-        ct = Court.objects.get(courtUUID = 'ca2')
+        ct = Court.objects.get(courtUUID=courtID)
 
         for url in urls:
             try: html = readURL(url, courtID)
@@ -186,7 +185,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             aTagsRegex = re.compile('(.*?.pdf).*?', re.IGNORECASE)
             docketNumRegex = re.compile('.*/(\d{1,2}-\d{1,4})(.*).pdf')
-            aTags = soup.findAll(attrs = {'href' : aTagsRegex})
+            aTags = soup.findAll(attrs={'href' : aTagsRegex})
 
             if DAEMONMODE:
                 # this mess is necessary because the court puts random
@@ -265,7 +264,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 i += 1
         return
 
-    elif (courtID == 3):
+    elif (courtID == 'ca3'):
         #  This URL provides the latest 25 cases, so I need to pick out the new
         # ones and only get those. I can do this efficiently by trying to do each,
         # and then giving up once I hit one that I've done before. This will work
@@ -277,7 +276,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             "http://www.ca3.uscourts.gov/recentop/week/recprec.htm",
             "http://www.ca3.uscourts.gov/recentop/week/recnonprec.htm",
             )
-        ct = Court.objects.get(courtUUID = 'ca3')
+        ct = Court.objects.get(courtUUID=courtID)
 
         for url in urls:
             try: html = readURL(url, courtID)
@@ -294,7 +293,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             # all links ending in pdf, case insensitive
             regex = re.compile("pdf$", re.IGNORECASE)
-            aTags = soup.findAll(attrs = {"href": regex})
+            aTags = soup.findAll(attrs={"href": regex})
 
             # we will use these vars in our while loop, better not to compile them
             # each time
@@ -353,13 +352,13 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 i += 1
         return
 
-    elif (courtID == 4):
+    elif (courtID == 'ca4'):
         # The fourth circuit is THE worst form of HTML I've ever seen. It's
         # going to break a lot, but I've done my best to clean it up, and make it
         # reliable.
 
         urls = ("http://pacer.ca4.uscourts.gov/opinions_today.htm",)
-        ct = Court.objects.get(courtUUID = 'ca4')
+        ct = Court.objects.get(courtUUID=courtID)
 
         for url in urls:
             try: html = readURL(url, courtID)
@@ -382,7 +381,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             # all links ending in pdf, case insensitive
             regex = re.compile("pdf$", re.IGNORECASE)
-            aTags = soup.findAll(attrs = {"href": regex})
+            aTags = soup.findAll(attrs={"href": regex})
             if VERBOSITY >= 3: print aTags
 
             i = 0
@@ -454,7 +453,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 i += 1
         return
 
-    elif (courtID == 5):
+    elif (courtID == 'ca5'):
         # New fifth circuit scraper, which can get back versions all the way to
         # 1992!
 
@@ -463,7 +462,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         # within the set. Watch closely.
 
         urls = ("http://www.ca5.uscourts.gov/Opinions.aspx",)
-        ct = Court.objects.get(courtUUID = 'ca5')
+        ct = Court.objects.get(courtUUID=courtID)
 
         for url in urls:
             # Use just one date, it seems to work better this way.
@@ -499,7 +498,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             #all links ending in pdf, case insensitive
             aTagRegex = re.compile("pdf$", re.IGNORECASE)
-            aTags = soup.findAll(attrs = {"href": aTagRegex})
+            aTags = soup.findAll(attrs={"href": aTagRegex})
 
             unpubRegex = re.compile(r"pinions.*unpub")
 
@@ -567,14 +566,14 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 i += 1
         return
 
-    elif (courtID == 6):
+    elif (courtID == 'ca6'):
         # Results are available without an HTML POST, but those results lack a
         # date field. Hence, we must do an HTML POST.
 
         # Missing a day == OK. Just need to monkey with the date POSTed.
 
         urls = ("http://www.ca6.uscourts.gov/cgi-bin/opinions.pl",)
-        ct = Court.objects.get(courtUUID = 'ca6')
+        ct = Court.objects.get(courtUUID=courtID)
 
         for url in urls:
             today = datetime.date.today()
@@ -604,7 +603,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             soup = BeautifulSoup(html)
 
             aTagsRegex = re.compile('pdf$', re.IGNORECASE)
-            aTags = soup.findAll(attrs = {'href' : aTagsRegex})
+            aTags = soup.findAll(attrs={'href' : aTagsRegex})
 
             i = 0
             dupCount = 0
@@ -661,14 +660,14 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 i += 1
         return
 
-    elif (courtID == 7):
+    elif (courtID == 'ca7'):
         # another court where we need to do a post. This will be a good
         # starting place for getting the judge field, when we're ready for that.
 
         # Missing a day == OK. Queries return cases for the past week.
 
         urls = ("http://www.ca7.uscourts.gov/fdocs/docs.fwx",)
-        ct = Court.objects.get(courtUUID = 'ca7')
+        ct = Court.objects.get(courtUUID=courtID)
 
         for url in urls:
             # if these strings change, check that documentType still gets set correctly.
@@ -690,7 +689,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 soup = BeautifulSoup(html)
 
                 aTagsRegex = re.compile('pdf$', re.IGNORECASE)
-                aTags = soup.findAll(attrs = {'href' : aTagsRegex})
+                aTags = soup.findAll(attrs={'href' : aTagsRegex})
 
                 i = 0
                 dupCount = 0
@@ -743,7 +742,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     i += 1
         return
 
-    elif (courtID == 8):
+    elif (courtID == 'ca8'):
         # Has a search interface that can be hacked with POST data, but the
         # HTML returned from it is an utter wasteland consisting of nothing but
         # <br>, <b> and text. So we can't really use it.
@@ -755,7 +754,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         # Missing a day == bad.
 
         urls = ("http://www.ca8.uscourts.gov/cgi-bin/new/today2.pl",)
-        ct = Court.objects.get(courtUUID = 'ca8')
+        ct = Court.objects.get(courtUUID=courtID)
 
         for url in urls:
             try: html = readURL(url, courtID)
@@ -771,7 +770,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             soup = BeautifulSoup(html)
 
             aTagsRegex = re.compile('pdf$', re.IGNORECASE)
-            aTags = soup.findAll(attrs = {'href' : aTagsRegex})
+            aTags = soup.findAll(attrs={'href' : aTagsRegex})
 
             docketNumRegex = re.compile('(\d{2})(\d{4})(u|p)', re.IGNORECASE)
             caseDateRegex = re.compile('(\d{2}/\d{2}/\d{4})(.*)(</b>)')
@@ -828,7 +827,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 i += 1
         return
 
-    elif (courtID == 9):
+    elif (courtID == 'ca9'):
         # This court, by virtue of having a javascript laden website, was very
         # hard to parse properly. BeautifulSoup couldn't handle it at all, so lxml
         # has to be used.
@@ -840,7 +839,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             "http://www.ca9.uscourts.gov/memoranda/?o_mode=view&amp;o_sort_field=21&amp;o_sort_type=DESC&o_page_size=100",
             )
 
-        ct = Court.objects.get(courtUUID = 'ca9')
+        ct = Court.objects.get(courtUUID=courtID)
 
         for url in urls:
             if VERBOSITY >= 1: print "Scraping URL: " + url
@@ -927,10 +926,10 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
         return
 
-    elif (courtID == 10):
+    elif (courtID == 'ca10'):
         # a daily feed of all the items posted THAT day. Missing a day == bad.
         urls = ("http://www.ca10.uscourts.gov/opinions/new/daily_decisions.rss",)
-        ct = Court.objects.get(courtUUID = 'ca10')
+        ct = Court.objects.get(courtUUID=courtID)
 
         for url in urls:
             try: html = readURL(url, courtID)
@@ -1019,7 +1018,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 i += 1
         return
 
-    elif (courtID == 11):
+    elif (courtID == 'ca11'):
         # Prior to rev 313 (2010-04-27), this got published documents only,
         # using the court's RSS feed.
 
@@ -1032,7 +1031,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
             "http://www.ca11.uscourts.gov/unpub/searchdate.php",
             "http://www.ca11.uscourts.gov/opinions/searchdate.php",
         )
-        ct = Court.objects.get(courtUUID = 'ca11')
+        ct = Court.objects.get(courtUUID=courtID)
 
         for url in urls:
             date = time.strftime('%Y-%m', datetime.date.today().timetuple())
@@ -1113,10 +1112,10 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 i += 1
         return
 
-    elif (courtID == 12):
+    elif (courtID == 'cadc'):
         # A decent RSS feed, created 2011-02-01
         urls = ("http://www.cadc.uscourts.gov/internet/opinions.nsf/uscadcopinions.xml",)
-        ct = Court.objects.get(courtUUID = 'cadc')
+        ct = Court.objects.get(courtUUID=courtID)
 
         for url in urls:
             try: html = readURL(url, courtID)
@@ -1186,10 +1185,10 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 i += 1
         return
 
-    elif (courtID == 13):
+    elif (courtID == 'cafc'):
         # for last seven days use:
         urls = ("http://www.cafc.uscourts.gov/index.php?searchword=&ordering=&date=7&type=&origin=&searchphrase=all&Itemid=12&option=com_reports",)
-        ct = Court.objects.get(courtUUID = "cafc")
+        ct = Court.objects.get(courtUUID=courtID)
 
         for url in urls:
             try: html = readURL(url, courtID)
@@ -1275,12 +1274,12 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 i += 1
         return
 
-    if (courtID == 14):
+    if (courtID == 'scotus'):
         # we do SCOTUS
         urls = ("http://www.supremecourt.gov/opinions/slipopinions.aspx",
                 "http://www.supremecourt.gov/opinions/in-chambers.aspx",
                 "http://www.supremecourt.gov/opinions/relatingtoorders.aspx",)
-        ct = Court.objects.get(courtUUID = 'scotus')
+        ct = Court.objects.get(courtUUID=courtID)
 
         for url in urls:
             if VERBOSITY >= 1: print "Scraping URL: " + url
@@ -1379,16 +1378,16 @@ def main():
     global dieNow
 
     # this line is used for handling SIGINT, so things can die safely.
-    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGQUIT, signal_handler)
 
     usage = "usage: %prog -d | (-c COURTID [-v {1,2}])"
     parser = OptionParser(usage)
-    parser.add_option('-d', '--daemon', action = "store_true", dest = 'daemonmode',
-        default = False, help = "Use this flag to turn on daemon mode at a rate of 20 minutes between each scrape")
-    parser.add_option('-c', '--court', dest = 'courtID', metavar = "COURTID",
-        help = "The court to scrape and extract")
-    parser.add_option('-v', '--verbosity', dest = 'verbosity', metavar = "VERBOSITY",
-        help = "Display status messages after execution. Higher values print more verbosity.")
+    parser.add_option('-d', '--daemon', action="store_true", dest='daemonmode',
+        default=False, help="Use this flag to turn on daemon mode at a rate of 20 minutes between each scrape")
+    parser.add_option('-c', '--court', dest='courtID', metavar="COURTID",
+        help="The court to scrape and extract")
+    parser.add_option('-v', '--verbosity', dest='verbosity', metavar="VERBOSITY",
+        help="Display status messages after execution. Higher values print more verbosity.")
     (options, args) = parser.parse_args()
 
     DAEMONMODE = options.daemonmode
@@ -1409,20 +1408,19 @@ def main():
             print "Error: court not found"
             raise ObjectDoesNotExist
 
-        if courtID == 0:
-            # we use a while loop to do all courts.
-            courtID = 1
-            while courtID <= len(PACER_CODES):
+        if courtID == 'all':
+            # get the court IDs from models.py
+            courts = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
+            for court in courts:
                 # This catches all exceptions regardless of their trigger, so
                 # if one court dies, the next isn't affected.
                 try:
-                    scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
+                    scrapeCourt(court, DAEMONMODE, VERBOSITY)
                 except Exception:
                     print '*****Uncaught error scraping court*****\n"' + traceback.format_exc() + "\n\n"
                 # this catches SIGINT, so the code can be killed safely.
                 if dieNow == True:
                     sys.exit(0)
-                courtID += 1
         else:
             # we're only doing one court
             scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
@@ -1437,22 +1435,24 @@ def main():
         # If so, run the scrapers. If not, check the next one.
         VERBOSITY = 0
 
-        wait = (30 * 60) / len(PACER_CODES)
-        courtID = 1
-        while courtID <= len(PACER_CODES):
-            scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
+        # get the court IDs from models.py
+        courts = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
+        num_courts = len(courts)
+        wait = (30 * 60) / len(courts)
+        i = 0
+        while i <= num_courts:
+            scrapeCourt(courts[i], DAEMONMODE, VERBOSITY)
             # this catches SIGINT, so the code can be killed safely.
             if dieNow == True:
                 sys.exit(0)
 
             time.sleep(wait)
-            if courtID == len(PACER_CODES):
+            if i == num_courts:
                 # reset courtID
-                courtID = 1
+                i = 0
             else:
                 # increment it
-                courtID += 1
-
+                i += 1
     return 0
 
 

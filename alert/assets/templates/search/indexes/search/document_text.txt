@@ -1,0 +1,13 @@
+{{ object.documentPlainText }}
+{{ object.documentHTML|striptags }}
+{{ object.citation.caseNameFull }}
+{{ object.documentType }}
+{{ object.documentSHA1 }}
+{{ object.court }}
+{{ object.court.shortName }}
+{{ object.court.courtUUID }}
+
+{# This code must match the code in document_caseNumber.txt #}
+{{ object.citation.docketNumber }}
+{{ object.citation.westCite }}
+{{ object.citation.lexisCite }} 

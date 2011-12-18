@@ -18,58 +18,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.localflavor.us.models import USStateField
-from django.core.validators import MaxLengthValidator
-from alert.alertSystem.models import Document
-
-FREQUENCY = (
-    ('dly', 'Daily'),
-    ('wly', 'Weekly'),
-    ('mly', 'Monthly'),
-    ('off', 'Off'),
-)
-
-
-# a class where alerts are held/handled.
-class Alert(models.Model):
-    alertUUID = models.AutoField('a unique ID for each alert', primary_key=True)
-    alertName = models.CharField('a name for the alert', max_length=75)
-    alertText = models.CharField('the text of an alert created by a user',
-        max_length=200)
-    alertFrequency = models.CharField('the rate chosen by the user for the alert',
-        choices=FREQUENCY,
-        max_length=10)
-    alertPrivacy = models.BooleanField('should the alert be considered private',
-        default=True)
-    sendNegativeAlert = models.BooleanField('should alerts be sent when there are no hits during a specified period',
-        default=False)
-    lastHitDate = models.DateTimeField('the exact date and time stamp that the alert last sent an email',
-        blank=True,
-        null=True)
-
-    def __unicode__(self):
-        return 'Alert ' + str(self.alertUUID) + ': ' + self.alertText
-
-    class Meta:
-        verbose_name = 'alert'
-        ordering = [ 'alertFrequency', 'alertText']
-        db_table = 'Alert'
-
-
-# a class where favorites are held
-class Favorite(models.Model):
-    doc_id = models.ForeignKey(Document,
-        verbose_name='the document that is favorited')
-    name  = models.CharField('a name for the alert', max_length=100)
-    notes = models.TextField('notes about the favorite',
-        validators=[MaxLengthValidator(500)],
-        max_length=500,
-        blank=True)
-    def __unicode__(self):
-        return 'Favorite %s' % self.id
-
-    class Meta:
-        db_table = 'Favorite'
-
+from alert.alerts.models import Alert
+from alert.favorites.models import Favorite
 
 # a class where bar memberships are held and handled.
 class BarMembership(models.Model):
@@ -113,8 +63,8 @@ class UserProfile(models.Model):
         blank=True,
         null=True)
     favorite = models.ManyToManyField(Favorite,
-        verbose_name = 'the favorites created by the user',
-        related_name = 'users',
+        verbose_name='the favorites created by the user',
+        related_name='users',
         blank=True,
         null=True)
     plaintextPreferred = models.BooleanField('should the alert should be sent in plaintext',

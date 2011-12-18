@@ -5,8 +5,9 @@
 {% block search-form %}{% endblock %}
 {% block sidebar %}{% endblock %}
 
-{% block head %}
-    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+{% block footer-scripts %}
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="/media/js/jquery-1.6.2.min.js"><\/script>')</script>
     <script type="text/javascript">
 	    $(document).ready(function() {
 		    $('.auto-focus:first').focus();
@@ -15,7 +16,7 @@
 {% endblock %}
 
 {% block content %}
-    <div class="span-18 last append-1" id="content">
+    <div class="span-17 last" id="content">
         {% if alreadyConfirmed %}
             <div class="span-18">
                 <h2>Already confirmed</h2>

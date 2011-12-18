@@ -31,7 +31,7 @@ from alert import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alert.alertSystem.models import Document
+from alert.search.models import Document
 from alert.lib.string_utils import anonymize
 from celery.decorators import task
 from lxml import etree
