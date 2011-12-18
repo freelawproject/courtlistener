@@ -16,28 +16,24 @@
 
 # imports of local settings and views
 from alert import settings
-from alert.casepage.views import view_case
-from alert.contact.views import contact
-from alert.contact.views import thanks
-from alert.data_dumper.views import dump_index
-from alert.data_dumper.views import serve_or_gen_dump
-from alert.favorites.views import delete_favorite
-from alert.favorites.views import edit_favorite
-from alert.favorites.views import save_or_update_favorite
-from alert.feeds.views import allCourtsFeed
-from alert.feeds.views import courtFeed
-from alert.feeds.views import searchFeed
-from alert.pinger.views import validateForBing
-from alert.pinger.views import validateForGoogle
-from alert.pinger.views import validateForYahoo
+from alert.alertSystem.models import PACER_CODES
+from alert.alertSystem.views import delete_favorite
+from alert.alertSystem.views import edit_favorite
+from alert.alertSystem.views import redirect_short_url
+from alert.alertSystem.views import save_or_update_favorite
+from alert.alertSystem.views import viewCase
+from alert.alertSystem.views import viewDocumentListByCourt
+from alert.contact.views import contact, thanks
+from alert.data_dumper.views import dump_index, serve_or_gen_dump
+from alert.feeds.views import allCourtsFeed, courtFeed, searchFeed
+from alert.pinger.views import validateForBing, validateForGoogle, validateForYahoo
 from alert.robots.views import robots
-from alert.alerts.views import delete_alert
-from alert.alerts.views import delete_alert_confirm
-from alert.alerts.views import edit_alert
-from alert.search.models import Court
-from alert.search.views import show_results
-from alert.search.views import tools_page
-from alert.tinyurl.views import redirect_short_url
+from alert.search.views import deleteAlert
+from alert.search.views import deleteAlertConfirm
+from alert.search.views import editAlert
+from alert.search.views import home
+from alert.search.views import showResults
+from alert.search.views import toolsPage
 from alert.userHandling.views import confirmEmail
 from alert.userHandling.views import deleteProfile
 from alert.userHandling.views import deleteProfileDone
@@ -52,7 +48,7 @@ from alert.userHandling.views import viewAlerts
 from alert.userHandling.views import viewSettings
 
 # this imports a variable that can be handed to the sitemap index generator function.
-from alert.casepage.sitemap import all_sitemaps as sitemaps
+from alert.alertSystem.sitemap import all_sitemaps as sitemaps
 from django.conf.urls.defaults import *
 
 # for the flatfiles in the sitemap
@@ -67,31 +63,20 @@ from django.contrib import admin
 admin.autodiscover()
 
 # creates a list of the first element of the choices variable for the courts field
-pacer_codes = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
+pacer_codes = []
+for code in PACER_CODES:
+    pacer_codes.append(code[0])
 
 urlpatterns = patterns('',
     # Admin docs and site
     (r'^admin/doc/', include('django.contrib.admindocs.urls')),
     (r'^admin/', include(admin.site.urls)),
 
-    # favicon and apple touch icons
-    (r'^favicon\.ico$', 'django.views.generic.simple.redirect_to',
-            {'url': '/media/images/ico/favicon.ico'}),
-    (r'^apple-touch-icon\.png$', 'django.views.generic.simple.redirect_to',
-            {'url': '/media/images/png/apple-touch-icon.png'}),
-    (r'^apple-touch-icon-57x57-precomposed\.png$', 'django.views.generic.simple.redirect_to',
-            {'url': '/media/images/png/apple-touch-icon-57x57-precomposed.png'}),
-    (r'^apple-touch-icon-72x72-precomposed\.png$', 'django.views.generic.simple.redirect_to',
-            {'url': '/media/images/png/apple-touch-icon-72x72-precomposed.png'}),
-    (r'^apple-touch-icon-114x114-precomposed\.png$', 'django.views.generic.simple.redirect_to',
-            {'url': '/media/images/png/apple-touch-icon-114x114-precomposed.png'}),
-    (r'^apple-touch-icon-precomposed\.png$', 'django.views.generic.simple.redirect_to',
-            {'url': '/media/images/png/apple-touch-icon-precomposed.png'}),
+    # Court listing pages
+    (r'^opinions/(' + "|".join(pacer_codes) + '|all)/$', viewDocumentListByCourt),
 
     # Display a case, a named URL because the get_absolute_url uses it.
-    url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case,
-            name="viewCase"),
-
+    url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', viewCase, name = "viewCase"),
     # Redirect users
     (r'^x/(.*)/$', redirect_short_url),
 
@@ -100,20 +85,23 @@ urlpatterns = patterns('',
     (r'^contact/thanks/$', thanks),
 
     # Various sign in/out etc. functions as provided by django
-    url(r'^sign-in/$', signIn, name="sign-in"),
+    url(r'^sign-in/$', signIn, name = "sign-in"),
     (r'^sign-out/$', signOut),
+
+    # Homepage and favicon
+    (r'^$', home),
+    (r'^favicon\.ico$', 'django.views.generic.simple.redirect_to', {'url': '/media/images/ico/favicon.ico'}),
 
     # Settings pages
     (r'^profile/$', redirect_to_settings),
-    url(r'^profile/settings/$', viewSettings, name='viewSettings'),
+    url(r'^profile/settings/$', viewSettings, name = 'viewSettings'),
     (r'^profile/favorites/$', view_favorites),
     (r'^profile/alerts/$', viewAlerts),
     (r'^profile/password/change/$', password_change),
     (r'^profile/delete/$', deleteProfile),
     (r'^profile/delete/done/$', deleteProfileDone),
-    url(r'^register/$', register, name="register"),
+    url(r'^register/$', register, name = "register"),
     (r'^register/success/$', registerSuccess),
-
     # Favorites pages
     (r'^favorite/create-or-update/$', save_or_update_favorite),
     (r'^favorite/delete/$', delete_favorite),
@@ -124,23 +112,21 @@ urlpatterns = patterns('',
     (r'^email-confirmation/request/$', requestEmailConfirmation),
     (r'^email-confirmation/success/$', emailConfirmSuccess),
 
-    # Reset password pages
+    #Reset password pages
     (r'^reset-password/$', password_reset),
     (r'^reset-password/instructions-sent/$', password_reset_done),
-    (r'^confirm-password/(?P<uidb36>.*)/(?P<token>.*)/$',
-            password_reset_confirm,
-            {'post_reset_redirect': '/reset-password/complete/'}),
-    (r'^reset-password/complete/$', signIn,
-            {'template_name': 'registration/password_reset_complete.html'}),
+    (r'^confirm-password/(?P<uidb36>.*)/(?P<token>.*)/$', password_reset_confirm, {'post_reset_redirect': '/reset-password/complete/'}),
+    (r'^reset-password/complete/$', signIn, {'template_name': 'registration/password_reset_complete.html'}),
 
-    # Search pages
-    (r'^$', show_results), # the home page
-
-    # Alert pages
-    (r'^alert/edit/(\d{1,6})/$', edit_alert),
-    (r'^alert/delete/(\d{1,6})/$', delete_alert),
-    (r'^alert/delete/confirm/(\d{1,6})/$', delete_alert_confirm),
-    (r'^tools/$', tools_page),
+    # Alert/search pages
+    # These URLs support either GET requests or things like /alert/preview/searchterm.
+    #url(r'^(alert/preview)/$', showResults, name="alertResults"),
+    url(r'^search/results/$', showResults, name = "searchResults"),
+    (r'^search/$', showResults), #for the URL hackers in the crowd
+    (r'^alert/edit/(\d{1,6})/$', editAlert),
+    (r'^alert/delete/(\d{1,6})/$', deleteAlert),
+    (r'^alert/delete/confirm/(\d{1,6})/$', deleteAlertConfirm),
+    (r'^tools/$', toolsPage),
 
     # Dump index and generation pages
     (r'^dump-info/$', dump_index),
@@ -159,11 +145,10 @@ urlpatterns = patterns('',
     (r'^LiveSearchSiteAuth.xml$', validateForBing),
     (r'^googleef3d845637ccb353.html$', validateForGoogle),
     # Sitemap index generator
-    (r'^sitemap\.xml$', 'alert.casepage.sitemap.index_copy',
+    (r'^sitemap\.xml$', 'alert.alertSystem.sitemap.indexCopy',
         {'sitemaps': sitemaps}),
     # this uses a custom sitemap generator that has a file-based cache.
-    (r'^sitemap-(?P<section>.+)\.xml$', 'alert.casepage.sitemap.cached_sitemap',
-        {'sitemaps': sitemaps}),
+    (r'^sitemap-(?P<section>.+)\.xml$', 'alert.alertSystem.sitemap.cachedSitemap', {'sitemaps': sitemaps}),
     (r'^robots.txt$', robots)
 )
 
@@ -175,6 +160,7 @@ urlpatterns += patterns('django.views.generic.simple',
     ('^opinions/$', 'redirect_to', {'url': '/opinions/all/'}),
     ('^report/$', 'redirect_to', {'url': 'http://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf'}),
 )
+
 
 # if it's not the production site, serve the static files this way.
 if settings.DEVELOPMENT:

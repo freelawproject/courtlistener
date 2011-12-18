@@ -14,8 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from alert.search.models import Court
-from alert.search.models import Document
+from alert.alertSystem.models import Court
+from alert.alertSystem.models import Document
 from alert.lib.db_tools import queryset_iterator
 from alert.lib.dump_lib import make_dump_file
 from alert.lib.dump_lib import get_date_range

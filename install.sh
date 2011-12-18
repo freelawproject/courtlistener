@@ -38,7 +38,8 @@
 # - install django from source
 # - install CourtListener from source
 # - put some basic data in the database
-# - install & configure Solr & pysolr
+# - install & configure Sphinx
+# - install django-sphinx
 # - configure mysql & courtlistener
 # - install django-celery, celery and rabbitmq
 # - install the django-debug toolbar
@@ -49,7 +50,7 @@
 # It's a monster...hopefully one that works.
 
 
-function print_help {
+function printHelp {
 cat <<EOF
 NAME
     install.sh
@@ -67,25 +68,27 @@ OPTIONS
     --install   Install all components of the courtlistener software
 
     Lightly Tested Options
-    --check_deps
+    --checkdeps
             Verify that the required dependencies are installed.
     --mysql
             Configure the MySQL database
     --ffmpeg
             install the FFmpeg audio transcoding library from source
-    --solr
-            install the Solr search engine and pysolr connector
+    --sphinx
+            install the Sphinx search engine
     --django
             install Django
-    --courtlistener
+    --courtListener
             set up the CL repository, and configure it with django
-    --importdata
+    --importData
             import some basic data into the DB, setting up the courts
-    --debugtoolbar
+    --debugToolbar
             install the django debug toolbar
-    --djangocelery
+    --djangoCelery
             install django-celery to handle task queues
-    --djangoextensions
+    --djangoSphinx
+            install the django-sphinx connector
+    --djangoExtensions
             install the django-extensions package from github
     --south
             install the South DB migration tool from mercurial
@@ -100,7 +103,7 @@ EXIT STATUS
         3   Missing critical dependency
         4   Error installing django from source
         5   Error getting user input
-        6   Error installing Solr
+        6   Error installing Sphinx
         7   Error configuring MySQL
 
 AUTHOR AND COPYRIGHT
@@ -111,11 +114,12 @@ EOF
 }
 
 
-function get_user_input {
+function getUserInput {
 cat<<EOF
 Welcome to the install script. This script will install the CourtListener system
 on your Debian-based Linux computer. We will begin by gathering several pieces
-of input from you, and then we will install everything that's needed.
+of input from you, and then we will install django, courtlistener, sphinx,
+django-sphinx, django-debug toolbar, MySQL, and all their dependencies.
 
 EOF
     read -p "Shall we continue? (y/n): " proceed
@@ -206,10 +210,10 @@ Press enter to proceed, or Ctrl+C to abort. " proceed
 }
 
 
-function check_deps {
+function checkDeps {
     # this function checks for various dependencies that the script assumes are
     # installed for its own functionality.
-    deps=(aptitude antiword checkinstall daemon g++ gcc git-core ipython libmysqlclient-dev libmysql++-dev libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget)
+    deps=(aptitude antiword checkinstall g++ gcc git-core ipython libmysqlclient-dev libmysql++-dev libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget)
     echo -e "\n########################"
     echo "Checking dependencies..."
     echo "########################"
@@ -261,7 +265,7 @@ function check_deps {
 }
 
 
-function install_django {
+function installDjango {
     # this process simply installs django. Configuration is done later.
     echo -e "\n####################"
     echo "Installing django..."
@@ -305,7 +309,7 @@ function install_django {
 }
 
 
-function install_court_listener {
+function installCourtListener {
     # this is probably the most tricky part of the operation. We get the courtlistener
     # code, place it in the correct location, and then configure the heck out of
     # it.
@@ -341,8 +345,7 @@ function install_court_listener {
 
     # we link up the init scripts
     echo "Installing init scripts in /etc/init.d/scraper"
-    ln -s $CL_INSTALL_DIR/court-listener/init-scripts/scraper /etc/init.d/scraper
-    update-rc.d scraper defaults
+    ln -s $CL_INSTALL_DIR/court-listener/init-scripts/scraper-init-script.sh /etc/init.d/scraper
 
     # we create the logging file and set up logrotate scripts
     mkdir -p "/var/log/scraper"
@@ -355,7 +358,7 @@ function install_court_listener {
     # this is the MEDIA_ROOT
     MEDIA_ROOT="$CL_INSTALL_DIR/court-listener/alert/assets/media/"
     TEMPLATE_DIRS="$CL_INSTALL_DIR/court-listener/alert/assets/templates/"
-    DUMP_DIR="$CL_INSTALL_DIR/court-listener/alert/assets/media/dumps/"
+    DUMP_DIR="$CL_INSTALL_DIR/court-listener/alert/assets/dumps/"
 
     # convert true and false (bash) to True and False (Python)
     if $DEVELOPMENT
@@ -448,7 +451,7 @@ EOF
 }
 
 
-function configure_mysql {
+function configureMySQL {
     echo -e "\n####################"
     echo "Configuring MySQL..."
     echo "####################"
@@ -461,11 +464,18 @@ function configure_mysql {
 
     # create and configure the db.
     # first, we make a SQL script, then we execute it, then we delete it.
+    # this will also set up a table for Sphinx's main+delta scheme. Kludgy.
     cat <<EOF > install.sql
 CREATE DATABASE $MYSQL_DB_NAME CHARACTER SET utf8;
 GRANT ALL ON $MYSQL_DB_NAME.* to $MYSQL_USERNAME WITH GRANT OPTION;
 SET PASSWORD FOR $MYSQL_USERNAME = password('$MYSQL_PWD');
 FlUSH PRIVILEGES;
+USE $MYSQL_DB_NAME;
+CREATE TABLE sph_counter
+(
+    counter_id INTEGER PRIMARY KEY NOT NULL,
+    max_doc_id INTEGER NOT NULL
+);
 EOF
     echo -e "\nWe are about to create the database $MYSQL_DB_NAME, with username
 $MYSQL_USERNAME and password $MYSQL_PWD."
@@ -474,7 +484,7 @@ $MYSQL_USERNAME and password $MYSQL_PWD."
     mysql -u'root' -p < install.sql
     if [ $? == "0" ]
     then
-        rm install.sql
+        # rm install.sql
         echo -e '\nMySQL configured successfully.'
     else
         echo -e '\nError configuring MySQL. Aborting.'
@@ -483,11 +493,7 @@ $MYSQL_USERNAME and password $MYSQL_PWD."
 }
 
 
-#############################################################################
-# This function lives on only because eventually we'll want it. For now, it #
-# does nothing. I have often wanted to delete it...yet somehow it survives. #
-#############################################################################
-function install_ffmpeg {
+function installFFmpeg {
     echo -e "\n####################"
     echo "Installing FFmpeg..."
     echo "####################"
@@ -552,39 +558,276 @@ installing from source is necessary.\n"
 }
 
 
-function install_solr {
+function installSphinx {
     echo -e "\n####################"
-    echo "Installing Solr..."
+    echo "Installing Sphinx..."
     echo "####################"
-    read -p "Would you like to install Solr? (y/n): " proceed
+    read -p "Would you like to install Sphinx? (y/n): " proceed
     if [ $proceed == "n" ]
     then
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-    
-    cd /usr/local
-    echo "Downloading Solr 4.0 development snapshot from 2011-11-04..."
-    wget https://builds.apache.org/job/Solr-trunk/lastBuild/artifact/artifacts/apache-solr-4.0-2011-11-04_09-29-42.tgz
-    
-    echo "Unpacking Solr to /usr/local/solr..."
-    tar -x -f apache-solr-4.0-2011-11-04_09-29-42.tgz
-    mv apache-solr-4.0-2011-11-04_09-29-42 solr 
-    rm apache-solr-4.0-2011-11-04_09-29-42.tgz 
-    
+
+    echo "Downloading Sphinx..."
+    cd $CL_INSTALL_DIR/court-listener/Sphinx
+    wget http://sphinxsearch.com/downloads/sphinx-0.9.9.tar.gz
+    tar xzvf sphinx-0.9.9.tar.gz; rm sphinx-0.9.9.tar.gz
+    cd sphinx-0.9.9
+    ./configure --with-prefix=/usr/local/sphinx
+    make
+    if [ $? == "0" ]
+    then
+        make install
+        if [ $? == '0' ]
+        then
+            cd ../
+            rm -r sphinx-0.9.9
+        fi
+    else
+        echo "Error building Sphinx. Aborting."
+        exit 6
+    fi
+
     # make a directory where logs will be created and set up the logger
-    ln -s $CL_INSTALL_DIR/court-listener/log-scripts/solr /etc/logrotate.d/solr
-    
-    # Enable Solr at startup
-    ln -s $CL_INSTALL_DIR/court-listener/init-scripts/solr /etc/init.d/solr
-    update-rc.d solr defaults
-    
-    # and hopefully that worked...
-    echo -e "\nSolr installed successfully."
+    mkdir /var/log/sphinx/
+    ln -s $CL_INSTALL_DIR/court-listener/log-scripts/sphinx /etc/logrotate.d/sphinx
+
+    # next we configure the thing...this is going to be ugly.
+    # note: EOF without quotes interprets variables and backslashes. To preserve
+    # things with either \ or $foo, use 'EOF'
+cat <<EOF > $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf
+source Document
+{
+    type                = mysql
+    sql_host            = localhost
+    sql_user            = $MYSQL_USERNAME
+    sql_pass            = $MYSQL_PWD
+    sql_db              = $MYSQL_DB_NAME
+    sql_port            =
+EOF
+
+# In this section, we need the $variables to not get interpreted by bash...
+cat <<'EOF' >> $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf
+    sql_query_pre       = SET NAMES utf8
+    sql_query_pre       = REPLACE INTO sph_counter SELECT 1, MAX(documentUUID) FROM Document
+    sql_query_post      =
+    sql_query_range     = SELECT min(documentUUID), max(documentUUID) from Document
+    sql_range_step      = 5000
+    sql_query           = \
+        SELECT Document.documentUUID, Citation.caseNameShort, Citation.caseNameFull as casename, Citation.docketNumber as docketNumber, Citation.westCite, Citation.lexisCite, Document.documentSHA1, TO_DAYS(Document.dateFiled) as dateFiled, TO_DAYS(Document.time_retrieved) as time_retrieved, Document.court_id as court, Document.documentPlainText as docText, Document.documentHTML as docHTML, Document.documentType as docStatus\
+        FROM Document, Citation\
+        WHERE Document.citation_id = Citation.citationUUID\
+            AND Document.documentUUID >= $start\
+            AND Document.documentUUID <= $end\
+            AND Document.documentUUID <= (SELECT max_doc_id FROM sph_counter WHERE counter_id=1);
+
+    sql_query_info      = SELECT * FROM `Document` WHERE `documentUUID` = $id
+
+    # ForeignKey's
+    sql_attr_uint       = Document.citation_id
+    sql_attr_uint       = Document.excerptSummary_id
+
+    # DateField's and DateTimeField's
+    sql_attr_timestamp   = dateFiled
+    sql_attr_timestamp   = time_retrieved
+}
+
+source delta : Document
+{
+    sql_query_pre = SET NAMES utf8
+    sql_query           = \
+        SELECT Document.documentUUID, Citation.caseNameShort, Citation.caseNameFull as casename, Citation.docketNumber as docketNumber, Citation.westCite, Citation.lexisCite, Document.documentSHA1, TO_DAYS(Document.dateFiled) as dateFiled, TO_DAYS(Document.time_retrieved) as time_retrieved, Document.court_id as court, Document.documentPlainText as docText, Document.documentHTML as docHTML, Document.documentType as docStatus\
+        FROM Document, Citation\
+        WHERE Document.citation_id = Citation.citationUUID\
+	AND Document.documentUUID >= $start\
+	AND Document.documentUUID <= $end\
+	AND Document.documentUUID > (SELECT max_doc_id FROM sph_counter WHERE counter_id=1);
+}
+EOF
+
+# in this section, we need the $variables to be interpreted...
+cat <<EOF >> $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf
+index Document
+{
+    source = Document
+    path = $CL_INSTALL_DIR/court-listener/Sphinx/data/Document
+    wordforms = $CL_INSTALL_DIR/court-listener/Sphinx/conf/wordforms.txt
+    stopwords = $CL_INSTALL_DIR/court-listener/Sphinx/conf/stopwords.txt
+    exceptions = $CL_INSTALL_DIR/court-listener/Sphinx/conf/exceptions.txt
+    docinfo = extern
+
+    # sets the minimum word length to index
+    min_word_len = 1
+    charset_type = utf-8
+
+    # these set up star searching (at a performance hit), but *test, *test* and test* all will work.
+    # Also note that infix enables *start end* and *middle*, while prefix just enables end*. Thus,
+    # an error will be thrown by the indexer if you try to set both of these configs!
+    # min_infix_len= 3
+    # infix_fields = caseName, docText, docHTML, Citation.caseNameFull, caseNumber
+    min_prefix_len = 3
+    prefix_fields = caseName, docText, docHTML, Citation.caseNameFull, docketNumber, westCite, lexisCite
+    enable_star = 1
+
+    # enables exact word form searching (=cat)
+    index_exact_words = 1
+
+    # enables stemming of english words longer than 3 characters
+    morphology      = stem_en
+    min_stemming_len = 4
+
+    # the default character set, with the addition of the hyphen and the removal of the Cryllic set.
+    charset_table = 0..9, A..Z->a..z, _, -, U+00A7, a..z
+
+    # Enable HTML stripping
+    html_strip = 1
+}
+
+index delta : Document
+{
+    source = delta
+    path = $CL_INSTALL_DIR/court-listener/Sphinx/data/Delta
 }
 
 
-function install_django_celery {
+indexer
+{
+	# memory limit, in bytes, kiloytes (16384K) or megabytes (256M)
+	# optional, default is 32M, max is 2047M, recommended is 256M to 1024M
+	mem_limit = 512M
+
+	# maximum IO calls per second (for I/O throttling)
+	# optional, default is 0 (unlimited)
+	max_iops = 0
+}
+
+searchd
+{
+	# IP address to bind on
+	# optional, default is 0.0.0.0 (ie. listen on all interfaces)
+	#
+	# address = 127.0.0.1
+	# address = 192.168.0.1
+
+
+	# searchd TCP port number
+	# mandatory, default is 3312
+	port = 3312
+
+	# log file, searchd run info is logged here
+	# optional, default is 'searchd.log'
+	log = /var/log/sphinx/searchd.log
+
+	# query log file, all search queries are logged here
+	# optional, default is empty (do not log queries)
+	query_log = /var/log/sphinx/query.log
+
+	# client read timeout, seconds
+	# optional, default is 5
+	read_timeout = 5
+
+	# maximum amount of children to fork (concurrent searches to run)
+	# optional, default is 0 (unlimited)
+	max_children = 30
+
+	# PID file, searchd process ID file name
+	# mandatory
+	pid_file = /var/log/sphinx/searchd.pid
+
+	# max amount of matches the daemon ever keeps in RAM, per-index
+	# WARNING, THERE'S ALSO PER-QUERY LIMIT, SEE SetLimits() API CALL
+	# default is 1000 (just like Google)
+	max_matches = 1000
+
+	# seamless rotate, prevents rotate stalls if precaching huge datasets
+	# optional, default is 1
+	seamless_rotate	= 1
+
+	# whether to forcibly preopen all indexes on startup
+	# optional, default is 0 (do not preopen)
+	preopen_indexes	= 0
+
+	# whether to unlink .old index copies on succesful rotation.
+	# optional, default is 1 (do unlink)
+	unlink_old = 1
+}
+EOF
+
+    # and hopefully that worked...
+    echo -e "\nSphinx installed successfully."
+}
+
+
+function installDjangoSphinx {
+    echo -e "\n###########################"
+    echo "Installing django-sphinx..."
+    echo "###########################"
+    read -p "Would you like to install django-sphinx? (y/n): " proceed
+    if [ $proceed == "n" ]
+    then
+        echo -e '\nGreat. Moving on.'
+        return 0
+    fi
+
+    # we install django-sphinx, and patch it per bug #X
+    cd $DJANGO_INSTALL_DIR
+    git clone git://github.com/dcramer/django-sphinx.git django-sphinx
+    cd django-sphinx
+
+    echo -e "\nPatching django-sphinx, since bug fixes aren't handled by its author..."
+
+    git apply << 'EOF'
+From a3c8c847d1ba6742f0a8e2ae9c69de3d30db42c1 Mon Sep 17 00:00:00 2001
+From: root <mike@courtlistener.com>
+Date: Mon, 12 Jul 2010 15:20:01 -0700
+Subject: [PATCH] Fix for stupid bugs.
+
+---
+ djangosphinx/utils/config.py |    6 +++---
+ setup.py                     |    1 -
+ 2 files changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/djangosphinx/utils/config.py b/djangosphinx/utils/config.py
+index 24a1907..18abb10 100644
+--- a/djangosphinx/utils/config.py
++++ b/djangosphinx/utils/config.py
+@@ -11,8 +11,8 @@ import djangosphinx.apis.current as sphinxapi
+ __all__ = ('generate_config_for_model', 'generate_config_for_models')
+
+ def _get_database_engine():
+-    if settings.DATABASE_ENGINE == 'mysql':
+-        return settings.DATABASE_ENGINE
++    if settings.DATABASES['default']['ENGINE'] == 'mysql':
++        return settings.DATABASES['default']['ENGINE']
+     elif settings.DATABASE_ENGINE.startswith('postgresql'):
+         return 'pgsql'
+     raise ValueError, "Only MySQL and PostgreSQL engines are supported by Sphinx."
+
+diff --git a/setup.py b/setup.py
+index 43b8582..c04bf9e 100755
+--- a/setup.py
++++ b/setup.py
+@@ -10,7 +10,6 @@ setup(
+     author='David Cramer',
+     author_email='dcramer@gmail.com',
+     url='http://github.com/dcramer/django-sphinx',
+-    install_requires=['django'],
+     description = 'An integration layer bringing Django and Sphinx Search together.',
+     packages=find_packages(),
+     include_package_data=True,
+--
+1.7.0.4
+
+EOF
+
+    python setup.py install
+
+    echo -e '\ndjango-sphinx installed successfully.'
+}
+
+
+function installDjangoCelery {
     echo -e '\n##################################'
     echo 'Installing django-celery and Celery...'
     echo '##################################
@@ -600,7 +843,11 @@ function install_django_celery {
         rabbitmqctl add_vhost "/celery"
         sudo rabbitmqctl add_user celery "$CELERY_PWD"
         sudo rabbitmqctl set_permissions -p "/celery" "celery" ".*" ".*" ".*"
-
+        
+        
+        echo "Installing init scripts in /etc/init.d/celeryd"
+        ln -s $CL_INSTALL_DIR/init-scripts/celeryd /etc/init.d/celeryd
+        
         # Make an unprivileged, non-password-enabled user and group to run celery
         useradd celery
         
@@ -612,11 +859,7 @@ function install_django_celery {
         
         # set up the logger
         ln -s $CL_INSTALL_DIR/court-listener/log-scripts/celery /etc/logrotate.d/celery
-        
-        echo "Installing init scripts in /etc/init.d/celeryd"
-        ln -s $CL_INSTALL_DIR/court-listener/init-scripts/celeryd /etc/init.d/celeryd
-        update-rc.d celeryd defaults
-              
+
         echo -e '\nDjango-celery and Celery installed successfully.'
     else
         echo -e '\nGreat. Moving on.'
@@ -625,7 +868,7 @@ function install_django_celery {
 }
 
 
-function install_debug_toolbar {
+function installDebugToolbar {
     if [ $INSTALL_DEBUG_TOOLBAR == 'y' ]
     then
         echo -e '\n##################################'
@@ -646,7 +889,7 @@ function install_debug_toolbar {
 }
 
 
-function install_django_extensions {
+function installDjangoExtensions {
     if [ $INSTALL_DJANGO_EXTENSIONS == 'y' ]
     then
         echo -e '\n###############################'
@@ -660,7 +903,7 @@ function install_django_extensions {
             return 0
         fi
 
-        # install it
+        # install the mo'
         cd $DJANGO_INSTALL_DIR
         git clone git://github.com/django-extensions/django-extensions.git django-extensions
         cd django-extensions
@@ -671,7 +914,7 @@ function install_django_extensions {
 }
 
 
-function install_south {
+function installSouth {
     echo -e '\n###################'
     echo 'Installing South...'
     echo '###################'
@@ -693,7 +936,7 @@ function install_south {
 }
 
 
-function import_data {
+function importData {
     # TODO: replace with an API call (once the API exists)
     echo -e "\n############################"
     echo "Importing data into MySQL..."
@@ -706,10 +949,10 @@ function import_data {
     fi
 
     # import data using the manage.py function. Data can be regenerated with:
-    # python manage.py dumpdata search.Court
+    # python manage.py dumpdata alertSystem.Court
     cd $CL_INSTALL_DIR/court-listener/alert
     cat <<EOF > /tmp/courts.json
-[{"pk": "ca1", "model": "search.court", "fields": {"end_date": null, "citation_string": "1st Cir.", "short_name": "First Circuit", "in_use": true, "URL": "http://www.ca1.uscourts.gov/", "full_name": "Court of Appeals for the First Circuit", "start_date": "1891-03-03"}}, {"pk": "ca10", "model": "search.court", "fields": {"end_date": null, "citation_string": "10th Cir.", "short_name": "Tenth Circuit", "in_use": true, "URL": "http://www.ca10.uscourts.gov/", "full_name": "Court of Appeals for the Tenth Circuit", "start_date": "1929-02-28"}}, {"pk": "ca11", "model": "search.court", "fields": {"end_date": null, "citation_string": "11th Cir.", "short_name": "Eleventh Circuit", "in_use": true, "URL": "http://www.ca11.uscourts.gov/", "full_name": "Court of Appeals for the Eleventh Circuit", "start_date": "1980-10-14"}}, {"pk": "ca2", "model": "search.court", "fields": {"end_date": null, "citation_string": "2d Cir.", "short_name": "Second Circuit", "in_use": false, "URL": "http://www.ca2.uscourts.gov/", "full_name": "Court of Appeals for the Second Circuit", "start_date": "1891-03-03"}}, {"pk": "ca3", "model": "search.court", "fields": {"end_date": null, "citation_string": "3rd Cir.", "short_name": "Third Circuit", "in_use": true, "URL": "http://www.ca3.uscourts.gov/", "full_name": "Court of Appeals for the Third Circuit", "start_date": "1891-03-03"}}, {"pk": "ca4", "model": "search.court", "fields": {"end_date": null, "citation_string": "4th Cir.", "short_name": "Fourth Circuit", "in_use": true, "URL": "http://www.ca4.uscourts.gov/", "full_name": "Court of Appeals for the Fourth Circuit", "start_date": "1891-03-03"}}, {"pk": "ca5", "model": "search.court", "fields": {"end_date": null, "citation_string": "5th Cir.", "short_name": "Fifth Circuit", "in_use": true, "URL": "http://www.ca5.uscourts.gov/", "full_name": "Court of Appeals for the Fifth Circuit", "start_date": "1891-03-03"}}, {"pk": "ca6", "model": "search.court", "fields": {"end_date": null, "citation_string": "6th Cir.", "short_name": "Sixth Circuit", "in_use": true, "URL": "http://www.ca6.uscourts.gov/", "full_name": "Court of Appeals for the Sixth Circuit", "start_date": "1891-03-03"}}, {"pk": "ca7", "model": "search.court", "fields": {"end_date": null, "citation_string": "7th Cir.", "short_name": "Seventh Circuit", "in_use": true, "URL": "http://www.ca7.uscourts.gov/", "full_name": "Court of Appeals for the Seventh Circuit", "start_date": "1891-03-03"}}, {"pk": "ca8", "model": "search.court", "fields": {"end_date": null, "citation_string": "8th Cir.", "short_name": "Eighth Circuit", "in_use": true, "URL": "http://www.ca8.uscourts.gov/", "full_name": "Court of Appeals for the Eighth Circuit", "start_date": "1891-03-03"}}, {"pk": "ca9", "model": "search.court", "fields": {"end_date": null, "citation_string": "9th Cir.", "short_name": "Ninth Circuit", "in_use": true, "URL": "http://www.ca9.uscourts.gov/", "full_name": "Court of Appeals for the Ninth Circuit", "start_date": "1891-03-03"}}, {"pk": "cadc", "model": "search.court", "fields": {"end_date": null, "citation_string": "D.C. Cir.", "short_name": "District of Columbia", "in_use": true, "URL": "http://www.cadc.uscourts.gov/", "full_name": "Court of Appeals for the D.C. Circuit", "start_date": "1893-02-09"}}, {"pk": "cafc", "model": "search.court", "fields": {"end_date": null, "citation_string": "Fed. Cir.", "short_name": "Federal Circuit", "in_use": true, "URL": "http://www.cafc.uscourts.gov/", "full_name": "Court of Appeals for the Federal Circuit", "start_date": "1982-04-02"}}, {"pk": "cc", "model": "search.court", "fields": {"end_date": "1992-10-29", "citation_string": "Ct. Cl.", "short_name": "Court of Claims", "in_use": false, "URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_coc.html", "full_name": "United States Court of Claims", "start_date": "1855-02-24"}}, {"pk": "ccpa", "model": "search.court", "fields": {"end_date": "1982-04-02", "citation_string": "C.C.P.A.", "short_name": "Customs and Patent Appeals", "in_use": true, "URL": "http://www.cafc.uscourts.gov/", "full_name": "Court of Customs and Patent Appeals", "start_date": "1909-08-05"}}, {"pk": "cit", "model": "search.court", "fields": {"end_date": null, "citation_string": "Ct. Intl. Trade", "short_name": "Court of International Trade", "in_use": false, "URL": "http://www.cit.uscourts.gov/", "full_name": "United States Court of International Trade", "start_date": null}}, {"pk": "com", "model": "search.court", "fields": {"end_date": "1913-01-01", "citation_string": "Comm. Ct.", "short_name": "Commerce Court", "in_use": false, "URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_com.html", "full_name": "Commerce Court", "start_date": "1910-01-01"}}, {"pk": "cusc", "model": "search.court", "fields": {"end_date": "1980-01-01", "citation_string": "Cust. Ct.", "short_name": "U.S. Customs Court", "in_use": false, "URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_cc_bib.html", "full_name": "United States Customs Court", "start_date": "1926-01-01"}}, {"pk": "eca", "model": "search.court", "fields": {"end_date": "1962-04-18", "citation_string": "Emer. Ct. App.", "short_name": "Emergency Court of Appeals", "in_use": true, "URL": "https://secure.wikimedia.org/wikipedia/en/wiki/Emergency_Court_of_Appeals", "full_name": "Emergency Court of Appeals", "start_date": "1942-01-30"}}, {"pk": "fiscr", "model": "search.court", "fields": {"end_date": null, "citation_string": "FISA Ct. Rev.", "short_name": "Foreign Intelligence Surveillance Court of Review", "in_use": false, "URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_fisc.html", "full_name": "Foreign Intelligence Surveillance Court of Review", "start_date": null}}, {"pk": "scotus", "model": "search.court", "fields": {"end_date": null, "citation_string": "SCOTUS", "short_name": "Supreme Court", "in_use": true, "URL": "http://supremecourt.gov/", "full_name": "Supreme Court of the United States", "start_date": "1789-09-24"}}, {"pk": "tecoa", "model": "search.court", "fields": {"end_date": "1992-10-29", "citation_string": "Temp. Emerg. Ct. App.", "short_name": "Temporary Emergency Court of Appeals", "in_use": false, "URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_tecoa.html", "full_name": "Temporary Emergency Court of Appeals", "start_date": "1971-12-01"}}, {"pk": "uscfc", "model": "search.court", "fields": {"end_date": null, "citation_string": "Fed. Cl.", "short_name": "Court of Federal Claims", "in_use": true, "URL": "http://www.uscfc.uscourts.gov/", "full_name": "United States Court of Federal Claims", "start_date": "1982-04-02"}}]
+[{"pk": "ca1", "model": "alertSystem.court", "fields": {"URL": "http://www.ca1.uscourts.gov", "startDate": "1891-03-03", "shortName": "1st Cir.", "endDate": null}}, {"pk": "ca10", "model": "alertSystem.court", "fields": {"URL": "http://www.ca10.uscourts.gov", "startDate": "1929-02-28", "shortName": "10th Cir.", "endDate": null}}, {"pk": "ca11", "model": "alertSystem.court", "fields": {"URL": "http://www.ca11.uscourts.gov", "startDate": "1980-10-14", "shortName": "11th Cir.", "endDate": null}}, {"pk": "ca2", "model": "alertSystem.court", "fields": {"URL": "http://www.ca2.uscourts.gov", "startDate": "1891-03-03", "shortName": "2d Cir.", "endDate": null}}, {"pk": "ca3", "model": "alertSystem.court", "fields": {"URL": "http://www.ca3.uscourts.gov", "startDate": "1891-03-03", "shortName": "3rd Cir.", "endDate": null}}, {"pk": "ca4", "model": "alertSystem.court", "fields": {"URL": "http://www.ca4.uscourts.gov", "startDate": "1891-03-03", "shortName": "4th Cir.", "endDate": null}}, {"pk": "ca5", "model": "alertSystem.court", "fields": {"URL": "http://www.ca5.uscourts.gov", "startDate": "1891-03-03", "shortName": "5th Cir.", "endDate": null}}, {"pk": "ca6", "model": "alertSystem.court", "fields": {"URL": "http://www.ca6.uscourts.gov", "startDate": "1891-03-03", "shortName": "6th Cir.", "endDate": null}}, {"pk": "ca7", "model": "alertSystem.court", "fields": {"URL": "http://www.ca7.uscourts.gov", "startDate": "1891-03-03", "shortName": "7th Cir.", "endDate": null}}, {"pk": "ca8", "model": "alertSystem.court", "fields": {"URL": "http://www.ca8.uscourts.gov", "startDate": "1891-03-03", "shortName": "8th Cir.", "endDate": null}}, {"pk": "ca9", "model": "alertSystem.court", "fields": {"URL": "http://www.ca9.uscourts.gov", "startDate": "1891-03-03", "shortName": "9th Cir.", "endDate": null}}, {"pk": "cadc", "model": "alertSystem.court", "fields": {"URL": "http://www.cadc.uscourts.gov", "startDate": "1893-02-09", "shortName": "D.C. Cir.", "endDate": null}}, {"pk": "cafc", "model": "alertSystem.court", "fields": {"URL": "http://www.cafc.uscourts.gov", "startDate": "1982-04-02", "shortName": "Fed. Cir.", "endDate": null}}, {"pk": "cc", "model": "alertSystem.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_coc.html", "startDate": "1855-02-24", "shortName": "Ct. Cl.", "endDate": "1982-04-02"}}, {"pk": "ccpa", "model": "alertSystem.court", "fields": {"URL": "http://www.cafc.uscourts.gov/", "startDate": "1909-08-05", "shortName": "C.C.P.A.", "endDate": "1982-04-02"}}, {"pk": "uscfc", "model": "alertSystem.court", "fields": {"URL": "http://www.uscfc.uscourts.gov/", "startDate": "1982-04-02", "shortName": "Fed. Cl.", "endDate": null}}, {"pk": "cit", "model": "alertSystem.court", "fields": {"URL": "http://www.cit.uscourts.gov", "startDate": "1980-10-10", "shortName": "Ct. Int'l Trade", "endDate": null}}, {"pk": "com", "model": "alertSystem.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_com.html", "startDate": "1910-06-18", "shortName": "Comm. Ct.", "endDate": "1913-12-31"}}, {"pk": "cusc", "model": "alertSystem.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_cc.html", "startDate": "1890-06-10", "shortName": "Cust. Ct.", "endDate": "1980-10-10"}}, {"pk": "eca", "model": "alertSystem.court", "fields": {"URL": "https://secure.wikimedia.org/wikipedia/en/wiki/Emergency_Court_of_Appeals", "startDate": "1942-01-30", "shortName": "Emer. Ct. App.", "endDate": "1962-04-18"}}, {"pk": "scotus", "model": "alertSystem.court", "fields": {"URL": "http://supremecourt.gov", "startDate": "1789-09-24", "shortName": "SCOTUS", "endDate": null}}, {"pk": "tecoa", "model": "alertSystem.court", "fields": {"URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_tecoa.html", "startDate": "1971-12-22", "shortName": "Temp. Emer. Ct. App.", "endDate": "1993-03-29"}}]
 EOF
     python manage.py syncdb
     python manage.py migrate
@@ -742,17 +985,18 @@ function finalize {
 
 function main {
     # run the program!
-    get_user_input
-    check_deps
-    install_django
-    install_court_listener
-    configure_mysql
-    install_solr
-    install_django_celery
-    install_debug_toolbar
-    install_django_extensions
-    install_south
-    import_data
+    getUserInput
+    checkDeps
+    installDjango
+    installCourtListener
+    configureMySQL
+    installSphinx
+    installDjangoSphinx
+    installDjangoCelery
+    installDebugToolbar
+    installDjangoExtensions
+    installSouth
+    importData
     finalize
 
     echo -e "\n\n#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#"
@@ -764,7 +1008,16 @@ and running the command:
 If that works, you should be able to see the CourtListener website in your browser
 at http://localhost:8000.
 
+If you would like Sphinx to start at bootup, add this line to the root's cron file:
+@reboot /usr/local/bin/searchd -c $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf
 
+That will enable you to search, but your content will also need to be indexed regularly.
+Cron jobs such as the following might work well:
+20	*	*	*	1-5	/usr/local/bin/indexer -c $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf delta --rotate > /dev/null
+45	1	1	*/2	*	/usr/local/bin/indexer -c $CL_INSTALL_DIR/court-listener/Sphinx/conf/sphinx.conf Document --rotate
+
+The first updates the delta index once every 20 minutes. The second updates the main
+index every other week.
 "
     read -p "Press enter to exit the install script, and begin hacking. Whew."
     exit 0
@@ -784,21 +1037,21 @@ then
     exit 2
 else
     case $1 in
-        --help) print_help;;
+        --help) printHelp;;
         --install) main;;
-        --checkdeps) check_deps;;
-        --mysql) get_user_input; configure_mysql;;
-        --ffmpeg) get_user_input; install_ffmpeg;;
-        --solr) get_user_input; install_solr;;
-        --django) get_user_input; install_django;;
-        --courtlistener) get_user_input; install_court_listener;;
-        --importdata) get_user_input; configure_mysql; import_data;;
-        --debugtoolbar) get_user_input; install_debug_toolbar;;
-        --djangocelery) get_user_input; install_django_celery;;
-        --djangosolr) get_user_input; install_solr;;
-        --djangoExtensions) get_user_input; install_django_extensions;;
-        --south) get_user_input; install_south; finalize;;
-        --finalize) get_user_input; finalize;;
+        --checkdeps) checkDeps;;
+        --mysql) getUserInput; configureMySQL;;
+        --ffmpeg) getUserInput; installFFmpeg;;
+        --sphinx) getUserInput; installSphinx;;
+        --django) getUserInput; installDjango;;
+        --courtListener) getUserInput; installCourtListener;;
+        --importData) getUserInput; configureMySQL; importData;;
+        --debugToolbar) getUserInput; installDebugToolbar;;
+        --djangoCelery) getUserInput; installDjangoCelery;;
+        --djangoSphinx) getUserInput; installDjangoSphinx;;
+        --djangoExtensions) getUserInput; installDjangoExtensions;;
+        --south) getUserInput; installSouth; finalize;;
+        --finalize) getUserInput; finalize;;
         *) echo "install.sh: Invalid argument. Try the --help argument."
            exit 2;
     esac

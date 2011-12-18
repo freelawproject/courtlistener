@@ -29,8 +29,8 @@ setup_environ(settings)
 
 from django.contrib.flatpages.models import FlatPage
 from django.template import loader, Context
-from alert.search.models import Document
-from alert.search.models import Court
+from alert.alertSystem.models import Document
+from alert.alertSystem.models import PACER_CODES
 
 def makeStats():
     '''
@@ -54,11 +54,10 @@ def makeStats():
     totalCasesQ = Document.objects.all().count()
 
     statsP = []
-    court_codes = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
     # get all the courts
-    for code in court_codes:
-        q = Document.objects.filter(court=code,
-            documentType="Published").exclude(dateFiled=None)
+    for code in PACER_CODES:
+        q = Document.objects.filter(court = code[0],
+            documentType = "Published").exclude(dateFiled = None)
         numDocs = q.count()
         if numDocs != 0:
             doc = q.order_by('dateFiled')[0]
@@ -66,10 +65,10 @@ def makeStats():
             statsP.append(tempList)
 
     statsU = []
-    for code in court_codes:
-        q = Document.objects.filter(court=code,
-            documentType__in=["Unpublished", "Errata", "In-chambers", "Relating-to"])\
-            .exclude(dateFiled=None)
+    for code in PACER_CODES:
+        q = Document.objects.filter(court = code[0],
+            documentType__in = ["Unpublished", "Errata", "In-chambers", "Relating-to"])\
+            .exclude(dateFiled = None)
         numDocs = q.count()
         if numDocs != 0:
             doc = q.order_by('dateFiled')[0]
@@ -77,9 +76,9 @@ def makeStats():
             statsU.append(tempList)
 
     statsMissingType = []
-    for code in court_codes:
-        q = Document.objects.filter(court=code,
-            documentType="").exclude(dateFiled=None)
+    for code in PACER_CODES:
+        q = Document.objects.filter(court = code[0],
+            documentType = "").exclude(dateFiled = None)
         numDocs = q.count()
         if numDocs != 0:
             doc = q.order_by('dateFiled')[0]
@@ -108,7 +107,7 @@ def main():
     html = t.render(c)
 
     # put that in the correct flatpage
-    page = FlatPage.objects.get(url='/coverage/')
+    page = FlatPage.objects.get(url = '/coverage/')
     page.content = html
     page.save()
 

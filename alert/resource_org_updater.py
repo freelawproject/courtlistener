@@ -21,7 +21,7 @@ from alert import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alert.search.models import Document
+from alert.alertSystem.models import Document
 from difflib import Differ
 from optparse import OptionParser
 import datetime, os, re

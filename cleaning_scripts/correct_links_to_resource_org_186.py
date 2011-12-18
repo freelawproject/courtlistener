@@ -32,7 +32,7 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from search.models import Document, Citation
+from alertSystem.models import Document, Citation
 from lib.db_tools import queryset_iterator
 from lib.string_utils import clean_string
 from lib.string_utils import harmonize

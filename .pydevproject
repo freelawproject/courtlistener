@@ -7,4 +7,10 @@
 <pydev_pathproperty name="org.python.pydev.PROJECT_SOURCE_PATH">
 <path>/court-listener</path>
 </pydev_pathproperty>
+<pydev_variables_property name="org.python.pydev.PROJECT_VARIABLE_SUBSTITUTION">
+<key>DJANGO_MANAGE_LOCATION</key>
+<value>alert/manage.py</value>
+<key>DJANGO_SETTINGS_MODULE</key>
+<value>alert.settings</value>
+</pydev_variables_property>
 </pydev_project>

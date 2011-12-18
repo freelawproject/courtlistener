@@ -11,11 +11,7 @@
     Design and Development: Michael Lissner
     Site: http://michaeljaylissner.com
     Twitter: @mlissner
-    Location: Berkeley, CA
-    
-    Funded in part by: public.resource.org
-    Site: public.resource.org
-    Twitter: @carlmalamud
+    Location: Oakland, CA
 
 
 /* SITE */
@@ -23,8 +19,8 @@
   Components:
         Text Extraction: Antiword, libwpd-tools, pdf2text
         Code: BeautifulSoup, Celery, Django, jQuery (NobelCount, tooltip), lxml,
-              Mercurial, RabbitMQ, sunburnt, titlecase, Python
-        Infrastructure: Apache2, Linux, MySQL, Solr
+              Mercurial, RabbitMQ, titlecase, Python
+        Infrastructure: Apache2, Linux, MySQL, Sphinx
   Source: https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/overview
 
 

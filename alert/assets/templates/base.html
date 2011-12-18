@@ -4,9 +4,8 @@
         <meta charset=utf-8>
         <meta http-equiv="Content-Language" content="en"/>
         <meta name="language" content="en_us"/>
-        <meta name="description" content="Create alerts, search for and browse the latest Court opinions. Updated automatically with the latest court documents.">
-        <link rel="search" type="application/opensearchdescription+xml" title="CourtListener" href="/media/xml/opensearch.xml" />
-        
+        <meta name="description" content="Create alerts, search for and browse the latest Circuit Court and Supreme Court opinions. Updated daily with the latest appeals court documents.">
+        <meta name="keywords" content="court states district appeals united cir claim sentence circuit defendant evidence motion judgment plaintiffs filed judge review law conviction government"/>
         <title>{% block title %}CourtListener.com{% endblock %}</title>
         <link rel="author" href="humans.txt" type="text/plain"/>
         <link rel="stylesheet" href="/media/css/blueprint/screen.css" type="text/css" media="screen, projection">
@@ -22,16 +21,16 @@
         <div class="container">
             {% block header %}
                 <div class="header-container span-24">
-                    <div class="span-7 header" id="header">
+                    <div class="span-12 header" id="header">
                         <a href="/">
                             <img src="/media/images/png/logo.png"
-                                 alt="CourtListener logo"
+                                 alt="Court Listener logo"
                                  width="252"
                                  height="28"/>
                         </a>
 
                         {% if user.is_authenticated %}
-                            <div id="navigation">
+                            <div class="navigation">
                                 <ul>
                                     <li><a href="/opinions/all/">Browse</a></li>
                                     <li><a href="/profile/alerts/">Profile</a></li>
@@ -39,7 +38,7 @@
                                 </ul>
                             </div>
                         {% else %}
-                            <div id="navigation">
+                            <div class="navigation">
                                 <ul>
                                     <li><a href="/about/">About</a></li>
                                     <li><a href="/opinions/all">Browse</a></li>
@@ -58,8 +57,28 @@
                     </div>
 
                     {% block search-form %}
-                    <div class="span-17 last" id="searchform">
-                        {% include "search/search_form_snippet.html" %}
+                    <div class="span-12 last" id="searchform">
+                        <form action="/" method="get">
+                            <div id="search-form">
+                                <table>
+                                    <tbody>
+                                        <tr>
+                                            <td>
+                                                <input class="{% if not results.object_list or not query%}auto-focus{% endif %} wide-title"
+                                                name="q"
+                                                id="search-input"
+                                                value="{{query}}"
+                                                autocomplete="off">
+                                             </td>
+                                            <td>
+                                                <button type="submit" class="button title"
+                                                name="search" id="search-button">Search</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </form>
                     </div>
                     {% endblock %}
                 </div>
@@ -67,15 +86,14 @@
             {% endblock %}
 
             {% block sidebar %}
-                <div class="span-5 append-2" id="sidebar">
+                <div class="span-5 append-1" id="sidebar">
                 </div>
             {% endblock %}
 
-            {# TODO: Is this block being used somewhere? #}
             {% block nav %}{% endblock %}
             {% block content %}
-                <div class="span-17 last" id="content">
-                    <p>Your content seems to be missing! This is never good.</p>
+                <div class="span-18 last" id="content">
+                    <p>Your content seems to be missing!</p>
                 </div>
             {% endblock %}
 

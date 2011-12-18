@@ -17,8 +17,10 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.forms import ModelForm
 from alert.userHandling.models import UserProfile
+from alert.userHandling.models import Favorite
 
 
 class ProfileForm(ModelForm):
@@ -36,6 +38,7 @@ class UserForm(ModelForm):
     # ensure that emails are always unique.
     def clean_email(self):
         email = self.cleaned_data.get('email')
+        username = self.instance.username
 
         if email and (User.objects.filter(email=email).count() > 1):
             raise forms.ValidationError(
@@ -48,7 +51,7 @@ class UserForm(ModelForm):
         # Either is BAD, BAD, BAD
         exclude = ('password', 'last_login', 'date_joined', 'is_staff',
             'username', 'is_active', 'is_superuser', 'groups',
-            'user_permissions',)
+            'user_permissions', )
 
 
 class UserCreationFormExtended(UserCreationForm):
@@ -72,3 +75,23 @@ class UserCreationFormExtended(UserCreationForm):
 
 class EmailConfirmationForm(forms.Form):
     email = forms.EmailField()
+
+
+# Used in the favorite forms.
+class FavoriteForm(ModelForm):
+    class Meta:
+        model = Favorite
+        widgets = {
+            'id'     : forms.HiddenInput(),
+            'doc_id' : forms.HiddenInput(),
+            'name'   : forms.TextInput(attrs = {
+                                        'class' : 'span-10 last',
+                                        'id' : 'save-favorite-name-field',
+                                        'tabindex' : '1',
+                                        'maxlength': '100'}),
+            'notes'  : forms.Textarea(attrs = {
+                                        'class' : 'span-10 last bottom',
+                                        'id' : 'save-favorite-notes-field',
+                                        'tabindex': '2',
+                                        'maxlength' : '600'})
+        }

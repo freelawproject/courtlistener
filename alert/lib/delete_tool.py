@@ -32,7 +32,7 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alert.search.models import Court
+from alertSystem.models import *
 from lib.db_tools import queryset_iterator
 
 import datetime
@@ -46,6 +46,8 @@ def delete_data_by_time_and_court(courtID, SIMULATE, delTime=None, VERBOSITY=0):
     '''
     Deletes data for a court. If a time is given, uses that time as a constraint.
     '''
+    courtID = PACER_CODES[courtID-1][0]
+
     if delTime is not None:
         if VERBOSITY >= 1:
             print "Deleting data newer than %s for court %s" % (delTime, courtID)
@@ -56,9 +58,9 @@ def delete_data_by_time_and_court(courtID, SIMULATE, delTime=None, VERBOSITY=0):
     else:
         if VERBOSITY >= 1:
             print "Deleting all data for court %s" % courtID
-        count = Document.objects.filter(court=courtID).count()
+        count = Document.objects.filter(court = courtID).count()
         if count != 0:
-            docs = queryset_iterator(Document.objects.filter(court=courtID))
+            docs = queryset_iterator(Document.objects.filter(court = courtID))
 
     if VERBOSITY >= 1:
         print "Deleting %s documents from the database." % (count)
@@ -99,7 +101,7 @@ def delete_orphaned_citations(SIMULATE, VERBOSITY=0):
 
     total = 0
     for cite in cites:
-        docs = Document.objects.filter(citation=cite)
+        docs = Document.objects.filter(citation = cite)
         if docs.count() == 0:
             if VERBOSITY >= 2:
                 print "Deleting orphan citation %s from the database." % cite
@@ -154,7 +156,11 @@ def main():
         VERBOSITY = 2
 
     if options.documents:
-        courtID = options.courtID
+        # We delete documents
+        try:
+            courtID = int(options.courtID)
+        except:
+            parser.error("Court number must be a valid integer")
 
         delTime = options.delTime
         if delTime is not None:
@@ -168,11 +174,12 @@ def main():
                     parser.error("Unable to parse time. Please use format: YYYY-MM-DD HH:MM:SS or YYYY-MM-DD")
 
         # All options are go. Proceed!
-        if courtID == 'all':
+        if courtID == 0:
             # All courts shall be done!
-            courts = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
-            for courtID in courts:
+            courtID = 1
+            while courtID <= len(PACER_CODES):
                 delete_data_by_time_and_court(courtID, SIMULATE, delTime, VERBOSITY)
+                courtID += 1
                 gc.collect()
         else:
             # Just one court, please.

@@ -33,8 +33,8 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alert.search.models import Court
-from tinyurl.encode_decode import *
+from alertSystem.models import *
+from lib.encode_decode import *
 from lib.string_utils import *
 from lib.scrape_tools import *
 from django.core.files.base import ContentFile
@@ -167,7 +167,7 @@ def ca3_query_and_count_results(query, ct):
 
 
 def back_scrape_court(courtID, VERBOSITY):
-    if (courtID == 'ca1'):
+    if (courtID == 1):
         '''
         This scrapes ca1 using an HTTP POST. The data comes back in a nice
         tabular format, so that's easy, but it's paginated 200 per page, so we
@@ -179,7 +179,7 @@ def back_scrape_court(courtID, VERBOSITY):
         names, so we'll have to get them from resource.org.
         '''
         url = 'http://www.ca1.uscourts.gov/cgi-bin/opinions.pl'
-        ct = Court.objects.get(courtUUID='ca1')
+        ct = Court.objects.get(courtUUID = 'ca1')
 
         # Build an array of every the date every 30 days from 1993-01-01 to today
         hoy = datetime.date.today()
@@ -280,7 +280,7 @@ def back_scrape_court(courtID, VERBOSITY):
                             except: continue
 
                             # This helps out the parser in corner cases.
-                            quickHtml = unicode(quickHtml, errors='ignore')
+                            quickHtml = unicode(quickHtml, errors = 'ignore')
 
                             # Get the useful part of the webpage.
                             quickTree = etree.parse(StringIO.StringIO(quickHtml), parser)
@@ -308,8 +308,8 @@ def back_scrape_court(courtID, VERBOSITY):
                             sha1Hash = hashlib.sha1(documentPlainText).hexdigest()
 
                             # using that, we check for a dup
-                            doc, created = Document.objects.get_or_create(documentSHA1=sha1Hash,
-                                court=ct)
+                            doc, created = Document.objects.get_or_create(documentSHA1 = sha1Hash,
+                                court = ct)
 
                             if created:
                                 # we only do this if it's new
@@ -382,8 +382,8 @@ def back_scrape_court(courtID, VERBOSITY):
         return
 
 
-    if (courtID == 'ca2'):
-        ct = Court.objects.get(courtUUID='ca2')
+    if (courtID == 2):
+        ct = Court.objects.get(courtUUID = 'ca2')
         '''
         Take the starting date, and find the last day in the month that corresponds
         with that date.
@@ -398,7 +398,7 @@ def back_scrape_court(courtID, VERBOSITY):
         startDate = datetime.date(2007, 04, 01)
         dupCount = 0
         while startDate < today:
-            numDaysInMonthMinusOne = datetime.timedelta(days=calendar.monthrange(
+            numDaysInMonthMinusOne = datetime.timedelta(days = calendar.monthrange(
                 startDate.year, startDate.month)[1] - 1)
             endDate = startDate + numDaysInMonthMinusOne
 
@@ -458,7 +458,7 @@ def back_scrape_court(courtID, VERBOSITY):
                     doc.dateFiled = dateFiled
 
                     # next: caseNameShort
-                    caseNameShort = smart_unicode(cells[1].text, errors='ignore')
+                    caseNameShort = smart_unicode(cells[1].text, errors = 'ignore')
                     if VERBOSITY >= 2:
                         print "Casenameshort: " + caseNameShort
 
@@ -483,12 +483,12 @@ def back_scrape_court(courtID, VERBOSITY):
                     doc.save()
 
             # Increment the start date by one month.
-            numDaysInMonth = datetime.timedelta(days=calendar.monthrange(
+            numDaysInMonth = datetime.timedelta(days = calendar.monthrange(
                 startDate.year, startDate.month)[1])
             startDate = startDate + numDaysInMonth
 
 
-    if (courtID == 'ca3'):
+    if (courtID == 3):
         '''
         This one is a little fun. They don't have their docs organized in an easy way,
         so we have to search for them using quieries like #filename *1p.pdf,
@@ -540,14 +540,14 @@ def back_scrape_court(courtID, VERBOSITY):
         *0 --> 51
         *1 --> ?
         '''
-        ct = Court.objects.get(courtUUID='ca3')
+        ct = Court.objects.get(courtUUID = 'ca3')
 
         seed = 'aa'
 
         ca3_query_zoom_and_parse_results(seed, ct)
 
 
-    if (courtID == 'ca4'):
+    if (courtID == 4):
         '''
         Did some research on this court today. There appear to be two search
         engines. The first seems to be the old one, and it doesn't work at all;
@@ -565,7 +565,7 @@ def back_scrape_court(courtID, VERBOSITY):
         '''
         pass
 
-    if (courtID == 'ca5'):
+    if (courtID == 5):
         '''
         Court is accessible via a HTTP Post, but requires some random fields
         in order to work. The method here, as of 2010/04/27, is to create an
@@ -591,7 +591,7 @@ def back_scrape_court(courtID, VERBOSITY):
                 i += 1
 
         url = "http://www.ca5.uscourts.gov/Opinions.aspx"
-        ct = Court.objects.get(courtUUID='ca5')
+        ct = Court.objects.get(courtUUID = 'ca5')
 
         if verbosity >= 2: print "dates: " + str(dates)
 
@@ -629,7 +629,7 @@ def back_scrape_court(courtID, VERBOSITY):
 
             #all links ending in pdf, case insensitive
             aTagRegex = re.compile("pdf$", re.IGNORECASE)
-            aTags = soup.findAll(attrs={"href": aTagRegex})
+            aTags = soup.findAll(attrs = {"href": aTagRegex})
 
             unpubRegex = re.compile(r"pinions.*unpub")
 
@@ -711,7 +711,7 @@ def back_scrape_court(courtID, VERBOSITY):
 
         return result
 
-    if courtID == 'ca10':
+    if courtID == 10:
         '''Functional as of 2010/08/11. This court has a search form, which
         returns ten results at a time. The results are in pretty shabby form,
         hence we request then ONE AT A TIME!
@@ -723,7 +723,7 @@ def back_scrape_court(courtID, VERBOSITY):
         '''
 
         url = "http://www.ca10.uscourts.gov/searchbydateresults.php"
-        ct = Court.objects.get(courtUUID='ca10')
+        ct = Court.objects.get(courtUUID = 'ca10')
         not_binding = re.compile('not(\s+)binding(\s+)precedent', re.IGNORECASE)
 
         i = 0
@@ -812,8 +812,8 @@ def back_scrape_court(courtID, VERBOSITY):
 
             # do the pdftotext work
             process = subprocess.Popen(
-                ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"], shell=False,
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"], shell = False,
+                stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
             content, err = process.communicate()
             if err: result += "Error parsing file: " + doc.citation.caseNameShort
 
@@ -834,7 +834,7 @@ def back_scrape_court(courtID, VERBOSITY):
         return result
 
 
-    if courtID == 'ca11':
+    if courtID == 11:
         """Functional as of 2010/04/27. This court has a URL for its precedential
         and non-precedential cases, so we shall iterate over those. For each URL,
         we build an array of dates that we want to query.
@@ -848,7 +848,7 @@ def back_scrape_court(courtID, VERBOSITY):
         """
 
         url = "http://www.ca11.uscourts.gov/rss/pubopnsfeed.php"
-        ct = Court.objects.get(courtUUID='ca11')
+        ct = Court.objects.get(courtUUID = 'ca11')
 
         urls = (
             "http://www.ca11.uscourts.gov/unpub/searchdate.php",
@@ -969,13 +969,13 @@ def back_scrape_court(courtID, VERBOSITY):
                     i += 1
         return result
 
-    if courtID == 'cadc':
+    if courtID == 12:
         '''
         cadc - a nice HTML page, with good data. Scraped using lxml, no major
         tricks.
         '''
         VERBOSITY = verbosity
-        ct = Court.objects.get(courtUUID=courtID)
+        ct = Court.objects.get(courtUUID = 'cadc')
 
         months = [ '01', '02', '03', '04', '05', '06', '07', '08', '09', '10',
             '11', '12']
@@ -1059,8 +1059,8 @@ def back_scrape_court(courtID, VERBOSITY):
 
         return
 
-    if (courtID == 'cafc'):
-        ct = Court.objects.get(courtUUID=courtID)
+    if (courtID == 13):
+        ct = Court.objects.get(courtUUID = "cafc")
 
         # Sample URLs for page 2 and 3 (as of 2011-02-09)
         # http://www.cafc.uscourts.gov/opinions-orders/0/50/all/page-11-5.html
@@ -1170,8 +1170,8 @@ def back_scrape_court(courtID, VERBOSITY):
                 i += 1
         return
 
-    if courtID == 'scotus':
-        """This code is the same as in the scraper as of today (2010-05-05).
+    if courtID == 14:
+        """SCOTUS. This code is the same as in the scraper as of today (2010-05-05).
         There is a two year overlap between the resource.org stuff and the stuff
         obtained this way. That two years could be obtained, but for now, I've
         simply closed the gap."""
@@ -1189,7 +1189,7 @@ def back_scrape_court(courtID, VERBOSITY):
                 "http://www.supremecourt.gov/opinions/relatingtoorders.aspx?Term=06",
                 "http://www.supremecourt.gov/opinions/relatingtoorders.aspx?Term=07",
                 "http://www.supremecourt.gov/opinions/relatingtoorders.aspx?Term=08",)
-        ct = Court.objects.get(courtUUID='scotus')
+        ct = Court.objects.get(courtUUID = 'scotus')
 
         for url in urls:
             if verbosity >= 2: print "Now scraping: " + url
@@ -1283,7 +1283,7 @@ def back_scrape_court(courtID, VERBOSITY):
         Amazingly, resource.org simply lacks this volume."""
         httplib.HTTPConnection.debuglevel = 1
         urls = ('http://web.archive.org/web/20051222044311/www.supremecourtus.gov/opinions/04slipopinion.html',)
-        ct = Court.objects.get(courtUUID='scotus')
+        ct = Court.objects.get(courtUUID = 'scotus')
 
         for url in urls:
             if verbosity >= 2: print "Now scraping: " + url
@@ -1293,7 +1293,7 @@ def back_scrape_court(courtID, VERBOSITY):
             import StringIO
             data = StringIO.StringIO(data)
             import gzip
-            gzipper = gzip.GzipFile(fileobj=data)
+            gzipper = gzip.GzipFile(fileobj = data)
             html = gzipper.read()
             tree = fromstring(html)
 
@@ -1332,7 +1332,7 @@ def back_scrape_court(courtID, VERBOSITY):
                 try:
                     request = urllib2.Request("http://web.archive.org/web/20051222044311/" + caseLink)
                     request.add_header('User-agent', 'Mozilla/5.0(Windows; U; Windows NT 5.2; rv:1.9.2) Gecko/20100101 Firefox/3.6')
-                    h = urllib2.HTTPHandler(debuglevel=1)
+                    h = urllib2.HTTPHandler(debuglevel = 1)
                     opener = urllib2.build_opener(h)
                     webFile = opener.open(request).read()
                     stringThing = StringIO.StringIO()
@@ -1355,8 +1355,8 @@ def back_scrape_court(courtID, VERBOSITY):
                 sha1Hash = hashlib.sha1(data).hexdigest()
 
                 # using that, we check for a dup
-                doc, created = Document.objects.get_or_create(documentSHA1=sha1Hash,
-                    court=ct)
+                doc, created = Document.objects.get_or_create(documentSHA1 = sha1Hash,
+                    court = ct)
 
                 if created:
                     # we only do this if it's new
@@ -1406,14 +1406,14 @@ def main():
 
     usage = "usage: %prog -c COURTID (-s | -p) [-v {1,2}]"
     parser = OptionParser(usage)
-    parser.add_option('-s', '--scrape', action="store_true", dest='scrape',
-        default=False, help="Whether to scrape")
-    parser.add_option('-p', '--parse', action="store_true", dest='parse',
-        default=False, help="Whether to parse")
-    parser.add_option('-c', '--court', dest='courtID', metavar="COURTID",
-        help="The court to scrape, parse or both")
-    parser.add_option('-v', '--verbosity', dest='verbosity', metavar="VERBOSITY",
-        help="Display status messages after execution. Higher values are more verbosity.")
+    parser.add_option('-s', '--scrape', action = "store_true", dest = 'scrape',
+        default = False, help = "Whether to scrape")
+    parser.add_option('-p', '--parse', action = "store_true", dest = 'parse',
+        default = False, help = "Whether to parse")
+    parser.add_option('-c', '--court', dest = 'courtID', metavar = "COURTID",
+        help = "The court to scrape, parse or both")
+    parser.add_option('-v', '--verbosity', dest = 'verbosity', metavar = "VERBOSITY",
+        help = "Display status messages after execution. Higher values are more verbosity.")
     (options, args) = parser.parse_args()
     if not options.courtID or (not options.scrape and not options.parse):
         parser.error("You must specify a court and whether to scrape and/or parse it")
@@ -1430,12 +1430,14 @@ def main():
     else:
         verbosity = '0'
 
-    if courtID == 'all':
+    if courtID == 0:
         # we use a while loop to do all courts.
-        pacer_codes = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
-        for courtID in pacer_codes:
+        courtID = 1
+        from alertSystem.models import PACER_CODES
+        while courtID <= len(PACER_CODES):
             if options.scrape: back_scrape_court(courtID, verbosity)
             if options.parse:  parseCourt(courtID, verbosity)
+            courtID += 1
     else:
         # we're only doing one court
         if options.scrape: back_scrape_court(courtID, verbosity)

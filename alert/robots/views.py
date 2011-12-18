@@ -25,7 +25,7 @@
 #  ways how any modified versions differ from the original version.
 
 
-from alert.search.models import Document
+from alert.alertSystem.models import Document
 from django.http import HttpResponse
 from django.template import loader, Context
 from django.views.decorators.cache import cache_page

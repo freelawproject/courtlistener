@@ -1,13 +1,50 @@
-# -*- coding: utf-8 -*-
+# This software and any associated files are copyright 2010 Brian Carver and
+# Michael Lissner.
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#  Under Sections 7(a) and 7(b) of version 3 of the GNU Affero General Public
+#  License, that license is supplemented by the following terms:
+#
+#  a) You are required to preserve this legal notice and all author
+#  attributions in this program and its accompanying documentation.
+#
+#  b) You are prohibited from misrepresenting the origin of any material
+#  within this covered work and you are required to mark in reasonable
+#  ways how any modified versions differ from the original version.
+# encoding: utf-8
 import datetime
 from south.db import db
 from south.v2 import SchemaMigration
 from django.db import models
 
-
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
+        
+        # Adding model 'Alert'
+        db.create_table('Alert', (
+            ('alertUUID', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
+            ('alertName', self.gf('django.db.models.fields.CharField')(max_length=75)),
+            ('alertText', self.gf('django.db.models.fields.CharField')(max_length=200)),
+            ('alertFrequency', self.gf('django.db.models.fields.CharField')(max_length=10)),
+            ('alertPrivacy', self.gf('django.db.models.fields.BooleanField')(default=True, blank=True)),
+            ('sendNegativeAlert', self.gf('django.db.models.fields.BooleanField')(default=False, blank=True)),
+            ('lastHitDate', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
+        ))
+        db.send_create_signal('userHandling', ['Alert'])
+
         # Adding model 'BarMembership'
         db.create_table('BarMembership', (
             ('barMembershipUUID', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
@@ -22,11 +59,11 @@ class Migration(SchemaMigration):
             ('location', self.gf('django.db.models.fields.CharField')(max_length=100, blank=True)),
             ('employer', self.gf('django.db.models.fields.CharField')(max_length=100, blank=True)),
             ('avatar', self.gf('django.db.models.fields.files.ImageField')(max_length=100, blank=True)),
-            ('wantsNewsletter', self.gf('django.db.models.fields.BooleanField')(default=False)),
-            ('plaintextPreferred', self.gf('django.db.models.fields.BooleanField')(default=False)),
+            ('wantsNewsletter', self.gf('django.db.models.fields.BooleanField')(default=False, blank=True)),
+            ('plaintextPreferred', self.gf('django.db.models.fields.BooleanField')(default=False, blank=True)),
             ('activationKey', self.gf('django.db.models.fields.CharField')(max_length=40)),
             ('key_expires', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
-            ('emailConfirmed', self.gf('django.db.models.fields.BooleanField')(default=False)),
+            ('emailConfirmed', self.gf('django.db.models.fields.BooleanField')(default=False, blank=True)),
         ))
         db.send_create_signal('userHandling', ['UserProfile'])
 
@@ -42,19 +79,16 @@ class Migration(SchemaMigration):
         db.create_table('UserProfile_alert', (
             ('id', models.AutoField(verbose_name='ID', primary_key=True, auto_created=True)),
             ('userprofile', models.ForeignKey(orm['userHandling.userprofile'], null=False)),
-            ('alert', models.ForeignKey(orm['alerts.alert'], null=False))
+            ('alert', models.ForeignKey(orm['userHandling.alert'], null=False))
         ))
         db.create_unique('UserProfile_alert', ['userprofile_id', 'alert_id'])
 
-        # Adding M2M table for field favorite on 'UserProfile'
-        db.create_table('UserProfile_favorite', (
-            ('id', models.AutoField(verbose_name='ID', primary_key=True, auto_created=True)),
-            ('userprofile', models.ForeignKey(orm['userHandling.userprofile'], null=False)),
-            ('favorite', models.ForeignKey(orm['favorites.favorite'], null=False))
-        ))
-        db.create_unique('UserProfile_favorite', ['userprofile_id', 'favorite_id'])
 
     def backwards(self, orm):
+        
+        # Deleting model 'Alert'
+        db.delete_table('Alert')
+
         # Deleting model 'BarMembership'
         db.delete_table('BarMembership')
 
@@ -67,20 +101,8 @@ class Migration(SchemaMigration):
         # Removing M2M table for field alert on 'UserProfile'
         db.delete_table('UserProfile_alert')
 
-        # Removing M2M table for field favorite on 'UserProfile'
-        db.delete_table('UserProfile_favorite')
 
     models = {
-        'alerts.alert': {
-            'Meta': {'ordering': "['alertFrequency', 'alertText']", 'object_name': 'Alert', 'db_table': "'Alert'"},
-            'alertFrequency': ('django.db.models.fields.CharField', [], {'max_length': '10'}),
-            'alertName': ('django.db.models.fields.CharField', [], {'max_length': '75'}),
-            'alertPrivacy': ('django.db.models.fields.BooleanField', [], {'default': 'True'}),
-            'alertText': ('django.db.models.fields.CharField', [], {'max_length': '200'}),
-            'alertUUID': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'lastHitDate': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
-            'sendNegativeAlert': ('django.db.models.fields.BooleanField', [], {'default': 'False'})
-        },
         'auth.group': {
             'Meta': {'object_name': 'Group'},
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
@@ -101,9 +123,9 @@ class Migration(SchemaMigration):
             'first_name': ('django.db.models.fields.CharField', [], {'max_length': '30', 'blank': 'True'}),
             'groups': ('django.db.models.fields.related.ManyToManyField', [], {'to': "orm['auth.Group']", 'symmetrical': 'False', 'blank': 'True'}),
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'is_active': ('django.db.models.fields.BooleanField', [], {'default': 'True'}),
-            'is_staff': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
-            'is_superuser': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
+            'is_active': ('django.db.models.fields.BooleanField', [], {'default': 'True', 'blank': 'True'}),
+            'is_staff': ('django.db.models.fields.BooleanField', [], {'default': 'False', 'blank': 'True'}),
+            'is_superuser': ('django.db.models.fields.BooleanField', [], {'default': 'False', 'blank': 'True'}),
             'last_login': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime.now'}),
             'last_name': ('django.db.models.fields.CharField', [], {'max_length': '30', 'blank': 'True'}),
             'password': ('django.db.models.fields.CharField', [], {'max_length': '128'}),
@@ -117,47 +139,15 @@ class Migration(SchemaMigration):
             'model': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
             'name': ('django.db.models.fields.CharField', [], {'max_length': '100'})
         },
-        'favorites.favorite': {
-            'Meta': {'object_name': 'Favorite', 'db_table': "'Favorite'"},
-            'doc_id': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['search.Document']"}),
-            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'name': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
-            'notes': ('django.db.models.fields.TextField', [], {'max_length': '500', 'blank': 'True'})
-        },
-        'search.citation': {
-            'Meta': {'object_name': 'Citation', 'db_table': "'Citation'"},
-            'caseNameFull': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
-            'caseNameShort': ('django.db.models.fields.CharField', [], {'db_index': 'True', 'max_length': '100', 'blank': 'True'}),
-            'citationUUID': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'docketNumber': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
-            'lexisCite': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
-            'slug': ('django.db.models.fields.SlugField', [], {'max_length': '50', 'null': 'True'}),
-            'westCite': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'})
-        },
-        'search.court': {
-            'Meta': {'ordering': "['courtUUID']", 'object_name': 'Court', 'db_table': "'Court'"},
-            'URL': ('django.db.models.fields.URLField', [], {'max_length': '200'}),
-            'courtUUID': ('django.db.models.fields.CharField', [], {'max_length': '100', 'primary_key': 'True'}),
-            'endDate': ('django.db.models.fields.DateField', [], {'null': 'True', 'blank': 'True'}),
-            'shortName': ('django.db.models.fields.CharField', [], {'max_length': '100', 'blank': 'True'}),
-            'startDate': ('django.db.models.fields.DateField', [], {'null': 'True', 'blank': 'True'})
-        },
-        'search.document': {
-            'Meta': {'ordering': "['-time_retrieved']", 'object_name': 'Document', 'db_table': "'Document'"},
-            'blocked': ('django.db.models.fields.BooleanField', [], {'default': 'False', 'db_index': 'True'}),
-            'citation': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['search.Citation']", 'null': 'True', 'blank': 'True'}),
-            'court': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['search.Court']"}),
-            'dateFiled': ('django.db.models.fields.DateField', [], {'db_index': 'True', 'null': 'True', 'blank': 'True'}),
-            'date_blocked': ('django.db.models.fields.DateField', [], {'null': 'True', 'blank': 'True'}),
-            'documentHTML': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
-            'documentPlainText': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
-            'documentSHA1': ('django.db.models.fields.CharField', [], {'max_length': '40', 'db_index': 'True'}),
-            'documentType': ('django.db.models.fields.CharField', [], {'max_length': '50', 'blank': 'True'}),
-            'documentUUID': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'download_URL': ('django.db.models.fields.URLField', [], {'max_length': '200', 'db_index': 'True'}),
-            'local_path': ('django.db.models.fields.files.FileField', [], {'max_length': '100', 'blank': 'True'}),
-            'source': ('django.db.models.fields.CharField', [], {'max_length': '3', 'blank': 'True'}),
-            'time_retrieved': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'})
+        'userHandling.alert': {
+            'Meta': {'ordering': "['alertFrequency', 'alertText']", 'object_name': 'Alert', 'db_table': "'Alert'"},
+            'alertFrequency': ('django.db.models.fields.CharField', [], {'max_length': '10'}),
+            'alertName': ('django.db.models.fields.CharField', [], {'max_length': '75'}),
+            'alertPrivacy': ('django.db.models.fields.BooleanField', [], {'default': 'True', 'blank': 'True'}),
+            'alertText': ('django.db.models.fields.CharField', [], {'max_length': '200'}),
+            'alertUUID': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'lastHitDate': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
+            'sendNegativeAlert': ('django.db.models.fields.BooleanField', [], {'default': 'False', 'blank': 'True'})
         },
         'userHandling.barmembership': {
             'Meta': {'ordering': "['barMembership']", 'object_name': 'BarMembership', 'db_table': "'BarMembership'"},
@@ -167,18 +157,17 @@ class Migration(SchemaMigration):
         'userHandling.userprofile': {
             'Meta': {'object_name': 'UserProfile', 'db_table': "'UserProfile'"},
             'activationKey': ('django.db.models.fields.CharField', [], {'max_length': '40'}),
-            'alert': ('django.db.models.fields.related.ManyToManyField', [], {'symmetrical': 'False', 'to': "orm['alerts.Alert']", 'null': 'True', 'blank': 'True'}),
+            'alert': ('django.db.models.fields.related.ManyToManyField', [], {'symmetrical': 'False', 'to': "orm['userHandling.Alert']", 'null': 'True', 'blank': 'True'}),
             'avatar': ('django.db.models.fields.files.ImageField', [], {'max_length': '100', 'blank': 'True'}),
             'barmembership': ('django.db.models.fields.related.ManyToManyField', [], {'symmetrical': 'False', 'to': "orm['userHandling.BarMembership']", 'null': 'True', 'blank': 'True'}),
-            'emailConfirmed': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
+            'emailConfirmed': ('django.db.models.fields.BooleanField', [], {'default': 'False', 'blank': 'True'}),
             'employer': ('django.db.models.fields.CharField', [], {'max_length': '100', 'blank': 'True'}),
-            'favorite': ('django.db.models.fields.related.ManyToManyField', [], {'blank': 'True', 'related_name': "'users'", 'null': 'True', 'symmetrical': 'False', 'to': "orm['favorites.Favorite']"}),
             'key_expires': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
             'location': ('django.db.models.fields.CharField', [], {'max_length': '100', 'blank': 'True'}),
-            'plaintextPreferred': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
+            'plaintextPreferred': ('django.db.models.fields.BooleanField', [], {'default': 'False', 'blank': 'True'}),
             'user': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['auth.User']", 'unique': 'True'}),
             'userProfileUUID': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'wantsNewsletter': ('django.db.models.fields.BooleanField', [], {'default': 'False'})
+            'wantsNewsletter': ('django.db.models.fields.BooleanField', [], {'default': 'False', 'blank': 'True'})
         }
     }
 

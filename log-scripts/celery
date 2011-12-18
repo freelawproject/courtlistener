@@ -6,6 +6,6 @@
     noolddir
     sharedscripts
     postrotate
-        /etc/init.d/celeryd restart 
+    /etc/init.d/celery restart 
     endscript
 }
