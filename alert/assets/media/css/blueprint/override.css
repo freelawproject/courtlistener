@@ -105,16 +105,16 @@ mark {
     padding-top: 10px;
 }
 
-#navigation {
+nav {
     padding-bottom: 3em;
 }
 
-#navigation ul {
+nav ul {
     display: inline;
     padding: 0;
 }
 
-#navigation ul li {
+nav ul li {
     list-style: none outside none;
     padding: 0em 0.7em 0em 0.0em;
     white-space: nowrap;

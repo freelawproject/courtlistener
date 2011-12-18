@@ -40,15 +40,15 @@
                         </a>
 
                         {% if user.is_authenticated %}
-                            <div id="navigation">
+                            <nav>
                                 <ul>
                                     <li><a href="/opinions/all/">Browse</a></li>
                                     <li><a href="/profile/alerts/">Profile</a></li>
                                     <li><a href="/sign-out/">Sign out</a></li>
                                 </ul>
-                            </div>
+                            </nav>
                         {% else %}
-                            <div id="navigation">
+                            <nav>
                                 <ul>
                                     <li><a href="/about/">About</a></li>
                                     <li><a href="/opinions/all">Browse</a></li>
@@ -62,7 +62,7 @@
                                         <li><a href="{%url sign-in %}">Sign in / Register</a></li>
                                     {% endif %}
                                 </ul>
-                            </div>
+                            </nav>
                         {% endif %}
                     </div>
 

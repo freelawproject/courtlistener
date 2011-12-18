@@ -180,73 +180,74 @@
 	        </select>
 	        <hr class="space"/>
             {% for result in results.object_list %}
-	            {% if result.documentType = "Published" %}
-                    <div class="green-circle" title="This is a {{result.get_documentType_display}} opinion"></div>
-                {% else %} 
-                    {% if result.documentType = "Unpublished" or result.documentType = "Errata" or result.documentType = "In-chambers" or result.documentType = "Relating-to" %}
-                        <div class="red-circle" title="This is a {{result.get_documentType_display}} opinion"></div>
-                    {% else %}
-                        <div class="orange-circle" title="The status of this opinion is unknown"></div>
-                    {% endif %}
-                {% endif %}
-     
-	            <h3 class="bottom serif">
-	                <a href="{{ result.get_absolute_url}}?q={{query}}" class="visitable">
-	                    {{ result.caseName|safe }},
-	                    {% if result.westCite != '' and result.westCite != None %}
-	                        {{ result.westCite }}
+                <article>
+		            {% if result.documentType = "Published" %}
+	                    <div class="green-circle" title="This is a {{result.get_documentType_display}} opinion"></div>
+	                {% else %} 
+	                    {% if result.documentType = "Unpublished" or result.documentType = "Errata" or result.documentType = "In-chambers" or result.documentType = "Relating-to" %}
+	                        <div class="red-circle" title="This is a {{result.get_documentType_display}} opinion"></div>
 	                    {% else %}
-	                        {{ result.docketNumber }}
+	                        <div class="orange-circle" title="The status of this opinion is unknown"></div>
 	                    {% endif %}
-	                    ({% if result.court != 'SCOTUS' %}{{ result.court|nbsp }}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
-	                </a>
-	            </h3>
-
-	            <p class="bottom">
-	                {% if result.download_URL or result.local_path %}
-	                    {% if result.source != 'R' %}
-	                        <span class="meta-data-header">View Original:</span>
-	                        <span class="meta-data-value">
-		                        {% if result.download_URL %}
-		                            <a href="{{result.download_URL}}" class="visitable">From the court</a>
-		                        {% endif %}
-		                        {% if result.download_URL and result.local_path %}
-		                            &nbsp;&nbsp;|&nbsp;&nbsp;
-		                        {% endif %}
-		                        {% if result.local_path %}
-		                            <a href="/{{result.local_path}}" class="visitable">Our backup</a>
-		                        {% endif %}
-	                        </span>
-	                    {% else %}
-	                        <span class="meta-data-value"><strong>No downloadable versions.</strong></span>
-	                    {% endif %}
-	                {% else %}
-	                    <span class="meta-data-value"><strong>No downloadable versions.</strong></span>
 	                {% endif %}
-	           
-	                <span class="meta-data-header">Date Filed:</span>
-	                <span class="meta-data-value">
-		                {% if result.dateFiled %}
-		                    {{result.dateFiled|date:"l, F jS, Y"}}
+	     
+		            <h3 class="bottom serif">
+		                <a href="{{ result.get_absolute_url}}?q={{query}}" class="visitable">
+		                    {{ result.caseName|safe }},
+		                    {% if result.westCite != '' and result.westCite != None %}
+		                        {{ result.westCite }}
+		                    {% else %}
+		                        {{ result.docketNumber }}
+		                    {% endif %}
+		                    ({% if result.court != 'SCOTUS' %}{{ result.court|nbsp }}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
+		                </a>
+		            </h3>
+	
+		            <p class="bottom">
+		                {% if result.download_URL or result.local_path %}
+		                    {% if result.source != 'R' %}
+		                        <span class="meta-data-header">View Original:</span>
+		                        <span class="meta-data-value">
+			                        {% if result.download_URL %}
+			                            <a href="{{result.download_URL}}" class="visitable" rel="external" rel="noreferrer">From the court</a>
+			                        {% endif %}
+			                        {% if result.download_URL and result.local_path %}
+			                            &nbsp;&nbsp;|&nbsp;&nbsp;
+			                        {% endif %}
+			                        {% if result.local_path %}
+			                            <a href="/{{result.local_path}}" class="visitable">Our backup</a>
+			                        {% endif %}
+		                        </span>
+		                    {% else %}
+		                        <span class="meta-data-value"><strong>No downloadable versions.</strong></span>
+		                    {% endif %}
 		                {% else %}
-		                    Unknown date
+		                    <span class="meta-data-value"><strong>No downloadable versions.</strong></span>
 		                {% endif %}
-	                </span>
-	            </p>
-	            <p class="bottom">
-	                {% if result.westCite != '' and result.westCite != None and result.docketNumber %}
-                        <span class="meta-data-header">Docket Number:</span>
-                        <span class="meta-data-value">{{ result.docketNumber }}</span>
-                    {% endif %}
-	            </p>
-	            {% comment %}
-	            <p>
-	                &hellip;{% for frag in result.text %}
-	                   {{ frag|safe }}&hellip;
-	                {% endfor %}
-	            </p>
-	            {% endcomment %}
-
+		           
+		                <span class="meta-data-header">Date Filed:</span>
+		                <time class="meta-data-value" datetime="{{ result.dateFiled|date:'Y-m-d'}}" pubdate>
+			                {% if result.dateFiled %}
+			                    {{result.dateFiled|date:"l, F jS, Y"}}
+			                {% else %}
+			                    Unknown date
+			                {% endif %}
+		                </time>
+		            </p>
+		            <p class="bottom">
+		                {% if result.westCite != '' and result.westCite != None and result.docketNumber %}
+	                        <span class="meta-data-header">Docket Number:</span>
+	                        <span class="meta-data-value">{{ result.docketNumber }}</span>
+	                    {% endif %}
+		            </p>
+		            {% comment %}
+		            <p>
+		                &hellip;{% for frag in result.text %}
+		                   {{ frag|safe }}&hellip;
+		                {% endfor %}
+		            </p>
+		            {% endcomment %}
+                </article>
             {% endfor %}      
         {% else %}
             <h2 class="alt">Your search &mdash; <strong>{{ query }}</strong> &mdash; had no results.</h2>
@@ -263,12 +264,12 @@
             <div class="box">
                 <div id="pagination-left">
                     <h3 class="bottom arrow-left-before">
-                        {% if results.has_previous %}<a href="?q={{ query }}&amp;page={{ results.previous_page_number }}">{% endif %}Previous{% if results.has_previous %}</a>{% endif %}
+                        {% if results.has_previous %}<a href="?q={{ query }}&amp;page={{ results.previous_page_number }}" rel="prev">{% endif %}Previous{% if results.has_previous %}</a>{% endif %}
                     </h3>
                 </div>
                 <div id="pagination-right">
                     <h3 class="bottom arrow-right-after">
-                        {% if results.has_next %}<a href="?q={{ query }}&amp;page={{ results.next_page_number }}">{% endif %}Next{% if results.has_next %}</a>{% endif %}
+                        {% if results.has_next %}<a href="?q={{ query }}&amp;page={{ results.next_page_number }}" rel="next">{% endif %}Next{% if results.has_next %}</a>{% endif %}
                     </h3>
                 </div>
                 <div id="pagination-center">
