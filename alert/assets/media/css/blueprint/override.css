@@ -1,28 +1,9 @@
 /* --------------------------------------------------------------------------
 Sets up all the overrides or additional CSS that the site uses.
 ---------------------------------------------------------------------------*/
-/* ie.css - these are imported from the old blueprint ie.css file */
-.lt8 body {text-align:center;}
-.lt8 .container {text-align:left;}
-* html.lt8 .column, * html.lt8 .span-1, * html.lt8 .span-2, * html.lt8 .span-3, * html.lt8 .span-4, * html.lt8 .span-5, * html.lt8 .span-6, * html.lt8 .span-7, * html.lt8 .span-8, * html.lt8 .span-9, * html.lt8 .span-10, * html.lt8 .span-11, * html.lt8 .span-12, * html.lt8 .span-13, * html.lt8 .span-14, * html.lt8 .span-15, * html.lt8 .span-16, * html.lt8 .span-17, * html.lt8 .span-18, * html.lt8 .span-19, * html.lt8 .span-20, * html.lt8 .span-21, * html.lt8 .span-22, * html.lt8 .span-23, * html.lt8 .span-24 {display:inline;overflow-x:hidden;}
-* html.lt8 legend {margin:0px -8px 16px 0;padding:0;}
-.lt8 sup {vertical-align:text-top;}
-.lt8 sub {vertical-align:text-bottom;}
-html.lt8>body p code {*white-space:normal;}
-.lt8 hr {margin:-8px auto 11px;}
-.lt8 img {-ms-interpolation-mode:bicubic;}
-.lt8 .clearfix, .lt8 .container {display:inline-block;}
-* html.lt8 .clearfix, * html.lt8 .container {height:1%;}
-.lt8 fieldset {padding-top:0;}
-.lt8 textarea {overflow:auto;}
-.lt8 input.text, .lt8 input.title, .lt8 textarea {background-color:#fff;border:1px solid #bbb;}
-.lt8 input.text:focus, .lt8 input.title:focus {border-color:#666;}
-.lt8 input.text, .lt8 input.title, .lt8 textarea, .lt8 select {margin:0.5em 0;}
-.lt8 input.checkbox, .lt8 input.radio {position:relative;top:.25em;}
-.lt8 form.inline div, .lt8 form.inline p {vertical-align:middle;}
-.lt8 form.inline label {position:relative;top:-0.25em;}
-.lt8 form.inline input.checkbox, .lt8 form.inline input.radio, .lt8 form.inline input.button, .lt8 form.inline button {margin:0.5em 0;}
-.lt8 button, .lt8 input.button {position:relative;top:0.25em;}
+/* Some good stuff from h4pl.com */
+::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
+::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 
 
 .footer-item {
@@ -72,7 +53,8 @@ span.bold {
 }
 
 .hidden {
-    display: none;
+    display: none !important;
+    visibility: hidden;
 }
 
 .round {
@@ -97,8 +79,11 @@ span.bold {
 }
 
 mark {
+	/* Needs extra declarations for old browsers */
     font-weight: bold;
-    background-color: #ffffbf;	
+    background-color: #ffffbf;
+    color: #000;	
+    font-style: italic;
 }
 
 .serif {

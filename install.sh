@@ -583,6 +583,22 @@ function install_solr {
     echo -e "\nSolr installed successfully."
 }
 
+function configure_apache {
+    echo -e '\n##################################'
+    echo 'Configuring apache2...'
+    echo '##################################
+'
+    read -p "Would you likek to add an apache2 configuration to your sites-available directory? (y/n): " proceed
+    if [ $proceed == "y" ]
+    then
+        ln -s $CL_INSTALL_DIR/court-listener/alert/apache/courtlistener.com.conf /etc/apache2/sites-available/courtlistener.com.conf
+        echo -e '\nApache linked up successfully.'
+    else
+        echo -e '\nGreat. Moving on.'
+        return 0
+    fi
+}
+
 
 function install_django_celery {
     echo -e '\n##################################'
@@ -748,6 +764,7 @@ function main {
     install_court_listener
     configure_mysql
     install_solr
+    configure_apache
     install_django_celery
     install_debug_toolbar
     install_django_extensions

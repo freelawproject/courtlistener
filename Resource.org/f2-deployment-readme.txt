@@ -66,6 +66,7 @@ SOLR + Haystack!
  - consider/resolve old URL support. What does /opinions/all/ do? What about /opinions/ca2/, etc? 
  - add information about date/time formats. Useful to tell people that they can use timestamps or just dates. It 
    might be worth investigating django forms help_text for this.  
+ - check if .hgignore needs updating.
 
 
 SOLR DEPLOYMENT:
