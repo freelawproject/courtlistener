@@ -26,7 +26,11 @@ from alert.alertSystem.views import viewDocumentListByCourt
 from alert.contact.views import contact, thanks
 from alert.data_dumper.views import dump_index, serve_or_gen_dump
 from alert.feeds.views import allCourtsFeed, courtFeed, searchFeed
-from alert.pinger.views import validateForBing, validateForGoogle, validateForYahoo
+from alert.pinger.views import validateForBing
+from alert.pinger.views import validateForGoogle
+from alert.pinger.views import validateForGoogle2
+from alert.pinger.views import validateForGoogle3
+from alert.pinger.views import validateForYahoo
 from alert.robots.views import robots
 from alert.search.views import deleteAlert
 from alert.search.views import deleteAlertConfirm
@@ -144,6 +148,9 @@ urlpatterns = patterns('',
     (r'^y_key_6de7ece99e1672f2.html$', validateForYahoo),
     (r'^LiveSearchSiteAuth.xml$', validateForBing),
     (r'^googleef3d845637ccb353.html$', validateForGoogle),
+    (r'^google646349975c2495b6.html$', validateForGoogle2),
+    (r'^google646349975c2495b6.html$', validateForGoogle3),
+
     # Sitemap index generator
     (r'^sitemap\.xml$', 'alert.alertSystem.sitemap.indexCopy',
         {'sitemaps': sitemaps}),
