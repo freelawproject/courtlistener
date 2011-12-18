@@ -12,32 +12,36 @@
 
 
 {% block head %}
-	<link rel="stylesheet" href="/media/css/jquery.tooltip.css" type="text/css" media="screen, projection">
-	<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
-	<script type="text/javascript" src="/media/js/jquery.tooltip.min.js"></script>
-	<script type="text/javascript">
-	   $(document).ready(function() {
-	       $('.auto-focus:first').focus();
-	       $('.sidebar-section > h3').click(function () {
-	    	   $(this).next('.hidden').toggle('fast');
-	    	   $(this).next('.shown').toggle('fast');
-	           $(this).toggleClass('collapsed-heading');
-	           $(this).toggleClass('expanded-heading');
-	           $(this).toggleClass('arrow-right-before');
-	           $(this).toggleClass('arrow-down-before');
-	       });
-	       $('#q').tooltip({
-	           track: false,
-	           delay: 1,
-	           showURL: false,
-	           showBody: " - ",
-	           fade: 250,
-	           positionLeft: true
-	       });
-	   });
-	</script>
+	<link rel="stylesheet" href="/media/css/jquery.tooltip.css" type="text/css" media="screen, projection">	
 	<link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?q={{ query }}" />
 	<link rel="canonical" href="http://courtlistener.com/search/results/{% if query %}?q={{ query }}{% endif %}" />
+{% endblock %}
+
+{% block footer-scripts %}
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="/media/js/jquery-1.6.2.min.js"><\/script>')</script>
+    <script defer type="text/javascript" src="/media/js/jquery.tooltip.min.js"></script>
+    <script type="text/javascript">
+       $(document).ready(function() {
+           $('.auto-focus:first').focus();
+           $('.sidebar-section > h3').click(function () {
+               $(this).next('.hidden').toggle('fast');
+               $(this).next('.shown').toggle('fast');
+               $(this).toggleClass('collapsed-heading');
+               $(this).toggleClass('expanded-heading');
+               $(this).toggleClass('arrow-right-before');
+               $(this).toggleClass('arrow-down-before');
+           });
+           $('#q').tooltip({
+               track: false,
+               delay: 1,
+               showURL: false,
+               showBody: " - ",
+               fade: 250,
+               positionLeft: true
+           });
+       });
+    </script>
 {% endblock %}
 
 

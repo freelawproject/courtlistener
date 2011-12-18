@@ -35,6 +35,7 @@ from alert.alerts.views import delete_alert
 from alert.alerts.views import delete_alert_confirm
 from alert.alerts.views import edit_alert
 from alert.search.models import Court
+from alert.search.views import browser_warning
 from alert.search.views import show_results
 from alert.search.views import tools_page
 from alert.tinyurl.views import redirect_short_url
@@ -87,10 +88,11 @@ urlpatterns = patterns('',
             {'url': '/media/images/png/apple-touch-icon-114x114-precomposed.png'}),
     (r'^apple-touch-icon-precomposed\.png$', 'django.views.generic.simple.redirect_to',
             {'url': '/media/images/png/apple-touch-icon-precomposed.png'}),
+    (r'^bad-browser/$', browser_warning),
 
     # Display a case, a named URL because the get_absolute_url uses it.
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case,
-            name="viewCase"),
+        name="viewCase"),
 
     # Redirect users
     (r'^x/(.*)/$', redirect_short_url),
@@ -130,7 +132,8 @@ urlpatterns = patterns('',
     (r'^confirm-password/(?P<uidb36>.*)/(?P<token>.*)/$',
             password_reset_confirm,
             {'post_reset_redirect': '/reset-password/complete/'}),
-    (r'^reset-password/complete/$', signIn,
+    (r'^reset-password/complete/$',
+            signIn,
             {'template_name': 'registration/password_reset_complete.html'}),
 
     # Search pages
