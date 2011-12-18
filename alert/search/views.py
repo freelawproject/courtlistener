@@ -206,3 +206,6 @@ def show_results(request):
 
 def tools_page(request):
     return render_to_response('tools.html', {}, RequestContext(request))
+
+def browser_warning(request):
+    return render_to_response('browser_warning.html', {}, RequestContext(request))

@@ -64,6 +64,8 @@ SOLR + Haystack!
  - add xxx-xx-xxxx etc to the stopwords list (#190)
  - change case title from Courtlistener.com / Browse / Foo --> / Cases / Foo
  - consider/resolve old URL support. What does /opinions/all/ do? What about /opinions/ca2/, etc? 
+ - add information about date/time formats. Useful to tell people that they can use timestamps or just dates. It 
+   might be worth investigating django forms help_text for this.  
 
 
 SOLR DEPLOYMENT:
