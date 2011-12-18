@@ -27,19 +27,22 @@ SORT_CHOICES = (
 
 class SearchForm(forms.Form):
     q = forms.CharField()
-    refine = forms.BooleanField()
+    refine = forms.BooleanField(required=False, widget=forms.RadioSelect)
     sort = forms.ChoiceField(choices=SORT_CHOICES)
     case_name = forms.CharField()
-    status_p = forms.BooleanField()
-    status_u = forms.BooleanField()
-    court_all = forms.BooleanField()
-    courts = Court.objects.filter(in_use=True).order_by('order')
+    status_p = forms.BooleanField(required=False)
+    status_u = forms.BooleanField(required=False)
+    court_all = forms.BooleanField(required=False)
+    courts = Court.objects.filter(in_use=True)
     for court in courts:
-        court.courtUUID = forms.BooleanField()
+        court.courtUUID = forms.BooleanField(label=court.short_name,
+                                             required=False)
+    filed_before = forms.DateTimeField(default='YYYY-MM-DD')
+    filed_after = forms.DateTimeField(default='YYYY-MM-DD')
+    west_cite = forms.CharField()
+    docket_number = forms.CharField()
 
     class Meta:
         widgets = {
                    'refine': forms.RadioSelect,
-                   'status_p': forms.CheckboxInput,
-                   'status_u': forms.CheckboxInput
                  }
