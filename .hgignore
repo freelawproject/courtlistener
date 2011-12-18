@@ -35,6 +35,9 @@ Piwik
 # the FederalReports
 Resource.org/data
 
+# the cached robots.txt from Resource.org
+alert/robots/cached_file.txt
+
 # Sphinx
 Sphinx/data
 Sphinx/log

@@ -29,6 +29,8 @@ from alert.feeds.views import courtFeed
 from alert.feeds.views import searchFeed
 from alert.pinger.views import validateForBing
 from alert.pinger.views import validateForGoogle
+from alert.pinger.views import validateForGoogle2
+from alert.pinger.views import validateForGoogle3
 from alert.pinger.views import validateForYahoo
 from alert.robots.views import robots
 from alert.alerts.views import delete_alert
@@ -161,6 +163,9 @@ urlpatterns = patterns('',
     (r'^y_key_6de7ece99e1672f2.html$', validateForYahoo),
     (r'^LiveSearchSiteAuth.xml$', validateForBing),
     (r'^googleef3d845637ccb353.html$', validateForGoogle),
+    (r'^google646349975c2495b6.html$', validateForGoogle2),
+    (r'^google646349975c2495b6.html$', validateForGoogle3),
+
     # Sitemap index generator
     (r'^sitemap\.xml$', 'alert.casepage.sitemap.index_copy',
         {'sitemaps': sitemaps}),
