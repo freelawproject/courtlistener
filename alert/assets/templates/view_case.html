@@ -34,14 +34,12 @@
         // Handles the clipboard actions.
         $(document).ready(function() {
             $('#copy_png').click(function() {
-                console.log("clicked");
                 $('#copy_png').toggleClass('copy_png_selected');
                 $('#link-div').toggle();
                 $('#copy-input').select();
             });
             $('html').click(function() {
                 // Hides the input box if needed.
-                console.log('html was clicked');
                 $('#link-div').hide();
                 $('#copy_png').removeClass('copy_png_selected');
             });

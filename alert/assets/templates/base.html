@@ -22,7 +22,7 @@
         <link rel="stylesheet" href="/media/css/blueprint/override.css" type="text/css" media="screen, projection">
         <link rel="stylesheet" href="/media/css/blueprint/plugins/fancy-type/screen.css" type="text/css" media="screen, projection">
         <link rel="stylesheet" href="/media/css/blueprint/plugins/buttons/screen.css" type="text/css" media="screen, projection">
-        <script src="js/libs/modernizr-2.0.6.min.js"></script>
+        <script src="/media/js/modernizr-2.0.6.min.js"></script>
         <title>{% block title %}CourtListener.com{% endblock %}</title>
         {% block head %}{% endblock %}
     </head>
@@ -123,17 +123,20 @@
                 </span>
             </footer>
         </div>
+        {% block footer-scripts %}{% endblock %}
         {% if not user.is_superuser  %}
             <!-- Piwik -->
             <script type="text/javascript">
-            var pkBaseURL = (("https:" == document.location.protocol) ? "https://piwik.courtlistener.com/" : "http://piwik.courtlistener.com/");
-            document.write(unescape("%3Cscript src='" + pkBaseURL + "piwik.js' type='text/javascript'%3E%3C/script%3E"));
-            </script><script type="text/javascript">
-            try {
-            var piwikTracker = Piwik.getTracker(pkBaseURL + "piwik.php", 1);
-            piwikTracker.trackPageView();
-            piwikTracker.enableLinkTracking();
-            } catch( err ) {}
+            Modernizr.load({
+            	load: 'http://piwik.courtlistener.com/piwik.js',
+            	complete: function() {
+            		try {
+            			var piwikTracker = Piwik.getTracker('http://piwik.courtlistener.com/piwik.php', 1);
+            			piwikTracker.trackPageView();
+                        piwikTracker.enableLinkTracking();
+            		} catch(err) {}
+            	}
+            });
             </script><noscript><p><img src="http://piwik.courtlistener.com/piwik.php?idsite=1" style="border:0" alt=""/></p></noscript>
             <!-- End Piwik Tag -->
         {% endif %}
@@ -141,6 +144,5 @@
 		    <script src="//ajax.googleapis.com/ajax/libs/chrome-frame/1.0.3/CFInstall.min.js"></script>
 		    <script>window.attachEvent('onload',function(){CFInstall.check({mode:'inline', url:'/bad-browser/', cssText: 'width: 100%; height: 200px;' })})</script>
 	    <![endif]-->
-        {% block footer-scripts %}{% endblock %}
     </body>
 </html>
