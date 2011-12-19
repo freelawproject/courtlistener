@@ -47,7 +47,8 @@ QA:
  - Test with and without JS
  - Test where items are placed when they lack a date and date sorting is used
  - Is there a limit to the number of results? Do we handle it? 
- 
+ - Does Piwik still work?
+ - Do placeholders work in IE6-9? 
     
  
 SOLR + Haystack!
@@ -67,6 +68,7 @@ SOLR + Haystack!
  - add information about date/time formats. Useful to tell people that they can use timestamps or just dates. It 
    might be worth investigating django forms help_text for this.  
  - check if .hgignore needs updating.
+ - update the sitemap
 
 
 SOLR DEPLOYMENT:

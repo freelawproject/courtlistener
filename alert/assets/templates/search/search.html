@@ -41,6 +41,12 @@
                positionLeft: true
            });
        });
+       Modernizr.load({
+    	   // Sets up the placeholders in browsers that don't support them.
+    	   test: Modernizr.placeholder,
+    	   nope: '/media/js/placeholder-1.8.6.min.js',
+    	   complete: function () { $('input, textarea').placeholder(); }
+       });
     </script>
 {% endblock %}
 
@@ -209,7 +215,7 @@
 		                        <span class="meta-data-header">View Original:</span>
 		                        <span class="meta-data-value">
 			                        {% if result.download_URL %}
-			                            <a href="{{result.download_URL}}" class="visitable" rel="external" rel="noreferrer">From the court</a>
+			                            <a href="{{result.download_URL}}" class="visitable" rel="external noreferrer">From the court</a>
 			                        {% endif %}
 			                        {% if result.download_URL and result.local_path %}
 			                            &nbsp;&nbsp;|&nbsp;&nbsp;

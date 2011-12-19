@@ -86,16 +86,10 @@ mark {
     font-style: italic;
 }
 
-.serif {
-    font-family: "Warnock Pro","Goudy Old Style","Palatino","Book Antiqua",Georgia,serif;
-}
-
-.meta-data-header {
-    font-weight: bold;
-}
-.meta-data-value {
-    margin-right: 2em;	
-}
+.serif{ font-family: "Warnock Pro","Goudy Old Style","Palatino","Book Antiqua",Georgia,serif; }
+.meta-data-header{ font-weight: bold; }
+.meta-data-value{ margin-right: 2em; }
+.placeholder{ color: #aaa; }
 
 
 
