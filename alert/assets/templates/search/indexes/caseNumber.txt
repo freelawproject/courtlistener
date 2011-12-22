@@ -1,0 +1,4 @@
+{# This code must match the code in document_text.txt #}
+{{ object.citation.docketNumber|default_if_none:"" }}
+{{ object.citation.westCite|default_if_none:"" }}
+{{ object.citation.lexisCite|default_if_none:"" }}

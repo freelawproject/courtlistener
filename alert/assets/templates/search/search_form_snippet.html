@@ -1,30 +1,67 @@
-<form action="." method="get">
-    <div id="search-form">
+<form action="." method="get" id="search-form">
+    <div id="search-container">
         <table>
             <tbody>
                 <tr>
                     <td>
-                        {# TODO: Make sure this works #}
+                        {# TODO: Make sure autofocus works #}
                         <input class="{% if count == 0 or not query  %}auto-focus{% endif %} wide-title"
+                            value="{{search_form.q.value}}"
                             name="q"
-                            id="search-input"
-                            value="{{query}}"
-                            autocomplete="off">
+                            id="id_q"
+                            autocomplete="off"
+                            type="text">
                      </td>
                     <td>
-                        <button type="submit" class="button title"
-                        name="search" id="search-button">Search</button>
+                        <button type="submit" 
+                            class="button title" 
+                            name="search" 
+                            id="search-button">Search</button>
                     </td>
                 </tr>
                 <tr>
                     <td colspan="2">
                         <div class="right">
-                            <input type="radio" value="new" name="group1">New search
-                            <input type="radio" value="old" name="group1">In current results
+                            {% for choice in search_form.refine.field.choices %}
+	                            <label for="id_{{ search_form.refine.html_name }}_{{ forloop.counter0 }}">
+	                                <input
+		                                type="radio"
+		                                id="id_{{ search_form.refine.html_name }}_{{ forloop.counter0 }}"
+		                                value="{{ choice.0 }}"
+		                                name="{{ search_form.refine.html_name }}"
+		                                {% if choice.0 == search_form.refine.value %}checked="checked"{% endif %}>
+		                                {{ choice.1 }}
+	                            </label>
+                            {% endfor %}
                         </div>
                     </td>
                 </tr>
             </tbody>
         </table>
+        <div id="extra-search-fields">
+            {{ search_form.sort }}
+            <div id="extra-sidebar-fields">
+                <h4 class="bottom">Case name</h4>
+                {{ search_form.case_name }}
+                <hr class="space">
+                <h4 class="bottom">Federal Appeals Courts</h4>
+                {% for court in facet_fields.court_exact %}
+                    <!--  See the view for next steps. I need a better variable from the view to process here. -->
+                    <p class="bottom">
+                        <!--  This is what things should look like: -->
+                        <input id="id_scotus" type="checkbox" name="scotus">
+                        <label for="id_ca1">First Circuit:</label>
+                        
+                        <!--  this is what I've been working with -->
+                        <a href="{{ request.get_full_path }}&amp;selected_facets=court_exact:{{ court.0|urlencode }}">
+                            {{ court.0 }}
+                        </a>
+                        <span class="gray small">({{ court.1 }})</span>
+                    </p>
+                {% endfor %}
+                <hr class="space">
+            </div>
+        </div>
+        {{ search_form }}
     </div>
 </form>

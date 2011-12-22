@@ -11,8 +11,7 @@
 
 
 
-{% block head %}
-	<link rel="stylesheet" href="/media/css/jquery.tooltip.css" type="text/css" media="screen, projection">	
+{% block head %}	
 	<link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?q={{ query }}" />
 	<link rel="canonical" href="http://courtlistener.com/search/results/{% if query %}?q={{ query }}{% endif %}" />
 {% endblock %}
@@ -20,7 +19,6 @@
 {% block footer-scripts %}
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
     <script>window.jQuery || document.write('<script src="/media/js/jquery-1.6.2.min.js"><\/script>')</script>
-    <script defer type="text/javascript" src="/media/js/jquery.tooltip.min.js"></script>
     <script type="text/javascript">
        $(document).ready(function() {
            $('.auto-focus:first').focus();
@@ -32,17 +30,45 @@
                $(this).toggleClass('arrow-right-before');
                $(this).toggleClass('arrow-down-before');
            });
-           $('#q').tooltip({
-               track: false,
-               delay: 1,
-               showURL: false,
-               showBody: " - ",
-               fade: 250,
-               positionLeft: true
+           $('#id_sort').change(function() {
+        	   // Makes the sort drop down work when changed.
+        	   $('#search-form').submit();
+           });
+           $('#id_sort').appendTo('#result-order-chooser-placeholder');
+           $('#id_sort').show();
+           $('#extra-sidebar-fields').appendTo('#sidebar-facet-placeholder');
+           $('#extra-sidebar-fields').show()
+           
+//        	   $("#search-form").submit(function(e) {
+//        		   e.preventDefault();
+       		    
+// 			    var q      = $('#id_q').val()
+// 			    var sort   = $('#id_sort').val();
+			
+// 			    var dataString = '?q='+ q + '&sort='+ sort;
+// 			    window.location = dataString;
+// 		    });
+           
+           $('#search-form').submit(function(e){
+        	   e.preventDefault();
+        	   
+        	   // Gather up the values elsewhere in the HTML, and add them to 
+        	   // the main form.
+        	   $('.external-input').each(function() {
+        		  var el = $(this);
+        		  $('<input type="hidden" name="' + el.attr('name') + '" />')
+        		      .val(el.val())
+        		      .appendTo('#search-form');
+        	   });
+        	   //console.log($('#search-form').serialize());
+        	   //$.get('.', $('#search-form').serialize());
+        	   document.location = '?' + $('#search-form').serialize();
+        	   //window.location.search = '?' + $('#search-form').serialize();
+        	   
            });
        });
        Modernizr.load({
-    	   // Sets up the placeholders in browsers that don't support them.
+    	   // Sets up HTML5 input placeholders in browsers that don't support them.
     	   test: Modernizr.placeholder,
     	   nope: '/media/js/placeholder-1.8.6.min.js',
     	   complete: function () { $('input, textarea').placeholder(); }
@@ -138,7 +164,8 @@
 
 	        <div class="sidebar-section">
 	            <h3 class="pointer expanded-heading arrow-down-before">Refine your search</h3>
-	            <div class="shown">
+	            <div class="shown" id="sidebar-facet-placeholder"></div>
+	            <div>
 	                <h4 class="bottom">Federal Appeals Courts</h4>
 	                {% for court in facet_fields.court_exact %}
 	                    <p class="bottom">
@@ -179,11 +206,7 @@
         
         {% if results.paginator.count > 0 %}
             <h2 id="result-count">{{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }}</h2>
-            <select id="result-order-chooser">
-	            <option>Relevance</option>
-	            <option>Date: newest first</option>
-	            <option>Date: oldest first</option>
-	        </select>
+            <div id="result-order-chooser-placeholder"></div>
 	        <hr class="space"/>
             {% for result in results.object_list %}
                 <article>
