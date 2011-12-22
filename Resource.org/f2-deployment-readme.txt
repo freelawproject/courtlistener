@@ -69,6 +69,7 @@ SOLR + Haystack!
    might be worth investigating django forms help_text for this.  
  - check if .hgignore needs updating.
  - update the sitemap
+ - adjust the apache config to point to the new robots.txt location (tinyurl/robots.txt)
 
 
 SOLR DEPLOYMENT:
@@ -85,7 +86,10 @@ SOLR DEPLOYMENT:
     sudo update-rc.d scraper defaults
     
  - hg pull -u
-    - adjust the apache config to point to the new robots.txt location (tinyurl/robots.txt)
+ - upgrade Django:
+    - svn switch -r 17237 http://code.djangoproject.com/svn/django/branches/releases/1.3.X
+    - update 20-private to have this: 'ENGINE': 'django.db.backends.mysql'
+    - restart apache2
  - reindex 
     - How big will our index be? Space on disk, or do we need to remove Sphinx first?
         - Should be OK. There are 736 docs on my local system, which require 22MB.

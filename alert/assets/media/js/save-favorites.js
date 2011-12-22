@@ -51,7 +51,7 @@ $(function() {
         // validate and process form here
         var csrf   = $("input[name=csrfmiddlewaretoken]").val();
         var doc_id = $("input#id_doc_id").val();
-        var name  = $("input#save-favorite-name-field").val();
+        var name   = $("input#save-favorite-name-field").val();
         var notes  = $("textarea#save-favorite-notes-field").val();
 
         var dataString = 'csrf='+ csrf + '&doc_id=' + doc_id + '&notes=' + notes + '&name=' + name;

@@ -16,6 +16,11 @@
 
 from alert import settings
 from alert.lib.string_utils import trunc
+
+# Celery requires imports like this. Disregard syntax error.
+#from search.tasks import delete_docs
+#from search.tasks import add_or_update_docs
+
 from alert.tinyurl.encode_decode import num_to_ascii
 from django.template.defaultfilters import slugify
 from django.utils.text import get_valid_filename
@@ -162,51 +167,66 @@ class Citation(models.Model):
 
 
 class Document(models.Model):
-    '''A class which holds the bulk of the information regarding documents. This 
-    must go last, since it references the above classes'''
+    '''A class representing a single court opinion.
+    
+    This must go last, since it references the above classes
+    '''
     documentUUID = models.AutoField("a unique ID for each document",
                                     primary_key=True)
-    source = models.CharField("the source of the document",
-                              max_length=3,
-                              choices=DOCUMENT_SOURCES,
-                              blank=True)
-    documentSHA1 = models.CharField("unique ID for the document, as generated via sha1 on the PDF",
-                                    max_length=40,
-                                    db_index=True)
-    dateFiled = models.DateField("the date filed by the court",
-                                 blank=True,
-                                 null=True,
-                                 db_index=True)
-    court = models.ForeignKey(Court,
-                              verbose_name="the court where the document was filed",
-                              db_index=True)
-    citation = models.ForeignKey(Citation,
-                                 verbose_name="the citation information for the document",
-                                 blank=True,
-                                 null=True)
-    download_URL = models.URLField("the URL on the court website where the document was originally scraped",
-                                   verify_exists=False,
-                                   db_index=True)
-    time_retrieved = models.DateTimeField("the exact date and time stamp that the document was placed into our database",
-                                          auto_now_add=True,
-                                          editable=False)
-    local_path = models.FileField("the location, relative to MEDIA_ROOT, where the files are stored",
-                                  upload_to=make_pdf_upload_path,
-                                  blank=True)
-    documentPlainText = models.TextField("plain text of the document after extraction from the PDF",
-                                         blank=True)
-    documentHTML = models.TextField("HTML of the document",
-                                    blank=True)
-    documentType = models.CharField("the type of document, as described by document_types.txt",
-                                    max_length=50,
-                                    blank=True,
-                                    choices=DOCUMENT_STATUSES)
-    date_blocked = models.DateField('original block date',
-                                    blank=True,
-                                    null=True)
-    blocked = models.BooleanField('block crawlers for this document',
-                                  db_index=True,
-                                  default=False)
+    source = models.CharField(
+                      "the source of the document",
+                      max_length=3,
+                      choices=DOCUMENT_SOURCES,
+                      blank=True)
+    documentSHA1 = models.CharField(
+                      "unique ID for the document, as generated via sha1 on the PDF",
+                      max_length=40,
+                      db_index=True)
+    dateFiled = models.DateField(
+                      "the date filed by the court",
+                      blank=True,
+                      null=True,
+                      db_index=True)
+    court = models.ForeignKey(
+                      Court,
+                      verbose_name="the court where the document was filed",
+                      db_index=True)
+    citation = models.ForeignKey(
+                      Citation,
+                      verbose_name="the citation information for the document",
+                      blank=True,
+                      null=True)
+    download_URL = models.URLField(
+                      "the URL on the court website where the document was originally scraped",
+                      verify_exists=False,
+                      db_index=True)
+    time_retrieved = models.DateTimeField(
+                      "the exact date and time stamp that the document was placed into our database",
+                      auto_now_add=True,
+                      editable=False)
+    local_path = models.FileField(
+                      "the location, relative to MEDIA_ROOT, where the files are stored",
+                      upload_to=make_pdf_upload_path,
+                      blank=True)
+    documentPlainText = models.TextField(
+                      "plain text of the document after extraction from the PDF",
+                      blank=True)
+    documentHTML = models.TextField(
+                      "HTML of the document",
+                      blank=True)
+    documentType = models.CharField(
+                      "the type of document, as described by document_types.txt",
+                      max_length=50,
+                      blank=True,
+                      choices=DOCUMENT_STATUSES)
+    date_blocked = models.DateField(
+                      'original block date',
+                      blank=True,
+                      null=True)
+    blocked = models.BooleanField(
+                      'block crawlers for this document',
+                      db_index=True,
+                      default=False)
 
     def __unicode__(self):
         if self.citation:
@@ -228,21 +248,31 @@ class Document(models.Model):
         '''
         If the value of blocked changed to True, invalidate the sitemap cache
         where that value was stored. Google can later pick it up properly.
+        
+        Note that there is also a celery task associated with the post_save
+        signal.
         '''
         # Run the standard save function.
         super(Document, self).save(*args, **kwargs)
-        # Then delete the cached sitemap if the item is blocked.
+
+        # Delete the cached sitemap if the item is blocked.
         if self.blocked:
             invalidate_sitemap_cache_by_court(self.court_id)
+
 
     def delete(self, *args, **kwargs):
         '''
         If the item is deleted, we need to update the sitemap that previously
         contained it. Note that this doesn't get called when an entire queryset
         is deleted, but that should be OK.
+        
+        Note that there is also a celery task associated with the post_delete
+        signal.
         '''
         # Delete the item.
         super(Document, self).delete(*args, **kwargs)
+
+        # Invalidate the sitemap cache
         invalidate_sitemap_cache_by_court(self.court_id)
 
     class Meta:

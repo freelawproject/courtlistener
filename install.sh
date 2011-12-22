@@ -288,8 +288,9 @@ function install_django {
     # get django!
     echo "Downloading django with svn..."
     cd $DJANGO_INSTALL_DIR
-    svn co http://code.djangoproject.com/svn/django/branches/releases/1.2.X .
-
+    # Upgrade this with svn up, or upgrade versions with something like:
+    # svn switch -r revNum http://code.djangoproject.com/svn/django/branches/releases/1.4.X/
+    svn co http://code.djangoproject.com/svn/django/branches/releases/1.3.X .
 
     # link django with python
     if [ ! -d $PYTHON_SITES_PACKAGES_DIR ]

@@ -97,7 +97,7 @@ class SolrConnection(object):
             raise SolrError(r, c)
 
     def select(self, params):
-        print "sunburnt.SolrConnection.select params: %s" % str(params)
+        #print "sunburnt.SolrConnection.select params: %s" % str(params)
         qs = urllib.urlencode(params)
         url = "%s?%s" % (self.select_url, qs)
         if len(url) > self.max_length_get_url:

@@ -16,6 +16,7 @@
 
 from alert.alerts.forms import CreateAlertForm
 from alert.lib import sunburnt
+from alert.search.forms import SearchForm
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.core.paginator import PageNotAnInteger
@@ -24,27 +25,9 @@ from django.conf import settings
 from django.shortcuts import render_to_response
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
+from django.utils.datastructures import MultiValueDictKeyError
 
 conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
-
-
-def message_user(query, request):
-    '''Check that the user's query is valid in a number of ways:
-      1. Are they using any invalid fields?
-      2. ? 
-    
-    '''
-
-
-    '''
-    # TODO: Write the regexes to process this. Import from the search class 
-    #       when doing so.
-
-    if len(messageText) > 0:
-        messages.add_message(request, messages.INFO, messageText)
-    '''
-    return True
-
 
 def get_date_filed_or_return_zero(doc):
     """Used for sorting dates. Returns the date field or the earliest date
@@ -63,16 +46,17 @@ def show_results(request):
     solr_log.close()
     print
     print
+    print "Running the show_results view..."
     '''Show the results for a query
     
     Implements a parallel faceted search interface with Solr as the backend.
     '''
 
-    query = request.GET.get('q', '')
+    query = request.GET.get('q', '*')
+
 
     # this handles the alert creation form.
     if request.method == 'POST':
-        from alert.userHandling.models import Alert
         # an alert has been created
         alert_form = CreateAlertForm(request.POST)
         if alert_form.is_valid():
@@ -86,31 +70,81 @@ def show_results(request):
             up = request.user.get_profile()
             up.alert.add(alert)
             messages.add_message(request, messages.SUCCESS,
-                'Your alert was created successfully.')
+                                 'Your alert was created successfully.')
 
             # and redirect to the alerts page
             return HttpResponseRedirect('/profile/alerts/')
     else:
         # the form is loading for the first time, load it, then load the rest
-        # of the page!
+        # of the page
         alert_form = CreateAlertForm(initial={'alertText': query,
                                               'alertFrequency': "dly"})
 
-    # alert the user if there are any errors in their query
-    message_user(query, request)
+    '''
+    Code beyond this point will be run if the alert form failed, or if the 
+    submission was a GET request. Beyond this point, we run the searches.
+    '''
 
-    # Build up all the queries needed
+    search_form = SearchForm(request.GET)
+
     params = {}
-    params['q'] = query
+    if search_form.is_valid():
+        print "valid form!"
+        cd = search_form.cleaned_data
+        print "Data has been scrubbed!"
+
+        # Build up all the queries needed
+        params['q'] = cd['q']
+        params['sort'] = request.GET.get('sort', '')
+        if cd.get('refine') == 'refine':
+            # Then we concern ourselves with the other parameters"
+            pass
+
+
+        # Finally, we make a copy of request.GET so it is mutable, and we make
+        # some adjustments that we want to see in the rendered form.
+        mutable_get = request.GET.copy()
+        # Send the user the cleaned up query
+        mutable_get['q'] = cd['q']
+        # Always reset the radio box to refine
+        mutable_get['refine'] = 'refine'
+        search_form = SearchForm(mutable_get)
+
+
+
+    else:
+        print "The form is invalid or unbound."
+        params['q'] = '*'
+
     params['facet'] = 'true'
     params['facet.field'] = ['status_exact', 'court_exact']
-    #try:
-    print "alert.search.views request.GET['selected_facets']: %s" % request.GET['selected_facets']
-    params['selected_facets'] = request.GET['selected_facets']
-    #except
+    try:
+        #print "alert.search.views request.GET['selected_facets']: %s" % request.GET['selected_facets']
+        params['selected_facets'] = request.GET['selected_facets']
+    except MultiValueDictKeyError:
+        pass
 
+    # Run the query
+    print "Params sent to search are: %s" % params
     results_si = conn.raw_query(**params)
     facet_fields = results_si.execute().facet_counts.facet_fields
+
+    print facet_fields
+    '''~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    TODO
+        I have to pause here, and go create the crawler for the database, 
+        because a recrawl is necessary. Once that's done, I need to combine the 
+        data coming back from Solr, which will have the following form:
+        
+        {'status_exact': [('Unpublished', 335), ('Published', 271), 
+        ('Relating-to', 1), ('Errata', 0)], 'court_exact': [('ca2', 189), 
+        ('ca9', 178), ('ca3', 118)...]}
+        
+        ...with the checkbox form fields. I should be able to get a list of the
+        fields back that I need, but I haven't figured out how just yet. The goal
+        is to get a tuple/list into the template that looks something like:
+        ((short_name, id, count), (short_name, id, count), (short_name, id, count))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'''
 
     # Set up pagination
     paginator = Paginator(results_si, 20)
@@ -123,12 +157,13 @@ def show_results(request):
     except EmptyPage:
         # If page is out of range (e.g. 9999), deliver last page of results.
         paged_results = paginator.page(paginator.num_pages)
-    print "alert.search.views facet_fields.facet_counts: %s" % facet_fields
+    #print "alert.search.views facet_fields.facet_counts: %s" % facet_fields
 
-    return render_to_response('search/search.html', {'query': query,
-                              'alert_form': alert_form, 'results': paged_results,
-                              'facet_fields': facet_fields},
-                              RequestContext(request))
+    return render_to_response(
+                  'search/search.html',
+                  {'search_form': search_form, 'alert_form': alert_form,
+                   'results': paged_results, 'facet_fields': facet_fields},
+                  RequestContext(request))
 
     #############
     # SCRAPS
