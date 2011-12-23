@@ -16,6 +16,7 @@
 
 
 from alert.search.models import Court
+from alert.search.models import DOCUMENT_STATUSES
 from django import forms
 
 REFINE_CHOICES = (
@@ -41,8 +42,6 @@ class SearchForm(forms.Form):
                         required=False,
                         widget=forms.TextInput(
                                    attrs={'class': 'span-5 external-input'}))
-    status_p = forms.BooleanField(required=False, initial=True)
-    status_u = forms.BooleanField(required=False, initial=True)
     filed_before = forms.DateTimeField(
                         required=False,
                         widget=forms.TextInput(
@@ -53,28 +52,43 @@ class SearchForm(forms.Form):
                                    attrs={'placeholder': 'YYYY-MM-DD'}))
     west_cite = forms.CharField(required=False)
     docket_number = forms.CharField(required=False)
-    court_all = forms.BooleanField(required=False, initial=True)
 
+    def __init__(self, *args, **kwargs):
+        print "Form init called..."
+        super(SearchForm, self).__init__(*args, **kwargs)
 
-    def __init__(self, data={}, *args, **kwargs):
-        super(SearchForm, self).__init__(data, *args, **kwargs)
-        if data.get('sort') is not None:
-            # If there's a query, add the refine field.
+        # Query the DB so we can build up check boxes for each court in use.  
+        courts = Court.objects.filter(in_use=True).values_list(
+                                                    'courtUUID', 'short_name')
+        if self.data.get('sort') is not None:
+            # If there's a sort order, this is a refinement.
             self.fields['refine'] = forms.ChoiceField(
                                               choices=REFINE_CHOICES,
                                               required=False,
+                                              initial='refine',
                                               widget=forms.RadioSelect())
-
-        # Query the DB, and build up check boxes for each court that's in use.  
-        # See: http://stackoverflow.com/questions/8556844 and 
-        # http://jacobian.org/writing/dynamic-form-generation/
-        courts = Court.objects.filter(in_use=True).values_list(
-                                                    'courtUUID', 'short_name')
-        for court in courts:
-            self.fields[court[0]] = forms.BooleanField(
-                                              label=court[1],
-                                              required=False,
-                                              initial=True)
+            for court in courts:
+                self.fields['court_' + court[0]] = forms.BooleanField(
+                                                              label=court[1],
+                                                              required=False)
+            for status in DOCUMENT_STATUSES:
+                self.fields['stat_' + status[0]] = forms.BooleanField(
+                                                              label=status[1],
+                                                              required=False)
+        else:
+            # It's a new query, check all the boxes.
+            for court in courts:
+                self.fields['court_' + court[0]] = forms.BooleanField(
+                                                              label=court[1],
+                                                              required=False,
+                                                              initial=True,
+                                                              widget=forms.CheckboxInput(attrs={'checked':'checked'}))
+            for status in DOCUMENT_STATUSES:
+                self.fields['stat_' + status[0]] = forms.BooleanField(
+                                                              label=status[1],
+                                                              required=False,
+                                                              initial=True,
+                                                              widget=forms.CheckboxInput(attrs={'checked':'checked'}))
 
 
     def clean_q(self):

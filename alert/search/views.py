@@ -84,67 +84,138 @@ def show_results(request):
     Code beyond this point will be run if the alert form failed, or if the 
     submission was a GET request. Beyond this point, we run the searches.
     '''
-
     search_form = SearchForm(request.GET)
 
     params = {}
     if search_form.is_valid():
-        print "valid form!"
         cd = search_form.cleaned_data
-        print "Data has been scrubbed!"
 
         # Build up all the queries needed
         params['q'] = cd['q']
         params['sort'] = request.GET.get('sort', '')
-        if cd.get('refine') == 'refine':
-            # Then we concern ourselves with the other parameters"
-            pass
+        params['facet'] = 'true'
+        params['facet.mincount'] = 0
+        params['facet.field'] = ['{!ex=dt}status_exact', '{!ex=dt}court_exact']
+        selected_courts = [k.replace('court_', '')
+                           for k, v in cd.iteritems()
+                           if (k.startswith('court_') and v == True)]
+        selected_courts = ' OR '.join(selected_courts)
+        selected_stats = [k.replace('stat_', '')
+                          for k, v in cd.iteritems()
+                          if (k.startswith('stat_') and v == True)]
+        selected_stats = ' OR '.join(selected_stats)
+        fq = []
+        if len(selected_courts) > 0:
+            fq.append('{!tag=dt}court_exact:(%s)' % selected_courts)
+        if len(selected_stats) > 0:
+            fq.append('{!tag=dt}status_exact:(%s)' % selected_stats)
+        if len(fq) > 0:
+            params['fq'] = fq
 
-
-        # Finally, we make a copy of request.GET so it is mutable, and we make
-        # some adjustments that we want to see in the rendered form.
-        mutable_get = request.GET.copy()
-        # Send the user the cleaned up query
-        mutable_get['q'] = cd['q']
-        # Always reset the radio box to refine
-        mutable_get['refine'] = 'refine'
-        search_form = SearchForm(mutable_get)
-
-
-
+        '''
+        GOAL:
+        http://localhost:8983/solr/select/?q=*:*&version=2.2&start=0&rows=0&indent=on&fq={!tag=dt}court_exact:%28ca1%20OR%20ca2%29&facet=true&facet.field={!ex=dt}court_exact&facet.field={!ex=dt}status_exact
+        http://localhost:8983/solr/select/?
+            q=*:*
+            &version=2.2
+            &start=0
+            &rows=0
+            &indent=on
+            &fq={!tag=dt}court_exact:%28ca1%20OR%20ca2%29
+            &facet=true
+            &facet.field={!ex=dt}court_exact
+            &facet.field={!ex=dt}status_exact
+        '''
     else:
         print "The form is invalid or unbound."
+        #TODO: Remove before sending live
+        assert False
         params['q'] = '*'
-
-    params['facet'] = 'true'
-    params['facet.field'] = ['status_exact', 'court_exact']
-    try:
-        #print "alert.search.views request.GET['selected_facets']: %s" % request.GET['selected_facets']
-        params['selected_facets'] = request.GET['selected_facets']
-    except MultiValueDictKeyError:
-        pass
 
     # Run the query
     print "Params sent to search are: %s" % params
     results_si = conn.raw_query(**params)
     facet_fields = results_si.execute().facet_counts.facet_fields
-
     print facet_fields
-    '''~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    TODO
-        I have to pause here, and go create the crawler for the database, 
-        because a recrawl is necessary. Once that's done, I need to combine the 
-        data coming back from Solr, which will have the following form:
-        
-        {'status_exact': [('Unpublished', 335), ('Published', 271), 
-        ('Relating-to', 1), ('Errata', 0)], 'court_exact': [('ca2', 189), 
-        ('ca9', 178), ('ca3', 118)...]}
-        
-        ...with the checkbox form fields. I should be able to get a list of the
-        fields back that I need, but I haven't figured out how just yet. The goal
-        is to get a tuple/list into the template that looks something like:
-        ((short_name, id, count), (short_name, id, count), (short_name, id, count))
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'''
+
+    # Merge the fields with the facet values and set up the form fields.
+    # We need to handle two cases:
+    #   1. The initial load of the page. For this we use the checked attr that 
+    #      is set on the form if there isn't a sort order in the request.
+    #   2. The load after form submission. For this, we use the field.value().
+    # The other thing we're accomplishing here is to merge the fields from 
+    # Django with the counts from Solr.
+    court_facets = []
+    court_list = dict(facet_fields['court_exact'])
+    for field in search_form:
+        try:
+            count = court_list[field.html_name.replace('court_', '')]
+        except KeyError:
+            # Happens when a field is iterated on that doesn't exist in the 
+            # facets variable
+            continue
+
+        try:
+            refine = search_form['refine'].value()
+        except KeyError:
+            # Happens on page load, since the field doesn't exist yet.
+            refine = 'new'
+
+        if refine == 'new':
+            checked = True
+        else:
+            # It's a refinement
+            if field.value() == 'on':
+                checked = True
+            else:
+                checked = False
+
+        facet = [field.label,
+                 field.html_name,
+                 count,
+                 checked]
+        court_facets.append(facet)
+
+    status_facets = []
+    status_list = dict(facet_fields['status_exact'])
+    for field in search_form:
+        try:
+            count = status_list[field.html_name.replace('stat_', '')]
+        except KeyError:
+            # Happens when a field is iterated on that doesn't exist in the 
+            # facets variable
+            continue
+
+        try:
+            refine = search_form['refine'].value()
+        except KeyError:
+            # Happens on page load, since the field doesn't exist yet.
+            refine = 'new'
+
+        if refine == 'new':
+            checked = True
+        else:
+            print field.value()
+            # It's a refinement
+            if field.value() == 'on':
+                checked = True
+            else:
+                checked = False
+
+        facet = [field.label,
+                 field.html_name,
+                 count,
+                 checked]
+        status_facets.append(facet)
+
+    # Finally, we make a copy of request.GET so it is mutable, and we make
+    # some adjustments that we want to see in the rendered form.
+    mutable_get = request.GET.copy()
+    # Send the user the cleaned up query
+    mutable_get['q'] = cd['q']
+    # Always reset the radio box to refine
+    mutable_get['refine'] = 'refine'
+    search_form = SearchForm(mutable_get)
 
     # Set up pagination
     paginator = Paginator(results_si, 20)
@@ -162,7 +233,8 @@ def show_results(request):
     return render_to_response(
                   'search/search.html',
                   {'search_form': search_form, 'alert_form': alert_form,
-                   'results': paged_results, 'facet_fields': facet_fields},
+                   'results': paged_results, 'court_facets': court_facets,
+                   'status_facets': status_facets},
                   RequestContext(request))
 
     #############

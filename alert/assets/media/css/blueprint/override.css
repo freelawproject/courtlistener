@@ -44,6 +44,15 @@ span.bold {
     font-weight: bold;
 }
 
+.striken {
+	text-decoration: line-through;
+	color: gray;
+}
+
+.gray {
+    color: gray;	
+}
+
 .center {
     text-align: center;
 }
@@ -173,6 +182,9 @@ nav ul li {
     display: none;
 }
 .js #extra-sidebar-fields {
+    display: none;
+}
+.nojs #sidebar-search-form {
     display: none;
 }
 
