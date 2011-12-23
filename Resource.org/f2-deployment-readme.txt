@@ -30,6 +30,7 @@ Features:
  - Highlighting on all returned fields
  - Multicore should be investigated/implemented
  - RAM tuning should be investigated/implemented
+ - Result speed?
  
 
     

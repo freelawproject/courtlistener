@@ -20,8 +20,8 @@ from alert.search.models import DOCUMENT_STATUSES
 from django import forms
 
 REFINE_CHOICES = (
-        ('new', 'New search'),
-        ('refine', 'In current results'),
+        ('new', 'Reset filters'),
+        ('refine', 'Keep filters'),
     )
 
 SORT_CHOICES = (
