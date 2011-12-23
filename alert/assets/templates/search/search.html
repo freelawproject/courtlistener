@@ -22,11 +22,9 @@
     <script type="text/javascript">
        $(document).ready(function() {
            $('.auto-focus:first').focus();
-           $('.sidebar-section > h3').click(function () {
+           $('.sidebar-section h3').click(function () {
                $(this).next('.hidden').toggle('fast');
                $(this).next('.shown').toggle('fast');
-               $(this).toggleClass('collapsed-heading');
-               $(this).toggleClass('expanded-heading');
                $(this).toggleClass('arrow-right-before');
                $(this).toggleClass('arrow-down-before');
            });
@@ -37,7 +35,7 @@
            $('#id_sort').appendTo('#result-order-chooser-placeholder');
            $('#id_sort').show();
            $('#extra-sidebar-fields').prependTo('#sidebar-facet-placeholder');
-           $('#extra-sidebar-fields').show()           
+           $('#extra-sidebar-fields').show();
            $('#search-form,#sidebar-search-form').submit(function(e){
         	   console.log("Triggered");
         	   e.preventDefault();
@@ -73,7 +71,7 @@
     <div class="span-5 append-2" id="sidebar">
         {% if not error %}
         <div class="sidebar-section">
-            <h3 class="pointer collapsed-heading arrow-right-before">Create alert</h3>
+            <h3 class="pointer arrow-right-before">Create alert</h3>
             <div id="hidden-create-alert" class="hidden">
 		        {% if query %}
 		           {% if user.is_authenticated %}
@@ -157,11 +155,13 @@
         </div>
         
         <div class="sidebar-section">
-            <h3 class="pointer expanded-heading arrow-down-before">Refine your search</h3>
-            <form action="." method="get" id="sidebar-search-form">
-                <div class="shown" id="sidebar-facet-placeholder"></div>
-              <hr class="space">
-            </form>
+            <h3 class="pointer arrow-down-before">Refine your search</h3>
+            <div class="shown">
+	            <form action="." method="get" id="sidebar-search-form">
+	                <div class="shown" id="sidebar-facet-placeholder"></div>
+	              <hr class="space">
+	            </form>
+            </div>
         </div>
         {% endif %}
     </div>
