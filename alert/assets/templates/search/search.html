@@ -71,6 +71,7 @@
 
 {% block sidebar %}
     <div class="span-5 append-2" id="sidebar">
+        {% if not error %}
         <div class="sidebar-section">
             <h3 class="pointer collapsed-heading arrow-right-before">Create alert</h3>
             <div id="hidden-create-alert" class="hidden">
@@ -157,21 +158,12 @@
         
         <div class="sidebar-section">
             <h3 class="pointer expanded-heading arrow-down-before">Refine your search</h3>
-            <div class="shown" id="sidebar-facet-placeholder">
-                <form action="." method="get" id="sidebar-search-form">
-	                {% comment %}
-	                    This form must be here rather than moved here because the
-	                    DOM gets built incorrectly otherwise since it appears as 
-	                    form within a form.
-	                {% endcomment %}
-                    <button 
-                        type="submit" 
-                        class="button title" 
-                        name="search">Apply filters</button>
-                </form>
-                <hr class="space">
-            </div>
+            <form action="." method="get" id="sidebar-search-form">
+                <div class="shown" id="sidebar-facet-placeholder"></div>
+              <hr class="space">
+            </form>
         </div>
+        {% endif %}
     </div>
 {% endblock %}
 
@@ -262,14 +254,25 @@
                 </article>
             {% endfor %}      
         {% else %}
-            <h2 class="alt">Your search &mdash; <strong>{{ query }}</strong> &mdash; had no results.</h2>
-            <h4 class="bottom">Search tips:</h4>
-            <ul>
-                <li>Check your spelling</li>
-                <li>Try fewer filters</li>
-                <li>Remove quotes if you used them</li>
-            </ul>
-            <p>Did you expect more results than this? If so, <a href="/contact/">let us know</a>! We value your feedback.</p>
+            {% if not error %}
+	            <h2 class="alt">Your search &mdash; <strong>{{ query }}</strong> &mdash; had no results.</h2>
+	            <p class="bottom">Search tips:</p>
+	            <ul>
+	                <li>Check your spelling</li>
+	                <li>Try fewer filters</li>
+	                <li>Remove quotes if you used them</li>
+	            </ul>
+	            <p>Did you expect more results than this? If so, <a href="/contact/">let us know</a>! We value your feedback.</p>
+            {% else %}
+                <h2 class="alt">Your search &mdash; <strong>{{ query }}</strong> &mdash; encountered a <strong>deadly</strong> error.</h2>
+                <p class="bottom">This could be because:</p>
+                <ul>
+                    <li>CourtListener couldn't make sense of your query</li>
+                    <li>Our system is down and can't respond</li>
+                    <li>Some other reason</li>
+                </ul>
+                <p>We log these errors and work to resolve them, but if you think we can benefit from your experience, don't hesitate to <a href="/contact/">let us know</a>! We value your feedback.</p>                
+            {% endif %}
         {% endif %}
         
         {% if results.has_previous or results.has_next %}

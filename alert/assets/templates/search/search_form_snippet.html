@@ -38,60 +38,69 @@
                 </tr>
             </tbody>
         </table>
-        <div id="extra-search-fields">
-            {{ search_form.sort }}
-            <div id="extra-sidebar-fields">
-                <h4 class="bottom">Case name</h4>
-                {{ search_form.case_name }}
-                <hr class="space">
-                <h4 class="bottom">Federal Appeals Courts</h4>
-        
-                {% for court in court_facets %}
-                    <p class="bottom">
-                        <input 
-                            id="id_{{ court.1 }}" 
-                            type="checkbox" 
-                            name="{{ court.1 }}" 
-                            class="external-input"
-                            {% if court.3 %}checked="checked"{% endif %} >
-                        <label 
-                            for="id_{{ court.1 }}" 
-                            class="pointer
-                             {% if court.2 == 0 %}striken{% endif %}">{{ court.0 }}</label>
-                        <span class="gray small">({{ court.2 }})</span>
-                    </p>
-                {% endfor %}
-                
-                <hr class="space">
-                <h4 class="bottom">Precedential Status</h4>
-                {% for status in status_facets %}
-                    <p class="bottom">
-                        <input
-                            id="id_{{ status.1 }}"
-                            type="checkbox"
-                            name="{{ status.1 }}"
-                            class="external-input"
-                            {% if status.3 %}checked="checked"{% endif %} >
-                        <label
-                            for="id_{{ status.1 }}"
-                            class="pointer
-                             {% if status.2 == 0 %}stiken{% endif %}">{{ status.0 }}</label>
-                        <span class="gray small">({{ status.2 }})</span>
-                    </p>
-                {% endfor %}
-                
-                <!-- OLDCODE
-                    <p class="bottom">
-                        <a href="{{ request.get_full_path }}&amp;selected_facets=status_exact:{{ status.0|urlencode }}">
-                            {{ status.0 }}
-                        </a>
-                        <span class="gray small">({{ status.1 }})</span>
-                    </p>-->
-                
-            
-            </div>
-        </div>
-        {# search_form #}
-            
+        {% if not error %}
+	        <div id="extra-search-fields">
+	            {{ search_form.sort }}
+	            <div id="extra-sidebar-fields">
+	                <h4 class="bottom">Case name</h4>
+	                {{ search_form.case_name }}
+	                <hr class="space">
+	                <h4 class="bottom">Federal Appeals Courts</h4>
+	        
+	                {% for court in court_facets %}
+	                    <p class="bottom">
+	                        <input 
+	                            id="id_{{ court.1 }}" 
+	                            type="checkbox" 
+	                            name="{{ court.1 }}" 
+	                            class="external-input"
+	                            {% if court.3 %}checked="checked"{% endif %} 
+	                            {% if court.2 == 0 %}disabled="disabled"{% endif %}>
+	                        <label 
+	                            for="id_{{ court.1 }}" 
+	                            class="pointer
+	                             {% if court.2 == 0 %}striken{% endif %}">{{ court.0 }}</label>
+	                        <span class="gray small">({{ court.2 }})</span>
+	                    </p>
+	                {% endfor %}
+	                
+	                <hr class="space">
+	                <h4 class="bottom">Precedential Status</h4>
+	                {% for status in status_facets %}
+	                    <p class="bottom">
+	                        <input
+	                            id="id_{{ status.1 }}"
+	                            type="checkbox"
+	                            name="{{ status.1 }}"
+	                            class="external-input"
+	                            {% if status.3 %}checked="checked"{% endif %}
+	                            {% if status.2 == 0 %}disabled="disabled"{% endif %} >
+	                        <label
+	                            for="id_{{ status.1 }}"
+	                            class="pointer
+	                             {% if status.2 == 0 %}striken{% endif %}">{{ status.0 }}</label>
+	                        <span class="gray small">({{ status.2 }})</span>
+	                    </p>
+	                {% endfor %}
+	                <button 
+	                    type="submit" 
+	                    class="button title" 
+	                    name="search">Apply Filters</button>
+	                <hr class="space">
+	                <h4 class="bottom">Filed After</h4>
+	                <p class="bottom span-5">{{ search_form.filed_after }}</p>
+	                <h4 class="bottom">Filed Before</h4>
+	                <p class="bottom span-5">{{ search_form.filed_before }}</p>
+	                
+	                <hr class="space">
+	                <h4 class="bottom">West Citation</h4>
+	                <p class="bottom">{{ search_form.west_cite }}</p>
+	                <h4 class="bottom">Docket Number</h4>
+	                <p class="bottom">{{ search_form.docket_number }}</p>
+	            </div>
+	        </div>
+        {% endif %}
+        {# search_form #}       
     </div>
+    
 </form>
