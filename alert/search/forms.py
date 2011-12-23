@@ -45,13 +45,21 @@ class SearchForm(forms.Form):
     filed_before = forms.DateTimeField(
                         required=False,
                         widget=forms.TextInput(
-                                   attrs={'placeholder': 'YYYY-MM-DD'}))
+                                   attrs={'placeholder': 'YYYY-MM-DD',
+                                          'class': 'span-3 external-input'}))
     filed_after = forms.DateTimeField(
                         required=False,
                         widget=forms.TextInput(
-                                   attrs={'placeholder': 'YYYY-MM-DD'}))
-    west_cite = forms.CharField(required=False)
-    docket_number = forms.CharField(required=False)
+                                   attrs={'placeholder': 'YYYY-MM-DD',
+                                          'class': 'span-3 external-input'}))
+    west_cite = forms.CharField(
+                        required=False,
+                        widget=forms.TextInput(
+                                   attrs={'class': 'span-5 external-input'}))
+    docket_number = forms.CharField(
+                        required=False,
+                        widget=forms.TextInput(
+                                   attrs={'class': 'span-5 external-input'}))
 
     def __init__(self, *args, **kwargs):
         print "Form init called..."

@@ -11,21 +11,21 @@ To do:
 
 Features:
  - Boosting of status, casename, and casenumber
- - Result counts
+ + Result counts
  - Faceted search
-    - facet counts with parallel selection
-        - court
-        - status
-    - field filtering
-        - filed date
-        - casename
-        - west citation
-        - docket number
- - Result ordering
- - New/previous search radio buttons
- - Realtime indexing via Celery
- - DB to index script
- - Homepage shows all results
+    + facet counts with parallel selection
+        + court
+        + status
+    + field filtering
+        + filed date
+        + casename
+        + west citation
+        + docket number
+ + Result ordering
+ + New/previous search radio buttons
+ + Realtime indexing via Celery
+ + DB to index script
+ + Homepage shows all results
  - Snippets with multiple fragments
  - Highlighting on all returned fields
  - Multicore should be investigated/implemented
@@ -48,28 +48,31 @@ QA:
  - Test where items are placed when they lack a date and date sorting is used
  - Is there a limit to the number of results? Do we handle it? 
  - Does Piwik still work?
- - Do placeholders work in IE6-9? 
+ - Do placeholders work in IE6-9?
+ - How do we handle cases that lack dates? 
     
  
 SOLR + Haystack!
  - Finish the configuration of solr in the installer
- - create database crawler to import entire thing into Solr
+ + create database crawler to import entire thing into Solr
 
  - update all places that search can be performed in the project
     - RSS feeds
     - Alerts
         - There were X new results for your Alert. Here are the first 15.
         - TOC at top of alerts with HTML anchors.
-    - Front end
+    + Front end
  - update flat advanced search page
  - add xxx-xx-xxxx etc to the stopwords list (#190)
  - change case title from Courtlistener.com / Browse / Foo --> / Cases / Foo
  - consider/resolve old URL support. What does /opinions/all/ do? What about /opinions/ca2/, etc? 
- - add information about date/time formats. Useful to tell people that they can use timestamps or just dates. It 
+ + add information about date/time formats. Useful to tell people that they can use timestamps or just dates. It 
    might be worth investigating django forms help_text for this.  
- - check if .hgignore needs updating.
+ + check if .hgignore needs updating.
  - update the sitemap
- - adjust the apache config to point to the new robots.txt location (tinyurl/robots.txt)
+ + adjust the apache config to point to the new robots.txt location (tinyurl/robots.txt)
+ - Open question: Should missing facets be exposed?
+ - Make sure the no results page looks good.
 
 
 SOLR DEPLOYMENT:
