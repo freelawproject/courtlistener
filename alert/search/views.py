@@ -44,16 +44,19 @@ def make_date_query(cd, request):
     before = cd['filed_before']
     after = cd['filed_after']
 
-    if after > before:
-        print "message made"
-        message = 'You\'ve requested all documents before %s and after\
-                   %s. Since %s comes before %s, these filters cannot not be \
-                   used' % (before.date(),
-                            after.date(),
-                            before.date(),
-                            after.date())
-        messages.add_message(request, messages.INFO, message)
-        return ''
+    try:
+        if after > before:
+            message = 'You\'ve requested all documents before %s and after\
+                       %s. Since %s comes before %s, these filters cannot not be \
+                       used' % (before.date(),
+                                after.date(),
+                                before.date(),
+                                after.date())
+            messages.add_message(request, messages.INFO, message)
+            return ''
+    except TypeError:
+        # Happens when one of the inputs isn't a date
+        pass
     if hasattr(after, 'strftime'):
         date_filter = '{%sZ TO ' % after.isoformat()
     else:
@@ -170,6 +173,8 @@ def show_results(request):
             main_fq.extend(['{!tag=dt}status_exact:(%s)' % selected_stats,
                             '{!tag=dt}court_exact:(%s)' % selected_courts])
 
+        # If a param has been added to the fq variables, then we add them to the
+        # main_params var. Otherwise, we don't, as doing so throws an error.
         if len(main_fq) > 0:
             main_params['fq'] = main_fq
         if len(court_fq) > 0:
@@ -180,7 +185,7 @@ def show_results(request):
     else:
         print "The form is invalid or unbound."
         #TODO: Remove before sending live
-        assert False
+        messages
         main_params['q'] = '*'
 
     # Run the query

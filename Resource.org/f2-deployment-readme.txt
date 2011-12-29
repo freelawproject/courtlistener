@@ -74,6 +74,12 @@ SOLR + Haystack!
  + adjust the apache config to point to the new robots.txt location (tinyurl/robots.txt)
  - Open question: Should missing facets be exposed?
  - Make sure the no results page looks good.
+ - Dates:
+   + Make the dates support years and year-months.
+   - Make invalid dates throw an error to the user.
+   - Make dates support dashes in addition to slashes.
+ - Current Results --> Keep filters
+ - Clear filters/"All courts"
 
 
 SOLR DEPLOYMENT:
