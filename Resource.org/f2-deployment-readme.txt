@@ -53,10 +53,12 @@ QA:
  - How do we handle cases that lack dates? 
     
  
-SOLR + Haystack!
+SOLR
  - Finish the configuration of solr in the installer
  + create database crawler to import entire thing into Solr
-
+ - Fix alerts
+ - Fix pagination
+ - Fix display of results
  - update all places that search can be performed in the project
     - RSS feeds
     - Alerts
@@ -72,14 +74,14 @@ SOLR + Haystack!
  + check if .hgignore needs updating.
  - update the sitemap
  + adjust the apache config to point to the new robots.txt location (tinyurl/robots.txt)
- - Open question: Should missing facets be exposed?
+ + Open question: Should missing facets be exposed?
  - Make sure the no results page looks good.
  - Dates:
    + Make the dates support years and year-months.
    - Make invalid dates throw an error to the user.
-   - Make dates support dashes in addition to slashes.
- - Current Results --> Keep filters
- - Clear filters/"All courts"
+   + Make dates support dashes in addition to slashes.
+ + Current Results --> Keep filters
+ + Clear filters/"All courts"
 
 
 SOLR DEPLOYMENT:

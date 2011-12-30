@@ -96,6 +96,10 @@ class SearchForm(forms.Form):
                                               required=False,
                                               initial='refine',
                                               widget=forms.RadioSelect())
+            self.fields['court_all'] = forms.BooleanField(
+                                                  label='All Courts',
+                                                  required=False,
+                                                  widget=forms.CheckboxInput(attrs={'class':'external-input'}))
             for court in courts:
                 self.fields['court_' + court[0]] = forms.BooleanField(
                                                               label=court[1],
@@ -106,6 +110,11 @@ class SearchForm(forms.Form):
                                                               required=False)
         else:
             # It's a new query, check all the boxes.
+            self.fields['court_all'] = forms.BooleanField(
+                                                  label='All Courts',
+                                                  required=False,
+                                                  initial=True,
+                                                  widget=forms.CheckboxInput(attrs={'checked':'checked', 'class':'external-input'}))
             for court in courts:
                 self.fields['court_' + court[0]] = forms.BooleanField(
                                                               label=court[1],

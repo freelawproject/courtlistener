@@ -22,8 +22,9 @@
   Standards: HTML5, CSS3
   Components:
         Text Extraction: Antiword, libwpd-tools, pdf2text
-        Code: BeautifulSoup, Celery, Django, jQuery (NobelCount, tooltip), lxml,
-              Mercurial, RabbitMQ, sunburnt, titlecase, Python
+        Code: BeautifulSoup, Celery, Django, jQuery (NobelCount), lxml,
+              Mercurial, RabbitMQ, sunburnt, titlecase
+        Icons: Silk icons
         Infrastructure: Apache2, Linux, MySQL, Solr
   Source: https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/overview
 
