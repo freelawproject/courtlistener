@@ -298,7 +298,6 @@ def show_results(request):
                                   {'error': True, 'query': query},
                                   RequestContext(request))
 
-
     return render_to_response(
                   'search/search.html',
                   {'search_form': search_form, 'alert_form': alert_form,

@@ -34,8 +34,10 @@ class SearchDocument(object):
             self.dateFiled = datetime.combine(doc.dateFiled, time())
         self.court = doc.court.short_name
         self.court_id = doc.court.courtUUID
+        self.court_citation_string = doc.court.citation_string
         try:
             self.caseName = doc.citation.caseNameFull
+            self.absolute_url = doc.get_absolute_url()
         except AttributeError:
             raise InvalidDocumentError
         self.docketNumber = doc.citation.docketNumber

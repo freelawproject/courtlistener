@@ -106,15 +106,17 @@
     <field name="status" type="text" indexed="true" stored="true" multiValued="false" />
     <field name="court" type="text" indexed="true" stored="true" multiValued="false" />
     <field name="court_id" type="text" indexed="true" stored="true" multiValued="false" />
+    <field name="court_citation_string" type="string" indexed="false" stored="true" multiValued="false" />
+    <field name="court_exact" type="string" indexed="true" stored="true" multiValued="false" />
     <field name="caseName" type="text" indexed="true" stored="true" multiValued="false" />
     <field name="text" type="text" indexed="true" stored="true" multiValued="false" />
     <field name="status_exact" type="string" indexed="true" stored="true" multiValued="false" />
     <field name="dateFiled" type="date" indexed="true" stored="true" multiValued="false" />
     <field name="docketNumber" type="text" indexed="true" stored="true" multiValued="false" />
-    <field name="court_exact" type="string" indexed="true" stored="true" multiValued="false" />
     <field name="lexisCite" type="text" indexed="true" stored="true" multiValued="false" />
     <field name="westCite" type="text" indexed="true" stored="true" multiValued="false" />
     <field name="caseNumber" type="text" indexed="true" stored="true" multiValued="false" />
+    <field name="absolute_url" type="string" indexed="false" stored="true" multiValued="false" />
   </fields>
 
   <!-- field to use to determine and enforce document uniqueness. -->

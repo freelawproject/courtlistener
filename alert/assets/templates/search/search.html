@@ -210,14 +210,14 @@
                     {% endif %}
 
                     <h3 class="bottom serif">
-                        <a href="{{ result.get_absolute_url}}?q={{query}}" class="visitable">
+                        <a href="{{ result.absolute_url}}?q={{query}}" class="visitable">
                             {{ result.caseName|safe }},
                             {% if result.westCite != '' and result.westCite != None %}
                                 {{ result.westCite }}
                             {% else %}
                                 {{ result.docketNumber }}
                             {% endif %}
-                            ({% if result.court != 'SCOTUS' %}{{ result.court|nbsp }}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
+                            ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|nbsp }}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
                         </a>
                     </h3>
 
