@@ -1,3 +1,5 @@
+{% load humanize %}
+
 <form action="." method="get" id="search-form">
     <div id="search-container">
         <table>
@@ -46,21 +48,28 @@
 	                {{ search_form.case_name }}
 	                <hr class="space">
 	                <h4 class="bottom">Federal Appeals Courts</h4>
-	        
+
+	                <p class="bottom">
+	                   {{ search_form.court_all }}
+	                   <label
+	                       for="id_court_all"
+	                       class="pointer">{{ search_form.court_all.label }}</label>
+	                   <span class="gray small">({{ results.paginator.count|intcomma }})</span>
+	                </p>
 	                {% for court in court_facets %}
 	                    <p class="bottom">
 	                        <input 
 	                            id="id_{{ court.1 }}" 
 	                            type="checkbox" 
 	                            name="{{ court.1 }}" 
-	                            class="external-input"
+	                            class="external-input court-checkbox"
 	                            {% if court.3 %}checked="checked"{% endif %} 
 	                            {% if court.2 == 0 %}disabled="disabled"{% endif %}>
 	                        <label 
 	                            for="id_{{ court.1 }}" 
 	                            class="pointer
 	                             {% if court.2 == 0 %}striken{% endif %}">{{ court.0 }}</label>
-	                        <span class="gray small">({{ court.2 }})</span>
+	                        <span class="gray small">({{ court.2|intcomma }})</span>
 	                    </p>
 	                {% endfor %}
 	                
@@ -72,20 +81,20 @@
 	                            id="id_{{ status.1 }}"
 	                            type="checkbox"
 	                            name="{{ status.1 }}"
-	                            class="external-input"
+	                            class="external-input status-checkbox"
 	                            {% if status.3 %}checked="checked"{% endif %}
 	                            {% if status.2 == 0 %}disabled="disabled"{% endif %} >
 	                        <label
 	                            for="id_{{ status.1 }}"
 	                            class="pointer
 	                             {% if status.2 == 0 %}striken{% endif %}">{{ status.0 }}</label>
-	                        <span class="gray small">({{ status.2 }})</span>
+	                        <span class="gray small">({{ status.2|intcomma }})</span>
 	                    </p>
 	                {% endfor %}
 	                <button 
 	                    type="submit" 
 	                    class="button title span-4" 
-	                    name="search">Apply Filters</button>
+	                    name="apply-filters">Apply Filters</button>
 	                <hr class="space">
 	                <h4 class="bottom">Filed After</h4>
 	                <p class="bottom span-5">{{ search_form.filed_after }}</p>
@@ -97,10 +106,13 @@
 	                <p class="bottom">{{ search_form.west_cite }}</p>
 	                <h4 class="bottom">Docket Number</h4>
 	                <p class="bottom">{{ search_form.docket_number }}</p>
+                    <button 
+                        type="submit" 
+                        class="button title span-4" 
+                        name="search">Search</button>
 	            </div>
 	        </div>
         {% endif %}
-        {# search_form #}       
+        {# search_form #}
     </div>
-    
 </form>
