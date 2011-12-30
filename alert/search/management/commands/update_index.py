@@ -108,6 +108,7 @@ class Command(BaseCommand):
                 if self.verbosity >= 1:
                     self.stderr.write('InvalidDocumentError: Unable to index document %s\n' % doc.pk)
                 pass
+        self.stderr.write('Committing all documents to the index...\n')
         self.si.commit()
 
 
