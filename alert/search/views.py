@@ -28,7 +28,6 @@ from django.conf import settings
 from django.shortcuts import render_to_response
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
-from django.utils.datastructures import MultiValueDictKeyError
 
 conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
 
@@ -226,13 +225,11 @@ def show_results(request):
         stat_facet_fields = conn.raw_query(**stat_facet_params).execute().facet_counts.facet_fields
         # Create a search string that does not contain the page numbers
         get_dict = parse_qs(request.META['QUERY_STRING'])
-        print 'get_dict %s' % get_dict
         try:
             del get_dict['page']
         except KeyError:
             pass
         get_string = urlencode(get_dict, True) + '&'
-        print 'get_string %s' % get_string
     except:
         return render_to_response('search/search.html',
                                   {'error': True, 'query': query},

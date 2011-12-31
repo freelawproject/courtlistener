@@ -58,7 +58,7 @@ SOLR
  - Finish the configuration of solr in the installer
  + create database crawler to import entire thing into Solr
  - Fix alerts
- - Fix pagination
+ + Fix pagination
  + Fix display of results
  - update all places that search can be performed in the project
     - RSS feeds
@@ -68,8 +68,8 @@ SOLR
     + Front end
  - update flat advanced search page
  - add xxx-xx-xxxx etc to the stopwords list (#190), and add the stopwords to the Solr directory
- - change case title from Courtlistener.com / Browse / Foo --> / Cases / Foo
- - consider/resolve old URL support. What does /opinions/all/ do? What about /opinions/ca2/, etc? 
+ + change case title from Courtlistener.com / Browse / Foo --> / Cases / Foo
+ + consider/resolve old URL support. What does /opinions/all/ do? What about /opinions/ca2/, etc? 
  + add information about date/time formats. Useful to tell people that they can use timestamps or just dates. It 
    might be worth investigating django forms help_text for this.  
  + check if .hgignore needs updating.
@@ -110,7 +110,7 @@ SOLR DEPLOYMENT:
         - Should be OK. There are 736 docs on my local system, which require 22MB.
         - There are 815 times more docs on the live system, which means they will take 17.5GB
         - SSD Disk has ~50GB free.  
-    - python manage.py rebuild_index -k 4 -b 1000 -v 2
+    - python manage.py update_index --update --everything
  - Synchronize the database for the refactoring changes:
         update django_content_type set app_label = 'alerts' where name='alert';
         update django_content_type set app_label = 'favorites' where name='favorite';
@@ -127,9 +127,13 @@ SOLR DEPLOYMENT:
         mysql> insert into south_migrationhistory set app_name='scrapers', migration='0001_initial', applied='2011-12-01'; -- fakes the convert_to_south command
         mysql> insert into south_migrationhistory set app_name='search', migration='0001_initial', applied='2011-12-01'; # fakes the convert_to_south command
         python manage.py migrate search --auto #runs the migration needed on this model
+        python manage.py migrate alerts
         
         # Don't think this is necessary. Not sure why it's here.
         python manage.py syncdb
+    - Update all user alerts
+        - possibly useful: select au.first_name, au.last_name, au.email, au.username, a.alertName, a.alertText, a.alertFrequency from Alert a left outer join UserProfile_alert upa on upa.alert_id = a.alertUUID left outer join UserProfile up on upa.userprofile_id = up.userProfileUUID left outer join auth_user au on au.id = up.user_id order by au.email;
+        
  
  - uninstall Sphinx!
     - remove Sphinx logs
