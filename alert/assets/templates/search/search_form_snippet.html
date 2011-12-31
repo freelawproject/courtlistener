@@ -67,8 +67,7 @@
 	                            {% if court.2 == 0 %}disabled="disabled"{% endif %}>
 	                        <label 
 	                            for="id_{{ court.1 }}" 
-	                            class="pointer
-	                             {% if court.2 == 0 %}striken{% endif %}">{{ court.0 }}</label>
+	                            class="{% if court.2 == 0 %}striken{% else %}pointer{% endif %}">{{ court.0 }}</label>
 	                        <span class="gray small">({{ court.2|intcomma }})</span>
 	                    </p>
 	                {% endfor %}
@@ -87,7 +86,7 @@
 	                        <label
 	                            for="id_{{ status.1 }}"
 	                            class="pointer
-	                             {% if status.2 == 0 %}striken{% endif %}">{{ status.0 }}</label>
+	                             {% if status.2 == 0 %}striken{% else %}pointer{% endif %}">{{ status.0 }}</label>
 	                        <span class="gray small">({{ status.2|intcomma }})</span>
 	                    </p>
 	                {% endfor %}

@@ -33,8 +33,6 @@ class Alert(models.Model):
     alertFrequency = models.CharField('the rate chosen by the user for the alert',
         choices=FREQUENCY,
         max_length=10)
-    alertPrivacy = models.BooleanField('should the alert be considered private',
-        default=True)
     sendNegativeAlert = models.BooleanField('should alerts be sent when there are no hits during a specified period',
         default=False)
     lastHitDate = models.DateTimeField('the exact date and time stamp that the alert last sent an email',

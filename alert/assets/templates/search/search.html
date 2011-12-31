@@ -2,18 +2,14 @@
 {% load text_filters %}
 {% load humanize %}
 
-{# this could mirror the titles of yahoo, google and bing more closely, if we want. #}
 {% block title %} CourtListener.com / Results / {{ query }} /
     {% if results.paginator.num_pages %}
     Page / {{ results.number }} of {{ results.paginator.num_pages }}
     {% endif %}
 {% endblock %}
 
-
-
-{% block head %}    
+{% block head %}
     <link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?q={{ query }}" />
-    <link rel="canonical" href="http://courtlistener.com/search/results/{% if query %}?q={{ query }}{% endif %}" />
 {% endblock %}
 
 {% block footer-scripts %}
@@ -86,84 +82,79 @@
         {% if not error %}
         <div class="sidebar-section">
             <h3 class="pointer arrow-right-before">Create alert</h3>
-            <div id="hidden-create-alert" class="hidden">
-                {% if query %}
-                   {% if user.is_authenticated %}
-                        {% if alertForm.errors %}
-                            <div class="span-4 error">
-                                <p class="bottom">Please fix the errors below.</p>
-                            </div>
-                        {% endif %}
-
-                        <form action="" method="post">{% csrf_token %}
-                            <p>
-                                <label for="id_alertText">Alert query</label>
-                                {% if alertForm.alertText.errors %}
-                                    <br><span class="errortext">
-                                        {% for error in alertForm.alertText.errors %}
-                                            {{ error|escape }}
-                                        {% endfor %}
-                                    </span>
-                                {% endif %}<br>
-                                {{ alertForm.alertText }}
-                            </p>
-                            <p>
-                                <label for="id_alertName">Give the alert a name</label>
-                                {% if alertForm.alertName.errors %}
-                                    <br><span class="errortext">
-                                        {% for error in alertForm.alertName.errors %}
-                                            {{ error|escape }}
-                                        {% endfor %}
-                                    </span>
-                                {% endif %}
-                                {{ alertForm.alertName }}
-                            </p>
-                            <p>
-                                <label for="id_alertFrequency">How often should we notify you</label>
-                                {% if alertForm.alertFrequency.errors %}
-                                    <br><span class="errortext">
-                                        {% for error in alertForm.alertFrequency.errors %}
-                                            {{ error|escape }}
-                                        {% endfor %}
-                                    </span>
-                                {% endif %}<br>
-                                {{ alertForm.alertFrequency }}
-                            </p>
-                            <p>
-                                {{ alertForm.alertPrivacy }}
-                                <label for="id_alertPrivacy">This alert is private</label>
-                                <label style="color:#000099; font-weight:normal;" title=" - In the future, we may allow users to share their public alerts." href="#" id="q" class="help">[?]</label>
-                                {% if alertForm.alertPrivacy.errors %}
-                                    <span class="errortext">
-                                        {% for error in alertForm.alertPrivacy.errors %}
-                                            {{ error|escape }}
-                                        {% endfor %}
-                                    </span>
-                                {% endif %}<br>
-
-                            </p>
-                            <p>
-                                {{ alertForm.sendNegativeAlert }}
-                                <label for="id_alertName">Send me an email even when there are no hits</label>
-                                {% if alertForm.sendNegativeAlert.errors %}
-                                    <span class="errortext">
-                                        {% for error in alertForm.sendNegativeAlert.errors %}
-                                            {{ error|escape }}
-                                        {% endfor %}
-                                    </span>
-                                {% endif %}<br>
-                            </p>
-                            <button type="submit" class="button title" name="alertSave">Create alert</button>
-                        </form>
-
-                    {% else %}
-                        {# User is not authenticated #}
-                        <p>To get daily alerts for this search, <a href="{%url sign-in%}?next={{request.path}}?q={{query}}&page={{results.number}}">sign in</a> or
-                        <a href="{%url register%}?next={{request.path}}?q={{query}}&page={{results.number}}">register</a> as a new user.</p>
+            <div id="hidden-create-alert" class="hidden"> 
+                {% if user.is_authenticated %}
+                    {% if alert_form.errors %}
+                        <div class="span-4 error">
+                            <p class="bottom">Please fix the errors below.</p>
+                        </div>
                     {% endif %}
+
+                    <form action="" method="post">{% csrf_token %}
+                        <p>
+                            <label for="id_alertText">Alert query</label>
+                            {% if alert_form.alertText.errors %}
+                                <br><span class="errortext">
+                                    {% for error in alert_form.alertText.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}<br>
+                            {{ alert_form.alertText }}
+                        </p>
+                        <p>
+                            <label for="id_alertName">Give the alert a name</label>
+                            {% if alert_form.alertName.errors %}
+                                <br><span class="errortext">
+                                    {% for error in alert_form.alertName.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}
+                            {{ alert_form.alertName }}
+                        </p>
+                        <p>
+                            <label for="id_alertFrequency">How often should we notify you</label>
+                            {% if alert_form.alertFrequency.errors %}
+                                <br><span class="errortext">
+                                    {% for error in alert_form.alertFrequency.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}<br>
+                            {{ alert_form.alertFrequency }}
+                        </p>
+                        <p>
+                            {{ alert_form.alertPrivacy }}
+                            <label for="id_alertPrivacy">This alert is private</label>
+                            <label style="color:#000099; font-weight:normal;" title=" - In the future, we may allow users to share their public alerts." href="#" id="q" class="help">[?]</label>
+                            {% if alert_form.alertPrivacy.errors %}
+                                <span class="errortext">
+                                    {% for error in alert_form.alertPrivacy.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}<br>
+
+                        </p>
+                        <p>
+                            {{ alert_form.sendNegativeAlert }}
+                            <label for="id_alertName">Send me an email even when there are no hits</label>
+                            {% if alert_form.sendNegativeAlert.errors %}
+                                <span class="errortext">
+                                    {% for error in alert_form.sendNegativeAlert.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}<br>
+                        </p>
+                        <button type="submit" class="button title" name="alertSave">Create alert</button>
+                    </form>
+
                 {% else %}
-                    {# no query was placed #}
-                    <p>To create an alert, place a query or filter the results.</p>
+                    {# User is not authenticated #}
+                    <p>To get daily alerts for this search, <a href="{%url sign-in%}?next={{request.path}}?q={{query}}&page={{results.number}}">sign in</a> or
+                    <a href="{%url register%}?next={{request.path}}?q={{query}}&page={{results.number}}">register</a> as a new user.</p>
                 {% endif %}
             </div>
         </div>
