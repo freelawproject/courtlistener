@@ -44,6 +44,9 @@ class SearchDocument(object):
         self.westCite = doc.citation.westCite
         self.lexisCite = doc.citation.lexisCite
         self.status = doc.documentType
+        self.source = doc.source
+        self.download_url = doc.download_URL
+        self.local_path = str(doc.local_path)
 
         # Load the caseName field using a template to make it a concatenation
         case_name_template = loader.get_template('search/indexes/caseNumber.txt')

@@ -120,13 +120,35 @@ def show_results(request):
         cd = search_form.cleaned_data
 
         # Build up all the queries needed
-        main_fq = []
-        court_fq = []
-        stat_fq = []
         main_params['q'] = cd['q']
         court_facet_params['q'] = cd['q']
         stat_facet_params['q'] = cd['q']
+
+        # Sorting for the main query
         main_params['sort'] = request.GET.get('sort', '')
+
+        # Requested fields for the main query. We only need the fields here that
+        # are not requested as part of highlighting. Facet params are not set 
+        # here because they do not retrieve results, only counts (they are set
+        # to 0 rows).
+        main_params['fl'] = 'id,absolute_url,court_id,local_path,source,download_url,status,dateFiled'
+
+        # Highlighting for the main query.
+        main_params['hl'] = 'true'
+        main_params['hl.fl'] = 'text,caseName,westCite,docketNumber,lexisCite,court_citation_string'
+        main_params['hl.snippets'] = '5'
+        # If there aren't any hits in the text return the field instead
+        main_params['f.text.hl.alternateField'] = 'text'
+        main_params['f.text.hl.maxAlternateFieldLength'] = '500'
+        main_params['f.caseName.hl.alternateField'] = 'caseName'
+        main_params['f.westCite.hl.alternateField'] = 'westCite'
+        main_params['f.docketNumber.hl.alternateField'] = 'docketNumber'
+        main_params['f.lexisCite.hl.alternateField'] = 'lexisCite'
+        main_params['f.court_citation_string.hl.alternateField'] = 'court_citation_string'
+
+        main_fq = []
+        court_fq = []
+        stat_fq = []
         # Case Name
         if cd['case_name'] != '':
             main_fq.append('caseName:' + cd['case_name'])
@@ -149,9 +171,12 @@ def show_results(request):
         court_fq.append(date_query)
         stat_fq.append(date_query)
 
+        # Faceting
+        court_facet_params['rows'] = '0'
+        stat_facet_params['rows'] = '0'
         court_facet_params['facet'] = 'true'
-        court_facet_params['facet.mincount'] = 0
         stat_facet_params['facet'] = 'true'
+        court_facet_params['facet.mincount'] = 0
         stat_facet_params['facet.mincount'] = 0
         court_facet_params['facet.field'] = '{!ex=dt}court_exact'
         stat_facet_params['facet.field'] = '{!ex=dt}status_exact'
@@ -189,9 +214,12 @@ def show_results(request):
         main_params['q'] = '*'
 
     # Run the query
-    print "Params sent to search are: %s" % main_params
+    print "Params sent to search are: %s" % '&'.join(['%s=%s' % (k, v) for k, v in main_params.items()])
+    results_si = conn.raw_query(**main_params)
+    #print results_si.execute()
     try:
         results_si = conn.raw_query(**main_params)
+        print results_si.execute()
         court_facet_fields = conn.raw_query(**court_facet_params).execute().facet_counts.facet_fields
         stat_facet_fields = conn.raw_query(**stat_facet_params).execute().facet_counts.facet_fields
     except:
@@ -325,7 +353,7 @@ def show_results(request):
     # Set up highlighting
     #hl_results = highlight_si.highlight('text', snippets=5).highlight('status')\
     #    .highlight('caseName').highlight('westCite').highlight('docketNumber')\
-    #    .highlight('lexisCite').highlight('westCite').execute()
+    #    .highlight('lexisCite').execute()
     #import pprint
     #pprint.pprint(hl_results)
 

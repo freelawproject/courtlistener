@@ -132,13 +132,13 @@ class SearchForm(forms.Form):
     def clean_q(self):
         '''
         Cleans up various problems with the query:
-         - '' --> '*'
+         - '' --> '*:*'
         
         '''
         q = self.cleaned_data['q']
 
-        if q == '' :
-            return '*'
+        if q == '' or q == '*':
+            return '*:*'
         else:
             return q
 

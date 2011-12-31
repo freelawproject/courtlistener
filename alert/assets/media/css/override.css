@@ -88,10 +88,7 @@ span.bold {
 
 mark {
 	/* Needs extra declarations for old browsers */
-    font-weight: bold;
     background-color: #ffffbf;
-    color: #000;	
-    font-style: italic;
 }
 
 .serif{ font-family: "Warnock Pro","Goudy Old Style","Palatino","Book Antiqua",Georgia,serif; }
