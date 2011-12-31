@@ -42,7 +42,6 @@
                         {% if user.is_authenticated %}
                             <nav>
                                 <ul>
-                                    <li><a href="/opinions/all/">Browse</a></li>
                                     <li><a href="/profile/alerts/">Profile</a></li>
                                     <li><a href="/sign-out/">Sign out</a></li>
                                 </ul>
@@ -51,7 +50,6 @@
                             <nav>
                                 <ul>
                                     <li><a href="/about/">About</a></li>
-                                    <li><a href="/opinions/all">Browse</a></li>
                                     {% if request.path != "/sign-out/" %}
                                         <li>
                                             <a href="{%url sign-in %}?next={{request.path}}{% if query %}?q={{ query }}{%endif%}">
