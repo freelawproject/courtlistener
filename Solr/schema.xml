@@ -117,6 +117,9 @@
     <field name="westCite" type="text" indexed="true" stored="true" multiValued="false" />
     <field name="caseNumber" type="text" indexed="true" stored="true" multiValued="false" />
     <field name="absolute_url" type="string" indexed="false" stored="true" multiValued="false" />
+    <field name="download_url" type="string" indexed="false" stored="true" multiValued="false" />
+    <field name="local_path" type="string" indexed="false" stored="true" multiValued="false" />
+    <field name="source" type="string" indexed="false" stored="true" multiValued="false" />
   </fields>
 
   <!-- field to use to determine and enforce document uniqueness. -->

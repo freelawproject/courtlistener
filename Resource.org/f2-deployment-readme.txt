@@ -50,7 +50,8 @@ QA:
  - Is there a limit to the number of results? Do we handle it? 
  - Does Piwik still work?
  - Do placeholders work in IE6-9?
- - How do we handle cases that lack dates? 
+ - How do we handle cases that lack dates?
+ - Test that the various display logic still works for displaying the result meta data (exercise all the if/else statements) 
     
  
 SOLR
@@ -58,7 +59,7 @@ SOLR
  + create database crawler to import entire thing into Solr
  - Fix alerts
  - Fix pagination
- - Fix display of results
+ + Fix display of results
  - update all places that search can be performed in the project
     - RSS feeds
     - Alerts
@@ -66,7 +67,7 @@ SOLR
         - TOC at top of alerts with HTML anchors.
     + Front end
  - update flat advanced search page
- - add xxx-xx-xxxx etc to the stopwords list (#190)
+ - add xxx-xx-xxxx etc to the stopwords list (#190), and add the stopwords to the Solr directory
  - change case title from Courtlistener.com / Browse / Foo --> / Cases / Foo
  - consider/resolve old URL support. What does /opinions/all/ do? What about /opinions/ca2/, etc? 
  + add information about date/time formats. Useful to tell people that they can use timestamps or just dates. It 
@@ -82,6 +83,8 @@ SOLR
    + Make dates support dashes in addition to slashes.
  + Current Results --> Keep filters
  + Clear filters/"All courts"
+ - Make * queries map to *:* internally, see: https://mail-archives.apache.org/mod_mbox/lucene-solr-user/201112.mbox/%3Calpine.DEB.2.00.1112131115550.16571@bester%3E
+ - include solrconfig.xml in our Solr directory.
 
 
 SOLR DEPLOYMENT:

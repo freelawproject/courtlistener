@@ -24,7 +24,7 @@
         Text Extraction: Antiword, libwpd-tools, pdf2text
         Code: BeautifulSoup, Celery, Django, jQuery (NobelCount), lxml,
               Mercurial, RabbitMQ, sunburnt, titlecase
-        Icons: Silk icons
+        Display: Silk icons, Blueprint CSS
         Infrastructure: Apache2, Linux, MySQL, Solr
   Source: https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/overview
 

@@ -199,41 +199,41 @@
             <hr class="space"/>
             {% for result in results.object_list %}
                 <article>
-                    {% if result.documentType = "Published" %}
-                        <div class="green-circle" title="This is a {{result.get_documentType_display}} opinion"></div>
+                    {% if result.status = "Published" %}
+                        <div class="green-circle" title="This is a {{ result.status }} opinion"></div>
                     {% else %} 
-                        {% if result.documentType = "Unpublished" or result.documentType = "Errata" or result.documentType = "In-chambers" or result.documentType = "Relating-to" %}
-                            <div class="red-circle" title="This is a {{result.get_documentType_display}} opinion"></div>
+                        {% if result.status = "Unpublished" or result.status = "Errata" or result.status = "In-chambers" or result.status = "Relating-to" %}
+                            <div class="red-circle" title="This is a {{ result.status }} opinion"></div>
                         {% else %}
                             <div class="orange-circle" title="The status of this opinion is unknown"></div>
                         {% endif %}
                     {% endif %}
 
                     <h3 class="bottom serif">
-                        <a href="{{ result.absolute_url}}?q={{query}}" class="visitable">
-                            {{ result.caseName|safe }},
-                            {% if result.westCite != '' and result.westCite != None %}
-                                {{ result.westCite }}
+                        <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}" class="visitable">
+                            {{ result.solr_highlights.caseName.0|safe }},
+                            {% if result.solr_highlights.westCite.0 != '' and result.solr_highlights.westCite.0 != None %}
+                                {{ result.solr_highlights.westCite.0 }}
                             {% else %}
-                                {{ result.docketNumber }}
+                                {{ result.solr_highlights.docketNumber.0 }}
                             {% endif %}
-                            ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|nbsp }}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
+                            ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|safe|nbsp }}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
                         </a>
                     </h3>
 
                     <p class="bottom">
-                        {% if result.download_URL or result.local_path %}
+                        {% if result.download_url or result.local_path %}
                             {% if result.source != 'R' %}
                                 <span class="meta-data-header">View Original:</span>
                                 <span class="meta-data-value">
-                                    {% if result.download_URL %}
-                                        <a href="{{result.download_URL}}" class="visitable" rel="external noreferrer">From the court</a>
+                                    {% if result.download_url %}
+                                        <a href="{{ result.download_url }}" class="visitable" rel="external noreferrer">From the court</a>
                                     {% endif %}
-                                    {% if result.download_URL and result.local_path %}
+                                    {% if result.download_url and result.local_path %}
                                         &nbsp;&nbsp;|&nbsp;&nbsp;
                                     {% endif %}
                                     {% if result.local_path %}
-                                        <a href="/{{result.local_path}}" class="visitable">Our backup</a>
+                                        <a href="/{{ result.local_path }}" class="visitable">Our backup</a>
                                     {% endif %}
                                 </span>
                             {% else %}
@@ -253,18 +253,16 @@
                         </time>
                     </p>
                     <p class="bottom">
-                        {% if result.westCite != '' and result.westCite != None and result.docketNumber %}
+                        {% if result.solr_highlights.westCite.0 != '' and result.solr_highlights.westCite.0 != None and result.solr_highlights.docketNumber.0 %}
                             <span class="meta-data-header">Docket Number:</span>
-                            <span class="meta-data-value">{{ result.docketNumber }}</span>
+                            <span class="meta-data-value">{{ result.solr_highlights.docketNumber.0 }}</span>
                         {% endif %}
                     </p>
-                    {% comment %}
                     <p>
-                        &hellip;{% for frag in result.text %}
+                        &hellip;{% for frag in result.solr_highlights.text %}
                            {{ frag|safe }}&hellip;
                         {% endfor %}
                     </p>
-                    {% endcomment %}
                 </article>
             {% endfor %}
         {% else %}
@@ -292,13 +290,21 @@
         {% if results.has_previous or results.has_next %}
             <div class="box">
                 <div id="pagination-left">
-                    <h3 class="bottom arrow-left-before">
-                        {% if results.has_previous %}<a href="?q={{ query }}&amp;page={{ results.previous_page_number }}" rel="prev">{% endif %}Previous{% if results.has_previous %}</a>{% endif %}
-                    </h3>
+                    {% if results.has_previous %}
+                        <h3 class="bottom arrow-left-before">
+                            <a href="?{{ request.META.QUERY_STRING }}&amp;page={{ results.previous_page_number }}" rel="prev">
+                                Previous
+                            </a>
+                        </h3>
+                    {% else %}
+                        &nbsp;
+                    {% endif %}
                 </div>
                 <div id="pagination-right">
                     <h3 class="bottom arrow-right-after">
-                        {% if results.has_next %}<a href="?q={{ query }}&amp;page={{ results.next_page_number }}" rel="next">{% endif %}Next{% if results.has_next %}</a>{% endif %}
+                        {% if results.has_next %}
+                            <a href="?{{ request.META.QUERY_STRING }}&amp;page={{ results.next_page_number }}" rel="next">{% endif %}Next{% if results.has_next %}</a>
+                        {% endif %}
                     </h3>
                 </div>
                 <div id="pagination-center">
