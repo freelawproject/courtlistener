@@ -144,7 +144,7 @@
                             </p>
                             <p>
                                 {{ alertForm.sendNegativeAlert }}
-                                <label for="id_alertName">Send me alerts even when there are no hits</label>
+                                <label for="id_alertName">Send me an email even when there are no hits</label>
                                 {% if alertForm.sendNegativeAlert.errors %}
                                     <span class="errortext">
                                         {% for error in alertForm.sendNegativeAlert.errors %}
@@ -260,7 +260,7 @@
                     </p>
                     <p>
                         &hellip;{% for frag in result.solr_highlights.text %}
-                           {{ frag|safe }}&hellip;
+                           {{ frag|safe|underscore_to_space }}&hellip;
                         {% endfor %}
                     </p>
                 </article>
@@ -292,7 +292,7 @@
                 <div id="pagination-left">
                     {% if results.has_previous %}
                         <h3 class="bottom arrow-left-before">
-                            <a href="?{{ request.META.QUERY_STRING }}&amp;page={{ results.previous_page_number }}" rel="prev">
+                            <a href="?{{ get_string }}page={{ results.previous_page_number }}" rel="prev">
                                 Previous
                             </a>
                         </h3>
@@ -301,11 +301,13 @@
                     {% endif %}
                 </div>
                 <div id="pagination-right">
-                    <h3 class="bottom arrow-right-after">
-                        {% if results.has_next %}
-                            <a href="?{{ request.META.QUERY_STRING }}&amp;page={{ results.next_page_number }}" rel="next">{% endif %}Next{% if results.has_next %}</a>
-                        {% endif %}
-                    </h3>
+                    {% if results.has_next %}
+                        <h3 class="bottom arrow-right-after">
+                            <a href="?{{ get_string }}page={{ results.next_page_number }}" rel="next">Next</a>
+                        </h3>
+                    {% else %}
+                        &nbsp;
+                    {% endif %}
                 </div>
                 <div id="pagination-center">
                     <h3 class="bottom">

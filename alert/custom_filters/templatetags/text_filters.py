@@ -36,8 +36,8 @@ def nbsp(text, autoescape=None):
     if autoescape:
         esc = conditional_escape
     else:
-        # This is an anonymous python identity function. Simply returns the value
-        # of x when x is given.
+        # This is an anonymous python identity function. Simply returns the 
+        # value of x when x is given.
         esc = lambda x: x
     return mark_safe(re.sub('\s', '&nbsp;', esc(text.strip())))
 nbsp.needs_autoescape = True
@@ -53,3 +53,15 @@ def v_wrapper(text, autoescape=None):
         esc = lambda x: x
     return mark_safe(re.sub(' v\. ', '<span class="alt bold"> v. </span>', esc(text)))
 v_wrapper.needs_autoescape = True
+
+
+@register.filter
+@stringfilter
+def underscore_to_space(text, autoescape=None):
+    '''Removed underscores from text.'''
+    if autoescape:
+        esc = conditional_escape
+    else:
+        esc = lambda x: x
+    return mark_safe(re.sub('_', ' ', esc(text)))
+underscore_to_space.needs_autoescape = True

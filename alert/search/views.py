@@ -14,6 +14,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from urllib import urlencode
+from urlparse import parse_qs
+
 from alert.alerts.forms import CreateAlertForm
 from alert.lib import sunburnt
 from alert.search.forms import SearchForm
@@ -137,6 +140,7 @@ def show_results(request):
         main_params['hl'] = 'true'
         main_params['hl.fl'] = 'text,caseName,westCite,docketNumber,lexisCite,court_citation_string'
         main_params['hl.snippets'] = '5'
+        main_params['hl.maxAnalyzedChars'] = '150000'
         # If there aren't any hits in the text return the field instead
         main_params['f.text.hl.alternateField'] = 'text'
         main_params['f.text.hl.maxAlternateFieldLength'] = '500'
@@ -214,20 +218,25 @@ def show_results(request):
         main_params['q'] = '*'
 
     # Run the query
-    print "Params sent to search are: %s" % '&'.join(['%s=%s' % (k, v) for k, v in main_params.items()])
-    results_si = conn.raw_query(**main_params)
-    #print results_si.execute()
     try:
         results_si = conn.raw_query(**main_params)
-        print results_si.execute()
+        #print "Params sent to search are: %s" % '&'.join(['%s=%s' % (k, v) for k, v in main_params.items()])
+        #print results_si.execute()
         court_facet_fields = conn.raw_query(**court_facet_params).execute().facet_counts.facet_fields
         stat_facet_fields = conn.raw_query(**stat_facet_params).execute().facet_counts.facet_fields
+        # Create a search string that does not contain the page numbers
+        get_dict = parse_qs(request.META['QUERY_STRING'])
+        print 'get_dict %s' % get_dict
+        try:
+            del get_dict['page']
+        except KeyError:
+            pass
+        get_string = urlencode(get_dict, True) + '&'
+        print 'get_string %s' % get_string
     except:
         return render_to_response('search/search.html',
                                   {'error': True, 'query': query},
                                   RequestContext(request))
-
-
 
     # Merge the fields with the facet values and set up the form fields.
     # We need to handle two cases:
@@ -325,70 +334,13 @@ def show_results(request):
         return render_to_response('search/search.html',
                                   {'error': True, 'query': query},
                                   RequestContext(request))
-
     return render_to_response(
                   'search/search.html',
                   {'search_form': search_form, 'alert_form': alert_form,
                    'results': paged_results, 'court_facets': court_facets,
-                   'status_facets': status_facets, 'query': query},
+                   'status_facets': status_facets, 'query': query,
+                   'get_string': get_string},
                   RequestContext(request))
-
-    #############
-    # SCRAPS
-    #############
-    #highlight_si = conn.query()
-    #highlight_si = highlight_si.query(highlight_si.Q({'q':'court -newell'}))
-
-    '''
-    q_frags = query.split()
-    results_si = conn.query(q_frags[0])
-    facet_si = conn.query(q_frags[0])
-    highlight_si = conn.query(q_frags[0])
-    for frag in q_frags[1:]:
-        results_si = results_si.query(frag)
-        facet_si = facet_si.query(frag)
-        highlight_si = highlight_si.query(frag)
-    '''
-
-    # Set up highlighting
-    #hl_results = highlight_si.highlight('text', snippets=5).highlight('status')\
-    #    .highlight('caseName').highlight('westCite').highlight('docketNumber')\
-    #    .highlight('lexisCite').execute()
-    #import pprint
-    #pprint.pprint(hl_results)
-
-    '''
-    results = []
-    for result in results_si.execute():
-        #type(result['id'])
-        #results_si[result['id']]['highlighted_text'] = result.highlighting['text']
-        #results_si[hl_results.highlighting['search.document.464']]['highlighted_text'] = 'foo'
-        temp_dict = {}
-        try:
-            temp_dict['caseName'] = hl_results.highlighting[result['id']]['caseName'][0]
-        except KeyError:
-            temp_dict['caseName'] = result['caseName']
-        try:
-            temp_dict['text'] = hl_results.highlighting[result['id']]['text']
-        except KeyError:
-            # No highlighting in the text for this result. Just assign the 
-            # default unhighlighted value
-            temp_dict['text'] = result['text']
-
-        results.append(temp_dict)
-    '''
-
-    '''
-    Goal:
-     [doc1: {caseName: 'foo', text: 'bar', status:'baz'}]
-    '''
-
-    '''
-    for d in r:
-        d['highlighted_name'] = r.highlighting[d['id']]['name']
-    book_list = r
-    '''
-
 
 def tools_page(request):
     return render_to_response('tools.html', {}, RequestContext(request))
