@@ -81,76 +81,56 @@
     <div class="span-5 append-2" id="sidebar">
         {% if not error %}
         <div class="sidebar-section">
-            <h3 class="pointer arrow-right-before">Create alert</h3>
-            <div id="hidden-create-alert" class="hidden"> 
+            {% if not alert_form.errors %}
+                <h3 class="pointer arrow-right-before">Create alert</h3>
+                <div id="hidden-create-alert" class="hidden">
+            {% else %}
+                <h3 class="pointer arrow-down-before">Create alert</h3>
+                <div id="hidden-create-alert" class="shown">
+            {% endif %} 
                 {% if user.is_authenticated %}
-                    {% if alert_form.errors %}
-                        <div class="span-4 error">
-                            <p class="bottom">Please fix the errors below.</p>
-                        </div>
-                    {% endif %}
-
-                    <form action="" method="post">{% csrf_token %}
-                        <p>
-                            <label for="id_alertText">Alert query</label>
-                            {% if alert_form.alertText.errors %}
-                                <br><span class="errortext">
-                                    {% for error in alert_form.alertText.errors %}
-                                        {{ error|escape }}
-                                    {% endfor %}
-                                </span>
-                            {% endif %}<br>
+                    {% if not get_string %}
+                        <p>To create an alert, first place a query. We cannot email all
+                        new cases at this time.</p>
+                    {% else %}
+                        {% if alert_form.errors %}
+                            <div class="span-4 error">
+                                <p class="bottom">Please fix the errors below.</p>
+                                <p>{{ alert_form.errors }}</p>
+                            </div>
+                        {% endif %}
+                        <form action="" method="post">{% csrf_token %}
                             {{ alert_form.alertText }}
-                        </p>
-                        <p>
-                            <label for="id_alertName">Give the alert a name</label>
-                            {% if alert_form.alertName.errors %}
-                                <br><span class="errortext">
-                                    {% for error in alert_form.alertName.errors %}
-                                        {{ error|escape }}
-                                    {% endfor %}
-                                </span>
-                            {% endif %}
-                            {{ alert_form.alertName }}
-                        </p>
-                        <p>
-                            <label for="id_alertFrequency">How often should we notify you</label>
-                            {% if alert_form.alertFrequency.errors %}
-                                <br><span class="errortext">
-                                    {% for error in alert_form.alertFrequency.errors %}
-                                        {{ error|escape }}
-                                    {% endfor %}
-                                </span>
-                            {% endif %}<br>
-                            {{ alert_form.alertFrequency }}
-                        </p>
-                        <p>
-                            {{ alert_form.alertPrivacy }}
-                            <label for="id_alertPrivacy">This alert is private</label>
-                            <label style="color:#000099; font-weight:normal;" title=" - In the future, we may allow users to share their public alerts." href="#" id="q" class="help">[?]</label>
-                            {% if alert_form.alertPrivacy.errors %}
-                                <span class="errortext">
-                                    {% for error in alert_form.alertPrivacy.errors %}
-                                        {{ error|escape }}
-                                    {% endfor %}
-                                </span>
-                            {% endif %}<br>
-
-                        </p>
-                        <p>
-                            {{ alert_form.sendNegativeAlert }}
-                            <label for="id_alertName">Send me an email even when there are no hits</label>
-                            {% if alert_form.sendNegativeAlert.errors %}
-                                <span class="errortext">
-                                    {% for error in alert_form.sendNegativeAlert.errors %}
-                                        {{ error|escape }}
-                                    {% endfor %}
-                                </span>
-                            {% endif %}<br>
-                        </p>
-                        <button type="submit" class="button title" name="alertSave">Create alert</button>
-                    </form>
-
+                            <p>
+                                <label for="id_alertName">Give the alert a name</label>
+                                {% if alert_form.alertName.errors %}
+                                    <br><span class="errortext">
+                                        {% for error in alert_form.alertName.errors %}
+                                            {{ error|escape }}
+                                        {% endfor %}
+                                    </span>
+                                {% endif %}
+                                {{ alert_form.alertName }}
+                            </p>
+                            <p>
+                                <label for="id_alertFrequency">How often should we notify you?</label>
+                                {% if alert_form.alertFrequency.errors %}
+                                    <br><span class="errortext">
+                                        {% for error in alert_form.alertFrequency.errors %}
+                                            {{ error|escape }}
+                                        {% endfor %}
+                                    </span>
+                                {% endif %}<br>
+                                {{ alert_form.alertFrequency }}
+                            </p>
+                            <p>
+                                {{ alert_form.sendNegativeAlert }}
+                                <label for="id_sendNegativeAlert">Send me an email even when there are no hits</label>
+                                <br>
+                            </p>
+                            <button type="submit" class="button title" name="alertSave">Create alert</button>
+                        </form>
+                    {% endif %}
                 {% else %}
                     {# User is not authenticated #}
                     <p>To get daily alerts for this search, <a href="{%url sign-in%}?next={{request.path}}?q={{query}}&page={{results.number}}">sign in</a> or

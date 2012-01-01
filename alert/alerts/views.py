@@ -44,14 +44,14 @@ def edit_alert(request, alert_id):
 
     # check if the user can edit this, or if they are url hacking
     alert = get_object_or_404(Alert, pk=alert_id,
-                              users__user=request.user)
+                              userprofile=request.user.get_profile())
 
     # If they've made it this far, they can edit the item, therefore, we load 
     # the form.
     if request.method == 'POST':
-        form = CreateAlertForm(request.POST)
-        if form.is_valid():
-            cd = form.cleaned_data
+        alert_form = CreateAlertForm(request.POST)
+        if alert_form.is_valid():
+            cd = alert_form.cleaned_data
 
             # save the changes
             alert_form = CreateAlertForm(cd, instance=alert)
@@ -62,14 +62,13 @@ def edit_alert(request, alert_id):
             # redirect to the alerts page
             return HttpResponseRedirect('/profile/alerts/')
 
-        else:
-            # the form is loading for the first time
-            alert_form = CreateAlertForm(instance=alert)
+    else:
+        # the form is loading for the first time
+        alert_form = CreateAlertForm(instance=alert)
 
-        return render_to_response('profile/edit_alert.html',
-                                  {'form': alert_form, 'alert_id': alert_id},
-                                  RequestContext(request))
-
+    return render_to_response('profile/edit_alert.html',
+                              {'form': alert_form, 'alert_id': alert_id},
+                              RequestContext(request))
 
 @login_required
 def delete_alert(request, alert_id):
@@ -80,14 +79,13 @@ def delete_alert(request, alert_id):
 
     # check if the user can edit this, or if they are url hacking
     alert = get_object_or_404(Alert, pk=alert_id,
-                              users__user=request.user)
+                              userprofile=request.user.get_profile())
 
     # if they've made it this far, they have permission to edit the alert
     alert.delete()
     messages.add_message(request, messages.SUCCESS,
         'Your alert was deleted successfully.')
     return HttpResponseRedirect('/profile/alerts/')
-
 
 @login_required
 def delete_alert_confirm(request, alert_id):
