@@ -2,14 +2,14 @@
 {% load text_filters %}
 {% load humanize %}
 
-{% block title %} CourtListener.com / Results / {{ query }} /
+{% block title %} CourtListener.com / Results / {{ request.GET.q }} /
     {% if results.paginator.num_pages %}
     Page / {{ results.number }} of {{ results.paginator.num_pages }}
     {% endif %}
 {% endblock %}
 
 {% block head %}
-    <link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?q={{ query }}" />
+    <link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?q={{ request.GET.q }}" />
 {% endblock %}
 
 {% block footer-scripts %}
@@ -133,8 +133,8 @@
                     {% endif %}
                 {% else %}
                     {# User is not authenticated #}
-                    <p>To get daily alerts for this search, <a href="{%url sign-in%}?next={{request.path}}?q={{query}}&page={{results.number}}">sign in</a> or
-                    <a href="{%url register%}?next={{request.path}}?q={{query}}&page={{results.number}}">register</a> as a new user.</p>
+                    <p>To get daily alerts for this search, <a href="{%url sign-in%}?next={{request.path}}?{{ get_string }}page={{results.number}}">sign in</a> or
+                    <a href="{%url register%}?next={{request.path}}?{{ get_string }}page={{results.number}}">register</a> as a new user.</p>
                 {% endif %}
             </div>
         </div>
@@ -238,7 +238,7 @@
             {% endfor %}
         {% else %}
             {% if not error %}
-                <h2 class="alt">Your search &mdash; <strong>{{ query }}</strong> &mdash; had no results.</h2>
+                <h2 class="alt">Your search &mdash; <strong>{{ request.GET.q }}</strong> &mdash; had no results.</h2>
                 <p class="bottom">Search tips:</p>
                 <ul>
                     <li>Check your spelling</li>
@@ -247,7 +247,7 @@
                 </ul>
                 <p>Did you expect more results than this? If so, <a href="/contact/">let us know</a>! We value your feedback.</p>
             {% else %}
-                <h2 class="alt">Your search &mdash; <strong>{{ query }}</strong> &mdash; encountered a <strong>deadly</strong> error.</h2>
+                <h2 class="alt">Your search &mdash; <strong>{{ request.GET.q }}</strong> &mdash; encountered a <strong>deadly</strong> error.</h2>
                 <p class="bottom">This could be because:</p>
                 <ul>
                     <li>CourtListener couldn't make sense of your query</li>

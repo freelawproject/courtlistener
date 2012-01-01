@@ -26,8 +26,8 @@ Features:
  + Realtime indexing via Celery
  + DB to index script
  + Homepage shows all results
- - Snippets with multiple fragments
- - Highlighting on all returned fields
+ + Snippets with multiple fragments
+ + Highlighting on all returned fields
  - Multicore should be investigated/implemented
  - RAM tuning should be investigated/implemented
  - Result speed?
@@ -97,6 +97,10 @@ SOLR
 </requestHandler>
  - include solrconfig.xml in our Solr directory.
  - add coverage to the header
+ - remove all print lines
+ - make sure that the next functionsn work from the register and sign-in pages, and the save favorite popup
+ - run pylint for a few hours
+ - check for TODO statements
 
 
 SOLR DEPLOYMENT:
@@ -152,3 +156,16 @@ SOLR DEPLOYMENT:
     - remove Sphinx indexes
     - remove Sphinx configs
     - remove database table: drop table sph_counter;
+    
+  note to blog:
+    - big overhaul, lots of new features
+        - relevance and date-based sorting
+        - highlighting
+        - faceted search
+        - snippets
+        - unlimited result pagination?
+        - real-time search indexes
+    - lost a couple things:
+        - old RSS feed format is removed, need to recreate them as searches
+        - some search connectors
+    - all alerts updated by hand. Will get an email from us if we have any issues
