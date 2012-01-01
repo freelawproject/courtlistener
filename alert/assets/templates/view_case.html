@@ -29,23 +29,12 @@
     <script>window.jQuery || document.write('<script src="/media/js/jquery-1.6.2.min.js"><\/script>')</script>
     <script defer type="text/javascript" src="/media/js/jquery.NobleCount.min.js"></script>
     <script defer type="text/javascript" src="/media/js/save-favorites.js"></script>
+    <script type="text/javascript" src="/media/js/search-form.js"></script>
     <script type="text/javascript">
-        // Handles the clipboard actions.
+        // Handles the clipboard action.
         $(document).ready(function() {
-            $('#copy_png').click(function() {
-                $('#copy_png').toggleClass('copy_png_selected');
-                $('#link-div').toggle();
+            $('#share-header').click(function() {
                 $('#copy-input').select();
-            });
-            $('html').click(function() {
-                // Hides the input box if needed.
-                $('#link-div').hide();
-                $('#copy_png').removeClass('copy_png_selected');
-            });
-            $('#copy-input, #copy_png').click(function(e) {
-                // Prevents the above from hiding the input box when it is clicked.
-                $('copy-input').select();
-                e.stopPropagation();
             });
         });
     </script>
@@ -57,16 +46,18 @@
         {% if user.is_superuser and doc %}
             <div class="sidebar-section">
                 <h3 class="bottom">Admin</h3>
-                <p><a href="/admin/search/citation/{{doc.citation_id}}/">Document & Citation</a></p>
+                <p><a href="/admin/search/citation/{{doc.citation_id}}/">Document &amp; Citation</a></p>
             </div>
         {% endif %}
 
 
         {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
         <div class="{% if not favorite_form.instance.doc_id %}hidden{% endif %} sidebar-section" id="sidebar-notes">
-            <h3 class="bottom inline">Your Notes</h3>
-            <p class="inline" id="edit-favorite">(<a href="#favorite-editor">edit</a>)</p>
-            <p id="sidebar-notes-text">
+            <div>
+                <h3 class="bottom inline arrow-down-before">Your Notes</h3>
+                <p class="inline" id="edit-favorite">(<a href="#favorite-editor">edit</a>)</p>
+            </div>
+            <p id="sidebar-notes-text" class="shown">
                 {{ favorite_form.instance.notes|default:"(none)" }}
             </p>
         </div>
@@ -74,8 +65,8 @@
 
         {# Download original? #}
         <div class="sidebar-section">
-            <h3 class="bottom">View Original</h3>
-            <p>
+            <h3 class="bottom pointer arrow-down-before">View Original</h3>
+            <p class="shown">
                 {% if doc.download_URL or doc.local_path %}
                     {% if doc.source != 'R' %}
                         {% if doc.download_URL and result.source != 'R' %}
@@ -98,21 +89,30 @@
 
         {# Show the social links using sprites #}
         <div class="sidebar-section">
-            <h3 class="bottom">Share</h3>
-            <p>
+            <h3 class="bottom pointer arrow-right-before" id="share-header">Share</h3>
+            <div class="hidden">
                 <a href="mailto:?subject={{title|urlencode}}%20at%20CourtListener.com&body={{doc.get_small_url}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
-                <span title="Copy link to clipboard" class="sprites copy_png_unselected" id="copy_png"></span>
                 <a href="http://www.facebook.com/share.php?u={{doc.get_small_url}}&t={{title}} at CourtListener.com" target="_blank" title="Facebook" class="sprites" id="facebook_png"></a>
                 <a href="http://twitter.com/home?status={{doc.get_small_url}}" target="_blank" title="Twitter" class="sprites" id="twitter_gif"></a>
                 <a href="http://digg.com/submit?phase=2&url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Digg" class="sprites" id="digg_png"></a>
                 <a href="http://reddit.com/submit?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Reddit" class="sprites" id="reddit_png"></a>
                 <a href="http://del.icio.us/post?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="delicious" class="sprites" id="delicious_png"></a>
-            </p>
-            <div id="link-div" class="hidden">
                 <input type="text" readonly="readonly" id="copy-input" value="{{doc.get_small_url}}"></input>
             </div>
+            <hr class="space">
         </div>
-
+        
+        {# Show the search refine section. This is populated with JS #}
+        <div class="sidebar-section">
+            <h3 class="pointer arrow-right-before">Refine your search</h3>
+            <div class="hidden">
+                <form action="/" method="get" id="sidebar-search-form">
+                    <div class="shown" id="sidebar-facet-placeholder"></div>
+                  <hr class="space">
+                </form>
+            </div>
+        </div>
+        
     </div>
 {% endblock %}
 
