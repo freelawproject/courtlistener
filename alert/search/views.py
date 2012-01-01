@@ -83,6 +83,15 @@ def show_results(request):
 
     query = request.GET.get('q', '*')
 
+    # Create a search string that does not contain the page numbers
+    get_dict = parse_qs(request.META['QUERY_STRING'])
+    try:
+        del get_dict['page']
+    except KeyError:
+        pass
+    get_string = urlencode(get_dict, True)
+    if len(get_string) > 0:
+        get_string = get_string + '&'
 
     # this handles the alert creation form.
     if request.method == 'POST':
@@ -106,7 +115,7 @@ def show_results(request):
     else:
         # the form is loading for the first time, load it, then load the rest
         # of the page
-        alert_form = CreateAlertForm(initial={'alertText': query,
+        alert_form = CreateAlertForm(initial={'alertText': get_string,
                                               'alertFrequency': "dly"})
 
     '''
@@ -223,13 +232,6 @@ def show_results(request):
         #print results_si.execute()
         court_facet_fields = conn.raw_query(**court_facet_params).execute().facet_counts.facet_fields
         stat_facet_fields = conn.raw_query(**stat_facet_params).execute().facet_counts.facet_fields
-        # Create a search string that does not contain the page numbers
-        get_dict = parse_qs(request.META['QUERY_STRING'])
-        try:
-            del get_dict['page']
-        except KeyError:
-            pass
-        get_string = urlencode(get_dict, True) + '&'
     except:
         return render_to_response('search/search.html',
                                   {'error': True, 'query': query},

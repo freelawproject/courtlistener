@@ -29,7 +29,7 @@ class Alert(models.Model):
     alertUUID = models.AutoField('a unique ID for each alert', primary_key=True)
     alertName = models.CharField('a name for the alert', max_length=75)
     alertText = models.CharField('the text of an alert created by a user',
-        max_length=200)
+        max_length=2500)
     alertFrequency = models.CharField('the rate chosen by the user for the alert',
         choices=FREQUENCY,
         max_length=10)

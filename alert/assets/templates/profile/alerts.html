@@ -34,22 +34,22 @@
                 <table class="settings-table">
                     <thead>
                         <tr>
-                            <th>Query name</th>
-                            <th>Query</th>
+                            <th>Query&nbsp;name</th>
                             <th>Frequency</th>
-                            <th>Last hit</th>
-                            <th>Private</th>
+                            <th>Last&nbsp;hit</th>
                             <th colspan="2">Subscribe</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for alert in user.get_profile.alert.all %}
                         <tr>
-                            <td><p class="bottom" title="{{alert.alertName}}">{{ alert.alertName|capfirst|truncatewords:"6" }}</p></td>
-                            <td><a href="/search/results/?q={{alert.alertText}}" title="{{alert.alertText}}">{{ alert.alertText|truncatewords:"14" }}</a></td>
+                            <td>
+                                <p class="bottom" title="{{alert.alertName}}">
+                                    <a href="/?{{alert.alertText}}">{{ alert.alertName|capfirst|truncatewords:"6" }}</a>
+                                </p>
+                            </td>
                             <td>{{ alert.get_alertFrequency_display }}</td>
                             <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"Never" }}</td>
-                            <td>{{ alert.alertPrivacy|yesno:"Yes,No" }}</td>
                             <td>
                                 <a href="/feed/search/?q={{alert.alertText}}">
                                     <img src="/media/images/png/atom-feed.png" alt="atom icon" height="12px" width="12px">
@@ -65,7 +65,7 @@
             </div>
         {% else %}
             <h3>You have not made any alerts.</h3>
-            <form action="/" method="post">{% csrf_token %}
+            <form action="/" method="get">
             <button type="submit" class="button">Make new alert</button>
         {% endif %}
     </div>

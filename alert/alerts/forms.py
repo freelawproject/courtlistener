@@ -16,6 +16,7 @@
 
 from django.forms import ModelForm
 from alert.userHandling.models import Alert
+from django.forms.widgets import HiddenInput, TextInput
 
 class CreateAlertForm(ModelForm):
     # things can be overridden here, if desired. E.g:
@@ -23,3 +24,7 @@ class CreateAlertForm(ModelForm):
     class Meta:
         model = Alert
         exclude = ('lastHitDate',)
+        widgets = {
+            'alertText': HiddenInput(),
+            'alertName': TextInput(attrs={'class': 'span-5'})
+        }

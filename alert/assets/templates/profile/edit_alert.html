@@ -5,40 +5,29 @@
 {% block nav-alerts %}active{% endblock %}
 
 {% block content %}
-    <div class="span-17 last" id="content">
+    <div class="span-8 last" id="content">
         {% if form.errors %}
-            <div class="span-10 error">
+            <div class="span-6 error">
                 <p class="bottom">There were errors with your submission.</p>
             </div>
-            <div class="span-7 last">&nbsp;</div>
         {% endif %}
 
-        <div class="span-17 last">
+        <div class="span-8">
             <form action="" method="post">{% csrf_token %}
+                {{ form.alertText }}
                 <p>
                     <label for="id_alertName">Give the alert a name</label>
                     {% if form.alertName.errors %}
-                        <br><span class="errortext">
+                        <span class="errortext">
                             {% for error in form.alertName.errors %}
                                 {{ error|escape }}
                             {% endfor %}
                         </span>
-                    {% endif %}<br>
-                    {{ form.alertName }}
+                    {% endif %}
+                    <input type="text" maxlength="75" name="alertName" class="span-8" value="{{form.alertName.value}}" id="id_alertName">
                 </p>
                 <p>
-                    <label for="id_alertText">Alert query</label>
-                    {% if form.alertText.errors %}
-                        <br><span class="errortext">
-                            {% for error in form.alertText.errors %}
-                                {{ error|escape }}
-                            {% endfor %}
-                        </span>
-                    {% endif %}<br>
-                    {{ form.alertText }}
-                </p>
-                <p>
-                    <label for="id_alertFrequency">How often should we notify you</label>
+                    <label for="id_alertFrequency">How often should we notify you?</label>
                     {% if form.alertFrequency.errors %}
                         <br><span class="errortext">
                             {% for error in form.alertFrequency.errors %}
@@ -49,20 +38,8 @@
                     {{ form.alertFrequency }}
                 </p>
                 <p>
-                    {{ form.alertPrivacy }}
-                    <label for="id_alertPrivacy">This alert is private</label>
-                    {% if form.alertPrivacy.errors %}
-                        <span class="errortext">
-                            {% for error in form.alertPrivacy.errors %}
-                                {{ error|escape }}
-                            {% endfor %}
-                        </span>
-                    {% endif %}<br>
-
-                </p>
-                <p>
                     {{ form.sendNegativeAlert }}
-                    <label for="id_alertName">Send me alerts even when there are no hits</label>
+                    <label for="id_sendNegativeAlert">Send me an email even when there are no hits</label>
                     {% if form.sendNegativeAlert.errors %}
                         <span class="errortext">
                             {% for error in form.sendNegativeAlert.errors %}

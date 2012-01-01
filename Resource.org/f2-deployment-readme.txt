@@ -39,29 +39,31 @@ QA:
     - can I delete/edit YOUR alert?
     - what happens if I try to hack the URL bar with non-ints?
         - if OK, try it without the int check in the delete_alert and edit_alert functions
- - Check that the tools page works (code moved but untested)
+ + Check that the tools page works (code moved but untested)
  - Test that length of the search isn't limited (length of what? The query or the number of results?)
  - Test that Univ. and other v's are fixed so they are only italicized when necessary
  - Ensure that the rabbit-mq, celery and solr will start up at reboot
  - Test whether q='' works
- - Test proper pluralization of results
+ + Test proper pluralization of results
  - Test with and without JS
  - Test where items are placed when they lack a date and date sorting is used
  - Is there a limit to the number of results? Do we handle it? 
  - Does Piwik still work?
  - Do placeholders work in IE6-9?
- - How do we handle cases that lack dates?
  - Test that the various display logic still works for displaying the result meta data (exercise all the if/else statements) 
     
  
 SOLR
  - Finish the configuration of solr in the installer
  + create database crawler to import entire thing into Solr
- - Fix alerts
+ - Fix favorite creation
+ - Fix placing searches from the profile pages
  + Fix pagination
  + Fix display of results
  - update all places that search can be performed in the project
     - RSS feeds
+        - Link in headers
+        - Link in alerts page
     - Alerts
         - There were X new results for your Alert. Here are the first 15.
         - TOC at top of alerts with HTML anchors.
@@ -83,8 +85,18 @@ SOLR
    + Make dates support dashes in addition to slashes.
  + Current Results --> Keep filters
  + Clear filters/"All courts"
- - Make * queries map to *:* internally, see: https://mail-archives.apache.org/mod_mbox/lucene-solr-user/201112.mbox/%3Calpine.DEB.2.00.1112131115550.16571@bester%3E
+ - Make * queries map to *:* internally, see: https://mail-archives.apache.org/mod_mbox/lucene-solr-user/201112.mbox/%3Calpine.DEB.2.00.1112131115550.16571@bester%3E,
+ - See if a default query can be set up:
+ <requestHandler name="standard" default="true">
+   <lst name="defaults">
+     <str name="echoParams">none</str>
+     <str name="q">*:*</str>
+     <int name="rows">0</int>
+     <bool name="stats">true</bool>
+   </lst>
+</requestHandler>
  - include solrconfig.xml in our Solr directory.
+ - add coverage to the header
 
 
 SOLR DEPLOYMENT:
