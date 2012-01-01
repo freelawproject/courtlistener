@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from alert.lib import search_utils
+from alert.search.forms import SearchForm
 from alert.search.models import Court
 from alert.search.models import Document
 from alert.tinyurl.encode_decode import ascii_to_num
@@ -45,12 +47,8 @@ def view_case(request, court, pk, casename):
     title = doc.citation.caseNameShort
     user = request.user
 
-    try:
-        # Check if we know the user's query. Pass it onwards if so.
-        query = request.GET['q']
-    except MultiValueDictKeyError:
-        # No query parameter.
-        query = ''
+    search_form = SearchForm(request.GET)
+    get_string = search_utils.make_get_string(request)
 
     try:
         # Get the favorite, if possible
@@ -61,6 +59,9 @@ def view_case(request, court, pk, casename):
         favorite_form = FavoriteForm(initial={'doc_id': doc.documentUUID,
             'name' : doc.citation.caseNameFull})
 
-    return render_to_response('view_case.html', {'title': title,
-        'doc': doc, 'court': ct, 'favorite_form': favorite_form, 'query': query},
-        RequestContext(request))
+    return render_to_response('view_case.html',
+                              {'title': title, 'doc': doc, 'court': ct,
+                               'favorite_form': favorite_form,
+                               'search_form': search_form,
+                               'get_string': get_string},
+                              RequestContext(request))
