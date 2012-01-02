@@ -3,8 +3,8 @@
 {{ object.citation.caseNameFull|default_if_none:"" }}
 {{ object.documentType|default_if_none:"" }}
 {{ object.documentSHA1|default_if_none:"" }}
-{{ object.court|default_if_none:"" }}
-{{ object.court.shortName|default_if_none:"" }}
+{{ object.court.full_name|default_if_none:"" }}
+{{ object.court.citation_string|default_if_none:"" }}
 {{ object.court.courtUUID|default_if_none:"" }}
 
 {# This code must match the code in document_caseNumber.txt #}

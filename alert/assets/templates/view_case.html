@@ -45,8 +45,8 @@
         {# show the admin tools if applicable #}
         {% if user.is_superuser and doc %}
             <div class="sidebar-section">
-                <h3 class="bottom">Admin</h3>
-                <p><a href="/admin/search/citation/{{doc.citation_id}}/">Document &amp; Citation</a></p>
+                <h3 class="bottom arrow-down-before pointer">Admin</h3>
+                <p class="shown"><a href="/admin/search/citation/{{doc.citation_id}}/">Document &amp; Citation</a></p>
             </div>
         {% endif %}
 
@@ -131,7 +131,7 @@
             {% else %}
                 {{doc.citation.docketNumber}}
             {% endif %}
-            ({% if doc.court.shortName != 'SCOTUS' %}{{doc.court.shortName|nbsp}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
+            ({% if doc.court.citation_string != 'SCOTUS' %}{{doc.court.citation_string|nbsp}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
         </h2>
         <div id="modal-rel">
             {# Modal box for saving the favorite #}
@@ -183,7 +183,7 @@
                 {# user is not authenticated #}
                 <div id="modal-logged-out" class="hidden pointer span-7">
                     <h3 class="center bottom">
-                        <a href="{%url sign-in %}?next={{request.path}}{% if query %}?q={{ query }}{%endif%}">
+                        <a href="{%url sign-in %}?next={{request.path}}?{{get_string|urlencode}}">
                             Sign in or register to save a favorite.
                         </a>
                     </h3>

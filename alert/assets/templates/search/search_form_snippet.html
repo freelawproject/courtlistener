@@ -1,4 +1,5 @@
 {% load humanize %}
+{% load widget_tweaks %}
 
 <form action="/" method="get" id="search-form">
     <div id="search-container">
@@ -6,18 +7,17 @@
             <tbody>
                 <tr>
                     <td>
-                        {# TODO: Make sure autofocus works #}
-                        <input class="{% if count == 0 or not query  %}auto-focus{% endif %} wide-title"
-                            value="{{search_form.q.value}}"
+                        <input class="{% if results.paginator.count == 0 or error %}auto-focus{% endif %} wide-title"
+                            value="{{ search_form.q.value|default:'' }}"
                             name="q"
                             id="id_q"
                             autocomplete="off"
                             type="text">
                      </td>
                     <td>
-                        <button type="submit" 
-                            class="button title" 
-                            name="search" 
+                        <button type="submit"
+                            class="button title"
+                            name="search"
                             id="search-button">Search</button>
                     </td>
                 </tr>
@@ -50,11 +50,15 @@
 	                <h4 class="bottom">Federal Appeals Courts</h4>
 
 	                <p class="bottom">
-	                   {{ search_form.court_all }}
-	                   <label
-	                       for="id_court_all"
-	                       class="pointer">{{ search_form.court_all.label }}</label>
-	                   <span class="gray small">({{ results.paginator.count|intcomma }})</span>
+                        {% if results.paginator.count == 0 %}
+                            {{ search_form.court_all|attr:"disabled:disabled" }}
+                        {% else %}
+                            {{ search_form.court_all }}
+                        {% endif %}
+	                    <label
+	                        for="id_court_all"
+	                        class="{% if results.paginator.count == 0 %}gray{% else %}pointer{% endif %}">{{ search_form.court_all.label }}</label>
+	                    <span class="gray small">({{ results.paginator.count|intcomma }})</span>
 	                </p>
 	                {% for court in court_facets %}
 	                    <p class="bottom">
@@ -67,7 +71,7 @@
 	                            {% if court.2 == 0 %}disabled="disabled"{% endif %}>
 	                        <label 
 	                            for="id_{{ court.1 }}" 
-	                            class="{% if court.2 == 0 %}striken{% else %}pointer{% endif %}">{{ court.0 }}</label>
+	                            class="{% if court.2 == 0 %}gray{% else %}pointer{% endif %}">{{ court.0 }}</label>
 	                        <span class="gray small">({{ court.2|intcomma }})</span>
 	                    </p>
 	                {% endfor %}
@@ -86,7 +90,7 @@
 	                        <label
 	                            for="id_{{ status.1 }}"
 	                            class="pointer
-	                             {% if status.2 == 0 %}striken{% else %}pointer{% endif %}">{{ status.0 }}</label>
+	                             {% if status.2 == 0 %}gray{% else %}pointer{% endif %}">{{ status.0 }}</label>
 	                        <span class="gray small">({{ status.2|intcomma }})</span>
 	                    </p>
 	                {% endfor %}

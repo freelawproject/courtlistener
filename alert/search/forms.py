@@ -89,7 +89,6 @@ class SearchForm(forms.Form):
                                    attrs={'class': 'span-5 external-input'}))
 
     def __init__(self, *args, **kwargs):
-        print "Form init called..."
         super(SearchForm, self).__init__(*args, **kwargs)
 
         # Query the DB so we can build up check boxes for each court in use.  
@@ -105,7 +104,7 @@ class SearchForm(forms.Form):
             self.fields['court_all'] = forms.BooleanField(
                                                   label='All Courts',
                                                   required=False,
-                                                  widget=forms.CheckboxInput(attrs={'class':'external-input'}))
+                                                  widget=forms.CheckboxInput(attrs={'class': 'external-input'}))
             for court in courts:
                 self.fields['court_' + court[0]] = forms.BooleanField(
                                                               label=court[1],
@@ -120,7 +119,7 @@ class SearchForm(forms.Form):
                                                   label='All Courts',
                                                   required=False,
                                                   initial=True,
-                                                  widget=forms.CheckboxInput(attrs={'checked':'checked', 'class':'external-input'}))
+                                                  widget=forms.CheckboxInput(attrs={'checked':'checked', 'class': 'external-input'}))
             for court in courts:
                 self.fields['court_' + court[0]] = forms.BooleanField(
                                                               label=court[1],

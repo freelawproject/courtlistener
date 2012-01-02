@@ -14,7 +14,7 @@ We have news regarding your alerts at CourtListener.com.
 -------------------------------------------------------{% endif %}{% if docs != "None" %}Your {{alert.get_alertFrequency_display|lower}} alert -- {{alert.alertText}} -- had {{docs|length}} hit{{docs|pluralize}}:
 -------------------------------------------------------{% endif %}
 Edit/delete this alert: http://courtlistener.com/alert/edit/{{ alert.alertUUID }}/{% endif %}
-{% if docs != "None" %}{{forloop.counter}}. {{doc.citation.caseNameFull}}, {% if doc.citation.westCite != '' and doc.citation.westCite != None %}{{doc.citation.westCite}}{% else %}{{doc.citation.docketNumber}}{% endif %} ({% if doc.court.shortName != 'SCOTUS' %}{{doc.court.shortName}} {% endif %}{{doc.dateFiled|date:"Y"}})
+{% if docs != "None" %}{{forloop.counter}}. {{doc.citation.caseNameFull}}, {% if doc.citation.westCite != '' and doc.citation.westCite != None %}{{doc.citation.westCite}}{% else %}{{doc.citation.docketNumber}}{% endif %} ({% if doc.court.citation_string != 'SCOTUS' %}{{doc.court.citation_string}} {% endif %}{{doc.dateFiled|date:"Y"}})
 Precedential Status: {{doc.get_documentType_display}}
  - View on our site: http://courtlistener.com{{doc.get_absolute_url}}
  - Download original from the court: {{doc.download_URL}}

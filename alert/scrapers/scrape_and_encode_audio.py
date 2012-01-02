@@ -191,7 +191,7 @@ def makeAudioFromUrl(url, audioLink):
     sha1Hash = hashlib.sha1(data).hexdigest()
 
     # using that, we check for a dup
-    audio, created = Audio.objects.get_or_create(SHA1 = sha1Hash)
+    audio, created = Audio.objects.get_or_create(SHA1=sha1Hash)
 
     if created:
         # we only do this if it's new
@@ -203,7 +203,7 @@ def makeAudioFromUrl(url, audioLink):
     return myFile, audio, created, error
 
 
-def encode_audio(mime-type, data):
+def encode_audio(mime - type, data):
     '''
     Fires off a new thread that does the audio encoding for the file. If
     possible, uses a low nice value when doing encoding.
@@ -233,9 +233,9 @@ def encode_audio(mime-type, data):
     # http://stackoverflow.com/questions/2463533/is-it-possible-to-renice-a-subprocess
     # A better method is probably using a preexec_fn of os.nice() to the
     # subprocess call.
-    if mime-type == "mp3":
+    if mime - type == "mp3":
         # Convert the sample rate to something good, make it mono.
-    elif mime-type == "wma":
+    elif mime - type == "wma":
         # Convert make an acceptable mp3 from the wma.
 
     # make the ogg from the mp3.
@@ -293,13 +293,13 @@ def hasDuplicate(caseNum, caseName):
 
     # data cleanup
     caseName = harmonize(clean_string(caseName))
-    caseNum  = clean_string(caseNum)
+    caseNum = clean_string(caseNum)
 
     caseNameShort = trunc(caseName, 100)
 
     # check for duplicates, make the object in their absence
     cite, created = Citation.objects.get_or_create(
-        caseNameShort = str(caseNameShort), docketNumber = str(caseNum))
+        caseNameShort=str(caseNameShort), docketNumber=str(caseNum))
 
     if caseNameShort == caseName:
         # no truncation.
@@ -390,7 +390,7 @@ def scrapeCourt(courtID):
 
         # incredibly, this RSS feed is in cron order, so new stuff is at the
         # end. Mind blowing.
-        i = len(caseLinks)-1
+        i = len(caseLinks) - 1
         if VERBOSITY >= 2: print str(i)
         dupCount = 0
         while i > 0:
@@ -445,7 +445,7 @@ def scrapeCourt(courtID):
             doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
             try:
                 logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                    ": Added " + ct.shortName + ": " + cite.caseNameShort)
+                    ": Added " + ct.citation_string + ": " + cite.caseNameShort)
             except UnicodeDecodeError:
                 pass
             doc.save()
@@ -550,7 +550,7 @@ def scrapeCourt(courtID):
 
                 # some caseDate cleanup
                 splitDate = caseDate.split('-')
-                caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
+                caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
 
@@ -562,7 +562,7 @@ def scrapeCourt(courtID):
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.citation_string + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -648,7 +648,7 @@ def scrapeCourt(courtID):
 
                 # next up is the caseDate
                 splitDate = caseDate.split('/')
-                caseDate = datetime.date(int("20" + splitDate[2]),int(splitDate[0]),
+                caseDate = datetime.date(int("20" + splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
 
@@ -665,7 +665,7 @@ def scrapeCourt(courtID):
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.citation_string + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -760,7 +760,7 @@ def scrapeCourt(courtID):
 
                 # some caseDate cleanup
                 splitDate = caseDate.split('/')
-                caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
+                caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
 
@@ -772,7 +772,7 @@ def scrapeCourt(courtID):
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.citation_string + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -893,7 +893,7 @@ def scrapeCourt(courtID):
 
                 # some caseDate cleanup
                 splitDate = caseDate.split('/')
-                caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
+                caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
 
@@ -909,7 +909,7 @@ def scrapeCourt(courtID):
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.citation_string + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -924,11 +924,11 @@ def scrapeCourt(courtID):
         Missing a day == OK. Just need to monkey with the date POSTed.
         """
         urls = ("http://www.ca6.uscourts.gov/cgi-bin/opinions.pl",)
-        ct = Court.objects.get(courtUUID = 'ca6')
+        ct = Court.objects.get(courtUUID='ca6')
 
         for url in urls:
             today = datetime.date.today()
-            formattedToday = str(today.month) + '/' + str(today.day) + '/' +\
+            formattedToday = str(today.month) + '/' + str(today.day) + '/' + \
                 str(today.year)
 
             postValues = {
@@ -1002,7 +1002,7 @@ def scrapeCourt(courtID):
 
                 # some caseDate cleanup
                 splitDate = caseDate.split('/')
-                caseDate = datetime.date(int(splitDate[0]),int(splitDate[1]),
+                caseDate = datetime.date(int(splitDate[0]), int(splitDate[1]),
                     int(splitDate[2]))
                 doc.dateFiled = caseDate
 
@@ -1018,7 +1018,7 @@ def scrapeCourt(courtID):
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.citation_string + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -1033,7 +1033,7 @@ def scrapeCourt(courtID):
         Missing a day == OK. Queries return cases for the past week.
         """
         urls = ("http://www.ca7.uscourts.gov/fdocs/docs.fwx",)
-        ct = Court.objects.get(courtUUID = 'ca7')
+        ct = Court.objects.get(courtUUID='ca7')
 
         for url in urls:
             # if these strings change, check that documentType still gets set correctly.
@@ -1049,7 +1049,7 @@ def scrapeCourt(courtID):
 
                 if DAEMONMODE:
                     # if it's DAEMONMODE, see if the court has changed
-                    changed = courtChanged(url+dataString, html)
+                    changed = courtChanged(url + dataString, html)
                     if not changed:
                         # if not, bail. If so, continue to the scraping.
                         return
@@ -1115,7 +1115,7 @@ def scrapeCourt(courtID):
                     doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                     try:
                         logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                            ": Added " + ct.shortName + ": " + cite.caseNameShort)
+                            ": Added " + ct.citation_string + ": " + cite.caseNameShort)
                     except UnicodeDecodeError:
                         pass
                     doc.save()
@@ -1125,7 +1125,7 @@ def scrapeCourt(courtID):
 
     elif (courtID == 8):
         urls = ("http://www.ca8.uscourts.gov/cgi-bin/new/today2.pl",)
-        ct = Court.objects.get(courtUUID = 'ca8')
+        ct = Court.objects.get(courtUUID='ca8')
 
         for url in urls:
             try: html = urllib2.urlopen(url).read()
@@ -1176,7 +1176,7 @@ def scrapeCourt(courtID):
 
                 # using caseLink, we can get the docketNumber and documentType
                 junk = aTags[i].contents[0]
-                docketNumber = caseNumRegex.search(junk).group(1) + "-" +\
+                docketNumber = caseNumRegex.search(junk).group(1) + "-" + \
                     caseNumRegex.search(junk).group(2)
 
                 documentType = caseNumRegex.search(junk).group(3).upper()
@@ -1193,7 +1193,7 @@ def scrapeCourt(courtID):
 
                 # some caseDate cleanup
                 splitDate = caseDate.split('/')
-                caseDate = datetime.date(int(splitDate[2]),int(splitDate[0]),
+                caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
                 doc.dateFiled = caseDate
 
@@ -1205,7 +1205,7 @@ def scrapeCourt(courtID):
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.citation_string + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -1223,7 +1223,7 @@ def scrapeCourt(courtID):
             "http://www.ca9.uscourts.gov/opinions/?o_mode=view&amp;o_sort_field=19&amp;o_sort_type=DESC&o_page_size=100",
             "http://www.ca9.uscourts.gov/memoranda/?o_mode=view&amp;o_sort_field=21&amp;o_sort_type=DESC&o_page_size=100",)
 
-        ct = Court.objects.get(courtUUID = 'ca9')
+        ct = Court.objects.get(courtUUID='ca9')
 
         for url in urls:
             if VERBOSITY >= 2: print "Link is now: " + url
@@ -1318,7 +1318,7 @@ def scrapeCourt(courtID):
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.citation_string + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -1329,7 +1329,7 @@ def scrapeCourt(courtID):
     elif (courtID == 10):
         # a daily feed of all the items posted THAT day. Missing a day == bad.
         urls = ("http://www.ca10.uscourts.gov/opinions/new/daily_decisions.rss",)
-        ct = Court.objects.get(courtUUID = 'ca10')
+        ct = Court.objects.get(courtUUID='ca10')
 
         for url in urls:
             try: html = urllib2.urlopen(url).read()
@@ -1429,7 +1429,7 @@ def scrapeCourt(courtID):
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.citation_string + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -1450,7 +1450,7 @@ def scrapeCourt(courtID):
             "http://www.ca11.uscourts.gov/unpub/searchdate.php",
             "http://www.ca11.uscourts.gov/opinions/searchdate.php",
         )
-        ct = Court.objects.get(courtUUID = 'ca11')
+        ct = Court.objects.get(courtUUID='ca11')
 
         for url in urls:
             date = strftime('%Y-%m', datetime.date.today().timetuple())
@@ -1478,14 +1478,14 @@ def scrapeCourt(courtID):
 
             if 'unpub' in url:
                 docketNumbers = tree.xpath('//table[3]//table//table/tr[1]/td[2]')
-                caseLinks   = tree.xpath('//table[3]//table//table/tr[3]/td[2]/a')
-                caseDates   = tree.xpath('//table[3]//table//table/tr[4]/td[2]')
-                caseNames   = tree.xpath('//table[3]//table//table/tr[6]/td[2]')
+                caseLinks = tree.xpath('//table[3]//table//table/tr[3]/td[2]/a')
+                caseDates = tree.xpath('//table[3]//table//table/tr[4]/td[2]')
+                caseNames = tree.xpath('//table[3]//table//table/tr[6]/td[2]')
             elif 'opinion' in url:
                 docketNumbers = tree.xpath('//table[3]//td[3]//table/tr[1]/td[2]')
-                caseLinks   = tree.xpath('//table[3]//td[3]//table/tr[3]/td[2]/a')
-                caseDates   = tree.xpath('//table[3]//td[3]//table/tr[4]/td[2]')
-                caseNames   = tree.xpath('//table[3]//td[3]//table/tr[6]/td[2]')
+                caseLinks = tree.xpath('//table[3]//td[3]//table/tr[3]/td[2]/a')
+                caseDates = tree.xpath('//table[3]//td[3]//table/tr[4]/td[2]')
+                caseNames = tree.xpath('//table[3]//td[3]//table/tr[6]/td[2]')
 
             '''
             # for debugging
@@ -1542,7 +1542,7 @@ def scrapeCourt(courtID):
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.citation_string + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -1554,7 +1554,7 @@ def scrapeCourt(courtID):
         # terrible site. Code assumes that we download the opinion on the day
         # it is released. If we miss a day, that could cause a problem.
         urls = ("http://www.cadc.uscourts.gov/bin/opinions/allopinions.asp",)
-        ct = Court.objects.get(courtUUID = 'cadc')
+        ct = Court.objects.get(courtUUID='cadc')
 
         for url in urls:
             try: html = urllib2.urlopen(url).read()
@@ -1603,7 +1603,7 @@ def scrapeCourt(courtID):
                     dupCount = 0
 
                 # using caseLink, we can get the docketNumber
-                docketNumber =  caseNumRegex.search(caseLink).group(1)
+                docketNumber = caseNumRegex.search(caseLink).group(1)
 
                 # we can hard-code this b/c the D.C. Court paywalls all
                 # unpublished opinions.
@@ -1626,7 +1626,7 @@ def scrapeCourt(courtID):
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.citation_string + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -1639,7 +1639,7 @@ def scrapeCourt(courtID):
         urls = ("http://www.cafc.uscourts.gov/index.php?option=com_reports&view=report&layout=search&Itemid=12",)
         # for last seven days use:
         #urls = ("http://www.cafc.uscourts.gov/index.php?searchword=&ordering=&date=7&type=&origin=&searchphrase=all&Itemid=12&option=com_reports",)
-        ct = Court.objects.get(courtUUID = "cafc")
+        ct = Court.objects.get(courtUUID="cafc")
 
         for url in urls:
             try: html = urllib2.urlopen(url).read()
@@ -1709,7 +1709,7 @@ def scrapeCourt(courtID):
                 caseNameShort = trTags[i].td.nextSibling.nextSibling.nextSibling\
                     .nextSibling.nextSibling.nextSibling.a.contents[0]\
                     .replace('[MOTION]', '').replace('[ORDER]', '').replace('(RULE 36)', '')\
-                    .replace('[ERRATA]', '').replace('[CORRECTED]','')
+                    .replace('[ERRATA]', '').replace('[CORRECTED]', '')
                 caseNameShort = titlecase(caseNameShort.lower())
 
                 # next: documentType
@@ -1731,7 +1731,7 @@ def scrapeCourt(courtID):
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.citation_string + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -1744,7 +1744,7 @@ def scrapeCourt(courtID):
         urls = ("http://www.supremecourt.gov/opinions/slipopinions.aspx",
                 "http://www.supremecourt.gov/opinions/in-chambers.aspx",
                 "http://www.supremecourt.gov/opinions/relatingtoorders.aspx",)
-        ct = Court.objects.get(courtUUID = 'scotus')
+        ct = Court.objects.get(courtUUID='scotus')
 
         for url in urls:
             if VERBOSITY >= 2: print "Scraping URL: " + url
@@ -1841,7 +1841,7 @@ def scrapeCourt(courtID):
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
                 try:
                     logger.debug(strftime("%a, %d %b %Y %H:%M", localtime()) +
-                        ": Added " + ct.shortName + ": " + cite.caseNameShort)
+                        ": Added " + ct.citation_string + ": " + cite.caseNameShort)
                 except UnicodeDecodeError:
                     pass
                 doc.save()
@@ -1917,7 +1917,7 @@ def main():
         # If so, run the scrapers. If not, check the next one.
         from search.models import PACER_CODES
         from time import sleep
-        wait = (30*60)/len(PACER_CODES)
+        wait = (30 * 60) / len(PACER_CODES)
         courtID = 1
         while courtID <= len(PACER_CODES):
             scrapeCourt(courtID)

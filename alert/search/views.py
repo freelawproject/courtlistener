@@ -23,6 +23,7 @@ from django.core.paginator import EmptyPage
 from django.shortcuts import render_to_response
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
+from django.views.decorators.cache import never_cache
 
 def get_date_filed_or_return_zero(doc):
     """Used for sorting dates. Returns the date field or the earliest date
@@ -34,6 +35,7 @@ def get_date_filed_or_return_zero(doc):
         import datetime
         return datetime.date(1, 1, 1)
 
+@never_cache
 def show_results(request):
     '''Show the results for a query
     
@@ -83,7 +85,7 @@ def show_results(request):
                                   {'error': True},
                                   RequestContext(request))
 
-    # Finally, we make a copy of request.GET so it is mutable, and we make
+    # Make a copy of request.GET so it is mutable, and we make
     # some adjustments that we want to see in the rendered form.
     mutable_get = request.GET.copy()
     if search_form.is_valid():
