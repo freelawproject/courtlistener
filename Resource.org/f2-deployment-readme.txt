@@ -50,7 +50,8 @@ QA:
  - Is there a limit to the number of results? Do we handle it? 
  - Does Piwik still work?
  - Do placeholders work in IE6-9?
- - Test that the various display logic still works for displaying the result meta data (exercise all the if/else statements) 
+ - Test that the various display logic still works for displaying the result meta data (exercise all the if/else statements)
+ - make sure that the next functionsn work from the register and sign-in pages, and the save favorite popup 
     
  
 SOLR
@@ -81,8 +82,11 @@ SOLR
  - Make sure the no results page looks good.
  - Dates:
    + Make the dates support years and year-months.
-   - Make invalid dates throw an error to the user.
    + Make dates support dashes in addition to slashes.
+ - Validity checks:
+    - Make sure the user selects at least one court and at least one status.
+    - Make invalid dates throw an error to the user.
+    - Make sure the after date is before the before date.
  + Current Results --> Keep filters
  + Clear filters/"All courts"
  - Make * queries map to *:* internally, see: https://mail-archives.apache.org/mod_mbox/lucene-solr-user/201112.mbox/%3Calpine.DEB.2.00.1112131115550.16571@bester%3E,
@@ -98,9 +102,9 @@ SOLR
  - include solrconfig.xml in our Solr directory.
  - add coverage to the header
  - remove all print lines
- - make sure that the next functionsn work from the register and sign-in pages, and the save favorite popup
  - run pylint for a few hours
  - check for TODO statements
+ - make sure sending zero courts to the server doesn't crash. Should just reset to all courts.
 
 
 SOLR DEPLOYMENT:

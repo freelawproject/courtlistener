@@ -26,10 +26,12 @@ from django.contrib.auth.models import User
 from django.contrib.auth import login
 from django.contrib.sites.models import Site
 from django.core.mail import send_mail
+from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.shortcuts import redirect
 from django.template import RequestContext
-from django.http import HttpResponseRedirect
+from django.views.decorators.cache import never_cache
+
 import datetime
 import random
 import hashlib
@@ -38,20 +40,20 @@ import hashlib
 def redirect_to_settings(request):
     return redirect(viewSettings, permanent=True)
 
-
 @login_required
+@never_cache
 def viewAlerts(request):
     return render_to_response('profile/alerts.html', {},
         RequestContext(request))
 
-
 @login_required
+@never_cache
 def view_favorites(request):
     return render_to_response('profile/favorites.html', {},
         RequestContext(request))
 
-
 @login_required
+@never_cache
 def viewSettings(request):
     oldEmail = request.user.email # this line has to be at the top to work.
     user = request.user
@@ -67,7 +69,7 @@ def viewSettings(request):
 
             # Build the activation key for the new account
             salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-            activationKey = hashlib.sha1(salt+user.username).hexdigest()
+            activationKey = hashlib.sha1(salt + user.username).hexdigest()
             key_expires = datetime.datetime.today() + datetime.timedelta(5)
 
             # Toggle the confirmation status.
@@ -151,9 +153,11 @@ def deleteProfileDone(request):
         RequestContext(request))
 
 @check_honeypot(field_name='skip_me_if_alive')
+@never_cache
 def register(request):
     '''allow only an anonymous user to register'''
     redirect_to = request.REQUEST.get('next', '')
+    print redirect_to
     if 'sign-in' in redirect_to:
         # thus, we don't redirect people back to the sign-in form
         redirect_to = ''
@@ -192,7 +196,7 @@ def register(request):
 
                 # Build the activation key for the new account
                 salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-                activationKey = hashlib.sha1(salt+new_user.username)\
+                activationKey = hashlib.sha1(salt + new_user.username)\
                     .hexdigest()
                 key_expires = datetime.datetime.today() + datetime\
                     .timedelta(5)
@@ -200,9 +204,9 @@ def register(request):
                 # associate a new UserProfile associated with the new user
                 # this makes it so every time we call get_profile(), we can be
                 # sure there is a profile waiting for us (a good thing).
-                up = UserProfile(user = new_user,
-                                 activationKey = activationKey,
-                                 key_expires = key_expires)
+                up = UserProfile(user=new_user,
+                                 activationKey=activationKey,
+                                 key_expires=key_expires)
                 up.save()
 
                 # Log the user in (pulled from the login view and here:
@@ -241,7 +245,7 @@ http://courtlistener.com/contact/." % (
         # a logical fallback
         return HttpResponseRedirect('/profile/settings/')
 
-
+@never_cache
 def registerSuccess(request):
     '''all redirect security checks should be done by now. Inform the user of
     their status, and redirect them.'''
@@ -249,7 +253,7 @@ def registerSuccess(request):
     return render_to_response('registration/registration_complete.html',
         {'redirect_to': redirect_to}, RequestContext(request))
 
-
+@never_cache
 def confirmEmail(request, activationKey):
     '''Confirms email addresses for a user.
 
@@ -276,6 +280,7 @@ def confirmEmail(request, activationKey):
 
 
 @login_required
+@never_cache
 def requestEmailConfirmation(request):
     # Send a confirmation link, and inform the user that it has been sent.
     user = request.user
@@ -294,7 +299,7 @@ def requestEmailConfirmation(request):
 
         # make a new activation key.
         salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-        activationKey = hashlib.sha1(salt+user.username).hexdigest()
+        activationKey = hashlib.sha1(salt + user.username).hexdigest()
         key_expires = datetime.datetime.today() + datetime.timedelta(5)
 
         # associate it with the user's account.
@@ -322,7 +327,7 @@ http://courtlistener.com/contact/." % (
             'registration/request_email_confirmation.html', {},
             RequestContext(request))
 
-
+@never_cache
 def emailConfirmSuccess(request):
     return render_to_response(
         'registration/request_email_confirmation_success.html',
@@ -330,6 +335,7 @@ def emailConfirmSuccess(request):
 
 
 @login_required
+@never_cache
 def password_change(request):
     if request.method == "POST":
         form = PasswordChangeForm(user=request.user, data=request.POST)

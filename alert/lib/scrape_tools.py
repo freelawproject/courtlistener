@@ -109,10 +109,10 @@ def printAndLogNewDoc(VERBOSITY, ct, cite):
 
     if VERBOSITY >= 1:
         print time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + \
-            ": Added " + ct.shortName + ": " + caseName + \
+            ": Added " + ct.citation_string + ": " + caseName + \
             ", " + str(caseNum)
     logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) +
-        ": Added " + ct.shortName + ": " + caseName + \
+        ": Added " + ct.citation_string + ": " + caseName + \
         ", " + str(caseNum))
 
 

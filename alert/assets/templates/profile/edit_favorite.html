@@ -7,40 +7,7 @@
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
     <script>window.jQuery || document.write('<script src="/media/js/jquery-1.6.2.min.js"><\/script>')</script>
     <script defer type="text/javascript" src="/media/js/jquery.NobleCount.min.js"></script>
-    <script type='text/javascript'>
-        $(document).ready(function() {
-            $('#save-favorite-notes-field').NobleCount('#characters-remaining',{
-                // set up the char counter
-                //on_negative: 'errortext',
-                on_negative: function(t_obj, char_area, c_settings, char_rem){
-                    $('#characters-remaining').addClass("errortext");
-                    $('#saveFavorite').attr('disabled', 'disabled');
-                },
-                on_positive: function(t_obj, char_area, c_settings, char_rem){
-                    $('#characters-remaining').removeClass("errortext");
-                    $('#saveFavorite').removeAttr('disabled');
-                },
-                max_chars: '500'
-            });
-            $("#save-favorite-delete").click(function() {
-                // Send a post that deletes the favorite from the DB, and if successful
-                // remove the notes and tags from the sidebar, and toggle the star icon
-                // to be blanked out.
-                var csrf   = $("input[name=csrfmiddlewaretoken]").val();
-                var doc_id = $("input#id_doc_id").val();
-                var dataString = 'csrf=' + csrf + '&doc_id=' + doc_id + "&message=True";
-                $.ajax({
-                    type: "POST",
-                    url: "/favorite/delete/",
-                    data: dataString,
-                    success: function(){
-                        window.location = '/profile/favorites/';
-                    }
-                });
-                return false;
-            });
-        });
-    </script>
+    <script defer type="text/javascript" src="/media/js/save-favorites-profile.js"></script>
 {% endblock %}
 
 {% block nav-favorites %}active{% endblock %}
@@ -63,7 +30,7 @@
                         {% else %}
                             {{doc.citation.docketNumber}}
                         {% endif %}
-                        ({% if doc.court.shortName != 'SCOTUS' %}{{doc.court.shortName|nbsp}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
+                        ({% if doc.court.citation_string != 'SCOTUS' %}{{doc.court.citation_string|nbsp}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
                     </a>
                 </h3>
                 <p class="bottom">

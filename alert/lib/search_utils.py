@@ -108,6 +108,18 @@ def make_date_query(cd, request=None):
         date_filter = '%s*}' % date_filter
     return 'dateFiled:%s' % date_filter
 
+def get_selected_field_string(cd, prefix):
+    '''Pulls the selected checkboxes out of the form data, and puts it into Solr
+    strings. Uses a prefix to know which items to pull out of the cleaned data.
+    Check forms.py to see how the prefixes are set up.
+    '''
+    selected_fields = [k.replace(prefix, '')
+                       for k, v in cd.iteritems()
+                       if (k.startswith(prefix) and v == True)]
+
+    selected_field_string = ' OR '.join(selected_fields)
+    return selected_field_string
+
 def place_main_query(request, search_form):
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     main_params = {}
@@ -176,18 +188,6 @@ def place_main_query(request, search_form):
     #print "Params sent to search are: %s" % '&'.join(['%s=%s' % (k, v) for k, v in main_params.items()])
     #print results_si.execute()
     return conn.raw_query(**main_params)
-
-def get_selected_field_string(cd, prefix):
-    '''Pulls the selected checkboxes out of the form data, and puts it into Solr
-    strings. Uses a prefix to know which items to pull out of the cleaned data.
-    Check forms.py to see how the prefixes are set up.
-    '''
-    selected_fields = [k.replace(prefix, '')
-                       for k, v in cd.iteritems()
-                       if (k.startswith(prefix) and v == True)]
-
-    selected_field_string = ' OR '.join(selected_fields)
-    return selected_field_string
 
 def place_facet_queries(search_form):
     '''Get facet values for the court and status filters

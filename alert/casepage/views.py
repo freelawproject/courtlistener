@@ -25,10 +25,10 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import render_to_response
 from django.shortcuts import get_object_or_404
 from django.template import RequestContext
-from django.views.decorators.cache import cache_page
+from django.views.decorators.cache import never_cache
 from django.utils.datastructures import MultiValueDictKeyError
 
-@cache_page(60 * 5)
+@never_cache
 def view_case(request, court, pk, casename):
     '''Take a court and an ID, and return the document.
 
