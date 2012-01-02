@@ -57,8 +57,8 @@ QA:
 SOLR
  - Finish the configuration of solr in the installer
  + create database crawler to import entire thing into Solr
- - Fix favorite creation
- - Fix placing searches from the profile pages
+ + Fix favorite creation
+ + Fix placing searches from the profile pages
  + Fix pagination
  + Fix display of results
  - update all places that search can be performed in the project
