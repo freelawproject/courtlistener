@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from django.conf import settings
 from django.contrib.syndication.views import Feed
 from django.contrib.syndication.views import FeedDoesNotExist
 from django.core.exceptions import ObjectDoesNotExist
@@ -21,66 +22,61 @@ from django.shortcuts import get_object_or_404
 from django.utils import feedgenerator
 from django.utils.feedgenerator import Atom1Feed
 
+from alert.lib import search_utils
+from alert.search.forms import SearchForm
 from alert.search.models import Court, Document
+from alert.lib import sunburnt
 
 
-class searchFeed(Feed):
+class search_feed(Feed):
     """This feed returns the results of a search feed. It lacks a second
     argument in the method b/c it gets its search query from a GET request."""
     feed_type = Atom1Feed
 
-    # get the court info from the URL
-    def get_object(self, request, query):
-        try:
-            query = request.GET['q']
-        except:
-            query = ''
-        return query
+    # get the query info from the URL
+    def get_object(self, request, get_string):
+        return request
 
-    def title(self, obj):
-        return "CourtListener.com results for the query: \"" + obj + "\""
+    title = "CourtListener.com custom search feed"
 
     def link(self, obj):
-        return '/feed/search/' + obj + '/'
+        return '/feed/search/?' + search_utils.make_get_string(obj)
 
     author_name = "CourtListener.com"
     author_email = "feeds@courtlistener.com"
 
     def items(self, obj):
-        '''# Do a Sphinx query here. Return the first 20 results that aren't too
-        # old (fixes issue 110)
-        import datetime
-        # TODO: Replace this line.
-        queryset = Document.search.query(obj)
-        results = queryset.set_options(mode="SPH_MATCH_EXTENDED2")\
-            .order_by('-dateFiled')
-        # parse out documents prior to 1900. This could be done with
-        # .exclude, if it worked.
-        parsedResults = []
-        for result in results:
-            if (result.dateFiled > datetime.date(1900, 1, 1)):
-                parsedResults.append(result)
-        return parsedResults'''
-        pass
+        '''# Do a Solr query here. Return the first 20 results'''
+        search_form = SearchForm(obj.GET)
+        if search_form.is_valid():
+            cd = search_form.cleaned_data
+            conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+            main_params = search_utils.build_main_query(cd, highlight=False)
+            main_params.update({'sort': 'dateFiled desc'})
+            main_params['rows'] = '20'
+            main_params['start'] = '0'
+            results_si = conn.raw_query(**main_params).execute()
+            return results_si
+        else:
+            return None
+
+    def item_link(self, item):
+        return item['absolute_url']
 
     def item_author_name(self, item):
-        return item.court
-
-    def item_author_link(self, item):
-        return item.court.URL
+        return item['court']
 
     def item_pubdate(self, item):
         import datetime
-        return datetime.datetime.combine(item.dateFiled, datetime.time())
+        return datetime.datetime.combine(item['dateFiled'], datetime.time())
 
-    def item_categories(self, item):
-        cat = [item.get_documentType_display(), ]
-        return cat
+    def item_title(self, item):
+        return item['caseName']
 
-    description_template = 'feeds/template.html'
+    description_template = 'feeds/solr_desc_template.html'
 
 
-class courtFeed(Feed):
+class court_feed(Feed):
     """This feed returns the cases for a court, and accepts courts of the value:
     ca1, ca2..."""
     feed_type = Atom1Feed
@@ -90,7 +86,7 @@ class courtFeed(Feed):
         return get_object_or_404(Court, courtUUID=court)
 
     def title(self, obj):
-        return "CourtListener.com: All opinions for the " + obj.get_courtUUID_display()
+        return "CourtListener.com: All opinions for the " + obj.full_name
 
     def link(self, obj):
         return '/feed/court/' + obj.courtUUID + '/'
@@ -118,12 +114,12 @@ class courtFeed(Feed):
     title_template = 'feeds/title_template.html'
 
 
-class allCourtsFeed(Feed):
+class all_courts_feed(Feed):
     """This feed returns the cases for all courts"""
     feed_type = Atom1Feed
 
     def title(self):
-        return "CourtListener.com: All opinions for the circuit courts"
+        return "CourtListener.com: All opinions (high volume)"
 
     def link(self):
         return '/feed/court/all/'

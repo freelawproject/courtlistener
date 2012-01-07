@@ -47,6 +47,8 @@ def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
     '''
     facets = []
     solr_facet_values = dict(solr_facet_values[solr_field])
+    # Are any of the checkboxes checked?
+    no_facets_selected = not any([field.value() == 'on' for field in search_form if field.html_name.startswith(prefix)])
     for field in search_form:
         try:
             count = solr_facet_values[field.html_name.replace(prefix, '')]
@@ -61,7 +63,7 @@ def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
             # Happens on page load, since the field doesn't exist yet.
             refine = 'new'
 
-        if refine == 'new':
+        if refine == 'new' or no_facets_selected:
             checked = True
         else:
             # It's a refinement
@@ -77,27 +79,10 @@ def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
         facets.append(facet)
     return facets
 
-def make_date_query(cd, request=None):
+def make_date_query(cd):
     '''Given the cleaned data from a form, return a valid Solr fq string'''
     before = cd['filed_before']
     after = cd['filed_after']
-
-    try:
-        if after > before:
-            if request:
-                # We don't always want to create a message. Only do this if the
-                # caller sets the request var.
-                message = 'You\'ve requested all documents before %s and after\
-                           %s. Since %s comes before %s, these filters cannot \
-                           not be used' % (before.date(),
-                                           after.date(),
-                                           before.date(),
-                                           after.date())
-                messages.add_message(request, messages.INFO, message)
-            return ''
-    except TypeError:
-        # Happens when one of the inputs isn't a date
-        pass
     if hasattr(after, 'strftime'):
         date_filter = '{%sZ TO ' % after.isoformat()
     else:
@@ -120,18 +105,15 @@ def get_selected_field_string(cd, prefix):
     selected_field_string = ' OR '.join(selected_fields)
     return selected_field_string
 
-def place_main_query(request, search_form):
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+def build_main_query(cd, request=None, highlight=True):
     main_params = {}
-    if search_form.is_valid():
-        cd = search_form.cleaned_data
+    # Build up all the queries needed
+    main_params['q'] = cd['q']
 
-        # Build up all the queries needed
-        main_params['q'] = cd['q']
+    # Sorting for the main query
+    main_params['sort'] = cd.get('sort', '')
 
-        # Sorting for the main query
-        main_params['sort'] = request.GET.get('sort', '')
-
+    if highlight:
         # Requested fields for the main query. We only need the fields here that
         # are not requested as part of highlighting. Facet params are not set 
         # here because they do not retrieve results, only counts (they are set
@@ -151,45 +133,45 @@ def place_main_query(request, search_form):
         main_params['f.docketNumber.hl.alternateField'] = 'docketNumber'
         main_params['f.lexisCite.hl.alternateField'] = 'lexisCite'
         main_params['f.court_citation_string.hl.alternateField'] = 'court_citation_string'
-
-        main_fq = []
-        # Case Name
-        if cd['case_name'] != '':
-            main_fq.append('caseName:' + cd['case_name'])
-
-        # Citations
-        if cd['west_cite'] != '':
-            main_fq.append('westCite:' + cd['west_cite'])
-        if cd['docket_number'] != '':
-            main_fq.append('docketNumber:' + cd['docket_number'])
-
-        # Dates
-        date_query = make_date_query(cd, request)
-        main_fq.append(date_query)
-
-        # Facet filters
-        selected_courts_string = get_selected_field_string(cd, 'court_')
-        selected_stats_string = get_selected_field_string(cd, 'stat_')
-        if len(selected_courts_string) + len(selected_stats_string) > 0:
-            main_fq.extend(['{!tag=dt}status_exact:(%s)' % selected_stats_string,
-                            '{!tag=dt}court_exact:(%s)' % selected_courts_string])
-
-        # If a param has been added to the fq variables, then we add them to the
-        # main_params var. Otherwise, we don't, as doing so throws an error.
-        if len(main_fq) > 0:
-            main_params['fq'] = main_fq
-
     else:
-        print "The form is invalid or unbound."
-        #TODO: Remove before sending live
-        main_params['q'] = '*'
+        # highlighting is off, therefore we get the default fl parameter, 
+        # which gives us all fields. We could set it manually, but there's 
+        # no need.
+        pass
+
+    main_fq = []
+    # Case Name
+    if cd['case_name'] != '':
+        main_fq.append('caseName:' + cd['case_name'])
+
+    # Citations
+    if cd['west_cite'] != '':
+        main_fq.append('westCite:' + cd['west_cite'])
+    if cd['docket_number'] != '':
+        main_fq.append('docketNumber:' + cd['docket_number'])
+
+    # Dates
+    date_query = make_date_query(cd)
+    main_fq.append(date_query)
+
+    # Facet filters
+    selected_courts_string = get_selected_field_string(cd, 'court_')
+    selected_stats_string = get_selected_field_string(cd, 'stat_')
+    if len(selected_courts_string) + len(selected_stats_string) > 0:
+        main_fq.extend(['{!tag=dt}status_exact:(%s)' % selected_stats_string,
+                        '{!tag=dt}court_exact:(%s)' % selected_courts_string])
+
+    # If a param has been added to the fq variables, then we add them to the
+    # main_params var. Otherwise, we don't, as doing so throws an error.
+    if len(main_fq) > 0:
+        main_params['fq'] = main_fq
 
     # For debugging:
     #print "Params sent to search are: %s" % '&'.join(['%s=%s' % (k, v) for k, v in main_params.items()])
     #print results_si.execute()
-    return conn.raw_query(**main_params)
+    return main_params
 
-def place_facet_queries(search_form):
+def place_facet_queries(cd):
     '''Get facet values for the court and status filters
     
     Using the search form, query Solr and get the values for the court and 
@@ -201,66 +183,58 @@ def place_facet_queries(search_form):
     shared_facet_params = {}
     court_facet_params = {}
     stat_facet_params = {}
-    if search_form.is_valid():
-        cd = search_form.cleaned_data
 
-        # Build up all the queries needed
-        shared_facet_params['q'] = cd['q']
+    # Build up all the queries needed
+    shared_facet_params['q'] = cd['q']
 
-        shared_fq = []
-        court_fq = []
-        stat_fq = []
-        # Case Name
-        if cd['case_name'] != '':
-            shared_fq.append('caseName:' + cd['case_name'])
+    shared_fq = []
+    court_fq = []
+    stat_fq = []
+    # Case Name
+    if cd['case_name'] != '':
+        shared_fq.append('caseName:' + cd['case_name'])
 
-        # Citations
-        if cd['west_cite'] != '':
-            shared_fq.append('westCite:' + cd['west_cite'])
-        if cd['docket_number'] != '':
-            shared_fq.append('docketNumber:' + cd['docket_number'])
+    # Citations
+    if cd['west_cite'] != '':
+        shared_fq.append('westCite:' + cd['west_cite'])
+    if cd['docket_number'] != '':
+        shared_fq.append('docketNumber:' + cd['docket_number'])
 
-        # Dates
-        date_query = make_date_query(cd)
-        shared_fq.append(date_query)
+    # Dates
+    date_query = make_date_query(cd)
+    shared_fq.append(date_query)
 
-        # Faceting
-        shared_facet_params['rows'] = '0'
-        shared_facet_params['facet'] = 'true'
-        shared_facet_params['facet.mincount'] = 0
-        court_facet_params['facet.field'] = '{!ex=dt}court_exact'
-        stat_facet_params['facet.field'] = '{!ex=dt}status_exact'
-        selected_courts_string = get_selected_field_string(cd, 'court_')
-        selected_stats_string = get_selected_field_string(cd, 'stat_')
-        if len(selected_courts_string) > 0:
-            court_fq.extend(['{!tag=dt}court_exact:(%s)' % selected_courts_string,
-                             'status_exact:(%s)' % selected_stats_string])
-        if len(selected_stats_string) > 0:
-            stat_fq.extend(['{!tag=dt}status_exact:(%s)' % selected_stats_string,
-                            'court_exact:(%s)' % selected_courts_string])
+    # Faceting
+    shared_facet_params['rows'] = '0'
+    shared_facet_params['facet'] = 'true'
+    shared_facet_params['facet.mincount'] = 0
+    court_facet_params['facet.field'] = '{!ex=dt}court_exact'
+    stat_facet_params['facet.field'] = '{!ex=dt}status_exact'
+    selected_courts_string = get_selected_field_string(cd, 'court_')
+    selected_stats_string = get_selected_field_string(cd, 'stat_')
+    if len(selected_courts_string) > 0:
+        court_fq.extend(['{!tag=dt}court_exact:(%s)' % selected_courts_string,
+                         'status_exact:(%s)' % selected_stats_string])
+    if len(selected_stats_string) > 0:
+        stat_fq.extend(['{!tag=dt}status_exact:(%s)' % selected_stats_string,
+                        'court_exact:(%s)' % selected_courts_string])
 
-        # Add the shared fq values to each parameter value
-        court_fq.extend(shared_fq)
-        stat_fq.extend(shared_fq)
+    # Add the shared fq values to each parameter value
+    court_fq.extend(shared_fq)
+    stat_fq.extend(shared_fq)
 
-        # If a param has been added to the fq variables, then we add them to the
-        # main_params var. Otherwise, we don't, as doing so throws an error.
-        if len(court_fq) > 0:
-            court_facet_params['fq'] = court_fq
-        if len(stat_fq) > 0:
-            stat_facet_params['fq'] = stat_fq
+    # If a param has been added to the fq variables, then we add them to the
+    # main_params var. Otherwise, we don't, as doing so throws an error.
+    if len(court_fq) > 0:
+        court_facet_params['fq'] = court_fq
+    if len(stat_fq) > 0:
+        stat_facet_params['fq'] = stat_fq
 
-        # We add shared parameters to each parameter variable
-        court_facet_params.update(shared_facet_params)
-        stat_facet_params.update(shared_facet_params)
+    # We add shared parameters to each parameter variable
+    court_facet_params.update(shared_facet_params)
+    stat_facet_params.update(shared_facet_params)
 
     court_facet_fields = conn.raw_query(**court_facet_params).execute().facet_counts.facet_fields
     stat_facet_fields = conn.raw_query(**stat_facet_params).execute().facet_counts.facet_fields
 
-    # Create facet variables that can be used in our templates
-    court_facets = make_facets_variable(
-                     court_facet_fields, search_form, 'court_exact', 'court_')
-    status_facets = make_facets_variable(
-                     stat_facet_fields, search_form, 'status_exact', 'stat_')
-
-    return court_facets, status_facets
+    return court_facet_fields, stat_facet_fields

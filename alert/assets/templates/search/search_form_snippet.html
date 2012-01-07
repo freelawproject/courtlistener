@@ -42,7 +42,7 @@
         </table>
         {% if not error %}
 	        <div id="extra-search-fields">
-	            {{ search_form.sort }}
+	            {% if results.paginator.count > 0 %}{{ search_form.sort }}{% endif %}
 	            <div id="extra-sidebar-fields">
 	                <h4 class="bottom">Case name</h4>
 	                {{ search_form.case_name }}

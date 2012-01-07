@@ -16,6 +16,7 @@
 
 from datetime import datetime
 from datetime import time
+from django.core.urlresolvers import NoReverseMatch
 from django.template import Context
 from django.template import loader
 
@@ -38,7 +39,7 @@ class SearchDocument(object):
         try:
             self.caseName = doc.citation.caseNameFull
             self.absolute_url = doc.get_absolute_url()
-        except AttributeError:
+        except AttributeError, NoReverseMatch:
             raise InvalidDocumentError
         self.docketNumber = doc.citation.docketNumber
         self.westCite = doc.citation.westCite

@@ -16,7 +16,11 @@
 
 from alert.alerts.forms import CreateAlertForm
 from alert.lib import search_utils
+from alert.lib import sunburnt
 from alert.search.forms import SearchForm
+
+from django.conf import settings
+from django.contrib import messages
 from django.core.paginator import Paginator
 from django.core.paginator import PageNotAnInteger
 from django.core.paginator import EmptyPage
@@ -24,6 +28,9 @@ from django.shortcuts import render_to_response
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
 from django.views.decorators.cache import never_cache
+
+from datetime import date
+
 
 def get_date_filed_or_return_zero(doc):
     """Used for sorting dates. Returns the date field or the earliest date
@@ -77,49 +84,70 @@ def show_results(request):
     search_form = SearchForm(request.GET)
 
     # Run the query
-    try:
-        results_si = search_utils.place_main_query(request, search_form)
-        court_facets, status_facets = search_utils.place_facet_queries(search_form)
-    except:
-        return render_to_response('search/search.html',
-                                  {'error': True},
-                                  RequestContext(request))
-
-    # Make a copy of request.GET so it is mutable, and we make
-    # some adjustments that we want to see in the rendered form.
-    mutable_get = request.GET.copy()
     if search_form.is_valid():
-        # Send the user the cleaned up query
         cd = search_form.cleaned_data
-        mutable_get['q'] = cd['q']
-    # Always reset the radio box to refine
-    mutable_get['refine'] = 'refine'
-    search_form = SearchForm(mutable_get)
-
-    # Set up pagination
-    try:
-        paginator = Paginator(results_si, 20)
-        page = request.GET.get('page', 1)
         try:
-            paged_results = paginator.page(page)
-        except PageNotAnInteger:
-            # If page is not an integer, deliver first page.
-            paged_results = paginator.page(1)
-        except EmptyPage:
-            # If page is out of range (e.g. 9999), deliver last page of results.
-            paged_results = paginator.page(paginator.num_pages)
-        #print "alert.search.views facet_fields.facet_counts: %s" % facet_fields
-    except:
-        # Catches any Solr errors, and simply aborts.
-        return render_to_response('search/search.html',
-                                  {'error': True},
-                                  RequestContext(request))
-    return render_to_response(
-                  'search/search.html',
-                  {'search_form': search_form, 'alert_form': alert_form,
-                   'results': paged_results, 'court_facets': court_facets,
-                   'status_facets': status_facets, 'get_string': get_string},
-                  RequestContext(request))
+            conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+            results_si = conn.raw_query(**search_utils.build_main_query(cd, request))
+            court_facet_fields, stat_facet_fields = search_utils.place_facet_queries(cd)
+            # Create facet variables that can be used in our templates
+            court_facets = search_utils.make_facets_variable(
+                             court_facet_fields, search_form, 'court_exact', 'court_')
+            status_facets = search_utils.make_facets_variable(
+                             stat_facet_fields, search_form, 'status_exact', 'stat_')
+        except:
+            return render_to_response('search/search.html',
+                                      {'error': True},
+                                      RequestContext(request))
+
+        # Make a copy of request.GET so it is mutable, and we make
+        # some adjustments that we want to see in the rendered form.
+        mutable_get = request.GET.copy()
+        if search_form.is_valid():
+            # Send the user the cleaned up query
+            cd = search_form.cleaned_data
+            mutable_get['q'] = cd['q']
+            if mutable_get.get('filed_before'):
+                mutable_get['filed_before'] = date.strftime(cd['filed_before'], '%Y-%m-%d')
+            if mutable_get.get('filed_after'):
+                mutable_get['filed_after'] = date.strftime(cd['filed_after'], '%Y-%m-%d')
+            mutable_get['court_all'] = cd['court_all']
+        # Always reset the radio box to refine
+        mutable_get['refine'] = 'refine'
+        search_form = SearchForm(mutable_get)
+
+        # Set up pagination
+        try:
+            paginator = Paginator(results_si, 20)
+            page = request.GET.get('page', 1)
+            try:
+                paged_results = paginator.page(page)
+            except PageNotAnInteger:
+                # If page is not an integer, deliver first page.
+                paged_results = paginator.page(1)
+            except EmptyPage:
+                # If page is out of range (e.g. 9999), deliver last page of results.
+                paged_results = paginator.page(paginator.num_pages)
+        except:
+            # Catches any Solr errors, and simply aborts.
+            print "Pagination failed"
+            return render_to_response('search/search.html',
+                                      {'error': True},
+                                      RequestContext(request))
+
+        return render_to_response(
+                      'search/search.html',
+                      {'search_form': search_form, 'alert_form': alert_form,
+                       'results': paged_results, 'court_facets': court_facets,
+                       'status_facets': status_facets, 'get_string': get_string},
+                      RequestContext(request))
+    else:
+        # Invalid form, send it back
+        print "Invalid or unbound form"
+        return render_to_response(
+                      'search/search.html',
+                      {'error': True},
+                      RequestContext(request))
 
 def tools_page(request):
     return render_to_response('tools.html', {}, RequestContext(request))

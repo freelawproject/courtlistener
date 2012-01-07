@@ -147,7 +147,35 @@ class SearchForm(forms.Form):
         else:
             return q
 
-    '''
-    TODO: Add validation rules here:
-        - parse out invalid fields
-    '''
+    def clean(self):
+        cleaned_data = self.cleaned_data
+
+        # 1. Make sure that the dates do this |--> <--| rather than <--| |-->
+        before = cleaned_data.get('filed_before')
+        after = cleaned_data.get('filed_after')
+        if before and after:
+            # Only do something if both fields are valid so far.
+            if before < after:
+                # The user is requesting dates like this: <--b  a-->. Switch the dates
+                # so their query is like this: a-->   <--b
+                print "Swapping %s for %s" % (before, after)
+                cleaned_data['filed_before'] = after
+                cleaned_data['filed_after'] = before
+
+        # 2. Make sure that the user has selected at least one facet for each
+        #    taxonomy.
+        court_bools = [v for k, v in cleaned_data.iteritems() if k.startswith('court_')]
+        if not any(court_bools):
+            # Set all facets to true
+            for key in cleaned_data.iterkeys():
+                if key.startswith('court_'):
+                    cleaned_data[key] = True
+
+        stat_bools = [v for k, v in cleaned_data.iteritems() if k.startswith('stat_')]
+        if not any(stat_bools):
+            # Set all facets to true
+            for key in cleaned_data.iterkeys():
+                if key.startswith('stat_'):
+                    cleaned_data[key] = True
+
+        return cleaned_data

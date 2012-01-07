@@ -103,19 +103,20 @@
     <dynamicField name="*_d"  type="sdouble" indexed="true"  stored="true"/>
     <dynamicField name="*_dt" type="date"    indexed="true"  stored="true"/>
     
+    <field name="text" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true"/>
+    
     <field name="status" type="text" indexed="true" stored="true" multiValued="false" />
     <field name="court" type="text" indexed="true" stored="true" multiValued="false" />
     <field name="court_id" type="text" indexed="true" stored="true" multiValued="false" />
-    <field name="court_citation_string" type="string" indexed="false" stored="true" multiValued="false" />
+    <field name="court_citation_string" type="string" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
     <field name="court_exact" type="string" indexed="true" stored="true" multiValued="false" />
-    <field name="caseName" type="text" indexed="true" stored="true" multiValued="false" />
-    <field name="text" type="text" indexed="true" stored="true" multiValued="false" />
+    <field name="caseName" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
     <field name="status_exact" type="string" indexed="true" stored="true" multiValued="false" />
     <field name="dateFiled" type="date" indexed="true" stored="true" multiValued="false" />
-    <field name="docketNumber" type="text" indexed="true" stored="true" multiValued="false" />
-    <field name="lexisCite" type="text" indexed="true" stored="true" multiValued="false" />
-    <field name="westCite" type="text" indexed="true" stored="true" multiValued="false" />
-    <field name="caseNumber" type="text" indexed="true" stored="true" multiValued="false" />
+    <field name="docketNumber" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+    <field name="lexisCite" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+    <field name="westCite" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+    <field name="caseNumber" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
     <field name="absolute_url" type="string" indexed="false" stored="true" multiValued="false" />
     <field name="download_url" type="string" indexed="false" stored="true" multiValued="false" />
     <field name="local_path" type="string" indexed="false" stored="true" multiValued="false" />

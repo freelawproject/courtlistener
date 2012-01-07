@@ -56,21 +56,32 @@ QA:
  
 SOLR
  - Finish the configuration of solr in the installer
+    - include solrconfig.xml in our Solr directory.
+    - include synonyms, stopwords, etc.
  + create database crawler to import entire thing into Solr
  + Fix favorite creation
  + Fix placing searches from the profile pages
  + Fix pagination
  + Fix display of results
  - update all places that search can be performed in the project
-    - RSS feeds
-        - Link in headers
-        - Link in alerts page
+    + RSS feeds
+        + Link in headers
+        + Link in alerts page
     - Alerts
         - There were X new results for your Alert. Here are the first 15.
         - TOC at top of alerts with HTML anchors.
     + Front end
  - update flat advanced search page
- - add xxx-xx-xxxx etc to the stopwords list (#190), and add the stopwords to the Solr directory
+ - verify search parity:
+    - prefix/infix searching
+    - phrases
+    - facets
+        - status:blah works?
+    - etc.
+ + add xxx-xx-xxxx etc to the stopwords list (#190)
+ + add the stopwords to the Solr directory
+ - set up the Solr synonyms to mirror the ones in Sphinx
+ + try to reconfigure highlighting to see if the search for * failure can be fixed
  + change case title from Courtlistener.com / Browse / Foo --> / Cases / Foo
  + consider/resolve old URL support. What does /opinions/all/ do? What about /opinions/ca2/, etc? 
  + add information about date/time formats. Useful to tell people that they can use timestamps or just dates. It 
@@ -78,33 +89,40 @@ SOLR
  + check if .hgignore needs updating.
  - update the sitemap
  + adjust the apache config to point to the new robots.txt location (tinyurl/robots.txt)
- + Open question: Should missing facets be exposed?
- - Make sure the no results page looks good.
- - Dates:
+ + Open question: Should missing facets be exposed? --> no, though an option for admins?
+ + Make sure the no results page looks good.
+ + Dates:
    + Make the dates support years and year-months.
    + Make dates support dashes in addition to slashes.
- - Validity checks:
-    - Make sure the user selects at least one court and at least one status.
-    - Make invalid dates throw an error to the user.
-    - Make sure the after date is before the before date.
+ + Validity checks:
+    + Make sure the user selects at least one court and at least one status.
+    + Make invalid dates throw an error to the user.
+    + Make sure the after date is before the before date.
  + Current Results --> Keep filters
  + Clear filters/"All courts"
  - Make * queries map to *:* internally, see: https://mail-archives.apache.org/mod_mbox/lucene-solr-user/201112.mbox/%3Calpine.DEB.2.00.1112131115550.16571@bester%3E,
- - See if a default query can be set up:
- <requestHandler name="standard" default="true">
-   <lst name="defaults">
-     <str name="echoParams">none</str>
-     <str name="q">*:*</str>
-     <int name="rows">0</int>
-     <bool name="stats">true</bool>
-   </lst>
-</requestHandler>
- - include solrconfig.xml in our Solr directory.
- - add coverage to the header
+ + See if a default query can be set up:
+ - add coverage, alerts and favorites to the header
  - remove all print lines
  - run pylint for a few hours
  - check for TODO statements
  - make sure sending zero courts to the server doesn't crash. Should just reset to all courts.
+ - what happens to cases that lack dates? If Solr handles them well already, we 
+   can delete the function from views.py. Else, we need to probably add a 
+   default date when the item is indexed
+ - ensure that dates older than 1900 work:
+    - save via /admin
+    - delete via /admin
+    - add/update via the update_index command
+    - search results
+    - feeds
+    - alerts
+ - make sure that saving/deleting a document updates the index.
+ - sort out why Modernizr doesn't seem to be working
+ - analyze net usage, and optimize if possible
+ - unify the way meta data is shown throughout
+ - test the various IEs
+ - search for 2d doesn't highlight in the case title (issue 199)
 
 
 SOLR DEPLOYMENT:
@@ -170,6 +188,5 @@ SOLR DEPLOYMENT:
         - unlimited result pagination?
         - real-time search indexes
     - lost a couple things:
-        - old RSS feed format is removed, need to recreate them as searches
         - some search connectors
     - all alerts updated by hand. Will get an email from us if we have any issues

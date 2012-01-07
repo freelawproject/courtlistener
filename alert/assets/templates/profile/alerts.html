@@ -52,7 +52,7 @@
                             <td>{{ alert.get_alertFrequency_display }}</td>
                             <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"Never" }}</td>
                             <td>
-                                <a href="/feed/search/?q={{alert.alertText}}">
+                                <a href="/feed/search/?{{ alert.alertText }}">
                                     <img src="/media/images/png/atom-feed.png" alt="atom icon" height="12px" width="12px">
                                 </a>
                             </td>

@@ -24,9 +24,9 @@ from alert.data_dumper.views import serve_or_gen_dump
 from alert.favorites.views import delete_favorite
 from alert.favorites.views import edit_favorite
 from alert.favorites.views import save_or_update_favorite
-from alert.feeds.views import allCourtsFeed
-from alert.feeds.views import courtFeed
-from alert.feeds.views import searchFeed
+from alert.feeds.views import all_courts_feed
+from alert.feeds.views import court_feed
+from alert.feeds.views import search_feed
 from alert.pinger.views import validateForBing
 from alert.pinger.views import validateForGoogle
 from alert.pinger.views import validateForGoogle2
@@ -94,7 +94,7 @@ urlpatterns = patterns('',
 
     # Display a case, a named URL because the get_absolute_url uses it.
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case,
-        name="viewCase"),
+        name="view_case"),
 
     # Redirect users
     (r'^x/(.*)/$', redirect_short_url),
@@ -155,9 +155,9 @@ urlpatterns = patterns('',
     (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
 
     # Feeds
-    (r'^feed/(search)/$', searchFeed()), #lacks URL capturing b/c it will use GET queries.
-    (r'^feed/court/all/$', allCourtsFeed()),
-    (r'^feed/court/(?P<court>' + '|'.join(pacer_codes) + ')/$', courtFeed()),
+    (r'^feed/(search)/$', search_feed()), #lacks URL capturing b/c it will use GET queries.
+    (r'^feed/court/all/$', all_courts_feed()),
+    (r'^feed/court/(?P<court>' + '|'.join(pacer_codes) + ')/$', court_feed()),
 
     # SEO-related stuff
     (r'^y_key_6de7ece99e1672f2.html$', validateForYahoo),

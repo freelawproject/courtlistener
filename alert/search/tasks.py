@@ -57,6 +57,7 @@ def save_doc_handler(sender, **kwargs):
     '''Responds to the post_save signal and updates the document in the search
     index. See search/__init__.py for the connecting code.
     '''
-    search_doc = SearchDocument(kwargs['instance'].pk)
+    doc = Document.objects.get(pk=kwargs['instance'].pk)
+    search_doc = SearchDocument(doc)
     si.add(search_doc)
     si.commit()
