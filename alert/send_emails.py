@@ -18,9 +18,8 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
+from alerts.models import FREQUENCY
 from userHandling.models import UserProfile
-from userHandling.models import FREQUENCY
-from search.views import preparseQuery
 from search.models import Document
 from django.template import loader, Context
 from django.core.mail import send_mail, EmailMultiAlternatives
@@ -64,8 +63,7 @@ def emailer(rate, verbose, simulate):
 
     # query all users with alerts of the desired frequency
     # use the distinct method to only return one instance of each person.
-    userProfiles = UserProfile.objects.filter(alert__alertFrequency=RATE)\
-        .distinct()
+    userProfiles = UserProfile.objects.filter(alert__alertFrequency=RATE).distinct()
 
     if verbose:
         print "todayInt: " + str(todayInt)
@@ -201,7 +199,6 @@ def emailer(rate, verbose, simulate):
                     msg.send(fail_silently=False)
         elif verbose:
             print "Not sending mail for this alert."
-
 
     return "Done"
 

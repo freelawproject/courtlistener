@@ -636,17 +636,6 @@ class RawSolrSearch(BaseSearch):
         result = self.interface.search(**self.q)
         return self.transform_result(result, constructor)
 
-    '''
-    Commented out because I don't understand what's wrong with the super method.
-    def paginate(self, start=None, rows=None):
-        print "search.RawSolrSearch.paginate start: %s" % start
-        print "search.RawSolrSearch.paginate rows: %s" % rows
-        self.q['start'] = self.paginator.start
-        self.q['rows'] = self.paginator.rows
-        return self
-    '''
-
-
 
 class MltSolrSearch(BaseSearch):
     """Manage parameters to build a MoreLikeThisHandler query"""

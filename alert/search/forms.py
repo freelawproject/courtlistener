@@ -158,7 +158,6 @@ class SearchForm(forms.Form):
             if before < after:
                 # The user is requesting dates like this: <--b  a-->. Switch the dates
                 # so their query is like this: a-->   <--b
-                print "Swapping %s for %s" % (before, after)
                 cleaned_data['filed_before'] = after
                 cleaned_data['filed_after'] = before
 
