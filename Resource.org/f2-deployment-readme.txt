@@ -10,9 +10,9 @@ To do:
 
 
 Features:
- - Boosting of status, casename, and casenumber
+ + Boosting of status, casename, and casenumber
  + Result counts
- - Faceted search
+ + Faceted search
     + facet counts with parallel selection
         + court
         + status
@@ -31,9 +31,9 @@ Features:
  - Multicore should be investigated/implemented
  - RAM tuning should be investigated/implemented
  - Result speed?
- 
 
-    
+
+
 QA:
  - Check for proper alert deletion and editing functionality, since code rewritten. Tests:
     - can I delete/edit YOUR alert?
@@ -51,18 +51,14 @@ QA:
  - Does Piwik still work?
  - Do placeholders work in IE6-9?
  - Test that the various display logic still works for displaying the result meta data (exercise all the if/else statements)
- - make sure that the next functionsn work from the register and sign-in pages, and the save favorite popup 
+ - make sure that the next functionsn work from the register and sign-in pages, and the save favorite popup
+ - test that dumps still work
     
  
 SOLR
  - Finish the configuration of solr in the installer
     - include solrconfig.xml in our Solr directory.
     - include synonyms, stopwords, etc.
- + create database crawler to import entire thing into Solr
- + Fix favorite creation
- + Fix placing searches from the profile pages
- + Fix pagination
- + Fix display of results
  - update all places that search can be performed in the project
     + RSS feeds
         + Link in headers
@@ -72,41 +68,19 @@ SOLR
         - TOC at top of alerts with HTML anchors.
     + Front end
  - update flat advanced search page
+    - mention that years and months can be used for dates
  - verify search parity:
     - prefix/infix searching
     - phrases
     - facets
         - status:blah works?
     - etc.
- + add xxx-xx-xxxx etc to the stopwords list (#190)
- + add the stopwords to the Solr directory
  - set up the Solr synonyms to mirror the ones in Sphinx
- + try to reconfigure highlighting to see if the search for * failure can be fixed
- + change case title from Courtlistener.com / Browse / Foo --> / Cases / Foo
- + consider/resolve old URL support. What does /opinions/all/ do? What about /opinions/ca2/, etc? 
- + add information about date/time formats. Useful to tell people that they can use timestamps or just dates. It 
-   might be worth investigating django forms help_text for this.  
- + check if .hgignore needs updating.
  - update the sitemap
- + adjust the apache config to point to the new robots.txt location (tinyurl/robots.txt)
- + Open question: Should missing facets be exposed? --> no, though an option for admins?
- + Make sure the no results page looks good.
- + Dates:
-   + Make the dates support years and year-months.
-   + Make dates support dashes in addition to slashes.
- + Validity checks:
-    + Make sure the user selects at least one court and at least one status.
-    + Make invalid dates throw an error to the user.
-    + Make sure the after date is before the before date.
- + Current Results --> Keep filters
- + Clear filters/"All courts"
- - Make * queries map to *:* internally, see: https://mail-archives.apache.org/mod_mbox/lucene-solr-user/201112.mbox/%3Calpine.DEB.2.00.1112131115550.16571@bester%3E,
- + See if a default query can be set up:
  - add coverage, alerts and favorites to the header
- - remove all print lines
+ + remove all print lines
  - run pylint for a few hours
- - check for TODO statements
- - make sure sending zero courts to the server doesn't crash. Should just reset to all courts.
+     - check for TODO statements
  - what happens to cases that lack dates? If Solr handles them well already, we 
    can delete the function from views.py. Else, we need to probably add a 
    default date when the item is indexed

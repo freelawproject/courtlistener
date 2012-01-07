@@ -157,7 +157,6 @@ def deleteProfileDone(request):
 def register(request):
     '''allow only an anonymous user to register'''
     redirect_to = request.REQUEST.get('next', '')
-    print redirect_to
     if 'sign-in' in redirect_to:
         # thus, we don't redirect people back to the sign-in form
         redirect_to = ''

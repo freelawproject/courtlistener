@@ -130,7 +130,6 @@ def show_results(request):
                 paged_results = paginator.page(paginator.num_pages)
         except:
             # Catches any Solr errors, and simply aborts.
-            print "Pagination failed"
             return render_to_response('search/search.html',
                                       {'error': True},
                                       RequestContext(request))
@@ -143,7 +142,6 @@ def show_results(request):
                       RequestContext(request))
     else:
         # Invalid form, send it back
-        print "Invalid or unbound form"
         return render_to_response(
                       'search/search.html',
                       {'error': True},
