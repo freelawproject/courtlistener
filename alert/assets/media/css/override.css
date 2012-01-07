@@ -82,10 +82,6 @@ span.bold {
     cursor: hand;
 }
 
-.help {
-    cursor: help;
-}
-
 mark {
 	/* Needs extra declarations for old browsers */
     background-color: #ffffbf;
@@ -150,7 +146,23 @@ nav ul li {
     height: 32px;
     padding: 4px 10px;
     margin: 0px;
-    border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
+    border-color: #a6a6a6;
+}
+
+a.button, button {
+    border-color: #a6a6a6;
+    background-color: #6683B7;
+    color: white;
+}
+
+button:hover, a.button:hover {
+  background-color: #7896D0;
+  border:1px solid gray;
+  color: #eeeeee;
+}
+a.button:active {
+  background-color: #7896D0;
+  color: #eeeeee;
 }
 
 #id_q:focus{
@@ -174,7 +186,7 @@ nav ul li {
 }
 
 #result-count {
-    float: left;    
+    float: left;
 }
 
 #id_sort {

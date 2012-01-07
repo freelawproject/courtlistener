@@ -52,7 +52,7 @@
             <li><strong><a href="/opinions/all/">all</a></strong> - All courts</li>
             {% for court in courts %}
                 <li>
-                    <strong><a href="/opinions/{{court.courtUUID}}/">{{court.courtUUID}}</a></strong> - {{court.get_courtUUID_display}}
+                    <strong><a href="/opinions/{{court.courtUUID}}/">{{court.courtUUID}}</a></strong> - {{court.full_name}}
                 </li>
             {% endfor %}
         </ul>

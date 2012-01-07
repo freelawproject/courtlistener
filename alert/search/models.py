@@ -236,7 +236,7 @@ class Document(models.Model):
 
     @models.permalink
     def get_absolute_url(self):
-        return ('viewCase', [str(self.court.courtUUID),
+        return ('view_case', [str(self.court.courtUUID),
             num_to_ascii(self.documentUUID), self.citation.slug])
 
     # source: http://stackoverflow.com/questions/1119722/base-62-conversion-in-python

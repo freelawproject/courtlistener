@@ -6,21 +6,15 @@
 {% block title %}CourtListener.com / Cases / {{ title }}{% endblock %}
 
 {% block head %}
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the First Circuit" href="/feed/court/ca1/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Second Circuit" href="/feed/court/ca2/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Third Circuit" href="/feed/court/ca3/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Fourth Circuit" href="/feed/court/ca4/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Fifth Circuit" href="/feed/court/ca5/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Sixth Circuit" href="/feed/court/ca6/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Seventh Circuit" href="/feed/court/ca7/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eighth Circuit" href="/feed/court/ca8/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Ninth Circuit" href="/feed/court/ca9/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Tenth Circuit" href="/feed/court/ca10/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Eleventh Circuit" href="/feed/court/ca11/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the D.C. Circuit" href="/feed/court/cadc/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Federal Circuit" href="/feed/court/cafc/">
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for the Supreme Court of the U.S." href="/feed/court/scotus/">
+    {% if not error %} 
+        {% if get_string %}
+            <link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?{{ get_string }}" />
+        {% endif %}
+        <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">
+        {% for court in court_facets %}
+            <link rel="alternate" type="application/rss+xml" title="Atom feed for {{ court.0 }}" href="/feed/court/{{ court.1 }}/">
+        {% endfor %}
+    {% endif %}
     <link rel="shortlink" type="text/html" href="{{doc.get_small_url}}">
 {% endblock %}
 
