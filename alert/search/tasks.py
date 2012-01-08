@@ -25,6 +25,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from alert.lib import sunburnt
+from alert.search.models import Citation
 from alert.search.models import Document
 from alert.search.search_indexes import SearchDocument
 from celery.decorators import task
@@ -61,3 +62,18 @@ def save_doc_handler(sender, **kwargs):
     search_doc = SearchDocument(doc)
     si.add(search_doc)
     si.commit()
+
+@task
+def save_cite_handler(sender, **kwargs):
+    '''If a citation is updated, we should update the index. If a citation and
+    a document are both updated simultaneously, we will needlessly update the
+    index twice. No easy way around it.
+    '''
+    if not kwargs['created']:
+        # We only do this on update, not creation.
+        cite = Citation.objects.get(pk=kwargs['instance'].pk)
+        docs = Document.objects.filter(citation=cite)
+        for doc in docs:
+            search_doc = SearchDocument(doc)
+            si.add(search_doc)
+        si.commit()

@@ -53,6 +53,7 @@ QA:
  - Test that the various display logic still works for displaying the result meta data (exercise all the if/else statements)
  - make sure that the next functionsn work from the register and sign-in pages, and the save favorite popup
  - test that dumps still work
+ - test acct deletion
     
  
 SOLR
@@ -91,19 +92,23 @@ SOLR
     - search results
     - feeds
     - alerts
- - make sure that saving/deleting a document updates the index.
- - sort out why Modernizr doesn't seem to be working
- - analyze net usage, and optimize if possible
+ + make sure that saving a document updates the index
+ - make sure that deleting a document updates the index
+ + sort out why Modernizr doesn't seem to be working
+ + analyze net usage, and optimize if possible
  - unify the way meta data is shown throughout
  - test the various IEs
  - search for 2d doesn't highlight in the case title (issue 199)
+ - fix the icons
 
 
 SOLR DEPLOYMENT:
  - install Solr (see script)
  - install daemon
- - remove Sphinx @restart cron job <-- this should match the installer cron jobs.
- - add any Solr indexing cron jobs
+ - cron:
+    - remove Sphinx @restart cron job <-- this should match the installer cron jobs.
+    - add any Solr indexing cron jobs --> NONE!
+    - change the alerts to use mly, wkly and dly
  - Run:
     sudo update-rc.d solr defaults
     sudo update-rc.d celeryd defaults

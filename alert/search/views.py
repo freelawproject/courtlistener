@@ -88,7 +88,7 @@ def show_results(request):
         cd = search_form.cleaned_data
         try:
             conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
-            results_si = conn.raw_query(**search_utils.build_main_query(cd, request))
+            results_si = conn.raw_query(**search_utils.build_main_query(cd))
             court_facet_fields, stat_facet_fields = search_utils.place_facet_queries(cd)
             # Create facet variables that can be used in our templates
             court_facets = search_utils.make_facets_variable(

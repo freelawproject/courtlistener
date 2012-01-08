@@ -46,7 +46,7 @@ class search_feed(Feed):
     author_email = "feeds@courtlistener.com"
 
     def items(self, obj):
-        '''# Do a Solr query here. Return the first 20 results'''
+        '''Do a Solr query here. Return the first 20 results'''
         search_form = SearchForm(obj.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
