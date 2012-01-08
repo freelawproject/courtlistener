@@ -48,11 +48,10 @@
             {% else %}
                 <h3 class="pointer arrow-down-before">Create alert</h3>
                 <div id="hidden-create-alert" class="shown">
-            {% endif %} 
-                {% if user.is_authenticated %}
-                    {% if not get_string %}
-                        <p>To create an alert, first place a query.</p>
-                    {% else %}
+            {% endif %}
+            {% if user.is_authenticated %}
+                {% if get_string %}
+                    {% if search_form.sort.value != 'dateFiled asc' %}
                         {% if alert_form.errors %}
                             <div class="span-4 error">
                                 <p class="bottom">Please fix the errors below.</p>
@@ -90,13 +89,18 @@
                             </p>
                             <button type="submit" class="button title" name="alertSave">Create alert</button>
                         </form>
+                    {% else %}
+                        <p>Alerts cannot be created when the oldest results are listed first.</p>
                     {% endif %}
                 {% else %}
-                    {# User is not authenticated #}
-                    <p>To get daily alerts for this search, <a href="{%url sign-in%}?next={{request.path}}?{{get_string|urlencode}}page={{results.number}}">sign in</a> or
-                    <a href="{%url register%}?next={{request.path}}?next={{request.path}}?{{get_string|urlencode}}page={{results.number}}">register</a> as a new user.</p>
+                    <p>To create an alert, first place a query.</p>
                 {% endif %}
-            </div>
+            {% else %}
+                {# User is not authenticated #}
+                <p>To get daily alerts for this search, <a href="{%url sign-in%}?next={{request.path}}?{{get_string|urlencode}}page={{results.number}}">sign in</a> or
+                <a href="{%url register%}?next={{request.path}}?next={{request.path}}?{{get_string|urlencode}}page={{results.number}}">register</a> as a new user.</p>
+            {% endif %}
+                </div>
         </div>
 
         <div class="sidebar-section">
@@ -116,7 +120,6 @@
 {% block content %}
     <div class="span-17 last">
         {% if messages %}
-            {# TODO: Make sure this works and looks right #}
             <div class="span-17 last">
                 {% for message in messages %}
                     <p class="bottom {{message.tags}}">{{message|safe}}</p>
@@ -144,11 +147,11 @@
                         <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}" class="visitable">
                             {{ result.solr_highlights.caseName.0|safe }},
                             {% if result.solr_highlights.westCite.0 != '' and result.solr_highlights.westCite.0 != None %}
-                                {{ result.solr_highlights.westCite.0 }}
+                                {{ result.solr_highlights.westCite.0|safe }}
                             {% else %}
-                                {{ result.solr_highlights.docketNumber.0 }}
+                                {{ result.solr_highlights.docketNumber.0|safe }}
                             {% endif %}
-                            ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|safe }}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
+                            ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
                         </a>
                     </h3>
 
@@ -186,7 +189,7 @@
                     <p class="bottom">
                         {% if result.solr_highlights.westCite.0 != '' and result.solr_highlights.westCite.0 != None and result.solr_highlights.docketNumber.0 %}
                             <span class="meta-data-header">Docket Number:</span>
-                            <span class="meta-data-value">{{ result.solr_highlights.docketNumber.0 }}</span>
+                            <span class="meta-data-value">{{ result.solr_highlights.docketNumber.0|safe }}</span>
                         {% endif %}
                     </p>
                     <p>

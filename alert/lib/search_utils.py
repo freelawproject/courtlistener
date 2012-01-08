@@ -19,12 +19,12 @@ from urlparse import parse_qs
 
 from alert.lib import sunburnt
 from django.conf import settings
-from django.contrib import messages
 
 
 def make_get_string(request):
     '''Makes a get string from the request object. If necessary, it removes 
-    the pagination parameters.'''
+    the pagination parameters.
+    '''
     get_dict = parse_qs(request.META['QUERY_STRING'])
     try:
         del get_dict['page']
@@ -34,6 +34,17 @@ def make_get_string(request):
     if len(get_string) > 0:
         get_string = get_string + '&'
     return get_string
+
+def get_string_to_dict(get_string):
+    '''Reverses the work that the make_get_string function performs, building a 
+    dict from the get_string. 
+    
+    Used by alerts.
+    '''
+    get_dict = {}
+    for k, v in parse_qs(get_string).iteritems():
+        get_dict[k] = v[0]
+    return get_dict
 
 def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
     '''Create a useful facet variable for use in a template
@@ -105,7 +116,7 @@ def get_selected_field_string(cd, prefix):
     selected_field_string = ' OR '.join(selected_fields)
     return selected_field_string
 
-def build_main_query(cd, request=None, highlight=True):
+def build_main_query(cd, highlight=True):
     main_params = {}
     # Build up all the queries needed
     main_params['q'] = cd['q']
@@ -192,13 +203,13 @@ def place_facet_queries(cd):
     stat_fq = []
     # Case Name
     if cd['case_name'] != '':
-        shared_fq.append('caseName:' + cd['case_name'])
+        shared_fq.append('caseName:%s' % cd['case_name'])
 
     # Citations
     if cd['west_cite'] != '':
-        shared_fq.append('westCite:' + cd['west_cite'])
+        shared_fq.append('westCite:%s' % cd['west_cite'])
     if cd['docket_number'] != '':
-        shared_fq.append('docketNumber:' + cd['docket_number'])
+        shared_fq.append('docketNumber:%s' % cd['docket_number'])
 
     # Dates
     date_query = make_date_query(cd)

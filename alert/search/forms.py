@@ -133,7 +133,6 @@ class SearchForm(forms.Form):
                                                               initial=True,
                                                               widget=forms.CheckboxInput(attrs={'checked':'checked'}))
 
-
     def clean_q(self):
         '''
         Cleans up various problems with the query:
@@ -148,6 +147,9 @@ class SearchForm(forms.Form):
             return q
 
     def clean(self):
+        '''
+        Handles validation fixes that need to be performed across fields.
+        '''
         cleaned_data = self.cleaned_data
 
         # 1. Make sure that the dates do this |--> <--| rather than <--| |-->

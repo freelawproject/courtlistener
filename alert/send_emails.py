@@ -18,190 +18,148 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
+from alert.lib import search_utils
+from alert.lib import sunburnt
 from alerts.models import FREQUENCY
+from alert.search.forms import SearchForm
 from userHandling.models import UserProfile
-from search.models import Document
+
 from django.template import loader, Context
 from django.core.mail import send_mail, EmailMultiAlternatives
 
-import calendar
 import datetime
-import time
 from optparse import OptionParser
 
+class InvalidDateError(Exception):
+    pass
 
-def emailer(rate, verbose, simulate):
-    """This will load all the users each day/week/month, and send them
-    emails."""
-    # remap the FREQUENCY variable from the model so the human keys relate
-    # back to the indices
-    rates = {}
-    for r in FREQUENCY:
-        rates[r[1].lower()] = r[0]
-    RATE = rates[rate]
-
-    # sphinx likes time in UnixTime format, which the below accomplishes.
-    # There doesn't appear to be an easier way to do this. The output can be
-    # tested in the shell with: date --date="2010-04-16" +%s
-    # Unfortunately, Sphinx gets confused with negative dates, which is what
-    # UnixTimes do before 1970. Thus, we add about 500 years.
-    today = datetime.date.today()
-    todayInt = today.toordinal() + 365
-    dateIntsPastWeek = []
-    dateIntsPastMonth = []
-    i = 0
-    while i < 7:
-        dateIntsPastWeek.append(todayInt - (1 * i))
-        i += 1
-    i = 0
-    while i < calendar.mdays[datetime.date.today().month]:
-        dateIntsPastMonth.append(todayInt - (1 * i))
-        i += 1
-
-    EMAIL_SUBJECT = 'New hits for your alert at CourtListener.com'
+def send_alert(userProfile, hits, verbose, simulate):
+    EMAIL_SUBJECT = 'New hits for your CourtListener alerts'
     EMAIL_SENDER = 'alerts@courtlistener.com'
 
-    # query all users with alerts of the desired frequency
-    # use the distinct method to only return one instance of each person.
-    userProfiles = UserProfile.objects.filter(alert__alertFrequency=RATE).distinct()
+    if userProfile.plaintextPreferred:
+        txt_template = loader.get_template('emails/email.txt')
+        c = Context({'hits':hits})
+        email_text = txt_template.render(c)
+        if verbose and simulate:
+            print "email_text: %s" % email_text
+        if not simulate:
+            send_mail(EMAIL_SUBJECT, email_text, EMAIL_SENDER, [userProfile.user.email], fail_silently=False)
+    else:
+        txt_template = loader.get_template('emails/email.txt')
+        html_template = loader.get_template('emails/email.html')
+        c = Context({'hits':hits})
+        email_text = txt_template.render(c)
+        html_text = html_template.render(c)
+        if verbose and simulate:
+            print "email_text: %s" % email_text
+            print "html_text: %s" % html_text
+        if not simulate:
+            msg = EmailMultiAlternatives(EMAIL_SUBJECT, email_text,
+                EMAIL_SENDER, [userProfile.user.email])
+            msg.attach_alternative(html_text, "text/html")
+            msg.send(fail_silently=False) # send a multi-part email
 
-    if verbose:
-        print "todayInt: " + str(todayInt)
-        print "dateIntsPastWeek: " + str(dateIntsPastWeek)
-        print "dateIntsPastMonth: " + str(dateIntsPastMonth)
-        print "userProfiles (with " + rate + " alerts): " + str(userProfiles)
+def get_cut_off_date(rate):
+    today = datetime.date.today()
+    if rate == 'dly':
+        cut_off_date = today
+    elif rate == 'wly':
+        cut_off_date = today - datetime.timedelta(days=7)
+    elif rate == 'mly':
+        if today.day > 28:
+            raise InvalidDateError, 'Monthly alerts cannot be run on the 29th, 30th or 31st.'
+        early_last_month = today - datetime.timedelta(days=28)
+        cut_off_date = datetime.date(early_last_month.year, early_last_month.month, 1)
+    return cut_off_date
+
+def emailer(rate, verbose, simulate):
+    """Send out an email to every user whose alert has a new hit for a rate.
+    
+    Look up all users that have alerts for a given period of time, and iterate
+    over them. For each of their alerts that has a hit, build up an email that 
+    contains all the hits. 
+    
+    It's tempting to lookup alerts and iterate over those instead of over the 
+    users. The problem with that is that it would send one email per *alert*, 
+    not per *user*.
+    """
+
+    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+    cut_off_date = get_cut_off_date(rate)
+
+    # Query all users with alerts of the desired frequency
+    # Use the distinct method to only return one instance of each person. 
+    userProfiles = UserProfile.objects.filter(alert__alertFrequency=rate).distinct()
 
     # for each user with a daily, weekly or monthly alert...
     for userProfile in userProfiles:
         #...get their alerts...
-        alerts = userProfile.alert.filter(alertFrequency=RATE)
+        alerts = userProfile.alert.filter(alertFrequency=rate)
         if verbose:
-            print "\n\n" + rate + " alerts for user " + userProfile.user\
-                .email + ": " + str(alerts)
+            print "\n\nAlerts for user %s: %s" % (userProfile.user.email,
+                                                  alerts)
 
         hits = []
         # ...and iterate over their alerts.
         for alert in alerts:
-            query = preparseQuery(alert.alertText)
-
             try:
                 if verbose:
-                    print "Now running the query: " + query
-                if RATE == 'dly':
-                    # query the alert
-                    if verbose:
-                        "Now running the search for: " + query
-                    queryset = Document.search.query(query)
-                    results = queryset.set_options(
-                        mode="SPH_MATCH_EXTENDED2")\
-                        .filter(dateFiled=todayInt)
-                elif RATE == 'wly' and today.weekday() == 6:
-                    # if it's a weekly alert and today is Sunday
-                    if verbose:
-                        "Now running the search for: " + query
-                    queryset = Document.search.query(query)
-                    results = queryset.set_options(
-                        mode="SPH_MATCH_EXTENDED2")\
-                        .filter(dateFiled=dateIntsPastWeek)
-                elif RATE == 'mly' and today.day == 1:
-                    # if it's a monthly alert and today is the first of the
-                    # month
-                    if verbose:
-                        "Now running the search for: " + query
-                    queryset = Document.search.query(query)
-                    results = queryset.set_options(
-                        mode="SPH_MATCH_EXTENDED2")\
-                        .filter(dateFiled=dateIntsPastMonth)
-                elif RATE == "off":
+                    print "Now running the query: %s" % alert.alertText
+
+                # Set up the data
+                data = search_utils.get_string_to_dict(alert.alertText)
+                try:
+                    del data['filed_before']
+                except KeyError:
                     pass
+                data['filed_after'] = cut_off_date
+                if verbose:
+                    print "Data sent to SearchForm is: %s" % data
+                search_form = SearchForm(data)
+                if search_form.is_valid():
+                    cd = search_form.cleaned_data
+                    main_params = search_utils.build_main_query(cd)
+                    main_params['rows'] = '25'
+                    main_params['start'] = '0'
+                    main_params['hl.tag.pre'] = '<em>'
+                    main_params['hl.tag.post'] = '</em>'
+                    results = conn.raw_query(**main_params).execute()
+                else:
+                    print "Query for alert %s was invalid" % alert.alertText
+                    print "Errors from the SearchForm: %s" % search_form.errors
+                    continue
             except:
-                # search occasionally fails. We need to log this.
-                print "Search for this alert failed: " + query
+                print "Search for this alert failed: %s" % alert.alertText
                 continue
 
-
             if verbose:
-                print "The value of results is: " + str(results)
-                print "The value of results.count() is: " + \
-                    str(results.count())
-                print "There were " + str(results.count()) + \
-                " hits for the alert \"" + query + \
-                "\". Here are the first 0-20: " + str(results)
+                print "The value of results is: %s" % results
+                print "The there were %s results" % len(results)
 
-            # hits is a multidimensional array. Ugh. It consists of alerts,
-            # paired with a list of documents, of the form:
-            # [[alert1, [hit1, hit2, hit3, hit4]], [alert2, [hit1, hit2]]]
+            # hits is a multi-dimensional array. It consists of alerts,
+            # paired with a list of document dicts, of the form:
+            # [[alert1, [{hit1}, {hit2}, {hit3}]], [alert2, ...]]
             try:
-                if results.count() > 0:
-                    # very important! if you don't do the slicing here, you'll
-                    # only get the first 20 hits. also very frustrating!
-                    alertWithResults = [alert, results[0:results.count()]]
-                    hits.append(alertWithResults)
-                    # set the hit date to today
+                if len(results) > 0:
+                    hits.append([alert, results])
                     alert.lastHitDate = datetime.date.today()
                     alert.save()
-                    if verbose:
-                        print "alertWithResults: " + str(alertWithResults)
-                        print "hits: " + str(hits)
-
                 elif alert.sendNegativeAlert:
                     # if they want an alert even when no hits.
-                    alertWithResults = [alert, "None"]
-                    hits.append(alertWithResults)
-
+                    hits.append([alert, None])
                     if verbose:
-                        print "Sending results for negative alert, " + \
-                            query + "."
-                        print "alertWithResults: " + str(alertWithResults)
-                        print "hits: " + str(hits)
+                        print "Sending results for negative alert %s" % alert.alertName
             except Exception, e:
-                print "Search barfed on this alert: " + query
+                print "Search failed on this alert: %s" % alert.alertText
                 print e
 
         if len(hits) > 0:
-            # either the hits var has the value "None", or it has hits.
-            if userProfile.plaintextPreferred:
-                # send a plaintext email.
-                txtTemplate = loader.get_template('emails/email.txt')
-                c = Context({
-                    'hits': hits,
-                })
-                email_text = txtTemplate.render(c)
-
-                if verbose and simulate:
-                    print "email_text: " + str(email_text)
-
-                if not simulate:
-                    send_mail(
-                        EMAIL_SUBJECT,
-                        email_text,
-                        EMAIL_SENDER,
-                        [userProfile.user.email],
-                        fail_silently=False)
-            else:
-                # send a multi-part email
-                txtTemplate = loader.get_template('emails/email.txt')
-                htmlTemplate = loader.get_template('emails/email.html')
-                c = Context({
-                    'hits': hits,
-                })
-                email_text = txtTemplate.render(c)
-                html_text = htmlTemplate.render(c)
-
-                if verbose and simulate:
-                    print "email_text: " + str(email_text)
-                    print "html_text: " + str(html_text)
-
-                if not simulate:
-                    msg = EmailMultiAlternatives(EMAIL_SUBJECT, email_text,
-                        EMAIL_SENDER, [userProfile.user.email])
-                    msg.attach_alternative(html_text, "text/html")
-                    msg.send(fail_silently=False)
+            send_alert(userProfile, hits, verbose, simulate)
         elif verbose:
-            print "Not sending mail for this alert."
+            print "No hits, thus not sending mail for this alert."
 
     return "Done"
-
 
 def main():
     usage = "usage: %prog -r RATE [--verbose] [--simulate]"
@@ -216,15 +174,16 @@ def main():
     (options, args) = parser.parse_args()
     if not options.rate:
         parser.error("You must specify a rate")
-
+    if options.rate not in dict(FREQUENCY).keys():
+        parser.error("Invalid rate. Rate must be one of: %s" % ', '.join(dict(FREQUENCY).iterkeys()))
     rate = options.rate
     verbose = options.verbose
     simulate = options.simulate
 
     if simulate:
-        print "******************"
-        print "* NO EMAILS SENT *"
-        print "******************"
+        print "**********************************"
+        print "* SIMULATE MODE - NO EMAILS SENT *"
+        print "**********************************"
 
     return emailer(rate, verbose, simulate)
 

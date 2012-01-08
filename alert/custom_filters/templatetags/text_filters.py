@@ -65,3 +65,21 @@ def underscore_to_space(text, autoescape=None):
         esc = lambda x: x
     return mark_safe(re.sub('_', ' ', esc(text)))
 underscore_to_space.needs_autoescape = True
+
+@register.filter
+@stringfilter
+def compress_whitespace(text, autoescape=None):
+    '''Compress whitespace in a string as a browser does with HTML
+    
+    For example, this:
+    text   foo
+    
+    bar    baz
+    bcomes: 'text foo bar baz'
+    '''
+    if autoescape:
+        esc = conditional_escape
+    else:
+        esc = lambda x: x
+    return mark_safe(' '.join(text.split()))
+compress_whitespace.needs_autoescape = True

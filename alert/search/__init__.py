@@ -16,8 +16,8 @@
 
 from django.db.models.signals import post_delete, post_save
 
-from alert.search.models import Document
-from alert.search.tasks import delete_doc_handler, save_doc_handler
+from alert.search.models import Citation, Document
+from alert.search.tasks import delete_doc_handler, save_doc_handler, save_cite_handler
 
 post_save.connect(
             save_doc_handler,
@@ -28,3 +28,8 @@ post_delete.connect(
             delete_doc_handler,
             sender=Document,
             dispatch_uid='delete_doc_handler')
+
+post_save.connect(
+            save_cite_handler,
+            sender=Citation,
+            dispatch_uid='save_cite_handler')

@@ -114,9 +114,9 @@
 {% block content %}
     <article class="span-17 last">
         {% if favorite_form.instance.doc_id %}
-            <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-on"></a>
+            <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-on" title="Save/edit favorite"></a>
         {% else %}
-            <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-off"></a>
+            <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-off" title="Save/edit favorite"></a>
         {% endif %}
         <h2>
             {{ doc.citation.caseNameFull|v_wrapper }},
