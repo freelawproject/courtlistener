@@ -10,14 +10,14 @@ class SunburntJSONEncoder(json.JSONEncoder):
         if isinstance(o, SolrResponse):
             return self.encode(list(o))
         return super(SunburntJSONEncoder, self).encode(o)
-        
+
     def default(self, obj):
         if hasattr(obj, "strftime"):
             try:
                 microsecond = obj.microsecond
             except AttributeError:
-                microsecond = int(1000000*math.modf(obj.second)[0])
-            return u"%s.%sZ" % (obj.strftime("%Y-%m-%dT%H:%M:%S"), microsecond)
+                microsecond = int(1000000 * math.modf(obj.second)[0])
+            return u"%s.%sZ" % (obj.isoformat(), microsecond)
         return super(SunburntJSONEncoder, self).default(obj)
 
 def dump(obj, fp, *args, **kwargs):

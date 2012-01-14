@@ -68,9 +68,6 @@ SOLR
  - remove all print lines
  - run pylint for a few hours
      - check for TODO statements
- - what happens to cases that lack dates? If Solr handles them well already, we 
-   can delete the function from views.py. Else, we need to probably add a 
-   default date when the item is indexed
  - ensure that dates older than 1900 work:
     - save via /admin
     - delete via /admin

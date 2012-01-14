@@ -60,7 +60,7 @@ class solr_date(object):
         if hasattr(self._dt_obj, "microsecond"):
             return self._dt_obj.microsecond
         else:
-            return int(1000000*math.modf(self._dt_obj.second)[0])
+            return int(1000000 * math.modf(self._dt_obj.second)[0])
 
     def __repr__(self):
         return repr(self._dt_obj)
@@ -69,7 +69,7 @@ class solr_date(object):
         """ Serialize a datetime object in the format required
         by Solr. See http://wiki.apache.org/solr/IndexingDates
         """
-        return u"%s.%sZ" % (self._dt_obj.strftime("%Y-%m-%dT%H:%M:%S"),
+        return u"%s.%sZ" % (self._dt_obj.isoformat(),
                             "%06d" % self.microsecond)
 
     def __cmp__(self, other):
@@ -219,31 +219,31 @@ class SolrNumericalField(SolrField):
 
 class SolrShortField(SolrNumericalField):
     base_type = int
-    min = -(2**15)
-    max = 2**15-1
+    min = -(2 ** 15)
+    max = 2 ** 15 - 1
 
 
 class SolrIntField(SolrNumericalField):
     base_type = int
-    min = -(2**31)
-    max = 2**31-1
+    min = -(2 ** 31)
+    max = 2 ** 31 - 1
 
 
 class SolrLongField(SolrNumericalField):
     base_type = long
-    min = -(2**63)
-    max = 2**63-1
+    min = -(2 ** 63)
+    max = 2 ** 63 - 1
 
 
 class SolrFloatField(SolrNumericalField):
     base_type = float
-    max = (2.0-2.0**(-23)) * 2.0**127
+    max = (2.0 - 2.0 ** (-23)) * 2.0 ** 127
     min = -max
 
 
 class SolrDoubleField(SolrNumericalField):
     base_type = float
-    max = (2.0-2.0**(-52)) * 2.0**1023
+    max = (2.0 - 2.0 ** (-52)) * 2.0 ** 1023
     min = -max
 
 
@@ -385,7 +385,7 @@ class SolrSchema(object):
         """initialize a schema object from a
         filename or file-like object."""
         self.fields, self.dynamic_fields, self.default_field_name, self.unique_key \
-            = self.schema_parse(f)
+ = self.schema_parse(f)
         self.default_field = self.fields[self.default_field_name] \
             if self.default_field_name else None
         self.unique_field = self.fields[self.unique_key] \
@@ -618,7 +618,7 @@ class SolrDelete(object):
 
 
 class SolrFacetCounts(object):
-    members= ["facet_dates", "facet_fields", "facet_queries"]
+    members = ["facet_dates", "facet_fields", "facet_queries"]
     def __init__(self, **kwargs):
         for member in self.members:
             setattr(self, member, kwargs.get(member, ()))
