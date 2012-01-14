@@ -68,17 +68,8 @@ SOLR
  - remove all print lines
  - run pylint for a few hours
      - check for TODO statements
- - ensure that dates older than 1900 work:
-    - save via /admin
-    - delete via /admin
-    - add/update via the update_index command
-    - search results
-    - feeds
-    - alerts
- - unify/test the way meta data is shown throughout
  - test the various IEs
  - search for 2d doesn't highlight in the case title (issue 199)
- - what about html content?
  - result count is missing from the case page in the filters
  
 Feedback:
