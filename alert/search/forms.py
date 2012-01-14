@@ -110,7 +110,7 @@ class SearchForm(forms.Form):
                                                               label=court[1],
                                                               required=False)
             for status in DOCUMENT_STATUSES:
-                self.fields['stat_' + status[0]] = forms.BooleanField(
+                self.fields['stat_' + status[1]] = forms.BooleanField(
                                                               label=status[1],
                                                               required=False)
         else:
@@ -127,7 +127,7 @@ class SearchForm(forms.Form):
                                                               initial=True,
                                                               widget=forms.CheckboxInput(attrs={'checked':'checked'}))
             for status in DOCUMENT_STATUSES:
-                self.fields['stat_' + status[0]] = forms.BooleanField(
+                self.fields['stat_' + status[1]] = forms.BooleanField(
                                                               label=status[1],
                                                               required=False,
                                                               initial=True,

@@ -108,8 +108,11 @@ def get_selected_field_string(cd, prefix):
     '''Pulls the selected checkboxes out of the form data, and puts it into Solr
     strings. Uses a prefix to know which items to pull out of the cleaned data.
     Check forms.py to see how the prefixes are set up.
+    
+    Final strings are of the form "A" OR "B" OR "C", with quotes in case there 
+    are spaces in the values.
     '''
-    selected_fields = [k.replace(prefix, '')
+    selected_fields = ['"%s"' % k.replace(prefix, '')
                        for k, v in cd.iteritems()
                        if (k.startswith(prefix) and v == True)]
 
@@ -134,8 +137,12 @@ def build_main_query(cd, highlight=True):
         # Highlighting for the main query.
         main_params['hl'] = 'true'
         main_params['hl.fl'] = 'text,caseName,westCite,docketNumber,lexisCite,court_citation_string'
-        main_params['hl.snippets'] = '5'
-        main_params['hl.maxAnalyzedChars'] = '150000'
+        main_params['f.caseName.hl.fragListBuilder'] = 'single'
+        main_params['f.westCite.hl.fragListBuilder'] = 'single'
+        main_params['f.docketNumber.hl.fragListBuilder'] = 'single'
+        main_params['f.lexisCite.hl.fragListBuilder'] = 'single'
+        main_params['f.court_citation_string.hl.fragListBuilder'] = 'single'
+        main_params['f.text.hl.snippets'] = '5'
         # If there aren't any hits in the text return the field instead
         main_params['f.text.hl.alternateField'] = 'text'
         main_params['f.text.hl.maxAlternateFieldLength'] = '500'

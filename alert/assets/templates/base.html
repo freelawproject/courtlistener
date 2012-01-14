@@ -40,7 +40,9 @@
                         {% if user.is_authenticated %}
                             <nav>
                                 <ul>
-                                    <li><a href="/profile/alerts/">Profile</a></li>
+                                    <li><a href="/profile/alerts/">Alerts</a></li>
+                                    <li><a href="/profile/favorites/">Favorites</a></li>
+                                    <li><a href="/coverage/">Coverage</a></li>
                                     <li><a href="/sign-out/">Sign out</a></li>
                                 </ul>
                             </nav>
@@ -48,6 +50,7 @@
                             <nav>
                                 <ul>
                                     <li><a href="/about/">About</a></li>
+                                    <li><a href="/coverage/">Coverage</a></li>
                                     {% if request.path != "/sign-out/" %}
                                         <li>
                                             <a href="{%url sign-in %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}">
@@ -76,14 +79,11 @@
                 </div>
             {% endblock %}
 
-            {# TODO: Is this block being used somewhere? #}
-            {% block nav %}{% endblock %}
             {% block content %}
                 <div class="span-17 last" id="content">
                     <p>Your content seems to be missing! This is never good.</p>
                 </div>
             {% endblock %}
-
 
             <div class="span-24 last">
                 <hr class="space">

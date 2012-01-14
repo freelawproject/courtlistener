@@ -18,7 +18,10 @@ Sets up all the overrides or additional CSS that the site uses.
     float: left;
 }
 
-.settings-nav-item a, .settings-nav-item a:hover, .settings-nav-item a:active, .settings-nav-item a:focus {
+.settings-nav-item a,
+.settings-nav-item a:hover,
+.settings-nav-item a:active,
+.settings-nav-item a:focus {
     color: black;
 }
 
@@ -53,6 +56,9 @@ span.bold {
     color: gray;	
 }
 
+.left {
+    float: left;
+}
 .center {
     text-align: center;
 }
@@ -149,12 +155,16 @@ nav ul li {
     border-color: #a6a6a6;
 }
 
+#advanced {
+    color: black;
+}
+
+/* Button formatting */
 a.button, button {
     border-color: #a6a6a6;
     background-color: #6683B7;
     color: white;
 }
-
 button:hover, a.button:hover {
   background-color: #7896D0;
   border:1px solid gray;
@@ -165,18 +175,6 @@ a.button:active {
   color: #eeeeee;
 }
 
-#id_q:focus{
-    outline-style: none;
-}
-
-#search-button {
-    left: 0px;
-}
-
-#new-search-chooser {
-    float: right;
-}
-
 #sidebar {
     margin-top: 6px;
 }
@@ -185,10 +183,19 @@ a.button:active {
     margin-bottom: 2em;
 }
 
+/* Results page */
+#id_q:focus{
+    outline-style: none;
+}
+#search-button {
+    left: 0px;
+}
+#new-search-chooser {
+    float: right;
+}
 #result-count {
     float: left;
 }
-
 #id_sort {
     float: right;
 }
@@ -201,17 +208,14 @@ a.button:active {
 .nojs #sidebar-search-form {
     display: none;
 }
-
 #pagination-left {
     float: left;
     width: 200px;	
 }
-
 #pagination-center {
 	margin: auto;
 	text-align: center;
 }
-
 #pagination-right {
 	float: right;
 	width: 200px;
@@ -223,20 +227,16 @@ a.button:active {
 a:link, a:visited {
     text-decoration: none;
 }
-
 a:visited.visitable {
     color: #9d11b3;	
 }
-
 a:focus, a:hover {
     color: #000099;
     text-decoration: underline;
 }
-
 .fake-link {
     color: #009;
 }
-
 .fake-link:hover {
     text-decoration: underline;
     color: #009;
@@ -248,15 +248,12 @@ a:focus, a:hover {
 .error a, .notice a, .success a {
     text-decoration: underline;
 }
-
 .error a:focus, .error a:hover {
     color: #8A1F11;
 }
-
 .notice a:focus, .notice a:hover, .success a:focus, .success a:hover {
     color: #514721;
 }
-
 .errortext {
     color: #8a1f11;
 }
@@ -267,35 +264,29 @@ span.num {
     position: absolute;
     color: #999999;
 }
-
 p.indent {
     position: relative;
     margin-left: 2em;
     margin-top: 1.5em;
 }
-
 div.footnotes {
     border-top: 1px dotted black;
     padding-top: 1em;
 }
-
 div.footnote > p {
     margin-left: 2em;
 }
-
 div.prelims {
     background: none repeat scroll 0 0 #eeeeee;
     border: 1px solid #dddddd;
     padding-top: 1.5em;
 }
-
 div.prelims p {
     position: relative;
     margin-left: 2em;
     margin-right: 2em;
     margin-top: 0em;
 }
-
 p.parties {
     text-align: center;
 }
@@ -305,7 +296,6 @@ div.footnote a.footnote {
     color: #000099;
     position: absolute;
 }
-
 p a.footnote {
     /* make footnotes superscript */
     vertical-align: text-top;
@@ -320,7 +310,6 @@ input.wide-title {
     padding: 5px;
     font-size:1.5em;
 }
-
 
 /* Disabled button formatting */
 button[disabled]:active, button[disabled]:hover, button[disabled] {
@@ -339,31 +328,10 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     cursor: default;
 }
 
-fieldset.collapsed {
-    border-bottom-width: 0px;
-    border-left-width: 0px;
-    border-right-width: 0px;
-    border-top-width: 0px;
-    margin-bottom: 0px;
-    padding: 0em;
-}
-
-#advanced {
-    float: right;
-}
-
-#advanced-home-page {
-    width: 545px;
-}
-
-#advanced-home-page > legend {
-    font-size: 100%;
-}
-
+/* Save favorites and modal box configs */
 #modal-rel {
     position: relative;
 }
-
 #modal-save-favorite, #modal-logged-out {
     z-index: 10;
     top: -10px;
@@ -374,35 +342,28 @@ fieldset.collapsed {
     border: 1px solid #DDDDDD;
     background: white;
 }
-
 #modal-logged-out {
     top: -10px;
     left: 10px;
     padding: 2em;
 }
-
 #save-favorite-text-area {
     height: auto;
 }
-
 #modal-save-favorite .save-favorite-button {
     margin-right: 0px;
 }
-
 #favorites-bottom-section {
     margin-top: 4em;
 }
-
 #save-favorite-delete {
     margin-bottom: 0.3em;
 }
-
 #favorites-buttons {
     position: absolute;
     right: 1em;
     bottom: 0.3em;
 }
-
 
 /* Tables on settings pages */
 .settings-table th {
@@ -410,17 +371,14 @@ fieldset.collapsed {
     border-style: solid;
     border-color: gray;
 }
-
 .settings-table td {
     border-width: 0px 0px 1px 0px;
     border-style: dotted;
     border-color: gray;
 }
-
 .settings-table tr:last-child td {
     border-width: 0px;
 }
-
 .settings-table tbody tr:hover {
     background-color: #f0f0f0;
 }
@@ -433,10 +391,6 @@ fieldset.collapsed {
     display: inline;
     float: left;
 }
-
-
-
-
 .arrow-down-before:before { 
     content: '';
     display: inline-block;  
@@ -447,7 +401,6 @@ fieldset.collapsed {
     margin: 2px 5px 0 0;
     width: 0;
 }
-
 .arrow-right-before:before { 
     content: '';
     display: inline-block;  
@@ -458,7 +411,6 @@ fieldset.collapsed {
     margin: 0 2px 4px 0;
     width: 0;
 }
-
 .arrow-left-before:before { 
     content: '';
     display: inline-block;  
@@ -469,7 +421,6 @@ fieldset.collapsed {
     margin: 0 2px 2px 0;
     width: 0;
 }
-
 .arrow-right-after:after { 
     content: '';
     display: inline-block;  
@@ -480,119 +431,71 @@ fieldset.collapsed {
     margin: 0 0 2px 2px;
     width: 0;
 }
-
-/* TODO: Make these circles cross browser as possible. Test in friggin' IE. */
-.red-circle {
-    background: none repeat scroll 0 0 #E45843;
-    border-radius: 6px;
-    content: "";
-    float: left;
-    height: 12px;
-    margin: 2px 12px 0 0;
-    width: 12px;
-}
-
-.orange-circle {
-    background: none repeat scroll 0 0 orange;
-    border-radius: 6px;
-    content: "";
-    float: left;
-    height: 12px;
-    margin: 2px 12px 0 0;
-    width: 12px;
-}
-
-.green-circle {
-    background: none repeat scroll 0 0 #62A66A;
-    border-radius: 6px;
-    content: "";
-    float: left;
-    height: 12px;
-    margin: 2px 12px 0 0;
-    width: 12px;
-}
-
 #copy-input {
     width: 118px;
 }
-
 #delicious_png {
     height               : 16px;
 	width                : 16px;
 	background-position  : -16px -16px;
     margin: 0px 2px 0px 2px;
 }
-
 #delicious_png:hover {
 	background-position  : -16px 0px;
 }
-
 #digg_png {
 	height               : 14px;
 	width                : 16px;
 	background-position  : -32px -14px;
     margin: 0px 2px 0px 2px;
 }
-
 #digg_png:hover {
 	background-position  : -32px 0px;
 }
-
 #email_link_png {
 	height               : 16px;
 	width                : 16px;
 	background-position  : -48px -16px;
     margin: 0px 0px 0px 2px;
 }
-
 #email_link_png:hover {
 	background-position  : -48px 0px;
 }
-
 #facebook_png {
     height               : 16px;
 	width                : 16px;
     background-position  : -82px -16px;
     margin: 0px 2px 0px 2px;
 }
-
 #facebook_png:hover {
     background-position  : -82px 0px;
 }
-
 #reddit_png {
 	height               : 18px;
 	width                : 18px;
-
 	background-position  : -64px -18px;
     margin: 0px 2px 0px 2px;
 }
-
 #reddit_png:hover {
 	background-position  : -64px 0px;
 }
-
 #twitter_gif {
 	height               : 16px;
 	width                : 16px;
 	background-position  : -98px -16px;
     margin: 0px 2px 0px 2px;
 }
-
 #twitter_gif:hover {
 	background-position  : -98px 0px;
 }
-
 #favorite-star-png {
     margin: 8px 5px 0px 0px;
 }
-
 .favorite-on {
-   height               : 16px;
+    height               : 16px;
 	width                : 16px;
 	background-position  : -114px -16px;
 }
-
 .favorite-off {
     height               : 16px;
 	width                : 16px;

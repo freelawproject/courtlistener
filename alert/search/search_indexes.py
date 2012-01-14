@@ -44,7 +44,7 @@ class SearchDocument(object):
         self.docketNumber = doc.citation.docketNumber
         self.westCite = doc.citation.westCite
         self.lexisCite = doc.citation.lexisCite
-        self.status = doc.documentType
+        self.status = doc.get_documentType_display()
         self.source = doc.source
         self.download_url = doc.download_URL
         self.local_path = str(doc.local_path)
@@ -60,5 +60,5 @@ class SearchDocument(object):
         self.text = text_template.render(c).translate(null_map)
 
         # Faceting fields
-        self.status_exact = doc.documentType
+        self.status_exact = doc.get_documentType_display()
         self.court_exact = doc.court.courtUUID
