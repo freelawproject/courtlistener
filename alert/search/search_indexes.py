@@ -31,6 +31,7 @@ class SearchDocument(object):
 
         # Standard fields
         self.id = doc.pk
+        print "Django DB value for dateFiled: %s" % doc.dateFiled
         if doc.dateFiled is not None:
             self.dateFiled = datetime.combine(doc.dateFiled, time())
         self.court = doc.court.short_name

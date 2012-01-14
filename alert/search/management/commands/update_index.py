@@ -95,7 +95,7 @@ class Command(BaseCommand):
         an empty index or an existing one. If run on an existing index,
         existing documents will be updated.
         '''
-        self.stdout.write("Adding or updating all documents.\n")
+        self.stdout.write("Adding or updating all documents...\n")
         everything = queryset_iterator(Document.objects.filter(court__in_use=True))
         for doc in everything:
             # Make a search doc, and add it to the index

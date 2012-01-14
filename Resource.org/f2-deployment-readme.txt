@@ -81,7 +81,6 @@ SOLR
  - unify/test the way meta data is shown throughout
  - test the various IEs
  - search for 2d doesn't highlight in the case title (issue 199)
- - upgrade to get the fix for https://issues.apache.org/jira/browse/SOLR-2749 (reopen if fix isn't there)
  - what about html content?
  - result count is missing from the case page in the filters
  

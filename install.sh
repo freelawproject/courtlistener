@@ -556,13 +556,18 @@ function install_solr {
     wget https://builds.apache.org/job/Solr-trunk/lastBuild/artifact/artifacts/apache-solr-4.0-2012-01-13_09-34-29.tgz
     
     echo "Unpacking Solr to /usr/local/solr..."
-    tar -x -f apache-solr-4.0-2011-11-04_09-29-42.tgz
-    mv apache-solr-4.0-2012-01-13_09-34-29 solr 
+    if [ -d solr ]
+    then
+        echo "Solr installation already exists. Backing up before replacing. You should delete this manually if you no longer need it."
+        mv solr solr.`date -I`.bak 
+    fi
+    tar -x -f apache-solr-4.0-2012-01-13_09-34-29.tgz
+    mv apache-solr-4.0-2012-01-13_09-34-29 solr
     rm apache-solr-4.0-2012-01-13_09-34-29.tgz
     
     # link up the solrconfig and schema files to the ones in CL
-    ln -s $CL_INSTALL_DIR/court-listener/Solr/conf/solrconfig.xml /usr/local/solr/example/solr/conf/solrconfig.xml
-    ln -s $CL_INSTALL_DIR/court-listener/Solr/conf/schema.xml /usr/local/solr/example/solr/conf/schema.xml
+    ln -s -f $CL_INSTALL_DIR/court-listener/Solr/conf/solrconfig.xml /usr/local/solr/example/solr/conf/solrconfig.xml
+    ln -s -f $CL_INSTALL_DIR/court-listener/Solr/conf/schema.xml /usr/local/solr/example/solr/conf/schema.xml
     
     # make a directory where logs will be created and set up the logger
     ln -s $CL_INSTALL_DIR/court-listener/log-scripts/solr /etc/logrotate.d/solr
