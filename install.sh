@@ -128,31 +128,19 @@ EOF
     fi
 
     # this function sets some variables that will be used throughout the program
-    read -p "The default location for your django installation is /usr/local/django. Is this OK? (y/n): " proceed
-    if [ $proceed == "n" ]
-    then
-        read -p "Where shall we install django (starting at /, no trailing slash)?: " DJANGO_INSTALL_DIR
-    else
-        DJANGO_INSTALL_DIR='/usr/local/django'
-    fi
+    DJANGO_INSTALL_DIR='/usr/local/django'
 
     # set up the PYTHON_SITES_PACKAGES_DIR
     PYTHON_SITES_PACKAGES_DIR=`python -c "from distutils.sysconfig import get_python_lib; print get_python_lib()"`
-    read -p "The default location for your CourtListener installation is /var/www. Is this OK? (y/n): " proceed
-    if [ $proceed == 'n' ]
-    then
-        read -p "You will need to update the init scripts manually to point to this location. Where shall we install CourtListener (starting at /, no trailing slash): " CL_INSTALL_DIR
-    else
-        CL_INSTALL_DIR='/var/www'
-    fi
+    CL_INSTALL_DIR='/var/www'
 
     # set up the private settings file
     echo -e "\nWe are going to set up two settings files. One with private data, and one with
 public data. For the private data, we will need to gather some information.
 This file should NEVER be checked into revision control!
 "
-    read -p "What name would you like used as the admin name for the site (e.g. Michael Lissner): " CONFIG_NAME
-    read -p "What email address should be used for the admin of the site (e.g. mike@courtlistener.com): " CONFIG_EMAIL
+    read -p "What name would you like used as the admin name for the site (e.g. John Wesley Powell): " CONFIG_NAME
+    read -p "What email address should be used for the admin of the site (e.g. jwesley@courtlistener.com): " CONFIG_EMAIL
     read -p "Would you like the django-debug toolbar installed? It's good for dev work. (y/n): " INSTALL_DEBUG_TOOLBAR
     read -p "Would you like the django-extensions package installed? It's also good for dev work. (y/n): " INSTALL_DJANGO_EXTENSIONS
     read -p "Is this a development machine? (y/n): " DEVELOPMENT
@@ -209,7 +197,6 @@ Press enter to proceed, or Ctrl+C to abort. " proceed
 function check_deps {
     # this function checks for various dependencies that the script assumes are
     # installed for its own functionality.
-    deps=(aptitude antiword checkinstall daemon g++ gcc git-core ipython libmysqlclient-dev libmysql++-dev libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget)
     echo -e "\n########################"
     echo "Checking dependencies..."
     echo "########################"
@@ -219,7 +206,7 @@ function check_deps {
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-
+    deps=(aptitude antiword checkinstall daemon g++ gcc git-core ipython libmysqlclient-dev libmysql++-dev libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget)
     for dep in ${deps[@]}
     do
         echo -n "Checking for $dep..."
@@ -377,12 +364,12 @@ MANAGERS = ADMINS
 
 DATABASES = {
     'default': {
-        'ENGINE': 'mysql', # Add 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
-        'NAME': '$MYSQL_DB_NAME',                      # Or path to database file if using sqlite3.
-        'USER': '$MYSQL_USERNAME',                      # Not used with sqlite3.
-        'PASSWORD': '$MYSQL_PWD',                  # Not used with sqlite3.
-        'HOST': '',                      # Set to empty string for localhost. Not used with sqlite3.
-        'PORT': '',                      # Set to empty string for default. Not used with sqlite3.
+        'ENGINE': 'django.db.backends.mysql', 
+        'NAME': '$MYSQL_DB_NAME',
+        'USER': '$MYSQL_USERNAME',
+        'PASSWORD': '$MYSQL_PWD',
+        'HOST': '',
+        'PORT': '',
     }
 }
 
@@ -566,12 +553,16 @@ function install_solr {
     
     cd /usr/local
     echo "Downloading Solr 4.0 development snapshot from 2011-11-04..."
-    wget https://builds.apache.org/job/Solr-trunk/lastBuild/artifact/artifacts/apache-solr-4.0-2011-11-04_09-29-42.tgz
+    wget https://builds.apache.org/job/Solr-trunk/lastBuild/artifact/artifacts/apache-solr-4.0-2012-01-13_09-34-29.tgz
     
     echo "Unpacking Solr to /usr/local/solr..."
     tar -x -f apache-solr-4.0-2011-11-04_09-29-42.tgz
-    mv apache-solr-4.0-2011-11-04_09-29-42 solr 
-    rm apache-solr-4.0-2011-11-04_09-29-42.tgz 
+    mv apache-solr-4.0-2012-01-13_09-34-29 solr 
+    rm apache-solr-4.0-2012-01-13_09-34-29.tgz
+    
+    # link up the solrconfig and schema files to the ones in CL
+    ln -s $CL_INSTALL_DIR/court-listener/Solr/conf/solrconfig.xml /usr/local/solr/example/solr/conf/solrconfig.xml
+    ln -s $CL_INSTALL_DIR/court-listener/Solr/conf/schema.xml /usr/local/solr/example/solr/conf/schema.xml
     
     # make a directory where logs will be created and set up the logger
     ln -s $CL_INSTALL_DIR/court-listener/log-scripts/solr /etc/logrotate.d/solr

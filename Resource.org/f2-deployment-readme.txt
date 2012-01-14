@@ -54,32 +54,18 @@ QA:
  - make sure that the next functionsn work from the register and sign-in pages, and the save favorite popup
  - test that dumps still work
  - test acct deletion
-    
- 
-SOLR
- - Finish the configuration of solr in the installer
-    - include solrconfig.xml in our Solr directory.
-    - include synonyms, stopwords, etc.
- - update all places that search can be performed in the project
-    + RSS feeds
-        + Link in headers
-        + Link in alerts page
-    - Alerts
-        - There were X new results for your Alert. Here are the first 15.
-        - TOC at top of alerts with HTML anchors.
-    + Front end
- - update flat advanced search page
-    - mention that years and months can be used for dates
  - verify search parity:
     - prefix/infix searching
     - phrases
     - facets
         - status:blah works?
     - etc.
+    
+ 
+SOLR
  - set up the Solr synonyms to mirror the ones in Sphinx
- - update the sitemap
- - add coverage, alerts and favorites to the header
- + remove all print lines
+    - when done, status:p should work as should status:precedential
+ - remove all print lines
  - run pylint for a few hours
      - check for TODO statements
  - what happens to cases that lack dates? If Solr handles them well already, we 
@@ -92,14 +78,21 @@ SOLR
     - search results
     - feeds
     - alerts
- + make sure that saving a document updates the index
- - make sure that deleting a document updates the index
- + sort out why Modernizr doesn't seem to be working
- + analyze net usage, and optimize if possible
- - unify the way meta data is shown throughout
+ - unify/test the way meta data is shown throughout
  - test the various IEs
  - search for 2d doesn't highlight in the case title (issue 199)
- - fix the icons
+ - upgrade to get the fix for https://issues.apache.org/jira/browse/SOLR-2749 (reopen if fix isn't there)
+ - what about html content?
+ - result count is missing from the case page in the filters
+ 
+Feedback:
+ - search for 2009, it's corrected to 2010-01-01. s/b 2009-12-31
+ - filter from the case page...doesn't work.
+ - keep filters unchecked on case page. STR:
+    1. Search for essex
+    2. Click on third result
+ - queries that only use the filters with no results look bad: Your search -- -- had no results. Also applies to alerts.
+ - What the hell happened to the headers on the settings pages? 
 
 
 SOLR DEPLOYMENT:
@@ -120,7 +113,7 @@ SOLR DEPLOYMENT:
  - hg pull -u
  - upgrade Django:
     - svn switch -r 17237 http://code.djangoproject.com/svn/django/branches/releases/1.3.X
-    - update 20-private to have this: 'ENGINE': 'django.db.backends.mysql'
+    - update 20-private to have this: 'ENGINE': 'django.db.backends.mysql',
     - restart apache2
  - reindex 
     - How big will our index be? Space on disk, or do we need to remove Sphinx first?

@@ -41,6 +41,10 @@ $(document).ready(function() {
         $(this).toggleClass('arrow-right-before');
         $(this).toggleClass('arrow-down-before');
     });
+    $('#create-alert-header').click(function(){
+    	// Puts the cursor in the alertName box when the create alert section is expanded.
+        $('#id_alertName').focus();
+    });
 });
 Modernizr.load({
     // Sets up HTML5 input placeholders in browsers that don't support them.

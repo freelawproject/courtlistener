@@ -43,10 +43,10 @@
         {% if not error %}
         <div class="sidebar-section">
             {% if not alert_form.errors %}
-                <h3 class="pointer arrow-right-before">Create alert</h3>
+                <h3 class="pointer arrow-right-before" id="create-alert-header">Create alert</h3>
                 <div id="hidden-create-alert" class="hidden">
             {% else %}
-                <h3 class="pointer arrow-down-before">Create alert</h3>
+                <h3 class="pointer arrow-down-before" id="create-alert-header">Create alert</h3>
                 <div id="hidden-create-alert" class="shown">
             {% endif %}
             {% if user.is_authenticated %}
@@ -133,16 +133,6 @@
             <hr class="space"/>
             {% for result in results.object_list %}
                 <article>
-                    {% if result.status = "Published" %}
-                        <div class="green-circle" title="This is a {{ result.status }} opinion"></div>
-                    {% else %} 
-                        {% if result.status = "Unpublished" or result.status = "Errata" or result.status = "In-chambers" or result.status = "Relating-to" %}
-                            <div class="red-circle" title="This is a {{ result.status }} opinion"></div>
-                        {% else %}
-                            <div class="orange-circle" title="The status of this opinion is unknown"></div>
-                        {% endif %}
-                    {% endif %}
-
                     <h3 class="bottom serif">
                         <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}" class="visitable">
                             {{ result.solr_highlights.caseName.0|safe }},
@@ -180,11 +170,13 @@
                         <span class="meta-data-header">Date Filed:</span>
                         <time class="meta-data-value" datetime="{{ result.dateFiled|date:'Y-m-d'}}" pubdate>
                             {% if result.dateFiled %}
-                                {{result.dateFiled|date:"l, F jS, Y"}}
+                                {{result.dateFiled|date:"F jS, Y"}}
                             {% else %}
                                 Unknown date
                             {% endif %}
                         </time>
+                        <span class="meta-data-header">Status:</span>
+                        <span class="meta-data-value">{{ result.status }}</span>
                     </p>
                     <p class="bottom">
                         {% if result.solr_highlights.westCite.0 != '' and result.solr_highlights.westCite.0 != None and result.solr_highlights.docketNumber.0 %}

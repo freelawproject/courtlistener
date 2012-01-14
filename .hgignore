@@ -26,9 +26,6 @@ alert/assets/media/sitemaps
 alert/assets/media/doc
 alert/assets/media/dumps
 
-# the django-sphinx code
-django-sphinx
-
 # the piwik install
 Piwik
 
@@ -38,9 +35,8 @@ Resource.org/data
 # the cached robots.txt from Resource.org
 alert/robots/cached_file.txt
 
-# Sphinx
-Sphinx/data
-Sphinx/log
+# Solr
+Solr/data
 
 # pdfdisplay
 pdfdisplay
