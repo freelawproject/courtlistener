@@ -31,17 +31,6 @@ from django.views.decorators.cache import never_cache
 
 from datetime import date
 
-
-def get_date_filed_or_return_zero(doc):
-    """Used for sorting dates. Returns the date field or the earliest date
-    possible in Python. With this done, items without dates will be listed
-    last without throwing errors to the sort function."""
-    if (doc.dateFiled != None):
-        return doc.dateFiled
-    else:
-        import datetime
-        return datetime.date(1, 1, 1)
-
 @never_cache
 def show_results(request):
     '''Show the results for a query

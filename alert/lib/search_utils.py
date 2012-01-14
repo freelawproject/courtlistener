@@ -94,14 +94,18 @@ def make_date_query(cd):
     '''Given the cleaned data from a form, return a valid Solr fq string'''
     before = cd['filed_before']
     after = cd['filed_after']
-    if hasattr(after, 'strftime'):
-        date_filter = '{%sZ TO ' % after.isoformat()
+    if any([before, after]):
+        if hasattr(after, 'strftime'):
+            date_filter = '{%sZ TO ' % after.isoformat()
+        else:
+            date_filter = '{* TO '
+        if hasattr(before, 'strftime'):
+            date_filter = '%s%sZ}' % (date_filter, before.isoformat())
+        else:
+            date_filter = '%s*}' % date_filter
     else:
-        date_filter = '{* TO '
-    if hasattr(before, 'strftime'):
-        date_filter = '%s%sZ}' % (date_filter, before.isoformat())
-    else:
-        date_filter = '%s*}' % date_filter
+        # No date filters were requested
+        return ""
     return 'dateFiled:%s' % date_filter
 
 def get_selected_field_string(cd, prefix):
