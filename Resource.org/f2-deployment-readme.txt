@@ -71,9 +71,9 @@ SOLR
  - test the various IEs
  - search for 2d doesn't highlight in the case title (issue 199)
  - result count is missing from the case page in the filters
+ - court filter not working!
  
 Feedback:
- - search for 2009, it's corrected to 2010-01-01. s/b 2009-12-31
  - filter from the case page...doesn't work.
  - keep filters unchecked on case page. STR:
     1. Search for essex

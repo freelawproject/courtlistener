@@ -14,8 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from alert.search.fields import CeilingDateTimeField
-from alert.search.fields import FloorDateTimeField
+from alert.search.fields import CeilingDateField
+from alert.search.fields import FloorDateField
 from alert.search.models import Court
 from alert.search.models import DOCUMENT_STATUSES
 from django import forms
@@ -32,25 +32,17 @@ SORT_CHOICES = (
     )
 
 INPUT_FORMATS = [
-    '%Y-%m-%d %H:%M:%S', # '2006-10-25 14:30:59'
-    '%Y-%m-%d %H:%M', # '2006-10-25 14:30'
     '%Y-%m-%d', # '2006-10-25'
     '%Y-%m', # '2006-10'
     '%Y', # '2006'
-    '%m-%d-%Y %H:%M:%S', # '10-25-2006 14:30:59'
-    '%m-%d-%Y %H:%M', # '10-25-2006 14:30'
     '%m-%d-%Y', # '10-25-2006'
     '%m-%Y', # '10-2006'
-    '%m/%d/%Y %H:%M:%S', # '10/25/2006 14:30:59'
-    '%m/%d/%Y %H:%M', # '10/25/2006 14:30'
+    '%m-%d-%y', # '10-25-06'
+    '%m-%y', # '10-06'
     '%m/%d/%Y', # '10/25/2006'
     '%m/%Y', # '10/2006'
-    '%m/%d/%y %H:%M:%S', # '10/25/06 14:30:59'
-    '%m/%d/%y %H:%M', # '10/25/06 14:30'
     '%m/%d/%y', # '10/25/06'
     '%m/%y', # '10/06'
-    '%Y/%m/%d %H:%M:%S', # '2006/10/26 14:30:59'
-    '%Y/%m/%d %H:%M', # '2006/10/26 14:30'
     '%Y/%m/%d', # '2006/10/26'
     '%Y/%m', # '2006/10'
     ]
@@ -66,34 +58,39 @@ class SearchForm(forms.Form):
     case_name = forms.CharField(
                         required=False,
                         widget=forms.TextInput(
-                                   attrs={'class': 'span-5 external-input'}))
-    filed_after = CeilingDateTimeField(
+                                   attrs={'class': 'span-5 external-input',
+                                          'autocomplete': 'off'}))
+    filed_after = FloorDateField(
                         required=False,
                         input_formats=INPUT_FORMATS,
                         widget=forms.TextInput(
                                    attrs={'placeholder': 'YYYY-MM-DD',
-                                          'class': 'span-3 external-input'}))
-    filed_before = FloorDateTimeField(
+                                          'class': 'span-3 external-input',
+                                          'autocomplete': 'off'}))
+    filed_before = CeilingDateField(
                         required=False,
                         input_formats=INPUT_FORMATS,
                         widget=forms.TextInput(
                                    attrs={'placeholder': 'YYYY-MM-DD',
-                                          'class': 'span-3 external-input'}))
+                                          'class': 'span-3 external-input',
+                                          'autocomplete': 'off'}))
     west_cite = forms.CharField(
                         required=False,
                         widget=forms.TextInput(
-                                   attrs={'class': 'span-5 external-input'}))
+                                   attrs={'class': 'span-5 external-input',
+                                          'autocomplete': 'off'}))
     docket_number = forms.CharField(
                         required=False,
                         widget=forms.TextInput(
-                                   attrs={'class': 'span-5 external-input'}))
+                                   attrs={'class': 'span-5 external-input',
+                                          'autocomplete': 'off'}))
 
     def __init__(self, *args, **kwargs):
         super(SearchForm, self).__init__(*args, **kwargs)
 
         # Query the DB so we can build up check boxes for each court in use.  
-        courts = Court.objects.filter(in_use=True).values_list(
-                                                    'courtUUID', 'short_name')
+        courts = Court.objects.filter(in_use=True).values_list('courtUUID', 'short_name')
+
         if self.data.get('sort') is not None:
             # If there's a sort order, this is a refinement.
             self.fields['refine'] = forms.ChoiceField(
