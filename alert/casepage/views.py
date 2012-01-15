@@ -33,7 +33,7 @@ def view_case(request, court, pk, casename):
     '''Take a court and an ID, and return the document.
 
     We also test if the document ID is a favorite for the user, and send data
-    as such. If it's a favorite, we send the bound form for the favorite, so
+    as such. If it's a favorite, we send the bound form for the favorite so
     it can populate the form on the page. If it is not a favorite, we send the
     unbound form.
     '''
@@ -52,7 +52,7 @@ def view_case(request, court, pk, casename):
 
     if search_form.is_valid():
         cd = search_form.cleaned_data
-        court_facet_fields, stat_facet_fields = search_utils.place_facet_queries(cd)
+        court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(cd)
         # Create facet variables that can be used in our templates
         court_facets = search_utils.make_facets_variable(
                          court_facet_fields, search_form, 'court_exact', 'court_')
@@ -70,7 +70,7 @@ def view_case(request, court, pk, casename):
 
     return render_to_response(
                   'view_case.html',
-                  {'title': title, 'doc': doc, 'court': ct,
+                  {'title': title, 'doc': doc, 'court': ct, 'count': count,
                    'favorite_form': favorite_form, 'search_form': search_form,
                    'get_string': get_string, 'court_facets': court_facets,
                    'status_facets': status_facets},

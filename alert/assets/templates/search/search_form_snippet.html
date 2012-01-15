@@ -7,7 +7,7 @@
             <tbody>
                 <tr>
                     <td>
-                        <input class="{% if results.paginator.count == 0 or error %}auto-focus{% endif %} wide-title"
+                        <input class="{% if count == 0 or error %}auto-focus{% endif %} wide-title"
                             value="{{ search_form.q.value|default:'' }}"
                             name="q"
                             id="id_q"
@@ -46,7 +46,7 @@
         </table>
         {% if not error %}
 	        <div id="extra-search-fields">
-	            {% if results.paginator.count > 0 %}{{ search_form.sort }}{% endif %}
+	            {% if count > 0 %}{{ search_form.sort }}{% endif %}
 	            <div id="extra-sidebar-fields">
 	                <h4 class="bottom">Case name</h4>
 	                {{ search_form.case_name }}
@@ -54,15 +54,15 @@
 	                <h4 class="bottom">Federal Appeals Courts</h4>
 
 	                <p class="bottom">
-                        {% if results.paginator.count == 0 %}
+                        {% if count == 0 %}
                             {{ search_form.court_all|attr:"disabled:disabled" }}
                         {% else %}
                             {{ search_form.court_all }}
                         {% endif %}
 	                    <label
 	                        for="id_court_all"
-	                        class="{% if results.paginator.count == 0 %}gray{% else %}pointer{% endif %}">{{ search_form.court_all.label }}</label>
-	                    <span class="gray small">({{ results.paginator.count|intcomma }})</span>
+	                        class="{% if count == 0 %}gray{% else %}pointer{% endif %}">{{ search_form.court_all.label }}</label>
+	                    <span class="gray small">({{ count|intcomma }})</span>
 	                </p>
 	                {% for court in court_facets %}
 	                    <p class="bottom">
