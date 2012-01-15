@@ -193,7 +193,11 @@
             {% endfor %}
         {% else %}
             {% if not error %}
-                <h2 class="alt">Your search &mdash; <strong>{{ request.GET.q }}</strong> &mdash; had no results.</h2>
+                <h2 class="alt">Your search
+                    {% if request.GET.q != "" %}
+                        &mdash; <strong>{{ request.GET.q }}</strong> &mdash; 
+                    {% endif %}
+                    had no results.</h2>
                 <p class="bottom">Search tips:</p>
                 <ul>
                     <li>Check your spelling</li>
@@ -204,7 +208,11 @@
                 have. If you expected more results than this, <a href="/contact/">let us know</a>! 
                 We value your feedback.</p>
             {% else %}
-                <h2 class="alt">Your search &mdash; <strong>{{ request.GET.q }}</strong> &mdash; encountered a <strong>deadly</strong> error.</h2>
+                <h2 class="alt">Your search 
+                    {% if request.GET.q != "" %}
+                        &mdash; <strong>{{ request.GET.q }}</strong> &mdash;
+                    {% endif %}
+                    encountered a <strong>deadly</strong> error.</h2>
                 <p class="bottom">This could be because:</p>
                 <ul>
                     <li>CourtListener couldn't make sense of your query</li>
