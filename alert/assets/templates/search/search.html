@@ -55,7 +55,6 @@
                         {% if alert_form.errors %}
                             <div class="span-4 error">
                                 <p class="bottom">Please fix the errors below.</p>
-                                <p>{{ alert_form.errors }}</p>
                             </div>
                         {% endif %}
                         <form action="" method="post">{% csrf_token %}

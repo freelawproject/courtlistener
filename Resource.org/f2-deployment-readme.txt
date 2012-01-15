@@ -28,30 +28,27 @@ Features:
  + Homepage shows all results
  + Snippets with multiple fragments
  + Highlighting on all returned fields
- - Multicore should be investigated/implemented
+ + Multicore should be investigated/implemented
  - RAM tuning should be investigated/implemented
  - Result speed?
 
 
 
 QA:
- - Check for proper alert deletion and editing functionality, since code rewritten. Tests:
-    - can I delete/edit YOUR alert?
-    - what happens if I try to hack the URL bar with non-ints?
-        - if OK, try it without the int check in the delete_alert and edit_alert functions
+ + Check for proper alert deletion and editing functionality, since code rewritten. Tests:
+    + can I delete/edit YOUR alert?
+    + what happens if I try to hack the URL bar with non-ints?
+        + if OK, try it without the int check in the delete_alert and edit_alert functions
  + Check that the tools page works (code moved but untested)
- - Test that length of the search isn't limited (length of what? The query or the number of results?)
- - Test that Univ. and other v's are fixed so they are only italicized when necessary
- - Ensure that the rabbit-mq, celery and solr will start up at reboot
- - Test whether q='' works
+ + Test that Univ. and other v's are fixed so they are only italicized when necessary
+ + Test whether q='' works
  + Test proper pluralization of results
- - Test with and without JS
- - Test where items are placed when they lack a date and date sorting is used
- - Is there a limit to the number of results? Do we handle it? 
- - Does Piwik still work?
- - Do placeholders work in IE6-9?
- - Test that the various display logic still works for displaying the result meta data (exercise all the if/else statements)
- - make sure that the next functionsn work from the register and sign-in pages, and the save favorite popup
+ + Test with and without JS
+ + Test where items are placed when they lack a date and date sorting is used
+ + Is there a limit to the number of results? Do we handle it? 
+ + Do placeholders work in IE6-9?
+ + Test that the various display logic still works for displaying the result meta data (exercise all the if/else statements)
+ + make sure that the next functions work from the register and sign-in pages, and the save favorite popup
  - test that dumps still work
  - test acct deletion
  - verify search parity:
@@ -138,3 +135,8 @@ SOLR DEPLOYMENT:
     - lost a couple things:
         - some search connectors
     - all alerts updated by hand. Will get an email from us if we have any issues
+    
+     - Test that length of the search isn't limited (length of what? The query or the number of results?)
+     - Ensure that the rabbit-mq, celery and solr will start up at reboot
+     - check speed, ram, CPUs
+     - Does Piwik still work?
