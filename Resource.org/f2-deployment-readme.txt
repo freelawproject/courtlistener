@@ -72,6 +72,7 @@ SOLR
  - search for 2d doesn't highlight in the case title (issue 199)
  - result count is missing from the case page in the filters
  - court filter not working!
+ - tweak the tab index so that the advanced link comes later.
  
 Feedback:
  - filter from the case page...doesn't work.
@@ -79,7 +80,7 @@ Feedback:
     1. Search for essex
     2. Click on third result
  - queries that only use the filters with no results look bad: Your search -- -- had no results. Also applies to alerts.
- - What the hell happened to the headers on the settings pages? 
+ - What the hell happened to the headers on the settings pages?
 
 
 SOLR DEPLOYMENT:

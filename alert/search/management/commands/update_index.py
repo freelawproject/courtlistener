@@ -1,9 +1,25 @@
+# This software and any associated files are copyright 2010 Brian Carver and
+# Michael Lissner.
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 import sys
 
 from alert.lib import sunburnt
 from alert.lib.db_tools import queryset_iterator
+from alert.lib.timer import print_timing
 from alert.search.models import Document
 from alert.search.search_indexes import InvalidDocumentError
 from alert.search.search_indexes import SearchDocument
@@ -49,6 +65,7 @@ class Command(BaseCommand):
     args = '(--update | --delete) (--everything | --document <doc_id> <doc_id>) [--debug]'
     help = 'Adds, updates or removes documents in the index.'
 
+    @print_timing
     def delete(self, *documents):
         '''
         Given a document, creates a Celery task to delete it.
@@ -78,8 +95,8 @@ class Command(BaseCommand):
             self.stdout.write('Committing the deletion...\n')
         self.si.commit()
         self.stdout.write('\nDone. Your index has been emptied. Hope this is what you intended.\n')
-        sys.exit(0)
 
+    @print_timing
     def add_or_update(self, *documents):
         '''
         Given a document, adds it to the index, or updates it if it's already
@@ -89,6 +106,7 @@ class Command(BaseCommand):
         # Use Celery to add or update the document asynrhronously
         add_or_update_docs.delay(documents)
 
+    @print_timing
     def add_or_update_all(self):
         '''
         Iterates over the entire corpus, adding it to the index. Can be run on 
@@ -97,6 +115,9 @@ class Command(BaseCommand):
         '''
         self.stdout.write("Adding or updating all documents...\n")
         everything = queryset_iterator(Document.objects.filter(court__in_use=True))
+        count = Document.objects.all().count()
+        indexed_count = 0
+        punted_count = 0
         for doc in everything:
             # Make a search doc, and add it to the index
             if self.verbosity >= 2:
@@ -104,13 +125,16 @@ class Command(BaseCommand):
             try:
                 search_doc = SearchDocument(doc)
                 self.si.add(search_doc)
+                indexed_count += 1
             except InvalidDocumentError:
-                if self.verbosity >= 1:
+                if self.verbosity >= 2:
                     self.stderr.write('InvalidDocumentError: Unable to index document %s\n' % doc.pk)
+                punted_count += 1
                 pass
-        self.stderr.write('Committing all documents to the index...\n')
+            self.stdout.write("\rIndexed %d of %d.   Punted %d of %d." %
+                              (indexed_count, count, punted_count, count))
+        self.stdout.write('\nCommitting all documents to the index...\n')
         self.si.commit()
-
 
     def handle(self, *args, **options):
         self.verbosity = int(options.get('verbosity', 1))

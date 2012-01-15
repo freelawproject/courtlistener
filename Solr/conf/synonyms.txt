@@ -29,9 +29,8 @@ pixima => pixma
 
 # These are easy b/c we don't want to return documents containing the letter
 # u or the letter p. 
-u => unpublished, non-precedential
+u, unpublished, non-precedential
 p, precedential, published
-
 us, usa, united states
 e, errata
 i, in-chambers
