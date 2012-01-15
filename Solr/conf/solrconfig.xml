@@ -745,14 +745,6 @@
      <fragListBuilder name="simple" default="true" class="solr.highlight.SimpleFragListBuilder"/>
      <!-- Configure the single fragListBuilder -->
      <fragListBuilder name="single" class="solr.highlight.SingleFragListBuilder"/>
-     
-     <boundaryScanner name="breakIterator" class="solr.highlight.BreakIteratorBoundaryScanner">
-       <lst name="defaults">
-         <str name="hl.bs.type">WORD</str>
-         <str name="hl.bs.language">en</str>
-         <str name="hl.bs.country">US</str>
-       </lst>
-     </boundaryScanner>
 
      <lst name="defaults">
        <str name="echoParams">explicit</str>
@@ -780,6 +772,11 @@
        <str name="hl.tag.pre"><![CDATA[<mark>]]></str>
        <str name="hl.tag.post"><![CDATA[</mark>]]></str>
        <str name="hl.useFastVectorHighlighter">true</str>
+       
+       <str name="hl.boundaryScanner">breakIterator</str>
+       <str name="hl.bs.type">WORD</str>
+       <str name="hl.bs.language">en</str>
+       <str name="hl.bs.country">US</str>
               
      </lst>
     <!-- In addition to defaults, "appends" params can be specified
