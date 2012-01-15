@@ -26,6 +26,7 @@
 
 import calendar
 import gzip
+import shutil
 import time
 import os
 
@@ -138,6 +139,8 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 z_file.write('  %s\n' % etree.tostring(row).encode('utf-8'))
 
         except IndexError:
+            # Cleanup the temp files and exit. Ignore errors.
+            shutil.rmtree(os.path.join(path_from_root, temp_dir), True)
             return HttpResponseBadRequest('<h2>Error 400: No cases found \
                 for this time period.</h2>')
 
@@ -156,6 +159,8 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
         pass
 
     # Move the new file to the correct location
+    print "os.path.join(path_from_root, temp_dir, filename): %s " % os.path.join(path_from_root, temp_dir, filename)
+    print "os.path.join(path_from_root, filename) + '.gz': %s " % (os.path.join(path_from_root, filename) + '.gz')
     os.rename(os.path.join(path_from_root, temp_dir, filename),
               os.path.join(path_from_root, filename) + '.gz')
 

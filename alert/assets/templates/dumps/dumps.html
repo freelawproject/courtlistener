@@ -3,8 +3,10 @@
 {% block title %}CourtListener.com / Data Dumps{% endblock %}
 {% block search-form %}{% endblock %}
 
+{% block sidebar %}{% endblock %}
+
 {% block content %}
-    <div class="span-17 last">
+    <div class="span-13 append-2">
         <h2 id="about">XML Data Dumps</h2>
         <p>For hackers and legal analysts, we provide XML dumps of our data.
         We generate these files the first time they are requested, so some files 
@@ -23,7 +25,7 @@
         <h3>Using the Dumps</h3>
         <p>Annual, monthly or daily dumps can be accessed at
         http://courtlistener.com/dump-api/<strong>year/month/day/court</strong>.xml.gz.</p>
-        <p>For example, let's look at ways to access the First Circuit of Appeals (<strong>ca1</strong>):</p>
+        <p class="bottom">For example, let's look at ways to access the First Circuit of Appeals (<strong>ca1</strong>):</p>
         <ul>
             <li>All ca1 cases from 2009: <a href="/dump-api/2009/ca1.xml.gz">
                 http://courtlistner.com/dump-api/<strong>2009/ca1</strong>.xml.gz</a></li>
@@ -33,7 +35,7 @@
                 http://courtlistner.com/dump-api/2009/06/<strong>09</strong>/ca1.xml.gz</a></li>
         </ul>
         
-        <p>If you would like <strong>all</strong> documents for a given time period,
+        <p>If you would like <strong>all</strong> cases for a given time period,
         you can use <strong>all</strong> for the court name. For example,
         <a href="http://courtlistener.com/dump-api/2009/06/09/all.xml.gz">
         http://courtlistener.com/dump-api/2009/06/09/<strong>all</strong>.xml.gz</a>
@@ -45,17 +47,6 @@
         <a href="/dump-api/all.xml.gz">http://courtlistener.com/dump-api/all.xml.gz</a>. 
         This dump is currently very large ({{dump_size}}). It's currently not 
         possible to obtain complete dumps for individual courts.</p>    
-
-        <h3>Available Courts</h3>
-        <p class="bottom">The available court names, in order of start date, are:</p>
-        <ul>
-            <li><strong><a href="/opinions/all/">all</a></strong> - All courts</li>
-            {% for court in courts %}
-                <li>
-                    <strong><a href="/opinions/{{court.courtUUID}}/">{{court.courtUUID}}</a></strong> - {{court.full_name}}
-                </li>
-            {% endfor %}
-        </ul>
         
         <h3>Copyright</h3>
         <p>
@@ -68,6 +59,18 @@
         <h3>Feedback</h3>
         <p>We welcome feedback and feature requests to this API. Please get in touch in
         <a href="https://groups.google.com/forum/#!forum/courtlistener-discuss">our forum</a>.</p>
-
+    </div>
+        
+    <div class="span-9 last">
+        <h3>Available Courts</h3>
+        <p class="bottom">The available court names, in order of start date, are:</p>
+        <ul>
+            <li><strong><a href="/opinions/all/">all</a></strong> - All courts</li>
+            {% for court in courts %}
+                <li>
+                    <strong><a href="/?q=&case_name=&court_{{court.courtUUID}}=on&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Relating-to+orders=on&filed_after=&filed_before=&west_cite=&docket_number=&sort=score+asc">{{court.courtUUID}}</a></strong> - {{court.full_name}}
+                </li>
+            {% endfor %}
+        </ul>
     </div>
 {% endblock %}
