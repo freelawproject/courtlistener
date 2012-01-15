@@ -60,19 +60,16 @@ QA:
     - facets
         - status:blah works?
     - etc.
-    
- 
-SOLR
- - set up the Solr synonyms to mirror the ones in Sphinx
-    - when done, status:p should work as should status:precedential
  - remove all print lines
  - run pylint for a few hours
      - check for TODO statements
  - test the various IEs
+ 
+    
+ 
+SOLR
  - search for 2d doesn't highlight in the case title (issue 199)
- - result count is missing from the case page in the filters
- - court filter not working!
- - tweak the tab index so that the advanced link comes later.
+ - court query filter not working! - try a search for court:ca2
  
 Feedback:
  - filter from the case page...doesn't work.

@@ -256,7 +256,9 @@ def place_facet_queries(cd):
     court_facet_params.update(shared_facet_params)
     stat_facet_params.update(shared_facet_params)
 
-    court_facet_fields = conn.raw_query(**court_facet_params).execute().facet_counts.facet_fields
+    court_response = conn.raw_query(**court_facet_params).execute()
+    count = court_response.result.numFound
+    court_facet_fields = court_response.facet_counts.facet_fields
     stat_facet_fields = conn.raw_query(**stat_facet_params).execute().facet_counts.facet_fields
 
-    return court_facet_fields, stat_facet_fields
+    return court_facet_fields, stat_facet_fields, count

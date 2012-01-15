@@ -78,7 +78,7 @@ def show_results(request):
         try:
             conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
             results_si = conn.raw_query(**search_utils.build_main_query(cd))
-            court_facet_fields, stat_facet_fields = search_utils.place_facet_queries(cd)
+            court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(cd)
             # Create facet variables that can be used in our templates
             court_facets = search_utils.make_facets_variable(
                              court_facet_fields, search_form, 'court_exact', 'court_')
@@ -127,7 +127,8 @@ def show_results(request):
                       'search/search.html',
                       {'search_form': search_form, 'alert_form': alert_form,
                        'results': paged_results, 'court_facets': court_facets,
-                       'status_facets': status_facets, 'get_string': get_string},
+                       'status_facets': status_facets, 'get_string': get_string,
+                       'count': count},
                       RequestContext(request))
     else:
         # Invalid form, send it back
