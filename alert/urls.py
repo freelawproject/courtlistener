@@ -51,8 +51,8 @@ from alert.userHandling.views import register
 from alert.userHandling.views import registerSuccess
 from alert.userHandling.views import requestEmailConfirmation
 from alert.userHandling.views import view_favorites
-from alert.userHandling.views import viewAlerts
-from alert.userHandling.views import viewSettings
+from alert.userHandling.views import view_alerts
+from alert.userHandling.views import view_settings
 
 # this imports a variable that can be handed to the sitemap index generator function.
 from alert.casepage.sitemap import all_sitemaps as sitemaps
@@ -109,9 +109,9 @@ urlpatterns = patterns('',
 
     # Settings pages
     (r'^profile/$', redirect_to_settings),
-    url(r'^profile/settings/$', viewSettings, name='viewSettings'),
+    url(r'^profile/settings/$', view_settings, name='viewSettings'),
     (r'^profile/favorites/$', view_favorites),
-    (r'^profile/alerts/$', viewAlerts),
+    (r'^profile/alerts/$', view_alerts),
     (r'^profile/password/change/$', password_change),
     (r'^profile/delete/$', deleteProfile),
     (r'^profile/delete/done/$', deleteProfileDone),

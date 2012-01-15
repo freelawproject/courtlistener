@@ -42,7 +42,7 @@ def redirect_to_settings(request):
 
 @login_required
 @never_cache
-def viewAlerts(request):
+def view_alerts(request):
     return render_to_response('profile/alerts.html', {},
         RequestContext(request))
 
@@ -54,7 +54,7 @@ def view_favorites(request):
 
 @login_required
 @never_cache
-def viewSettings(request):
+def view_settings(request):
     oldEmail = request.user.email # this line has to be at the top to work.
     user = request.user
     up = user.get_profile()
