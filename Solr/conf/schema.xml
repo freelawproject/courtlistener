@@ -37,7 +37,7 @@
         <tokenizer class="solr.WhitespaceTokenizerFactory"/>
         <filter class="solr.SynonymFilterFactory" synonyms="/var/www/court-listener/Solr/conf/synonyms.txt" ignoreCase="true" expand="true"/>
         <filter class="solr.StopFilterFactory" ignoreCase="true" words="/var/www/court-listener/Solr/conf/stopwords.txt"/>
-        <filter class="solr.WordDelimiterFilterFactory" generateWordParts="1" generateNumberParts="1" catenateWords="1" catenateNumbers="1" catenateAll="0"/>
+        <filter class="solr.WordDelimiterFilterFactory" generateWordParts="1" generateNumberParts="1" catenateWords="1" catenateNumbers="1" catenateAll="0" splitOnNumerics="0"/>
         <filter class="solr.LowerCaseFilterFactory"/>
         <filter class="solr.SnowballPorterFilterFactory" protected="/var/www/court-listener/Solr/conf/protwords.txt" language="English"/>
         <filter class="solr.RemoveDuplicatesTokenFilterFactory"/>
@@ -45,13 +45,31 @@
       <analyzer type="query">
         <tokenizer class="solr.WhitespaceTokenizerFactory"/>
         <filter class="solr.StopFilterFactory" ignoreCase="true" words="/var/www/court-listener/Solr/conf/stopwords.txt"/>
-        <filter class="solr.WordDelimiterFilterFactory" generateWordParts="1" generateNumberParts="1" catenateWords="0" catenateNumbers="0" catenateAll="0"/>
+        <filter class="solr.WordDelimiterFilterFactory" generateWordParts="1" generateNumberParts="1" catenateWords="0" catenateNumbers="0" catenateAll="0" splitOnNumerics="0"/>
         <filter class="solr.LowerCaseFilterFactory"/>
         <filter class="solr.SnowballPorterFilterFactory" protected="/var/www/court-listener/Solr/conf/protwords.txt" language="English"/>
         <filter class="solr.RemoveDuplicatesTokenFilterFactory"/>
       </analyzer>
     </fieldType>
-
+    
+    <fieldType name="text_no_word_parts" class="solr.TextField" positionIncrementGap="100">
+        <!--  mlr: Stops words like Non-precedential from being indexed as precedential by turning off generateWordParts -->
+        <analyzer type="index">
+            <tokenizer class="solr.WhitespaceTokenizerFactory"/>
+            
+            <filter class="solr.SynonymFilterFactory" synonyms="/var/www/court-listener/Solr/conf/synonyms.txt" ignoreCase="true" expand="true"/>
+            <filter class="solr.WordDelimiterFilterFactory" generateWordParts="0" generateNumberParts="1" catenateWords="1" catenateNumbers="1" catenateAll="0" splitOnNumerics="0"/>
+            <filter class="solr.LowerCaseFilterFactory"/>
+            <filter class="solr.RemoveDuplicatesTokenFilterFactory"/>
+        </analyzer>
+        <analyzer type="query">
+            <tokenizer class="solr.WhitespaceTokenizerFactory"/>
+            <filter class="solr.WordDelimiterFilterFactory" generateWordParts="0" generateNumberParts="1" catenateWords="0" catenateNumbers="0" catenateAll="0" splitOnNumerics="0"/>
+            <filter class="solr.LowerCaseFilterFactory"/>
+            <filter class="solr.RemoveDuplicatesTokenFilterFactory"/>
+        </analyzer>
+    </fieldType>
+    
     <fieldType name="text_ws" class="solr.TextField" positionIncrementGap="100">
       <analyzer>
         <tokenizer class="solr.WhitespaceTokenizerFactory"/>
@@ -102,7 +120,7 @@
     
     <field name="text" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true"/>
     
-    <field name="status" type="text" indexed="true" stored="true" multiValued="false" />
+    <field name="status" type="text_no_word_parts" indexed="true" stored="true" multiValued="false" />
     <field name="court" type="text" indexed="true" stored="true" multiValued="false" />
     <field name="court_id" type="text" indexed="true" stored="true" multiValued="false" />
     <field name="court_citation_string" type="string" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
