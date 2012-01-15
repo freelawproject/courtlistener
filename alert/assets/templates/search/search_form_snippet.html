@@ -12,18 +12,20 @@
                             name="q"
                             id="id_q"
                             autocomplete="off"
-                            type="text">
+                            type="text"
+                            tabindex="5">
                      </td>
                     <td>
                         <button type="submit"
                             class="button title"
                             name="search"
-                            id="search-button">Search</button>
+                            id="search-button"
+                            tabindex="6">Search</button>
                     </td>
                 </tr>
                 <tr>
                     <td colspan="2">
-                        <div class="left"><a href="/search/advanced-techniques" id="advanced">Advanced</a></div>
+                        <div class="left"><a href="/search/advanced-techniques" id="advanced" tabindex="8">Advanced</a></div>
                         <div class="right">
                             {% for choice in search_form.refine.field.choices %}
 	                            <label for="id_{{ search_form.refine.html_name }}_{{ forloop.counter0 }}" class="pointer">
@@ -32,6 +34,7 @@
 		                                id="id_{{ search_form.refine.html_name }}_{{ forloop.counter0 }}"
 		                                value="{{ choice.0 }}"
 		                                name="{{ search_form.refine.html_name }}"
+                                        tabindex="7"
 		                                {% if choice.0 == search_form.refine.value %}checked="checked"{% endif %}>
 		                                {{ choice.1 }}
 	                            </label>

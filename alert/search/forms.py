@@ -54,12 +54,14 @@ class SearchForm(forms.Form):
                          initial='rel',
                          required=False,
                          widget=forms.Select(
-                                   attrs={'class': 'external-input'}))
+                                   attrs={'class': 'external-input',
+                                          'tabindex':'9'}))
     case_name = forms.CharField(
                         required=False,
                         widget=forms.TextInput(
                                    attrs={'class': 'span-5 external-input',
-                                          'autocomplete': 'off'}))
+                                          'autocomplete': 'off',
+                                          'tabindex': '10'}))
     filed_after = FloorDateField(
                         required=False,
                         input_formats=INPUT_FORMATS,
@@ -97,7 +99,7 @@ class SearchForm(forms.Form):
                                               choices=REFINE_CHOICES,
                                               required=False,
                                               initial='refine',
-                                              widget=forms.RadioSelect())
+                                              widget=forms.RadioSelect(attrs={'tabindex': '7'}))
             self.fields['court_all'] = forms.BooleanField(
                                                   label='All Courts',
                                                   required=False,

@@ -151,13 +151,13 @@
                                 <span class="meta-data-header">View Original:</span>
                                 <span class="meta-data-value">
                                     {% if result.download_url %}
-                                        <a href="{{ result.download_url }}" class="visitable" rel="external noreferrer">From the court</a>
+                                        <a href="{{ result.download_url }}" class="visitable" rel="external noreferrer" tabindex="-1">From the court</a>
                                     {% endif %}
                                     {% if result.download_url and result.local_path %}
                                         &nbsp;&nbsp;|&nbsp;&nbsp;
                                     {% endif %}
                                     {% if result.local_path %}
-                                        <a href="/{{ result.local_path }}" class="visitable">Our backup</a>
+                                        <a href="/{{ result.local_path }}" class="visitable" tabindex="-1">Our backup</a>
                                     {% endif %}
                                 </span>
                             {% else %}
