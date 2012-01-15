@@ -70,14 +70,6 @@ QA:
 SOLR
  - search for 2d doesn't highlight in the case title (issue 199)
  - court query filter not working! - try a search for court:ca2
- 
-Feedback:
- - filter from the case page...doesn't work.
- - keep filters unchecked on case page. STR:
-    1. Search for essex
-    2. Click on third result
- - queries that only use the filters with no results look bad: Your search -- -- had no results. Also applies to alerts.
- - What the hell happened to the headers on the settings pages?
 
 
 SOLR DEPLOYMENT:
