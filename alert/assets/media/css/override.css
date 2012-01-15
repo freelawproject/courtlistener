@@ -93,7 +93,7 @@ mark {
     background-color: #ffffbf;
 }
 
-.serif{ font-family: "Warnock Pro","Goudy Old Style","Palatino","Book Antiqua",Georgia,serif; }
+.serif{ font-family: "Warnock Pro","Palatino","Book Antiqua",Georgia,serif; }
 .meta-data-header{ font-weight: bold; }
 .meta-data-value{ margin-right: 2em; }
 .placeholder{ color: #aaa; }

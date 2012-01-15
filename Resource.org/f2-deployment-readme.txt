@@ -69,7 +69,6 @@ QA:
  
 SOLR
  - search for 2d doesn't highlight in the case title (issue 199)
- - court query filter not working! - try a search for court:ca2
 
 
 SOLR DEPLOYMENT:
