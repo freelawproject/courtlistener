@@ -96,13 +96,13 @@ def make_date_query(cd):
     after = cd['filed_after']
     if any([before, after]):
         if hasattr(after, 'strftime'):
-            date_filter = '{%sZ TO ' % after.isoformat()
+            date_filter = '[%sT00:00:00Z TO ' % after.isoformat()
         else:
-            date_filter = '{* TO '
+            date_filter = '[* TO '
         if hasattr(before, 'strftime'):
-            date_filter = '%s%sZ}' % (date_filter, before.isoformat())
+            date_filter = '%s%sT23:59:59Z]' % (date_filter, before.isoformat())
         else:
-            date_filter = '%s*}' % date_filter
+            date_filter = '%s*]' % date_filter
     else:
         # No date filters were requested
         return ""
