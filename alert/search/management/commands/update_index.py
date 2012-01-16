@@ -21,11 +21,10 @@ from alert.lib import sunburnt
 from alert.lib.db_tools import queryset_iterator
 from alert.lib.timer import print_timing
 from alert.search.models import Document
-from alert.search.search_indexes import InvalidDocumentError
-from alert.search.search_indexes import SearchDocument
 # Celery requires imports like this. Disregard syntax error.
 from search.tasks import delete_docs
 from search.tasks import add_or_update_docs
+from search.tasks import add_or_update_doc_object
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -116,30 +115,26 @@ class Command(BaseCommand):
         self.stdout.write("Adding or updating all documents...\n")
         everything = queryset_iterator(Document.objects.all())
         count = Document.objects.all().count()
-        indexed_count = 0
-        punted_count = 0
+        processed_count = 0
         not_in_use = 0
         for doc in everything:
             # Make a search doc, and add it to the index
             if self.verbosity >= 2:
                 self.stdout.write('Indexing document %s' % doc.pk)
             if doc.court.in_use == True:
-                try:
-                    search_doc = SearchDocument(doc)
-                    self.si.add(search_doc)
-                    indexed_count += 1
-                except InvalidDocumentError:
-                    if self.verbosity >= 2:
-                        self.stderr.write('InvalidDocumentError: Unable to index document %s\n' % doc.pk)
-                    punted_count += 1
-                    pass
+                add_or_update_doc_object.delay(doc)
+                processed_count += 1
             else:
                 # The document is in an unused court
                 not_in_use += 1
 
-            self.stdout.write("\rIndexed %d of %d.   Punted %d of %d.   Not in use: %d" %
-                              (indexed_count, count, punted_count, count, not_in_use))
-        self.stdout.write('\nCommitting all documents to the index...\n')
+            if processed_count % 1000 == 0:
+                # Do a commit every 1000 items, for good measure.
+                self.si.commit()
+
+            self.stdout.write("\rProcessed %d of %d.   Not in use: %d" %
+                              (processed_count, count, not_in_use))
+        self.stdout.write('\nCommitting last chunk...\n')
         self.si.commit()
 
     def handle(self, *args, **options):

@@ -62,7 +62,9 @@ QA:
      - check for TODO statements
  - test the various IEs
  
-    
+x GB/600000 
+
+1gb/19000
  
 SOLR
  - search for 2d doesn't highlight in the case title (issue 199)
@@ -118,11 +120,11 @@ SOLR DEPLOYMENT:
         - possibly useful: select au.first_name, au.last_name, au.email, au.username, a.alertName, a.alertText, a.alertFrequency from Alert a left outer join UserProfile_alert upa on upa.alert_id = a.alertUUID left outer join UserProfile up on upa.userprofile_id = up.userProfileUUID left outer join auth_user au on au.id = up.user_id order by au.email;
         
  
- - uninstall Sphinx!
-    - remove Sphinx logs
-    - remove Sphinx indexes
-    - remove Sphinx configs
-    - remove database table: drop table sph_counter;
+ + uninstall Sphinx!
+    + remove Sphinx logs
+    + remove Sphinx indexes
+    + remove Sphinx configs
+    + remove database table: drop table sph_counter;
     
   note to blog:
     - big overhaul, lots of new features
@@ -136,9 +138,11 @@ SOLR DEPLOYMENT:
         - some search connectors
     - all alerts updated by hand. Will get an email from us if we have any issues
     
-     - Test that length of the search isn't limited (length of what? The query or the number of results?)
-     - Ensure that the rabbit-mq, celery and solr will start up at reboot
-     - check speed, ram, CPUs
-     - Does Piwik still work?
-     - Do the dumps get served? Do they get cached? Do they work properly when there's no data behind the dump?
-     - verify that the correct courts are/aren't in use 
+ - Test that length of the search isn't limited (length of what? The query or the number of results?)
+ - Ensure that the rabbit-mq, celery and solr will start up at reboot
+ - check speed, ram, CPUs
+ - Does Piwik still work?
+ - Do the dumps get served? Do they get cached? Do they work properly when there's no data behind the dump?
+ - verify that the correct courts are/aren't in use
+ - fix issue with encodings...somehow.
+     

@@ -24,10 +24,27 @@ setup_environ(settings)
 from alert.lib import sunburnt
 from alert.search.models import Citation
 from alert.search.models import Document
+from alert.search.search_indexes import InvalidDocumentError
 from alert.search.search_indexes import SearchDocument
 from celery.decorators import task
 
 si = sunburnt.SolrInterface(settings.SOLR_URL, mode='w')
+
+@task
+def add_or_update_doc_object(doc):
+    '''Adds a document object to the solr index.
+    
+    This function is for use with the update_index command. It's slightly 
+    different thant he commands below because it expects a django object, 
+    rather than a primary key. This rejects the standard Celery advice about
+    not passing objects around, but thread safety shouldn't be an issue since
+    this is only used by the update_index command.'''
+    try:
+        search_doc = SearchDocument(doc)
+        si.add(search_doc)
+        return 0
+    except InvalidDocumentError:
+        print "Unable to parse document %s" % doc.pk
 
 @task
 def delete_docs(docs):
