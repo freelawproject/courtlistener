@@ -21,9 +21,6 @@ from alert import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-
 from alert.lib import sunburnt
 from alert.search.models import Citation
 from alert.search.models import Document

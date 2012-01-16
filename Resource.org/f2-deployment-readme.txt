@@ -72,9 +72,9 @@ SOLR DEPLOYMENT:
  - install Solr (see script)
  - install daemon
  - cron:
-    - remove Sphinx @restart cron job <-- this should match the installer cron jobs.
-    - add any Solr indexing cron jobs --> NONE!
-    - change the alerts to use mly, wkly and dly
+    + remove Sphinx @restart cron job <-- this should match the installer cron jobs.
+    + add any Solr indexing cron jobs --> NONE!
+    + change the alerts to use mly, wly and dly
  - Run:
     sudo update-rc.d solr defaults
     sudo update-rc.d celeryd defaults
