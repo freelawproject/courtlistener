@@ -69,13 +69,13 @@ SOLR
 
 
 SOLR DEPLOYMENT:
- - install Solr (see script)
- - install daemon
- - cron:
+ + install Solr (see script)
+ + install daemon
+ + cron:
     + remove Sphinx @restart cron job <-- this should match the installer cron jobs.
     + add any Solr indexing cron jobs --> NONE!
     + change the alerts to use mly, wly and dly
- - Run:
+ + Run:
     sudo update-rc.d solr defaults
     sudo update-rc.d celeryd defaults
     # Fix the init.d link for the scraper:
@@ -83,11 +83,11 @@ SOLR DEPLOYMENT:
     sudo ln -s /var/www/court-listener/init-scripts/scraper /etc/init.d/scraper
     sudo update-rc.d scraper defaults
     
- - hg pull -u
- - upgrade Django:
-    - svn switch -r 17237 http://code.djangoproject.com/svn/django/branches/releases/1.3.X
-    - update 20-private to have this: 'ENGINE': 'django.db.backends.mysql',
-    - restart apache2
+ + hg pull -u
+ + upgrade Django:
+    + svn switch -r 17237 http://code.djangoproject.com/svn/django/branches/releases/1.3.X
+    + update 20-private to have this: 'ENGINE': 'django.db.backends.mysql',
+    + restart apache2
  - reindex 
     - How big will our index be? Space on disk, or do we need to remove Sphinx first?
         - Should be OK. There are 736 docs on my local system, which require 22MB.
