@@ -33,7 +33,11 @@ def queryset_iterator(queryset, chunksize=1000):
         chunksize = 5
 
     documentUUID = 0
+    qs = queryset.order_by('-pk')
+    print qs.query
     last_pk = queryset.order_by('-documentUUID')[0].documentUUID
+
+
     queryset = queryset.order_by('documentUUID')
     while documentUUID < last_pk:
         for row in queryset.filter(documentUUID__gt=documentUUID)[:chunksize]:
