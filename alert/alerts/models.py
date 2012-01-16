@@ -40,7 +40,7 @@ class Alert(models.Model):
         null=True)
 
     def __unicode__(self):
-        return 'Alert ' + str(self.alertUUID) + ': ' + self.alertText
+        return 'Alert ' + str(self.alertUUID) + ': ' + self.alertName
 
     class Meta:
         verbose_name = 'alert'
