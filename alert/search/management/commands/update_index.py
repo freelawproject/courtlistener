@@ -114,8 +114,6 @@ class Command(BaseCommand):
         existing documents will be updated.
         '''
         self.stdout.write("Adding or updating all documents...\n")
-        qs = Document.objects.all()
-        print qs.query
         everything = queryset_iterator(Document.objects.all())
         count = Document.objects.all().count()
         indexed_count = 0
