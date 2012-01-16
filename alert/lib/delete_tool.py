@@ -33,6 +33,8 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from alert.search.models import Court
+from alert.search.models import Citation
+from alert.search.models import Document
 from lib.db_tools import queryset_iterator
 
 import datetime
