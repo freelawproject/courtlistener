@@ -27,6 +27,7 @@ from alert.favorites.views import save_or_update_favorite
 from alert.feeds.views import all_courts_feed
 from alert.feeds.views import court_feed
 from alert.feeds.views import search_feed
+from alert.maintenance_warning.views import show_maintenance_warning
 from alert.pinger.views import validateForBing
 from alert.pinger.views import validateForGoogle
 from alert.pinger.views import validateForGoogle2
@@ -92,6 +93,9 @@ urlpatterns = patterns('',
             {'url': '/media/images/png/apple-touch-icon-precomposed.png'}),
     (r'^bad-browser/$', browser_warning),
 
+    # Maintenance mode!
+    (r'/*', show_maintenance_warning),
+
     # Display a case, a named URL because the get_absolute_url uses it.
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case,
         name="view_case"),
@@ -109,7 +113,7 @@ urlpatterns = patterns('',
 
     # Settings pages
     (r'^profile/$', redirect_to_settings),
-    url(r'^profile/settings/$', view_settings, name='viewSettings'),
+    url(r'^profile/settings/$', view_settings, name='view_settings'),
     (r'^profile/favorites/$', view_favorites),
     (r'^profile/alerts/$', view_alerts),
     (r'^profile/password/change/$', password_change),

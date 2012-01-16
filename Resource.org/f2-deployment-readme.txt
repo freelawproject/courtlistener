@@ -49,8 +49,8 @@ QA:
  + Do placeholders work in IE6-9?
  + Test that the various display logic still works for displaying the result meta data (exercise all the if/else statements)
  + make sure that the next functions work from the register and sign-in pages, and the save favorite popup
- - test that dumps still work
- - test acct deletion
+ + test that dumps still work
+ + test acct deletion
  - verify search parity:
     - prefix/infix searching
     - phrases
@@ -140,3 +140,4 @@ SOLR DEPLOYMENT:
      - Ensure that the rabbit-mq, celery and solr will start up at reboot
      - check speed, ram, CPUs
      - Does Piwik still work?
+     - Do the dumps get served? Do they get cached? Do they work properly when there's no data behind the dump? 

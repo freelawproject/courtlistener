@@ -38,7 +38,7 @@ import hashlib
 
 
 def redirect_to_settings(request):
-    return redirect(viewSettings, permanent=True)
+    return redirect(view_settings, permanent=True)
 
 @login_required
 @never_cache
