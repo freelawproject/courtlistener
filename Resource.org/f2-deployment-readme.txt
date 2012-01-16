@@ -140,4 +140,5 @@ SOLR DEPLOYMENT:
      - Ensure that the rabbit-mq, celery and solr will start up at reboot
      - check speed, ram, CPUs
      - Does Piwik still work?
-     - Do the dumps get served? Do they get cached? Do they work properly when there's no data behind the dump? 
+     - Do the dumps get served? Do they get cached? Do they work properly when there's no data behind the dump?
+     - verify that the correct courts are/aren't in use 

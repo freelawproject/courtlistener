@@ -114,25 +114,33 @@ class Command(BaseCommand):
         existing documents will be updated.
         '''
         self.stdout.write("Adding or updating all documents...\n")
-        everything = queryset_iterator(Document.objects.filter(court__in_use=True))
+        qs = Document.objects.all()
+        print qs.query
+        everything = queryset_iterator(Document.objects.all())
         count = Document.objects.all().count()
         indexed_count = 0
         punted_count = 0
+        not_in_use = 0
         for doc in everything:
             # Make a search doc, and add it to the index
             if self.verbosity >= 2:
                 self.stdout.write('Indexing document %s' % doc.pk)
-            try:
-                search_doc = SearchDocument(doc)
-                self.si.add(search_doc)
-                indexed_count += 1
-            except InvalidDocumentError:
-                if self.verbosity >= 2:
-                    self.stderr.write('InvalidDocumentError: Unable to index document %s\n' % doc.pk)
-                punted_count += 1
-                pass
-            self.stdout.write("\rIndexed %d of %d.   Punted %d of %d." %
-                              (indexed_count, count, punted_count, count))
+            if doc.court.in_use == True:
+                try:
+                    search_doc = SearchDocument(doc)
+                    self.si.add(search_doc)
+                    indexed_count += 1
+                except InvalidDocumentError:
+                    if self.verbosity >= 2:
+                        self.stderr.write('InvalidDocumentError: Unable to index document %s\n' % doc.pk)
+                    punted_count += 1
+                    pass
+            else:
+                # The document is in an unused court
+                not_in_use += 1
+
+            self.stdout.write("\rIndexed %d of %d.   Punted %d of %d.   Not in use: %d" %
+                              (indexed_count, count, punted_count, count, not_in_use))
         self.stdout.write('\nCommitting all documents to the index...\n')
         self.si.commit()
 
