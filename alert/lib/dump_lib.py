@@ -159,8 +159,6 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
         pass
 
     # Move the new file to the correct location
-    print "os.path.join(path_from_root, temp_dir, filename): %s " % os.path.join(path_from_root, temp_dir, filename)
-    print "os.path.join(path_from_root, filename) + '.gz': %s " % (os.path.join(path_from_root, filename) + '.gz')
     os.rename(os.path.join(path_from_root, temp_dir, filename),
               os.path.join(path_from_root, filename) + '.gz')
 
