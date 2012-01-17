@@ -1,0 +1,3 @@
+Indexing 601290 documents took 19606 seconds (~5.5hrs).
+
+The index is 18GB in size.

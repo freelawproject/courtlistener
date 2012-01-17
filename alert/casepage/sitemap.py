@@ -45,7 +45,7 @@ def index_copy(request, sitemaps):
             pages = site().paginator.num_pages
         else:
             pages = site.paginator.num_pages
-        sitemap_url = urlresolvers.reverse('alert.alerts.sitemap.cachedSitemap', kwargs={'section': section})
+        sitemap_url = urlresolvers.reverse('alert.casepage.sitemap.cached_sitemap', kwargs={'section': section})
         sites.append('%s://%s%s' % (protocol, current_site.domain, sitemap_url))
         if pages > 1:
             for page in range(2, pages + 1):
