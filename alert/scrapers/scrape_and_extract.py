@@ -1400,17 +1400,14 @@ def main():
         # no verbosity supplied, assume 0
         VERBOSITY = 0
 
+    courts = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
+    courtID = options.courtID
     if not DAEMONMODE:
-        # some data validation, for good measure
-        try:
-            courtID = int(options.courtID)
-        except:
+        if not any([courtID not in courts, courtID != 'all']):
             print "Error: court not found"
             raise ObjectDoesNotExist
 
         if courtID == 'all':
-            # get the court IDs from models.py
-            courts = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
             for court in courts:
                 # This catches all exceptions regardless of their trigger, so
                 # if one court dies, the next isn't affected.
@@ -1435,8 +1432,6 @@ def main():
         # If so, run the scrapers. If not, check the next one.
         VERBOSITY = 0
 
-        # get the court IDs from models.py
-        courts = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
         num_courts = len(courts)
         wait = (30 * 60) / len(courts)
         i = 0
@@ -1454,7 +1449,6 @@ def main():
                 # increment it
                 i += 1
     return 0
-
 
 if __name__ == '__main__':
     main()
