@@ -330,6 +330,7 @@ function install_court_listener {
     # we link up the init scripts
     echo "Installing init scripts in /etc/init.d/scraper"
     ln -s $CL_INSTALL_DIR/court-listener/init-scripts/scraper /etc/init.d/scraper
+    mkdir /var/run/scraper
     update-rc.d scraper defaults
 
     # we create the logging file and set up logrotate scripts
