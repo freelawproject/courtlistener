@@ -171,8 +171,7 @@ urlpatterns = patterns('',
     (r'^google646349975c2495b6.html$', validateForGoogle3),
 
     # Sitemap index generator
-    (r'^sitemap\.xml$', 'alert.casepage.sitemap.index_copy',
-        {'sitemaps': sitemaps}),
+    (r'^sitemap\.xml$', 'alert.casepage.sitemap.index_copy', {'sitemaps': sitemaps}),
     # this uses a custom sitemap generator that has a file-based cache.
     (r'^sitemap-(?P<section>.+)\.xml$', 'alert.casepage.sitemap.cached_sitemap',
         {'sitemaps': sitemaps}),
