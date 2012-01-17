@@ -25,6 +25,8 @@
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
 
+# Debug daemon using the -f flag to run it in the foreground. 
+
 start () {
     echo -n "Starting the scraper...."
     daemon --command="/usr/bin/python /var/www/court-listener/alert/scrapers/scrape_and_extract.py -d" --respawn --output=/var/log/scraper/daemon_log.out --name=scraper --user=www-data --verbose --pidfiles=/var/run/scraper
