@@ -164,8 +164,10 @@ class SolrUnicodeField(SolrField):
     def from_user_data(self, value):
         if isinstance(value, SolrString):
             return value
-        else:
+        elif isinstance(value, unicode) or isinstance(value, long):
             return WildcardString(unicode(value))
+        else:
+            return WildcardString(unicode(value, encoding='utf-8'))
 
     def to_query(self, value):
         return value.escape_for_lqs_term()

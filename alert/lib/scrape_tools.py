@@ -31,15 +31,18 @@ from alert import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alert.search.models import Citation
-from alert.search.models import Document
-from alert.scrapers.models import urlToHash
 from alert.lib.string_utils import clean_string
 from alert.lib.string_utils import harmonize
 from alert.lib.string_utils import titlecase
 from alert.lib.string_utils import trunc
+from alert.search.models import Citation
+from alert.search.models import Document
+from alert.search.tasks import save_doc_handler
+from alert.scrapers.models import urlToHash
+
 
 from django.core.files.base import ContentFile
+from django.db.models.signals import post_save
 from django.utils.encoding import smart_unicode
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
@@ -154,8 +157,16 @@ def makeDocFromURL(LinkToDoc, ct):
     sha1Hash = hashlib.sha1(data).hexdigest()
 
     # using that, we check for a dup
+    post_save.disconnect(
+                save_doc_handler,
+                sender=Document,
+                dispatch_uid='save_doc_handler')
     doc, created = Document.objects.get_or_create(documentSHA1=sha1Hash,
-        court=ct)
+                                                  court=ct)
+    post_save.connect(
+                save_doc_handler,
+                sender=Document,
+                dispatch_uid='save_doc_handler')
 
     if created:
         # we only do this if it's new
