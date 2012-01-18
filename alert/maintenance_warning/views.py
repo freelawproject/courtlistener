@@ -14,12 +14,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from django.shortcuts import render_to_response
-from django.template import RequestContext
+from django.http import HttpResponse
+from django.template import Context, loader
 from django.views.decorators.cache import never_cache
+
+class HttpResponseTemporaryUnavailable(HttpResponse):
+    status = 503
 
 @never_cache
 def show_maintenance_warning(request):
-    '''Blocks access to a URL, and instead loads a maintenance warning.'''
-    return render_to_response('maintenance/maintenance.html', {},
-                              RequestContext(request))
+    '''Blocks access to a URL, and instead loads a maintenance warning. 
+    
+    Uses a 503 status code, which preserves SEO. See:
+    https://plus.google.com/115984868678744352358/posts/Gas8vjZ5fmB
+    '''
+    t = loader.get_template('maintenance/sopa.html')
+    return HttpResponseTemporaryUnavailable(t.render(Context({})))
