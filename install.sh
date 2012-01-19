@@ -206,7 +206,7 @@ function check_deps {
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-    deps=(aptitude antiword checkinstall daemon g++ gcc git-core ipython libmysqlclient-dev libmysql++-dev libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget)
+    deps=(aptitude antiword checkinstall daemon g++ gcc git-core ipython  libapache2-mod-xsendfile libmysqlclient-dev libmysql++-dev libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget)
     for dep in ${deps[@]}
     do
         echo -n "Checking for $dep..."
