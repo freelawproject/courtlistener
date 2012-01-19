@@ -17,6 +17,7 @@
 # imports of local settings and views
 from alert import settings
 from alert.casepage.views import view_case
+from alert.casepage.views import serve_static_file
 from alert.contact.views import contact
 from alert.contact.views import thanks
 from alert.data_dumper.views import dump_index
@@ -72,6 +73,7 @@ admin.autodiscover()
 
 # creates a list of the first element of the choices variable for the courts field
 pacer_codes = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
+mime_types = ('pdf', 'wpd', 'txt', 'doc')
 
 urlpatterns = patterns('',
     # Admin docs and site
@@ -93,14 +95,16 @@ urlpatterns = patterns('',
             {'url': '/media/images/png/apple-touch-icon-precomposed.png'}),
     (r'^bad-browser/$', browser_warning),
 
-    # Maintenance mode!
+    # Maintenance and protest mode!
     #(r'/*', show_maintenance_warning),
 
-    # Display a case, a named URL because the get_absolute_url uses it.
+    # Display a case; a named URL because the get_absolute_url uses it.
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case,
         name="view_case"),
+    # Serve a static file
+    (r'^(?P<mime>' + "|".join(mime_types) + ')/(?P<file_path>.*)/$', serve_static_file),
 
-    # Redirect users
+    # Redirect users that arrive via crt.li
     (r'^x/(.*)/$', redirect_short_url),
 
     # Contact us pages

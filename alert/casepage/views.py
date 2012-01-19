@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from alert import settings
 from alert.lib import search_utils
 from alert.search.forms import SearchForm
 from alert.search.models import Court
@@ -22,11 +23,13 @@ from alert.tinyurl.encode_decode import ascii_to_num
 from alert.favorites.forms import FavoriteForm
 from alert.favorites.models import Favorite
 from django.core.exceptions import ObjectDoesNotExist
+from django.http import HttpResponse
 from django.shortcuts import render_to_response
 from django.shortcuts import get_object_or_404
 from django.template import RequestContext
 from django.views.decorators.cache import never_cache
-from django.utils.datastructures import MultiValueDictKeyError
+
+import os
 
 @never_cache
 def view_case(request, court, pk, casename):
@@ -75,3 +78,22 @@ def view_case(request, court, pk, casename):
                    'get_string': get_string, 'court_facets': court_facets,
                    'status_facets': status_facets},
                   RequestContext(request))
+
+def serve_static_file(request, mime='', file_path=''):
+    '''Sends a static file to a user.
+    
+    This serves up the static case files such as the PDFs in a way that can be
+    blocked from search engines if necessary. We do four things:
+     - Look up the document associated with the filepath
+     - Check if it's blocked
+     - If blocked, we set the x-robots-tag HTTP header
+     - Serve up the file using Apache2's xsendfile
+    '''
+    doc = get_object_or_404(Document, local_path=os.path.join(mime, file_path))
+    response = HttpResponse()
+    if doc.blocked:
+        response['X-Robots-Tag'] = 'noindex,noodp,noarchive,noimageindex'
+    print "So far, so good"
+    abs_file_path = os.path.join(settings.MEDIA_ROOT, file_path)
+    response['X-Sendfile'] = abs_file_path
+    return response
