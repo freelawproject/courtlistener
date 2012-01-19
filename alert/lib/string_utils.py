@@ -25,7 +25,6 @@
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
 
-
 import re
 from django.utils.encoding import smart_str
 from django.utils.encoding import smart_unicode
@@ -49,8 +48,7 @@ ALL_CAPS = re.compile(r'^[A-Z\s%s%s%s]+$' % (PUNCT, WEIRD_CHARS, NUMS))
 UC_INITIALS = re.compile(r"^(?:[A-Z]{1}\.{1}|[A-Z]{1}\.{1}[A-Z]{1})+,?$")
 MAC_MC = re.compile(r"^([Mm]a?c)(\w+)")
 def titlecase(text, DEBUG=False):
-    '''
-    Titlecases input text
+    '''Titlecases input text
 
     This filter changes all words to Title Caps, and attempts to be clever
     about *un*capitalizing SMALL words like a/an/the in the input.
@@ -112,7 +110,6 @@ def titlecase(text, DEBUG=False):
                     item))
             tc_line.append("-".join(hyphenated))
 
-
         result = " ".join(tc_line)
 
         result = SMALL_FIRST.sub(lambda m: '%s%s' % (
@@ -120,14 +117,11 @@ def titlecase(text, DEBUG=False):
             m.group(2).capitalize()), result)
 
         result = SMALL_LAST.sub(lambda m: m.group(0).capitalize(), result)
-
         result = SUBPHRASE.sub(lambda m: '%s%s' % (
             m.group(1),
             m.group(2).capitalize()), result)
 
-
         processed.append(result)
-
         text = "\n".join(processed)
 
     # replace V. with v.
@@ -137,7 +131,6 @@ def titlecase(text, DEBUG=False):
     text = text.replace('Llc.', 'LLC')
 
     return text
-
 
 # For use in harmonize function
 US = 'USA|U\.S\.A\.|U\.S\.?|U\. S\.?|(The )?United States of America|The United States'
@@ -202,7 +195,6 @@ def harmonize(text):
 
     return clean_string(result)
 
-
 def clean_string(string):
     '''Clean up strings.
 
@@ -249,13 +241,15 @@ def clean_string(string):
     # return something vaguely sane
     return string
 
-
-
 # For use in anonymize function
 SSN_AND_ITIN = re.compile('(\s|^)(\d{3}-\d{2}-\d{4})(\s|$)')
 EIN = re.compile('(\s|^)(\d{2}-\d{7})(\s|$)')
 def anonymize(string):
-    """Convert SSNs, EIN and alienIDs to X's."""
+    '''Anonymizes private information.
+    
+    Converts SSNs, EIN and alienIDs to X's. Reports whether a modification was
+    made, as a boolean.
+    '''
 
     '''
     # For testing
@@ -275,17 +269,17 @@ def anonymize(string):
         if result != goal:
             print "\"" + test + "\"" + " --> " + "\"" + result + "\""
     '''
-
-    string = re.sub(SSN_AND_ITIN, r"\1XXX-XX-XXXX\3", string)
-    string = re.sub(EIN, r"\1XX-XXXXXXX\3", string)
-
-    return string
-
+    string, ssn_replacements = re.subn(SSN_AND_ITIN, r"\1XXX-XX-XXXX\3", string)
+    string, ien_replacements = re.subn(EIN, r"\1XX-XXXXXXX\3", string)
+    modified = bool(ssn_replacements + ien_replacements)
+    return string, modified
 
 def trunc(s, length):
-    """finds the rightmost space in a string, and truncates there. Lacking such
-    a space, truncates at length"""
-
+    '''Truncates a string at a good length.
+    
+    Finds the rightmost space in a string, and truncates there. Lacking such
+    a space, truncates at length.
+    '''
     if len(s) <= length:
         return s
     else:
@@ -296,10 +290,14 @@ def trunc(s, length):
             end = length
         return s[0:end]
 
-
 def removeLeftMargin(s):
-    # Gets rid of left hand margin using the mode of
-    # the number of spaces before text in the doc.
+    '''Gets rid of left hand margin.
+    
+    Given a block of text, calculates the mode the number of spaces before text 
+    in the doc, and then removes that number of spaces from the text. This 
+    should not be used in the general case, but can be used in cases where a
+    left-hand margin is known to exist.
+    '''
     lines = s.split('\n')
     marginSizes = []
     for line in lines:
@@ -313,7 +311,6 @@ def removeLeftMargin(s):
                     marginSizes.append(oldlength - newlength)
 
     mode = max([marginSizes.count(y), y] for y in marginSizes)[1]
-
     lines_out = []
     for line in lines:
         numLSpaces = len(line) - len(line.lstrip())
@@ -327,7 +324,6 @@ def removeLeftMargin(s):
         lines_out.append(line_out)
 
     return '\n'.join(lines_out)
-
 
 def removeDuplicateLines(s):
     # Remove duplciate lines next to each other.

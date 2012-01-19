@@ -34,6 +34,7 @@ setup_environ(settings)
 from alert.search.models import Document
 from alert.lib.string_utils import anonymize
 from celery.decorators import task
+from datetime import date
 from lxml import etree
 from lxml.etree import tostring
 
@@ -53,7 +54,7 @@ def extract_doc_content(pk):
     logger = extract_doc_content.get_logger()
     logger.info("Extracting contents of document %s" % (pk,))
 
-    doc = Document.objects.get(pk = pk)
+    doc = Document.objects.get(pk=pk)
 
     path = str(doc.local_path)
     path = settings.MEDIA_ROOT + path
@@ -63,13 +64,16 @@ def extract_doc_content(pk):
     if mimetype == 'pdf':
         # do the pdftotext work for PDFs
         process = subprocess.Popen(["pdftotext", "-layout", "-enc", "UTF-8",
-            path, "-"], shell = False, stdout = subprocess.PIPE, stderr = DEVNULL)
+            path, "-"], shell=False, stdout=subprocess.PIPE, stderr=DEVNULL)
         content, err = process.communicate()
         if content == '':
             # probably an image PDF. TODO: Add code here to create OCR task in 
             # celery.
             content = "Unable to extract document content."
-        doc.documentPlainText = anonymize(content)
+        doc.documentPlainText, blocked = anonymize(content)
+        if blocked:
+            doc.blocked = True
+            doc.date_blocked = date.today()
         if err:
             print "****Error extracting PDF text from: " + doc.citation.caseNameShort + "****"
             return 1
@@ -84,8 +88,8 @@ def extract_doc_content(pk):
     elif mimetype == 'wpd':
         # It's a Word Perfect file. Use the wpd2html converter, clean up
         # the HTML and save the content to the HTML field.
-        process = subprocess.Popen(['wpd2html', path, '-'], shell = False,
-            stdout = subprocess.PIPE, stderr = DEVNULL)
+        process = subprocess.Popen(['wpd2html', path, '-'], shell=False,
+            stdout=subprocess.PIPE, stderr=DEVNULL)
         content, err = process.communicate()
 
         parser = etree.HTMLParser()
@@ -108,8 +112,8 @@ def extract_doc_content(pk):
             return 1
     elif mimetype == 'doc':
         # read the contents of MS Doc files
-        process = subprocess.Popen(['antiword', path, '-i', '1'], shell = False,
-            stdout = subprocess.PIPE, stderr = DEVNULL)
+        process = subprocess.Popen(['antiword', path, '-i', '1'], shell=False,
+            stdout=subprocess.PIPE, stderr=DEVNULL)
         content, err = process.communicate()
         doc.documentPlainText = anonymize(content)
         if err:
