@@ -34,14 +34,9 @@ from django.views.decorators.cache import cache_page
 @cache_page(60 * 60)
 def robots(request):
     '''Generate the robots.txt file'''
-    response = HttpResponse(mimetype = 'text/plain')
-
-    docs = Document.objects.filter(blocked = True).order_by('date_blocked')
-
-    # make them into pretty HTML
+    response = HttpResponse(mimetype='text/plain')
     t = loader.get_template('robots/robots.txt')
-    c = Context({'docs': docs})
-    text = t.render(c)
-    response.write(text)
+    c = Context({})
+    response.write(t.render(c))
     return response
 
