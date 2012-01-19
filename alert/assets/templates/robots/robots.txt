@@ -3,16 +3,6 @@ Sitemap: http://courtlistener.com/sitemap.xml
 
 Disallow: /robots.txt
 Disallow: /x/
-Disallow: /doc/
 Disallow: /dumps/
-Disallow: /pdf/
-Disallow: /txt/
-Disallow: /wpd/
 
 Disallow: /assets/
-
-{% for doc in docs %}
-# Added: {{doc.date_blocked|default_if_none:"Unknown"}}
-Disallow: {{doc.get_absolute_url}}
-{% if doc.local_path%}Disallow: /{{doc.local_path}}{% endif %}
-{% endfor %}

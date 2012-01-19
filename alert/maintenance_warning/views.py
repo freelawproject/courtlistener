@@ -19,7 +19,7 @@ from django.template import Context, loader
 from django.views.decorators.cache import never_cache
 
 class HttpResponseTemporaryUnavailable(HttpResponse):
-    status = 503
+    status_code = 503
 
 @never_cache
 def show_maintenance_warning(request):

@@ -51,7 +51,6 @@ class SearchForm(forms.Form):
     q = forms.CharField(required=False, initial='*')
     sort = forms.ChoiceField(
                          choices=SORT_CHOICES,
-                         initial='rel',
                          required=False,
                          widget=forms.Select(
                                    attrs={'class': 'external-input',

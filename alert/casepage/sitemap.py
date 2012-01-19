@@ -137,7 +137,7 @@ class MyFlatPageSitemap(FlatPageSitemap):
     '''Reprioritizes certain flatpages.
 
     Extends the FlatPageSitemap class so that specific priorities can be
-    given to various pages; prioritizes the about page, deprioritizes
+    given to various pages; prioritizes the about page, de-prioritizes
     the legal pages.'''
     def priority(self, item):
         if 'about' in str(item.get_absolute_url).lower():
@@ -162,7 +162,7 @@ all_sitemaps = {}
 pacer_codes = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
 for pacer_code in pacer_codes:
     info_dict = {
-        'queryset'  : Document.objects.filter(court=pacer_code, blocked=False),
+        'queryset'  : Document.objects.filter(court=pacer_code),
         'date_field': 'time_retrieved',
     }
 
