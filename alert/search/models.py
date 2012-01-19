@@ -207,7 +207,8 @@ class Document(models.Model):
     local_path = models.FileField(
                       "the location, relative to MEDIA_ROOT, where the files are stored",
                       upload_to=make_pdf_upload_path,
-                      blank=True)
+                      blank=True,
+                      db_index=True)
     documentPlainText = models.TextField(
                       "plain text of the document after extraction from the PDF",
                       blank=True)
