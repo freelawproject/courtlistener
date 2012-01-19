@@ -6,7 +6,7 @@
 {% block title %}CourtListener.com / Cases / {{ title }}{% endblock %}
 
 {% block head %}
-    {% if not error %} 
+    {% if not error %}
         {% if get_string %}
             <link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?{{ get_string }}" />
         {% endif %}
@@ -14,6 +14,10 @@
         {% for court in court_facets %}
             <link rel="alternate" type="application/rss+xml" title="Atom feed for {{ court.0 }}" href="/feed/court/{{ court.1 }}/">
         {% endfor %}
+    {% endif %}
+    {% if doc.blocked %}
+        <!--  blocked as of {{ doc.date_blocked|default_if_none:"an unknown date" }} -->
+        <meta name="robots" content="noindex,noodp,noarchive,noimageindex" />
     {% endif %}
     <link rel="shortlink" type="text/html" href="{{doc.get_small_url}}">
 {% endblock %}
