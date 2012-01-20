@@ -206,7 +206,7 @@ function check_deps {
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-    deps=(aptitude antiword checkinstall daemon g++ gcc git-core ipython  libapache2-mod-xsendfile libmysqlclient-dev libmysql++-dev libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget)
+    deps=(aptitude antiword apache2 checkinstall daemon g++ gcc git-core ipython libapache2-mod-xsendfile libapache2-mod-wsgi libmysqlclient-dev libmysql++-dev libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget)
     for dep in ${deps[@]}
     do
         echo -n "Checking for $dep..."
@@ -586,11 +586,14 @@ function configure_apache {
     echo 'Configuring apache2...'
     echo '##################################
 '
-    read -p "Would you likek to add an apache2 configuration to your sites-available directory? (y/n): " proceed
+    read -p "Would you like to add an apache2 configuration to your sites-available directory and enable the needed modules? (y/n): " proceed
     if [ $proceed == "y" ]
     then
-        ln -s $CL_INSTALL_DIR/court-listener/alert/apache/courtlistener.com.conf /etc/apache2/sites-available/courtlistener.com.conf
-        echo -e '\nApache linked up successfully.'
+        ln -s $CL_INSTALL_DIR/court-listener/apache/courtlistener.com.conf /etc/apache2/sites-available/courtlistener.com.conf
+        a2enmod headers
+        a2ensite courtlistener.com.conf
+        service apache2 restart
+        echo -e '\nApache set up successfully - you should be able to access it at localhost on port 80.'
     else
         echo -e '\nGreat. Moving on.'
         return 0

@@ -225,7 +225,7 @@ class Document(models.Model):
                       blank=True,
                       null=True)
     blocked = models.BooleanField(
-                      'block crawlers for this document',
+                      'block indexing of this document',
                       db_index=True,
                       default=False)
 

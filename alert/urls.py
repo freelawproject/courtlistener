@@ -102,7 +102,7 @@ urlpatterns = patterns('',
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case,
         name="view_case"),
     # Serve a static file
-    (r'^(?P<mime>' + "|".join(mime_types) + ')/(?P<file_path>.*)/$', serve_static_file),
+    (r'^(?P<mime>' + "|".join(mime_types) + ')/(?P<file_path>.*)$', serve_static_file),
 
     # Redirect users that arrive via crt.li
     (r'^x/(.*)/$', redirect_short_url),

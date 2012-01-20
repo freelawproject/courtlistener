@@ -90,10 +90,10 @@ def serve_static_file(request, mime='', file_path=''):
      - Serve up the file using Apache2's xsendfile
     '''
     doc = get_object_or_404(Document, local_path=os.path.join(mime, file_path))
+    file_name = file_path.split('/')[-1]
     response = HttpResponse()
     if doc.blocked:
         response['X-Robots-Tag'] = 'noindex,noodp,noarchive,noimageindex'
-    print "So far, so good"
-    abs_file_path = os.path.join(settings.MEDIA_ROOT, file_path)
-    response['X-Sendfile'] = abs_file_path
+    response['X-Sendfile'] = os.path.join(settings.MEDIA_ROOT, mime, file_path)
+    response['Content-Disposition'] = 'attachment; filename="%s"' % file_name
     return response
