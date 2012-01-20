@@ -1,0 +1,24 @@
+Content Extraction:
+ - implement OCR
+    - Can it be optimized
+    - can it use more CPUs
+    - can punctuation words be eliminated
+ - investigate Apache Tika
+ 
+Search XML tool is broken
+ - can old versions be updated?
+ - easy to add old URL support?
+ - need to update the actual XML thing.
+ - Court Listener --> CourtListener
+ 
+Privacy:
+ - debug:
+ - install apache with WSGI?
+ - deploy
+    - migrate the search app.
+    - relink the new config file: sudo ln -s /var/www/court-listener/apache/courtlistener.com.conf /etc/apache2/sites-available/courtlistener.com.conf
+    - ran
+
+Solr:
+ - set up a regular optimize command
+ - fix the overlapping counts for log court names.
