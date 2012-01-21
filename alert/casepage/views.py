@@ -79,7 +79,7 @@ def view_case(request, court, pk, casename):
                    'status_facets': status_facets},
                   RequestContext(request))
 
-def serve_static_file(request, mime='', file_path=''):
+def serve_static_file(request, file_path=''):
     '''Sends a static file to a user.
     
     This serves up the static case files such as the PDFs in a way that can be
@@ -89,11 +89,11 @@ def serve_static_file(request, mime='', file_path=''):
      - If blocked, we set the x-robots-tag HTTP header
      - Serve up the file using Apache2's xsendfile
     '''
-    doc = get_object_or_404(Document, local_path=os.path.join(mime, file_path))
+    doc = get_object_or_404(Document, local_path=file_path)
     file_name = file_path.split('/')[-1]
     response = HttpResponse()
     if doc.blocked:
         response['X-Robots-Tag'] = 'noindex,noodp,noarchive,noimageindex'
-    response['X-Sendfile'] = os.path.join(settings.MEDIA_ROOT, mime, file_path)
+    response['X-Sendfile'] = os.path.join(settings.MEDIA_ROOT, file_path)
     response['Content-Disposition'] = 'attachment; filename="%s"' % file_name
     return response

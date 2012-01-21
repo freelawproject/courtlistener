@@ -242,32 +242,13 @@ def clean_string(string):
     return string
 
 # For use in anonymize function
-SSN_AND_ITIN = re.compile('(\s|^)(\d{3}-\d{2}-\d{4})(\s|$)')
-EIN = re.compile('(\s|^)(\d{2}-\d{7})(\s|$)')
+SSN_AND_ITIN = re.compile('(\D|^)(\d{3}-\d{2}-\d{4})(\D|$)')
+EIN = re.compile('(\D|^)(\d{2}-\d{7})(\D|$)')
 def anonymize(string):
     '''Anonymizes private information.
     
     Converts SSNs, EIN and alienIDs to X's. Reports whether a modification was
     made, as a boolean.
-    '''
-
-    '''
-    # For testing
-    test_strings = [
-        ("444-44-4444", "XXX-XX-XXXX"),
-        ("   444-44-4444", "   XXX-XX-XXXX"),
-        ("   444-44-4444   ", "   XXX-XX-XXXX   "),
-        ("4444-44-4444", "4444-44-4444"),
-        (" 4444-44-4444", " 4444-44-4444"),
-        (" 4444-44-4444 ", " 4444-44-4444 "),
-        ("444-44-44444", "444-44-44444"),
-        ("444-444-4444", "444-444-4444")]
-
-    for test, goal in test_strings:
-        result = re.sub(SSN_AND_ITIN, r"\1XXX-XX-XXXX\3", test)
-        result = re.sub(EIN, r'\1XX-XXXXXXX\3', result)
-        if result != goal:
-            print "\"" + test + "\"" + " --> " + "\"" + result + "\""
     '''
     string, ssn_replacements = re.subn(SSN_AND_ITIN, r"\1XXX-XX-XXXX\3", string)
     string, ien_replacements = re.subn(EIN, r"\1XX-XXXXXXX\3", string)

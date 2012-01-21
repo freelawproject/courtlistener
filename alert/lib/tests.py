@@ -23,8 +23,10 @@ Replace these with more appropriate tests for your application.
 """
 
 from django.test import TestCase
-from lib.string_utils import clean_string
-from lib.string_utils import harmonize
+from alert.lib.string_utils import anonymize
+from alert.lib.string_utils import clean_string
+from alert.lib.string_utils import harmonize
+
 
 class SimpleTest(TestCase):
     def test_basic_addition(self):
@@ -112,4 +114,18 @@ __test__ = {"doctest": """
 'Test v. United States'
 >>> harmonize(clean_string('The United States v. Lissner'))
 'United States v. Lissner'
+
+# Tests for anonymize function
+>>> anonymize('333-33-3333')
+('XXX-XX-XXXX', True)
+>>> anonymize('3333-33-3333')
+('3333-33-3333', False)
+>>> anonymize(' 333-33-3333')
+(' XXX-XX-XXXX', True)
+>>> anonymize(' 333-33-3333 ')
+(' XXX-XX-XXXX ', True)
+>>> anonymize(' 333-33-3333.')
+(' XXX-XX-XXXX.', True)
+>>> anonymize(' 33-3333333')
+(' XX-XXXXXXX', True)
 """}
