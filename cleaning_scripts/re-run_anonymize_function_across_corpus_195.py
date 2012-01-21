@@ -36,6 +36,7 @@ from search.models import Document
 from alert.lib.db_tools import queryset_iterator
 from alert.lib.string_utils import anonymize
 from optparse import OptionParser
+from datetime import date
 import re
 
 def cleaner(simulate=False, verbose=False):
@@ -66,6 +67,8 @@ def cleaner(simulate=False, verbose=False):
 
         if not simulate and any(any_mods):
             doc.documentPlainText = '\n'.join(clean_lines)
+            doc.blocked = True
+            doc.date_blocked = date.today()
             doc.save()
 
 
