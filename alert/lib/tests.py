@@ -130,4 +130,6 @@ __test__ = {"doctest": """
 (' XX-XXXXXXX', True)
 >>> anonymize('CV-11-0000445-')
 ('CV-11-0000445-', False)
+>>> anonymize('Q44-6850015')
+('Q44-6850015', False)
 """}
