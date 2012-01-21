@@ -244,8 +244,8 @@ def clean_string(string):
 
 # three digits dash two digits dash four digits, not proceeded or followed 
 # by digits. Proceeding start of line (^) or following end of line ($) OK.   
-SSN_AND_ITIN = re.compile('([^0-9-]|^)(\d{3}-\d{2}-\d{4})([^0-9-]|$)')
-EIN = re.compile('([^0-9-]|^|[^-])(\d{2}-\d{7})([^0-9-]|$)')
+SSN_AND_ITIN = re.compile('([^0-9A-Za-z-]|^)(\d{3}-\d{2}-\d{4})([^0-9A-Za-z-]|$)')
+EIN = re.compile('([^0-9A-Za-z-]|^)(\d{2}-\d{7})([^0-9A-Za-z-]|$)')
 def anonymize(string):
     '''Anonymizes private information.
     

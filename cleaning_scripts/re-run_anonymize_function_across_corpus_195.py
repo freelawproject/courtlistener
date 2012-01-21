@@ -48,13 +48,25 @@ def cleaner(simulate=False, verbose=False):
     docs = queryset_iterator(Document.objects.all())
     for doc in docs:
         text = doc.documentPlainText
-        clean_text, modified = anonymize(text)
-        if modified:
-            if verbose:
+        clean_lines = []
+        any_mods = []
+        for line in text.split('\n'):
+            clean_line, modified = anonymize(line)
+            if modified:
                 print "Fixing text in document: %s" % doc.documentUUID
-            doc.documentPlainText = clean_text
-            if not simulate:
-                doc.save()
+                print "Line reads: %s" % line
+                fix = raw_input("Fix the line? [Y/n]: ") or 'y'
+                if fix.lower() == 'y':
+                    clean_lines.append(clean_line)
+                    any_mods.append(modified)
+                else:
+                    clean_lines.append(line)
+            else:
+                clean_lines.append(line)
+
+        if not simulate and any(any_mods):
+            doc.documentPlainText = '\n'.join(clean_lines)
+            doc.save()
 
 
 def main():
