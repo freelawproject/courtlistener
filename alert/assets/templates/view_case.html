@@ -17,7 +17,7 @@
     {% endif %}
     {% if doc.blocked %}
         <!--  blocked as of {{ doc.date_blocked|default_if_none:"an unknown date" }} -->
-        <meta name="robots" content="noindex,noodp,noarchive,noimageindex" />
+        <meta name="robots" content="noindex, noodp, noarchive, noimageindex" />
     {% endif %}
     <link rel="shortlink" type="text/html" href="{{doc.get_small_url}}">
 {% endblock %}

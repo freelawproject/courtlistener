@@ -93,7 +93,7 @@ def serve_static_file(request, file_path=''):
     file_name = file_path.split('/')[-1]
     response = HttpResponse()
     if doc.blocked:
-        response['X-Robots-Tag'] = 'noindex,noodp,noarchive,noimageindex'
+        response['X-Robots-Tag'] = 'noindex, noodp, noarchive, noimageindex'
     response['X-Sendfile'] = os.path.join(settings.MEDIA_ROOT, file_path)
     response['Content-Disposition'] = 'attachment; filename="%s"' % file_name
     return response
