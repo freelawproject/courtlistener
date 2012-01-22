@@ -1,7 +1,7 @@
 # Google, AOL, Bing, Yahoo!
 # These support meta robots and x-robots-tag.
 # Crawl everything except a few explicit blocks 
-User-agent: Google
+User-agent: Googlebot
 Disallow: /robots.txt
 Disallow: /x/
 Disallow: /dumps/
