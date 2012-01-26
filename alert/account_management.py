@@ -34,12 +34,11 @@ def delete_old_accounts(verbose, simulate):
     This script will find accounts older than roughly two months that have
     not been confirmed, and delete them. It can be run once a month, or so.
     """
-
     two_months_ago = (datetime.date.today() - datetime.timedelta(60))
 
     # get the accounts
-    unconfirmed_ups = UserProfile.objects.filter(emailConfirmed = False,
-        user__date_joined__lte = two_months_ago.isoformat())
+    unconfirmed_ups = UserProfile.objects.filter(emailConfirmed=False,
+        user__date_joined__lte=two_months_ago.isoformat())
 
     # some redundant code here, but emphasis is on getting it right.
     for up in unconfirmed_ups:
@@ -91,8 +90,8 @@ def notify_unconfirmed(verbose, simulate):
     a_week_ago = (datetime.date.today() - datetime.timedelta(7))
 
     # get the accounts
-    unconfirmed_ups = UserProfile.objects.filter(emailConfirmed = False,
-        key_expires__lte = a_week_ago)
+    unconfirmed_ups = UserProfile.objects.filter(emailConfirmed=False,
+        key_expires__lte=a_week_ago)
 
     for up in unconfirmed_ups:
         if verbose:
@@ -113,7 +112,7 @@ def notify_unconfirmed(verbose, simulate):
             user = up.user
             # Build and save a new activation key for the account.
             salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-            activationKey = hashlib.sha1(salt+user.username).hexdigest()
+            activationKey = hashlib.sha1(salt + user.username).hexdigest()
             key_expires = datetime.datetime.today() + datetime\
                     .timedelta(5)
             up.activationKey = activationKey
@@ -144,7 +143,7 @@ http://courtlistener.com/contact/." % (
 
 def generate_keys_expiration_dates():
     # generate keys expiration dates for accounts that lack them
-    keyless = UserProfile.objects.filter(key_expires = None)
+    keyless = UserProfile.objects.filter(key_expires=None)
 
     for up in keyless:
         print "User \"" + up.user.username + \
@@ -158,7 +157,7 @@ def generate_keys_expiration_dates():
 def find_legit():
     # find accounts that have alerts, and mark them as confirmed.
     # this is a one-off script used to grandfather-in old accounts
-    real_users = UserProfile.objects.filter(emailConfirmed = False)
+    real_users = UserProfile.objects.filter(emailConfirmed=False)
 
     for user in real_users:
         if user.alert.count() > 0:
@@ -176,10 +175,10 @@ def main():
     parser.add_option('-g', '--grandfather', action='store_true',
         dest='grandfather', default=False, help="Grandfather in legit users.")
     parser.add_option('-n', '--notify', action="store_true", dest='notify',
-        default=False, help="Notify users with unconfirmed accounts older " +\
+        default=False, help="Notify users with unconfirmed accounts older " + \
         "five days and delete orphaned profiles.")
     parser.add_option('-d', '--delete', action="store_true", dest='delete',
-        default=False, help="Delete unconfirmed accounts older than two " +\
+        default=False, help="Delete unconfirmed accounts older than two " + \
         "months.")
     parser.add_option('-v', '--verbose', action="store_true", dest='verbose',
         default=False, help="Display variable values during execution")

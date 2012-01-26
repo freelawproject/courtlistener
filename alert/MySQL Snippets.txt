@@ -1,4 +1,0 @@
-# Find duplicate documents by documentSHA1:
-select documentUUID, count(documentSHA1) as cnt from Document group by documentSHA1 having cnt > 1 order by cnt;
-
-
