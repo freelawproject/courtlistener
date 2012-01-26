@@ -758,13 +758,14 @@
        
        <!-- Default boosting -->
        <str name="qf">
-          text^1.0 dateFiled^1.0 court^1.0 caseName^1.5 docketNumber^1.0 westCite^1.0 lexisCite^1.0 status^1.25 caseNumber^1.25
+          text^1.0 dateFiled^1.0 court^1.0 caseName^3 docketNumber^1.0 westCite^1.0 lexisCite^1.0 status^1.25 caseNumber^1.25
        </str>
        
        <!--  default query -->
        <str name="q.alt">*:*</str>
        <int name="rows">20</int>
-       
+       <str name="q.op">AND</str>
+
        <!-- Fields returned -->
        <str name="fl">*,score</str>
        
@@ -772,7 +773,6 @@
        <str name="hl.tag.pre"><![CDATA[<mark>]]></str>
        <str name="hl.tag.post"><![CDATA[</mark>]]></str>
        <str name="hl.useFastVectorHighlighter">true</str>
-       
        <str name="hl.boundaryScanner">breakIterator</str>
        <str name="hl.bs.type">WORD</str>
        <str name="hl.bs.language">en</str>

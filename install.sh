@@ -41,6 +41,7 @@
 # - install & configure Solr & pysolr
 # - configure mysql & courtlistener
 # - install django-celery, celery and rabbitmq
+# - install OCR tools
 # - install the django-debug toolbar
 # - install the south DB migration tool
 # - sync the django configuration with the database
@@ -81,6 +82,8 @@ OPTIONS
             set up the CL repository, and configure it with django
     --importdata
             import some basic data into the DB, setting up the courts
+    --ocr
+            Install a number of OCR tools, including Leptonica and Tesseract
     --debugtoolbar
             install the django debug toolbar
     --djangocelery
@@ -206,7 +209,7 @@ function check_deps {
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-    deps=(aptitude antiword apache2 checkinstall daemon g++ gcc git-core ipython libapache2-mod-xsendfile libapache2-mod-wsgi libmysqlclient-dev libmysql++-dev libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget)
+    deps=(autoconf automake antiword apache2 checkinstall daemon g++ gcc git-core imagemagick ipython libapache2-mod-xsendfile libapache2-mod-wsgi libjpeg62-dev libmysqlclient-dev libmysql++-dev libpng12-dev libtiff4-dev libtiff-tools libtool libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget zlib1g-dev)
     for dep in ${deps[@]}
     do
         echo -n "Checking for $dep..."
@@ -217,7 +220,7 @@ function check_deps {
             echo "MISSING."
             if [ $dep == "aptitude" ]
             then
-                echo "Aborting. Fatal error. Please install aptitude and try again."
+                echo "Aborting. Fatal error: aptitude is required for dependency management."
                 exit 3
             else
                 missingDeps=( ${missingDeps[@]-} $dep )
@@ -642,6 +645,44 @@ function install_django_celery {
 }
 
 
+function install_OCR {
+    echo -e '\n#########################################'
+    echo 'Installing Tesseract and its dependencies...'
+    echo '#########################################'
+    
+    read -p "Install Tesseract and its dependencies on this computer? (y/n): " proceed
+    if [ $proceed == "y" ]
+    then
+        wget http://tesseract-ocr.googlecode.com/files/tesseract-3.01.tar.gz
+        tar -zvxf tesseract-3.01.tar.gz
+        wget http://tesseract-ocr.googlecode.com/files/eng.traineddata.gz
+        gunzip eng.traineddata.gz
+        # tesseract 3.01 requires leptonica >1.67
+        wget https://leptonica.googlecode.com/files/leptonica-1.68.tar.gz
+        tar -zvxf leptonica-1.68.tar.gz
+        cd leptonica-1.68
+        ./configure
+        make
+        sudo make install
+        cd ../tesseract-3.01
+        ./autogen.sh
+        ./configure
+        make
+        sudo make install
+        sudo ldconfig
+        sudo mv ../eng.traineddata /usr/local/share/tessdata/
+        # Cleanup
+        cd ..
+        rm -r tesseract-3.01*
+        rm -r leptonica-1.68*
+        echo -r '\nTesseract and Leptonica installed successsfully.'
+    else
+        echo -r '\nGreat. Moving on.'
+        return 0
+    fi
+
+}
+
 function install_debug_toolbar {
     if [ $INSTALL_DEBUG_TOOLBAR == 'y' ]
     then
@@ -767,6 +808,7 @@ function main {
     install_solr
     configure_apache
     install_django_celery
+    install_ocr
     install_debug_toolbar
     install_django_extensions
     install_south
@@ -813,6 +855,7 @@ else
         --importdata) get_user_input; configure_mysql; import_data;;
         --debugtoolbar) get_user_input; install_debug_toolbar;;
         --djangocelery) get_user_input; install_django_celery;;
+        --ocr) install_ocr;;
         --djangosolr) get_user_input; install_solr;;
         --djangoExtensions) get_user_input; install_django_extensions;;
         --south) get_user_input; install_south; finalize;;
