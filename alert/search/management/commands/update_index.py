@@ -45,6 +45,12 @@ class Command(BaseCommand):
             dest='delete_mode',
             default=False,
             help='Run the command in delete mode. Use this to remove documents from the index.'),
+        make_option('--optimize',
+            action='store_true',
+            dest='optimize_mode',
+            default=False,
+            help=('Run the optimize command against the current index. Note ',
+                  'that the index is always optimized after updating everything.')),
         make_option('--everything',
             action='store_true',
             dest='everything',
@@ -134,8 +140,19 @@ class Command(BaseCommand):
 
             self.stdout.write("\rProcessed %d of %d.   Not in use: %d" %
                               (processed_count, count, not_in_use))
-        self.stdout.write('\nCommitting last chunk...\n')
-        self.si.commit()
+        self.stdout.write('\nCommitting last chunk and optimizing the index...\n')
+        self.si.optimize()
+
+    @print_timing
+    def optimize(self):
+        '''Runs the Solr optimize command. 
+        
+        Not much more than a wrapper of a wrapper (Sunburnt) of a wrapper 
+        (Solr). Weird. Thankfully, Lucene isn't a wrapper of anything.
+        '''
+        self.stdout.write('Optimizing the index...')
+        self.si.optimize()
+        self.stdout.write('done.\n')
 
     def handle(self, *args, **options):
         self.verbosity = int(options.get('verbosity', 1))
@@ -174,6 +191,12 @@ class Command(BaseCommand):
             else:
                 self.stderr.write('Error: You must specify whether you wish to delete everything or a single document.\n')
                 sys.exit(1)
+
+        elif options.get('optimize_mode'):
+            if self.verbosity >= 1:
+                self.stdout.write('Running in optimize mode...\n')
+            self.optimize()
+            sys.exit(0)
 
         else:
             self.stderr.write('Error: You must specify whether you wish to update or delete documents.\n')

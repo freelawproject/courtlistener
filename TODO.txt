@@ -13,4 +13,7 @@ Search XML tool is broken
 
 Solr:
  - set up a regular optimize command
- - fix the overlapping counts for log court names.
+ - fix the overlapping counts for log court names in the sidebar.
+ 
+Server:
+ - clear out old kernels. They've filled /boot

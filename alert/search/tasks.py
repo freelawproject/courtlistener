@@ -47,6 +47,8 @@ def add_or_update_doc_object(doc):
             search_doc = SearchDocument(doc)
             si.add(search_doc)
             return 0
+        except AttributeError:
+            print "AttributeError trying to add doc.pk: %s" % doc.pk
         except InvalidDocumentError:
             print "Unable to parse document %s" % doc.pk
             break
