@@ -153,7 +153,7 @@ class Command(BaseCommand):
         self.si.optimize()
 
     @print_timing
-    def optimize(self):
+    def optimize_index(self):
         '''Runs the Solr optimize command. 
         
         Not much more than a wrapper of a wrapper (Sunburnt) of a wrapper 
@@ -204,7 +204,7 @@ class Command(BaseCommand):
         elif options.get('optimize_mode'):
             if self.verbosity >= 1:
                 self.stdout.write('Running in optimize mode...\n')
-            self.optimize()
+            self.optimize_index()
             sys.exit(0)
 
         else:
