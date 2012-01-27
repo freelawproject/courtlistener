@@ -17,3 +17,11 @@ Solr:
  
 Server:
  - clear out old kernels. They've filled /boot
+ 
+
+Big picture:
+ - fix the search tool add-on
+ - fix the issue with the crawler creating docs that lack citations
+ - fix the sitemaps
+ - set up the optimize command in cron
+ - clear out old kernels

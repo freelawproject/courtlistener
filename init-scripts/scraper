@@ -43,7 +43,7 @@ start () {
 
 stop () {
     echo -n "Killing the scraper..."
-    daemon --stop --name='scraper'
+    daemon --stop --name=scraper --user=www-data
     RETVAL=$?
     
     if [ $RETVAL = 0 ]
@@ -57,7 +57,7 @@ stop () {
 
 status () {
     # report on the status of the daemon
-    daemon --running --verbose --name=scraper
+    daemon --running --verbose --name=scraper --user=www-data
     return $?
 }
 

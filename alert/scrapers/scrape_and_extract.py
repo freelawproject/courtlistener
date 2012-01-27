@@ -484,8 +484,10 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
             data = urllib.urlencode(postValues)
             req = urllib2.Request(url, data)
-            try: html = readURL(req, courtID)
-            except: continue
+            try:
+                html = readURL(req, courtID)
+            except:
+                continue
 
             if DAEMONMODE:
                 # if it's DAEMONMODE, see if the court has changed
@@ -515,6 +517,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 # we begin with the caseLink field
                 caseLink = aTags[i].get('href')
                 caseLink = urljoin(url, caseLink)
+                if VERBOSITY >= 2:
+                    print "Case link: %s" % caseLink
 
                 try: myFile, doc, created = makeDocFromURL(caseLink, ct)
                 except makeDocError:
