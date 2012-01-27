@@ -5,12 +5,6 @@ Content Extraction:
     - can punctuation words be eliminated
  - investigate Apache Tika
  
-Search XML tool is broken
- - can old versions be updated?
- - easy to add old URL support?
- - need to update the actual XML thing.
- - Court Listener --> CourtListener
-
 Solr:
  - set up a regular optimize command
  - fix the overlapping counts for log court names in the sidebar.
@@ -20,8 +14,10 @@ Server:
  
 
 Big picture:
- - fix the search tool add-on
  - fix the issue with the crawler creating docs that lack citations
  - fix the sitemaps
  - set up the optimize command in cron
  - clear out old kernels
+ - F3
+ - OCR
+ - recrawl
