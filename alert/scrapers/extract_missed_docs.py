@@ -39,11 +39,13 @@ from alert.search.models import Document
 # adding alert to the front of this breaks celery. Ignore pylint error.
 from scrapers.tasks import extract_doc_content
 
+import datetime
+import time
 import traceback
 from optparse import OptionParser
 
 
-def extract_all_docs(court):
+def extract_all_docs(court, filter_time):
     '''
     Here, we do the following:
      1. For a given court, find all of its documents
@@ -53,12 +55,13 @@ def extract_all_docs(court):
     returns a string containing the result
     '''
 
-    print "NOW PARSING COURT: %s" % (court,)
+    print "NOW PARSING COURT: %s" % court
 
     # select all documents from this jurisdiction that lack plainText and were
     # downloaded from the court.
     docs = Document.objects.filter(documentPlainText="", documentHTML="",
-        court__courtUUID=court, source="C")
+                                   court__courtUUID=court, source="C",
+                                   dateFiled__gte=filter_time)
 
     num_docs = docs.count()
     if num_docs == 0:
@@ -70,13 +73,27 @@ def extract_all_docs(court):
 
 
 def main():
-    usage = "usage: %prog -c COURTID"
+    usage = "usage: %prog -c COURTID -t datetime"
     parser = OptionParser(usage)
     parser.add_option('-c', '--court', dest='court_id', metavar="COURTID",
         help="The court to extract. Use 0 to extract all courts.")
+    parser.add_option('-t', '--time', dest='filter_time', metavar='filter_time',
+        help=("Take action for all documents newer than this time. Format as ",
+              "follows: YYYY-MM-DD HH:MM:SS or YYYY-MM-DD"))
     options, _ = parser.parse_args()
 
     court = options.court_id
+
+    filter_time = options.filter_time
+    if filter_time is not None:
+        try:
+            # Parse the date string into a datetime object
+            filter_time = datetime.datetime(*time.strptime(options.filter_time, "%Y-%m-%d %H:%M:%S")[0:6])
+        except ValueError:
+            try:
+                filter_time = datetime.datetime(*time.strptime(options.filter_time, "%Y-%m-%d")[0:5])
+            except ValueError:
+                parser.error("Unable to parse time. Please use format: YYYY-MM-DD HH:MM:SS or YYYY-MM-DD")
 
     if court == 'all':
         # get the court IDs from models.py
@@ -85,16 +102,14 @@ def main():
             # This catches all exceptions regardless of their trigger, so
             # if one court dies, the next isn't affected.
             try:
-                extract_all_docs(court)
+                extract_all_docs(court, filter_time)
             except Exception:
                 print '*****Uncaught error parsing court*****\n"' + traceback.format_exc() + "\n\n"
     else:
         # We just do the court requested
-        extract_all_docs(court)
+        extract_all_docs(court, filter_time)
 
     exit(0)
-
-
 
 if __name__ == '__main__':
     main()
