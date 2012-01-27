@@ -94,6 +94,8 @@ def main():
                 filter_time = datetime.datetime(*time.strptime(options.filter_time, "%Y-%m-%d")[0:5])
             except ValueError:
                 parser.error("Unable to parse time. Please use format: YYYY-MM-DD HH:MM:SS or YYYY-MM-DD")
+    else:
+        parser.error('Time is a required argument.')
 
     if court == 'all':
         # get the court IDs from models.py
