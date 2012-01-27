@@ -95,6 +95,7 @@ def main():
             except ValueError:
                 parser.error("Unable to parse time. Please use format: YYYY-MM-DD HH:MM:SS or YYYY-MM-DD")
     else:
+        # Without a time filter, this query is locking, taking a long time.
         parser.error('Time is a required argument.')
 
     if court == 'all':
