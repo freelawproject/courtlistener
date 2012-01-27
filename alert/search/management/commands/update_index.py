@@ -26,14 +26,13 @@ from search.tasks import delete_docs
 from search.tasks import add_or_update_docs
 from search.tasks import add_or_update_doc_object
 
+from celery.task.sets import TaskSet
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from optparse import make_option
+import time
 
 class Command(BaseCommand):
-    '''
-    Builds the index from scratch. First deletes all values. Use with caution.
-    '''
     option_list = BaseCommand.option_list + (
         make_option('--update',
             action='store_true',
@@ -123,18 +122,28 @@ class Command(BaseCommand):
         count = Document.objects.all().count()
         processed_count = 0
         not_in_use = 0
+        subtasks = []
         for doc in everything:
             # Make a search doc, and add it to the index
             if self.verbosity >= 2:
                 self.stdout.write('Indexing document %s' % doc.pk)
             if doc.court.in_use == True:
-                add_or_update_doc_object.delay(doc)
+                subtasks.append(add_or_update_doc_object.subtask((doc,)))
                 processed_count += 1
             else:
                 # The document is in an unused court
                 not_in_use += 1
 
             if processed_count % 1000 == 0:
+                # Every 1000 documents, we send the subtasks off for processing
+                job = TaskSet(tasks=subtasks)
+                result = job.apply_async()
+                while not result.ready():
+                    time.sleep(5)
+
+                # The jobs finished - clean things up for the next round
+                subtasks = []
+
                 # Do a commit every 1000 items, for good measure.
                 self.si.commit()
 
