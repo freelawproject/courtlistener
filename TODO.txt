@@ -9,15 +9,10 @@ Solr:
  - set up a regular optimize command
  - fix the overlapping counts for log court names in the sidebar.
  
-Server:
- - clear out old kernels. They've filled /boot
- 
 
 Big picture:
  - fix the issue with the crawler creating docs that lack citations
  - fix the sitemaps
- - set up the optimize command in cron
- - clear out old kernels
  - F3
  - OCR
  - recrawl
