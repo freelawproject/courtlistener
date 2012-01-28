@@ -416,7 +416,8 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                 docketNumber, documentType = fileName.split('.')[0:2]
                 # the docketNumber needs a hyphen inserted after the second digit
                 docketNumber = docketNumber[0:2] + "-" + docketNumber[2:]
-                if VERBOSITY >= 2: print "Case number: %s" % docketNumber
+                if VERBOSITY >= 2:
+                    print "Case number: %s" % docketNumber
 
                 if documentType == 'U':
                     doc.documentType = 'Unpublished'
@@ -424,18 +425,20 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     doc.documentType = 'Published'
                 else:
                     doc.documentType = ""
-                if VERBOSITY >= 2: print "Precedential status: %s" % doc.documentType
+                if VERBOSITY >= 2:
+                    print "Precedential status: %s" % doc.documentType
 
                 # next, we do the caseDate and caseNameShort, so we can quit before
                 # we get too far along.
                 junk = aTags[i].contents[0].replace('&nbsp;', ' ').strip()
-                if VERBOSITY >= 3: print "junk: " + str(junk)
+                if VERBOSITY >= 3:
+                    print "junk: " + str(junk)
                 try:
                     # this error seems to happen upon dups...not sure why yet
                     caseDate = clean_string(regexII.search(junk).group(0))
                     caseNameShort = regexIII.search(junk).group(1)
                 except AttributeError:
-                    print "****Unable to get casename at ca4****"
+                    print "****Unable to get casename or caseDate at ca4****"
                     i += 1
                     continue
                 if VERBOSITY >= 2: print "Case name: %s" % caseNameShort
