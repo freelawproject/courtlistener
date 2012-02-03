@@ -29,11 +29,11 @@ from alert.feeds.views import all_courts_feed
 from alert.feeds.views import court_feed
 from alert.feeds.views import search_feed
 from alert.maintenance_warning.views import show_maintenance_warning
-from alert.pinger.views import validateForBing
-from alert.pinger.views import validateForGoogle
-from alert.pinger.views import validateForGoogle2
-from alert.pinger.views import validateForGoogle3
-from alert.pinger.views import validateForYahoo
+from alert.pinger.views import validate_for_bing
+from alert.pinger.views import validate_for_bing
+from alert.pinger.views import validate_for_google
+from alert.pinger.views import validate_for_google2
+from alert.pinger.views import validate_for_google3
 from alert.robots.views import robots
 from alert.alerts.views import delete_alert
 from alert.alerts.views import delete_alert_confirm
@@ -168,11 +168,11 @@ urlpatterns = patterns('',
     (r'^feed/court/(?P<court>' + '|'.join(pacer_codes) + ')/$', court_feed()),
 
     # SEO-related stuff
-    (r'^y_key_6de7ece99e1672f2.html$', validateForYahoo),
-    (r'^LiveSearchSiteAuth.xml$', validateForBing),
-    (r'^googleef3d845637ccb353.html$', validateForGoogle),
-    (r'^google646349975c2495b6.html$', validateForGoogle2),
-    (r'^google646349975c2495b6.html$', validateForGoogle3),
+    (r'^LiveSearchSiteAuth.xml$', validate_for_bing),
+    (r'^BingSiteAuth.xml$', validate_for_bing2)
+    (r'^googleef3d845637ccb353.html$', validate_for_google),
+    (r'^google646349975c2495b6.html$', validate_for_google2),
+    (r'^google646349975c2495b6.html$', validate_for_google3),
 
     # Sitemap index generator
     (r'^sitemap\.xml$', 'alert.casepage.sitemap.index_copy', {'sitemaps': sitemaps}),
