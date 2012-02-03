@@ -30,7 +30,7 @@ from alert.feeds.views import court_feed
 from alert.feeds.views import search_feed
 from alert.maintenance_warning.views import show_maintenance_warning
 from alert.pinger.views import validate_for_bing
-from alert.pinger.views import validate_for_bing
+from alert.pinger.views import validate_for_bing2
 from alert.pinger.views import validate_for_google
 from alert.pinger.views import validate_for_google2
 from alert.pinger.views import validate_for_google3
@@ -169,7 +169,7 @@ urlpatterns = patterns('',
 
     # SEO-related stuff
     (r'^LiveSearchSiteAuth.xml$', validate_for_bing),
-    (r'^BingSiteAuth.xml$', validate_for_bing2)
+    (r'^BingSiteAuth.xml$', validate_for_bing2),
     (r'^googleef3d845637ccb353.html$', validate_for_google),
     (r'^google646349975c2495b6.html$', validate_for_google2),
     (r'^google646349975c2495b6.html$', validate_for_google3),
