@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
 # 
@@ -15,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-#!/usr/bin/env python
 from django.core.management import execute_manager
 try:
     import settings # Assumed to be in the same directory.

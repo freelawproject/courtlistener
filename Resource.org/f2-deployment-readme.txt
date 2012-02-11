@@ -7,3 +7,6 @@ To do:
     - Fix the "change this doc" docs in F3
     - export/import the latest court db, and update the install script.
     - add fiscr to the various places on the site where it's needed...
+ 
+ - HTML docs with ampersands show the ampersands in the highlighted text.
+ - 
