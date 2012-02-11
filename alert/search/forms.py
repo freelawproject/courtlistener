@@ -20,6 +20,8 @@ from alert.search.models import Court
 from alert.search.models import DOCUMENT_STATUSES
 from django import forms
 
+import re
+
 REFINE_CHOICES = (
         ('new', 'New search'),
         ('refine', 'Keep filters'),
@@ -148,9 +150,19 @@ class SearchForm(forms.Form):
         q = self.cleaned_data['q']
 
         if q == '' or q == '*':
-            return '*:*'
-        else:
-            return q
+            q = '*:*'
+
+        # Fix casename to work in all lowercase
+        q = re.sub('casename', 'caseName', q)
+        q = re.sub('lexiscite', 'lexisCite', q)
+        q = re.sub('westcite', 'westCite', q)
+        q = re.sub('casenumber', 'caseNumber', q)
+        q = re.sub('docketnumber', 'docketNumber', q)
+
+        # Make pipes work
+        q = re.sub('\|', ' OR ', q)
+
+        return q
 
     def clean(self):
         '''
