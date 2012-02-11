@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
 # 
@@ -33,6 +34,7 @@ setup_environ(settings)
 
 from alert.search.models import Document
 from alert.lib.string_utils import anonymize
+from alert.lib.mojibake import fix_mojibake
 from celery.decorators import task
 from datetime import date
 from lxml import etree
@@ -67,15 +69,18 @@ def extract_doc_content(pk):
             path, "-"], shell=False, stdout=subprocess.PIPE, stderr=DEVNULL)
         content, err = process.communicate()
         if content == '':
-            # probably an image PDF. TODO: Add code here to create OCR task in 
+            # probably an image PDF. TODO: Add code here to create OCR subtask in 
             # celery.
             content = "Unable to extract document content."
+        elif 'e' not in content:
+            # It's a corrupt PDF from ca9. Fix it.
+            content = fix_mojibake(unicode(content, 'utf-8', errors='ignore'))
         doc.documentPlainText, blocked = anonymize(content)
         if blocked:
             doc.blocked = True
             doc.date_blocked = date.today()
         if err:
-            print "****Error extracting PDF text from: " + doc.citation.caseNameShort + "****"
+            print "****Error extracting PDF text from: %s****" % (doc.citation.caseNameShort)
             return 1
     elif mimetype == 'txt':
         # read the contents of text files.
@@ -83,7 +88,7 @@ def extract_doc_content(pk):
             content = open(path).read()
             doc.documentPlainText = anonymize(content)
         except:
-            print "****Error extracting plain text from: " + doc.citation.caseNameShort + "****"
+            print "****Error extracting plain text from: %s****" % (doc.citation.caseNameShort)
             return 1
     elif mimetype == 'wpd':
         # It's a Word Perfect file. Use the wpd2html converter, clean up
