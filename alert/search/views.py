@@ -70,7 +70,6 @@ def show_results(request):
     Code beyond this point will be run if the alert form failed, or if the 
     submission was a GET request. Beyond this point, we run the searches.
     '''
-    #search_form = SearchForm(request.GET)
     if request.GET:
         search_form = SearchForm(request.GET)
     else:
