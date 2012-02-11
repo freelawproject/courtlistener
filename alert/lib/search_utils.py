@@ -59,7 +59,7 @@ def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
     facets = []
     solr_facet_values = dict(solr_facet_values[solr_field])
     # Are any of the checkboxes checked?
-    no_facets_selected = not any([field.value() == 'on' for field in search_form if field.html_name.startswith(prefix)])
+    no_facets_selected = not any([(field.value() == 'on' or field.value() == True) for field in search_form if field.html_name.startswith(prefix)])
     for field in search_form:
         try:
             count = solr_facet_values[field.html_name.replace(prefix, '')]
@@ -68,17 +68,10 @@ def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
             # facets variable
             continue
 
-        try:
-            refine = search_form['refine'].value()
-        except KeyError:
-            # Happens on page load, since the field doesn't exist yet.
-            refine = 'new'
-
-        if refine == 'new' or no_facets_selected:
+        if no_facets_selected:
             checked = True
         else:
-            # It's a refinement
-            if field.value() == 'on':
+            if field.value() == 'on' or field.value() == True:
                 checked = True
             else:
                 checked = False
@@ -163,13 +156,13 @@ def build_main_query(cd, highlight=True):
 
     main_fq = []
     # Case Name
-    if cd['case_name'] != '':
+    if cd['case_name'] != '' and cd['case_name'] is not None:
         main_fq.append('caseName:' + cd['case_name'])
 
     # Citations
-    if cd['west_cite'] != '':
+    if cd['west_cite'] != '' and cd['west_cite'] is not None:
         main_fq.append('westCite:' + cd['west_cite'])
-    if cd['docket_number'] != '':
+    if cd['docket_number'] != '' and cd['docket_number'] is not None:
         main_fq.append('docketNumber:' + cd['docket_number'])
 
     # Dates
@@ -213,13 +206,13 @@ def place_facet_queries(cd):
     court_fq = []
     stat_fq = []
     # Case Name
-    if cd['case_name'] != '':
+    if cd['case_name'] != '' and cd['case_name'] is not None:
         shared_fq.append('caseName:%s' % cd['case_name'])
 
     # Citations
-    if cd['west_cite'] != '':
+    if cd['west_cite'] != '' and cd['west_cite'] is not None:
         shared_fq.append('westCite:%s' % cd['west_cite'])
-    if cd['docket_number'] != '':
+    if cd['docket_number'] != '' and cd['docket_number'] is not None:
         shared_fq.append('docketNumber:%s' % cd['docket_number'])
 
     # Dates

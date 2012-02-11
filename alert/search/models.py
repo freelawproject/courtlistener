@@ -29,8 +29,8 @@ from django.db import models
 import glob
 import os
 
-# changes here need to be mirrored in the coverage page view and the exceptions
-# list for sphinx
+# changes here need to be mirrored in the coverage page view and Solr configs
+# Note that spaces cannot be used in the keys, or else the SearchForm won't work
 DOCUMENT_STATUSES = (
     ('Published', 'Precedential'),
     ('Unpublished', 'Non-Precedential'),
