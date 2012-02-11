@@ -10,7 +10,7 @@ CELERY_CONFIG_MODULE="celeryconfig"
 # %n will be replaced with the nodename.
 CELERYD_LOG_FILE="/var/log/celery/%n.log"
 CELERYD_LOG_LEVEL="INFO"
-CELERYD_PID_FILE="/var/run/celery@%n.pid"
+CELERYD_PID_FILE="/var/run/celery/celery@%n.pid"
 
 # Workers should run as an unprivileged user.
 CELERYD_USER="celery"
