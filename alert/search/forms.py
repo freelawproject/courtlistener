@@ -48,15 +48,17 @@ INPUT_FORMATS = [
     ]
 
 class SearchForm(forms.Form):
-    q = forms.CharField(required=False, initial='*')
+    q = forms.CharField(required=False, initial='*:*')
     sort = forms.ChoiceField(
                          choices=SORT_CHOICES,
                          required=False,
+                         initial='dateFiled desc',
                          widget=forms.Select(
                                    attrs={'class': 'external-input',
                                           'tabindex':'9'}))
     case_name = forms.CharField(
                         required=False,
+                        initial='',
                         widget=forms.TextInput(
                                    attrs={'class': 'span-5 external-input',
                                           'autocomplete': 'off',
@@ -117,7 +119,7 @@ class SearchForm(forms.Form):
                                                   label='All Courts',
                                                   required=False,
                                                   initial=True,
-                                                  widget=forms.CheckboxInput(attrs={'checked':'checked', 'class': 'external-input'}))
+                                                  widget=forms.CheckboxInput(attrs={'checked':'checked', 'class':'external-input'}))
             for court in courts:
                 self.fields['court_' + court[0]] = forms.BooleanField(
                                                               label=court[1],
@@ -125,11 +127,17 @@ class SearchForm(forms.Form):
                                                               initial=True,
                                                               widget=forms.CheckboxInput(attrs={'checked':'checked'}))
             for status in DOCUMENT_STATUSES:
+                if status[1] == 'Precedential':
+                    initial = True
+                    attrs = {'checked':'checked'}
+                else:
+                    initial = False
+                    attrs = {}
                 self.fields['stat_' + status[1]] = forms.BooleanField(
                                                               label=status[1],
                                                               required=False,
-                                                              initial=True,
-                                                              widget=forms.CheckboxInput(attrs={'checked':'checked'}))
+                                                              initial=initial,
+                                                              widget=forms.CheckboxInput(attrs=attrs))
 
     def clean_q(self):
         '''
