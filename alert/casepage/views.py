@@ -50,13 +50,27 @@ def view_case(request, court, pk, casename):
     title = doc.citation.caseNameShort
     user = request.user
 
-    search_form = SearchForm(request.GET)
+    if request.GET:
+        search_form = SearchForm(request.GET)
+    else:
+        search_form = SearchForm()
     get_string = search_utils.make_get_string(request)
 
-    if search_form.is_valid():
-        cd = search_form.cleaned_data
-        court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(cd)
-        # Create facet variables that can be used in our templates
+    if search_form.is_bound:
+        if search_form.is_valid():
+            cd = search_form.cleaned_data
+            court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(cd)
+            # Create facet variables that can be used in our templates
+            court_facets = search_utils.make_facets_variable(
+                             court_facet_fields, search_form, 'court_exact', 'court_')
+            status_facets = search_utils.make_facets_variable(
+                             stat_facet_fields, search_form, 'status_exact', 'stat_')
+    else:
+        # Unbound search form
+        initial_values = {}
+        for k, v in dict(search_form.fields).iteritems():
+            initial_values[k] = v.initial
+        court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(initial_values)
         court_facets = search_utils.make_facets_variable(
                          court_facet_fields, search_form, 'court_exact', 'court_')
         status_facets = search_utils.make_facets_variable(
