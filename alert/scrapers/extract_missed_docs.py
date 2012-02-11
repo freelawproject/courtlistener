@@ -61,7 +61,7 @@ def extract_all_docs(court, filter_time):
     # downloaded from the court.
     docs = Document.objects.filter(documentPlainText="", documentHTML="",
                                    court__courtUUID=court, source="C",
-                                   dateFiled__lte=filter_time)
+                                   dateFiled__gte=filter_time)
 
     num_docs = docs.count()
     if num_docs == 0:

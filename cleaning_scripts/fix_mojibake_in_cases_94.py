@@ -47,9 +47,6 @@ def cleaner(simulate=False, verbose=True):
 
     # Find all the cases using Solr
     results_si = conn.raw_query(**{'q': u'ÚÑÎ'})
-    #results_si = conn.raw_query(**{'q': 'court'})
-
-
     for result in results_si:
         # For each document
         doc = Document.objects.get(documentUUID=result['id'])
