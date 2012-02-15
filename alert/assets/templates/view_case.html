@@ -219,11 +219,20 @@
             <strong title="SHA1 Hash of the binary or text">Fingerprint:</strong> {{doc.documentSHA1}}
         </p>
         <br>
-
-        {% if doc.documentPlainText %}
-            <pre>{{doc.documentPlainText}}</pre>
-        {% else %}
-            {{doc.documentHTML|safe}}
+        {% if doc.extracted_by_ocr %}
+            <div class="notice span-17 last">
+                <p>The content of this document was extracted through optical 
+                character recognition (OCR). As a result you may prefer reading
+                it as a PDF. However, if you would like to see the content we 
+                have extracted, click this box.</p>
+            </div>
         {% endif %}
+        <div id="text">
+            {% if doc.documentPlainText %}
+                <pre>{{doc.documentPlainText}}</pre>
+            {% else %}
+                {{doc.documentHTML|safe}}
+            {% endif %}
+        </div>
     </article>
 {% endblock %}
