@@ -209,7 +209,7 @@ function check_deps {
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-    deps=(autoconf automake antiword apache2 checkinstall daemon g++ gcc git-core imagemagick ipython libapache2-mod-xsendfile libapache2-mod-wsgi libjpeg62-dev libmysqlclient-dev libmysql++-dev libpng12-dev libtiff4-dev libtiff-tools libtool libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget zlib1g-dev)
+    deps=(autoconf automake antiword apache2 apxs2 checkinstall daemon g++ gcc git-core imagemagick ipython libapache2-mod-wsgi libjpeg62-dev libmysqlclient-dev libmysql++-dev libpng12-dev libtiff4-dev libtiff-tools libtool libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils pylint python python-beautifulsoup python-chardet python-dateutil python-docutils python-mysqldb python-pip python-pyparsing python-setuptools rabbitmq-server subversion tar wget zlib1g-dev)
     for dep in ${deps[@]}
     do
         echo -n "Checking for $dep..."
@@ -247,6 +247,7 @@ function check_deps {
             exit 3
         fi
     fi
+
     echo -e "\nAll dependencies installed successfully."
 }
 
@@ -589,9 +590,11 @@ function configure_apache {
     echo 'Configuring apache2...'
     echo '##################################
 '
-    read -p "Would you like to add an apache2 configuration to your sites-available directory and enable the needed modules? (y/n): " proceed
+    read -p "Would you like to add an apache2 configuration to your sites-available directory, install and enable the needed modules? (y/n): " proceed
     if [ $proceed == "y" ]
     then
+        # Install the xsendfile module
+        apxs2 -cia $CL_INSNTALL_DIR/courtlistener/apache/mod_xsendfile.c
         ln -s $CL_INSTALL_DIR/court-listener/apache/courtlistener.com.conf /etc/apache2/sites-available/courtlistener.com.conf
         a2enmod headers
         a2ensite courtlistener.com.conf

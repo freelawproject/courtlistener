@@ -4,9 +4,9 @@ Content Extraction:
     - can it use more CPUs
     - can punctuation words be eliminated
  - investigate Apache Tika
+ - HTML docs with ampersands show the ampersands in the highlighted text.
  
 Solr:
- - set up a regular optimize command
  - fix the overlapping counts for log court names in the sidebar.
  
 

@@ -1,10 +1,11 @@
 Goals:
  - extensible to support video, sound, etc.
  - extensible to support geographies (US, Cuba, Mexico, California) 
- - proper mimetype identification (not based on suffix, but rather on sniffing)
+ - proper mimetype identification (not based on suffix, but rather on Magic Number sniffing)
  - integrated retry mechanism for busted links
  - Generalized architecture - no code repetition
  - Xpath-based scraping
+    - HTML5 Parser via lxml is an option, or perhaps building the JS Dom, and hitting it with jquery selectors
 
 
 Non-goals:
@@ -37,4 +38,6 @@ Layout:
                 Federal/
                 City/
             Cuba
-                Federal/    
+                Federal/
+                
+

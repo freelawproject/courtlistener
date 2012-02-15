@@ -228,6 +228,9 @@ class Document(models.Model):
                       'block indexing of this document',
                       db_index=True,
                       default=False)
+    extracted_by_ocr = models.BooleanField(
+                      'OCR was used to get this document content',
+                      default=False)
 
     def __unicode__(self):
         if self.citation:
