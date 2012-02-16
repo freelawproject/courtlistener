@@ -1,0 +1,43 @@
+Goals:
+ - extensible to support video, sound, etc.
+ - extensible to support geographies (US, Cuba, Mexico, California) 
+ - proper mimetype identification (not based on suffix, but rather on Magic Number sniffing)
+ - integrated retry mechanism for busted links
+ - Generalized architecture - no code repetition
+ - Xpath-based scraping
+    - HTML5 Parser via lxml is an option, or perhaps building the JS Dom, and hitting it with jquery selectors
+
+
+Non-goals:
+ - Audio/Video scrapers
+
+
+Nice to have:
+ - multi-threaded fetching (Twisted framework?)
+
+Layout: 
+    Scrapers/
+        Video/
+            UnitedStates/
+                State/
+                    California.py
+                Federal/
+                City/
+            Cuba/
+                Federal/
+        Audio/
+            UnitedStates
+                State/
+                Federal/
+                City/
+            Cuba/
+                Federal/
+        Written/
+            UnitedStates/
+                State/
+                Federal/
+                City/
+            Cuba
+                Federal/
+                
+

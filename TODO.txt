@@ -1,0 +1,18 @@
+Content Extraction:
+ - implement OCR
+    - Can it be optimized
+    - can it use more CPUs
+    - can punctuation words be eliminated
+ - investigate Apache Tika
+ - HTML docs with ampersands show the ampersands in the highlighted text.
+ 
+Solr:
+ - fix the overlapping counts for log court names in the sidebar.
+ 
+
+Big picture:
+ - fix the issue with the crawler creating docs that lack citations
+ - fix the sitemaps
+ - F3
+ - OCR
+ - recrawl
