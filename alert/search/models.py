@@ -203,7 +203,8 @@ class Document(models.Model):
     time_retrieved = models.DateTimeField(
                       "the exact date and time stamp that the document was placed into our database",
                       auto_now_add=True,
-                      editable=False)
+                      editable=False,
+                      db_index=True)
     local_path = models.FileField(
                       "the location, relative to MEDIA_ROOT, where the files are stored",
                       upload_to=make_pdf_upload_path,
