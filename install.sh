@@ -68,7 +68,7 @@ OPTIONS
     --install   Install all components of the courtlistener software
 
     Lightly Tested Options
-    --check_deps
+    --checkdeps
             Verify that the required dependencies are installed.
     --mysql
             Configure the MySQL database
