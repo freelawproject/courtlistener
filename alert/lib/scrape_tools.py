@@ -56,7 +56,6 @@ import time
 import traceback
 import urllib2
 
-
 LOG_FILENAME = '/var/log/scraper/daemon_log.out'
 
 # Set up a specific logger with our desired output level
