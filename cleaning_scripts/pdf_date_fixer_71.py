@@ -24,6 +24,9 @@
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
 
+import sys
+sys.path.append('/var/www/court-listener/alert')
+
 import settings
 from django.core.management import setup_environ
 setup_environ(settings)
@@ -112,7 +115,7 @@ def update_date(doc, simulate):
 			        + filename[string.rfind(filename, "."):]
 		            new = os.path.join(root, "pdf", year, month, day, filename)
 			    os.link(old, new)
-		     
+
             doc.local_path = os.path.join("pdf", year, month, day, filename)
             doc.save()
         print "***Created new hard link to " + new + " for doc: " + str(doc.documentUUID) + " ***"

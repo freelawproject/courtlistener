@@ -14,6 +14,9 @@ Goals:
     - precedential status
     - court
     - ...
+ - need to be able to kill it safely
+ - should be atomic (transactional) as much as possible
+ - multiple log levels - no printlines, only log entries
 
 
 Non-goals:
@@ -49,3 +52,61 @@ Layout:
                 Federal/
                 
 
+Overview
+--------------------------
+There scraping system is divided in two major parts. The first is the scraper, 
+which has information and configurations for all courts, and which actually goes
+out to their websites and gathers meta data. The goal of this part of the system
+is to provide the minimal tool possible that can go out and scrape a court when
+called via its API. The main goal here is minimalism and adaptability. We want
+this to be easily used by many organizations.
+
+The second component, the "caller" calls the scraper, and performs a number of
+tasks around saving its contents. CourtListener will serve as a reference 
+caller, and will demonstrate how to use the API.
+
+
+Division of tasks
+----------------------------
+Scraper:
+ - Provides an *ordered* set of cases from a court website. Their order should
+   be consistent so that the caller can make assumptions about which cases it 
+   has seen already.
+ - Fails hard. When the scraper fails due to a site changing, it should not try 
+   to continue working. It should just fail completely.
+ - DRY: The scraper shouldn't have redundant code.
+ - All opinions on the site should be returned regardless of precedential
+   status. It is the decision of the caller whether to save things like Errata.
+ - Precedential status should be normalized across courts. E.g., published and
+   precedential are the same.
+ - Returns utf-8 text, dammit
+
+Caller:
+ - Daemon mode: In this mode, the caller will run non-stop, hitting each court
+   at a configurable rate.
+ - Non-synchronous: The Caller should not have to wait for HTTP requests to 
+   return before proceeding to its next task.
+ - Killable: It's vital that the caller be killable in a safe manner, without
+   risk to data that it may be in the middle of scraping.
+ - Re-spawning: If the caller dies for whatever reason, it should respawn 
+   automatically.
+ - Friendly to court websites: The caller should avoid downloading files over
+   and over again via two methods:
+     1. Before downloading ANY files from the court, it can check a hash of the 
+        meta data returned. If unchanged, it should back off and visit the court
+        again later.
+     2. Assuming documents are returned in order by the scraper, it could 
+        support a sweep and incremental mode. In incremental mode, it would stop
+        downloading files after having encountered duplicates several times in a 
+        row.
+ - Magic numbers should be used to sniff the mimetype of files, with extension
+   as fallback.
+ - Content extraction is not part of the caller, but it should be considered as
+   part of the solution and in the reference caller.
+ - Meta data cleanup is located in the caller, and includes:
+    - Conversion of private IDs (like social security numbers) to X's.
+    - Harmonization of variations on United States
+    - Harmonization of vs. v, versus, etc. 
+    - Title-casing of uppercase case names
+    - Removal of all variations on 'et al'
+    - Removal of plaintiff, appellee, defendant and the like

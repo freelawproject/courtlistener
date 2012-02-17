@@ -276,8 +276,8 @@ def trunc(s, length):
 def removeLeftMargin(s):
     '''Gets rid of left hand margin.
     
-    Given a block of text, calculates the mode the number of spaces before text 
-    in the doc, and then removes that number of spaces from the text. This 
+    Given a block of text, calculates the mode of the number of spaces before 
+    text in the doc, and then removes that number of spaces from the text. This 
     should not be used in the general case, but can be used in cases where a
     left-hand margin is known to exist.
     '''
