@@ -70,9 +70,11 @@ def show_results(request):
     Code beyond this point will be run if the alert form failed, or if the 
     submission was a GET request. Beyond this point, we run the searches.
     '''
-    if request.GET:
+
+    try:
+        request.GET['sort']
         search_form = SearchForm(request.GET)
-    else:
+    except KeyError:
         search_form = SearchForm()
     # Run the query
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
