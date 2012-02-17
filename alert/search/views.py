@@ -72,9 +72,11 @@ def show_results(request):
     '''
 
     try:
+        # Bind the search form if a search has been placed
         request.GET['sort']
         search_form = SearchForm(request.GET)
     except KeyError:
+        # Otherwise, just run the default query
         search_form = SearchForm()
     # Run the query
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')

@@ -658,7 +658,6 @@ function install_OCR {
     then
         wget http://tesseract-ocr.googlecode.com/files/tesseract-3.01.tar.gz
         tar -zvxf tesseract-3.01.tar.gz
-        wget http://tesseract-ocr.googlecode.com/files/eng.traineddata.gz
         gunzip eng.traineddata.gz
         # tesseract 3.01 requires leptonica >1.67
         wget https://leptonica.googlecode.com/files/leptonica-1.68.tar.gz
@@ -673,7 +672,7 @@ function install_OCR {
         make
         sudo make install
         sudo ldconfig
-        sudo mv ../eng.traineddata /usr/local/share/tessdata/
+        sudo mv $CL_INSTALL_DIR/court-listener/OCR/eng.traineddata /usr/local/share/tessdata/
         # Cleanup
         cd ..
         rm -r tesseract-3.01*

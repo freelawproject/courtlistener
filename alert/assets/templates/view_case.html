@@ -221,11 +221,11 @@
         <br>
         {% if doc.extracted_by_ocr %}
             <div class="notice span-17 last">
-                <p>The content of this document was extracted through optical 
-                character recognition (OCR). As a result you may prefer reading
-                it as a PDF. However, if you would like to see the content we 
-                have extracted, click this box.</p>
+                <p class="bottom">The text of this document was obtained by analyzing a scanned
+                document provided by the court. As a result it may have typos,
+                and you may prefer reading the original.</p>
             </div>
+            <div class="clearfix"></div>
         {% endif %}
         <div id="text">
             {% if doc.documentPlainText %}

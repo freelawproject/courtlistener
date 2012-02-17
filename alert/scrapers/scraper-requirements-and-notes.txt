@@ -6,6 +6,14 @@ Goals:
  - Generalized architecture - no code repetition
  - Xpath-based scraping
     - HTML5 Parser via lxml is an option, or perhaps building the JS Dom, and hitting it with jquery selectors
+ - mimetype sniffing
+ - meta data to return:
+    - mimetype
+    - casename
+    - case date
+    - precedential status
+    - court
+    - ...
 
 
 Non-goals:
