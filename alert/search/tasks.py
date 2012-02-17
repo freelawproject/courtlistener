@@ -40,25 +40,17 @@ def add_or_update_doc_object(doc):
     rather than a primary key. This rejects the standard Celery advice about
     not passing objects around, but thread safety shouldn't be an issue since
     this is only used by the update_index command, and we want to query and 
-    build the SearchDocument objects in the task, not in its caller.'''
-    retries = 0
-    while True:
-        try:
-            search_doc = SearchDocument(doc)
-            si.add(search_doc)
-            return 0
-        except AttributeError:
-            print "AttributeError trying to add doc.pk: %s" % doc.pk
-        except InvalidDocumentError:
-            print "Unable to parse document %s" % doc.pk
-            break
-        except socket.error:
-            # Try again if we haven't tried ten times yet
-            if retries == 10:
-                print "Document %s was unable to be indexed due to %d socket errors." % (doc.pk, retries)
-                break
-            retries += 1
-            continue
+    build the SearchDocument objects in the task, not in its caller.
+    '''
+    try:
+        search_doc = SearchDocument(doc)
+        si.add(search_doc)
+    except AttributeError:
+        print "AttributeError trying to add doc.pk: %s" % doc.pk
+    except InvalidDocumentError:
+        print "Unable to parse document %s" % doc.pk
+    except socket.error, exc:
+        add_or_update_doc_object.retry(exc=exc, countdown=120)
 
 @task
 def delete_docs(docs):

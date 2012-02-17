@@ -88,12 +88,14 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
         if court == 'all':
             # dump everything.
             docs_to_dump = queryset_iterator(Document.objects.filter(
-                 dateFiled__gte=start_date, dateFiled__lte=end_date))
+                                                     dateFiled__gte=start_date,
+                                                     dateFiled__lte=end_date))
         else:
             # dump just the requested court
             docs_to_dump = queryset_iterator(Document.objects.filter(
-               dateFiled__gte=start_date, dateFiled__lte=end_date,
-               court=court))
+                                                     dateFiled__gte=start_date,
+                                                     dateFiled__lte=end_date,
+                                                     court=court))
 
         make_dump_file(docs_to_dump, path_from_root, filename)
 

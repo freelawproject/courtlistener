@@ -36,13 +36,16 @@ from alert.search.models import Document
 from alert.lib.string_utils import anonymize
 from alert.lib.mojibake import fix_mojibake
 from celery.decorators import task
+from celery.task.sets import subtask
 from datetime import date
 from lxml import etree
 from lxml.etree import tostring
 
+import os
 import re
 import StringIO
 import subprocess
+import time
 
 
 @task
@@ -59,7 +62,7 @@ def extract_doc_content(pk):
     doc = Document.objects.get(pk=pk)
 
     path = str(doc.local_path)
-    path = settings.MEDIA_ROOT + path
+    path = os.path.join(settings.MEDIA_ROOT, path)
 
     DEVNULL = open('/dev/null', 'w')
     mimetype = path.split('.')[-1]
@@ -68,13 +71,18 @@ def extract_doc_content(pk):
         process = subprocess.Popen(["pdftotext", "-layout", "-enc", "UTF-8",
             path, "-"], shell=False, stdout=subprocess.PIPE, stderr=DEVNULL)
         content, err = process.communicate()
-        if content == '':
-            # probably an image PDF. TODO: Add code here to create OCR subtask in 
-            # celery.
-            content = "Unable to extract document content."
+        if content.strip() == '':
+            # probably an image PDF. Send it to OCR
+            result = subtask("scrapers.tasks.extract_by_ocr", args=(path,), kwargs={}).apply()
+            success, content = result.get()
+            if success:
+                doc.extracted_by_ocr = True
+            elif content == '' or not success:
+                content = "Unable to extract document content."
         elif 'e' not in content:
             # It's a corrupt PDF from ca9. Fix it.
             content = fix_mojibake(unicode(content, 'utf-8', errors='ignore'))
+
         doc.documentPlainText, blocked = anonymize(content)
         if blocked:
             doc.blocked = True
@@ -86,7 +94,7 @@ def extract_doc_content(pk):
         # read the contents of text files.
         try:
             content = open(path).read()
-            doc.documentPlainText = anonymize(content)
+            doc.documentPlainText, blocked = anonymize(content)
         except:
             print "****Error extracting plain text from: %s****" % (doc.citation.caseNameShort)
             return 1
@@ -110,7 +118,7 @@ def extract_doc_content(pk):
 
         if 'not for publication' in content.lower():
             doc.documentType = "Unpublished"
-        doc.documentHTML = anonymize(content)
+        doc.documentHTML, blocked = anonymize(content)
 
         if err:
             print "****Error extracting WPD text from: " + doc.citation.caseNameShort + "****"
@@ -120,7 +128,7 @@ def extract_doc_content(pk):
         process = subprocess.Popen(['antiword', path, '-i', '1'], shell=False,
             stdout=subprocess.PIPE, stderr=DEVNULL)
         content, err = process.communicate()
-        doc.documentPlainText = anonymize(content)
+        doc.documentPlainText, blocked = anonymize(content)
         if err:
             print "****Error extracting DOC text from: " + doc.citation.caseNameShort + "****"
             return 1
@@ -136,3 +144,42 @@ def extract_doc_content(pk):
 
     logger.info("Successfully extracted contents of document %s" % (pk,))
     return 0
+
+@task
+def extract_by_ocr(path):
+    '''Extract the contents of a PDF using OCR
+    
+    Convert the PDF to a tiff, then perform OCR on the tiff using Tesseract. 
+    Take the contents and the exit code and return them to the caller.
+    '''
+    print "Running OCR subtask on %s" % path
+    content = ''
+    success = False
+    try:
+        DEVNULL = open('/dev/null', 'w')
+        tmp_file_prefix = os.path.join('/tmp', str(time.time()))
+        image_magick_command = ['convert', '-depth', '4', '-density', '300', path,
+                        tmp_file_prefix + '.tiff']
+        process = subprocess.Popen(image_magick_command, shell=False,
+                                   stdout=DEVNULL, stderr=DEVNULL)
+        _, err = process.communicate()
+        if not err:
+            tesseract_command = ['tesseract', tmp_file_prefix + '.tiff',
+                                 tmp_file_prefix, '-l', 'eng']
+            process = subprocess.Popen(tesseract_command, shell=False,
+                                       stdout=DEVNULL, stderr=DEVNULL)
+            _, err = process.communicate()
+
+            if not err:
+                content = open(tmp_file_prefix + '.txt').read()
+                success = True
+
+    finally:
+        # Remove tmp_file and the text file
+        for suffix in ['.tiff', '.txt']:
+            try:
+                os.remove(tmp_file_prefix + suffix)
+            except OSError:
+                pass
+
+    return success, content
