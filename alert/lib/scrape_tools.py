@@ -81,7 +81,8 @@ class makeDocError(Exception):
 
 
 def readURL(url, courtID):
-    try: html = urllib2.urlopen(url).read()
+    try:
+        html = urllib2.urlopen(url).read()
     except urllib2.HTTPError, e:
         print "****ERROR CONNECTING TO COURT: " + str(courtID) + "****"
         print 'HTTPError = ' + str(e.code)
