@@ -1,6 +1,7 @@
 $(document).ready(function() {
     $('#extra-sidebar-fields').prependTo('#sidebar-facet-placeholder');
     $('#extra-sidebar-fields').show();
+    
     $('#search-form,#sidebar-search-form').submit(function(e){
         // Overrides the submit buttons so that they gather the correct
         // form elements before submission.
@@ -22,6 +23,7 @@ $(document).ready(function() {
         });
         document.location = '/?' + $('#search-form').serialize();
     });
+    
     $('#id_court_all').click(function() {
         // Makes the check all box (un)check the other boxes
         $("input.court-checkbox:not(:disabled)").attr('checked', $('#id_court_all').is(':checked'));
@@ -35,12 +37,15 @@ $(document).ready(function() {
             $("#id_court_all").attr('checked', false);
         }
     });
+    
     $('.sidebar-section h3').click(function() {
+    	// Toggles the sidebar sections
         $(this).next('.hidden').toggle('fast');
         $(this).next('.shown').toggle('fast');
         $(this).toggleClass('arrow-right-before');
         $(this).toggleClass('arrow-down-before');
     });
+    
     $('#create-alert-header').click(function(){
     	// Puts the cursor in the alertName box when the create alert section is expanded.
         $('#id_alertName').focus();

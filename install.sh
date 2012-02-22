@@ -558,7 +558,7 @@ function install_solr {
     
     cd /usr/local
     echo "Downloading Solr 4.0 development snapshot from 2011-11-04..."
-    wget https://builds.apache.org/job/Solr-trunk/lastStableBuild/artifact/artifacts/apache-solr-4.0-2012-01-15_09-30-14.tgz
+    wget https://builds.apache.org/job/Solr-trunk/1758/artifact/artifacts/apache-solr-4.0-2012-02-09_02-07-08.tgz 
     
     echo "Unpacking Solr to /usr/local/solr..."
     if [ -d solr ]

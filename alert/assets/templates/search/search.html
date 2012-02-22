@@ -31,8 +31,10 @@
                // Makes the sort drop down work when changed.
                $('#search-form').submit();
            });
-           $('#id_sort').appendTo('#result-order-chooser-placeholder');
-           $('#id_sort').show();
+           {% if count > 0 %}
+               $('#id_sort').appendTo('#result-order-chooser-placeholder');
+               $('#id_sort').show();
+           {% endif %}
        });
     </script>
 {% endblock %}
