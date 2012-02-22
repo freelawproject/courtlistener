@@ -48,7 +48,7 @@ class Command(BaseCommand):
             action='store_true',
             dest='optimize_mode',
             default=False,
-            help=('Run the optimize command against the current index. Note ',
+            help=('Run the optimize command against the current index. Note '
                   'that the index is always optimized after updating everything.')),
         make_option('--everything',
             action='store_true',

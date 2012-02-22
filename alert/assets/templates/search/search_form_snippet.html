@@ -46,19 +46,15 @@
         </table>
         {% if not error %}
 	        <div id="extra-search-fields">
-	            {% if count > 0 %}{{ search_form.sort }}{% endif %}
+	            {{ search_form.sort }}
 	            <div id="extra-sidebar-fields">
 	                <h4 class="bottom">Case name</h4>
 	                {{ search_form.case_name }}
 	                <hr class="space">
 	                <h4 class="bottom">Federal Appeals Courts</h4>
 
-	                <p class="bottom">
-                        {% if count == 0 %}
-                            {{ search_form.court_all|attr:"disabled:disabled" }}
-                        {% else %}
-                            {{ search_form.court_all }}
-                        {% endif %}
+                    <p class="bottom">
+                        {{ search_form.court_all }}
 	                    <label
 	                        for="id_court_all"
 	                        class="{% if count == 0 %}gray{% else %}pointer{% endif %}">{{ search_form.court_all.label }}</label>
