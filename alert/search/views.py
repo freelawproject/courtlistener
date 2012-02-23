@@ -73,7 +73,7 @@ def show_results(request):
 
     try:
         # Bind the search form if a search has been placed
-        request.GET['sort']
+        request.GET['q']
         search_form = SearchForm(request.GET)
     except KeyError:
         # Otherwise, just run the default query
