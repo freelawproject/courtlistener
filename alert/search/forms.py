@@ -28,7 +28,7 @@ REFINE_CHOICES = (
     )
 
 SORT_CHOICES = (
-        ('score asc', 'Relevance'),
+        ('score desc', 'Relevance'),
         ('dateFiled desc', 'Date: newest first'),
         ('dateFiled asc', 'Date: oldest first'),
     )
@@ -96,8 +96,8 @@ class SearchForm(forms.Form):
         # Query the DB so we can build up check boxes for each court in use.  
         courts = Court.objects.filter(in_use=True).values_list('courtUUID', 'short_name')
 
-        if self.data.get('sort') is not None:
-            # If there's a sort order, this is a refinement.
+        if self.data.get('q') is not None:
+            # If there's a q parameter, this is a refinement.
             self.fields['refine'] = forms.ChoiceField(
                                               choices=REFINE_CHOICES,
                                               required=False,
