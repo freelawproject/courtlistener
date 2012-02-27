@@ -210,6 +210,11 @@ def hasDuplicate(case_name, west_cite=None, docket_number=None):
     citation will not be updated. Instead a new citation will be created, since
     West citations are not unique, and neither are docket numbers.
     '''
+
+    #
+    # TODO: Make sure I'm not doing lookups by case_name - there's no index (and
+    #       indeed there can't be, so performance WILL suck.
+    # 
     if west_cite and docket_number:
         # We have both the west citation and the docket number.
         cite, created = Citation.objects.get_or_create(case_name=case_name,
