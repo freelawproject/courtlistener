@@ -80,6 +80,8 @@ OPTIONS
             install Django
     --courtlistener
             set up the CL repository, and configure it with django
+    --juriscraper
+            set up Juriscraper, and add it to the Python path
     --importdata
             import some basic data into the DB, setting up the courts
     --ocr
@@ -135,7 +137,7 @@ EOF
 
     # set up the PYTHON_SITES_PACKAGES_DIR
     PYTHON_SITES_PACKAGES_DIR=`python -c "from distutils.sysconfig import get_python_lib; print get_python_lib()"`
-    CL_INSTALL_DIR='/var/www'
+    CL_INSTALL_DIR='/var/www/court-listener'
 
     # set up the private settings file
     echo -e "\nWe are going to set up two settings files. One with private data, and one with
@@ -166,29 +168,10 @@ TIME_ZONE is set to America/Los Angeles
 
     # set up the MySQL configs
     read -p "We will be setting up a MySQL DB. What would you like its name to be (e.g. courtlistener): " MYSQL_DB_NAME
-    read -p "And we will be giving it a username which must be different than the DB name. What would you like that to be (e.g. django): " MYSQL_USERNAME
+    MYSQL_USERNAME=django
     MYSQL_PWD=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789") for i in range(50)]);'`
-    echo -e "\nYou can set up the MySQL password manually, but we recommend a randomly
-generated password, since you should not ever need to type it in.
-"
-    read -p "Use the following random password: '$MYSQL_PWD'? (y/n): " proceed
-    if [ $proceed == 'n' ]
-    then
-        read -p "Very well. What would you like the password to be (do not use the # symbol): " MYSQL_PWD
-    fi
-
     CELERY_PWD=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789") for i in range(50)]);'`
-    echo -e "\nFinally, we will be installing Celery, which requires a password as well.
-You can set up the Celery password manually, but we recommend a randomly
-generated one, since you should not ever need to type it in.
-"
-    read -p "Use the following random password: '$CELERY_PWD'? (y/n): " proceed
-    if [ $proceed == 'n' ]
-    then
-        read -p "Very well. What would you like the password to be (do not use the # symbol): " CELERY_PWD
-    fi
-
-
+    
     read -p "
 Great. This is all the input we need for a while. We will now complete the
 installation process.
@@ -313,42 +296,35 @@ function install_court_listener {
 
     if [ ! -d $CL_INSTALL_DIR ]
     then
-        read -p "Directory '$CL_INSTALL_DIR' doesn't exist. Create it? (y/n): " proceed
-        if [ $proceed == "n" ]
-        then
-            echo "Bad juju. Aborting."
-            exit 5
-        else
-            mkdir -p $CL_INSTALL_DIR
-        fi
+        mkdir -p $CL_INSTALL_DIR
     fi
     cd $CL_INSTALL_DIR
     echo "Downloading CourtListener with mercurial..."
-    hg clone https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener court-listener
+    hg clone https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener .
 
     # begin the harder thing: configuring it correctly...
     # We need a link between the 20-private.conf adminMedia location and the
     # location of the django installation. Else, admin templates won't work.
-    ln -s $DJANGO_INSTALL_DIR/django/contrib/admin/media court-listener/alert/assets/media/adminMedia
+    ln -s $DJANGO_INSTALL_DIR/django/contrib/admin/media alert/assets/media/adminMedia
 
     # we link up the init scripts
     echo "Installing init scripts in /etc/init.d/scraper"
-    ln -s $CL_INSTALL_DIR/court-listener/init-scripts/scraper /etc/init.d/scraper
+    ln -s $CL_INSTALL_DIR/init-scripts/scraper /etc/init.d/scraper
     mkdir /var/run/scraper
     update-rc.d scraper defaults
 
     # we create the logging file and set up logrotate scripts
     mkdir -p "/var/log/scraper"
     touch /var/log/scraper/daemon_log.out
-    ln -s $CL_INSTALL_DIR/court-listener/log-scripts/scraper /etc/logrotate.d/scraper
+    ln -s $CL_INSTALL_DIR/log-scripts/scraper /etc/logrotate.d/scraper
 
     # this generates a nice random number, as it is done by django-admin.py
     SECRET_KEY=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789") for i in range(50)]);'`
 
     # this is the MEDIA_ROOT
-    MEDIA_ROOT="$CL_INSTALL_DIR/court-listener/alert/assets/media/"
-    TEMPLATE_DIRS="$CL_INSTALL_DIR/court-listener/alert/assets/templates/"
-    DUMP_DIR="$CL_INSTALL_DIR/court-listener/alert/assets/media/dumps/"
+    MEDIA_ROOT="$CL_INSTALL_DIR/alert/assets/media/"
+    TEMPLATE_DIRS="$CL_INSTALL_DIR/alert/assets/templates/"
+    DUMP_DIR="$CL_INSTALL_DIR/alert/assets/media/dumps/"
 
     # convert true and false (bash) to True and False (Python)
     if $DEVELOPMENT
@@ -360,7 +336,7 @@ function install_court_listener {
 
     # all settings should be in place. Now we make the file...
     echo -e "\nGenerating the installation config, 20-private.conf..."
-cat <<EOF > $CL_INSTALL_DIR/court-listener/alert/settings/20-private.conf
+cat <<EOF > $CL_INSTALL_DIR/alert/settings/20-private.conf
 ADMINS = (
     ('$CONFIG_NAME', '$CONFIG_EMAIL'),
 )
@@ -412,7 +388,7 @@ DEVELOPMENT = $DEVELOPMENT
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # this setting helps with settings elsewhere...include a trailing slash!
-INSTALL_ROOT = '$CL_INSTALL_DIR/court-listener/'
+INSTALL_ROOT = '$CL_INSTALL_DIR/'
 
 INTERNAL_IPS = ('127.0.0.1',)
 DEBUG_TOOLBAR_CONFIG = {'INTERCEPT_REDIRECTS': False}
@@ -426,18 +402,50 @@ EOF
 
     if [ $INSTALL_DEBUG_TOOLBAR == 'y' ]
     then
-        echo "    'debug_toolbar'," >> $CL_INSTALL_DIR/court-listener/alert/settings/20-private.conf
+        echo "    'debug_toolbar'," >> $CL_INSTALL_DIR/alert/settings/20-private.conf
     fi
     if [ $INSTALL_DJANGO_EXTENSIONS == 'y' ]
     then
-        echo "    'django_extensions'," >> $CL_INSTALL_DIR/court-listener/alert/settings/20-private.conf
+        echo "    'django_extensions'," >> $CL_INSTALL_DIR/alert/settings/20-private.conf
     fi
-    echo "])" >> $CL_INSTALL_DIR/court-listener/alert/settings/20-private.conf #this closes off the INSTALLED_APPS var.
+    echo "])" >> $CL_INSTALL_DIR/alert/settings/20-private.conf #this closes off the INSTALLED_APPS var.
 
     echo -e 'Done\n\nCourtListener installed and configured successfully.'
 
     # TODO: Add some useful aliases here. Research the best way to do this.
 
+}
+
+
+function install_juriscraper {
+    echo -e "\n##########################"
+    echo "Installing Juriscraper..."
+    echo "##########################"
+    read -p "Would you like to install Juriscraper? (y/n): " proceed
+    if [ $proceed == 'n' ]
+    then
+        echo -e '\nGreat. Moving on.'
+        return 0
+    fi
+    
+    JS_INSTALL_DIR='/usr/local/juriscraper'
+    
+    mkdir -p $JS_INSTALL_DIR
+    
+    cd $JS_INSTALL_DIR
+    echo "Downloading Juriscraper with mercurial..."
+    hg clone https://bitbucket.org/mlissner/juriscraper .
+    
+    # link Juriscraper with python
+    if [ ! -d $PYTHON_SITES_PACKAGES_DIR ]
+    then
+        echo "PYTHON_SITES_PACKAGES_DIR does not exist. Aborting."
+    else
+        echo -n "Linking python with Juriscraper..."
+        ln -s `pwd` $PYTHON_SITES_PACKAGES_DIR/juriscraper
+        echo "Done."
+    fi
+    
 }
 
 
@@ -571,14 +579,14 @@ function install_solr {
     rm apache-solr-4.0-2012-01-13_09-34-29.tgz
     
     # link up the solrconfig and schema files to the ones in CL
-    ln -s -f $CL_INSTALL_DIR/court-listener/Solr/conf/solrconfig.xml /usr/local/solr/example/solr/conf/solrconfig.xml
-    ln -s -f $CL_INSTALL_DIR/court-listener/Solr/conf/schema.xml /usr/local/solr/example/solr/conf/schema.xml
+    ln -s -f $CL_INSTALL_DIR/Solr/conf/solrconfig.xml /usr/local/solr/example/solr/conf/solrconfig.xml
+    ln -s -f $CL_INSTALL_DIR/Solr/conf/schema.xml /usr/local/solr/example/solr/conf/schema.xml
     
     # make a directory where logs will be created and set up the logger
-    ln -s $CL_INSTALL_DIR/court-listener/log-scripts/solr /etc/logrotate.d/solr
+    ln -s $CL_INSTALL_DIR/log-scripts/solr /etc/logrotate.d/solr
     
     # Enable Solr at startup
-    ln -s $CL_INSTALL_DIR/court-listener/init-scripts/solr /etc/init.d/solr
+    ln -s $CL_INSTALL_DIR/init-scripts/solr /etc/init.d/solr
     update-rc.d solr defaults
     
     # and hopefully that worked...
@@ -595,7 +603,7 @@ function configure_apache {
     then
         # Install the xsendfile module
         apxs2 -cia $CL_INSNTALL_DIR/courtlistener/apache/mod_xsendfile.c
-        ln -s $CL_INSTALL_DIR/court-listener/apache/courtlistener.com.conf /etc/apache2/sites-available/courtlistener.com.conf
+        ln -s $CL_INSTALL_DIR/apache/courtlistener.com.conf /etc/apache2/sites-available/courtlistener.com.conf
         a2enmod headers
         a2ensite courtlistener.com.conf
         service apache2 restart
@@ -634,10 +642,10 @@ function install_django_celery {
         chown celery:celery /var/run/celery
         
         # set up the logger
-        ln -s $CL_INSTALL_DIR/court-listener/log-scripts/celery /etc/logrotate.d/celery
+        ln -s $CL_INSTALL_DIR/log-scripts/celery /etc/logrotate.d/celery
         
         echo "Installing init scripts in /etc/init.d/celeryd"
-        ln -s $CL_INSTALL_DIR/court-listener/init-scripts/celeryd /etc/init.d/celeryd
+        ln -s $CL_INSTALL_DIR/init-scripts/celeryd /etc/init.d/celeryd
         update-rc.d celeryd defaults
               
         echo -e '\nDjango-celery and Celery installed successfully.'
@@ -672,7 +680,7 @@ function install_OCR {
         make
         sudo make install
         sudo ldconfig
-        sudo mv $CL_INSTALL_DIR/court-listener/OCR/eng.traineddata /usr/local/share/tessdata/
+        sudo mv $CL_INSTALL_DIR/OCR/eng.traineddata /usr/local/share/tessdata/
         # Cleanup
         cd ..
         rm -r tesseract-3.01*
@@ -767,7 +775,7 @@ function import_data {
 
     # import data using the manage.py function. Data can be regenerated with:
     # python manage.py dumpdata search.Court
-    cd $CL_INSTALL_DIR/court-listener/alert
+    cd $CL_INSTALL_DIR/alert
     cat <<EOF > /tmp/courts.json
 [{"pk": "scotus", "model": "search.court", "fields": {"end_date": null, "citation_string": "SCOTUS", "short_name": "Supreme Court", "in_use": true, "URL": "http://supremecourt.gov/", "full_name": "Supreme Court of the United States", "position": 1.0, "start_date": "1789-09-24"}}, {"pk": "ca1", "model": "search.court", "fields": {"end_date": null, "citation_string": "1st Cir.", "short_name": "First Circuit", "in_use": true, "URL": "http://www.ca1.uscourts.gov/", "full_name": "Court of Appeals for the First Circuit", "position": 101.0, "start_date": "1891-03-03"}}, {"pk": "ca2", "model": "search.court", "fields": {"end_date": null, "citation_string": "2d Cir.", "short_name": "Second Circuit", "in_use": true, "URL": "http://www.ca2.uscourts.gov/", "full_name": "Court of Appeals for the Second Circuit", "position": 102.0, "start_date": "1891-03-03"}}, {"pk": "ca3", "model": "search.court", "fields": {"end_date": null, "citation_string": "3rd Cir.", "short_name": "Third Circuit", "in_use": true, "URL": "http://www.ca3.uscourts.gov/", "full_name": "Court of Appeals for the Third Circuit", "position": 103.0, "start_date": "1891-03-03"}}, {"pk": "ca4", "model": "search.court", "fields": {"end_date": null, "citation_string": "4th Cir.", "short_name": "Fourth Circuit", "in_use": true, "URL": "http://www.ca4.uscourts.gov/", "full_name": "Court of Appeals for the Fourth Circuit", "position": 104.0, "start_date": "1891-03-03"}}, {"pk": "ca5", "model": "search.court", "fields": {"end_date": null, "citation_string": "5th Cir.", "short_name": "Fifth Circuit", "in_use": true, "URL": "http://www.ca5.uscourts.gov/", "full_name": "Court of Appeals for the Fifth Circuit", "position": 105.0, "start_date": "1891-03-03"}}, {"pk": "ca6", "model": "search.court", "fields": {"end_date": null, "citation_string": "6th Cir.", "short_name": "Sixth Circuit", "in_use": true, "URL": "http://www.ca6.uscourts.gov/", "full_name": "Court of Appeals for the Sixth Circuit", "position": 106.0, "start_date": "1891-03-03"}}, {"pk": "ca7", "model": "search.court", "fields": {"end_date": null, "citation_string": "7th Cir.", "short_name": "Seventh Circuit", "in_use": true, "URL": "http://www.ca7.uscourts.gov/", "full_name": "Court of Appeals for the Seventh Circuit", "position": 107.0, "start_date": "1891-03-03"}}, {"pk": "ca8", "model": "search.court", "fields": {"end_date": null, "citation_string": "8th Cir.", "short_name": "Eighth Circuit", "in_use": true, "URL": "http://www.ca8.uscourts.gov/", "full_name": "Court of Appeals for the Eighth Circuit", "position": 108.0, "start_date": "1891-03-03"}}, {"pk": "ca9", "model": "search.court", "fields": {"end_date": null, "citation_string": "9th Cir.", "short_name": "Ninth Circuit", "in_use": true, "URL": "http://www.ca9.uscourts.gov/", "full_name": "Court of Appeals for the Ninth Circuit", "position": 109.0, "start_date": "1891-03-03"}}, {"pk": "ca10", "model": "search.court", "fields": {"end_date": null, "citation_string": "10th Cir.", "short_name": "Tenth Circuit", "in_use": true, "URL": "http://www.ca10.uscourts.gov/", "full_name": "Court of Appeals for the Tenth Circuit", "position": 110.0, "start_date": "1929-02-28"}}, {"pk": "ca11", "model": "search.court", "fields": {"end_date": null, "citation_string": "11th Cir.", "short_name": "Eleventh Circuit", "in_use": true, "URL": "http://www.ca11.uscourts.gov/", "full_name": "Court of Appeals for the Eleventh Circuit", "position": 111.0, "start_date": "1980-10-14"}}, {"pk": "cadc", "model": "search.court", "fields": {"end_date": null, "citation_string": "D.C. Cir.", "short_name": "District of Columbia", "in_use": true, "URL": "http://www.cadc.uscourts.gov/", "full_name": "Court of Appeals for the D.C. Circuit", "position": 112.0, "start_date": "1893-02-09"}}, {"pk": "cafc", "model": "search.court", "fields": {"end_date": null, "citation_string": "Fed. Cir.", "short_name": "Federal Circuit", "in_use": true, "URL": "http://www.cafc.uscourts.gov/", "full_name": "Court of Appeals for the Federal Circuit", "position": 113.0, "start_date": "1982-04-02"}}, {"pk": "cc", "model": "search.court", "fields": {"end_date": "1992-10-29", "citation_string": "Ct. Cl.", "short_name": "Court of Claims", "in_use": false, "URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_coc.html", "full_name": "United States Court of Claims", "position": 113.5, "start_date": "1855-02-24"}}, {"pk": "uscfc", "model": "search.court", "fields": {"end_date": null, "citation_string": "Fed. Cl.", "short_name": "Court of Federal Claims", "in_use": true, "URL": "http://www.uscfc.uscourts.gov/", "full_name": "United States Court of Federal Claims", "position": 113.6, "start_date": "1982-04-02"}}, {"pk": "com", "model": "search.court", "fields": {"end_date": "1913-01-01", "citation_string": "Comm. Ct.", "short_name": "Commerce Court", "in_use": false, "URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_com.html", "full_name": "Commerce Court", "position": 113.9, "start_date": "1910-01-01"}}, {"pk": "ccpa", "model": "search.court", "fields": {"end_date": "1982-04-02", "citation_string": "C.C.P.A.", "short_name": "Customs and Patent Appeals", "in_use": true, "URL": "http://www.cafc.uscourts.gov/", "full_name": "Court of Customs and Patent Appeals", "position": 114.0, "start_date": "1909-08-05"}}, {"pk": "cusc", "model": "search.court", "fields": {"end_date": "1980-01-01", "citation_string": "Cust. Ct.", "short_name": "U.S. Customs Court", "in_use": false, "URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_cc_bib.html", "full_name": "United States Customs Court", "position": 114.1, "start_date": "1926-01-01"}}, {"pk": "eca", "model": "search.court", "fields": {"end_date": "1962-04-18", "citation_string": "Emer. Ct. App.", "short_name": "Emergency Court of Appeals", "in_use": true, "URL": "https://secure.wikimedia.org/wikipedia/en/wiki/Emergency_Court_of_Appeals", "full_name": "Emergency Court of Appeals", "position": 116.0, "start_date": "1942-01-30"}}, {"pk": "tecoa", "model": "search.court", "fields": {"end_date": "1992-10-29", "citation_string": "Temp. Emerg. Ct. App.", "short_name": "Temporary Emergency Court of Appeals", "in_use": false, "URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_tecoa.html", "full_name": "Temporary Emergency Court of Appeals", "position": 116.1, "start_date": "1971-12-01"}}, {"pk": "fiscr", "model": "search.court", "fields": {"end_date": null, "citation_string": "FISA Ct. Rev.", "short_name": "Foreign Intelligence Surveillance Court of Review", "in_use": false, "URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_fisc.html", "full_name": "Foreign Intelligence Surveillance Court of Review", "position": 140.0, "start_date": null}}, {"pk": "cit", "model": "search.court", "fields": {"end_date": null, "citation_string": "Ct. Intl. Trade", "short_name": "Court of International Trade", "in_use": false, "URL": "http://www.cit.uscourts.gov/", "full_name": "United States Court of International Trade", "position": 141.0, "start_date": null}}]
 EOF
@@ -792,7 +800,7 @@ function finalize {
     fi
 
     echo -e '\nSyncing the django data model...'
-    cd $CL_INSTALL_DIR/court-listener/alert
+    cd $CL_INSTALL_DIR/alert
     python manage.py syncdb
     python manage.py migrate
 
@@ -820,9 +828,9 @@ function main {
     echo -e "\n\n#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#"
     echo '  CourtListener was completely installed correctly!'
     echo "#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#"
-    echo "You may test this installation by going to $CL_INSTALL_DIR/court-listener/alert
+    echo "You may test this installation by going to $CL_INSTALL_DI/alert
 and running the command:
-    $ python manage.py runserver
+    $ manage.py runserver
 If that works, you should be able to see the CourtListener website in your browser
 at http://localhost:8000.
 
@@ -854,6 +862,7 @@ else
         --solr) get_user_input; install_solr;;
         --django) get_user_input; install_django;;
         --courtlistener) get_user_input; install_court_listener;;
+        --juriscraper) get_user_input; install_juriscraper;;
         --importdata) get_user_input; configure_mysql; import_data;;
         --debugtoolbar) get_user_input; install_debug_toolbar;;
         --djangocelery) get_user_input; install_django_celery;;

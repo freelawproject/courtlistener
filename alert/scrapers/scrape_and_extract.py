@@ -34,6 +34,7 @@ from alert.lib.scrape_tools import readURL
 from alert.lib.scrape_tools import save_all
 
 from django.core.exceptions import ObjectDoesNotExist
+from juriscraper.opinions.united_states.federal import *
 
 import datetime
 import re
@@ -52,13 +53,22 @@ from time import mktime
 from urlparse import urljoin
 
 # for use in catching the SIGINT (Ctrl+C)
-dieNow = False
-
+die_now = False
 
 def signal_handler(signal, frame):
     print 'Exiting safely...this will finish the current court, then exit...'
-    global dieNow
-    dieNow = True
+    global die_now
+    die_now = True
+
+def scrape_court(court, verbosity):
+    try:
+        site = court.Site().parse()
+    except:
+        #TODO: Print stack trace here.
+        pass
+
+    # "Transactionally" save the values to the DB
+
 
 
 def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
@@ -1282,7 +1292,6 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
         return
 
     if (courtID == 'scotus'):
-        # we do SCOTUS
         urls = ("http://www.supremecourt.gov/opinions/slipopinions.aspx",
                 "http://www.supremecourt.gov/opinions/in-chambers.aspx",
                 "http://www.supremecourt.gov/opinions/relatingtoorders.aspx",)
@@ -1373,88 +1382,67 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
 
 
 def main():
-    """
-    The master function. This will receive arguments from the user, determine
-    the actions to take, then hand it off to other functions that will handle the
-    nitty-gritty work.
-
-    If the courtID is 0, then we scrape/extract all courts, one after the next.
-
-    returns a list containing the result
-    """
-    global dieNow
+    global die_now
 
     # this line is used for handling SIGINT, so things can die safely.
     signal.signal(signal.SIGQUIT, signal_handler)
 
-    usage = "usage: %prog -d | (-c COURTID [-v {1,2}])"
+    usage = 'usage: %prog -c COURTID [-d] [-r RATE] [-v {1,2}]'
     parser = OptionParser(usage)
     parser.add_option('-d', '--daemon', action="store_true", dest='daemonmode',
-        default=False, help="Use this flag to turn on daemon mode at a rate of 20 minutes between each scrape")
-    parser.add_option('-c', '--court', dest='courtID', metavar="COURTID",
-        help="The court to scrape and extract")
+                      default=False, help=('Use this flag to turn on daemon '
+                                           'mode, in which all courts will be '
+                                           'sraped in turn, non-stop.'))
+    parser.add_option('-r', '--rate', dest='rate', metavar='RATE',
+                      help=('The length of time in minutes it takes to crawl all '
+                            'known courts. Particularly useful if it is desired '
+                            'to quickly scrape over all courts. Default is 30 '
+                            'minutes.'))
+    parser.add_option('-c', '--courts', dest='court_id', metavar="COURTID",
+                      help=('The court(s) to scrape and extract. This should be in '
+                            'the form of a python module or package import '
+                            'from the Juriscraper library, e.g. '
+                            '"opinions.united_states.federal.ca1" or '
+                            'simply "opinions" to do everything.'))
     parser.add_option('-v', '--verbosity', dest='verbosity', metavar="VERBOSITY",
-        help="Display status messages after execution. Higher values print more verbosity.")
+                      help=('Display status messages during execution. Higher '
+                            'values print more verbosity.'))
     (options, args) = parser.parse_args()
 
-    DAEMONMODE = options.daemonmode
-    if not DAEMONMODE and not options.courtID:
-        parser.error("You must specify either daemon mode or a court to scrape and extract.")
+    daemon_mode = options.daemonmode
+    court_id = options.court_id
+
+    if not court_id:
+        parser.error('You must specify a court as a package or module.')
+    else:
+        try:
+            import court_id
+        except ImportError:
+            parser.error('Unable to import court module or package.')
 
     try:
-        VERBOSITY = int(options.verbosity)
-    except:
-        # no verbosity supplied, assume 0
-        VERBOSITY = 0
+        verbosity = int(options.verbosity)
+    except ValueError, AttributeError:
+        verbosity = 0
 
-    courts = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
-    courtID = options.courtID
-    if not DAEMONMODE:
-        if not any([courtID not in courts, courtID != 'all']):
-            print "Error: court not found"
-            raise ObjectDoesNotExist
+    try:
+        rate = int(options.rate)
+    except ValueError, AttributeError:
+        rate = 30
+    num_courts = len(court_id.__all__)
+    wait = (rate * 60) / num_courts
+    i = 0
+    while i >= num_courts:
+        scrape_court(court_id.__all__[i], verbosity)
+        # this catches SIGINT, so the code can be killed safely.
+        if die_now == True:
+            sys.exit(0)
 
-        if courtID == 'all':
-            for court in courts:
-                # This catches all exceptions regardless of their trigger, so
-                # if one court dies, the next isn't affected.
-                try:
-                    scrapeCourt(court, DAEMONMODE, VERBOSITY)
-                except Exception:
-                    print '*****Uncaught error scraping court*****\n"' + traceback.format_exc() + "\n\n"
-                # this catches SIGINT, so the code can be killed safely.
-                if dieNow == True:
-                    sys.exit(0)
+        time.sleep(wait)
+        if i == num_courts and daemon_mode:
+            i = 0
         else:
-            # we're only doing one court
-            scrapeCourt(courtID, DAEMONMODE, VERBOSITY)
-            # this catches SIGINT, so the code can be killed safely.
-            if dieNow == True:
-                sys.exit(0)
-
-    elif DAEMONMODE:
-        # daemon mode is ON. Iterate over all the courts, with a pause between
-        # them that is long enough such that all of them are hit over the course
-        # of thirty minutes. When checking a court, see if its HTML has changed.
-        # If so, run the scrapers. If not, check the next one.
-        VERBOSITY = 0
-
-        num_courts = len(courts)
-        wait = (30 * 60) / len(courts)
-        i = 0
-        while i <= num_courts:
-            scrapeCourt(courts[i], DAEMONMODE, VERBOSITY)
-            # this catches SIGINT, so the code can be killed safely.
-            if dieNow == True:
-                sys.exit(0)
-
-            time.sleep(wait)
-            if i == num_courts:
-                # reset courtID
-                i = 0
-            else:
-                # increment it
-                i += 1
+            i += 1
     return 0
 
 if __name__ == '__main__':
