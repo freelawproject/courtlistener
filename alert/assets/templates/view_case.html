@@ -123,7 +123,7 @@
             <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-off" title="Save/edit favorite"></a>
         {% endif %}
         <h2>
-            {{ doc.citation.caseNameFull|v_wrapper }},
+            {{ doc.citation.case_name|v_wrapper }},
             {% if doc.citation.westCite != '' and doc.citation.westCite != None %}
                 {{doc.citation.westCite}}
             {% else %}

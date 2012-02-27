@@ -67,8 +67,23 @@ def scrape_court(court, verbosity):
         #TODO: Print stack trace here.
         pass
 
-    # "Transactionally" save the values to the DB
+    if not court_changed(url, html):
+        return False
+    else:
+        logger.debug("Identified changed hash at: %s" % site.url)
 
+    # Iterate over the results by day.
+    for i in range(0, len(site.case_names)):
+        makeDocFromURL(caseLink, ct)
+        save_all(doc, ct, myFile, case_name, docketNumber, VERBOSITY)
+            hasDuplicate(case_name, None, docketNumber)
+        # Check for new documents using their url and 
+        # If two days are all repeats, quit.
+
+        # "Transactionally" save the values to the DB
+    # TODO: Use log levels, not verbosities, and get the logger working properly
+    # Figure out how to map from the court module to the CL court name
+    # Check if the court has 
 
 
 def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
@@ -1375,7 +1390,7 @@ def scrapeCourt(courtID, DAEMONMODE, VERBOSITY):
                     print "Error obtaining date field for " + caseLink
 
                 # last, save evrything (pdf, citation and document)
-                save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY)
+                save_all(doc, ct, myFile, case_name, docketNumber, VERBOSITY)
 
                 i += 1
         return

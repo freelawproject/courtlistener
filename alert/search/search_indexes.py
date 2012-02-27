@@ -37,7 +37,7 @@ class SearchDocument(object):
         self.court_id = doc.court.courtUUID
         self.court_citation_string = doc.court.citation_string
         try:
-            self.caseName = doc.citation.caseNameFull
+            self.caseName = doc.citation.case_name
             self.absolute_url = doc.get_absolute_url()
         except AttributeError, NoReverseMatch:
             raise InvalidDocumentError

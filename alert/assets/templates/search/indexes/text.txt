@@ -5,7 +5,7 @@
     {{ object.documentPlainText|default_if_none:"" }}
 {% endif %}
 
-{{ object.citation.caseNameFull|default_if_none:"" }}
+{{ object.citation.case_name|default_if_none:"" }}
 {{ object.documentType|default_if_none:"" }}
 {{ object.documentSHA1|default_if_none:"" }}
 {{ object.court.full_name|default_if_none:"" }}

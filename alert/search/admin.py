@@ -34,9 +34,9 @@ class DocumentAdminInline(admin.StackedInline):
 
 class CitationAdmin(admin.ModelAdmin):
     # This needs to be disabled for performance reasons.
-    #list_display = ('docketNumber', 'westCite', 'caseNameShort', )
+    #list_display = ('docketNumber', 'westCite', 'case_name', )
     inlines = [DocumentAdminInline]
-    search_fields = ['caseNameShort', 'caseNameFull', 'docketNumber', 'westCite']
+    search_fields = ['case_name', 'case_name', 'docketNumber', 'westCite']
 
 
 class DocumentAdmin(admin.ModelAdmin):
