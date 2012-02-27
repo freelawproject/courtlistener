@@ -1,7 +1,14 @@
+JURISCRAPER:
+ - Deployment:
+    - hg pull -u
+    - sudo ./install.sh --juriscraper
+    - kill the scraper if it's running
+
 BUGS:
  - Atom feeds for courts fail silently.
  - HTML docs with ampersands show the ampersands in the highlighted text.
  - Scrapers aren't working well.
+ - OCR needs to be finished
 
 Content Extraction:
  - investigate Apache Tika
