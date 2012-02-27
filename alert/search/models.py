@@ -127,12 +127,9 @@ class Citation(models.Model):
     slug = models.SlugField("URL that the document should map to",
                             max_length=50,
                             null=True)
-    caseNameShort = models.CharField("short name, as it is usually found on the court website",
-                                     max_length=100,
-                                     blank=True,
-                                     db_index=True)
-    caseNameFull = models.TextField("full name of the case, as found on the first page of the PDF",
-                                    blank=True)
+    case_name = models.TextField("full name of the case",
+                                    blank=True,
+                                    db_index=True)
     docketNumber = models.CharField("the docket number",
                                     blank=True,
                                     null=True,
@@ -153,12 +150,12 @@ class Citation(models.Model):
         '''
         if not self.citationUUID:
             # it's the first time it has been saved; generate the slug stuff
-            self.slug = trunc(slugify(self.caseNameShort), 50)
+            self.slug = trunc(slugify(self.case_name), 50)
         super(Citation, self).save(*args, **kwargs)
 
     def __unicode__(self):
-        if self.caseNameShort:
-            return smart_unicode(self.caseNameShort)
+        if self.case_name:
+            return smart_unicode(self.case_name)
         else:
             return str(self.citationUUID)
 
@@ -235,7 +232,7 @@ class Document(models.Model):
 
     def __unicode__(self):
         if self.citation:
-            return self.citation.caseNameShort
+            return self.citation.case_name
         else:
             return str(self.documentUUID)
 

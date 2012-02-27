@@ -88,7 +88,7 @@ def extract_doc_content(pk):
             doc.blocked = True
             doc.date_blocked = date.today()
         if err:
-            print "****Error extracting PDF text from: %s****" % (doc.citation.caseNameShort)
+            print "****Error extracting PDF text from: %s****" % (doc.citation.case_name)
             return 1
     elif mimetype == 'txt':
         # read the contents of text files.
@@ -96,7 +96,7 @@ def extract_doc_content(pk):
             content = open(path).read()
             doc.documentPlainText, blocked = anonymize(content)
         except:
-            print "****Error extracting plain text from: %s****" % (doc.citation.caseNameShort)
+            print "****Error extracting plain text from: %s****" % (doc.citation.case_name)
             return 1
     elif mimetype == 'wpd':
         # It's a Word Perfect file. Use the wpd2html converter, clean up
@@ -121,7 +121,7 @@ def extract_doc_content(pk):
         doc.documentHTML, blocked = anonymize(content)
 
         if err:
-            print "****Error extracting WPD text from: " + doc.citation.caseNameShort + "****"
+            print "****Error extracting WPD text from: " + doc.citation.case_name + "****"
             return 1
     elif mimetype == 'doc':
         # read the contents of MS Doc files
@@ -130,16 +130,16 @@ def extract_doc_content(pk):
         content, err = process.communicate()
         doc.documentPlainText, blocked = anonymize(content)
         if err:
-            print "****Error extracting DOC text from: " + doc.citation.caseNameShort + "****"
+            print "****Error extracting DOC text from: " + doc.citation.case_name + "****"
             return 1
     else:
-        print "*****Unknown mimetype: " + mimetype + ". Unable to extract content from: " + doc.citation.caseNameShort + "****"
+        print "*****Unknown mimetype: " + mimetype + ". Unable to extract content from: " + doc.citation.case_name + "****"
         return 2
 
     try:
         doc.save()
     except Exception, e:
-        print "****Error saving text to the db for: " + doc.citation.caseNameShort + "****"
+        print "****Error saving text to the db for: " + doc.citation.case_name + "****"
         return 3
 
     logger.info("Successfully extracted contents of document %s" % (pk,))

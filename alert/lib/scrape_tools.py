@@ -178,37 +178,29 @@ def makeDocFromURL(LinkToDoc, ct):
     return myFile, doc, created
 
 
-def courtChanged(url, contents):
+def court_changed(url, hash):
     '''
     Takes HTML contents from a court download, generates a SHA1, and then
     compares that hash to a value in the DB, if there is one. If there is a value
     and it is the same, it returns False. Else, it returns True.
     '''
-    sha1Hash = hashlib.sha1(contents).hexdigest()
-    url2Hash, created = urlToHash.objects.get_or_create(url=url)
+    urlToHash, created = urlToHash.objects.get_or_create(url=url)
 
-    if not created and url2Hash.SHA1 == sha1Hash:
+    if not created and url2Hash.SHA1 == hash:
         # it wasn't created, and it has the same SHA --> not changed.
         return False
     else:
-        # Whether or not it was created, it's a change, and so we update the SHA
+        # It's a newn URL or it's a changed hash --> Thus update the db.
         # and save the changes.
-        url2Hash.SHA1 = sha1Hash
+        url2Hash.SHA1 = hash
         url2Hash.save()
-
-        # Log the change time and URL
-        try:
-            logger.debug(time.strftime("%a, %d %b %Y %H:%M", time.localtime()) + ": URL: " + url)
-        except UnicodeDecodeError:
-            pass
-
         return True
 
 
-def hasDuplicate(caseName, westCite=None, docketNumber=None):
+def hasDuplicate(case_name, west_cite=None, docket_number=None):
     '''Determines if the case name and number are already in the DB.
 
-    Takes either a caseName, a westCite or a docketNumber or both, and checks
+    Takes either a case_name, a west_cite or a docket_number or both, and checks
     if the citation already exists in the database. If it exists, the citation
     is returned. If not, then a citation is created and returned.
 
@@ -218,47 +210,33 @@ def hasDuplicate(caseName, westCite=None, docketNumber=None):
     citation will not be updated. Instead a new citation will be created, since
     West citations are not unique, and neither are docket numbers.
     '''
-
-    # data cleanup
-    caseName = titlecase(harmonize(clean_string(caseName)))
-    if westCite:
-        westCite = clean_string(westCite)
-    if docketNumber:
-        docketNumber = clean_string(docketNumber)
-
-    caseNameShort = trunc(caseName, 100)
-
-    if westCite and docketNumber:
-        # We have both the west citation and the docket number
-        cite, created = Citation.objects.get_or_create(
-            caseNameShort=str(caseNameShort), westCite=str(westCite),
-            docketNumber=str(docketNumber))
-    elif westCite and not docketNumber:
+    if west_cite and docket_number:
+        # We have both the west citation and the docket number.
+        cite, created = Citation.objects.get_or_create(case_name=case_name,
+                                                       westCite=west_cite,
+                                                       docketNumber=docket_number)
+    elif west_cite and not docket_number:
         # Only the west citation was provided.
-        cite, created = Citation.objects.get_or_create(
-            caseNameShort=str(caseNameShort), westCite=str(westCite))
-    elif docketNumber and not westCite:
-        # Only the docketNumber was provided.
-        cite, created = Citation.objects.get_or_create(
-            caseNameShort=str(caseNameShort), docketNumber=str(docketNumber))
-
-    cite.caseNameFull = caseName
-
+        cite, created = Citation.objects.get_or_create(case_name=case_name,
+                                                       westCite=west_cite)
+    elif docket_number and not west_cite:
+        # Only the docket number was provided.
+        cite, created = Citation.objects.get_or_create(case_name=case_name,
+                                                       docketNumber=docket_number)
     cite.save()
-
     return cite, created
 
-def save_all(doc, ct, myFile, caseNameShort, docketNumber, VERBOSITY):
+def save_all(doc, ct, myFile, case_name, docketNumber, VERBOSITY):
     '''Runs standard finishing code on a document
 
     '''
-    # now that we have the docketNumber and caseNameShort, we can dup check
-    cite, _ = hasDuplicate(caseNameShort, None, docketNumber)
+    # now that we have the docketNumber and case_name, we can dup check
+    cite, _ = hasDuplicate(case_name, None, docketNumber)
 
     # Associate the cite with the doc
     doc.citation = cite
 
-    doc.local_path.save(trunc(clean_string(cite.caseNameShort), 80).strip('.') + ".pdf", myFile)
+    doc.local_path.save(trunc(cite.case_name), 80).strip('.') + ".pdf", myFile)
     printAndLogNewDoc(VERBOSITY, ct, cite)
     doc.save()
 

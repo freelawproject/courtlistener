@@ -16,6 +16,7 @@
 
 from alert import settings
 from alert.lib import search_utils
+from alert.lib.string_utils import trunc
 from alert.search.forms import SearchForm
 from alert.search.models import Court
 from alert.search.models import Document
@@ -47,7 +48,7 @@ def view_case(request, court, pk, casename):
     # Look up the court, document, title and favorite information
     doc = get_object_or_404(Document, documentUUID=pk)
     ct = get_object_or_404(Court, courtUUID=court)
-    title = doc.citation.caseNameShort
+    title = trunc(doc.citation.case_name, 100)
     user = request.user
 
     if request.GET:
@@ -82,7 +83,7 @@ def view_case(request, court, pk, casename):
     except (ObjectDoesNotExist, TypeError):
         # Not favorited or anonymous user
         favorite_form = FavoriteForm(initial={'doc_id': doc.documentUUID,
-            'name' : doc.citation.caseNameFull})
+            'name' : doc.citation.case_name})
 
     return render_to_response(
                   'view_case.html',

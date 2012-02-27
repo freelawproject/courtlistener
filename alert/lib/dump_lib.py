@@ -117,10 +117,10 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                         # Value not found.
                         row.set('lexisCite', '')
                     try:
-                        row.set('caseNameFull', doc.citation.caseNameFull)
+                        row.set('case_name', doc.citation.case_name)
                     except:
                         # Value not found.
-                        row.set('caseNameFull', '')
+                        row.set('case_name', '')
                     try:
                         row.set('source', doc.get_source_display())
                     except:
