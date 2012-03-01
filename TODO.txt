@@ -1,8 +1,14 @@
 JURISCRAPER:
+ - Pre deployment:
+    - Make a revision with the maintainance sign in place.
+    - Make another revision without it. 
  - Deployment:
-    - hg pull -u
-    - sudo ./install.sh --juriscraper
     - kill the scraper if it's running
+    - hg pull -u -r REVISION WITH MAINTAINANCE
+    - manage.py migrate search
+        - deletes a column, renames another -- should be fast? 
+    - sudo ./install.sh --juriscraper
+    - hg pull -u (takes down the maintenance sign)
 
 BUGS:
  - Atom feeds for courts fail silently.
