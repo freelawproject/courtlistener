@@ -134,7 +134,8 @@ class Command(BaseCommand):
                 # The document is in an unused court
                 not_in_use += 1
 
-            if processed_count % 1000 == 0:
+            last_document = (count == processed_count + not_in_use)
+            if (processed_count % 1000 == 0) or last_document:
                 # Every 1000 documents, we send the subtasks off for processing
                 job = TaskSet(tasks=subtasks)
                 result = job.apply_async()

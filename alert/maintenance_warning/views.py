@@ -28,5 +28,5 @@ def show_maintenance_warning(request):
     Uses a 503 status code, which preserves SEO. See:
     https://plus.google.com/115984868678744352358/posts/Gas8vjZ5fmB
     '''
-    t = loader.get_template('maintenance/sopa.html')
+    t = loader.get_template('maintenance/maintenance.html')
     return HttpResponseTemporaryUnavailable(t.render(Context({})))
