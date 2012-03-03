@@ -46,7 +46,7 @@ import re
 import StringIO
 import subprocess
 import time
-
+import traceback
 
 @task
 def extract_doc_content(pk):
@@ -140,6 +140,7 @@ def extract_doc_content(pk):
         doc.save()
     except Exception, e:
         print "****Error saving text to the db for: " + doc.citation.case_name + "****"
+        print traceback.format_exc()
         return 3
 
     logger.info("Successfully extracted contents of document %s" % (pk,))
