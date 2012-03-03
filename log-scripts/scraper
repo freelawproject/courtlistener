@@ -1,4 +1,4 @@
-/var/log/scraper/daemon_log.out {
+/var/log/juriscraper/debug.log {
     rotate 36500
     daily
     dateext
