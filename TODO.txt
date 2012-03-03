@@ -1,21 +1,6 @@
-JURISCRAPER:
- - Pre deployment:
-    - Make a revision with the maintenance sign in place.
-    - Make another revision without it.
-    - Check in the latest juriscraper
- - Deployment:
-    - kill the scraper if it's running
-    - hg pull -u -r REVISION WITH MAINTENANCE
-    - ran
-    - manage.py migrate search
-        - deletes a column, renames another -- should be fast? 
-    - sudo ./install.sh --juriscraper
-    - hg pull -u (takes down the maintenance sign)
-
 BUGS:
  - Atom feeds for courts fail silently.
  - HTML docs with ampersands show the ampersands in the highlighted text.
- - Scrapers aren't working well.
  - OCR needs to be finished
 
 Content Extraction:
@@ -26,7 +11,6 @@ Solr:
  
 
 Big picture:
- - fix the issue with the crawler creating docs that lack citations
  - fix the sitemaps
  - F3
  - OCR
