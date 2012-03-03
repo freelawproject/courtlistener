@@ -29,7 +29,9 @@
 
 start () {
     echo -n "Starting the scraper...."
-    daemon --command="/usr/bin/python /var/www/court-listener/alert/scrapers/scrape_and_extract.py -d" --respawn --output=/var/log/scraper/daemon_log.out --name=scraper --user=www-data --verbose
+    #daemon --command="/usr/bin/python /var/www/court-listener/alert/scrapers/scrape_and_extract.py -d -c 'juriscraper.opinions.united_states.federal'" --name=scraper --user=www-data --verbose
+    daemon --command="/usr/bin/python /var/www/court-listener/alert/scrapers/scrape_and_extract.py -d -c juriscraper.opinions.united_states.federal" --respawn --name=scraper --user=www-data --verbose
+    
     RETVAL=$?
     
     if [ $RETVAL = 0 ]
@@ -76,7 +78,7 @@ case "${1:-''}" in
         status
     ;;
     *)
-        echo "Usage: $SELF start|stop|kill|restart|status"
+        echo "Usage: $SELF start|stop|restart|status"
         exit 1
     ;;
 esac
