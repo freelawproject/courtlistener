@@ -446,6 +446,10 @@ function install_juriscraper {
         echo "Done."
     fi
     
+    pip install chardet==1.0.1
+    pip install requests==0.10.2
+    mkdir /var/log/juriscraper/
+    chown www-data:www-data /var/log/juriscraper  
 }
 
 
