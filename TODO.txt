@@ -6,6 +6,7 @@ JURISCRAPER:
  - Deployment:
     - kill the scraper if it's running
     - hg pull -u -r REVISION WITH MAINTENANCE
+    - ran
     - manage.py migrate search
         - deletes a column, renames another -- should be fast? 
     - sudo ./install.sh --juriscraper
