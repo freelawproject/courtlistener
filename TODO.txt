@@ -1,8 +1,5 @@
 JURISCRAPER:
  - Pre deployment:
-    - Move downloading to celery with retries
-    - Make sure that a failed link/etc doesn't crash whole thing
-    - Get the init script working
     - Make a revision with the maintenance sign in place.
     - Make another revision without it.
     - Check in the latest juriscraper

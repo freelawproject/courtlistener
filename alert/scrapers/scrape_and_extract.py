@@ -76,11 +76,8 @@ def court_changed(url, hash):
         return True, url2Hash
 
 def scrape_court(court):
-    #try:
     site = court.Site().parse()
-    #except:
-        # TODO: Print stack trace here.
-    #    pass
+
     changed, url2Hash = court_changed(site.url, site.hash)
     if not changed:
         logger.info("Unchanged hash at: %s" % site.url)
@@ -93,16 +90,16 @@ def scrape_court(court):
         # Percent encode URLs
         download_url = urllib2.quote(site.download_urls[i], safe="%/:=&?~#+!$,;'@()*[]")
 
-        # TODO: Make this use a celery task with retries
         try:
             data = urllib2.urlopen(download_url).read()
             # test for empty files (thank you CA1)
             if len(data) == 0:
-                logger.critical('EmptyFileError: %s' % download_url)
-                logger.critical(traceback.format_exc())
+                logger.warn('EmptyFileError: %s' % download_url)
+                logger.warn(traceback.format_exc())
+                continue
         except:
             logger.warn('DownloadingError: %s' % download_url)
-            logger.critical(traceback.format_exc())
+            logger.warn(traceback.format_exc())
             continue
 
         # Make a hash of the file
@@ -191,10 +188,11 @@ def scrape_court(court):
 
 
 def main():
+    logger.info("Starting up the scraper.")
     global die_now
 
-    # this line is used for handling SIGINT, so things can die safely.
-    signal.signal(signal.SIGQUIT, signal_handler)
+    # this line is used for handling SIGKILL, so things can die safely.
+    signal.signal(signal.SIGTERM, signal_handler)
 
     usage = 'usage: %prog -c COURTID [-d] [-r RATE]'
     parser = OptionParser(usage)
@@ -246,6 +244,7 @@ def main():
         while i < num_courts:
             # this catches SIGINT, so the code can be killed safely.
             if die_now == True:
+                logger.info("The scraper has stopped.")
                 sys.exit(1)
 
             try:
@@ -275,6 +274,7 @@ def main():
             else:
                 i += 1
 
+    logger.info("The scraper has stopped.")
     sys.exit(0)
 
 if __name__ == '__main__':
