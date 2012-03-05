@@ -14,9 +14,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#TODO: Use of the time.strptime function would improve this code here and there.
-#   info here: http://docs.python.org/library/time.html#time.strptime
-
 import sys
 sys.path.append('/var/www/court-listener/alert')
 
@@ -67,7 +64,6 @@ def court_changed(url, hash):
     returns False. Else, it returns True.
     '''
     url2Hash, created = urlToHash.objects.get_or_create(url=url)
-
     if not created and url2Hash.SHA1 == hash:
         # it wasn't created, and it has the same SHA --> not changed.
         return False, url2Hash

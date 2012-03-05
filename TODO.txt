@@ -1,7 +1,7 @@
 BUGS:
- - Finish OCR
  - Atom feeds for courts fail silently.
  - HTML docs with ampersands show the ampersands in the highlighted text.
+ - Set the content type for things returned by xsendfile
 
 Content Extraction:
  - investigate Apache Tika
@@ -13,7 +13,6 @@ Solr:
 Big picture:
  - fix the sitemaps
  - F3
- - OCR
  - recrawl
  
 To do:
@@ -21,8 +20,12 @@ To do:
  - recreate the stat_maker.py script (see bug)
  - Check the dates/courts in Brian's list of citation-less docs, and see if we
    missed any docs.
- - Do F3
-    - Fix the "change this doc" docs in F3
-    - export/import the latest court db, and update the install script.
-    - add fiscr to the various places on the site where it's needed...
-    - rerun the robots.txt script that imports from resource.org
+   
+   
+F3
+ - Fix the "change this doc" docs in F3
+ - export/import the latest court db, and update the install script.
+ - add fiscr to the various places on the site where it's needed...
+ - rerun the robots.txt script that imports from resource.org
+ - kill all related dumps
+ - optimize the Solr index

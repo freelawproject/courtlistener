@@ -31,6 +31,7 @@ from django.utils.encoding import smart_str, smart_unicode
 from alert.search.models import Court, Citation, Document
 from alert.lib.parse_dates import parse_dates
 from alert.lib.string_utils import trunc
+from alert.lib import sunburnt
 from alert.tinyurl.encode_decode import num_to_ascii
 from alert.lib.scrape_tools import hasDuplicate
 from cleaning_scripts.lib.string_diff import find_good_matches, gen_diff_ratio
@@ -48,35 +49,15 @@ import urllib2
 
 DEBUG = True
 
-def build_date_range(dateFiled, range = 5):
-    '''Build a date range to be handed off to a sphinx query
+def build_date_range(dateFiled, range=5):
+    '''Build a date range to be handed off to a solr query
 
-    This builds an array that can be handed off to Sphinx in order to complete
-    a date range filter. The range is set to a default of 5 days, which makes
-    an 11-value array, but other values can be set as well.
     '''
-    dateRange = []
-    dateFiledInt = dateFiled.toordinal() + 365
-    i = range
-    # first we add range days before the dateFiled
-    while i > 0:
-        dateRange.append(dateFiledInt - i)
-        i -= 1
-
-    # next, we add the date itself
-    dateRange.append(dateFiledInt)
-
-    # finally, we add five days after
-    i = 1
-    while i <= range:
-        dateRange.append(dateFiledInt + i)
-        i += 1
-
-    if DEBUG:
-        print "dateRange: %s to %s" % (date.fromordinal(dateRange[0] - 365), \
-            date.fromordinal(dateRange[range * 2] - 365))
-    return dateRange
-
+    after = dateFiled - datetime.timedelta(days=5)
+    before = dateFiled + datetime.timedelta(days=6)
+    date_range = '[%sZ TO %sZ]' % (after.isoformat(),
+                                   before.isoformat())
+    return date_range
 
 def load_stopwords():
     '''Loads Sphinx's stopwords file.
@@ -96,8 +77,7 @@ def load_stopwords():
     stopwords_file.close()
     return stopwords
 
-
-def make_good_query(content, caseName, court, count = 5, DEBUG = False):
+def make_solr_query(content, caseName, court, dateFiled, num_q_words=5, DEBUG=False):
     '''Grab words from the content and returns them to the caller.
 
     This function attempts to choose words from the content that would return
@@ -106,16 +86,18 @@ def make_good_query(content, caseName, court, count = 5, DEBUG = False):
     eliminated. After elimination, if no words are left, a query is made from
     the case name rather than the content.
     '''
+    main_params = {}
+    main_params['fq'] = ['court_exact:%s' % court,
+                         'dateFiled:%s' % build_date_range(dateFiled)]
     stopwords = load_stopwords()
     words = content.split()
     length = len(words)
     i = 1
-    max_sphinx_q_len = 15
     query_words = []
-    while i <= count and i < length and len(query_words) < max_sphinx_q_len:
+    while i <= num_q_words and i < length:
         new_word = words[i].encode('utf-8').lower()
 
-        # Clean the input a tad
+        # Clean the input a tad (remove 's, and a bunch of tailing/leading puncts)
         cleaner = re.compile(r'\'s')
         new_word = cleaner.sub('', new_word)
         new_word = new_word.strip('*').strip(',').strip('(').strip(')').strip(':').strip('"')
@@ -126,6 +108,7 @@ def make_good_query(content, caseName, court, count = 5, DEBUG = False):
         bad_stuff = re.search('[0-9./()!:&\']', new_word)
         too_short = True if len(new_word) <= 1 else False
         if stop or dup or bad_stuff or too_short:
+            # Try the next word
             i += 1
             continue
         else:
@@ -136,13 +119,11 @@ def make_good_query(content, caseName, court, count = 5, DEBUG = False):
 
     if len(query_words) > 0:
         # Set up an exact word query using the found words
-	print query_words
-        query = '=' + ' << ='.join(query_words) + ' @court %s' % court
-
+        main_params['q'] = ' '.join(query_words)
     else:
         # Either it's a short case, or no good words within it...or both.
         # Try the casename instead.
-        for word in caseName.split()[:max_sphinx_q_len]:
+        for word in caseName.split():
             # Clean up
             cleaner = re.compile(r'\'s')
             word = cleaner.sub('', word)
@@ -160,15 +141,14 @@ def make_good_query(content, caseName, court, count = 5, DEBUG = False):
                 else:
                     query_words.append(unicode(word, 'utf-8'))
 
-        query = '@casename =' + ' << ='.join(query_words) + ' @court %s' % court
+        main_params['q'] = ' AND '.join(query_words[:num_q_words])
 
     if DEBUG:
-        print "Query: %s" % query
+        print "  main_params are: %s" % main_params
 
-    return query
+    return main_params
 
-
-def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG = False):
+def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG=False):
     '''Checks for a duplicate that already exists in the DB
 
     This is the only major difference (so far) from the F2 import process. This
@@ -191,28 +171,26 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG = Fal
     ################################################
     ### Phase 1: Refine by court, date and words ###
     ################################################
-    num_words = 5
+    num_q_words = 5
 
     # Add one word until either you run out of words or you get less than
     # 50 results.
     result_count = 51
     word_count = len(content.split())
-    print "num_words: " + str(num_words)
-    while result_count > 50 and num_words <= word_count:
-        query = make_good_query(content, caseName, court, num_words, DEBUG)
-        queryset = Document.search.query(query)
-        docs_by_word_query = queryset.set_options(mode = "SPH_MATCH_EXTENDED2")\
-            .filter(dateFiled = build_date_range(dateFiled))
-        result_count = docs_by_word_query.count()
+    while result_count > 50 and num_q_words <= word_count:
+        main_params = make_solr_query(content, caseName, court, dateFiled, num_q_words, DEBUG)
+        conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+        queryset = conn.raw_query(**main_params).execute()
+        result_count = len(queryset)
         if DEBUG:
-            for result in docs_by_word_query:
-                print "After searching, found: %s" % result.pk
+            for result in queryset:
+                print "  After searching, found: %s - %s" % (result['id'], result['caseName'])
 
         if DEBUG:
-            print "Search results count: %s" % result_count
+            print "  Search results count: %s" % result_count
 
-        if not query.startswith('@casename'):
-            num_words += 1
+        if not main_params['q'].startswith('caseName'):
+            num_q_words += 1
         else:
             # We've exhausted the possibilities for this case. Need to move on
             # regardless of count.
@@ -224,15 +202,13 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG = Fal
     ########################################
     ### Phase 2: Find the best case name ###
     ########################################
-    results, confidences = find_good_matches(docs_by_word_query, caseName)
+    results, confidences = find_good_matches(queryset, caseName)
     if DEBUG:
-        print "After casename comparison, found %s candidate(s)" % len(results)
-        print "Results: %s" % results
-        print "Confidences: %s" % confidences
+        print "  After casename comparison, found %s candidate(s)" % len(results)
+        print "  Confidences: %s" % confidences
         if len(results) > 0:
             for result, confidence in zip(results, confidences):
-                print "Result document %s has confidence %s" % \
-                    (result.pk, confidence)
+                print "  Result document %s has confidence %s" % (result['id'], confidence)
 
     p2_result_count = len(results)
 
@@ -243,10 +219,10 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG = Fal
     if len(results) > 0:
         phase_three_results = []
         for result in results:
-            result_docket_number = re.sub("\D", "", result.citation.docketNumber)
+            result_docket_number = re.sub("\D", "", result['docketNumber'])
             new_docket_number = re.sub("\D", "", docketNumber)
             if DEBUG:
-                print "Docket numbers are (new - old): %s - %s" % (new_docket_number, result_docket_number)
+                print "  Docket numbers are (new - old): %s - %s" % (new_docket_number, result_docket_number)
             if result_docket_number == new_docket_number:
                 # Definitely a duplicate.
                 phase_three_results.append(result)
@@ -264,9 +240,8 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG = Fal
     #####################################
     if len(phase_three_results) > 0:
         phase_four_results = []
-        spaces = re.compile(r' ')
         for result in phase_three_results:
-            result_content_stripped = spaces.sub('', result.documentPlainText)
+            result_content_stripped = re.sub('\W', '', result['text'])
             if len(result_content_stripped) == 0:
                 # It's probably an HTML file. Try that field instead.
                 result_content_stripped = result.documentHTML
@@ -274,27 +249,27 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG = Fal
                 result_content_stripped = br.sub(' ', result_content_stripped)
                 p = re.compile(r'<.*?>')
                 result_content_stripped = p.sub('', result_content_stripped)
-                result_content_stripped = spaces.sub('', result_content_stripped).lower()
+                result_content_stripped = re.sub('\W', '', result_content_stripped).lower()
 
-            content_stripped = spaces.sub('', content).lower()
+            content_stripped = re.sub('\W', '', content).lower()
 
             # Check if lengths are within tolerance
             length = len(content_stripped)
-            print "Length of new content: %s" % length
-            print "Length of old content: %s" % len(result_content_stripped)
-            tolerance = length * 0.075
+            print "  Length of new content: %s" % length
+            print "  Length of old content: %s" % len(result_content_stripped)
+            tolerance = length * 0.30
             lower_bound = length - tolerance
             upper_bound = length + tolerance
             if  lower_bound < len(result_content_stripped) < upper_bound:
                 # The length of the result is within tolerance. Check that the
                 # text is similar
                 if DEBUG:
-                    print "Word length is within tolerance."
+                    print "  Word length is within tolerance."
                 phase_four_results.append(result)
 
             else:
                 if DEBUG:
-                    print "Word length is NOT within tolerance."
+                    print "  Word length is NOT within tolerance."
 
     else:
         phase_four_results = phase_three_results
@@ -303,7 +278,10 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG = Fal
 
     # Write result stats to a log
     result_stats = open('result_stats.csv', 'a')
-    result_stats.write('%s,' % id + ",".join(['%s', '%s', '%s', '%s']) % (p1_result_count, p2_result_count, p3_result_count, p4_result_count) + '\n')
+    result_stats.write('%s,' % id + ",".join(['%s', '%s', '%s', '%s']) % (p1_result_count,
+                                                                          p2_result_count,
+                                                                          p3_result_count,
+                                                                          p4_result_count) + '\n')
     result_stats.close()
 
     '''
@@ -317,24 +295,24 @@ def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG = Fal
     return phase_four_results
 
 
-def write_dups(source, dups, DEBUG = False):
+def write_dups(source, dups, DEBUG=False):
     '''Writes duplicates to a file so they are logged.
 
-    This function recieves a queryset and then writes out the values to a log.
+    This function receives a queryset and then writes out the values to a log.
     '''
     log = open('dup_log.txt', 'a')
     if dups[0] != None:
         log.write(str(source.pk))
-        print "Logging match: " + str(source.pk),
+        print "  Logging match: " + str(source.pk),
         for dup in dups:
             # write out each doc
             log.write('|' + str(dup.pk) + " - " + num_to_ascii(dup.pk))
             if DEBUG:
                 print '|' + str(dup.pk) + ' - ' + num_to_ascii(dup.pk),
     else:
-        log.write("No dups found for %s" % source.pk)
+        log.write("  No dups found for %s" % source.pk)
         if DEBUG:
-            print "No dups found for %s" % source.pk
+            print "  No dups found for %s" % source.pk
     print ''
     log.write('\n')
     log.close()
@@ -348,7 +326,7 @@ def import_and_report_records():
     do when importing from other sources, and allows us to test it.
     '''
 
-    docs = Document.objects.filter(court = 'ca1')[:5000]
+    docs = Document.objects.filter(court='ca1')[:5000]
     #docs = Document.objects.filter(pk = 985184)
 
     # do this 1000 times

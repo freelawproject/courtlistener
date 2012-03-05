@@ -7,27 +7,27 @@ p = parser()
 info = p.info
 
 def timetoken(token):
-  try:
-      float(token)
-      return True
-  except ValueError:
-      pass
-  return any(f(token) for f in (info.jump,info.weekday,info.month,info.hms,info.ampm,info.pertain,info.utczone,info.tzoffset))
+    try:
+        float(token)
+        return True
+    except ValueError:
+        pass
+    return any(f(token) for f in (info.jump, info.weekday, info.month, info.hms, info.ampm, info.pertain, info.utczone, info.tzoffset))
 
 
 def timesplit(input_string):
-  batch = []
-  for token in _timelex(input_string):
-      if timetoken(token):
-          if info.jump(token):
-              continue
-          batch.append(token)
-      else:
-          if batch:
-              yield " ".join(batch)
-              batch = []
-  if batch:
-      yield " ".join(batch)
+    batch = []
+    for token in _timelex(input_string):
+        if timetoken(token):
+            if info.jump(token):
+                continue
+            batch.append(token)
+        else:
+            if batch:
+                yield " ".join(batch)
+                batch = []
+    if batch:
+        yield " ".join(batch)
 
 
 def parse_dates(s, debug=False):
@@ -47,17 +47,17 @@ def parse_dates(s, debug=False):
     DEFAULT = datetime(1900, 12, 25)
     dates = []
     for item in timesplit(s):
-      #print "Found:", item
-      try:
-        date = p.parse(item, default=DEFAULT)
-        if date.year != DEFAULT.year and (date.month != DEFAULT.month and date.day != DEFAULT.day):
-            if debug:
-                print "Item %s parsed as: %s" % (item, date)
-            dates.append(date)
-      except ValueError:
-        pass
-      except TypeError:
-        pass
+        #print "Found:", item
+        try:
+            date = p.parse(item, default=DEFAULT)
+            if date.year != DEFAULT.year and (date.month != DEFAULT.month and date.day != DEFAULT.day):
+                if debug:
+                    print "Item %s parsed as: %s" % (item, date)
+                dates.append(date)
+        except ValueError:
+            pass
+        except TypeError:
+            pass
 
     return dates
 

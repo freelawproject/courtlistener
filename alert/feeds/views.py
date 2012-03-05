@@ -16,10 +16,7 @@
 
 from django.conf import settings
 from django.contrib.syndication.views import Feed
-from django.contrib.syndication.views import FeedDoesNotExist
-from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import get_object_or_404
-from django.utils import feedgenerator
 from django.utils.feedgenerator import Atom1Feed
 
 from alert.lib import search_utils
