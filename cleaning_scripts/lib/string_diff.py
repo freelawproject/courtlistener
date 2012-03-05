@@ -31,8 +31,8 @@ import re
 
 def remove_words(phrase):
     # Removes words and punctuation that don't help the diff comparison.
-    stop_words = 'a|an|and|as|at|but|by|en|etc|for|if|in|is|of|on|or|the|to|v\.?|via' +\
-        '|vs\.?|united|states?|et|al|appellants?|defendants?|administrator|plaintiffs?|error' +\
+    stop_words = 'a|an|and|as|at|but|by|en|etc|for|if|in|is|of|on|or|the|to|v\.?|via' + \
+        '|vs\.?|united|states?|et|al|appellants?|defendants?|administrator|plaintiffs?|error' + \
         '|others|against|ex|parte|complainants?|original|claimants?|devisee' + \
         '|executrix|executor'
     stop_words_reg = re.compile(r'^(%s)$' % stop_words, re.IGNORECASE)
@@ -131,28 +131,28 @@ def find_good_matches(results, case_name):
     This is nearly identical to find_best_match, but returns any good matches
     in an array, and returns their confidence thresholds in a second array.
     '''
-    if results.count() == 0:
+    if len(results) == 0:
         # No good candidates.
         return [], [0]
 
-    elif results.count() == 1:
+    elif len(results) == 1:
         # One hit returned make sure it's above THRESHOLD.
         HIGH_THRESHOLD = 0.3
-        candidate_case_name = results[0].citation.caseNameFull
+        candidate_case_name = results[0]['caseName']
         diff = gen_diff_ratio(candidate_case_name, case_name)
         if diff >= HIGH_THRESHOLD:
             return [results[0]], [diff]
         else:
             return [], [diff]
 
-    elif results.count() > 1:
+    elif len(results) > 1:
         # More than one hit. Find the best one using diff_lib
         THRESHOLD = 0.6
 
         diff_ratios = []
         for result in results:
             # Calculate its diff_ratio, and add it to an array
-            candidate_case_name = result.citation.caseNameFull
+            candidate_case_name = result['caseName']
             diff = gen_diff_ratio(candidate_case_name, case_name)
             diff_ratios.append(diff)
 

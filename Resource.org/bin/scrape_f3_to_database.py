@@ -45,7 +45,7 @@ import urllib2
 
 # Set to False to disable automatic browser usage. Else, set to the
 # command you want to run, e.g. 'firefox'
-BROWSER = False
+BROWSER = 'firefox-trunk'
 SIMULATE = True
 
 
@@ -150,7 +150,7 @@ def unpublished_cleaner(caseName):
     return caseName, documentType
 
 
-def write_dups(source, dups, DEBUG = False):
+def write_dups(source, dups, DEBUG=False):
     '''Writes duplicates to a file so they are logged.
 
     This function recieves a queryset and then writes out the values to a log.
@@ -161,9 +161,9 @@ def write_dups(source, dups, DEBUG = False):
         print "Logging match: " + source,
         for dup in dups:
             # write out each doc
-            log.write('|' + str(dup.pk) + " - " + num_to_ascii(dup.pk))
+            log.write('|' + str(dup['id']) + " - " + num_to_ascii(int(dup['id'])))
             if DEBUG:
-                print '|' + str(dup.pk) + ' - ' + num_to_ascii(dup.pk),
+                print '|' + str(dup['id']) + ' - ' + num_to_ascii(int(dup['id'])),
     else:
         log.write("%s" % source)
         if DEBUG:
@@ -207,7 +207,7 @@ def need_dup_check_in_date_and_court(dateFiled, court):
         +----------+----------------+
         14 rows in set (51.65 sec)
 
-    We'll ues these values to filter out cases that can't possibly have a dup.
+    We'll use these values to filter out cases that can't possibly have a dup.
 
     Returns True if a duplicate check should be run. Else: False.
     '''
@@ -343,7 +343,7 @@ def scrape_and_parse():
             for element in bodyContents:
                 body += tostring(element)
                 try:
-                    bodyText += tostring(element, method = 'text')
+                    bodyText += tostring(element, method='text')
                 except UnicodeEncodeError:
                     # Happens with odd characters. Simply pass this iteration.
                     pass
@@ -369,7 +369,7 @@ def scrape_and_parse():
                 if not court:
                     print absCaseLink
                     if BROWSER:
-                        subprocess.Popen([BROWSER, absCaseLink], shell = False).communicate()
+                        subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
                     court = raw_input("Please input court name (e.g. \"First Circuit of Appeals\"): ").lower()
                     court_fix_file.write("%s|%s\n" % (sha1Hash, court))
             if ('first' in court) or ('ca1' == court):
@@ -423,13 +423,13 @@ def scrape_and_parse():
                         # the fix file.
                         print absCaseLink
                         if BROWSER:
-                            subprocess.Popen([BROWSER, absCaseLink], shell = False).communicate()
+                            subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
                         court = raw_input("Unknown court. Input the court code to proceed successfully [%s]: " % saved_court)
                         court = court or saved_court
                     court_fix_file.write("%s|%s\n" % (sha1Hash, court))
 
             saved_court = court
-            court = Court.objects.get(courtUUID = court)
+            court = Court.objects.get(courtUUID=court)
             if DEBUG >= 4:
                 print "Court is: %s" % court
 
@@ -474,7 +474,7 @@ def scrape_and_parse():
                     else:
                         print absCaseLink
                         if BROWSER:
-                            subprocess.Popen([BROWSER, absCaseLink], shell = False).communicate()
+                            subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
                         print "Unknown date. Possible options are:"
                         try:
                             print "  1) %s" % saved_caseDate.strftime("%B %d, %Y")
@@ -528,7 +528,7 @@ def scrape_and_parse():
                 if not savedCaseNameShort:
                     print absCaseLink
                     if BROWSER:
-                        subprocess.Popen([BROWSER, absCaseLink], shell = False).communicate()
+                        subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
                     caseName = raw_input("Short casename: ")
                     case_name_short_fix_file.write("%s|%s\n" % (sha1Hash, caseName))
                 else:
@@ -555,21 +555,19 @@ def scrape_and_parse():
                 content = br.sub(' ', content)
                 p = re.compile(r'<.*?>')
                 content = p.sub('', content)
-                dups = check_dup(court.pk, caseDate, caseName, content, docketNumber, sha1Hash, DEBUG = True)
+                dups = check_dup(court.pk, caseDate, caseName, content, docketNumber, sha1Hash, DEBUG=True)
                 if len(dups) == 0:
                     # No dups found. Move on.
                     pass
                 elif len(dups) == 1:
                     # Duplicate found.
-                    write_dups(sha1Hash, dups, DEBUG = True)
+                    write_dups(sha1Hash, dups, DEBUG=True)
                 elif len(dups) > 1:
                     # Multiple dups found. Seek human review.
-                    write_dups(sha1Hash, dups, DEBUG = True)
+                    write_dups(sha1Hash, dups, DEBUG=True)
             else:
                 print "No complex check needed."
 
-            if not SIMULATE:
-                cite, new = hasDuplicate(caseName, westCite, docketNumber)
 
 
             #################################
@@ -577,8 +575,7 @@ def scrape_and_parse():
             #################################
             if not SIMULATE:
                 try:
-                    doc, created = Document.objects.get_or_create(
-                        documentSHA1 = sha1Hash, court = court)
+                    doc, created = Document.objects.get_or_create(documentSHA1=sha1Hash)
                 except MultipleObjectsReturned:
                     # this shouldn't happen now that we're using SHA1 as the dup
                     # check, but the old data is problematic, so we must catch this.
@@ -591,8 +588,13 @@ def scrape_and_parse():
                     doc.download_URL = download_URL
                     doc.dateFiled = caseDate
                     doc.source = "R"
-
                     doc.documentType = documentType
+
+                    # Make a citation
+                    cite = Citation(case_name=caseName,
+                                    docketNumber=docketNumber,
+                                    westCite=westCite)
+                    cite.save()
                     doc.citation = cite
                     doc.save()
 

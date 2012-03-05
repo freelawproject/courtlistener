@@ -43,7 +43,7 @@ def fixer(simulate=False, verbose=False):
     '''OCR documents that lack content'''
     #docs = queryset_iterator(Document.objects.filter(source='C', documentPlainText=''))
     docs = Document.objects.raw('''select documentUUID 
-                                   from Document 
+                                   from Document with (nolock)
                                    where source='C' and 
                                        documentPlainText REGEXP "^[[:space:]]*$"''')
     for doc in docs:

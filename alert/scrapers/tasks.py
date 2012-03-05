@@ -159,8 +159,8 @@ def extract_by_ocr(path):
     try:
         DEVNULL = open('/dev/null', 'w')
         tmp_file_prefix = os.path.join('/tmp', str(time.time()))
-        image_magick_command = ['convert', '-depth', '4', '-density', '300', path,
-                        tmp_file_prefix + '.tiff']
+        image_magick_command = ['convert', '-depth', '4', '-density', '300',
+                                path, tmp_file_prefix + '.tiff']
         process = subprocess.Popen(image_magick_command, shell=False,
                                    stdout=DEVNULL, stderr=DEVNULL)
         _, err = process.communicate()
