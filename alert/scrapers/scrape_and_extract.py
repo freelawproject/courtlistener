@@ -159,10 +159,11 @@ def scrape_court(court):
                 doc.local_path.save(file_name, cf, save=False)
             except:
                 logger.critical('Unable to save binary to disk. Deleted document: %s.' % doc)
-                doc.delete()
+                logger.critical(traceback.format_exc())
+                continue
+
 
             # Save everything
-            # using that, we check for a dup
             post_save.disconnect(
                         save_doc_handler,
                         sender=Document,

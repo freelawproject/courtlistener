@@ -33,40 +33,234 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
+from scrape_and_extract import signal_handler
+from alert.lib import magic
+from alert.lib.string_utils import trunc
+from alert.search.models import Citation
 from alert.search.models import Court
-from tinyurl.encode_decode import *
-from lib.string_utils import *
-from lib.scrape_tools import *
-from django.core.files.base import ContentFile
-from django.core.exceptions import ObjectDoesNotExist
+from alert.search.models import Document
+from alert.search.tasks import save_doc_handler
 
-import calendar
-import datetime
+from django.core.files.base import ContentFile
+from django.db.models.signals import post_save
+from juriscraper.GenericSite import logger
+
+# adding alert to the front of this breaks celery. Ignore pylint error.
+from scrapers.tasks import extract_doc_content
+
 import hashlib
-import httplib
-import re
-import StringIO
-import subprocess
+import mimetypes
+import signal
 import time
 import traceback
-import urllib
 import urllib2
-
-from BeautifulSoup import BeautifulSoup
-from lxml.html import fromstring
-from lxml.html import tostring
-from lxml import etree
 from optparse import OptionParser
-from urlparse import urljoin
+from requests import HTTPError
 
-DAEMONMODE = False
+# for use in catching the SIGINT (Ctrl+4)
+die_now = False
 
-"""This is where scrapers live that can be trained on historical data with some
-tweaking.
 
-These are generally much more hacked than those scrapers in scrape_and_extract.py,
-but they should work with some editing or updating."""
+def scrape_court(court):
+    global die_now
 
+    # opinions.united_states.federal.ca9u --> ca9 
+    court_str = court.__name__.split('.')[-1].split('_')[0]
+    court_obj = Court.objects.get(courtUUID=court_str)
+    if court_str == 'cafc':
+        def next_site():
+            # This is a generator that cranks out a site object when called.
+            # Useful because doing it this way won't load each site object
+            # with HTML until it's called.
+            for i in range(0, 185):
+                try:
+                    site = court.Site()
+                    site._download_backwards(i)
+                    yield site
+                except HTTPError, e:
+                    logger.warn("Failed to download page.")
+                    continue
+                #time.sleep(10)
+
+    for site in next_site():
+        if die_now == True:
+            logger.info("The scraper has stopped.")
+            sys.exit(1)
+        site.parse()
+
+        for i in range(0, len(site.case_names)):
+            # Percent encode URLs
+            download_url = urllib2.quote(site.download_urls[i], safe="%/:=&?~#+!$,;'@()*[]")
+
+            try:
+                data = urllib2.urlopen(download_url).read()
+                # test for empty files (thank you CA1)
+                if len(data) == 0:
+                    logger.warn('EmptyFileError: %s' % download_url)
+                    logger.warn(traceback.format_exc())
+                    continue
+            except:
+                logger.warn('DownloadingError: %s' % download_url)
+                logger.warn(traceback.format_exc())
+                continue
+
+            # Make a hash of the file
+            sha1_hash = hashlib.sha1(data).hexdigest()
+
+            # using the hash, check for a duplicate in the db.
+            exists = Document.objects.filter(documentSHA1=sha1_hash).exists()
+
+            # If the doc is a dup, increment the dup_count variable and set the
+            # dup_found_date
+            if exists:
+                logger.info('Duplicate found at: %s' % download_url)
+                continue
+
+            else:
+                logger.info('Adding new document found at: %s' % download_url)
+
+                # Make a citation
+                cite = Citation(case_name=site.case_names[i],
+                                docketNumber=site.docket_numbers[i])
+
+                # Make the document object
+                doc = Document(source='C',
+                               documentSHA1=sha1_hash,
+                               dateFiled=site.case_dates[i],
+                               court=court_obj,
+                               download_URL=download_url,
+                               documentType=site.precedential_statuses[i])
+
+                try:
+                    cf = ContentFile(data)
+                    mime = magic.from_buffer(data, mime=True)
+                    extension = mimetypes.guess_extension(mime)
+                    file_name = trunc(site.case_names[i], 80) + extension
+                    doc.local_path.save(file_name, cf, save=False)
+                except:
+                    logger.critical('Unable to save binary to disk. Deleted document: %s.' % doc)
+                    logger.critical(traceback.format_exc())
+                    continue
+
+
+                # Save everything
+                post_save.disconnect(
+                            save_doc_handler,
+                            sender=Document,
+                            dispatch_uid='save_doc_handler')
+                cite.save()
+                doc.citation = cite
+                doc.save()
+
+                # Extract the contents asynchronously.
+                extract_doc_content.delay(doc.pk)
+
+                logger.info("Successfully added: %s" % site.case_names[i])
+
+        # Update the hash if everything finishes properly.
+        logger.info("%s: Successfully crawled." % site.court_id)
+
+def main():
+    logger.info("Starting up the scraper.")
+    global die_now
+
+    # this line is used for handling SIGKILL, so things can die safely.
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    usage = 'usage: %prog -c COURTID [-d] [-r RATE]'
+    parser = OptionParser(usage)
+    parser.add_option('-d', '--daemon', action="store_true", dest='daemonmode',
+                      default=False, help=('Use this flag to turn on daemon '
+                                           'mode, in which all courts requested '
+                                           'will be scraped in turn, non-stop.'))
+    parser.add_option('-r', '--rate', dest='rate', metavar='RATE',
+                      help=('The length of time in minutes it takes to crawl all '
+                            'requested courts. Particularly useful if it is desired '
+                            'to quickly scrape over all courts. Default is 30 '
+                            'minutes.'))
+    parser.add_option('-c', '--courts', dest='court_id', metavar="COURTID",
+                      help=('The court(s) to scrape and extract. This should be in '
+                            'the form of a python module or package import '
+                            'from the Juriscraper library, e.g. '
+                            '"opinions.united_states.federal.ca1" or '
+                            'simply "opinions" to do all opinions.'))
+    (options, args) = parser.parse_args()
+
+    daemon_mode = options.daemonmode
+    court_id = options.court_id
+
+    try:
+        rate = int(options.rate)
+    except (ValueError, AttributeError, TypeError):
+        rate = 30
+
+    if not court_id:
+        parser.error('You must specify a court as a package or module.')
+    else:
+        try:
+            # Test that we have an __all__ attribute (proving that it's a package)
+            # something like: juriscraper.opinions.united_states.federal
+            mod_str_list = __import__(court_id,
+                                      globals(),
+                                      locals(),
+                                      ['*']).__all__
+        except AttributeError:
+            # Lacks the __all__ attribute. Probably of the form:
+            # juriscraper.opinions.united_states.federal.ca1
+            mod_str_list = [court_id.rsplit('.', 1)[1]]
+        except ImportError:
+            parser.error('Unable to import module or package. Aborting.')
+
+        num_courts = len(mod_str_list)
+        wait = (rate * 60) / num_courts
+        i = 0
+        while i < num_courts:
+            # this catches SIGINT, so the code can be killed safely.
+            if die_now == True:
+                logger.info("The scraper has stopped.")
+                sys.exit(1)
+
+            try:
+                mod = __import__('%s.%s' % (court_id, mod_str_list[i]),
+                                 globals(),
+                                 locals(),
+                                 [mod_str_list[i]])
+            except ImportError:
+                mod = __import__(court_id,
+                                 globals(),
+                                 locals(),
+                                 [mod_str_list[i]])
+            try:
+                scrape_court(mod)
+            except:
+                logger.critical('%s: ********!! CRAWLER DOWN !!***********')
+                logger.critical('%s: *****scrape_court method failed!*****')
+                logger.critical('%s: ********!! ACTION NEEDED !!**********')
+                logger.critical(traceback.format_exc())
+                i += 1
+                continue
+
+            time.sleep(wait)
+            last_court_in_list = (i == (num_courts - 1))
+            if last_court_in_list and daemon_mode:
+                i = 0
+            else:
+                i += 1
+
+    logger.info("The scraper has stopped.")
+    sys.exit(0)
+
+if __name__ == '__main__':
+    main()
+
+
+
+
+#############################################################################
+# BELOW HERE IS MOSTLY HISTORICAL CODE, KEPT AROUND IN CASE IT EVER BECOMES #
+# NECESSARY TO REVAMP AN OLD BACK-SCRAPER. THE CODE BELOW IS NASTY, AND IS  #
+# NOT WORTH YOUR TIME. AVOID IT IF YOU DON'T ALREADY KNOW IT.               # 
+#############################################################################
 
 def ca3_nextQuery(query, zoomIn):
     '''
@@ -1059,117 +1253,6 @@ def back_scrape_court(courtID, VERBOSITY):
 
         return
 
-    if (courtID == 'cafc'):
-        ct = Court.objects.get(courtUUID=courtID)
-
-        # Sample URLs for page 2 and 3 (as of 2011-02-09)
-        # http://www.cafc.uscourts.gov/opinions-orders/0/50/all/page-11-5.html
-        # http://www.cafc.uscourts.gov/opinions-orders/0/100/all/page-21-5.html
-        countID = 0
-        pageID = 88
-        while pageID <= 143:
-            if pageID == 0:
-                url = "http://www.cafc.uscourts.gov/opinions-orders/0/all"
-                pageID += 1
-            else:
-                countID = pageID * 50
-                url = "http://www.cafc.uscourts.gov/opinions-orders/0/" + str(countID) + "/all/page-" + str(pageID) + "1-5.html"
-                pageID += 1
-
-            print "\n\n*****URL Changed to: " + url + "*****"
-
-            try: html = readURL(url, courtID)
-            except: continue
-
-            soup = BeautifulSoup(html)
-
-            aTagsRegex = re.compile('pdf$', re.IGNORECASE)
-            trTags = soup.findAll('tr')
-
-            # start on the seventh row, since the prior trTags are junk.
-            i = 6
-            dupCount = 0
-            while i < len(trTags) - 1: # The last row is the pagination, so we don't do it.
-                print str(i),
-                try:
-                    caseLink = trTags[i].td.nextSibling.nextSibling.nextSibling\
-                        .nextSibling.nextSibling.nextSibling.a.get('href')
-                    caseLink = urljoin(url, caseLink)
-                    if 'opinion' not in caseLink:
-                        # we have a non-case PDF. punt
-                        print "Opinion not in caselink. Punting."
-                        i += 1
-                        continue
-                except:
-                    # the above fails when things get funky, in that case, we punt
-                    print "caselink failure"
-                    i += 1
-                    continue
-
-                try: myFile, doc, created = makeDocFromURL(caseLink, ct)
-                except makeDocError:
-                    i += 1
-                    continue
-
-                if not created:
-                    # it's an oldie, punt!
-                    dupCount += 1
-                    if dupCount == 50:
-                        # tenth duplicate in a a row. BREAK!
-                        break
-                    i += 1
-                    continue
-                else:
-                    dupCount = 0
-
-                # next: docketNumber
-                docketNumber = trTags[i].td.nextSibling.nextSibling.contents[0]
-
-                # next: dateFiled
-                dateFiled = trTags[i].td.contents[0].strip()
-                splitDate = dateFiled.split("-")
-                dateFiled = datetime.date(int(splitDate[0]), int(splitDate[1]),
-                    int(splitDate[2]))
-                doc.dateFiled = dateFiled
-
-                # next: caseNameShort
-                caseNameShort = trTags[i].td.nextSibling.nextSibling.nextSibling\
-                    .nextSibling.nextSibling.nextSibling.a.contents[0]\
-                    .replace('[MOTION]', '').replace('[ORDER]', '').replace('(RULE 36)', '')\
-                    .replace('[ERRATA]', '').replace('[CORRECTED]', '').replace('[ORDER 2]', '')\
-                    .replace('[ORDER}', '').replace('[ERRATA 2]', '').replace('{ORDER]', '')
-                caseNameShort = titlecase(caseNameShort)
-
-                # next: documentType
-                documentType = trTags[i].td.nextSibling.nextSibling.nextSibling\
-                    .nextSibling.nextSibling.nextSibling.nextSibling.nextSibling\
-                    .contents[0].strip()
-                # normalize the result for our internal purposes...
-                if documentType == "Nonprecedential":
-                    documentType = "Unpublished"
-                elif documentType == "Precedential":
-                    documentType = "Published"
-                doc.documentType = documentType
-
-                # now that we have the docketNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(docketNumber, caseNameShort)
-
-                # Set the mimetype
-                mimetype = "." + caseLink.split('.')[-1]
-
-                # last, save evrything (pdf, citation and document)
-                doc.citation = cite
-                try:
-                    doc.local_path.save(trunc(clean_string(caseNameShort), 80) + mimetype, myFile)
-                except UnicodeDecodeError:
-                    caseNameShort = raw_input("UnicodeDecodeError. Please enter the case name: ")
-                    doc.local_path.save(trunc(clean_string(caseNameShort), 80) + mimetype, myFile)
-                printAndLogNewDoc(VERBOSITY, ct, cite)
-                doc.save()
-
-                i += 1
-        return
-
     if courtID == 'scotus':
         """This code is the same as in the scraper as of today (2010-05-05).
         There is a two year overlap between the resource.org stuff and the stuff
@@ -1391,58 +1474,3 @@ def back_scrape_court(courtID, VERBOSITY):
                 i += 1
 
         return result
-
-
-def main():
-    """
-    The master function. This will receive arguments from the user, determine
-    the actions to take, then hand it off to other functions that will handle the
-    nitty-gritty crud.
-
-    If the courtID is 0, then we scrape/parse all courts, one after the next.
-
-    returns a list containing the result
-    """
-
-    usage = "usage: %prog -c COURTID (-s | -p) [-v {1,2}]"
-    parser = OptionParser(usage)
-    parser.add_option('-s', '--scrape', action="store_true", dest='scrape',
-        default=False, help="Whether to scrape")
-    parser.add_option('-p', '--parse', action="store_true", dest='parse',
-        default=False, help="Whether to parse")
-    parser.add_option('-c', '--court', dest='courtID', metavar="COURTID",
-        help="The court to scrape, parse or both")
-    parser.add_option('-v', '--verbosity', dest='verbosity', metavar="VERBOSITY",
-        help="Display status messages after execution. Higher values are more verbosity.")
-    (options, args) = parser.parse_args()
-    if not options.courtID or (not options.scrape and not options.parse):
-        parser.error("You must specify a court and whether to scrape and/or parse it")
-
-    try:
-        courtID = int(options.courtID)
-    except:
-        print "Error: court not found"
-        raise django.core.exceptions.ObjectDoesNotExist
-
-
-    if options.verbosity:
-        verbosity = options.verbosity
-    else:
-        verbosity = '0'
-
-    if courtID == 'all':
-        # we use a while loop to do all courts.
-        pacer_codes = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
-        for courtID in pacer_codes:
-            if options.scrape: back_scrape_court(courtID, verbosity)
-            if options.parse:  parseCourt(courtID, verbosity)
-    else:
-        # we're only doing one court
-        if options.scrape: back_scrape_court(courtID, verbosity)
-        if options.parse:  parseCourt(courtID, verbosity)
-
-    return 0
-
-
-if __name__ == '__main__':
-    main()
