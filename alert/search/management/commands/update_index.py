@@ -82,12 +82,20 @@ class Command(BaseCommand):
         '''
         Deletes all documents from the database.
         '''
+        count = self.si.query('*:*').count()
         self.stdout.write("\n")
-        yes_or_no = raw_input("WARNING: Are you **sure** you want to delete all documents? [y/N] ")
+        yes_or_no = raw_input("WARNING: Are you **sure** you want to delete all %s documents? [y/N] " % count)
         self.stdout.write('\n')
         if not yes_or_no.lower().startswith('y'):
             self.stdout.write("No action taken.\n")
             sys.exit(0)
+
+        if count > 10000:
+            # Double check...something might be off.
+            yes_or_no = raw_input('Are you double-plus sure? There is an awful lot of documents here? [y/N] ')
+            if not yes_or_no.lower().startswith('y'):
+                self.stdout.write("No action taken.\n")
+                sys.exit(0)
 
         if self.verbosity >= 1:
             self.stdout.write('Removing all documents from your index because you said so.\n')
@@ -166,7 +174,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.verbosity = int(options.get('verbosity', 1))
-        self.si = sunburnt.SolrInterface(settings.SOLR_URL, mode='w')
+        self.si = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
 
         if options.get('update_mode'):
             if self.verbosity >= 1:
