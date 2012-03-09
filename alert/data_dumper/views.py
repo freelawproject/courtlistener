@@ -39,7 +39,8 @@ def dump_index(request):
         # Happens when the file is unaccessible or doesn't exist. An estimate.
         dump_size = '2.1GB'
     return render_to_response('dumps/dumps.html',
-                              {'courts' : courts, 'dump_size': dump_size},
+                              {'courts' : courts,
+                               'dump_size': dump_size},
                               RequestContext(request))
 
 def serve_or_gen_dump(request, court, year=None, month=None, day=None):
@@ -54,8 +55,7 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
 
     else:
         # Date-based dump
-        start_date, end_date, annual, monthly, daily = get_date_range(
-            year, month, day)
+        start_date, end_date, annual, monthly, daily = get_date_range(year, month, day)
 
         # Ensure that it's a valid request.
         today = date.today()

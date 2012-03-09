@@ -1,4 +1,6 @@
 BUGS:
+ - Crawler startup doesn't happen properly
+ - Dumps need to be sped up dramatically
  - Atom feeds for courts fail silently.
  - HTML docs with ampersands show the ampersands in the highlighted text.
  - Set the content type for things returned by xsendfile
@@ -10,7 +12,7 @@ Content Extraction:
  - investigate Apache Tika
  
 Solr:
- - fix the overlapping counts for log court names in the sidebar.
+ - fix the overlapping counts for long court names in the sidebar.
  
 
 Big picture:
