@@ -162,7 +162,7 @@ all_sitemaps = {}
 pacer_codes = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
 for pacer_code in pacer_codes:
     info_dict = {
-        'queryset'  : Document.objects.filter(court=pacer_code),
+        'queryset'  : Document.objects.filter(court=pacer_code).order_by('time_retrieved'),
         'date_field': 'time_retrieved',
     }
 

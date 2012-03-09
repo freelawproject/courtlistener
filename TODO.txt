@@ -2,6 +2,9 @@ BUGS:
  - Atom feeds for courts fail silently.
  - HTML docs with ampersands show the ampersands in the highlighted text.
  - Set the content type for things returned by xsendfile
+ - Smart quotes breaking indexing
+ - Various bugs reported by celery and Google's crawlers
+ - Dump caches need invalidation similar to sitemaps
 
 Content Extraction:
  - investigate Apache Tika

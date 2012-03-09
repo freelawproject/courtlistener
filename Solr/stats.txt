@@ -1,8 +1,13 @@
-2011-01-22:
+2012-01-22:
 Prior to implementing Celery Tasksets, indexing 601290 documents took 19606 
 seconds (~5.5hrs). However, this method overwhelmed Rabbitmq. The index created
 was 18GB in size.
 
-2011-01-28:
+2012-01-28:
 After implementing Celery Tasksets, indexing 602039 documents took 32427 seconds, 
 including optimizing the index (18.6 docs/sec). The index created was 15GB in size.
+
+2012-03-08:
+Had to reindex after *accidental* deletion of index with 605188 documents.
+Took 38981 seconds, including optimizing the index (15.5 docs/sec). The index 
+created was 14GB in size.
