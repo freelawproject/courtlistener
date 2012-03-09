@@ -22,10 +22,13 @@ from django.contrib.sitemaps import FlatPageSitemap
 from django.contrib.sites.models import Site
 from django.core.paginator import EmptyPage, PageNotAnInteger
 from django.core import urlresolvers
+from django.db import connection
 from django.http import HttpResponse, Http404
 from django.template import loader
 from django.utils.encoding import smart_str
 from django.views.decorators.cache import never_cache
+
+
 
 from string import count
 import os
@@ -160,6 +163,8 @@ class MyFlatPageSitemap(FlatPageSitemap):
 # generator on the urls.py file. One sitemap per court + flatpages.
 all_sitemaps = {}
 pacer_codes = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
+# Make the session non-locking
+connection.cursor().execute('SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED')
 for pacer_code in pacer_codes:
     info_dict = {
         'queryset'  : Document.objects.filter(court=pacer_code).order_by('time_retrieved'),
