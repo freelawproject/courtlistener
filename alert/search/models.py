@@ -82,6 +82,28 @@ def invalidate_sitemap_cache_by_court(court):
     # Go back to the original location.
     os.chdir(original_dir)
 
+def invalidate_dumps_by_date_and_court(date, court):
+    '''Deletes dump files for a court and date
+    
+    Receives court and date parameters, and then deletes any corresponding 
+    dumps.
+    '''
+    year, month, day = '%s' % date.year, '%02d' % date.month, '%02d' % date.day
+    courts = (court, 'all')
+    for court in courts:
+        try:
+            os.remove(os.path.join(settings.DUMP_DIR, year, court + '.xml.gz'))
+        except OSError:
+            pass
+        try:
+            os.remove(os.path.join(settings.DUMP_DIR, year, month, court + '.xml.gz'))
+        except OSError:
+            pass
+        try:
+            os.remove(os.path.join(settings.DUMP_DIR, year, month, day, court + '.xml.gz'))
+        except OSError:
+            pass
+
 
 class Court(models.Model):
     '''A class to represent some information about each court, can be extended
@@ -250,7 +272,7 @@ class Document(models.Model):
 
     def save(self, *args, **kwargs):
         '''
-        If the value of blocked changed to True, invalidate the sitemap cache
+        If the value of blocked changed to True, invalidate the caches
         where that value was stored. Google can later pick it up properly.
         
         Note that there is also a celery task associated with the post_save
@@ -259,14 +281,15 @@ class Document(models.Model):
         # Run the standard save function.
         super(Document, self).save(*args, **kwargs)
 
-        # Delete the cached sitemap if the item is blocked.
+        # Delete the cached sitemaps and dumps if the item is blocked.
         if self.blocked:
             invalidate_sitemap_cache_by_court(self.court_id)
+            invalidate_dumps_by_date_and_court(self.dateFiled, self.court_id)
 
 
     def delete(self, *args, **kwargs):
         '''
-        If the item is deleted, we need to update the sitemap that previously
+        If the item is deleted, we need to update the caches that previously
         contained it. Note that this doesn't get called when an entire queryset
         is deleted, but that should be OK.
         
@@ -276,8 +299,9 @@ class Document(models.Model):
         # Delete the item.
         super(Document, self).delete(*args, **kwargs)
 
-        # Invalidate the sitemap cache
+        # Invalidate the sitemap and dump caches
         invalidate_sitemap_cache_by_court(self.court_id)
+        invalidate_dumps_by_date_and_court(self.dateFiled, self.court_id)
 
     class Meta:
         db_table = "Document"

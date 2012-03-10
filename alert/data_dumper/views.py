@@ -88,11 +88,11 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
         # Time-based dump with  no lock
         connection.cursor().execute('SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED')
         if court == 'all':
-            # dump everything.
-            qs = Document.objects.all()
+            # dump everything; disable default sorting
+            qs = Document.objects.all().order_by()
         else:
-            # dump just the requested court
-            qs = Document.objects.filter(court=court)
+            # dump just the requested court; disable default sorting
+            qs = Document.objects.filter(court=court).order_by()
         docs_to_dump = queryset_generator_by_date(qs,
                                                   'dateFiled',
                                                   start_date,
