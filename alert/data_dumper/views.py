@@ -22,6 +22,7 @@ from alert.lib.dump_lib import get_date_range
 from alert.lib.filesize import size
 from alert.settings import DUMP_DIR
 
+from django.db import connection
 from django.http import HttpResponseBadRequest
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
@@ -85,6 +86,7 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
         return HttpResponseRedirect(os.path.join('/dumps', filepath, filename))
     except IOError:
         # Time-based dump
+        connection.cursor().execute('SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED')
         if court == 'all':
             # dump everything.
             docs_to_dump = queryset_iterator(Document.objects.filter(
