@@ -32,19 +32,23 @@ from datetime import date
 
 from alert.search.models import Document
 from alert.lib.dump_lib import make_dump_file
-from alert.lib.db_tools import queryset_iterator
+from alert.lib.db_tools import queryset_generator
 from alert.settings import DUMP_DIR
+
+from django.db import connection
+
 
 def dump_all_cases():
     '''
     A simple function that dumps all cases to a single dump file. Rotates out 
     the old file before deleting it.
     '''
+
     today = date.today()
     end_date = '%d-%02d-%02d' % (today.year, today.month, today.day)
     # Get the documents from the database.
-    docs_to_dump = queryset_iterator(Document.objects.filter(
-        dateFiled__lte=end_date))
+    connection.cursor().execute('SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED')
+    docs_to_dump = queryset_generator(Document.objects.filter(dateFiled__lte=end_date))
 
     path_from_root = DUMP_DIR
     filename = 'all.xml'

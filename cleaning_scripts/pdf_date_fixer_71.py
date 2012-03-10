@@ -35,7 +35,7 @@ from alert.search.models import Document
 from optparse import OptionParser
 import gc, errno, os, os.path, string, time
 
-def queryset_iterator(queryset, chunksize=100):
+def queryset_generator(queryset, chunksize=100):
     '''
     from: http://djangosnippets.org/snippets/1949/
     Iterate over a Django Queryset ordered by the primary key
@@ -154,13 +154,13 @@ def main():
 
     if all:
         # run the script across the entire DB
-        queryset = queryset_iterator(Document.objects.all())
+        queryset = queryset_generator(Document.objects.all())
         for doc in queryset:
             update_date(doc, simulate)
         exit(0)
     else:
         # run the script for the start and end points
-        queryset = queryset_iterator(Document.objects.filter(documentUUID__gte=begin, documentUUID__lte=end))
+        queryset = queryset_generator(Document.objects.filter(documentUUID__gte=begin, documentUUID__lte=end))
         for doc in queryset:
             update_date(doc, simulate)
         exit(0)

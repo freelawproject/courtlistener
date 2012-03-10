@@ -33,7 +33,7 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from search.models import Document, Citation
-from lib.db_tools import queryset_iterator
+from lib.db_tools import queryset_generator
 from lib.string_utils import clean_string
 from lib.string_utils import harmonize
 from lib.string_utils import titlecase
@@ -59,7 +59,7 @@ def link_fixer(link):
     return fixed
 
 def cleaner(simulate=False, verbose=False):
-    docs = queryset_iterator(Document.objects.filter(source = 'R', time_retrieved__gt = '2011-06-01'))
+    docs = queryset_generator(Document.objects.filter(source = 'R', time_retrieved__gt = '2011-06-01'))
     for doc in docs:
         original_link = doc.download_URL
         fixed = link_fixer(original_link)

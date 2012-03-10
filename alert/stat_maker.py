@@ -28,6 +28,7 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from django.contrib.flatpages.models import FlatPage
+from django.db import connection
 from django.template import loader, Context
 from alert.search.models import Document
 from alert.search.models import Court
@@ -51,6 +52,7 @@ def makeStats():
             [[oldestDocInCourt, numCasesInCourt],[oldestDocInCourt2, numCasesInCourt2]]
     '''
 
+    connection.cursor().execute('SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED')
     totalCasesQ = Document.objects.all().count()
 
     statsP = []

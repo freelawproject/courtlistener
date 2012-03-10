@@ -35,7 +35,7 @@ setup_environ(settings)
 from django.template.defaultfilters import slugify
 
 from search.models import Document, Citation
-from lib.db_tools import queryset_iterator
+from lib.db_tools import queryset_generator
 from lib.string_utils import trunc
 from optparse import OptionParser
 

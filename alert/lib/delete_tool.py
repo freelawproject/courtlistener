@@ -35,7 +35,7 @@ setup_environ(settings)
 from alert.search.models import Court
 from alert.search.models import Citation
 from alert.search.models import Document
-from lib.db_tools import queryset_iterator
+from lib.db_tools import queryset_generator
 
 import datetime
 import gc
@@ -53,14 +53,14 @@ def delete_data_by_time_and_court(courtID, SIMULATE, delTime=None, VERBOSITY=0):
             print "Deleting data newer than %s for court %s" % (delTime, courtID)
         count = Document.objects.filter(time_retrieved__gt=delTime, court=courtID).count()
         if count != 0:
-            docs = queryset_iterator(Document.objects.filter(time_retrieved__gt=delTime, court=courtID))
+            docs = queryset_generator(Document.objects.filter(time_retrieved__gt=delTime, court=courtID))
 
     else:
         if VERBOSITY >= 1:
             print "Deleting all data for court %s" % courtID
         count = Document.objects.filter(court=courtID).count()
         if count != 0:
-            docs = queryset_iterator(Document.objects.filter(court=courtID))
+            docs = queryset_generator(Document.objects.filter(court=courtID))
 
     if VERBOSITY >= 1:
         print "Deleting %s documents from the database." % (count)

@@ -16,7 +16,7 @@
 
 from alert.search.models import Court
 from alert.search.models import Document
-from alert.lib.db_tools import queryset_iterator
+from alert.lib.db_tools import queryset_generator_by_date
 from alert.lib.dump_lib import make_dump_file
 from alert.lib.dump_lib import get_date_range
 from alert.lib.filesize import size
@@ -85,19 +85,18 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
         _ = open(os.path.join(path_from_root, filename), 'rb')
         return HttpResponseRedirect(os.path.join('/dumps', filepath, filename))
     except IOError:
-        # Time-based dump
+        # Time-based dump with  no lock
         connection.cursor().execute('SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED')
         if court == 'all':
             # dump everything.
-            docs_to_dump = queryset_iterator(Document.objects.filter(
-                                                     dateFiled__gte=start_date,
-                                                     dateFiled__lte=end_date))
+            qs = Document.objects.all()
         else:
             # dump just the requested court
-            docs_to_dump = queryset_iterator(Document.objects.filter(
-                                                     dateFiled__gte=start_date,
-                                                     dateFiled__lte=end_date,
-                                                     court=court))
+            qs = Document.objects.filter(court=court)
+        docs_to_dump = queryset_generator_by_date(qs,
+                                                  'dateFiled',
+                                                  start_date,
+                                                  end_date)
 
         make_dump_file(docs_to_dump, path_from_root, filename)
 

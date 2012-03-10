@@ -33,7 +33,7 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from search.models import Document
-from alert.lib.db_tools import queryset_iterator
+from alert.lib.db_tools import queryset_generator
 from alert.lib.string_utils import anonymize
 from optparse import OptionParser
 from datetime import date
@@ -46,7 +46,7 @@ def cleaner(simulate=False, verbose=False):
     punctuation before or after an ID. This script re-runs the function, fixing
     the error.
     '''
-    docs = queryset_iterator(Document.objects.all())
+    docs = queryset_generator(Document.objects.all())
     for doc in docs:
         text = doc.documentPlainText
         clean_lines = []

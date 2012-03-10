@@ -18,7 +18,7 @@
 import sys
 
 from alert.lib import sunburnt
-from alert.lib.db_tools import queryset_iterator
+from alert.lib.db_tools import queryset_generator
 from alert.lib.timer import print_timing
 from alert.search.models import Document
 # Celery requires imports like this. Disregard syntax error.
@@ -126,7 +126,7 @@ class Command(BaseCommand):
         existing documents will be updated.
         '''
         self.stdout.write("Adding or updating all documents...\n")
-        everything = queryset_iterator(Document.objects.all())
+        everything = queryset_generator(Document.objects.all())
         count = Document.objects.all().count()
         processed_count = 0
         not_in_use = 0
