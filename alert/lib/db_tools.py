@@ -55,15 +55,15 @@ def queryset_generator_by_date(queryset, date_field, start_date, end_date, chunk
     bottom_date = datetime.strptime(start_date, '%Y-%m-%d').date()
     top_date = bottom_date + chunksize - timedelta(1)
     while bottom_date <= end_date:
+        if top_date > end_date:
+            # Last iteration
+            top_date = end_date
         print "bottom-date: %s" % bottom_date
         print "top_date: %s" % top_date
         keywords = {'%s__gte' % date_field : bottom_date,
                     '%s__lte' % date_field : top_date}
         bottom_date = bottom_date + chunksize
         top_date = top_date + chunksize
-        if top_date > end_date:
-            # Last iteration
-            top_date = end_date
         for row in queryset.filter(**keywords):
             yield row
 

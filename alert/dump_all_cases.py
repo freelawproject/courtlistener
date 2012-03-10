@@ -32,7 +32,7 @@ from datetime import date
 
 from alert.search.models import Document
 from alert.lib.dump_lib import make_dump_file
-from alert.lib.db_tools import queryset_generator
+from alert.lib.db_tools import queryset_generator_by_date
 from alert.settings import DUMP_DIR
 
 from django.db import connection
@@ -45,10 +45,15 @@ def dump_all_cases():
     '''
 
     today = date.today()
+    start_date = '1754-09-01' # First American case
     end_date = '%d-%02d-%02d' % (today.year, today.month, today.day)
     # Get the documents from the database.
     connection.cursor().execute('SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED')
-    docs_to_dump = queryset_generator(Document.objects.filter(dateFiled__lte=end_date))
+    qs = Document.objects.all()
+    docs_to_dump = queryset_generator_by_date(qs,
+                                              'dateFiled',
+                                              start_date,
+                                              end_date)
 
     path_from_root = DUMP_DIR
     filename = 'all.xml'
