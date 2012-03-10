@@ -126,6 +126,21 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                     except:
                         # Value not found.
                         row.set('source', '')
+                    try:
+                        row.set('blocked', str(doc.blocked))
+                    except:
+                        # Value not found.
+                        row.set('blocked', '')
+                    try:
+                        row.set('date_blocked', str(doc.date_blocked))
+                    except:
+                        # Value not found.
+                        row.set('date_blocked', '')
+                    try:
+                        row.set('extracted_by_ocr', str(doc.extracted_by_ocr))
+                    except:
+                        # Value not found.
+                        row.set('extracted_by_ocr', '')
 
                     # Gather the doc text
                     if doc.documentHTML != '':
