@@ -162,7 +162,6 @@ def scrape_court(court):
                 logger.critical(traceback.format_exc())
                 continue
 
-
             # Save everything
             post_save.disconnect(
                         save_doc_handler,

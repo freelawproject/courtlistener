@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert import settings
+from alert.lib import magic
 from alert.lib import search_utils
 from alert.lib.string_utils import trunc
 from alert.search.forms import SearchForm
@@ -105,9 +106,12 @@ def serve_static_file(request, file_path=''):
     '''
     doc = get_object_or_404(Document, local_path=file_path)
     file_name = file_path.split('/')[-1]
+    file_loc = os.path.join(settings.MEDIA_ROOT, file_path.encode('utf-8'))
+    mimetype = magic.from_file(file_loc, mime=True)
     response = HttpResponse()
     if doc.blocked:
         response['X-Robots-Tag'] = 'noindex, noodp, noarchive, noimageindex'
     response['X-Sendfile'] = os.path.join(settings.MEDIA_ROOT, file_path.encode('utf-8'))
     response['Content-Disposition'] = 'attachment; filename="%s"' % file_name.encode('utf-8')
+    response['Content-Type'] = mimetype
     return response
