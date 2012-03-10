@@ -33,7 +33,7 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from search.models import Document, Citation
-from lib.db_tools import queryset_iterator
+from lib.db_tools import queryset_generator
 from lib.string_utils import clean_string
 from lib.string_utils import harmonize
 from lib.string_utils import titlecase
@@ -42,7 +42,7 @@ import re
 
 
 def cleaner(simulate=False, verbose=False):
-    docs = queryset_iterator(Document.objects.filter(dateFiled__gt = '1993-08-02'))
+    docs = queryset_generator(Document.objects.filter(dateFiled__gt = '1993-08-02'))
     for doc in docs:
         caseNameShortOrig = doc.citation.caseNameShort
         caseNameFullOrig = doc.citation.caseNameFull

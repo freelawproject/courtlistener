@@ -33,7 +33,7 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from search.models import Document
-from alert.lib.db_tools import queryset_iterator
+from alert.lib.db_tools import queryset_generator
 from optparse import OptionParser
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
@@ -41,7 +41,7 @@ from scrapers.tasks import extract_doc_content
 
 def fixer(simulate=False, verbose=False):
     '''OCR documents that lack content'''
-    #docs = queryset_iterator(Document.objects.filter(source='C', documentPlainText=''))
+    #docs = queryset_generator(Document.objects.filter(source='C', documentPlainText=''))
     docs = Document.objects.raw('''select documentUUID 
                                    from Document with (nolock)
                                    where source='C' and 

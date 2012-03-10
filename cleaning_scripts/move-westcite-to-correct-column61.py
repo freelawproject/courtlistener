@@ -40,7 +40,7 @@ def db_corrector(simulate, verbose):
     citations, we don't care particularly about errors, and can carelessly
     punt them.
     '''
-    docs = queryset_iterator(Document.objects.filter(source = 'R'))
+    docs = queryset_generator(Document.objects.filter(source = 'R'))
     for doc in docs:
         if verbose:
             print "Assigning %s to westCite on doc %s" % (doc.citation.docketNumber, doc.documentUUID)

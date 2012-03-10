@@ -14,10 +14,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import gc
+from datetime import date
+from datetime import datetime
+from datetime import timedelta
 from alert.settings import *
 
-def queryset_iterator(queryset, chunksize=1000):
+def queryset_generator(queryset, chunksize=1000):
     '''
     from: http://djangosnippets.org/snippets/1949/
     Iterate over a Django Queryset ordered by the primary key
@@ -39,4 +41,33 @@ def queryset_iterator(queryset, chunksize=1000):
         for row in queryset.filter(documentUUID__gt=documentUUID)[:chunksize]:
             documentUUID = row.documentUUID
             yield row
-        gc.collect()
+
+def queryset_generator_by_date(queryset, date_field, start_date, end_date, chunksize=7):
+    '''
+    Takes a queryset, and chunks it by date. Useful if sorting by pk isn't 
+    needed.
+    
+    Chunksize should be given in days, and start and end dates should be provided
+    as strings in the form 2012-03-08.
+    '''
+    chunksize = timedelta(chunksize)
+    end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+    bottom_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+    top_date = bottom_date + chunksize - timedelta(1)
+    while bottom_date <= end_date:
+        print "bottom-date: %s" % bottom_date
+        print "top_date: %s" % top_date
+        keywords = {'%s__gte' % date_field : bottom_date,
+                    '%s__lte' % date_field : top_date}
+        bottom_date = bottom_date + chunksize
+        top_date = top_date + chunksize
+        if top_date > end_date:
+            # Last iteration
+            top_date = end_date
+        for row in queryset.filter(**keywords):
+            yield row
+
+
+
+
+
