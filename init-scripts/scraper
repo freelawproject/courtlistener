@@ -28,7 +28,7 @@
 # Debug daemon using the -f flag to run it in the foreground. 
 
 start () {
-    echo -n "Starting the scraper...."
+    echo -n "Starting the scraper..."
     #daemon --command="/usr/bin/python /var/www/court-listener/alert/scrapers/scrape_and_extract.py -d -c 'juriscraper.opinions.united_states.federal'" --name=scraper --user=www-data --verbose
     daemon --command="/usr/bin/python /var/www/court-listener/alert/scrapers/scrape_and_extract.py -d -c juriscraper.opinions.united_states.federal" --respawn --name=scraper --user=www-data --verbose
     
@@ -44,7 +44,7 @@ start () {
 }
 
 stop () {
-    echo -n "Killing the scraper..."
+    echo -n "Stopping the scraper..."
     daemon --stop --name=scraper --user=www-data
     RETVAL=$?
     
@@ -55,6 +55,29 @@ stop () {
         echo "failed. See error code for more information."
     fi
     return $RETVAL
+}
+
+restart () {
+    echo -n "Stopping the scraper..."
+    daemon --stop --name=scraper --user=www-data
+    sleep 1
+    
+    while true
+    do
+        # Check if it's still running...
+        daemon --running --name=scraper --user=www-data
+        RETVAL=$?    
+        if [ $RETVAL != '0' ]
+        then
+            echo "done."
+            start
+            break
+        else
+            echo -n '.'
+            sleep 1
+        fi
+    done
+    
 }
 
 status () {
@@ -71,8 +94,7 @@ case "${1:-''}" in
         stop
     ;;
     'restart')
-        stop
-        start
+        restart
     ;;
     'status')
         status
