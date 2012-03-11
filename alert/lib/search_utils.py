@@ -59,7 +59,9 @@ def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
     facets = []
     solr_facet_values = dict(solr_facet_values[solr_field])
     # Are any of the checkboxes checked?
-    no_facets_selected = not any([(field.value() == 'on' or field.value() == True) for field in search_form if field.html_name.startswith(prefix)])
+    no_facets_selected = not any([(field.value() == 'on' or field.value() == True)
+                                  for field in search_form
+                                  if field.html_name.startswith(prefix)])
     for field in search_form:
         try:
             count = solr_facet_values[field.html_name.replace(prefix, '')]
@@ -79,7 +81,8 @@ def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
         facet = [field.label,
                  field.html_name,
                  count,
-                 checked]
+                 checked,
+                 field.html_name.split('_')[1]]
         facets.append(facet)
     return facets
 
