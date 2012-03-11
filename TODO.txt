@@ -1,6 +1,4 @@
 BUGS:
- - Crawler startup doesn't happen properly
- - Atom feeds for courts fail silently.
  - HTML docs with ampersands show the ampersands in the highlighted text.
  - Smart quotes breaking indexing
  - Various bugs reported by celery
