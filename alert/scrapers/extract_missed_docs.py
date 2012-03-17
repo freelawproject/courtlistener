@@ -1,3 +1,4 @@
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
@@ -74,7 +75,7 @@ def main():
     if options.docs is not None:
         for doc in options.docs:
             try:
-                doc = Document.objects.get(pk=doc)
+                doc = Document.objects.filter(pk=doc)
                 extract_all_docs(doc)
             except ObjectDoesNotExist:
                 print "The following document was not found: %s" % doc

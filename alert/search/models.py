@@ -31,6 +31,11 @@ import os
 
 # changes here need to be mirrored in the coverage page view and Solr configs
 # Note that spaces cannot be used in the keys, or else the SearchForm won't work
+JURISDICTIONS = (
+    ('F', 'Federal'),
+    ('S', 'State'),
+)
+
 DOCUMENT_STATUSES = (
     ('Published', 'Precedential'),
     ('Unpublished', 'Non-Precedential'),
@@ -61,7 +66,6 @@ def make_pdf_upload_path(instance, filename):
             get_valid_filename(filename)
     return path
 
-
 def invalidate_sitemap_cache_by_court(court):
     '''Deletes sitemaps for a given court
     
@@ -75,7 +79,6 @@ def invalidate_sitemap_cache_by_court(court):
 
     os.chdir(os.path.join(settings.MEDIA_ROOT, 'sitemaps'))
     sitemaps = glob.glob('%s*' % court)
-
     for sitemap in sitemaps:
         os.remove(sitemap)
 
@@ -133,8 +136,10 @@ class Court(models.Model):
     end_date = models.DateField("the date the court was abolished",
                                 blank=True,
                                 null=True)
+    jurisdiction = models.CharField("the jurisdiction of the court",
+                                    max_length=3,
+                                    choices=JURISDICTIONS)
 
-    # uses the choices argument in courtUUID to create a good display of the object.
     def __unicode__(self):
         return self.full_name
 
@@ -164,7 +169,7 @@ class Citation(models.Model):
                                  max_length=50,
                                  blank=True,
                                  null=True)
-    neutral_cite = models.CharField('Universal citation',
+    neutral_cite = models.CharField('Neutral citation',
                                       max_length=50,
                                       blank=True,
                                       null=True)
