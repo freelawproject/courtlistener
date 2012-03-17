@@ -142,7 +142,8 @@ def scrape_court(court):
 
             # Make a citation
             cite = Citation(case_name=site.case_names[i],
-                            docketNumber=site.docket_numbers[i])
+                            docketNumber=site.docket_numbers[i],
+                            neutral_cite=site.neutral_citations[i])
 
             # Make the document object
             doc = Document(source='C',
