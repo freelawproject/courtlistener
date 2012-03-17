@@ -136,9 +136,10 @@ def build_main_query(cd, highlight=True):
 
         # Highlighting for the main query.
         main_params['hl'] = 'true'
-        main_params['hl.fl'] = 'text,caseName,westCite,docketNumber,lexisCite,court_citation_string'
+        main_params['hl.fl'] = 'text,caseName,westCite,neutralCite,docketNumber,lexisCite,court_citation_string'
         main_params['f.caseName.hl.fragListBuilder'] = 'single'
         main_params['f.westCite.hl.fragListBuilder'] = 'single'
+        main_params['f.neutralCite.hl.fragListBuilder'] = 'single'
         main_params['f.docketNumber.hl.fragListBuilder'] = 'single'
         main_params['f.lexisCite.hl.fragListBuilder'] = 'single'
         main_params['f.court_citation_string.hl.fragListBuilder'] = 'single'
@@ -148,6 +149,7 @@ def build_main_query(cd, highlight=True):
         main_params['f.text.hl.maxAlternateFieldLength'] = '500'
         main_params['f.caseName.hl.alternateField'] = 'caseName'
         main_params['f.westCite.hl.alternateField'] = 'westCite'
+        main_params['f.neutralCite.hl.alternateField'] = 'neutralCite'
         main_params['f.docketNumber.hl.alternateField'] = 'docketNumber'
         main_params['f.lexisCite.hl.alternateField'] = 'lexisCite'
         main_params['f.court_citation_string.hl.alternateField'] = 'court_citation_string'
@@ -167,6 +169,8 @@ def build_main_query(cd, highlight=True):
         main_fq.append('westCite:' + cd['west_cite'])
     if cd['docket_number'] != '' and cd['docket_number'] is not None:
         main_fq.append('docketNumber:' + cd['docket_number'])
+    if cd['neutral_cite'] != '' and cd['neutral_cite'] is not None:
+        main_fq.append('neutralCite:' + cd['neutral_cite'])
 
     # Dates
     date_query = make_date_query(cd)
@@ -217,6 +221,8 @@ def place_facet_queries(cd):
         shared_fq.append('westCite:%s' % cd['west_cite'])
     if cd['docket_number'] != '' and cd['docket_number'] is not None:
         shared_fq.append('docketNumber:%s' % cd['docket_number'])
+    if cd['neutral_cite'] != '' and cd['neutral_cite'] is not None:
+        shared_fq.append('neutralCite:%s' % cd['neutral_cite'])
 
     # Dates
     date_query = make_date_query(cd)

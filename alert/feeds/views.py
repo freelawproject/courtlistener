@@ -55,7 +55,7 @@ class search_feed(Feed):
             results_si = conn.raw_query(**main_params).execute()
             return results_si
         else:
-            return None
+            return []
 
     def item_link(self, item):
         return item['absolute_url']

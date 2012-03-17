@@ -117,6 +117,11 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                         # Value not found.
                         row.set('lexisCite', '')
                     try:
+                        row.set('neutral_cite', doc.citation.neutral_cite)
+                    except:
+                        # Value not found.
+                        row.set('neutral_cite', '')
+                    try:
                         row.set('case_name', doc.citation.case_name)
                     except:
                         # Value not found.

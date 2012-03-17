@@ -1,7 +1,19 @@
 BUGS:
  - HTML docs with ampersands show the ampersands in the highlighted text.
- - Smart quotes breaking indexing
  - Various bugs reported by celery
+ - Court-based RSS feeds need to be Solr-powered, or at least be non-locking
+ - selecting "New Search" resets the filters to have all the statuses selected
+ - add/expose neutral citations:
+    - front end
+    - search form
+    - solr config (does this break things?)
+    - data model
+    - search object
+    - results
+    - rendered view
+    - delete dumps
+ - Rework extract_missed_docs to use argparser
+ - Add state courts to the front end
 
 Content Extraction:
  - investigate Apache Tika
@@ -11,9 +23,7 @@ Solr:
  
 
 Big picture:
- - fix the sitemaps
  - F3
- - recrawl
  
 To do:
  - check out the outliars in the DB by date
@@ -27,5 +37,5 @@ F3
  - export/import the latest court db, and update the install script.
  - add fiscr to the various places on the site where it's needed...
  - rerun the robots.txt script that imports from resource.org
- - kill all related dumps
- - optimize the Solr index
+ - kill all related dumps and sitemaps
+ - optimize the MySQL DB and Solr index 

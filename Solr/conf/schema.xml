@@ -133,6 +133,7 @@
     <field name="lexisCite" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
     <field name="westCite" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
     <field name="caseNumber" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+    <field name="neutralCite" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />   
     <field name="absolute_url" type="string" indexed="false" stored="true" multiValued="false" />
     <field name="download_url" type="string" indexed="false" stored="true" multiValued="false" />
     <field name="local_path" type="string" indexed="false" stored="true" multiValued="false" />

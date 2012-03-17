@@ -164,6 +164,10 @@ class Citation(models.Model):
                                  max_length=50,
                                  blank=True,
                                  null=True)
+    neutral_cite = models.CharField('Universal citation',
+                                      max_length=50,
+                                      blank=True,
+                                      null=True)
 
     def save(self, *args, **kwargs):
         '''

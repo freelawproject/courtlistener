@@ -124,7 +124,7 @@
         {% endif %}
         <h2>
             {{ doc.citation.case_name|v_wrapper }},
-            {% if doc.citation.westCite != '' and doc.citation.westCite != None %}
+            {% if doc.citation.westCite %}
                 {{doc.citation.westCite}}
             {% else %}
                 {{doc.citation.docketNumber}}
@@ -210,7 +210,11 @@
             {% endif %}
         </p>
         <p class="bottom">
-            {% if doc.citation.westCite != '' and doc.citation.westCite != None and doc.citation.docketNumber %}
+            {% if doc.citation.neutral_cite %}
+                <span class="meta-data-header">Neutral citation:</span>
+                <span class="meta-data-value">{{ doc.citation.neutral_cite }}</span>
+            {% endif %}
+            {% if doc.citation.westCite and doc.citation.docketNumber %}
                 <strong>Docket Number: </strong>
                 {{ doc.citation.docketNumber }}
             {% endif %}

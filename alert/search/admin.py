@@ -36,7 +36,7 @@ class CitationAdmin(admin.ModelAdmin):
     # This needs to be disabled for performance reasons.
     #list_display = ('docketNumber', 'westCite', 'case_name', )
     inlines = [DocumentAdminInline]
-    search_fields = ['case_name', 'case_name', 'docketNumber', 'westCite']
+    search_fields = ['case_name', 'docketNumber', 'westCite']
 
 
 class DocumentAdmin(admin.ModelAdmin):

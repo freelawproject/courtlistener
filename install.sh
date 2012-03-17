@@ -38,7 +38,7 @@
 # - install django from source
 # - install CourtListener from source
 # - put some basic data in the database
-# - install & configure Solr & pysolr
+# - install & configure Solr
 # - configure mysql & courtlistener
 # - install django-celery, celery and rabbitmq
 # - install OCR tools
@@ -75,7 +75,7 @@ OPTIONS
     --ffmpeg
             install the FFmpeg audio transcoding library from source
     --solr
-            install the Solr search engine and pysolr connector
+            install the Solr search engine
     --django
             install Django
     --courtlistener
@@ -560,9 +560,6 @@ function install_solr {
     # Enable Solr at startup
     ln -s $CL_INSTALL_DIR/init-scripts/solr /etc/init.d/solr
     update-rc.d solr defaults
-
-    # Install python connector
-    pip install pysolr
 
     # and hopefully that worked...
     echo -e "\nSolr installed successfully."

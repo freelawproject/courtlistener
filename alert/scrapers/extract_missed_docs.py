@@ -31,6 +31,7 @@ sys.path.append('/var/www/court-listener/alert')
 
 import settings
 from django.core.management import setup_environ
+from django.core.exceptions import ObjectDoesNotExist
 setup_environ(settings)
 
 from alert.search.models import Court
@@ -42,27 +43,10 @@ from scrapers.tasks import extract_doc_content
 import datetime
 import time
 import traceback
-from optparse import OptionParser
+import argparse
 
 
-def extract_all_docs(court, filter_time):
-    '''
-    Here, we do the following:
-     1. For a given court, find all of its documents
-     2. Determine if the document has been parsed already
-     3. If it has, punt, if not, open the PDF and parse it.
-
-    returns a string containing the result
-    '''
-
-    print "NOW PARSING COURT: %s" % court
-
-    # select all documents from this jurisdiction that lack plainText and were
-    # downloaded from the court.
-    docs = Document.objects.filter(documentPlainText="", documentHTML="",
-                                   court__courtUUID=court, source="C",
-                                   dateFiled__gte=filter_time)
-
+def extract_all_docs(docs):
     num_docs = docs.count()
     if num_docs == 0:
         print "Nothing to parse for this court."
@@ -73,44 +57,66 @@ def extract_all_docs(court, filter_time):
 
 
 def main():
-    usage = "usage: %prog -c COURTID -t datetime"
-    parser = OptionParser(usage)
-    parser.add_option('-c', '--court', dest='court_id', metavar="COURTID",
-        help="The court to extract. Use 0 to extract all courts.")
-    parser.add_option('-t', '--time', dest='filter_time', metavar='filter_time',
-        help=("Take action for all documents newer than this time. Format as ",
-              "follows: YYYY-MM-DD HH:MM:SS or YYYY-MM-DD"))
-    options, _ = parser.parse_args()
+    parser = argparse.ArgumentParser(description="Extract document content from cases.")
+    parser.add_argument('-c', '--court', dest='court_id', metavar="COURTID",
+                        help="The court to extract. Use 'all' to extract all courts.")
+    parser.add_argument('-d', '--document', dest='docs', metavar="DOC", nargs='+',
+                        help="The document IDs to extract.")
+    parser.add_argument('-t', '--time', dest='filter_time', metavar='DATE-TIME',
+                        help=("Take action for all documents newer than this time."
+                              " Format as follows: YYYY-MM-DD HH:MM:SS or"
+                              " YYYY-MM-DD"))
+    options = parser.parse_args()
 
     court = options.court_id
 
-    filter_time = options.filter_time
-    if filter_time is not None:
-        try:
-            # Parse the date string into a datetime object
-            filter_time = datetime.datetime(*time.strptime(options.filter_time, "%Y-%m-%d %H:%M:%S")[0:6])
-        except ValueError:
-            try:
-                filter_time = datetime.datetime(*time.strptime(options.filter_time, "%Y-%m-%d")[0:5])
-            except ValueError:
-                parser.error("Unable to parse time. Please use format: YYYY-MM-DD HH:MM:SS or YYYY-MM-DD")
-    else:
-        # Without a time filter, this query is locking, taking a long time.
-        parser.error('Time is a required argument.')
 
-    if court == 'all':
-        # get the court IDs from models.py
-        courts = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
-        for court in courts:
-            # This catches all exceptions regardless of their trigger, so
-            # if one court dies, the next isn't affected.
+    if options.docs is not None:
+        for doc in options.docs:
             try:
-                extract_all_docs(court, filter_time)
+                doc = Document.objects.get(pk=doc)
+                extract_all_docs(doc)
+            except ObjectDoesNotExist:
+                print "The following document was not found: %s" % doc
             except Exception:
                 print '*****Uncaught error parsing court*****\n"' + traceback.format_exc() + "\n\n"
+
     else:
-        # We just do the court requested
-        extract_all_docs(court, filter_time)
+        filter_time = options.filter_time
+        if filter_time is not None:
+            try:
+                # Parse the date string into a datetime object
+                filter_time = datetime.datetime(*time.strptime(options.filter_time, "%Y-%m-%d %H:%M:%S")[0:6])
+            except ValueError:
+                try:
+                    filter_time = datetime.datetime(*time.strptime(options.filter_time, "%Y-%m-%d")[0:5])
+                except ValueError:
+                    parser.error("Unable to parse time. Please use format: YYYY-MM-DD HH:MM:SS or YYYY-MM-DD")
+        else:
+            # Without a time filter, this query is locking, taking a long time.
+            parser.error('Time is a required argument.')
+
+        if court == 'all':
+            # get the court IDs from models.py
+            courts = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
+            for court in courts:
+                print "NOW PARSING COURT: %s" % court
+                # This catches all exceptions regardless of their trigger, so
+                # if one court dies, the next isn't affected.
+                try:
+                    docs = Document.objects.filter(documentPlainText="", documentHTML="",
+                                                   court__courtUUID=court, source="C",
+                                                   dateFiled__gte=filter_time)
+                    extract_all_docs(docs)
+                except Exception:
+                    print '*****Uncaught error parsing court*****\n"' + traceback.format_exc() + "\n\n"
+        else:
+            # We just do the court requested
+            print "NOW PARSING COURT: %s" % court
+            docs = Document.objects.filter(documentPlainText="", documentHTML="",
+                                           court__courtUUID=court, source="C",
+                                           dateFiled__gte=filter_time)
+            extract_all_docs(docs)
 
     exit(0)
 

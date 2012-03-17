@@ -44,12 +44,13 @@ class SearchDocument(object):
         self.docketNumber = doc.citation.docketNumber
         self.westCite = doc.citation.westCite
         self.lexisCite = doc.citation.lexisCite
+        self.neutralCite = doc.citation.neutral_cite
         self.status = doc.get_documentType_display()
         self.source = doc.source
         self.download_url = doc.download_URL
         self.local_path = str(doc.local_path)
 
-        # Load the caseName field using a template to make it a concatenation
+        # Load the case_name field using a template to make it a concatenation
         case_name_template = loader.get_template('search/indexes/caseNumber.txt')
         c = Context({ 'object': doc })
         self.caseNumber = case_name_template.render(c)

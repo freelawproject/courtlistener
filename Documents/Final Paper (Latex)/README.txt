@@ -1,6 +1,6 @@
 This paper is created with Latex.
 
-It can be compiled and opened on a Linix machine with:
+It can be compiled and opened on a Linux machine with:
     make veryclean; make pdf; make ; gnome-open paper.pdf
 
 Some Ubuntu dependencies are:

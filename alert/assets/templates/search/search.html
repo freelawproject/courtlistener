@@ -137,7 +137,7 @@
                     <h3 class="bottom serif">
                         <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}" class="visitable">
                             {{ result.solr_highlights.caseName.0|safe }},
-                            {% if result.solr_highlights.westCite.0 != '' and result.solr_highlights.westCite.0 != None %}
+                            {% if result.solr_highlights.westCite.0 %}
                                 {{ result.solr_highlights.westCite.0|safe }}
                             {% else %}
                                 {{ result.solr_highlights.docketNumber.0|safe }}
@@ -180,7 +180,11 @@
                         <span class="meta-data-value">{{ result.status }}</span>
                     </p>
                     <p class="bottom">
-                        {% if result.solr_highlights.westCite.0 != '' and result.solr_highlights.westCite.0 != None and result.solr_highlights.docketNumber.0 %}
+                        {% if result.solr_highlights.neutralCite.0 != '' and result.solr_highlights.neutralCite.0 != None %}
+                            <span class="meta-data-header">Neutral citation:</span>
+                            <span class="meta-data-value">{{ result.solr_highlights.neutralCite.0|safe }}</span>
+                        {% endif %}
+                        {% if result.solr_highlights.westCite.0 and result.solr_highlights.docketNumber.0 %}
                             <span class="meta-data-header">Docket Number:</span>
                             <span class="meta-data-value">{{ result.solr_highlights.docketNumber.0|safe }}</span>
                         {% endif %}

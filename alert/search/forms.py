@@ -84,6 +84,11 @@ class SearchForm(forms.Form):
                         widget=forms.TextInput(
                                    attrs={'class': 'span-5 external-input',
                                           'autocomplete': 'off'}))
+    neutral_cite = forms.CharField(
+                        required=False,
+                        widget=forms.TextInput(
+                                   attrs={'class': 'span-5 external-input',
+                                          'autocomplete': 'off'}))
     docket_number = forms.CharField(
                         required=False,
                         widget=forms.TextInput(
@@ -158,6 +163,7 @@ class SearchForm(forms.Form):
         q = re.sub('westcite', 'westCite', q)
         q = re.sub('casenumber', 'caseNumber', q)
         q = re.sub('docketnumber', 'docketNumber', q)
+        q = re.sub('neutralcite', 'neutralCite', q)
 
         # Make pipes work
         q = re.sub('\|', ' OR ', q)

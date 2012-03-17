@@ -72,6 +72,7 @@ def court_changed(url, hash):
         return True, url2Hash
 
 def scrape_court(court):
+    download_error = False
     site = court.Site().parse()
 
     changed, url2Hash = court_changed(site.url, site.hash)
@@ -160,6 +161,7 @@ def scrape_court(court):
             except:
                 logger.critical('Unable to save binary to disk. Deleted document: %s.' % doc)
                 logger.critical(traceback.format_exc())
+                download_error = True
                 continue
 
             # Save everything
@@ -178,8 +180,10 @@ def scrape_court(court):
 
     # Update the hash if everything finishes properly.
     logger.info("%s: Successfully crawled." % site.court_id)
-    url2Hash.SHA1 = site.hash
-    url2Hash.save()
+    if not download_error:
+        # Only update the hash if no errors occured. 
+        url2Hash.SHA1 = site.hash
+        url2Hash.save()
 
 
 

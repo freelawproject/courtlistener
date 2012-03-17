@@ -85,7 +85,7 @@
             <li><strong><a href="/opinions/all/">all</a></strong> - All courts</li>
             {% for court in courts %}
                 <li>
-                    <strong><a href="/?q=&case_name=&court_{{court.courtUUID}}=on&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Relating-to+orders=on&filed_after=&filed_before=&west_cite=&docket_number=&sort=score+desc">{{court.courtUUID}}</a></strong> - {{court.full_name}}
+                    <strong><a href="/?q=&case_name=&court_{{court.courtUUID}}=on&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Relating-to+orders=on&filed_after=&filed_before=&west_cite=&neutral_cite=&docket_number=&sort=score+desc">{{court.courtUUID}}</a></strong> - {{court.full_name}}
                 </li>
             {% endfor %}
         </ul>
