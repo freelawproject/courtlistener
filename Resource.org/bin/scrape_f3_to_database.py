@@ -173,7 +173,7 @@ def write_dups(source, dups, DEBUG=False):
     log.close()
 
 
-def need_dup_check_in_date_and_court(dateFiled, court):
+def need_dup_check_for_date_and_court(dateFiled, court):
     '''Checks whether a case needs duplicate checking.
 
     Performs a simple check for whether we have scraped any documents for the
@@ -545,7 +545,7 @@ def scrape_and_parse():
             ##########################
             ### Duplicate checking ###
             ##########################
-            if need_dup_check_in_date_and_court(caseDate, court):
+            if need_dup_check_for_date_and_court(caseDate, court):
                 print "Running complex dup check."
                 # There exist scraped cases in this court and date.
                 # Strip HTML.
@@ -624,8 +624,9 @@ def scrape_and_parse():
 
     return 0
 
+
 def main():
-    print scrape_and_parse()
+    scrape_and_parse()
     print "Completed all volumes successfully. Exiting."
     exit(0)
 

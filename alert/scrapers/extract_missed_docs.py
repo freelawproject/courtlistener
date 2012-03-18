@@ -71,7 +71,6 @@ def main():
 
     court = options.court_id
 
-
     if options.docs is not None:
         for doc in options.docs:
             try:
