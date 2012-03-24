@@ -51,7 +51,7 @@ def cleaner(simulate=False, verbose=True):
         # For each document
         doc = Document.objects.get(documentUUID=result['id'])
         if verbose:
-            print "http://localhost:8000" + doc.get_absolute_url()
+            print "http://courtlistener.com" + doc.get_absolute_url()
         # Correct the text
         text = doc.documentPlainText
         doc.documentPlainText = fix_mojibake(text)
