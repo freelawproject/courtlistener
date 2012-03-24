@@ -33,7 +33,7 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from search.models import Document
-from juriscraper.lib.string_utils import harmonize, clean_string
+from juriscraper.lib.string_utils import harmonize, clean_string, titlecase
 from optparse import OptionParser
 import re
 
@@ -51,14 +51,19 @@ def fixer(simulate=False, verbose=False):
             continue
         elif 'in re' in doc.citation.case_name.lower():
             continue
+        elif doc.citation.case_name == "(White) v. Gray":
+            doc.citation.case_name = "White v. Gray"
+            if not simulate:
+                doc.save()
+
 
         # Otherwise, we nuke the leading parens.
         old_case_name = doc.citation.case_name
-        new_case_name = harmonize(clean_string(re.sub('\(.*\)', '', doc.citation.case_name)))
+        new_case_name = titlecase(harmonize(clean_string(re.sub('\(.*?\)', '', doc.citation.case_name, 1))))
 
         if verbose:
             print "Fixing document %s: %s" % (doc.pk, doc)
-            print "        New for %s: %s" % (doc.pk, new_case_name)
+            print "        New for %s: %s\n" % (doc.pk, new_case_name)
 
         if not simulate:
             doc.citation.case_name = new_case_name

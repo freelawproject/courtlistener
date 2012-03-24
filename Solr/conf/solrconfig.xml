@@ -762,7 +762,7 @@
        </str>
        
        <!--  default query -->
-       <str name="q.alt">*:*</str>
+       <str name="q.alt">status:precedential</str>
        <int name="rows">20</int>
        <str name="q.op">AND</str>
 
@@ -1688,7 +1688,7 @@
 
   <!-- Legacy config for the admin interface -->
   <admin>
-    <defaultQuery>*:*</defaultQuery>
+    <defaultQuery>status:precedential</defaultQuery>
 
     <!-- configure a healthcheck file for servers behind a
          loadbalancer 
