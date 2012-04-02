@@ -33,9 +33,9 @@ from django.template import RequestContext
 from django.views.decorators.cache import never_cache
 
 import datetime
-import random
 import hashlib
-
+import random
+import re
 
 def redirect_to_settings(request):
     return redirect(view_settings, permanent=True)
