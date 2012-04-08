@@ -1,3 +1,5 @@
+
+
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
 #
@@ -30,7 +32,7 @@ import sys
 sys.path.append("/var/www/court-listener")
 
 from alert.lib.parse_dates import parse_dates
-from alert.lib.string_utils import clean_string, harmonize, titlecase
+from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 import datetime
 from lxml.html import fromstring, tostring
 import re
@@ -41,6 +43,74 @@ from urlparse import urljoin
 
 
 BROWSER = 'firefox-trunk'
+
+def need_dup_check_for_date_and_court(case):
+    '''Checks whether a case needs duplicate checking.
+
+    Performs a simple check for whether we have scraped any documents for the
+    date and court specified, using known dates of when scraping started at a
+    court.
+
+    The following MySQL is from the server, and indicates the earliest scraped
+    documents in each court:
+
+        mysql> select court_id, min(dateFiled)
+               from Document
+               where source = 'C'
+               group by court_id;
+        +----------+----------------+
+        | court_id | min(dateFiled) |
+        +----------+----------------+
+        | ca1      | 1993-01-05     |
+        | ca10     | 1995-09-01     |
+        | ca11     | 1994-12-09     |
+        | ca2      | 2003-04-08     |
+        | ca3      | 2009-07-02     |
+        | ca4      | 2010-03-12     |
+        | ca5      | 1992-05-14     |
+        | ca6      | 2010-03-15     |
+        | ca7      | 2010-03-12     |
+        | ca8      | 2010-03-12     |
+        | ca9      | 2010-03-10     |
+        | cadc     | 1997-09-12     |
+        | cafc     | 2004-11-30     |
+        | scotus   | 2005-10-07     |
+        +----------+----------------+
+        14 rows in set (51.65 sec)
+
+    We'll use these values to filter out cases that can't possibly have a dup.
+
+    Returns True if a duplicate check should be run. Else: False.
+    '''
+
+    earliest_dates = {
+        'ca1': datetime.datetime(1993, 1, 5),
+        'ca2': datetime.datetime(2003, 4, 8),
+        'ca3': datetime.datetime(2009, 7, 2),
+        'ca4': datetime.datetime(2010, 3, 12),
+        'ca5': datetime.datetime(1992, 5, 14),
+        'ca6': datetime.datetime(2010, 3, 15),
+        'ca7': datetime.datetime(2010, 3, 12),
+        'ca8': datetime.datetime(2010, 3, 12),
+        'ca9': datetime.datetime(2010, 3, 10),
+        'ca10': datetime.datetime(1995, 9, 1),
+        'ca11': datetime.datetime(1994, 12, 9),
+        'cadc': datetime.datetime(1997, 9, 12),
+        'cafc': datetime.datetime(2004, 11, 30),
+        'scotus': datetime.datetime(1600, 1, 1),
+        }
+    try:
+        if case.case_date <= earliest_dates[case.court]:
+            # Doc was filed before court was scraped. No need for check.
+            return False
+        else:
+            # Doc was filed after court was scraped. Need dup check. Alas.
+            return True
+    except KeyError:
+        # The court was never scraped - thus we get an exception. No need for
+        # check.
+        return False
+
 
 class Case(object):
     '''Represents a case within Resource.org'''
@@ -67,14 +137,18 @@ class Case(object):
         self.west_cite = self._get_west_cite()
         self.docket_number = self._get_docket_number()
         self.case_name, self.precedential_status = self._get_case_name_and_status()
-        self.status = 'R'
+        self.source = 'R'
 
     def __str__(self):
+        # TODO: Has issue with unicode...hard to track down, and a corner case,
+        # thus prioritizing other issues. Can be reproduced in vol. 23 of F3.
         out = []
         for attr, val in self.__dict__.iteritems():
             if any(['body' in attr,
                     'dict' in attr,
-                    'file' in attr]):
+                    'file' in attr,
+                    'tree' == attr,
+                    'url_element' == attr]):
                 continue
             out.append('%s: %s' % (attr, val))
         return '\n'.join(out) + '\n'
@@ -365,11 +439,13 @@ class Volume(object):
         return len(self.case_urls)
 
     def __getitem__(self, key):
-        case_url = urljoin(self.url, self.case_urls[key])
-        return Case(case_url)
+        for t in zip(self.case_urls[key],
+                     self.case_dates[key],
+                     self.sha1_hashes[key]):
+            yield Case(self.url, *t)
 
     def __iter__(self):
-        for i in range(0, self.__len__()):
+        for i in range(i, self.__len__()):
             yield Case(self.url,
                        self.case_urls[i],
                        self.case_dates[i],
@@ -385,13 +461,11 @@ class Corpus(object):
         self.volume_urls = self.tree.xpath('//table/tbody/tr/td[1]/a/@href')
 
     def __len__(self):
-        # Caches the len attr for better performance.
         return len(self.volume_urls)
 
     def __getitem__(self, key):
-        # Uses the key to create a volume object
-        volume_url = urljoin(self.url, self.volume_urls[key], "index.html")
-        return Volume(volume_url)
+        for vol in self.volume_urls[key]:
+             yield Volume(urljoin(self.url, vol + '/index.html'))
 
     def __iter__(self):
         for volume_url in self.volume_urls:

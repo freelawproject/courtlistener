@@ -52,7 +52,7 @@ def remove_words(phrase):
 def gen_diff_ratio(left, right):
     '''
     Genrates a difference between two strings
-    Returns a value between 0 and 1. 0 means the strings are totally diffferent.
+    Returns a value between 0 and 1. 0 means the strings are totally different.
     1 means they are identical.
     '''
     # Remove common strings from all case names /before/ comparison.
@@ -67,108 +67,31 @@ def gen_diff_ratio(left, right):
 
 
 def find_best_match(results, case_name):
-    '''Returns the best match within a SphinxQuerySet.
-
-    Given a SphinxQuerySet, make a decision about whether any of the
-    documents within the queryset are a good match with a provided case
-    name.
-
-    This is done by testing the size of the result set. If it's only one
-    item, it's assumed that the calling code has already weaned down the
-    results to a very likely candidate result, and a low-threshold test
-    is performed to ensure that the single result is somewhat similar to
-    the case name.
-
-    If multiple cases are in the SphinxQuerySet, then it's assumed that
-    our calling code wasn't able to wean the result set down very much,
-    and that there's a high degree of risk in picking the correct case.
-    Thus, a high-threshold test is applied to the best-matching candidate.
-
-    In the case that a good result is found, returns the candidate result
-    and the confidence threshold. If no good result is found, returns None
-    and a confidence threshold of zero.
+    '''Returns the closest match to within a Solr result set to a known 
+    string.
     '''
-    if results.count() == 0:
-        # No good candidates.
-        return None, 0
+    diff_ratios = []
+    for result in results:
+        # Calculate its diff_ratio, and add it to an array
+        diff = gen_diff_ratio(result['caseName'], case_name)
+        diff_ratios.append(diff)
 
-    elif results.count() == 1:
-        # One hit returned make sure it's above THRESHOLD.
-        HIGH_THRESHOLD = 0.3
-        candidate_case_name = results[0].citation.caseNameFull
-        diff = gen_diff_ratio(candidate_case_name, case_name)
-        if diff >= HIGH_THRESHOLD:
-            return results[0], diff
-        else:
-            return None, diff
+    # Find the max ratio, and grab the corresponding result
+    max_ratio = max(diff_ratios)
+    i = diff_ratios.index(max_ratio)
+    return results[i], max_ratio
 
-    elif results.count() > 1:
-        # More than one hit. Find the best one using diff_lib
-        THRESHOLD = 0.65
-
-        diff_ratios = []
-        for result in results:
-            # Calculate its diff_ratio, and add it to an array
-            candidate_case_name = result.citation.caseNameFull
-            diff = gen_diff_ratio(candidate_case_name, case_name)
-            diff_ratios.append(diff)
-
-        # Find the max ratio, and grab the corresponding result
-        max_ratio = max(diff_ratios)
-        i = diff_ratios.index(max_ratio)
-        if max_ratio >= THRESHOLD:
-            # Update the date in the DB
-            return results[i], max_ratio
-
-        else:
-            # Below the threshold. Punt!
-            return None, 0
-
-
-def find_good_matches(results, case_name):
+def find_confidences(results, case_name):
     '''Returns all matches above a threshold.
 
     This is nearly identical to find_best_match, but returns any good matches
     in an array, and returns their confidence thresholds in a second array.
     '''
-    if len(results) == 0:
-        # No good candidates.
-        return [], [0]
-
-    elif len(results) == 1:
-        # One hit returned make sure it's above THRESHOLD.
-        HIGH_THRESHOLD = 0.3
-        candidate_case_name = results[0]['caseName']
+    diff_ratios = []
+    for result in results:
+        # Calculate its diff_ratio, and add it to an array
+        candidate_case_name = result['caseName']
         diff = gen_diff_ratio(candidate_case_name, case_name)
-        if diff >= HIGH_THRESHOLD:
-            return [results[0]], [diff]
-        else:
-            return [], [diff]
+        diff_ratios.append(diff)
 
-    elif len(results) > 1:
-        # More than one hit. Find the best one using diff_lib
-        THRESHOLD = 0.6
-
-        diff_ratios = []
-        for result in results:
-            # Calculate its diff_ratio, and add it to an array
-            candidate_case_name = result['caseName']
-            diff = gen_diff_ratio(candidate_case_name, case_name)
-            diff_ratios.append(diff)
-
-        confidences = []
-        good_results = []
-        i = 0
-        while i < len(diff_ratios):
-            if diff_ratios[i] >= THRESHOLD:
-                confidences.append(diff_ratios[i])
-                good_results.append(results[i])
-
-            i += 1
-
-        if len(good_results) > 0:
-            return good_results, confidences
-
-        else:
-            # No good hits.
-            return [], [0]
+    return diff_ratios

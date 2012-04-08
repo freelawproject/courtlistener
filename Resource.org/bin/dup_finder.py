@@ -33,8 +33,7 @@ from alert.lib.parse_dates import parse_dates
 from alert.lib.string_utils import trunc
 from alert.lib import sunburnt
 from alert.tinyurl.encode_decode import num_to_ascii
-from alert.lib.scrape_tools import hasDuplicate
-from cleaning_scripts.lib.string_diff import find_good_matches, gen_diff_ratio
+from cleaning_scripts.lib.string_diff import find_confidences, gen_diff_ratio
 
 from lxml.html import fromstring, tostring
 from urlparse import urljoin
@@ -89,6 +88,7 @@ def make_solr_query(content, caseName, court, dateFiled, num_q_words=5, DEBUG=Fa
     main_params = {}
     main_params['fq'] = ['court_exact:%s' % court,
                          'dateFiled:%s' % build_date_range(dateFiled)]
+    main_params['rows'] = 100
     stopwords = load_stopwords()
     words = content.split()
     length = len(words)
@@ -147,6 +147,104 @@ def make_solr_query(content, caseName, court, dateFiled, num_q_words=5, DEBUG=Fa
         print "  main_params are: %s" % main_params
 
     return main_params
+
+def get_dup_stats(case):
+    '''The heart of the duplicate algorithm. Returns stats about the case as 
+    compared to other cases already in the system. Other methods can call this
+    one, and can make decisions based on the stats generated here.
+    
+    If no likely duplicates are encountered, stats are returned as zeroes.
+    
+    Process:
+        1. Refine the possible result set down to just a few candidates.
+        2. Determine their likelihood of being duplicates according to a 
+           number of measures:
+            - Similarity of case name
+            - Similarity of docket number
+            - Comparison of content length
+    '''
+    stats = []
+    DEBUG = True
+
+    ###################################### 
+    # 1: Refine by date, court and words #
+    ######################################
+    num_q_words = 5
+
+    # Add one word until either you run out of words or you get less than
+    # 50 results.
+    result_count = 51
+    word_count = len(case.body_text.split())
+    while result_count > 50 and num_q_words <= word_count:
+        main_params = make_solr_query(case.body_text,
+                                      case.case_name,
+                                      case.court,
+                                      case.case_date,
+                                      num_q_words)
+        conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+        candidates = conn.raw_query(**main_params).execute()
+        result_count = len(candidates)
+        if not main_params['q'].startswith('caseName'):
+            num_q_words += 1
+        else:
+            # We've exhausted the possibilities for this case. Need to move on
+            # regardless of count.
+            break
+
+    stats.append(result_count)
+    if result_count == 0:
+        return stats, candidates
+
+    #########################################
+    # 2: Attempt filtering by docket number #
+    #########################################
+    # Two-step process. First we see if we have any exact hits.
+    # Second, if there were exact hits, we forward those onwards. If not, we 
+    # forward everything.
+    remaining_candidates = []
+    new_docket_number = re.sub("\D", "", case.docket_number)
+    new_docket_number = re.sub("0", "", new_docket_number)
+    for candidate in candidates:
+        # Get rid of anything in the docket numbers that's not a digit
+        result_docket_number = re.sub("\D", "", candidate['docketNumber'])
+        # Get rid of zeroes too.
+        result_docket_number = re.sub('0', '', result_docket_number)
+        if new_docket_number == result_docket_number:
+            remaining_candidates.append(candidate)
+
+    if len(remaining_candidates) > 0:
+        # We had one or more exact hits! Use those.
+        candidates = remaining_candidates
+    else:
+        # We just let candidates from step one get passed through by doing nothing.
+        pass
+    stats.append(len(candidates))
+
+    ##############################
+    # 3: Find the best case name #
+    ##############################
+    confidences = find_confidences(candidates, case.case_name)
+    stats.append(confidences)
+
+    ###########################
+    # 4: Check content length #
+    ###########################
+    percent_diffs, gestalt_diffs = [], []
+    new_stripped_content = re.sub('\W', '', case.body_text).lower()
+    for candidate in candidates:
+        candidate_stripped_content = re.sub('\W', '', candidate['text']).lower()
+
+        # Calculate the difference in text length and their gestalt difference
+        length_diff = abs(len(candidate_stripped_content) - len(new_stripped_content))
+        percent_diff = float(length_diff) / len(new_stripped_content)
+        percent_diffs.append(percent_diff)
+        gestalt_diffs.append(gen_diff_ratio(candidate_stripped_content, new_stripped_content))
+
+    stats.append(percent_diffs)
+    stats.append(gestalt_diffs)
+
+    return stats, candidates
+
 
 def check_dup(court, dateFiled, caseName, content, docketNumber, id, DEBUG=False):
     '''Checks for a duplicate that already exists in the DB

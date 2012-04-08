@@ -30,7 +30,7 @@ from django.template.defaultfilters import slugify
 from django.utils.encoding import smart_str, smart_unicode
 from alert.search.models import Court, Citation, Document
 from alert.lib.parse_dates import parse_dates
-from alert.lib.string_utils import trunc
+from juriscraper.lib.string_utils import trunc
 from alert.lib.scrape_tools import hasDuplicate
 
 from lxml.html import fromstring, tostring
@@ -232,7 +232,7 @@ def scrape_and_parse():
             for element in bodyContents:
                 body += tostring(element)
                 try:
-                    bodyText += tostring(element, method = 'text')
+                    bodyText += tostring(element, method='text')
                 except UnicodeEncodeError:
                     # Happens with odd characters. Simply pass this iteration.
                     pass
@@ -255,7 +255,7 @@ def scrape_and_parse():
                 if not court:
                     print absCaseLink
                     if BROWSER:
-                        subprocess.Popen([BROWSER, absCaseLink], shell = False).communicate()
+                        subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
                     court = raw_input("Please input court name (e.g. \"First Circuit of Appeals\"): ").lower()
                     court_fix_file.write("%s|%s\n" % (sha1Hash, court))
             if ('first' in court) or ('ca1' == court):
@@ -309,13 +309,13 @@ def scrape_and_parse():
                         # the fix file.
                         print absCaseLink
                         if BROWSER:
-                            subprocess.Popen([BROWSER, absCaseLink], shell = False).communicate()
+                            subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
                         court = raw_input("Unknown court. Input the court code to proceed successfully [%s]: " % saved_court)
                         court = court or saved_court
                     court_fix_file.write("%s|%s\n" % (sha1Hash, court))
 
             saved_court = court
-            court = Court.objects.get(courtUUID = court)
+            court = Court.objects.get(courtUUID=court)
             if DEBUG >= 4:
                 print "Court is: %s" % court
 
@@ -332,7 +332,7 @@ def scrape_and_parse():
                 if not savedCaseNameShort:
                     print absCaseLink
                     if BROWSER:
-                        subprocess.Popen([BROWSER, absCaseLink], shell = False).communicate()
+                        subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
                     caseName = raw_input("Short casename: ")
                     cite.caseNameShort = trunc(caseName, 100)
                     cite.caseNameFull = caseName
@@ -406,7 +406,7 @@ def scrape_and_parse():
                     else:
                         print absCaseLink
                         if BROWSER:
-                            subprocess.Popen([BROWSER, absCaseLink], shell = False).communicate()
+                            subprocess.Popen([BROWSER, absCaseLink], shell=False).communicate()
                         print "Unknown date. Possible options are:"
                         try:
                             print "  1) %s" % saved_caseDate.strftime("%B %d, %Y")
@@ -444,7 +444,7 @@ def scrape_and_parse():
 
             try:
                 doc, created = Document.objects.get_or_create(
-                    documentSHA1 = sha1Hash, court = court)
+                    documentSHA1=sha1Hash, court=court)
             except MultipleObjectsReturned:
                 # this shouldn't happen now that we're using SHA1 as the dup
                 # check, but the old data is problematic, so we must catch this.

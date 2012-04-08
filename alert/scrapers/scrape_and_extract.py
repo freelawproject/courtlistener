@@ -68,7 +68,7 @@ def court_changed(url, hash):
         # it wasn't created, and it has the same SHA --> not changed.
         return False, url2Hash
     else:
-        # It's a newn URL or it's a changed hash.
+        # It's a known URL or it's a changed hash.
         return True, url2Hash
 
 def scrape_court(court):
@@ -133,10 +133,11 @@ def scrape_court(court):
                 continue
 
         else:
+            # Not a duplicate; proceed...
             logger.info('Adding new document found at: %s' % download_url)
             dup_count = 0
 
-            # opinions.united_states.federal.ca9u --> ca9 
+            # opinions.united_states.federal.ca9_u --> ca9 
             court_str = site.court_id.split('.')[-1].split('_')[0]
             court = Court.objects.get(courtUUID=court_str)
 
@@ -153,11 +154,13 @@ def scrape_court(court):
                            download_URL=download_url,
                            documentType=site.precedential_statuses[i])
 
+            # Make and associate the file object
             try:
                 cf = ContentFile(data)
                 mime = magic.from_buffer(data, mime=True)
                 extension = mimetypes.guess_extension(mime)
-                file_name = trunc(site.case_names[i], 80) + extension
+                # See issue #215 for why this must be lower-cased.
+                file_name = trunc(site.case_names[i].lower(), 80) + extension
                 doc.local_path.save(file_name, cf, save=False)
             except:
                 logger.critical('Unable to save binary to disk. Deleted document: %s.' % doc)

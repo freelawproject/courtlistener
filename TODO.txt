@@ -27,12 +27,14 @@ Solr:
 
 Big picture:
  - F3
+    - Remove courts.gov/c/F3/166/166.F3d.507.98-7803.1065.html
  
 To do:
  - check out the outliars in the DB by date
  - recreate the stat_maker.py script (see bug)
  - Check the dates/courts in Brian's list of citation-less docs, and see if we
    missed any docs.
+ - Move the crt.li apache conf over to the repo
    
    
 F3
