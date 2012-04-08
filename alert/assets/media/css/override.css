@@ -74,6 +74,7 @@ span.bold {
 .round {
     -moz-border-radius: 6px 6px 6px 6px;
     -webkit-border-radius: 6px;
+    border-radius: 6px;
 }
 
 .round-bottom {
@@ -81,6 +82,8 @@ span.bold {
     -moz-border-radius-bottomleft: 6px;
     -webkit-border-bottom-right-radius: 6px;
     -webkit-border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    border-bottom-left-radius: 6px;
 }
 
 .pointer {

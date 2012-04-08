@@ -24,9 +24,10 @@
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
 
+import dup_finder
 import f3_helpers
-
 import argparse
+import re
 
 def generate_training_data():
     '''Make a CSV that can be imported by the train_classifier method.
@@ -35,21 +36,81 @@ def generate_training_data():
     If they have a likely duplicate
     '''
     corpus = f3_helpers.Corpus('file:///var/www/court-listener/Resource.org/data/F3/')
-    for volume in corpus:
-        for case in volume:
-            print case
-            '''
-            self.url = _get_url()
-            self.sha1_hash = sha1_hash
-            self.download_url = _get_download_url()
-            self.body, self.body_text = _get_case_body()
-            self.court = _get_court()
-            self.case_date = _get_case_date(case_date)
-            self.west_cite = _get_west_cite()
-            self.docket_number = _get_docket_number()
-            self.case_name, self.precedential_status = _get_case_name_and_status()
-            self.status = 'R'
-            '''
+    vol_file = open('../logs/vol_file.txt', 'r+')
+    case_file = open('../logs/case_file.txt', 'r+')
+    stat_file = open('../logs/training_stats.csv', 'a')
+    try:
+        i = int(vol_file.readline())
+        print "Vol: %s" % i
+    except ValueError:
+        # the volume file is emtpy or otherwise failing.
+        i = 0
+    vol_file.close()
+    for volume in corpus[i:]:
+        try:
+            j = int(case_file.readline())
+        except ValueError:
+            j = 0
+        case_file.close()
+        for case in volume[j::10]:
+            if f3_helpers.need_dup_check_for_date_and_court(case):
+                print "Running dup check..."
+                # stats takes the form: [count_from_search] or 
+                #                       [count_from_search,
+                #                        count_from_docket_num,
+                #                        [case_name_diff_1, diff_2, diff_3, etc],
+                #                        [content_length_percent_diff_1, 2, 3],
+                #                        [content_diff_1, 2, 3]
+                #                       ]
+                # candidates is a list of 0 to n possible duplicates 
+                stats, candidates = dup_finder.get_dup_stats(case)
+                if len(candidates) == 0:
+                    # None found. Therefore...
+                    print "  No candidates found."
+                    continue
+                elif (re.sub("(\D|0)", "", case.docket_number) == \
+                            re.sub("(\D|0)", "", candidates[0]['docketNumber'])) and \
+                            (len(candidates) == 1):
+                    # If the docket numbers are identical, and there was 
+                    # only one result at that time...
+                    print "  Match made on docket number of single candidate."
+                    continue
+                else:
+                    # Possible duplicate, make stats for logistic regression.
+                    print "STATS: %s" % stats
+                    for i in range(0, len(candidates)):
+                        if stats[2][i] < 0.2:
+                            continue
+                        print "  %s) Case name: %s" % (i + 1, case.case_name)
+                        print "                %s" % candidates[i]['caseName']
+                        print "      Docket nums: %s" % (case.docket_number)
+                        print "                   %s" % candidates[i]['docketNumber']
+                        print "      Candidate URL: %s" % (case.download_url)
+                        print "      Match URL: http://courtlistener.com%s" % \
+                                            (candidates[i]['absolute_url'])
+
+                        choice = raw_input("Is this a duplicate? [y/N]: ")
+                        choice = choice or "n"
+                        new_stats = [stats[0], # count from search 
+                                     stats[1], # count from docket number
+                                     stats[2][i], # case name diff
+                                     stats[3][i], # content length diff
+                                     stats[4][i], # content diff
+                                     choice]       # whether a dup
+                        stat_file.write(','.join([str(s) for s in new_stats]) + '\n')
+            else:
+                print "Dup check not needed..."
+
+            # save our location within the volume
+            j += 1
+            case_file = open('../logs/case_file.txt', 'w')
+            case_file.write(str(j))
+            case_file.close()
+        # save our location within the corpus
+        i += 1
+        vol_file = open('../logs/vol_file.txt', 'w')
+        vol_file.write(str(i))
+        vol_file.close()
 
 
 def train_classifier():

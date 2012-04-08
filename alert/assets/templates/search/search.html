@@ -136,7 +136,7 @@
                 <article>
                     <h3 class="bottom serif">
                         <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}" class="visitable">
-                            {{ result.solr_highlights.caseName.0|safe }},
+                            {{result.solr_highlights.caseName.0|safe}},
                             {% if result.solr_highlights.westCite.0 %}
                                 {{ result.solr_highlights.westCite.0|safe }}
                             {% else %}
