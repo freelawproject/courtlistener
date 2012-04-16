@@ -36,20 +36,9 @@ def import_f3():
      1. Duplicate detection. This is done by filtering by query and then
         refining the results that are found. For more details, see the 
         dup_finder code. 
-     2. Merging duplicate documents. Merging is done along the following 
-        algorithm:
-         - SHA1 is preserved from CL
-         - The HTML from PRO gets added to CL's DB.
-         - CL's title is preserved (it tends to be better)
-         - The source field for the document is changed to CR (court and PRO)
-         - The west citation is added to CL's DB from PRO
-         - Block status is determined according to the indexing pipeline
-        If multiple documents are considered duplicates for the incoming case,
-        we check if they have identical text. If so, we treat them identically 
-        as above. If they differ, we skip the step of updating their HTML, and 
-        otherwise proceed as above.
+     2. Merging duplicate documents. See their code in the f3_helpers module.
     '''
-    simulate = True
+    simulate = False
     corpus = f3_helpers.Corpus('file:///var/www/court-listener/Resource.org/data/F3/')
     vol_file = open('../logs/vol_file.txt', 'r+')
     case_file = open('../logs/case_file.txt', 'r+')
@@ -166,14 +155,11 @@ def import_f3():
         vol_file.close()
 
 def main():
-    parser = argparse.ArgumentParser(description="Functions relating to importing "
-                                                 "F3 via a logistic regression "
-                                                 "classifier.")
+    parser = argparse.ArgumentParser(description="Functions relating to importing F3")
     parser.add_argument('--import-f3',
                         action="store_true",
                         help=("Iterate over F3 from resource.org, and import"
-                              " its contents. Use the logisitic classifier to"
-                              " detect duplicates."))
+                              " its contents."))
     options = parser.parse_args()
 
     if options.import_f3:
