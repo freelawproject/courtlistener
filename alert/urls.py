@@ -96,7 +96,7 @@ urlpatterns = patterns('',
     (r'^bad-browser/$', browser_warning),
 
     # Maintenance and protest mode!
-    #(r'/*', show_maintenance_warning),
+    (r'/*', show_maintenance_warning),
 
     # Display a case; a named URL because the get_absolute_url uses it.
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case,
