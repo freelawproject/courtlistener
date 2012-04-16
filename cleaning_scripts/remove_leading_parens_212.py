@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
 #
@@ -26,6 +24,7 @@
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
 
+
 import sys
 sys.path.append('/var/www/court-listener/alert')
 
@@ -33,32 +32,43 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alert.lib.mojibake import fix_mojibake
-from alert.lib import sunburnt
-from alert.search.models import Document
-
+from search.models import Document
+from juriscraper.lib.string_utils import harmonize, clean_string, titlecase
 from optparse import OptionParser
+import re
 
 
-conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+def fixer(simulate=False, verbose=False):
+    '''Remove leading slashes by running the new and improved harmonize/clean_string scipts'''
+    docs = Document.objects.raw(r'''select Document.documentUUID
+                                    from Document, Citation 
+                                    where Document.citation_id = Citation.citationUUID and 
+                                    Citation.case_name like '(%%';''')
 
-def cleaner(simulate=False, verbose=True):
-    '''Fix cases that have mojibake as a result of pdffactory 3.51.'''
+    for doc in docs:
+        # Special cases
+        if 'Klein' in doc.citation.case_name:
+            continue
+        elif 'in re' in doc.citation.case_name.lower():
+            continue
+        elif doc.citation.case_name == "(White) v. Gray":
+            doc.citation.case_name = "White v. Gray"
+            if not simulate:
+                doc.save()
 
-    # Find all the cases using Solr
-    results_si = conn.raw_query(**{'q': u'ÚÑÎ'})
-    for result in results_si:
-        # For each document
-        doc = Document.objects.get(documentUUID=result['id'])
+
+        # Otherwise, we nuke the leading parens.
+        old_case_name = doc.citation.case_name
+        new_case_name = titlecase(harmonize(clean_string(re.sub('\(.*?\)', '', doc.citation.case_name, 1))))
+
         if verbose:
-            print "http://courtlistener.com" + doc.get_absolute_url()
-        # Correct the text
-        text = doc.documentPlainText
-        doc.documentPlainText = fix_mojibake(text)
+            print "Fixing document %s: %s" % (doc.pk, doc)
+            print "        New for %s: %s\n" % (doc.pk, new_case_name)
 
-        # Save the case
         if not simulate:
-            doc.save()
+            doc.citation.case_name = new_case_name
+            doc.citation.save()
+
 
 def main():
     usage = "usage: %prog [--verbose] [---simulate]"
@@ -78,7 +88,7 @@ def main():
         print "* SIMULATE MODE - NO CHANGES WILL BE MADE *"
         print "*******************************************"
 
-    return cleaner(simulate, verbose)
+    return fixer(simulate, verbose)
     exit(0)
 
 if __name__ == '__main__':
