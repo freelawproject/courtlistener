@@ -1,5 +1,3 @@
-
-
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
 #
@@ -32,17 +30,118 @@ import sys
 sys.path.append("/var/www/court-listener")
 
 from alert.lib.parse_dates import parse_dates
+from alert.lib.string_utils import anonymize
+from alert.search.models import Citation, Court, Document
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
+
 import datetime
-from lxml.html import fromstring, tostring
 import re
 import subprocess
 import time
 import urllib2
+
+from lxml.html import fromstring, tostring
 from urlparse import urljoin
 
 
-BROWSER = 'firefox-trunk'
+BROWSER = 'firefox'
+
+def add_case(case):
+    '''Add the case to the database.
+    
+    '''
+    # Get the court
+    court = Court.objects.get(courtUUID=case.court)
+
+    # Make a citation
+    cite = Citation(case_name=case.case_name,
+                    docketNumber=case.docket_number,
+                    westCite=case.west_cite)
+
+    # Make the document object
+    doc = Document(source='R',
+                   documentSHA1=case.sha1_hash,
+                   dateFiled=case.case_date,
+                   court=court,
+                   download_URL=case.download_url,
+                   documentType=case.precedential_status)
+
+    doc.documentHTML, blocked = anonymize(case.body)
+    if blocked:
+        doc.blocked = True
+        doc.date_blocked = datetime.date.today()
+
+    # Save everything together
+    cite.save()
+    doc.citation = cite
+    doc.save()
+
+def merge_cases_simple(case, target_id):
+    '''Add `case` to the database, merging with target_id
+     
+     Merging is done along the following algorithm:
+     - SHA1 is preserved from CL
+     - The HTML from PRO gets added to CL's DB.
+     - CL's title is preserved (it tends to be better)
+     - The source field for the document is changed to CR (court and PRO)
+     - The west citation is added to CL's DB from PRO
+     - Block status is determined according to the indexing pipeline    
+    '''
+    doc = Document.objects.get(documentUUID=194852)
+    print "Merging %s with" % case.case_name
+    print "        %s" % doc.citation.case_name
+
+    doc.source = 'CR'
+    doc.citation.westCite = case.west_cite
+    doc.documentHTML, blocked = anonymize(case.body)
+    if blocked:
+        doc.blocked = True
+        doc.date_blocked = datetime.date.today()
+
+    doc.save()
+
+def merge_cases_complex(case, target_ids):
+    print "Running complex merge."
+    pass
+
+def find_same_docket_numbers(case, candidates):
+    '''Identify the candidates that have the same docket numbers as the case.
+    
+    '''
+    new_docket_number = case.docket_number
+    same_docket_numbers = []
+    for candidate in candidates:
+        if candidate['docketNumber'] == new_docket_number:
+            same_docket_numbers.append(candidate)
+    return same_docket_numbers
+
+def filter_by_stats(candidates, stats):
+    '''Looks at the candidates and their stats, and filters out obviously 
+    different candidates.
+    '''
+    filtered_stats = stats[0:2]
+    filtered_stats.append([])
+    filtered_stats.append([])
+    filtered_stats.append([])
+    filtered_candidates = []
+    for i in range(0, len(candidates)):
+        if stats[2][i] < 0.125:
+            # The case name is wildly different
+            continue
+        elif stats[3][i] > 400:
+            # The documents have wildly different lengths
+            continue
+        elif stats[4][i] < 0.4:
+            # The contents are wildly different
+            continue
+        else:
+            # It's a reasonably close match.
+            print "reasonable match found after filtering"
+            filtered_stats[2].append(stats[2][i])
+            filtered_stats[3].append(stats[3][i])
+            filtered_stats[4].append(stats[4][i])
+            filtered_candidates.append(candidates[i])
+    return filtered_candidates, filtered_stats
 
 def need_dup_check_for_date_and_court(case):
     '''Checks whether a case needs duplicate checking.
@@ -137,7 +236,6 @@ class Case(object):
         self.west_cite = self._get_west_cite()
         self.docket_number = self._get_docket_number()
         self.case_name, self.precedential_status = self._get_case_name_and_status()
-        self.source = 'R'
 
     def __str__(self):
         # TODO: Has issue with unicode...hard to track down, and a corner case,

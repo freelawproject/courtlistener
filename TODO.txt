@@ -1,6 +1,5 @@
 BUGS:
  - HTML docs with ampersands show the ampersands in the highlighted text.
- - Various bugs reported by celery
  - Court-based RSS feeds need to be Solr-powered, or at least be non-locking
  - selecting "New Search" resets the filters to have all the statuses selected
  - add/expose neutral citations and state courts
@@ -27,7 +26,7 @@ Solr:
 
 Big picture:
  - F3
-    - Remove courts.gov/c/F3/166/166.F3d.507.98-7803.1065.html
+    - Remove courts.gov/c/F3/166/166.F3d.507.98-7803.1065.html (Carl's request)
  
 To do:
  - check out the outliars in the DB by date

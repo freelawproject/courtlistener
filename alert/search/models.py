@@ -46,7 +46,8 @@ DOCUMENT_STATUSES = (
 
 DOCUMENT_SOURCES = (
     ('C', 'court website'),
-    ('R', 'bulk.resource.org'),
+    ('R', 'resource.org'),
+    ('CR', 'court website merged with resource.org'),
     ('M', 'manual input'),
     ('A', 'internet archive'),
 )
