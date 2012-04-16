@@ -73,7 +73,9 @@ def extract_doc_content(pk):
         content, err = process.communicate()
         if content.strip() == '':
             # probably an image PDF. Send it to OCR
-            result = subtask("scrapers.tasks.extract_by_ocr", args=(path,), kwargs={}).apply()
+            result = subtask("scrapers.tasks.extract_by_ocr",
+                             args=(path,),
+                             kwargs={}).apply()
             success, content = result.get()
             if success:
                 doc.extracted_by_ocr = True
