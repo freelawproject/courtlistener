@@ -182,7 +182,13 @@ def get_dup_stats(case):
                                       case.case_date,
                                       num_q_words)
         conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
-        candidates = conn.raw_query(**main_params).execute()
+        search_candidates = conn.raw_query(**main_params).execute()
+        # Refine to only documents gathered from the court website. Cannot do 
+        # this in the query since this field is stored not indexed.
+        candidates = []
+        for candidate in search_candidates:
+            if candidate['source'] == 'C':
+                candidates.append(candidate)
         result_count = len(candidates)
         if not main_params['q'].startswith('caseName'):
             num_q_words += 1

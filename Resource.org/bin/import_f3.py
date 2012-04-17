@@ -26,7 +26,6 @@
 
 import dup_finder
 import f3_helpers
-import argparse
 import re
 
 def import_f3():
@@ -86,7 +85,7 @@ def import_f3():
                 elif len(f3_helpers.find_same_docket_numbers(case, candidates)) == 1:
                     print "  One of the %s candidates had an identical docket number. Merging the opinions." % len(candidates)
                     if not simulate:
-                        f3_helpers.merge_cases_simple(case, f3_helpers.find_same_docket_numbers(case, candidates))
+                        f3_helpers.merge_cases_simple(case, f3_helpers.find_same_docket_numbers(case, candidates)[0]['id'])
                 elif len(f3_helpers.find_same_docket_numbers(case, candidates)) > 0:
                     print "  Several of the %s candidates had an identical docket number. Merging the opinions." % len(candidates)
                     if not simulate:
@@ -123,7 +122,7 @@ def import_f3():
                         stat_file.write(','.join([str(s) for s in new_stats]) + '\n')
 
                         if choice == 'y':
-                            duplicates.append(filtered_candidates[k])
+                            duplicates.append(filtered_candidates[k]['id'])
 
                     if len(duplicates) == 0:
                         print "No duplicates found after manual determination. Adding the opinion."
@@ -155,18 +154,7 @@ def import_f3():
         vol_file.close()
 
 def main():
-    parser = argparse.ArgumentParser(description="Functions relating to importing F3")
-    parser.add_argument('--import-f3',
-                        action="store_true",
-                        help=("Iterate over F3 from resource.org, and import"
-                              " its contents."))
-    options = parser.parse_args()
-
-    if options.import_f3:
-        import_f3()
-    else:
-        parser.error('At least one argument is required.')
-
+    import_f3()
     exit(0)
 
 if __name__ == '__main__':

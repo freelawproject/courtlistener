@@ -142,9 +142,11 @@ def scrape_court(court):
             court = Court.objects.get(courtUUID=court_str)
 
             # Make a citation
-            cite = Citation(case_name=site.case_names[i],
-                            docketNumber=site.docket_numbers[i],
-                            neutral_cite=site.neutral_citations[i])
+            cite = Citation(case_name=site.case_names[i])
+            if site.docket_numbers is not None:
+                 cite.docketNumber = site.docket_numbers[i]
+            if site.neutral_citations is not None:
+                 cite.neutral_cite = site.neutral_citations[i]
 
             # Make the document object
             doc = Document(source='C',

@@ -50,6 +50,7 @@ def add_case(case):
     '''Add the case to the database.
     
     '''
+    simulate = False 
     # Get the court
     court = Court.objects.get(courtUUID=case.court)
 
@@ -70,11 +71,12 @@ def add_case(case):
     if blocked:
         doc.blocked = True
         doc.date_blocked = datetime.date.today()
-
-    # Save everything together
-    cite.save()
-    doc.citation = cite
-    doc.save()
+    
+    if not simulate:
+        # Save everything together
+        cite.save()
+        doc.citation = cite
+        doc.save()
 
 def merge_cases_simple(case, target_id):
     '''Add `case` to the database, merging with target_id
@@ -87,7 +89,8 @@ def merge_cases_simple(case, target_id):
      - The west citation is added to CL's DB from PRO
      - Block status is determined according to the indexing pipeline    
     '''
-    doc = Document.objects.get(documentUUID=194852)
+    simulate = False
+    doc = Document.objects.get(documentUUID=target_id)
     print "Merging %s with" % case.case_name
     print "        %s" % doc.citation.case_name
 
@@ -97,12 +100,29 @@ def merge_cases_simple(case, target_id):
     if blocked:
         doc.blocked = True
         doc.date_blocked = datetime.date.today()
-
-    doc.save()
+    
+    if not simulate:
+        doc.citation.save()
+        doc.save()
 
 def merge_cases_complex(case, target_ids):
-    print "Running complex merge."
-    pass
+    '''Merge data from PRO with multiple cases that seem to be a match.
+    
+    The process here is a conservative one. We take *only* the information
+    from PRO that is not already in CL in any form, and add only that.
+    '''
+    for target_id in target_ids:
+        simulate = False
+        doc = Document.objects.get(documentUUID=target_id)
+        print "Merging %s with" % case.case_name
+        print "        %s" % doc.citation.case_name
+
+        doc.source = 'CR'
+        doc.citation.westCite = case.west_cite
+        
+        if not simulate:
+            doc.citation.save()
+            doc.save()
 
 def find_same_docket_numbers(case, candidates):
     '''Identify the candidates that have the same docket numbers as the case.
@@ -136,7 +156,6 @@ def filter_by_stats(candidates, stats):
             continue
         else:
             # It's a reasonably close match.
-            print "reasonable match found after filtering"
             filtered_stats[2].append(stats[2][i])
             filtered_stats[3].append(stats[3][i])
             filtered_stats[4].append(stats[4][i])
