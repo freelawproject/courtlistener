@@ -2,6 +2,7 @@ BUGS:
  - HTML docs with ampersands show the ampersands in the highlighted text.
  - Court-based RSS feeds need to be Solr-powered, or at least be non-locking
  - selecting "New Search" resets the filters to have all the statuses selected
+ - Crazy-long case names need a bug and fixing.
  - add/expose neutral citations and state courts
     - QA:
         - will the scraper work properly? Try Wisconsin (which has neutral citations) and try West Virginia (which doesn't) 
@@ -40,4 +41,5 @@ F3
  - export/import the latest court db, and update the install script.
  - rerun the robots.txt script that imports from resource.org
  - delete and regenerate all.gz
- - optimize the MySQL DB and Solr index 
+ - optimize the MySQL DB and Solr index
+ - test if the resource.org links are showing up in the front end (they shouldn't) 
