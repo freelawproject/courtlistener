@@ -122,12 +122,12 @@ def main():
     and cleaner to delete things this way.
     '''
 
-    usage = "usage: %prog -c COURT  (-d | -o) [-t time] [-v VERBOSITY] [-s]"
+    usage = "usage: %prog -c COURT  (-d | -o | --allcites) [-t time] [-v VERBOSITY] [-s]"
     parser = OptionParser(usage)
     parser.add_option('-d', '--documents', action='store_true', dest='documents',
         default=False, help="Delete documents")
     parser.add_option('-c', '--court', dest='courtID', metavar="COURTID",
-        help="The court to take action upon")
+        help="The court to take action upon. Use 'all' to take action all courts.")
     parser.add_option('-t', '--time', dest='delTime', metavar='delTime',
         help="Take action for all documents newer than this time. Format as follows: YYYY-MM-DD HH:MM:SS" +
         " or YYYY-MM-DD")
