@@ -89,7 +89,8 @@ def import_f3():
                 elif len(f3_helpers.find_same_docket_numbers(case, candidates)) > 0:
                     print "  Several of the %s candidates had an identical docket number. Merging the opinions." % len(candidates)
                     if not simulate:
-                        f3_helpers.merge_cases_complex(case, f3_helpers.find_same_docket_numbers(case, candidates))
+                        target_ids = [candidate['id'] for candidate in f3_helpers.find_same_docket_numbers(case, candidates)]
+                        f3_helpers.merge_cases_complex(case, target_ids)
                 else:
                     # Possible duplicate, filter out obviously bad cases, and 
                     # then pass forward for manual review if necessary.
@@ -98,45 +99,12 @@ def import_f3():
                         print "After filtering, no candidates remain. Adding the opinion."
                         if not simulate:
                             f3_helpers.add_case(case)
-
-                    print "FILTERED STATS: %s" % stats
-                    duplicates = []
-                    for k in range(0, len(filtered_candidates)):
-                        # Have to determine by "hand"
-                        print "  %s) Case name: %s" % (k + 1, case.case_name)
-                        print "                %s" % filtered_candidates[k]['caseName']
-                        print "      Docket nums: %s" % (case.docket_number)
-                        print "                   %s" % filtered_candidates[k]['docketNumber']
-                        print "      Candidate URL: %s" % (case.download_url)
-                        print "      Match URL: http://courtlistener.com%s" % \
-                                        (filtered_candidates[k]['absolute_url'])
-
-                        choice = raw_input("Is this a duplicate? [y/N]: ")
-                        choice = choice or "n"
-                        new_stats = [stats[0], # count from search 
-                                     stats[1], # count from docket number
-                                     stats[2][k], # case name diff
-                                     stats[3][k], # content length diff
-                                     stats[4][k], # content diff
-                                     choice]       # whether a dup
-                        stat_file.write(','.join([str(s) for s in new_stats]) + '\n')
-
-                        if choice == 'y':
-                            duplicates.append(filtered_candidates[k]['id'])
-
-                    if len(duplicates) == 0:
-                        print "No duplicates found after manual determination. Adding the opinion."
-                        if not simulate:
-                            f3_helpers.add_case(case)
-                    elif len(duplicates) == 1:
-                        print "Single duplicate found after manual determination. Merging the opinions."
-                        if not simulate:
-                            f3_helpers.merge_cases_simple(case, duplicates[0])
-                    elif len(duplicates) > 1:
-                        print "Multiple duplicates found after manual determination. Merging the opinions."
-                        if not simulate:
-                            f3_helpers.merge_cases_complex(case, duplicates)
-
+                    else:
+                        # Have to determine by hand.
+                        possible_ids = [can['id'] for can in filtered_candidates]
+                        hand_file = open('../logs/hand_file.csv', 'a')
+                        hand_file.write(str(volume_num) + ',' + str(j) + '\n')
+                        hand_file.close()
             else:
                 print "Dup check not needed. Adding the opinion."
                 if not simulate:
