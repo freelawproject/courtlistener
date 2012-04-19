@@ -45,6 +45,7 @@ class DocumentAdmin(admin.ModelAdmin):
     #list_filter = ('court',)
     fields = ('source', 'documentSHA1', 'dateFiled', 'court',
               'download_URL', 'local_path', 'documentPlainText', 'documentHTML',
+              'html_with_citations', 'cases_cited',
               'documentType', 'blocked', 'date_blocked', 'extracted_by_ocr')
     search_fields = ['documentPlainText']
 
