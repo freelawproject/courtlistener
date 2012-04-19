@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset=utf-8>
+        <meta http-equiv="Content-Language" content="en"/>
+        <meta name="language" content="en_us"/>
+        <meta name="description" content="Create alerts, search for and browse the latest Circuit Court and Supreme Court opinions. Updated daily with the latest appeals court documents.">
+        <meta name="keywords" content="court states district appeals united cir claim sentence circuit defendant evidence motion judgment plaintiffs filed judge review law conviction government"/>
+        <title> CourtListener.com / Results / michael /
+
+    Page / 1 of 100
+
+</title>
+        <link rel="author" href="humans.txt" type="text/plain"/>
+        <link rel="stylesheet" href="file:///var/www/court-listener/alert/assets/media/css/style.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="assets/override.css" type="text/css" media="screen, projection">
+        <!--[if lt IE 8]><link rel="stylesheet" href="/media/css/blueprint/ie.css" type="text/css" media="screen, projection"><![endif]-->
+
+    <link rel="stylesheet" href="/media/css/jquery.tooltip.css" type="text/css" media="screen, projection">
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+    <script type="text/javascript" src="file:///var/www/court-listener/alert/assets/media/js/jquery.tooltip.min.js"></script>
+    <script type="text/javascript">
+	    $(document).ready(function() {
+            $('.auto-focus:first').focus();
+            $("#create-alert").click(function () {
+                $('#hidden-create-alert').toggle("fast");
+                $('#create-alert').toggleClass('collapsed-heading');
+                $('#create-alert').toggleClass('expanded-heading');
+            });
+           $(".tips").click(function () {
+                $('#hidden-tips').toggle("fast");
+                $('#tips').toggleClass('collapsed-heading');
+                $('#tips').toggleClass('expanded-heading');
+            });
+		    $('#q').tooltip({
+	            track: false,
+	            delay: 1,
+	            showURL: false,
+	            showBody: " - ",
+	            fade: 250,
+	            positionLeft: true
+            });
+	    });
+     </script>
+     <link rel="search" type="application/opensearchdescription+xml" title="Court Listener" href="/media/xml/opensearch.xml" />
+     <link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?q=michael" />
+     <link rel="canonical" href="http://courtlistener.com/search/results/?q=michael" />
+
+    </head>
+
+    <body>
+        <div class="container">
+
+                <div class="header-container span-24">
+                    <div class="span-7 header" id="header">
+                        <a href="/">
+                            <img src="/var/www/court-listener/alert/assets/media/images/png/logo.png"
+                                 alt="Court Listener logo"
+                                 width="252"
+                                 height="28"/>
+                        </a>
+
+
+                            <div class="navigation">
+                                <ul>
+                                    <li><a href="/opinions/all/">Browse</a></li>
+                                    <li><a href="/profile/alerts/">Profile</a></li>
+                                    <li><a href="/sign-out/">Sign out</a></li>
+                                </ul>
+                            </div>
+
+                    </div>
+
+
+                    <div class="span-17 last" id="searchform">
+                        <form action="/" method="get">
+                            <div id="search-form">
+                                <table>
+                                    <tbody>
+                                        <tr>
+                                            <td>
+                                                <input class=" wide-title"
+                                                name="q"
+                                                id="search-input"
+                                                value="michael"
+                                                autocomplete="off"
+                                                style="width: 592px;">
+                                             </td>
+                                            <td>
+                                                <button type="submit" class="button title"
+                                                name="search" id="search-button">Search</button>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="2">
+                                                <div style="float: right;">
+                                                    <input type="radio" name='group1' value="new">New search
+                                                    <input type="radio" name='group1' value='old'>In current results
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </form>
+                    </div>
+
+                </div>
+                <hr>
+
+
+
+    <div class="span-5 append-2" id="sidebar">
+
+            <div class="sidebar-section">
+                <h3 id="create-alert" class="pointer collapsed-heading sprites">Create alert</h3>
+                <div id="hidden-create-alert" class="hidden">
+
+
+                    <form action="" method="post"><div style='display:none'><input type='hidden' name='csrfmiddlewaretoken' value='34eb69184b3f1fd9beaef72f9262fdeb' /></div>
+                        <p>
+                            <label for="id_alertText">Alert query</label>
+                            <br>
+                            <input id="id_alertText" type="text" name="alertText" value="michael" maxlength="200" />
+                        </p>
+
+                        <p>
+                            <label for="id_alertName">Give the alert a name</label>
+
+                            <input id="id_alertName" type="text" name="alertName" maxlength="75" />
+                        </p>
+
+                        <p>
+                            <label for="id_alertFrequency">How often should we notify you</label>
+                            <br>
+                            <select name="alertFrequency" id="id_alertFrequency">
+<option value="">---------</option>
+<option value="dly" selected="selected">Daily</option>
+<option value="wly">Weekly</option>
+<option value="mly">Monthly</option>
+<option value="off">Off</option>
+</select>
+                        </p>
+                        <p>
+                            <input checked="checked" type="checkbox" name="alertPrivacy" id="id_alertPrivacy" />
+                            <label for="id_alertPrivacy">This alert is private</label>
+                            <label style="color:#000099; font-weight:normal;" title=" - In the future, we may allow users to share their public alerts." href="#" id="q" class="help">[?]</label>
+                            <br>
+
+                        </p>
+                        <p>
+                            <input type="checkbox" name="sendNegativeAlert" id="id_sendNegativeAlert" />
+                            <label for="id_alertName">Send me alerts even when there are no hits</label>
+                            <br>
+                        </p>
+                        <button type="submit" class="button title" name="alertSave">Create alert</button>
+                    </form>
+                </div>
+            </div>
+
+
+
+
+        <div class="sidebar-section">
+            <h3 id="tips" class="tips pointer sprites expanded-heading">Refine your search</h3>
+<div>
+    <h4 class="bottom">Case name</h4>
+    <input type="text" class="span-5">
+    <hr class="space">
+    <h4 class="bottom">Federal Courts</h4>
+    <input type="checkbox"><label>All Federal Courts </label><span class="gray small">(122323)</span></label><br>
+    <input type="checkbox"><label>Supreme Court <span class="gray small">(2238)</span></label><br>
+    <input type="checkbox"><label>First Circuit <span class="gray small">(1823)</span></label><br>
+    <input type="checkbox"><label>Second Circuit <span class="gray small">(238)</span></label><br>
+    <input type="checkbox"><label>Third Circuit <span class="gray small">(2778)</span></label><br>
+    <input type="checkbox"><label>Fourth Circuit <span class="gray small">(2372)</span></label><br>
+    <input type="checkbox"><label>Fifth Circuit <span class="gray small">(1782)</span></label><br>
+    <input type="checkbox"><label>Sixth Circuit <span class="gray small">(1720)</span></label><br>
+    <input type="checkbox"><label>Seventh Circuit <span class="gray small">(2387)</span></label><br>
+    <input type="checkbox"><label>Eighth Circuit <span class="gray small">(789)</span></label><br>
+    <input type="checkbox"><label>Ninth Circuit <span class="gray small">(1023)</span></label><br>
+    <input type="checkbox"><label>Tenth Circuit <span class="gray small">(2238)</span></label><br>
+    <input type="checkbox"><label>Eleventh Circuit <span class="gray small">(7326)</span></label><br>
+    <input type="checkbox"><label>Twelfth Circuit <span class="gray small">(765)</span></label><br>
+    <input type="checkbox"><label>Federal Circuit <span class="gray small">(2238)</span></label><br>
+    <input type="checkbox"><label>District of Columbia <span class="gray small">(98)</span></label>
+    <hr class="space">
+    <h4 class="bottom">Status</h4>
+    <input type="checkbox"><label>Predecential <span class="gray small">(44,000)</span></label><br>
+    <input type="checkbox"><label>Non-Predecential (including Relating-To and In-Chamber) <span class="gray small">(9,800)</span></label><br>
+    <h4 class="space">
+    </h4><h4 class="bottom">Filed After</h4>
+    <input type="text">
+    <h4 class="bottom">Filed Before</h4>
+    <input type="text">
+    <hr class="space">
+    <h4 class="bottom">West Citation</h4>
+    <input name='west' placeholder='west cite' type='text'>
+    <h4 class="bottom">Docket Number</h4>
+    <input type="text">
+</div>
+
+        </div>
+    </div>
+
+
+
+
+    <div class="span-17 last">
+
+
+        <div style="float:left;">
+			<h2 style="padding-bottom:0px; margin-bottom: 0px;"> 12,383 Results </h2>
+			<p class="small gray" style="margin-top:-8px; padding-top: 0px;">0.002 seconds</p>
+		</div>
+
+        <select style="float:right;">
+            <option>Relevance</option>
+            <option>Date: newest first</option>
+            <option>Date: oldest first</option>
+        </select>
+
+        <p style="clear:both;">
+
+        </p>
+
+
+
+
+
+
+
+
+
+                <h3 class="bottom alt">
+                    <a href="/ca2/497z/interpharm-inc-v-wells-fargo-bank-na/?q=michael">
+                        Interpharm, Inc. v. Wells Fargo Bank, N.A.,
+
+                            10-1801
+
+                        (2d&nbsp;Cir.&nbsp;2011)
+                    </a>
+                </h3>
+                <p class="bottom">
+
+
+                            <strong>View Original:</strong>
+
+                                <a href="http://www.ca2.uscourts.gov/decisions/isysquery/d4c615b2-dabe-4fad-ac68-6d48362143a4/1/doc/10-1801_opn.pdf">From the court</a>
+
+
+                                &nbsp;&nbsp;|&nbsp;&nbsp;
+
+
+                                <a href="/pdf/2011/08/26/Interpharm_Inc._v._Wells_Fargo_Bank_N.A.pdf">Our backup</a>
+
+
+
+                </p>
+                <p class="bottom">
+                    <strong>Date Filed:</strong>
+
+                        Friday, August 26th, 2011
+
+                </p>
+                <p class="bottom">
+                    <strong>Status:</strong>
+
+                        Published/Precedential
+
+                </p>
+                <p>SMZ TMP DS 800 160 TAB INTERPHARM This contains 800mgs of Sulfamethoxazole and 160mgs of Trimethoprim a generic for Bactrim This ...SMZ TMP DS 800 160 TAB INTERPHARM This contains 800mgs of Sulfamethoxazole and 160mgs of Trimethoprim a generic for Bactrim This ...</p>
+                <p>
+
+                </p>
+
+                <h3 class="bottom alt">
+                    <a href="/cafc/497S/star-scientific-inc-v-rj-reynolds-tobacco-co/?q=michael">
+                        Star Scientific, Inc. v. R.J. Reynolds Tobacco Co.,
+
+                            2010-1186
+
+                        (Fed.&nbsp;Cir.&nbsp;2011)
+                    </a>
+                </h3>
+                <p class="bottom">
+
+
+                            <strong>View Original:</strong>
+
+                                <a href="http://www.cafc.uscourts.gov/images/stories/opinions-orders/10-1183.pdf">From the court</a>
+
+
+                                &nbsp;&nbsp;|&nbsp;&nbsp;
+
+
+                                <a href="/pdf/2011/08/26/Star_Scientific_Inc._v._R.J._Reynolds_Tobacco_Co.pdf">Our backup</a>
+
+
+
+                </p>
+                <p class="bottom">
+                    <strong>Date Filed:</strong>
+
+                        Friday, August 26th, 2011
+
+                </p>
+                <p class="bottom">
+                    <strong>Status:</strong>
+
+                        Published/Precedential
+
+                </p>
+                <p>SMZ TMP DS 800 160 TAB INTERPHARM This contains 800mgs of Sulfamethoxazole and 160mgs of Trimethoprim a generic for Bactrim This ...SMZ TMP DS 800 160 TAB INTERPHARM This contains 800mgs of Sulfamethoxazole and 160mgs of Trimethoprim a generic for Bactrim This ...</p>
+                <p>
+
+                </p>
+
+                <h3 class="bottom alt">
+                    <a href="/ca10/497W/united-states-v-coleman/?q=michael">
+                        United States v. Coleman,
+
+                            10-6134
+
+                        (10th&nbsp;Cir.&nbsp;2011)
+                    </a>
+                </h3>
+                <p class="bottom">
+
+
+                            <strong>View Original:</strong>
+
+                                <a href="http://www.ca10.uscourts.gov/opinions/10/10-6134.pdf">From the court</a>
+
+
+                                &nbsp;&nbsp;|&nbsp;&nbsp;
+
+
+                                <a href="/pdf/2011/08/26/United_States_v._Coleman.pdf">Our backup</a>
+
+
+
+                </p>
+                <p class="bottom">
+                    <strong>Date Filed:</strong>
+
+                        Friday, August 26th, 2011
+
+                </p>
+                <p class="bottom">
+                    <strong>Status:</strong>
+
+                        Published/Precedential
+
+                </p><p>SMZ TMP DS 800 160 TAB INTERPHARM This contains 800mgs of Sulfamethoxazole and 160mgs of Trimethoprim a generic for Bactrim This ...SMZ TMP DS 800 160 TAB INTERPHARM This contains 800mgs of Sulfamethoxazole and 160mgs of Trimethoprim a generic for Bactrim This ...</p>
+                <p>
+
+                </p>
+
+                <h3 class="bottom alt">
+                    <a href="/ca3/497Z/united-states-v-wayne-bryant/?q=michael">
+                        United States v. Wayne Bryant,
+
+                            09-3243
+
+                        (3rd&nbsp;Cir.&nbsp;2011)
+                    </a>
+                </h3>
+                <p class="bottom">
+
+
+                            <strong>View Original:</strong>
+
+                                <a href="http://www.ca3.uscourts.gov/opinarch/093243pa.pdf">From the court</a>
+
+
+                                &nbsp;&nbsp;|&nbsp;&nbsp;
+
+
+                                <a href="/pdf/2011/08/26/United_States_v._Wayne_Bryant.pdf">Our backup</a>
+
+
+
+                </p>
+                <p class="bottom">
+                    <strong>Date Filed:</strong>
+
+                        Friday, August 26th, 2011
+
+                </p>
+                <p class="bottom">
+                    <strong>Status:</strong>
+
+                        Published/Precedential
+
+                </p>
+                <p>SMZ TMP DS 800 160 TAB INTERPHARM This contains 800mgs of Sulfamethoxazole and 160mgs of Trimethoprim a generic for Bactrim This ...SMZ TMP DS 800 160 TAB INTERPHARM This contains 800mgs of Sulfamethoxazole and 160mgs of Trimethoprim a generic for Bactrim This ...</p>
+                <p>
+
+                </p>
+
+                <h3 class="bottom alt">
+                    <a href="/ca3/4981/michael-wayne-v-glen-mills-sch/?q=michael">
+                        Michael Wayne v. Glen Mills Sch,
+
+                            10-2793
+
+                        (3rd&nbsp;Cir.&nbsp;2011)
+                    </a>
+                </h3>
+                <p class="bottom">
+
+
+                            <strong>View Original:</strong>
+
+                                <a href="http://www.ca3.uscourts.gov/opinarch/102793np.pdf">From the court</a>
+
+
+                                &nbsp;&nbsp;|&nbsp;&nbsp;
+
+
+                                <a href="/pdf/2011/08/26/Michael_Wayne_v._Glen_Mills_Sch.pdf">Our backup</a>
+
+
+
+                </p>
+                <p class="bottom">
+                    <strong>Date Filed:</strong>
+
+                        Friday, August 26th, 2011
+
+                </p>
+                <p class="bottom">
+                    <strong>Status:</strong>
+
+                        Unpublished/Non-Precedential
+
+                </p>
+                <p>SMZ TMP DS 800 160 TAB INTERPHARM This contains 800mgs of Sulfamethoxazole and 160mgs of Trimethoprim a generic for Bactrim This ...SMZ TMP DS 800 160 TAB INTERPHARM This contains 800mgs of Sulfamethoxazole and 160mgs of Trimethoprim a generic for Bactrim This ...</p>
+                <p>
+
+                </p>
+
+                <h3 class="bottom alt">
+                    <a href="/ca9/4984/united-states-v-stinson/?q=michael">
+                        United States v. Stinson,
+
+                            07-50408
+
+                        (9th&nbsp;Cir.&nbsp;2011)
+                    </a>
+                </h3>
+                <p class="bottom">
+
+
+                            <strong>View Original:</strong>
+
+                                <a href="http://www.ca9.uscourts.gov/datastore/opinions/2011/08/26/07-50408.pdf">From the court</a>
+
+
+                                &nbsp;&nbsp;|&nbsp;&nbsp;
+
+
+                                <a href="/pdf/2011/08/26/United_States_v._Stinson.pdf">Our backup</a>
+
+
+
+                </p>
+                <p class="bottom">
+                    <strong>Date Filed:</strong>
+
+                        Friday, August 26th, 2011
+
+                </p>
+                <p class="bottom">
+                    <strong>Status:</strong>
+
+                        Published/Precedential
+
+                </p>
+                <p>SMZ TMP DS 800 160 TAB INTERPHARM This contains 800mgs of Sulfamethoxazole and 160mgs of Trimethoprim a generic for Bactrim This ...SMZ TMP DS 800 160 TAB INTERPHARM This contains 800mgs of Sulfamethoxazole and 160mgs of Trimethoprim a generic for Bactrim This ...</p>
+                <p>
+
+                </p>
+
+                <h3 class="bottom alt">
+                    <a href="/ca9/4985/juan-valadez-lopez-v-united-states/?q=michael">
+                        Juan Valadez Lopez v. United States,
+
+                            09-16375
+
+                        (9th&nbsp;Cir.&nbsp;2011)
+                    </a>
+                </h3>
+                <p class="bottom">
+
+
+                            <strong>View Original:</strong>
+
+                                <a href="http://www.ca9.uscourts.gov/datastore/opinions/2011/08/26/09-16375.pdf">From the court</a>
+
+
+                                &nbsp;&nbsp;|&nbsp;&nbsp;
+
+
+                                <a href="/pdf/2011/08/26/Juan_Valadez_Lopez_v._United_States.pdf">Our backup</a>
+
+
+
+                </p>
+                <p class="bottom">
+                    <strong>Date Filed:</strong>
+
+                        Friday, August 26th, 2011
+
+                </p>
+                <p class="bottom">
+                    <strong>Status:</strong>
+
+                        Published/Precedential
+
+                </p>
+                <p>
+
+                </p>
+
+                <h3 class="bottom alt">
+                    <a href="/ca9/4987/mark-young-v-county-of-los-angeles/?q=michael">
+                        Mark Young v. County of Los Angeles,
+
+                            09-56372
+
+                        (9th&nbsp;Cir.&nbsp;2011)
+                    </a>
+                </h3>
+                <p class="bottom">
+
+
+                            <strong>View Original:</strong>
+
+                                <a href="http://www.ca9.uscourts.gov/datastore/opinions/2011/08/26/09-56372.pdf">From the court</a>
+
+
+                                &nbsp;&nbsp;|&nbsp;&nbsp;
+
+
+                                <a href="/pdf/2011/08/26/Mark_Young_v._County_of_Los_Angeles.pdf">Our backup</a>
+
+
+
+                </p>
+                <p class="bottom">
+                    <strong>Date Filed:</strong>
+
+                        Friday, August 26th, 2011
+
+                </p>
+                <p class="bottom">
+                    <strong>Status:</strong>
+
+                        Published/Precedential
+
+                </p>
+                <p>
+
+                </p>
+
+                <h3 class="bottom alt">
+                    <a href="/ca9/4989/sec-v-harold-gewerter/?q=michael">
+                        SEC v. Harold Gewerter,
+
+                            10-16384
+
+                        (9th&nbsp;Cir.&nbsp;2011)
+                    </a>
+                </h3>
+                <p class="bottom">
+
+
+                            <strong>View Original:</strong>
+
+                                <a href="http://www.ca9.uscourts.gov/datastore/opinions/2011/08/26/10-16384.pdf">From the court</a>
+
+
+                                &nbsp;&nbsp;|&nbsp;&nbsp;
+
+
+                                <a href="/pdf/2011/08/26/SEC_v._Harold_Gewerter.pdf">Our backup</a>
+
+
+
+                </p>
+                <p class="bottom">
+                    <strong>Date Filed:</strong>
+
+                        Friday, August 26th, 2011
+
+                </p>
+                <p class="bottom">
+                    <strong>Status:</strong>
+
+                        Published/Precedential
+
+                </p>
+                <p>
+
+                </p>
+
+                <h3 class="bottom alt">
+                    <a href="/ca7/498c/jaymz-hernandez-v-lakesha-foster/?q=michael">
+                        Jaymz Hernandez v. Lakesha Foster,
+
+                            10-1364
+
+                        (7th&nbsp;Cir.&nbsp;2011)
+                    </a>
+                </h3>
+                <p class="bottom">
+
+
+                            <strong>View Original:</strong>
+
+                                <a href="http://www.ca7.uscourts.gov/fdocs/docs.fwx?submit=showbr&amp;shofile=10-1364_002.pdf">From the court</a>
+
+
+                                &nbsp;&nbsp;|&nbsp;&nbsp;
+
+
+                                <a href="/pdf/2011/08/26/Jaymz_Hernandez_v._Lakesha_Foster.pdf">Our backup</a>
+
+
+
+                </p>
+                <p class="bottom">
+                    <strong>Date Filed:</strong>
+
+                        Friday, August 26th, 2011
+
+                </p>
+                <p class="bottom">
+                    <strong>Status:</strong>
+
+                        Published/Precedential
+
+                </p>
+                <p>
+
+                </p>
+
+                <!-- Add images here for the left and right arrows. Use a sprite. --->
+                <div style="width: 100%;" class="box">
+                    <div style="float:left; width: 200px;">
+                        <h3 class="bottom">
+                            <a href="/search/results/?page=2&q=michael" style="color: black">« Previous</a>
+                        </h3>
+                    </div>
+                    <div style="float:right; width:200px; text-align:right;">
+                        <h3 class="bottom">
+                            <a href="/search/results/?page=4&q=michael" style="color: black">Next »</a>
+                        </h3>
+                    </div>
+                    <div style="margin:auto; text-align:center;">
+                        <h3 class="bottom">
+                            Page 3 of 100
+                        </h3>
+                    </div>
+                </div>
+
+    </div>
+
+
+
+            <div class="span-24 last">
+                <hr class="space">
+                <hr>
+            </div>
+            <div class="span-24 last" id="footer">
+                <span class="footer-item">
+                    <a href="/about/">About</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/dump-info/">Data Dumps</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/tools/">Tools</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/contribute/">Contribute</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/coverage/">Coverage</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/removal/">Removal</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/terms/">Terms &amp; Privacy</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/sitemap/">Sitemap</a>
+                </span>
+                <span class="footer-item">
+                    <a href="/contact/">Contact / Engage</a>
+                </span>
+            </div>
+        </div>
+
+    </body>
+</html>
