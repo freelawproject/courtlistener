@@ -69,8 +69,7 @@
 	                            {% if court.3 %}checked="checked"{% endif %} >
 	                        <label 
 	                            for="id_{{ court.1 }}" 
-	                            class="{% if court.2 == 0 %}gray{% else %}pointer{% endif %}">{{ court.0 }}</label>
-	                        <span class="gray small">({{ court.2|intcomma }})</span>
+	                            class="{% if court.2 == 0 %}gray{% else %}pointer{% endif %}">{{ court.0 }}</label>&nbsp;<span class="gray small">({{ court.2|intcomma }})</span>
 	                    </p>
 	                {% endfor %}
 	                
