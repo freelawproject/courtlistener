@@ -2,24 +2,7 @@ BUGS:
  - HTML docs with ampersands show the ampersands in the highlighted text.
  - Court-based RSS feeds need to be Solr-powered, or at least be non-locking
  - selecting "New Search" resets the filters to have all the statuses selected
- - Crazy-long case names need a bug and fixing.
- - add/expose neutral citations and state courts
-    - QA:
-        - will the scraper work properly? Try Wisconsin (which has neutral citations) and try West Virginia (which doesn't) 
-    - Deployment:
-        - DB migration is needed, so:
-            - Check in version with maint warning then one without
-            - pull the version with the maint warning
-            - restart apache
-            - manage.py migrate search
-            - hg pull -u
-        - delete dumps (they need regeneration)
-        - run: manage.py dumpdata search.Court (then put this in install.sh)
-    
  - Add state courts to the front end
-
-Content Extraction:
- - investigate Apache Tika
  
 Solr:
  - fix the overlapping counts for long court names in the sidebar.
@@ -33,6 +16,4 @@ To do:
    
    
 F3
- - export/import the latest court db, and update the install script.
- - do the hand file 
- - fiscr shouldn't be on top of dump page, the size of all.gz isn't correct either.
+ - do the hand file
