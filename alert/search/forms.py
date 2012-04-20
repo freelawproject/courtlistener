@@ -126,7 +126,8 @@ class SearchForm(forms.Form):
                                                   label='All Courts',
                                                   required=False,
                                                   initial=True,
-                                                  widget=forms.CheckboxInput(attrs={'checked':'checked', 'class':'external-input'}))
+                                                  widget=forms.CheckboxInput(attrs={'checked':'checked',
+                                                                                    'class':'external-input court-checkbox left'}))
             for court in courts:
                 self.fields['court_' + court[0]] = forms.BooleanField(
                                                               label=court[1],

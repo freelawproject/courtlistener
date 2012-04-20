@@ -186,6 +186,14 @@ a.button:active {
     margin-bottom: 2em;
 }
 
+div.sidebar-checkbox {
+    min-height: 23px; 
+}
+
+input.court-checkbox, input.status-checkbox {
+    top: 0px; 
+}
+
 /* Results page */
 #id_q:focus{
     outline-style: none;
