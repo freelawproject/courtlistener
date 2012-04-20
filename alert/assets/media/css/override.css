@@ -186,6 +186,31 @@ a.button:active {
     margin-bottom: 2em;
 }
 
+div.sidebar-checkbox {
+    padding-top: 2px;
+    padding-bottom: 2px; 
+}
+
+div.sidebar-checkbox label {
+    display: block;
+    padding-left: 22px;
+}
+
+div.sidebar-checkbox input {
+    width: 13px;
+    height: 13px;
+    padding: 0;
+    margin: 0 0 0 5px;
+    vertical-align: bottom;
+    position: relative;
+    top: 1px;
+    *overflow: hidden;
+}
+
+input.court-checkbox, input.status-checkbox {
+    top: 0px; 
+}
+
 /* Results page */
 #id_q:focus{
     outline-style: none;
