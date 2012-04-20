@@ -24,11 +24,6 @@ Content Extraction:
 Solr:
  - fix the overlapping counts for long court names in the sidebar.
  
-
-Big picture:
- - F3
-    - Remove courts.gov/c/F3/166/166.F3d.507.98-7803.1065.html (Carl's request)
- 
 To do:
  - check out the outliars in the DB by date
  - recreate the stat_maker.py script (see bug)
@@ -39,7 +34,5 @@ To do:
    
 F3
  - export/import the latest court db, and update the install script.
- - rerun the robots.txt script that imports from resource.org
- - delete and regenerate all.gz
- - optimize the MySQL DB and Solr index
- - test if the resource.org links are showing up in the front end (they shouldn't) 
+ - do the hand file 
+ - fiscr shouldn't be on top of dump page, the size of all.gz isn't correct either.
