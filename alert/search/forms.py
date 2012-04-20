@@ -123,7 +123,7 @@ class SearchForm(forms.Form):
         else:
             # It's a new query, check all the boxes.
             self.fields['court_all'] = forms.BooleanField(
-                                                  label='All Courts',
+                                                  label='All Courts / Clear',
                                                   required=False,
                                                   initial=True,
                                                   widget=forms.CheckboxInput(attrs={'checked':'checked',

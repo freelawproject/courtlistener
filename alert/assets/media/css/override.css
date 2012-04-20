@@ -187,7 +187,24 @@ a.button:active {
 }
 
 div.sidebar-checkbox {
-    min-height: 23px; 
+    padding-top: 2px;
+    padding-bottom: 2px; 
+}
+
+div.sidebar-checkbox label {
+    display: block;
+    padding-left: 24px;
+}
+
+div.sidebar-checkbox input {
+    width: 13px;
+    height: 13px;
+    padding: 0;
+    margin: 0 0 0 4px;
+    vertical-align: bottom;
+    position: relative;
+    top: 1px;
+    *overflow: hidden;
 }
 
 input.court-checkbox, input.status-checkbox {
