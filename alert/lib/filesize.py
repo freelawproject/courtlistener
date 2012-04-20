@@ -24,18 +24,26 @@ alternative = [
     (1024 ** 0, (' byte', ' bytes')),
     ]
 
-def size(bytes, system = alternative):
-    """Human-readable file size.
+def size(bytes, system=alternative):
+    """Human-readable file size. 
     
     """
     for factor, suffix in system:
         if bytes >= factor:
             break
-    amount = int(bytes / factor)
+    amount = float(bytes) / factor
     if isinstance(suffix, tuple):
         singular, multiple = suffix
         if amount == 1:
             suffix = singular
         else:
             suffix = multiple
-    return str(amount) + suffix
+
+    if suffix == 'PB':
+        return '%.3f%s' % (amount, suffix)
+    elif suffix == 'TB':
+        return '%.2f%s' % (amount, suffix)
+    elif suffix == 'GB':
+        return '%.1f%s' % (amount, suffix)
+    else:
+        return '%d%s' % (amount, suffix)
