@@ -245,16 +245,14 @@ class Document(models.Model):
     documentHTML = models.TextField(
                       "HTML of the document",
                       blank=True)
-
     html_with_citations = models.TextField(
                       "HTML of the document with citation links",
                       blank=True)
-
     cases_cited = models.ManyToManyField(
+                      'cases cited by this document',
                       Citation,
                       related_name="citing_cases",
                       null=True)
-    
     documentType = models.CharField(
                       "the type of document, as described by document_types.txt",
                       max_length=50,
