@@ -63,17 +63,16 @@
 	                </div>
 	                {% for court in court_facets %}
 	                    <div class="sidebar-checkbox">
-	                        <input 
-	                            id="id_{{ court.1 }}" 
-	                            type="checkbox" 
-	                            name="{{ court.1 }}" 
-	                            class="external-input court-checkbox left"
-	                            {% if court.3 %}checked="checked"{% endif %} >
-	                        
-                            <label 
-	                            for="id_{{ court.1 }}" 
-	                            class="pointer {% if court.2 == 0 %}gray{% endif %}">
-                                <div>{{ court.0 }}&nbsp;<span class="gray small">({{ court.2|intcomma }})</span></div>
+                            <input
+                                id="id_{{ court.1 }}" 
+                                type="checkbox" 
+                                name="{{ court.1 }}" 
+                                class="external-input court-checkbox left"
+                                {% if court.3 %}checked="checked"{% endif %} >
+                            <label
+                                for="id_{{ court.1 }}"  
+                                class="pointer {% if court.2 == 0 %}gray{% endif %}">
+                                {{ court.0 }}&nbsp;<span class="gray small">({{ court.2|intcomma }})</span>
                             </label>
 	                    </div>
 	                {% endfor %}
