@@ -53,42 +53,47 @@
 	                <hr class="space">
 	                <h4 class="bottom">Federal Appeals Courts</h4>
 
-                    <p class="bottom">
+                    <div class="sidebar-checkbox">
                         {{ search_form.court_all }}
 	                    <label
 	                        for="id_court_all"
-	                        class="{% if count == 0 %}gray{% else %}pointer{% endif %}">{{ search_form.court_all.label }}</label>&nbsp;<span class="gray small">({{ count|intcomma }})</span>
-	                </p>
+	                        class="pointer {% if count == 0 %}gray{% endif %}">
+                            <div>{{ search_form.court_all.label }}&nbsp;<span class="gray small">({{ count|intcomma }})</span></div>
+                        </label>
+	                </div>
 	                {% for court in court_facets %}
-	                    <p class="bottom">
+	                    <div class="sidebar-checkbox">
 	                        <input 
 	                            id="id_{{ court.1 }}" 
 	                            type="checkbox" 
 	                            name="{{ court.1 }}" 
-	                            class="external-input court-checkbox"
+	                            class="external-input court-checkbox left"
 	                            {% if court.3 %}checked="checked"{% endif %} >
-	                        <label 
+	                        
+                            <label 
 	                            for="id_{{ court.1 }}" 
-	                            class="{% if court.2 == 0 %}gray{% else %}pointer{% endif %}">{{ court.0 }}</label>&nbsp;<span class="gray small">({{ court.2|intcomma }})</span>
-	                    </p>
+	                            class="pointer {% if court.2 == 0 %}gray{% endif %}">
+                                <div>{{ court.0 }}&nbsp;<span class="gray small">({{ court.2|intcomma }})</span></div>
+                            </label>
+	                    </div>
 	                {% endfor %}
 	                
 	                <hr class="space">
 	                <h4 class="bottom">Precedential Status</h4>
 	                {% for status in status_facets %}
-	                    <p class="bottom">
+	                    <div class="sidebar-checkbox">
 	                        <input
 	                            id="id_{{ status.1 }}"
 	                            type="checkbox"
 	                            name="{{ status.1 }}"
-	                            class="external-input status-checkbox"
+	                            class="external-input status-checkbox left"
                                 {% if status.3 %}checked="checked"{% endif %} >
 	                        <label
 	                            for="id_{{ status.1 }}"
-	                            class="pointer
-	                             {% if status.2 == 0 %}gray{% else %}pointer{% endif %}">{{ status.0 }}</label>
-	                        <span class="gray small">({{ status.2|intcomma }})</span>
-	                    </p>
+	                            class="pointer {% if status.2 == 0 %}gray{% endif %}">
+                                <div>{{ status.0 }}&nbsp;<span class="gray small">({{ status.2|intcomma }})</span></div>
+                             </label>
+	                    </div>
 	                {% endfor %}
 	                <button 
 	                    type="submit" 
