@@ -27,8 +27,9 @@ class DocumentAdminInline(admin.StackedInline):
     model = Document
     fields = ('citation', 'source', 'documentSHA1', 'dateFiled', 'court',
               'download_URL', 'local_path', 'documentPlainText', 'documentHTML',
+              'html_with_citations', 'cases_cited',
               'documentType', 'blocked', 'date_blocked', 'extracted_by_ocr')
-    raw_id_fields = ('citation',)
+    raw_id_fields = ('citation', 'cases_cited')
     search_fields = ['documentPlainText']
 
 
@@ -43,10 +44,11 @@ class DocumentAdmin(admin.ModelAdmin):
     # ordering is brutal on MySQL. Don't put it here. Sorry.
     #list_display = ('citation',)
     #list_filter = ('court',)
-    fields = ('source', 'documentSHA1', 'dateFiled', 'court',
+    fields = ('citation', 'source', 'documentSHA1', 'dateFiled', 'court',
               'download_URL', 'local_path', 'documentPlainText', 'documentHTML',
               'html_with_citations', 'cases_cited',
               'documentType', 'blocked', 'date_blocked', 'extracted_by_ocr')
+    raw_id_fields = ('citation', 'cases_cited')
     search_fields = ['documentPlainText']
 
 
