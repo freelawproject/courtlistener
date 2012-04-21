@@ -249,7 +249,6 @@ class Document(models.Model):
                       "HTML of the document with citation links",
                       blank=True)
     cases_cited = models.ManyToManyField(
-                      'cases cited by this document',
                       Citation,
                       related_name="citing_cases",
                       null=True)

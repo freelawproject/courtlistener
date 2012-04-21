@@ -4,9 +4,6 @@ BUGS:
  - selecting "New Search" resets the filters to have all the statuses selected
  - Add state courts to the front end
  
-Solr:
- - fix the overlapping counts for long court names in the sidebar.
- 
 To do:
  - check out the outliars in the DB by date
  - recreate the stat_maker.py script (see bug)
@@ -17,3 +14,4 @@ To do:
    
 F3
  - do the hand file
+ - why three fiscr on coverage page, and one in facets?
