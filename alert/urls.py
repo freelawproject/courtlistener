@@ -96,7 +96,7 @@ urlpatterns = patterns('',
     (r'^bad-browser/$', browser_warning),
 
     # Maintenance and protest mode!
-    #(r'/*', show_maintenance_warning),
+    # (r'/*', show_maintenance_warning),
 
     # Display a case; a named URL because the get_absolute_url uses it.
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case,
@@ -177,8 +177,8 @@ urlpatterns = patterns('',
     # Sitemap index generator
     (r'^sitemap\.xml$', 'alert.casepage.sitemap.index_copy', {'sitemaps': sitemaps}),
     # this uses a custom sitemap generator that has a file-based cache.
-    (r'^sitemap-(?P<section>.+)\.xml$', 'alert.casepage.sitemap.cached_sitemap',
-        {'sitemaps': sitemaps}),
+    #(r'^sitemap-(?P<section>.+)\.xml$', 'alert.casepage.sitemap.cached_sitemap',
+    #    {'sitemaps': sitemaps}),
     (r'^robots.txt$', robots)
 )
 
