@@ -93,7 +93,7 @@ def update_documents(documents):
         citation_matches += new_cite_matches
         name_matches += new_name_matches
         if DEBUG >= 2:
-            print document.citation.case_name
+            print "%s at http://courtlistener.com/admin/search/citation/%s/" % (document.citation.case_name, document.citation.pk)
             print "  %d citations" % cite_found
             print "  %d exact matches" % new_cite_matches
             print "  %d name matches" % new_name_matches
@@ -108,7 +108,8 @@ def update_documents_by_id(id_list):
     update_documents(docs)
 
 def main():
-    docs = queryset_generator(Document.objects.all())
+    #docs = queryset_generator(Document.objects.all()[:10])
+    docs = Document.objects.all()[:10]
     update_documents(docs)
 
 if __name__ == '__main__':
