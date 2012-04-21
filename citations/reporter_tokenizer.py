@@ -18,7 +18,7 @@ REPORTER_RE = re.compile("(%s)" % REGEX)
 
 def tokenize(text):
     '''Tokenize text using regular expressions in the following steps:
-         -Split the text by the occurences of patterns which match a federal
+         -Split the text by the occurrences of patterns which match a federal
           reporter, including the reporter strings as part of the resulting list.
          -Perform simple tokenization (whitespace split) on each of the non-reporter
           strings in the list.
@@ -26,9 +26,7 @@ def tokenize(text):
        Example:
        >>>tokenize('See Roe v. Wade, 410 U. S. 113 (1973)')
        ['See', 'Roe', 'v.', 'Wade,', '410', 'U. S.', '113', '(1973)']
-'''
-
-
+    '''
     strings = REPORTER_RE.split(text)
     words = []
     for string in strings:
@@ -49,7 +47,7 @@ def _tokenize(text):
     #reduce excess whitespace
     text = re.sub(" +", " ", text)
     text = text.strip()
-    
+
     return text.split()
 
 

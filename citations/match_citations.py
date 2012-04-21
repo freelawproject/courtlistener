@@ -72,7 +72,6 @@ def reverse_match(conn, results, citing_doc):
 def case_name_query(conn, params, citation, citing_doc):
     query, length = make_name_param(citation.defendant, citation.plaintiff)
     params['q'] = "caseName:(%s)" % query
-    print params
     # Non-precedential documents shouldn't be cited
     params['fq'].append('status:Precedential')
     results = []
