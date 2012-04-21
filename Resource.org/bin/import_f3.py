@@ -116,11 +116,25 @@ def import_by_hand():
     simulate = True
     corpus = f3_helpers.Corpus('file:///var/www/court-listener/Resource.org/data/F3/')
     hand_file = open('../logs/hand_file.csv', 'r')
-    for line in hand_file:
+    line_placeholder = open('../logs/line_placeholder.txt', 'r+')
+    try:
+        line_num_done = int(line_placeholder.readline())
+    except ValueError:
+        # the volume file is emtpy or otherwise failing.
+        line_num_done = 0
+    line_placeholder.close()
+    for line in hand_file.readlines()[line_num_done:]:
         vol_num, case_num = line.split(',')
+        print "Vol: %s -- Case: %s" % (vol_num, case_num)
         volume = corpus[int(vol_num)]
         case = volume[int(case_num)]
+        print str(case)
+        print str(case.url), str(case.sha1_hash)
         run_dup_check(case, simulate)
+        line_num_done += 1
+        line_placeholder = open('../logs/line_placeholder.txt', 'w')
+        line_placeholder.write(str(line_num_done))
+        line_placeholder.close()
 
 def import_f3():
     '''Iterate over the F3 documents and import them. 
@@ -172,7 +186,9 @@ def import_f3():
         vol_file.close()
 
 def main():
-    if sys.argv[1] == '--import':
+    if len(sys.argv) != 2:
+        sys.exit("Wrong number of arguments. Usage: python import_f3.py (--import | --hand)")
+    elif sys.argv[1] == '--import':
         import_f3()
     elif sys.argv[1] == '--hand':
         import_by_hand()
