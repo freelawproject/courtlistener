@@ -225,7 +225,7 @@ function check_deps {
     fi
 
     # Install Python modules using pip
-    pythonModules=(beautifulsoup chardet python-dateutil docutils httplib2 ipython lxml MySQL-python pil pylint pyparsing setuptools)
+    pythonModules=(chardet python-dateutil docutils httplib2 ipython lxml MySQL-python pil pylint pyparsing setuptools)
     pip install ${pythonModules[@]-}
 
     echo -e "\nAll dependencies installed successfully."    

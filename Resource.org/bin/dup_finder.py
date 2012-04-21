@@ -29,11 +29,11 @@ from django.core.exceptions import MultipleObjectsReturned
 from django.template.defaultfilters import slugify
 from django.utils.encoding import smart_str, smart_unicode
 from alert.search.models import Court, Citation, Document
-from alert.lib.parse_dates import parse_dates
 from alert.lib.string_utils import trunc
 from alert.lib import sunburnt
 from alert.tinyurl.encode_decode import num_to_ascii
 from cleaning_scripts.lib.string_diff import find_confidences, gen_diff_ratio
+from juriscraper.lib.parse_dates import parse_dates
 
 from lxml.html import fromstring, tostring
 from urlparse import urljoin

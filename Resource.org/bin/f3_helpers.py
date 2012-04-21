@@ -29,7 +29,7 @@ os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 import sys
 sys.path.append("/var/www/court-listener")
 
-from alert.lib.parse_dates import parse_dates
+from juriscraper.lib.parse_dates import parse_dates
 from alert.lib.string_utils import anonymize
 from alert.search.models import Citation, Court, Document
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
@@ -415,11 +415,7 @@ class Case(object):
                 case_date = False
             if not case_date:
                 # Parse out the dates with debug set to false.
-                try:
-                    dates = parse_dates(self.body_text, False)
-                except OverflowError:
-                    # Happens when we try to make a date from a very large number
-                    dates = []
+                dates = parse_dates(self.body_text, False)
                 try:
                     first_date_found = dates[0]
                 except IndexError:
