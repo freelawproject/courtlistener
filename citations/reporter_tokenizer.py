@@ -6,6 +6,7 @@
 
 """
 This tokenizer uses regular expressions to tokenize text [WRITE ME]
+MLR: We should WRITE ME this.
 """
 
 import re
@@ -37,27 +38,16 @@ class FederalReporterTokenizer(object):
     at the end of a line.
     """
 
+    # MLR: Is it worth cleaning this up so it doesn't have stuff we don't care
+    # about? Things like lines 73-75, and the big comment above?
+
     # List of Federal Reporters
-    REPORTERS = ["U.S.",
-                 "U. S.",
-                 "S. Ct.",
-                 "L. Ed. 2d",
-                 "L. Ed.",
-                 "F.3d",
-                 "F.2d",
-                 "F. Supp. 2d",
-                 "F. Supp.",
-                 "F.",
-                 "F.R.D.",
-                 "B.R.",
-                 "Vet. App.",
-                 "M.J.",
-                 "Fed. Cl.",
-                 "Ct. Int'l Trade",
-                 "T.C."]
+    # MLR: Repeated from find_citations? 
+    REPORTERS = ["U.S.", "U. S.", "S. Ct.", "L. Ed. 2d", "L. Ed.", "F.3d",
+                 "F.2d", "F. Supp. 2d", "F. Supp.", "F.", "F.R.D.", "B.R.",
+                 "Vet. App.", "M.J.", "Fed. Cl.", "Ct. Int'l Trade", "T.C."]
 
     REGEX = "|".join(map(re.escape, REPORTERS))
-
     REPORTER_RE = re.compile("(%s)" % REGEX)
 
     def tokenize(self, text):

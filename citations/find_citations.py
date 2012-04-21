@@ -7,19 +7,21 @@ import os
 import re
 import sys
 
-REPORTERS = ["U.S.", "U. S.", "S. Ct.","L. Ed.","L. Ed. 2d","F.3d","F.2d","F.","F. Supp. 2d","F. Supp.",
-             "F.R.D.","B.R.","Vet. App.","M.J.","Fed. Cl.","Ct. Int'l Trade","T.C."]
+REPORTERS = ["U.S.", "U. S.", "S. Ct.", "L. Ed.", "L. Ed. 2d", "F.3d", "F.2d",
+             "F.", "F. Supp. 2d", "F. Supp.", "F.R.D.", "B.R.", "Vet. App.",
+             "M.J.", "Fed. Cl.", "Ct. Int'l Trade", "T.C."]
 
 FORWARD_SEEK = 20
 
 BACKWARD_SEEK = 70 # Average case name length in the db is 67
 
-STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed", "remanded", "see", "granted", "dismissed"]
-
+STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed",
+               "remanded", "see", "granted", "dismissed"]
 
 class Citation(object):
-    '''Convenience class which represents a single citation found in a document.'''
-
+    '''Convenience class which represents a single citation found in a document.
+    
+    '''
     def __init__(self, reporter, page, volume):
         self.reporter = reporter
         self.volume = volume
@@ -64,7 +66,6 @@ class Citation(object):
         print_string = u' '.join([print_string, paren])
         return print_string.encode("utf-8")
 
-
 # Adapted from nltk Penn Treebank tokenizer
 def strip_punct(text):
     #starting quotes
@@ -77,7 +78,7 @@ def strip_punct(text):
     text = re.sub(r'[,;:@#$%&]', r'', text)
     text = re.sub(r'([^\.])(\.)([\]\)}>"\']*)\s*$', r'\1', text)
     text = re.sub(r'[?!]', r'', text)
-    
+
     text = re.sub(r"([^'])' ", r"", text)
 
     #parens, brackets, etc.
@@ -90,16 +91,16 @@ def strip_punct(text):
 
     return text.strip()
 
-
 def get_court(paren_string, year):
     if year is None:
         return strip_punct(paren_string)
     year_index = paren_string.find(str(year))
     return strip_punct(paren_string[:year_index])
 
-
 def get_year(token):
-    '''Given a string token, look for a valid 4-digit number at the start and return its value.'''
+    '''Given a string token, look for a valid 4-digit number at the start and 
+    return its value.
+    '''
     token = strip_punct(token)
     if not token.isdigit():
         # Sometimes funny stuff happens?
@@ -113,63 +114,63 @@ def get_year(token):
         return None
     return year
 
-
 def add_post_citation(citation, words, reporter_index):
     '''Add to a citation object any additional information found after the base
-    citation, including court, year, and possibly page range.'''
-    end_position = reporter_index+2
+    citation, including court, year, and possibly page range.
+    
+    MLR: Needs explanation here, perhaps an example of what it is matching on? 
+    '''
+    end_position = reporter_index + 2
     # Start looking 2 tokens after the reporter (1 after page)
-    for start in xrange(reporter_index+2, min(reporter_index+FORWARD_SEEK, len(words))):
+    for start in xrange(reporter_index + 2, min(reporter_index + FORWARD_SEEK, len(words))):
         if words[start].startswith('('):
-            for end in xrange(start,start+FORWARD_SEEK):
+            for end in xrange(start, start + FORWARD_SEEK):
                 if words[end].find(')') > -1:
                     # Sometimes the paren gets split from the preceding content
                     if words[end].startswith(')'):
-                        citation.year = get_year(words[end-1])
+                        citation.year = get_year(words[end - 1])
                     else:
                         citation.year = get_year(words[end])
-                    citation.court = get_court(u' '.join(words[start:end+1]), citation.year)
+                    citation.court = get_court(u' '.join(words[start:end + 1]), citation.year)
                     end_position = end
                     break
             if start > reporter_index + 2:
                 # Then there's content between page and (), starting with a comma, which we skip
-                citation.extra = u' '.join(words[reporter_index+3:start])
+                citation.extra = u' '.join(words[reporter_index + 3:start])
             break
     return end_position
 
-
 def add_defendant(citation, words, reporter_index):
     '''Scan backwards from 2 tokens before reporter until you find v., in re, etc.
-    If no known stop-token is found, no defendant name is stored.  In the future, this
-    could be improved.'''
+    If no known stop-token is found, no defendant name is stored.  In the future, 
+    this could be improved.'''
     start_index = None
-    for index in xrange(reporter_index-1, max(reporter_index - BACKWARD_SEEK, 0), -1):
+    for index in xrange(reporter_index - 1, max(reporter_index - BACKWARD_SEEK, 0), -1):
         word = words[index]
         if word == ',':
             # Skip it
             continue
         if strip_punct(word).lower() in STOP_TOKENS:
             if word == 'v.':
-                citation.plaintiff = words[index-1]
+                citation.plaintiff = words[index - 1]
             start_index = index + 1
             break
         if word.endswith(';'):
             # String citation
             break
     if start_index:
-        citation.defendant = u' '.join(words[start_index:reporter_index-1])
-
+        citation.defendant = u' '.join(words[start_index:reporter_index - 1])
 
 def extract_base_citation(words, reporter_index):
     '''Given a list of words and the index of a federal reporter, look before and after
     for volume and page number.  If found, construct and return a Citation object.'''
     reporter = words[reporter_index]
-    if words[reporter_index-1].isdigit():
-        volume = int(words[reporter_index-1])
+    if words[reporter_index - 1].isdigit():
+        volume = int(words[reporter_index - 1])
     else: # No volume, therefore not a valid citation
         return None
-    page_str = words[reporter_index+1]
-    if page_str.find(',') == len(page_str) -1:
+    page_str = words[reporter_index + 1]
+    if page_str.find(',') == len(page_str) - 1:
         # Strip off ending comma, which occurs when there is a page range next
         page_str = page_str[:-1]
     if page_str.isdigit():
@@ -179,7 +180,6 @@ def extract_base_citation(words, reporter_index):
 
     return Citation(reporter, page, volume)
 
-
 def get_citations(text, tokenizer, html=True):
     if html:
         text = get_visible_text(text)
@@ -187,22 +187,21 @@ def get_citations(text, tokenizer, html=True):
     citations = []
     previous_end_position = 0
     for i in xrange(len(words)):
-          # Find reporter
-          if words[i] in REPORTERS:
-              citation = extract_base_citation(words, i)
-              if citation is None:
-                  # Not a valid citation; continue looking
-                  continue
-              end_position = add_post_citation(citation, words, i)
-              add_defendant(citation, words, i)
-              citations.append(citation)
+        # Find reporter
+        if words[i] in REPORTERS:
+            citation = extract_base_citation(words, i)
+            if citation is None:
+                # Not a valid citation; continue looking
+                continue
+            end_position = add_post_citation(citation, words, i)
+            add_defendant(citation, words, i)
+            citations.append(citation)
 
-              # Advance the counter; no need to re-check tokens in this citation
-              i = end_position
-              previous_end_position = end_position + 1
+            # Advance the counter; no need to re-check tokens in this citation
+            i = end_position
+            previous_end_position = end_position + 1
 
     return citations
-
 
 def getFileContents(filename):
     f = open(filename, "r")
@@ -210,18 +209,15 @@ def getFileContents(filename):
     f.close()
     return text
 
-
 def getCitationsFromFile(filename):
     contents = getFileContents(filename)
     return get_citations(contents)
-
 
 def getCitationsFromFiles(filenames):
     citations = []
     for filename in filenames:
         citations.extend(getCitationsFromFile(filename))
     return citations
-
 
 def main():
     citations = []
@@ -233,7 +229,6 @@ def main():
             if not (filename.endswith("xml") or filename.endswith("pdf")):
                 filenames.append(path + "/" + filename)
         citations = getCitationsFromFiles(filenames)
-
 
 if __name__ == "__main__":
     main()

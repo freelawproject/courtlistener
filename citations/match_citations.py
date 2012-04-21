@@ -35,9 +35,10 @@ def build_date_range(start_year, end_year):
                                    end.isoformat())
     return date_range
 
-
 def make_name_param(defendant, plaintiff):
-    '''Remove punctuation tokens and return cleaned string plus its length in tokens.'''
+    '''Remove punctuation tokens and return cleaned string plus its length in 
+    tokens.
+    '''
     token_list = defendant.split()
     if plaintiff:
         token_list.extend(plaintiff.split())
@@ -45,8 +46,10 @@ def make_name_param(defendant, plaintiff):
     query_words = [t for t in token_list if t not in string.punctuation]
     return (u' '.join(query_words), len(query_words))
 
-
 def reverse_match(conn, results, citing_doc):
+    '''Uses the case name of the found document to verify that it is a match on
+    the original.
+    '''
     params = {}
     for result in results:
         case_name_tokens = result['caseName'].split()
@@ -56,12 +59,12 @@ def reverse_match(conn, results, citing_doc):
         query_tokens = case_name_tokens[start:]
         query = ' '.join(query_tokens)
         # ~ performs a proximity search for the preceding phrase
+        # MLR: I thought ~ was used differently. Do we know this works? 
         params['q'] = '"%s" ~%d %s' % (query, len(query_tokens), citing_doc.documentSHA1)
         new_results = conn.raw_query(**params).execute()
         if len(new_results) == 1:
             return [result]
     return []
-
 
 def case_name_query(conn, params, citation, citing_doc):
     query, length = make_name_param(citation.defendant, citation.plaintiff)
@@ -82,7 +85,6 @@ def case_name_query(conn, params, citation, citing_doc):
         results = new_results
     return results
 
-
 def match_citation(citation, citing_doc):
     # TODO: Create shared solr connection to use across multiple citations/documents
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
@@ -94,6 +96,9 @@ def match_citation(citation, citing_doc):
     if citation.year:
         date_param = 'dateFiled:%s' % build_date_range(citation.year, citation.year)
     elif citation.reporter in REPORTER_DATES: #TODO: Also make sure end date is <= year of citing document
+        # MLR: I agree with this to do - didn't see it was missing until now. 
+        #      As we're going backwards, this is going to be increasingly valuable
+        #      for older cases, right? 
         start, end = REPORTER_DATES[citation.reporter]
         date_param = 'dateFiled:%s' % build_date_range(start, end)
     if date_param:
@@ -102,6 +107,8 @@ def match_citation(citation, citing_doc):
         citation.court = "SCOTUS"
     if citation.court:
         # Use startswith because citations are often missing final period, e.g. "2d Cir"
+        # MLR: This can get stored once at the beginning rather than queried 
+        # repeatedly, right? See: Django's values_list 
         results = Court.objects.filter(citation_string__startswith=citation.court)
         if len(results) == 1:
             court = results[0]
@@ -122,13 +129,14 @@ def match_citation(citation, citing_doc):
     if not citation.defendant:
         return [], False
     # Reset params
+    # MLR: Is resetting the params necessary? 
     main_params['fq'] = []
     if date_param:
         main_params['fq'].append(date_param)
     if court_param:
         main_params['fq'].append(court_param)
     return case_name_query(conn, main_params, citation, citing_doc), False
-    
+
 
 if __name__ == '__main__':
     exit(0)

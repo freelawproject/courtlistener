@@ -23,6 +23,8 @@ def html_filter(term):
 #
 # Get visible text content from the html
 #
+# MLR: Django has a built-in function to do this that we can use. If we use that
+# we'll get rid of the BS dependency, and the TODO above.
 def get_visible_text(html_content):
     soup = BeautifulSoup(html_content)
     strings = soup.findAll(text=True)
