@@ -50,7 +50,7 @@ def add_case(case):
     '''Add the case to the database.
     
     '''
-    simulate = False 
+    simulate = False
     # Get the court
     court = Court.objects.get(courtUUID=case.court)
 
@@ -71,7 +71,7 @@ def add_case(case):
     if blocked:
         doc.blocked = True
         doc.date_blocked = datetime.date.today()
-    
+
     if not simulate:
         # Save everything together
         cite.save()
@@ -100,7 +100,7 @@ def merge_cases_simple(case, target_id):
     if blocked:
         doc.blocked = True
         doc.date_blocked = datetime.date.today()
-    
+
     if not simulate:
         doc.citation.save()
         doc.save()
@@ -119,7 +119,7 @@ def merge_cases_complex(case, target_ids):
 
         doc.source = 'CR'
         doc.citation.westCite = case.west_cite
-        
+
         if not simulate:
             doc.citation.save()
             doc.save()
@@ -233,6 +233,7 @@ def need_dup_check_for_date_and_court(case):
 class Case(object):
     '''Represents a case within Resource.org'''
     def __init__(self, base_url, url_element, case_date, sha1_hash):
+        print "Making a case object"
         super(Case, self).__init__()
         # Non-core data attributes
         self.url_element = url_element
@@ -559,11 +560,12 @@ class Volume(object):
         for t in zip(self.case_urls[key],
                      self.case_dates[key],
                      self.sha1_hashes[key]):
-            yield Case(self.url, *t)
+            print "t: %s" % t
+            return Case(self.url, *t)
 
     def __iter__(self):
         for i in range(i, self.__len__()):
-            yield Case(self.url,
+            return Case(self.url,
                        self.case_urls[i],
                        self.case_dates[i],
                        self.sha1_hashes[i])
@@ -582,9 +584,9 @@ class Corpus(object):
 
     def __getitem__(self, key):
         for vol in self.volume_urls[key]:
-             yield Volume(urljoin(self.url, vol + '/index.html'))
+             return Volume(urljoin(self.url, vol + '/index.html'))
 
     def __iter__(self):
         for volume_url in self.volume_urls:
             volume_url = urljoin(self.url, volume_url + "/index.html")
-            yield Volume(volume_url)
+            return Volume(volume_url)
