@@ -1,81 +1,57 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-# Adapted from the Natural Language Toolkit: Tokenizers (nltk.tokenize.api)
+# Loosely adapted from the Natural Language Toolkit: Tokenizers
 # URL: <http://nltk.sourceforge.net>
-
-"""
-This tokenizer uses regular expressions to tokenize text [WRITE ME]
-MLR: We should WRITE ME this.
-"""
 
 import re
 
-class FederalReporterTokenizer(object):
-    """
-    The Treebank tokenizer uses regular expressions to tokenize text as in Penn Treebank.
-    This is the method that is invoked by ``word_tokenize()``.  It assumes that the
-    text has already been segmented into sentences, e.g. using ``sent_tokenize()``.
+# List of Federal Reporters
+REPORTERS = ["U.S.", "U. S.", "S. Ct.", "L. Ed. 2d", "L. Ed.", "F.3d",
+             "F.2d", "F. Supp. 2d", "F. Supp.", "F.", "F.R.D.", "B.R.",
+             "Vet. App.", "M.J.", "Fed. Cl.", "Ct. Int'l Trade", "T.C."]
 
-    This tokenizer performs the following steps:
+REGEX = "|".join(map(re.escape, REPORTERS))
 
-    - treat most punctuation characters as separate tokens
-    - split off commas and single quotes, when followed by whitespace
-    - separate periods that appear at the end of line
+REPORTER_RE = re.compile("(%s)" % REGEX)
 
-        >>> from nltk.tokenize import TreebankWordTokenizer
-        >>> s = '''Good muffins cost $3.88\\nin New York.  Please buy me\\ntwo of them.\\n\\nThanks.'''
-        >>> TreebankWordTokenizer().tokenize(s)
-        ['Good', 'muffins', 'cost', '$', '3.88', 'in', 'New', 'York.',
-        'Please', 'buy', 'me', 'two', 'of', 'them', '.', 'Thanks', '.']
-        >>> s = "They'll save and invest more."
-        >>> TreebankWordTokenizer().tokenize(s)
-        ['They', "'ll", 'save', 'and', 'invest', 'more', '.']
 
-    NB. this tokenizer assumes that the text is presented as one sentence per line,
-    where each line is delimited with a newline character.
-    The only periods to be treated as separate tokens are those appearing
-    at the end of a line.
-    """
+def tokenize(text):
+    '''Tokenize text using regular expressions in the following steps:
+         -Split the text by the occurences of patterns which match a federal
+          reporter, including the reporter strings as part of the resulting list.
+         -Perform simple tokenization (whitespace split) on each of the non-reporter
+          strings in the list.
 
-    # MLR: Is it worth cleaning this up so it doesn't have stuff we don't care
-    # about? Things like lines 73-75, and the big comment above?
+       Example:
+       >>>tokenize('See Roe v. Wade, 410 U. S. 113 (1973)')
+       ['See', 'Roe', 'v.', 'Wade,', '410', 'U. S.', '113', '(1973)']
+'''
 
-    # List of Federal Reporters
-    # MLR: Repeated from find_citations? 
-    REPORTERS = ["U.S.", "U. S.", "S. Ct.", "L. Ed. 2d", "L. Ed.", "F.3d",
-                 "F.2d", "F. Supp. 2d", "F. Supp.", "F.", "F.R.D.", "B.R.",
-                 "Vet. App.", "M.J.", "Fed. Cl.", "Ct. Int'l Trade", "T.C."]
 
-    REGEX = "|".join(map(re.escape, REPORTERS))
-    REPORTER_RE = re.compile("(%s)" % REGEX)
+    strings = REPORTER_RE.split(text)
+    words = []
+    for string in strings:
+        if string in REPORTERS:
+            words.append(string)
+        else:
+            words.extend(_tokenize(string))
+    return words
 
-    def tokenize(self, text):
-        strings = self.REPORTER_RE.split(text)
-        words = []
-        for string in strings:
-            if string in self.REPORTERS:
-                words.append(string)
-            else:
-                words.extend(self._tokenize(string))
-        return words
 
-    def _tokenize(self, text):
-        #add extra space to make things easier
-        text = " " + text + " "
+def _tokenize(text):
+    #add extra space to make things easier
+    text = " " + text + " "
 
-        #get rid of all those annoying underscores!
-        text = re.sub(r"__+", "", text)
+    #get rid of all the annoying underscores in text from pdfs
+    text = re.sub(r"__+", "", text)
 
-        #reduce excess whitespace
-        text = re.sub(" +", " ", text)
-        text = text.strip()
+    #reduce excess whitespace
+    text = re.sub(" +", " ", text)
+    text = text.strip()
+    
+    return text.split()
 
-        #add space at end to match up with MacIntyre's output (for debugging)
-        if text != "":
-            text += " "
-
-        return text.split()
 
 if __name__ == "__main__":
     exit(0)

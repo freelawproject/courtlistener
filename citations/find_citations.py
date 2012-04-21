@@ -1,15 +1,12 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-from reporter_tokenizer import FederalReporterTokenizer
-from html_utils import get_visible_text
 import os
 import re
 import sys
 
-REPORTERS = ["U.S.", "U. S.", "S. Ct.", "L. Ed.", "L. Ed. 2d", "F.3d", "F.2d",
-             "F.", "F. Supp. 2d", "F. Supp.", "F.R.D.", "B.R.", "Vet. App.",
-             "M.J.", "Fed. Cl.", "Ct. Int'l Trade", "T.C."]
+from juriscraper.lib.html_utils import get_visible_text
+import reporter_tokenizer
 
 FORWARD_SEEK = 20
 
@@ -117,8 +114,13 @@ def get_year(token):
 def add_post_citation(citation, words, reporter_index):
     '''Add to a citation object any additional information found after the base
     citation, including court, year, and possibly page range.
-    
-    MLR: Needs explanation here, perhaps an example of what it is matching on? 
+
+    Examples:
+        Full citation: 123 U.S. 345 (1894)
+        Post-citation info: year=1894
+
+        Full citation: 123 F.2d 345, 347-348 (4th Cir. 1990)
+        Post-citation info: year=1990, court="4th Cir.", extra (page range)="347-348"
     '''
     end_position = reporter_index + 2
     # Start looking 2 tokens after the reporter (1 after page)
@@ -180,15 +182,15 @@ def extract_base_citation(words, reporter_index):
 
     return Citation(reporter, page, volume)
 
-def get_citations(text, tokenizer, html=True):
+def get_citations(text, html=True):
     if html:
         text = get_visible_text(text)
-    words = tokenizer.tokenize(text)
+    words = reporter_tokenizer.tokenize(text)
     citations = []
     previous_end_position = 0
     for i in xrange(len(words)):
         # Find reporter
-        if words[i] in REPORTERS:
+        if words[i] in reporter_tokenizer.REPORTERS:
             citation = extract_base_citation(words, i)
             if citation is None:
                 # Not a valid citation; continue looking

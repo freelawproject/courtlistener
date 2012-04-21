@@ -26,6 +26,9 @@ REPORTER_DATES = {'F.': (1880, 1924),
 
 QUERY_LENGTH = 10
 
+# Store court values to avoid repeated DB queries
+courts = Court.objects.all().values('citation_string', 'courtUUID')
+
 
 def build_date_range(start_year, end_year):
     '''Build a date range to be handed off to a solr query.'''
@@ -59,8 +62,8 @@ def reverse_match(conn, results, citing_doc):
         query_tokens = case_name_tokens[start:]
         query = ' '.join(query_tokens)
         # ~ performs a proximity search for the preceding phrase
-        # MLR: I thought ~ was used differently. Do we know this works? 
-        params['q'] = '"%s" ~%d %s' % (query, len(query_tokens), citing_doc.documentSHA1)
+        # See: http://wiki.apache.org/solr/SolrRelevancyCookbook#Term_Proximity
+        params['q'] = '"%s"~%d %s' % (query, len(query_tokens), citing_doc.documentSHA1)
         new_results = conn.raw_query(**params).execute()
         if len(new_results) == 1:
             return [result]
@@ -69,6 +72,7 @@ def reverse_match(conn, results, citing_doc):
 def case_name_query(conn, params, citation, citing_doc):
     query, length = make_name_param(citation.defendant, citation.plaintiff)
     params['q'] = "caseName:(%s)" % query
+    print params
     # Non-precedential documents shouldn't be cited
     params['fq'].append('status:Precedential')
     results = []
@@ -91,29 +95,25 @@ def match_citation(citation, citing_doc):
     main_params = {}
     # Take 1: Use citation
     main_params['fq'] = []
-    date_param = None
-    court_param = None
     if citation.year:
-        date_param = 'dateFiled:%s' % build_date_range(citation.year, citation.year)
-    elif citation.reporter in REPORTER_DATES: #TODO: Also make sure end date is <= year of citing document
-        # MLR: I agree with this to do - didn't see it was missing until now. 
-        #      As we're going backwards, this is going to be increasingly valuable
-        #      for older cases, right? 
-        start, end = REPORTER_DATES[citation.reporter]
-        date_param = 'dateFiled:%s' % build_date_range(start, end)
-    if date_param:
-        main_params['fq'].append(date_param)
-    if not citation.court and citation.reporter == "U.S.":
+        start_year = end_year = citation.year
+    else:
+        end_year = citing_doc.dateFiled.year
+        start_year = 1754 # Earliest case in the db
+        if citation.reporter in REPORTER_DATES:
+            reporter_start, reporter_end = REPORTER_DATES[citation.reporter]
+            start_year = max(start_year, reporter_start)
+            end_year = min(end_year, reporter_end)
+    date_param = 'dateFiled:%s' % build_date_range(start_year, end_year)
+    main_params['fq'].append(date_param)
+    if not citation.court and citation.reporter in ["U.S.", "U. S."]:
         citation.court = "SCOTUS"
     if citation.court:
-        # Use startswith because citations are often missing final period, e.g. "2d Cir"
-        # MLR: This can get stored once at the beginning rather than queried 
-        # repeatedly, right? See: Django's values_list 
-        results = Court.objects.filter(citation_string__startswith=citation.court)
-        if len(results) == 1:
-            court = results[0]
-            court_param = 'court_exact:%s' % court.pk
-            main_params['fq'].append(court_param)
+        for court in courts:
+            # Use startswith because citations are often missing final period, e.g. "2d Cir"
+            if court['citation_string'].startswith(citation.court):
+                court_param = 'court_exact:%s' % court['courtUUID']
+                main_params['fq'].append(court_param)
 
     citation_param = 'westCite:"%s"' % citation.base_citation()
     main_params['fq'].append(citation_param)
@@ -128,13 +128,8 @@ def match_citation(citation, citing_doc):
     # Take 2: Use case name
     if not citation.defendant:
         return [], False
-    # Reset params
-    # MLR: Is resetting the params necessary? 
-    main_params['fq'] = []
-    if date_param:
-        main_params['fq'].append(date_param)
-    if court_param:
-        main_params['fq'].append(court_param)
+    # Remove citation parameter
+    main_params['fq'].remove(citation_param)
     return case_name_query(conn, main_params, citation, citing_doc), False
 
 
