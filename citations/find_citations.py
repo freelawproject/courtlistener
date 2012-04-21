@@ -39,10 +39,10 @@ class Citation(object):
     def as_html(self):
         template = u'<span class="volume">%(volume)d</span> ' \
             u'<span class="reporter">%(reporter)s</span> ' \
-            u'<span class="page">%(page)d</span> '
+            u'<span class="page">%(page)d</span>'
         inner_html = template % self.__dict__
         link = u'<a href="%s">' % self.match_url + inner_html + u'</a>'
-        return u'<span class="citation full-citation">' + link + '</span>'
+        return u'<span class="citation">' + link + '</span>'
 
     def __repr__(self):
         print_string = self.base_citation()
