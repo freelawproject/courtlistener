@@ -38,7 +38,7 @@ def build_date_range(start_year, end_year):
                                    end.isoformat())
     return date_range
 
-def make_name_param(defendant, plaintiff):
+def make_name_param(defendant, plaintiff=None):
     '''Remove punctuation tokens and return cleaned string plus its length in 
     tokens.
     '''
@@ -54,16 +54,16 @@ def reverse_match(conn, results, citing_doc):
     the original.
     '''
     params = {}
+    params['fq'] = ['id:%s' % citing_doc.pk]
     for result in results:
-        case_name_tokens = result['caseName'].split()
-        num_tokens = len(case_name_tokens)
+        case_name, length = make_name_param(result['caseName'])
         # Avoid overly long queries
-        start = max(num_tokens - QUERY_LENGTH, 0)
-        query_tokens = case_name_tokens[start:]
+        start = max(length - QUERY_LENGTH, 0)
+        query_tokens = case_name.split()[start:]
         query = ' '.join(query_tokens)
         # ~ performs a proximity search for the preceding phrase
         # See: http://wiki.apache.org/solr/SolrRelevancyCookbook#Term_Proximity
-        params['q'] = '"%s"~%d %s' % (query, len(query_tokens), citing_doc.documentSHA1)
+        params['q'] = '"%s"~%d' % (query, len(query_tokens))
         new_results = conn.raw_query(**params).execute()
         if len(new_results) == 1:
             return [result]
@@ -72,8 +72,6 @@ def reverse_match(conn, results, citing_doc):
 def case_name_query(conn, params, citation, citing_doc):
     query, length = make_name_param(citation.defendant, citation.plaintiff)
     params['q'] = "caseName:(%s)" % query
-    # Non-precedential documents shouldn't be cited
-    params['fq'].append('status:Precedential')
     results = []
     # Use Solr minimum match search, starting with requiring all words to match,
     # and decreasing by one word each time until a match is found
@@ -92,7 +90,7 @@ def match_citation(citation, citing_doc):
     # TODO: Create shared solr connection to use across multiple citations/documents
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     main_params = {}
-    # Take 1: Use citation
+    # Set up filter paramters
     main_params['fq'] = []
     if citation.year:
         start_year = end_year = citation.year
@@ -114,6 +112,10 @@ def match_citation(citation, citing_doc):
                 court_param = 'court_exact:%s' % court['courtUUID']
                 main_params['fq'].append(court_param)
 
+    # Non-precedential documents shouldn't be cited
+    main_params['fq'].append('status:Precedential')
+
+    # Take 1: Use citation
     citation_param = 'westCite:"%s"' % citation.base_citation()
     main_params['fq'].append(citation_param)
     results = conn.raw_query(**main_params).execute()
