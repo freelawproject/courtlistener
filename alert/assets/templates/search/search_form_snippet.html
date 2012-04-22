@@ -58,7 +58,7 @@
 	                    <label
 	                        for="id_court_all"
 	                        class="pointer {% if count == 0 %}gray{% endif %}">
-                            <div>{{ search_form.court_all.label }}&nbsp;<span class="gray small">({{ count|intcomma }})</span></div>
+                            {{ search_form.court_all.label }}&nbsp;<span class="gray small">({{ count|intcomma }})</span>
                         </label>
 	                </div>
 	                {% for court in court_facets %}

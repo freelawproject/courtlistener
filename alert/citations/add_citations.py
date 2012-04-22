@@ -28,12 +28,12 @@ def update_documents(documents):
         processed_count += 1
 
         last_document = (count == processed_count)
-        if (processed_count % 8 == 0) or last_document:
+        if (processed_count % 20 == 0) or last_document:
             # Every 1000 documents, we send the subtasks off for processing
             job = TaskSet(tasks=subtasks)
             result = job.apply_async()
             while not result.ready():
-                time.sleep(1)
+                time.sleep(0.25)
 
             # The jobs finished - clean things up for the next round
             subtasks = []
@@ -43,7 +43,7 @@ def update_documents_by_id(id_list):
     update_documents(docs)
 
 def main():
-    docs = queryset_generator(Document.objects.all())
+    docs = queryset_generator(Document.objects.all(), start=1000)
     #docs = Document.objects.all()[:10]
     update_documents(docs)
 
