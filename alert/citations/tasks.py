@@ -23,6 +23,7 @@ setup_environ(settings)
 
 from alert.citations import find_citations
 from alert.citations import match_citations
+from alert.search.models import Document
 from celery.decorators import task
 
 import re
@@ -53,6 +54,7 @@ def create_cited_html(document, citations):
 
 @task
 def update_document(document):
+    DEBUG = 2
     citations = get_document_citations(document)
     # List for tracking number of citation vs. name matches
     matched_citations = []

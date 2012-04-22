@@ -167,6 +167,7 @@ TIME_ZONE is set to America/Los Angeles
 
     # set up the MySQL configs
     read -p "We will be setting up a MySQL DB. What would you like its name to be (e.g. courtlistener): " MYSQL_DB_NAME
+    MYSQL_DB_NAME=${MYSQL_DB_NAME:-courtlistener}
     MYSQL_USERNAME=django
     MYSQL_PWD=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789") for i in range(50)]);'`
     CELERY_PWD=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789") for i in range(50)]);'`
