@@ -167,6 +167,7 @@ TIME_ZONE is set to America/Los Angeles
 
     # set up the MySQL configs
     read -p "We will be setting up a MySQL DB. What would you like its name to be (e.g. courtlistener): " MYSQL_DB_NAME
+    MYSQL_DB_NAME=${MYSQL_DB_NAME:-courtlistener}
     MYSQL_USERNAME=django
     MYSQL_PWD=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789") for i in range(50)]);'`
     CELERY_PWD=`python -c 'from random import choice; print "".join([choice("abcdefghijklmnopqrstuvwxyz0123456789") for i in range(50)]);'`
@@ -191,7 +192,7 @@ function check_deps {
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-    deps=(autoconf automake antiword apache2 apache2-prefork-dev checkinstall daemon g++ gcc git-core imagemagick libapache2-mod-wsgi libjpeg62-dev libmysqlclient-dev libmysql++-dev libpng12-dev libtiff4-dev libtiff-tools libtool libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils python python-mysqldb python-pip rabbitmq-server subversion tar wget zlib1g-dev)
+    deps=(autoconf automake antiword apache2 apache2-prefork-dev checkinstall daemon g++ gcc git-core imagemagick libapache2-mod-wsgi libjpeg62-dev libmysqlclient-dev libmysql++-dev libpng12-dev libjpeg-dev libtiff4-dev libtiff-tools libtool libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils python python-mysqldb python-pip rabbitmq-server subversion tar wget zlib1g-dev)
     for dep in ${deps[@]}
     do
         echo -n "Checking for $dep..."
