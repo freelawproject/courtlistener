@@ -109,9 +109,9 @@ class SearchForm(forms.Form):
                                               initial='refine',
                                               widget=forms.RadioSelect(attrs={'tabindex': '7'}))
             self.fields['court_all'] = forms.BooleanField(
-                                                  label='All Courts',
+                                                  label='All Courts / Clear',
                                                   required=False,
-                                                  widget=forms.CheckboxInput(attrs={'class': 'external-input'}))
+                                                  widget=forms.CheckboxInput(attrs={'class': 'external-input court-checkbox left'}))
             for court in courts:
                 self.fields['court_' + court[0]] = forms.BooleanField(
                                                               label=court[1],
