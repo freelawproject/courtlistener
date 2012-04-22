@@ -23,7 +23,10 @@ setup_environ(settings)
 
 from alert.citations import find_citations
 from alert.citations import match_citations
+from alert.search.models import Document
+from alert.search.tasks import save_doc_handler
 from celery.decorators import task
+from django.db.models.signals import post_save
 
 import re
 
@@ -53,6 +56,7 @@ def create_cited_html(document, citations):
 
 @task
 def update_document(document):
+    DEBUG = 2
     citations = get_document_citations(document)
     # List for tracking number of citation vs. name matches
     matched_citations = []
@@ -90,6 +94,11 @@ def update_document(document):
         if DEBUG >= 3:
             print document.html_with_citations
 
+    # Turn off solr updating; we're not changing anything in the search index
+    post_save.disconnect(
+        save_doc_handler,
+        sender=Document,
+        dispatch_uid='save_doc_handler')
     document.save()
     citation_matches = sum(matched_citations)
     name_matches = len(matched_citations) - citation_matches
