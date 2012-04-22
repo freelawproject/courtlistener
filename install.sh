@@ -191,7 +191,7 @@ function check_deps {
         echo -e '\nGreat. Moving on.'
         return 0
     fi
-    deps=(autoconf automake antiword apache2 apache2-prefork-dev checkinstall daemon g++ gcc git-core imagemagick libapache2-mod-wsgi libjpeg62-dev libmysqlclient-dev libmysql++-dev libpng12-dev libtiff4-dev libtiff-tools libtool libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils python python-mysqldb python-pip rabbitmq-server subversion tar wget zlib1g-dev)
+    deps=(autoconf automake antiword apache2 apache2-prefork-dev checkinstall daemon g++ gcc git-core imagemagick libapache2-mod-wsgi libjpeg62-dev libmysqlclient-dev libmysql++-dev libpng12-dev libjpeg-dev libtiff4-dev libtiff-tools libtool libwpd-tools logrotate make mercurial mysql-client mysql-server poppler-utils python python-mysqldb python-pip rabbitmq-server subversion tar wget zlib1g-dev)
     for dep in ${deps[@]}
     do
         echo -n "Checking for $dep..."
