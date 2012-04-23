@@ -167,6 +167,9 @@ def extract_base_citation(words, reporter_index):
     '''Given a list of words and the index of a federal reporter, look before and after
     for volume and page number.  If found, construct and return a Citation object.'''
     reporter = words[reporter_index]
+    # Get rid of extra space so that we only have one version to check
+    if reporter == 'U. S.':
+        reporter = 'U.S.'
     if words[reporter_index - 1].isdigit():
         volume = int(words[reporter_index - 1])
     else: # No volume, therefore not a valid citation

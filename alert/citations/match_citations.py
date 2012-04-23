@@ -16,6 +16,9 @@ import string
 
 DEBUG = True
 
+# Reporters currently covered in the CourtListener database
+CL_REPORTERS = ['F.2d', 'F.3d', 'U.S.']
+
 REPORTER_DATES = {'F.': (1880, 1924),
                   'F.2d': (1924, 1993),
                   'F.3d': (1999, date.today().year),
@@ -87,6 +90,9 @@ def case_name_query(conn, params, citation, citing_doc):
     return results
 
 def match_citation(citation, citing_doc):
+    # First, check and see whether we even have documents from this reporter
+    if not citation.reporter in CL_REPORTERS:
+        return [], True
     # TODO: Create shared solr connection to use across multiple citations/documents
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     main_params = {}
@@ -95,12 +101,12 @@ def match_citation(citation, citing_doc):
     if citation.year:
         start_year = end_year = citation.year
     else:
-        end_year = citing_doc.dateFiled.year
         start_year = 1754 # Earliest case in the db
+        end_year = date.today().year
         if citation.reporter in REPORTER_DATES:
-            reporter_start, reporter_end = REPORTER_DATES[citation.reporter]
-            start_year = max(start_year, reporter_start)
-            end_year = min(end_year, reporter_end)
+            start_year, end_year = REPORTER_DATES[citation.reporter]
+        if citing_doc.dateFiled:
+            end_year = min(end_year, citing_doc.dateFiled.year)
     date_param = 'dateFiled:%s' % build_date_range(start_year, end_year)
     main_params['fq'].append(date_param)
     if not citation.court and citation.reporter in ["U.S.", "U. S."]:
