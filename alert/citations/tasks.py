@@ -79,11 +79,11 @@ def update_document(document):
                 citation.match_url = matched_doc.get_absolute_url()
             except Document.DoesNotExist:
                 if DEBUG >= 2:
-                    print "No matches found for document id %d" % match_id
+                    print "No matches found for document id %s" % match_id
                 continue
             except Document.MultipleObjectsReturned:
                 if DEBUG >= 2:
-                    print "Multiple matches found for document id %d" % match_id
+                    print "Multiple matches found for document id %s" % match_id
                 continue
         else:
             if DEBUG >= 2:
