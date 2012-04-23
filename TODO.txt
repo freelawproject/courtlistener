@@ -1,0 +1,23 @@
+BUGS:
+ - HTML docs with ampersands show the ampersands in the highlighted text.
+ - Court-based RSS feeds need to be Solr-powered, or at least be non-locking
+ - selecting "New Search" resets the filters to have all the statuses selected
+ - Add state courts to the front end
+ 
+To do:
+ - check out the outliars in the DB by date
+ - recreate the stat_maker.py script (see bug)
+ - Check the dates/courts in Brian's list of citation-less docs, and see if we
+   missed any docs.
+ - Move the crt.li apache conf over to the repo
+   
+   
+F3
+ - do the hand file
+ - why three fiscr on coverage page, and one in facets?
+ - what's up with the courts I added to the DB that didn't get any F3 stuff?
+
+Citations:
+ - Restore sitemaps in urls.py and from the cache
+ - Make the celery user able to do things to www-data files
+ 
