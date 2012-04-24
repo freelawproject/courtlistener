@@ -15,4 +15,9 @@ To do:
 F3
  - do the hand file
  - why three fiscr on coverage page, and one in facets?
- - what's up with the courts I added to the DB that didn't get any F3 stuff? 
+ - what's up with the courts I added to the DB that didn't get any F3 stuff?
+
+Citations:
+ - Restore sitemaps in urls.py and from the cache
+ - Make the celery user able to do things to www-data files
+ 
