@@ -28,8 +28,9 @@ def update_documents(documents):
         processed_count += 1
 
         last_document = (count == processed_count)
-        if (processed_count % 20 == 0) or last_document:
-            # Every 1000 documents, we send the subtasks off for processing
+        if (processed_count % 25 == 0) or last_document:
+            # Every 25 documents, we send the subtasks off for processing
+            # Poll to see when they're done.
             job = TaskSet(tasks=subtasks)
             result = job.apply_async()
             while not result.ready():
@@ -43,7 +44,8 @@ def update_documents_by_id(id_list):
     update_documents(docs)
 
 def main():
-    docs = queryset_generator(Document.objects.all(), start=1000)
+    # Rowyn updated 23 April 2012 13:50
+    docs = queryset_generator(Document.objects.all(), start=219880)
     #docs = Document.objects.all()[:10]
     update_documents(docs)
 
