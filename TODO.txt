@@ -20,10 +20,6 @@ F3
 Citations:
  - Restore sitemaps in urls.py and from the cache
  - Make the celery user able to do things to www-data files
- - add blank = True to cited field
- - Should only add text to database if changed. Else it's a waste of space/performance
- - Max_packet_size issue
- - reduce the size of the Solr xmx (and remove it on dev machines)
  - check if disabling the save signal is needed every time, or just the once (perhaps why docs aren't saved?)
         - actually, this is *exactly* why. We need to be more granular in how we disable the save signal. 
  - solr pipeline

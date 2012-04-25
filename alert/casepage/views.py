@@ -25,6 +25,7 @@ from alert.tinyurl.encode_decode import ascii_to_num
 from alert.favorites.forms import FavoriteForm
 from alert.favorites.models import Favorite
 from django.core.exceptions import ObjectDoesNotExist
+from django.http import Http404
 from django.http import HttpResponse
 from django.shortcuts import render_to_response
 from django.shortcuts import get_object_or_404
@@ -107,7 +108,10 @@ def serve_static_file(request, file_path=''):
     doc = get_object_or_404(Document, local_path=file_path)
     file_name = file_path.split('/')[-1]
     file_loc = os.path.join(settings.MEDIA_ROOT, file_path.encode('utf-8'))
-    mimetype = magic.from_file(file_loc, mime=True)
+    try:
+        mimetype = magic.from_file(file_loc, mime=True)
+    except IOError:
+        raise Http404
     response = HttpResponse()
     if doc.blocked:
         response['X-Robots-Tag'] = 'noindex, noodp, noarchive, noimageindex'
