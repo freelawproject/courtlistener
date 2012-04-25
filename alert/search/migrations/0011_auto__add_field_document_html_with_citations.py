@@ -7,7 +7,7 @@ from django.db import models
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        
+
         # Adding field 'Document.html_with_citations'
         db.add_column('Document', 'html_with_citations', self.gf('django.db.models.fields.TextField')(default='', blank=True), keep_default=False)
 
@@ -21,7 +21,7 @@ class Migration(SchemaMigration):
 
 
     def backwards(self, orm):
-        
+
         # Deleting field 'Document.html_with_citations'
         db.delete_column('Document', 'html_with_citations')
 
@@ -36,6 +36,7 @@ class Migration(SchemaMigration):
             'citationUUID': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'docketNumber': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
             'lexisCite': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
+            'neutral_cite': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
             'slug': ('django.db.models.fields.SlugField', [], {'max_length': '50', 'null': 'True', 'db_index': 'True'}),
             'westCite': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'})
         },

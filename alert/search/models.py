@@ -251,7 +251,8 @@ class Document(models.Model):
     cases_cited = models.ManyToManyField(
                       Citation,
                       related_name="citing_cases",
-                      null=True)
+                      null=True,
+                      blank=True)
     documentType = models.CharField(
                       "the type of document, as described by document_types.txt",
                       max_length=50,
