@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% load honeypot %}
+
+{% block title %}CourtListener.com / Register{% endblock %}
+
+{% block footer-scripts %}
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="/media/js/jquery-1.6.2.min.js"><\/script>')</script>
+    <script type="text/javascript">
+	    $(document).ready(function() {
+		    $('.auto-focus:first').focus();
+	    });
+     </script>
+{% endblock %}
+
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div class="span-24 last" id="content">
+        <hr class="space">
+        <hr class="space">
+        <div class="prepend-8 span-8 last">
+            <div class="box round">
+                <h2>Register a new account</h2>
+                {% if form.errors %}
+                    <div class="span-6 error">
+                        <p class="bottom">There were errors with your submission.</p>
+                    </div>
+                {% endif %}
+
+                <form action="" method="post">{% csrf_token %}
+                    {% render_honeypot_field "skip_me_if_alive" %}
+                    <p>
+                        <label for="id_username">Username*</label>
+                        {% if form.username.errors %}
+                            <br><span class="errortext">
+                                {% for error in form.username.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </span>
+                        {% endif %}<br>
+                        <input id="id_username" type="text" name="username" maxlength="30" class="auto-focus span-7">
+                    </p>
+                    <p>
+                        <label for="id_email">Email address*</label>
+                        {% if form.email.errors %}
+                            <br><span class="errortext">
+                                {% for error in form.email.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </span>
+                        {% endif %}<br>
+                        <input type="text" maxlength="75" name="email" id="id_email" class="span-7">
+                    </p>
+                    <p>
+                        <label for="id_password1">Enter password*</label>
+                        {% if form.password1.errors %}
+                            <br><span class="errortext">
+                                {% for error in form.password1.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </span>
+                        {% endif %}<br>
+                        <input type="password" id="id_password1" name="password1" class="span-7">
+                    </p>
+                    <p>
+                        <label for="id_password2">Re-enter password*</label>
+                        {% if form.password2.errors %}
+                            <br><span class="errortext">
+                                {% for error in form.password2.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </span>
+                        {% endif %}<br>
+                        <input type="password" id="id_password2" name="password2" class="span-7">
+                    </p>
+                    <p>
+                        <label for="id_first_name">First name</label>
+                        {% if form.first_name.errors %}
+                            <br><span class="errortext">
+                                {% for error in form.first_name.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </span>
+                        {% endif %}<br>
+                        <input type="text" maxlength="30" name="first_name" id="id_first_name" class="span-7">
+                    </p>
+                    <p>
+                        <label for="id_last_name">Last name</label>
+                        {% if form.last_name.errors %}
+                            <br><span class="errortext">
+                                {% for error in form.last_name.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </span>
+                        {% endif %}<br>
+                        <input type="text" maxlength="30" name="last_name" id="id_last_name" class="span-7">
+                    </p>
+                    <button type="submit" class="button" name="register">Register</button>
+                    <p><a href="/reset-password/">Forgot username/password?</a></p>
+                </form>
+            </div>
+        </div>
+    </div>
+    <hr class="space">
+    <hr class="space">
+{% endblock %}
