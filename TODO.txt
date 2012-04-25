@@ -26,3 +26,4 @@ Citations:
  - reduce the size of the Solr xmx (and remove it on dev machines)
  - check if disabling the save signal is needed every time, or just the once (perhaps why docs aren't saved?)
         - actually, this is *exactly* why. We need to be more granular in how we disable the save signal. 
+ - solr pipeline
