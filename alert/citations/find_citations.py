@@ -191,7 +191,9 @@ def get_citations(text, html=True):
     words = reporter_tokenizer.tokenize(text)
     citations = []
     previous_end_position = 0
-    for i in xrange(len(words)):
+    # Exclude first and last tokens when looking for reporters, because valid
+    # citations must have a volume before and a page number after the reporter.
+    for i in xrange(1,len(words)-1):
         # Find reporter
         if words[i] in reporter_tokenizer.REPORTERS:
             citation = extract_base_citation(words, i)
