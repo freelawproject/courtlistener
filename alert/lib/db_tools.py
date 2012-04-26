@@ -36,10 +36,13 @@ def queryset_generator(queryset, chunksize=1000):
         chunksize = 5
 
     documentUUID = queryset.order_by('pk')[0].documentUUID
+    # Decrement document ID for use with 'greater than' filter
+    if documentUUID > 0:
+        documentUUID -= 1
     last_pk = queryset.order_by('-pk')[0].documentUUID
     queryset = queryset.order_by('pk')
     while documentUUID < last_pk:
-        for row in queryset.filter(documentUUID__gte=documentUUID)[:chunksize]:
+        for row in queryset.filter(documentUUID__gt=documentUUID)[:chunksize]:
             documentUUID = row.documentUUID
             yield row
 
