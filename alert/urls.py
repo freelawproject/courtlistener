@@ -16,6 +16,8 @@
 
 # imports of local settings and views
 from alert import settings
+from alert.casepage.sitemap import sitemap_maker
+from alert.casepage.sitemap import flat_sitemap_maker
 from alert.casepage.views import view_case
 from alert.casepage.views import serve_static_file
 from alert.contact.views import contact
@@ -56,8 +58,6 @@ from alert.userHandling.views import view_favorites
 from alert.userHandling.views import view_alerts
 from alert.userHandling.views import view_settings
 
-# this imports a variable that can be handed to the sitemap index generator function.
-from alert.casepage.sitemap import all_sitemaps as sitemaps
 from django.conf.urls.defaults import *
 
 # for the flatfiles in the sitemap
@@ -175,10 +175,8 @@ urlpatterns = patterns('',
     (r'^google646349975c2495b6.html$', validate_for_google3),
 
     # Sitemap index generator
-    (r'^sitemap\.xml$', 'alert.casepage.sitemap.index_copy', {'sitemaps': sitemaps}),
-    # this uses a custom sitemap generator that has a file-based cache.
-    #(r'^sitemap-(?P<section>.+)\.xml$', 'alert.casepage.sitemap.cached_sitemap',
-    #    {'sitemaps': sitemaps}),
+    (r'^sitemap\.xml$', sitemap_maker),
+    (r'^sitemap-flat\.xml$', flat_sitemap_maker),
     (r'^robots.txt$', robots)
 )
 
