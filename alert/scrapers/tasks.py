@@ -41,6 +41,9 @@ from datetime import date
 from lxml import etree
 from lxml.etree import tostring
 
+# adding alert to the front of this breaks celery. Ignore pylint error.
+from citations.tasks import update_document_by_id
+
 import os
 import re
 import StringIO
@@ -52,7 +55,8 @@ import traceback
 def extract_doc_content(pk):
     '''
     Given a document, we extract it, sniffing its mimetype, then store its 
-    contents in the database. 
+    contents in the database.  Finally, we asynchronously find citations in
+    the document content and match them to other documents.
     
     TODO: this implementation cannot be distributed due to using local paths.
     '''
@@ -144,6 +148,9 @@ def extract_doc_content(pk):
         print "****Error saving text to the db for: " + doc.citation.case_name + "****"
         print traceback.format_exc()
         return 3
+
+    # Identify and link citations within the document content
+    update_document_by_id.delay(doc.pk)
 
     logger.info("Successfully extracted contents of document %s" % (pk,))
     return 0

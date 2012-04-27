@@ -175,15 +175,21 @@ class Citation(models.Model):
                                       blank=True,
                                       null=True)
 
-    def save(self, *args, **kwargs):
+    def save(self, index=True, *args, **kwargs):
         '''
         create the URL from the case name, but only if this is the first
         time it has been saved.
         '''
+        created = self.pk is None
         if not self.citationUUID:
             # it's the first time it has been saved; generate the slug stuff
             self.slug = trunc(slugify(self.case_name), 50)
         super(Citation, self).save(*args, **kwargs)
+
+        # We only do this on update, not creation
+        if index and not created:
+            from search.tasks import update_cite
+            update_cite.delay(self.pk)
 
     def __unicode__(self):
         if self.case_name:
@@ -288,16 +294,18 @@ class Document(models.Model):
         ascii = num_to_ascii(self.documentUUID)
         return "http://crt.li/x/" + ascii
 
-    def save(self, *args, **kwargs):
+    def save(self, index=True, *args, **kwargs):
         '''
         If the value of blocked changed to True, invalidate the caches
         where that value was stored. Google can later pick it up properly.
-        
-        Note that there is also a celery task associated with the post_save
-        signal.
         '''
         # Run the standard save function.
         super(Document, self).save(*args, **kwargs)
+
+        # Update the search index.
+        if index:
+            from search.tasks import add_or_update_doc
+            add_or_update_doc.delay(self.pk)
 
         # Delete the cached sitemaps and dumps if the item is blocked.
         if self.blocked:
@@ -310,12 +318,13 @@ class Document(models.Model):
         If the item is deleted, we need to update the caches that previously
         contained it. Note that this doesn't get called when an entire queryset
         is deleted, but that should be OK.
-        
-        Note that there is also a celery task associated with the post_delete
-        signal.
         '''
         # Delete the item.
         super(Document, self).delete(*args, **kwargs)
+
+        # Update the search index.
+        from search.tasks import delete_doc
+        delete_doc.delay(self.pk)
 
         # Invalidate the sitemap and dump caches
         invalidate_sitemap_cache_by_court(self.court_id)
