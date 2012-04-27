@@ -49,11 +49,6 @@ def sitemap_maker(request, size=250):
             url = {}
             url['location'] = '%s://courtlistener.com%s' % (protocol,
                                                             result['absolute_url'])
-            try:
-                url['lastmod'] = result['dateFiled']
-            except KeyError:
-                # Some docs don't have this...
-                pass
             url['changefreq'] = 'never'
             url['priority'] = '0.5'
             urls.append(url)
