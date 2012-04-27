@@ -82,73 +82,69 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                     # These are required by the DB, and thus are safe
                     # without the try/except blocks
                     row.set('id', str(doc.documentUUID))
+                    row.set('path', doc.get_absolute_url())
                     row.set('sha1', doc.documentSHA1)
                     row.set('court', doc.court.full_name)
                     row.set('download_URL', doc.download_URL)
                     row.set('time_retrieved', str(doc.time_retrieved))
+                    # All are wrapped in try/except b/c the value might not be found.
                     try:
                         row.set('dateFiled', str(doc.dateFiled))
                     except:
-                        # Value not found.
-                        row.set('dateFiled', '')
+                        pass
                     try:
                         row.set('precedentialStatus', doc.documentType)
                     except:
-                        # Value not found.
-                        row.set('precedentialStatus', '')
+                        pass
                     try:
                         row.set('local_path', str(doc.local_path))
                     except:
-                        # Value not found.
-                        row.set('local_path', '')
+                        pass
                     try:
                         row.set('docketNumber', doc.citation.docketNumber)
                     except:
-                        # Value not found.
-                        row.set('docketNumber', '')
+                        pass
                     try:
                         row.set('westCite', doc.citation.westCite)
                     except:
-                        # Value not found.
-                        row.set('westCite', '')
+                        pass
                     try:
                         row.set('lexisCite', doc.citation.lexisCite)
                     except:
-                        # Value not found.
-                        row.set('lexisCite', '')
+                        pass
                     try:
                         row.set('neutral_cite', doc.citation.neutral_cite)
                     except:
-                        # Value not found.
-                        row.set('neutral_cite', '')
+                        pass
                     try:
                         row.set('case_name', doc.citation.case_name)
                     except:
-                        # Value not found.
-                        row.set('case_name', '')
+                        pass
                     try:
                         row.set('source', doc.get_source_display())
                     except:
-                        # Value not found.
-                        row.set('source', '')
+                        pass
                     try:
                         row.set('blocked', str(doc.blocked))
                     except:
-                        # Value not found.
-                        row.set('blocked', '')
+                        pass
                     try:
                         row.set('date_blocked', str(doc.date_blocked))
                     except:
-                        # Value not found.
-                        row.set('date_blocked', '')
+                        pass
                     try:
                         row.set('extracted_by_ocr', str(doc.extracted_by_ocr))
                     except:
-                        # Value not found.
-                        row.set('extracted_by_ocr', '')
+                        pass
+
+                    ids = ','.join([str(pk) for pk in doc.citation.citing_cases.all().values_list('pk', flat=True)])
+                    if len(ids) > 0:
+                        row.set('cited_by', ids)
 
                     # Gather the doc text
-                    if doc.documentHTML != '':
+                    if doc.html_with_citations != '':
+                        row.text = doc.html_with_citations.translate(null_map)
+                    elif doc.documentHTML != '':
                         row.text = doc.documentHTML
                     else:
                         row.text = doc.documentPlainText.translate(null_map)

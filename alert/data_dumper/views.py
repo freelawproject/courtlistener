@@ -38,7 +38,7 @@ def dump_index(request):
         dump_size = size(os.path.getsize(os.path.join(DUMP_DIR, 'all.xml.gz')))
     except os.error:
         # Happens when the file is unaccessible or doesn't exist. An estimate.
-        dump_size = '2.1GB'
+        dump_size = '2.8GB'
     return render_to_response('dumps/dumps.html',
                               {'courts' : courts,
                                'dump_size': dump_size},
@@ -48,8 +48,9 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
     if year is None:
         if court != 'all':
             # Sanity check
-            return HttpResponseBadRequest('<h2>Error 400: Complete dumps are \
-                not available for individual courts.</h2>')
+            return HttpResponseBadRequest('<h2>Error 400: Complete dumps are '
+                'not available for individual courts. Try using "all" for your '
+                'court ID instead.</h2>')
         else:
             # Serve the dump for all cases.
             return HttpResponseRedirect('/dumps/all.xml.gz')
@@ -63,12 +64,12 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
         today_str = '%d-%02d-%02d' % (today.year, today.month, today.day)
         if (today_str < end_date) and (today_str < start_date):
             # It's the future. They fail.
-            return HttpResponseBadRequest('<h2>Error 400: Requested date is in\
-                the future. Please try again later.</h2>')
+            return HttpResponseBadRequest('<h2>Error 400: Requested date is in '
+                'the future. Please try again then.</h2>')
         elif today_str <= end_date:
             # Some of the data is in the past, some could be in the future.
-            return HttpResponseBadRequest('<h2>Error 400: Requested date is \
-                partially in the future. Please try again later.</h2>')
+            return HttpResponseBadRequest('<h2>Error 400: Requested date is '
+                'partially in the future. Please try again then.</h2>')
 
     filename = court + '.xml'
     if daily:
@@ -100,5 +101,4 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
 
         make_dump_file(docs_to_dump, path_from_root, filename)
 
-        return HttpResponseRedirect(os.path.join('/dumps', filepath, filename)
-                                    + '.gz')
+        return HttpResponseRedirect('%s.gz' % os.path.join('/dumps', filepath, filename))

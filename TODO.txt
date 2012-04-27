@@ -1,4 +1,5 @@
 BUGS:
+ - New code for saving pdf makes 404s.
  - HTML docs with ampersands show the ampersands in the highlighted text.
  - Court-based RSS feeds need to be Solr-powered, or at least be non-locking
  - selecting "New Search" resets the filters to have all the statuses selected
@@ -27,3 +28,6 @@ Citations:
 Dumps:
   - add citation info
   - add absolute urls
+  
+Sitemaps:
+ - remove old sitemaps
