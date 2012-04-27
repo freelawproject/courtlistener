@@ -24,9 +24,7 @@ setup_environ(settings)
 from alert.citations import find_citations
 from alert.citations import match_citations
 from alert.search.models import Document
-from alert.search.tasks import save_doc_handler
 from celery.decorators import task
-from django.db.models.signals import post_save
 
 import re
 
@@ -56,6 +54,9 @@ def create_cited_html(document, citations):
 
 @task
 def update_document(document):
+    print "%s at http://courtlistener.com/admin/search/citation/%s/" % \
+        (document.citation.case_name, document.citation.pk)
+
     DEBUG = 2
     citations = get_document_citations(document)
     # List for tracking number of citation vs. name matches
@@ -79,11 +80,11 @@ def update_document(document):
                 citation.match_url = matched_doc.get_absolute_url()
             except Document.DoesNotExist:
                 if DEBUG >= 2:
-                    print "No matches found for document id %s" % match_id
+                    print "No database matches found for document id %s" % match_id
                 continue
             except Document.MultipleObjectsReturned:
                 if DEBUG >= 2:
-                    print "Multiple matches found for document id %s" % match_id
+                    print "Multiple database matches found for document id %s" % match_id
                 continue
         else:
             if DEBUG >= 2:
@@ -95,18 +96,15 @@ def update_document(document):
             print document.html_with_citations
 
     # Turn off solr updating; we're not changing anything in the search index
-    post_save.disconnect(
-        save_doc_handler,
-        sender=Document,
-        dispatch_uid='save_doc_handler')
-    document.save()
+    document.save(index=False)
     citation_matches = sum(matched_citations)
     name_matches = len(matched_citations) - citation_matches
 
-    print "%s at http://courtlistener.com/admin/search/citation/%s/" % \
-                            (document.citation.case_name, document.citation.pk)
     print "  %d citations" % len(citations)
     print "  %d exact matches" % citation_matches
     print "  %d name matches" % name_matches
 
-    return (len(citations), citation_matches, name_matches)
+@task
+def update_document_by_id(document_id):
+    doc = Document.objects.get(pk=document_id)
+    update_document(doc)
