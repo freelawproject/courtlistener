@@ -35,6 +35,7 @@ def make_get_string(request):
         get_string = get_string + '&'
     return get_string
 
+
 def get_string_to_dict(get_string):
     '''Reverses the work that the make_get_string function performs, building a 
     dict from the get_string. 
@@ -45,6 +46,7 @@ def get_string_to_dict(get_string):
     for k, v in parse_qs(get_string).iteritems():
         get_dict[k] = v[0]
     return get_dict
+
 
 def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
     '''Create a useful facet variable for use in a template
@@ -86,6 +88,7 @@ def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
         facets.append(facet)
     return facets
 
+
 def make_date_query(cd):
     '''Given the cleaned data from a form, return a valid Solr fq string'''
     before = cd['filed_before']
@@ -104,6 +107,7 @@ def make_date_query(cd):
         return ""
     return 'dateFiled:%s' % date_filter
 
+
 def get_selected_field_string(cd, prefix):
     '''Pulls the selected checkboxes out of the form data, and puts it into Solr
     strings. Uses a prefix to know which items to pull out of the cleaned data.
@@ -118,6 +122,7 @@ def get_selected_field_string(cd, prefix):
 
     selected_field_string = ' OR '.join(selected_fields)
     return selected_field_string
+
 
 def build_main_query(cd, highlight=True):
     main_params = {}
@@ -192,6 +197,7 @@ def build_main_query(cd, highlight=True):
     #print "Params sent to search are: %s" % '&'.join(['%s=%s' % (k, v) for k, v in main_params.items()])
     #print results_si.execute()
     return main_params
+
 
 def place_facet_queries(cd):
     '''Get facet values for the court and status filters

@@ -52,6 +52,7 @@ DOCUMENT_SOURCES = (
     ('A', 'internet archive'),
 )
 
+
 def make_pdf_upload_path(instance, filename):
     """Return a string like pdf/2010/08/13/foo_v._var.pdf, with the date set
     as the dateFiled for the case."""
@@ -67,24 +68,6 @@ def make_pdf_upload_path(instance, filename):
             get_valid_filename(filename)
     return path
 
-def invalidate_sitemap_cache_by_court(court):
-    '''Deletes sitemaps for a given court
-    
-    Recieves a court ID as a string, and deletes all sitemaps that are cached on
-    disk for that court. Could be optimized to delete the correct sitemap file, 
-    but remember that this is a disk-based cache, so we should be OK with 
-    deleting it from time to time.
-    '''
-    # Get the original location so we can return to it at the end.
-    original_dir = os.getcwd()
-
-    os.chdir(os.path.join(settings.MEDIA_ROOT, 'sitemaps'))
-    sitemaps = glob.glob('%s*' % court)
-    for sitemap in sitemaps:
-        os.remove(sitemap)
-
-    # Go back to the original location.
-    os.chdir(original_dir)
 
 def invalidate_dumps_by_date_and_court(date, court):
     '''Deletes dump files for a court and date
@@ -309,7 +292,6 @@ class Document(models.Model):
 
         # Delete the cached sitemaps and dumps if the item is blocked.
         if self.blocked:
-            invalidate_sitemap_cache_by_court(self.court_id)
             invalidate_dumps_by_date_and_court(self.dateFiled, self.court_id)
 
 
@@ -327,9 +309,7 @@ class Document(models.Model):
         delete_doc.delay(self.pk)
 
         # Invalidate the sitemap and dump caches
-        invalidate_sitemap_cache_by_court(self.court_id)
         invalidate_dumps_by_date_and_court(self.dateFiled, self.court_id)
 
     class Meta:
         db_table = "Document"
-        ordering = ["-time_retrieved"]

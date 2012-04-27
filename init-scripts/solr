@@ -12,6 +12,7 @@
 start () {
     echo -n "Starting solr..."
 
+    # Use python to determine if this is a dev machine
     DEV=`python -c 'import os.path;
 import glob;
 conffiles = glob.glob(os.path.join("/var/www/court-listener/alert/settings", "*.conf"));
