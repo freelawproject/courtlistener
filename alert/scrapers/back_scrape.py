@@ -39,10 +39,8 @@ from alert.lib.string_utils import trunc
 from alert.search.models import Citation
 from alert.search.models import Court
 from alert.search.models import Document
-from alert.search.tasks import save_doc_handler
 
 from django.core.files.base import ContentFile
-from django.db.models.signals import post_save
 from juriscraper.GenericSite import logger
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
@@ -143,14 +141,10 @@ def scrape_court(court):
                     continue
 
 
-                # Save everything
-                post_save.disconnect(
-                            save_doc_handler,
-                            sender=Document,
-                            dispatch_uid='save_doc_handler')
-                cite.save()
+                # Save everything, but don't update Solr index yet
+                cite.save(index=False)
                 doc.citation = cite
-                doc.save()
+                doc.save(index=False)
 
                 # Extract the contents asynchronously.
                 extract_doc_content.delay(doc.pk)

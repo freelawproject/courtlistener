@@ -66,34 +66,28 @@ def add_or_update_docs(docs):
         si.commit()
 
 @task
-def delete_doc_handler(sender, **kwargs):
-    '''Responds to the post_delete signal and deletes the document from the 
-    index. See search/__init__.py for the connecting code.
+def delete_doc(document_id):
+    '''Deletes the document from the index.  Called by Document delete function.
     '''
-    si.delete(kwargs['instance'].pk)
+    si.delete(document_id)
     si.commit()
 
 @task
-def save_doc_handler(sender, **kwargs):
-    '''Responds to the post_save signal and updates the document in the search
-    index. See search/__init__.py for the connecting code.
+def add_or_update_doc(document_id):
+    '''Updates the document in the index.  Called by Document save function.
     '''
-    doc = Document.objects.get(pk=kwargs['instance'].pk)
+    doc = Document.objects.get(pk=document_id)
     search_doc = SearchDocument(doc)
     si.add(search_doc)
     si.commit()
 
 @task
-def save_cite_handler(sender, **kwargs):
-    '''If a citation is updated, we should update the index. If a citation and
-    a document are both updated simultaneously, we will needlessly update the
-    index twice. No easy way around it.
+def update_cite(citation_id):
+    '''If a citation and a document are both updated simultaneously, we will
+    needlessly update the index twice. No easy way around it.
     '''
-    if not kwargs['created']:
-        # We only do this on update, not creation.
-        cite = Citation.objects.get(pk=kwargs['instance'].pk)
-        docs = Document.objects.filter(citation=cite)
-        for doc in docs:
-            search_doc = SearchDocument(doc)
-            si.add(search_doc)
-        si.commit()
+    cite = Citation.objects.get(pk=citation_id)
+    for doc in cite.document_set.all():
+        search_doc = SearchDocument(doc)
+        si.add(search_doc)
+    si.commit()
