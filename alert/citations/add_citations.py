@@ -15,6 +15,7 @@ from celery.task.sets import TaskSet
 from citations.tasks import update_document
 
 import time
+from argparse import ArgumentParser
 
 DEBUG = 2
 
@@ -39,14 +40,26 @@ def update_documents(documents):
             # The jobs finished - clean things up for the next round
             subtasks = []
 
-def update_documents_by_id(id_list):
-    docs = Document.objects.filter(pk__in=id_list)
-    update_documents(docs)
-
 def main():
-    # Rowyn updated 23 April 2012 13:50
-    docs = queryset_generator(Document.objects.all(), start=219880)
-    #docs = Document.objects.all()[:10]
+    parser = ArgumentParser()
+    parser.add_argument('--doc_ids', type=int, nargs='+', default=[],
+                        help='id(s) of one or more documents to update')
+    parser.add_argument('--start_id', type=int, default=0,
+                        help='start id for a range of documents to update')
+    parser.add_argument('--end_id', type=int,
+                        help='end id for a range of documents to update')
+    args = parser.parse_args()
+
+    if args.doc_ids and (args.start_id or args.end_id):
+        parser.error("You cannot specify both a list and a range of ids.")
+
+    if args.doc_ids:
+        query = Document.objects.filter(pk__in=args.doc_ids)
+    elif args.end_id:
+        query = Document.objects.filter(pk__gte=args.start_id, pk__lte=args.end_id)
+    else:
+        query = Document.objects.filter(pk__gte=args.start_id)
+    docs = queryset_generator(query)
     update_documents(docs)
 
 if __name__ == '__main__':
