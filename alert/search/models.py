@@ -171,6 +171,7 @@ class Citation(models.Model):
 
         # We only do this on update, not creation
         if index and not created:
+            # Import is here to avoid looped import problem
             from search.tasks import update_cite
             update_cite.delay(self.pk)
 
@@ -287,6 +288,7 @@ class Document(models.Model):
 
         # Update the search index.
         if index:
+            # Import is here to avoid looped import problem
             from search.tasks import add_or_update_doc
             add_or_update_doc.delay(self.pk)
 
@@ -305,6 +307,7 @@ class Document(models.Model):
         super(Document, self).delete(*args, **kwargs)
 
         # Update the search index.
+        # Import is here to avoid looped import problem
         from search.tasks import delete_doc
         delete_doc.delay(self.pk)
 

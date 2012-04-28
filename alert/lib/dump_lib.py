@@ -142,9 +142,9 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                         row.set('cited_by', ids)
 
                     # Gather the doc text
-                    if doc.html_with_citations != '':
+                    if doc.html_with_citations:
                         row.text = doc.html_with_citations.translate(null_map)
-                    elif doc.documentHTML != '':
+                    elif doc.documentHTML:
                         row.text = doc.documentHTML
                     else:
                         row.text = doc.documentPlainText.translate(null_map)

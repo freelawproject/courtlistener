@@ -20,14 +20,3 @@ F3
 
 Citations:
  - re-enable backups
- - Make the celery user able to do things to www-data files
- - check if disabling the save signal is needed every time, or just the once (perhaps why docs aren't saved?)
-        - actually, this is *exactly* why. We need to be more granular in how we disable the save signal. 
- - solr pipeline
-
-Dumps:
-  - add citation info
-  - add absolute urls
-  
-Sitemaps:
- - remove old sitemaps
