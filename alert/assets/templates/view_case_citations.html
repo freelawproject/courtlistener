@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% load text_filters %}
+
+{# Shown on document citation pages. #}
+
+{% block title %}CourtListener.com / Cases / {{ title }}{% endblock %}
+
+{% block head %}
+    {% if not error %}
+        {% if get_string %}
+            <link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?{{ get_string }}" />
+        {% endif %}
+        <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">
+        {% for court in court_facets %}
+            <link rel="alternate" type="application/rss+xml" title="Atom feed for {{ court.0 }}" href="/feed/court/{{ court.4 }}/">
+        {% endfor %}
+    {% endif %}
+    {% if doc.blocked %}
+        <!--  blocked as of {{ doc.date_blocked|default_if_none:"an unknown date" }} -->
+        <meta name="robots" content="noindex, noodp, noarchive, noimageindex" />
+    {% endif %}
+    <link rel="shortlink" type="text/html" href="{{doc.get_small_url}}">
+{% endblock %}
+
+{% block footer-scripts %}
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="/media/js/jquery-1.6.2.min.js"><\/script>')</script>
+    <script defer type="text/javascript" src="/media/js/jquery.NobleCount.min.js"></script>
+    <script type="text/javascript">
+    $('.sidebar-section h3').click(function() {
+    	// Toggles the sidebar sections
+        $(this).next('.hidden').toggle('fast');
+        $(this).next('.shown').toggle('fast');
+        $(this).toggleClass('arrow-right-before');
+        $(this).toggleClass('arrow-down-before');
+    });
+    </script>
+    <script type="text/javascript">
+    
+    function isBetween(num, beginning, end) {
+        return beginning < num && num < end;
+        }
+    
+    $('#citation-filters-submit').click(function() {
+        // applies filters to list of citations
+        
+        // console.log('filter button clicked');
+        event.preventDefault();
+        
+        var filedAfter = parseInt($('#citation-filters input').filter('input[name="filed_after"]')[0].value);
+        var filedBefore = parseInt($('#citation-filters input').filter('input[name="filed_before"]')[0].value);
+        var checkedCourts = $('#citation-filters input').filter(':checked');
+        var citingCases = $('.citing-case');
+        var courtmatch;
+        var yearmatch;
+        var year;
+        
+        // if any filters are active
+        if (checkedCourts.length || filedAfter || filedBefore) {
+            //console.log('there are active filters');
+            if (!filedAfter && filedAfter !== 0) {
+                filedAfter = 0;
+            }
+            if (!filedBefore && filedBefore !== 0) {
+                // arbitrary value larger than any year
+                filedBefore = 10000;
+            }
+
+            citingCases.each(function(index) {
+            
+                // the year is always the last class, right now, or the one before 'hidden'
+                // warning: this is really hacky and likely to break
+                year = $(this).attr('class').split(' ').pop();
+                if (year == 'hidden') {
+                    year = $(this).attr('class').split(' ').pop();
+                }
+                yearmatch = isBetween(parseInt(year), filedAfter, filedBefore);
+                // grr, there's a bug in the year matching that I can't figure out...
+                // check one court, filter, uncheck that court and check another court, filter again... the previously-filtered citations don't come back :/
+                // but they *do* come back if you clear all filters and filter!
+                console.log("Matches year: " + yearmatch);
+                
+                // if year already doesn't match, don't bother with the court matching
+                if (yearmatch) {
+                    if (checkedCourts) {
+                        courtmatch = false;
+                        for (var i in checkedCourts) {
+                            if ($(this).hasClass(checkedCourts[i].name)) {
+                                courtmatch = true;
+                                break;
+                            }
+                        }
+                    }
+                    else {
+                        courtmatch = true;
+                    }
+                }
+                else {
+                    courtmatch = false;
+                }
+                // console.log("Matches court: " + courtmatch);
+                
+                if (yearmatch && courtmatch) {
+                    // this animation might not be working, it's hard to tell
+                    $(this).removeClass('hidden');
+                    $(this).animate({opacity: 1}, 600 );
+                }
+                else {
+                    // this animation doesn't work
+                    $(this).animate({opacity: 0}, 600 );
+                    $(this).addClass('hidden');
+                }
+            }); 
+        }
+        else {
+            // console.log('no active filters');
+            citingCases.each( function(j){ $(this).removeClass('hidden'); $(this).animate({opacity: 1}, 600 ); } );
+        }
+    });
+    </script>
+{% endblock %}
+
+{% block sidebar %}
+    <div class="span-5 append-2" id="sidebar">
+        <div class="sidebar-section">
+        <h4 class="bottom"><a href="{{ doc.get_absolute_url }}">< Back to case view page</a></h4>
+        </div>
+        <div class="sidebar-section">
+        <h3 class="bottom pointer arrow-down-before">Filters</h3>
+            <div class="shown">
+                <form id="citation-filters">
+                <h4 class="bottom">Filed From</h4>
+	                <p class="bottom span-5"><input autocomplete="off" name="filed_after" placeholder="YYYY" type="text" class="span-2 external-input" id="id_filed_after" /></p>
+	                <h4 class="bottom">Filed To</h4>
+	                <p class="bottom span-5"><input autocomplete="off" name="filed_before" placeholder="YYYY" type="text" class="span-2 external-input" id="id_filed_before" /></p>
+                <h4 class="bottom">Court</h4>
+                {% for court in included_courts %}
+                <p class="bottom"><input type="checkbox" class="external-input court-checkbox" id="id_{{ court.courtUUID }}" name="{{ court.courtUUID }}" > <label for="{{ court.courtUUID }}">{{ court.short_name }}</label></p>
+                {% endfor %}
+                
+                <input id="citation-filters-submit" type="submit" value="Filter citing cases">
+                </form>
+            </div>
+        </div>
+    </div>
+       
+{% endblock sidebar %}
+
+{% block content %}
+    <article class="span-17 last">
+        <h2>
+            {{ doc.citation.case_name|v_wrapper }},
+            {% if doc.citation.westCite %}
+                {{doc.citation.westCite}}
+            {% else %}
+                {{doc.citation.docketNumber}}
+            {% endif %}
+            ({% if doc.court.citation_string != 'SCOTUS' %}{{doc.court.citation_string|nbsp}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
+        </h2>
+
+        <div id="cited-by-viewer">
+        <h3>Cited by {{ doc.citation.citing_cases.count }} cases:</h3>
+        <hr>
+        {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
+                <ul>
+                    {% for case in citing_cases %}
+                    <li class="citing-case {{ case.court.courtUUID }} {{ case.dateFiled.year }}">
+                    <span class="citation-name"><a href="{{case.get_small_url}}">{{ case.citation.case_name|v_wrapper }}
+                    {% if case.citation.westCite %}
+                        {{case.citation.westCite}}
+                    {% else %}
+                        {{case.citation.docketNumber}}
+                    {% endif %}</a></span><br/>
+            {{ case.court }} | {{ case.dateFiled }} | {{ case.citation.citing_cases.count }} citations</li>
+                    {% endfor %}
+                </ul>
+        </div>
+    </article>
+{% endblock %}
