@@ -92,23 +92,34 @@ class court_feed(Feed):
     author_email = "feeds@courtlistener.com"
 
     def items(self, obj):
-        return Document.objects.filter(court=obj.courtUUID).order_by("-dateFiled")[:20]
+        '''Do a Solr query here. Return the first 20 results'''
+        conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+        params = {}
+        params['q'] = '*:*'
+        params['court_exact'] = obj.courtUUID
+        params['sort'] = 'dateFiled desc'
+        params['rows'] = '20'
+        params['start'] = '0'
+        results_si = conn.raw_query(**params).execute()
+        return results_si
 
-    item_author_name = "CourtListener.com"
+    def item_link(self, item):
+        return item['absolute_url']
 
-    def item_author_link(self, item):
-        return item.court.URL
+    def item_author_name(self, item):
+        return item['court']
 
     def item_pubdate(self, item):
         import datetime
-        return datetime.datetime.combine(item.dateFiled, datetime.time())
+        return datetime.datetime.combine(item['dateFiled'], datetime.time())
+
+    def item_title(self, item):
+        return item['caseName']
 
     def item_categories(self, item):
-        cat = [item.get_documentType_display(), ]
-        return cat
+        return [item['status'], ]
 
-    description_template = 'feeds/template.html'
-    title_template = 'feeds/title_template.html'
+    description_template = 'feeds/solr_desc_template.html'
 
 
 class all_courts_feed(Feed):
@@ -125,20 +136,30 @@ class all_courts_feed(Feed):
     author_email = "feeds@courtlistener.com"
 
     def items(self, obj):
-        return Document.objects.all().order_by("-dateFiled")[:20]
+        '''Do a Solr query here. Return the first 20 results'''
+        conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+        params = {}
+        params['q'] = '*:*'
+        params['sort'] = 'dateFiled desc'
+        params['rows'] = '20'
+        params['start'] = '0'
+        results_si = conn.raw_query(**params).execute()
+        return results_si
 
-    item_author_name = "CourtListener.com"
+    def item_link(self, item):
+        return item['absolute_url']
 
-    def item_author_link(self, item):
-        return item.court.URL
+    def item_author_name(self, item):
+        return item['court']
 
     def item_pubdate(self, item):
         import datetime
-        return datetime.datetime.combine(item.dateFiled, datetime.time())
+        return datetime.datetime.combine(item['dateFiled'], datetime.time())
+
+    def item_title(self, item):
+        return item['caseName']
 
     def item_categories(self, item):
-        cat = [item.get_documentType_display(), ]
-        return cat
+        return [item['status'], ]
 
-    description_template = 'feeds/template.html'
-    title_template = 'feeds/title_template.html'
+    description_template = 'feeds/solr_desc_template.html'
