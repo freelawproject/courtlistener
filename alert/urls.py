@@ -101,8 +101,18 @@ urlpatterns = patterns('',
     # Display a case; a named URL because the get_absolute_url uses it.
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case,
         name="view_case"),
+
+    # Display a case's citations page
+    url(r'^(?:' + "|".join(pacer_codes) + ')/(.*)/(.*)/cited-by/$',
+        view_case_citations,
+        name="view_case_citations"),
+
     # Serve a static file
-    (r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$', serve_static_file),
+    (r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$',
+        serve_static_file),
+
+
+
 
     # Redirect users that arrive via crt.li
     (r'^x/(.*)/$', redirect_short_url),

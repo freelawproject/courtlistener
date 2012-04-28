@@ -19,12 +19,12 @@ from alert.lib import magic
 from alert.lib import search_utils
 from alert.lib.string_utils import trunc
 from alert.search.forms import SearchForm
-from alert.search.models import Court
-from alert.search.models import Document
+from alert.search.models import Citation, Court, Document
 from alert.tinyurl.encode_decode import ascii_to_num
 from alert.favorites.forms import FavoriteForm
 from alert.favorites.models import Favorite
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Count
 from django.http import Http404
 from django.http import HttpResponse
 from django.shortcuts import render_to_response
@@ -87,13 +87,44 @@ def view_case(request, court, pk, casename):
         favorite_form = FavoriteForm(initial={'doc_id': doc.documentUUID,
             'name' : doc.citation.case_name})
 
+    # get first five most influential cases that cite this case
+    citing_docs = doc.citation.citing_cases.all()
+    cited_by_trunc = citing_docs.annotate(influence=Count('citation__citing_cases')).order_by('-influence', 'dateFiled')[:5]
+
     return render_to_response(
                   'view_case.html',
                   {'title': title, 'doc': doc, 'court': ct, 'count': count,
                    'favorite_form': favorite_form, 'search_form': search_form,
                    'get_string': get_string, 'court_facets': court_facets,
-                   'status_facets': status_facets},
+                   'status_facets': status_facets,
+                   'cited_by_trunc': cited_by_trunc},
                   RequestContext(request))
+
+
+def view_case_citations(request, pk, casename):
+    # Decode the id string back to an int
+    pk = ascii_to_num(pk)
+
+    # Look up the document, title
+    doc = get_object_or_404(Document, documentUUID=pk)
+    title = trunc(doc.citation.case_name, 100)
+
+    #Get list of citing cases, ordered by influence
+    citing_docs = doc.citation.citing_cases.all()
+    citing_cases = citing_docs.annotate(influence=Count('citation__citing_cases')).order_by('-influence', 'dateFiled')
+
+    included_courts = []
+    # only send to template the courts for which we have citing cases
+    for court in Court.objects.all():
+        if citing_cases.filter(court=court):
+            included_courts.append(court)
+
+    return render_to_response('view_case_citations.html',
+                              {'title': title, 'doc': doc,
+                               'citing_cases': citing_cases,
+                               'included_courts': included_courts},
+                              RequestContext(request))
+
 
 def serve_static_file(request, file_path=''):
     '''Sends a static file to a user.

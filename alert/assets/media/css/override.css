@@ -162,6 +162,46 @@ nav ul li {
     color: black;
 }
 
+/* New case view styling, including citations */
+#text pre, .citation { 
+    font-family: "Helvetica Neue", Arial, Helvetica, sans-serif; 
+}
+
+/* cited by sidebar list styling */
+div.shown {
+    padding-top: 5px;
+}
+
+div.shown ul {
+    margin: 0;
+    padding: 0 0 0 17px;
+}
+
+.more { 
+    float: right; 
+}
+
+/* cited by viewer styling */
+#cited-by-viewer hr {
+    margin-bottom: 2px;
+}
+
+#cited-by-viewer ul {
+    padding: 0;
+    margin: 0;
+}
+
+#cited-by-viewer ul li {
+    list-style-type: none;
+    padding: 3px 0 2px 0;
+    border-bottom: 1pt solid #DDD;
+}
+
+.citation-name { 
+    font-size: 1.2em; 
+}
+
+
 /* Button formatting */
 a.button, button {
     border-color: #a6a6a6;
