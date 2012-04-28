@@ -142,9 +142,9 @@ def scrape_court(court):
             # Make a citation
             cite = Citation(case_name=site.case_names[i])
             if site.docket_numbers is not None:
-                 cite.docketNumber = site.docket_numbers[i]
+                cite.docketNumber = site.docket_numbers[i]
             if site.neutral_citations is not None:
-                 cite.neutral_cite = site.neutral_citations[i]
+                cite.neutral_cite = site.neutral_citations[i]
 
             # Make the document object
             doc = Document(source='C',
@@ -184,7 +184,6 @@ def scrape_court(court):
         # Only update the hash if no errors occured. 
         url2Hash.SHA1 = site.hash
         url2Hash.save()
-
 
 
 def main():
