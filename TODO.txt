@@ -1,7 +1,6 @@
 BUGS:
  - New code for saving pdf makes 404s.
  - HTML docs with ampersands show the ampersands in the highlighted text.
- - Court-based RSS feeds need to be Solr-powered, or at least be non-locking
  - selecting "New Search" resets the filters to have all the statuses selected
  - Add state courts to the front end
  
@@ -17,17 +16,3 @@ F3
  - do the hand file
  - why three fiscr on coverage page, and one in facets?
  - what's up with the courts I added to the DB that didn't get any F3 stuff?
-
-Citations:
- - re-enable backups
- - Make the celery user able to do things to www-data files
- - check if disabling the save signal is needed every time, or just the once (perhaps why docs aren't saved?)
-        - actually, this is *exactly* why. We need to be more granular in how we disable the save signal. 
- - solr pipeline
-
-Dumps:
-  - add citation info
-  - add absolute urls
-  
-Sitemaps:
- - remove old sitemaps

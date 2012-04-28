@@ -18,7 +18,7 @@ from datetime import datetime
 from datetime import timedelta
 from alert.settings import *
 
-def queryset_generator(queryset, chunksize=1000, start=0):
+def queryset_generator(queryset, chunksize=1000):
     '''
     from: http://djangosnippets.org/snippets/1949/
     Iterate over a Django Queryset ordered by the primary key
@@ -30,10 +30,15 @@ def queryset_generator(queryset, chunksize=1000, start=0):
 
     Note that the implementation of the iterator does not support ordered query sets.
     '''
+    if queryset.count() == 0:
+        return
     if DEVELOPMENT:
         chunksize = 5
 
-    documentUUID = start
+    documentUUID = queryset.order_by('pk')[0].documentUUID
+    # Decrement document ID for use with 'greater than' filter
+    if documentUUID > 0:
+        documentUUID -= 1
     last_pk = queryset.order_by('-pk')[0].documentUUID
     queryset = queryset.order_by('pk')
     while documentUUID < last_pk:
