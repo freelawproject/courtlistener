@@ -555,7 +555,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 	height               : 16px;
 	width                : 16px;
 	background-position  : -98px -16px;
-    margin: 0.7em 2px 0px 2px;
+    margin: 0.7em 2px 0px 2px;          
 }
 #twitter_gif:hover {
 	background-position  : -98px 0px;

@@ -4,16 +4,13 @@ BUGS:
  - selecting "New Search" resets the filters to have all the statuses selected
  - Add state courts to the front end
  - Tab index fail on saving favorite.
- - Your Notes needs pointer and proper collapsing.
  
 To do:
  - check out the outliars in the DB by date
  - recreate the stat_maker.py script (see bug)
  - Check the dates/courts in Brian's list of citation-less docs, and see if we
    missed any docs.
- - Move the crt.li apache conf over to the repo
- - Add citation pages to sitemaps (human and computer)
-   
+ - Move the crt.li apache conf over to the repo   
    
 F3
  - do the hand file
