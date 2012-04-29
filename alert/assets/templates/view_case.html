@@ -79,7 +79,7 @@
                             </li>
                         {% endfor %}
                     </ul>
-                    <a class="more" href="{{ doc.get_absolute_url }}cited-by/">More&hellip;</a>
+                    <a class="more" href="{{ doc.get_absolute_url }}cited-by/">More detail&hellip;</a>
                 </div>
             {% else %}
                 <h3 class="bottom pointer arrow-right-before">Cited By ({{ doc.citation.citing_cases.count }})</h3>
@@ -265,7 +265,9 @@
             <div class="clearfix"></div>
         {% endif %}
         <div id="text">
-            {% if doc.documentHTML %}
+            {% if doc.html_with_citations %}
+                {% doc.html_with_citations|safe %}
+            {% elif doc.documentHTML %}
                 {{doc.documentHTML|safe}}
             {% else %}
                 <pre>{{doc.documentPlainText}}</pre>
