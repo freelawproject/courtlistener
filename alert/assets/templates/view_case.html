@@ -52,12 +52,14 @@
         {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
         <div class="{% if not favorite_form.instance.doc_id %}hidden{% endif %} sidebar-section" id="sidebar-notes">
             <div>
-                <h3 class="bottom inline arrow-down-before">Your Notes</h3>
+                <h3 class="bottom inline arrow-down-before pointer">Your Notes</h3>
                 <p class="inline" id="edit-favorite">(<a href="#favorite-editor">edit</a>)</p>
+                <div class="shown">
+                    <p id="sidebar-notes-text">
+                        {{ favorite_form.instance.notes|default:"(none)" }}
+                    </p>
+                </div>
             </div>
-            <p id="sidebar-notes-text" class="shown">
-                {{ favorite_form.instance.notes|default:"(none)" }}
-            </p>
         </div>
 
 
@@ -121,13 +123,10 @@
         <div class="sidebar-section">
             <h3 class="bottom pointer arrow-right-before" id="share-header">Share</h3>
             <div class="hidden">
+                <input type="text" readonly="readonly" id="copy-input" value="{{doc.get_small_url}}"></input>
                 <a href="mailto:?subject={{title|urlencode}}%20at%20CourtListener.com&body={{doc.get_small_url}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
                 <a href="http://www.facebook.com/share.php?u={{doc.get_small_url}}&t={{title}} at CourtListener.com" target="_blank" title="Facebook" class="sprites" id="facebook_png"></a>
                 <a href="http://twitter.com/home?status={{doc.get_small_url}}" target="_blank" title="Twitter" class="sprites" id="twitter_gif"></a>
-                <a href="http://digg.com/submit?phase=2&url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Digg" class="sprites" id="digg_png"></a>
-                <a href="http://reddit.com/submit?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Reddit" class="sprites" id="reddit_png"></a>
-                <a href="http://del.icio.us/post?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="delicious" class="sprites" id="delicious_png"></a>
-                <input type="text" readonly="readonly" id="copy-input" value="{{doc.get_small_url}}"></input>
             </div>
             <hr class="space">
         </div>

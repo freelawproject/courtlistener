@@ -40,8 +40,8 @@ $(document).ready(function() {
     
     $('.sidebar-section h3').click(function() {
     	// Toggles the sidebar sections
-        $(this).next('.hidden').toggle('fast');
-        $(this).next('.shown').toggle('fast');
+        $(this).siblings('.hidden').toggle('fast');
+        $(this).siblings('.shown').toggle('fast');
         $(this).toggleClass('arrow-right-before');
         $(this).toggleClass('arrow-down-before');
     });
