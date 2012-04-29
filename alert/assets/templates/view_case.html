@@ -63,23 +63,32 @@
 
         {# Show cases that cite this case #}
         <div id="cited-by" class="sidebar-section">
-            <h3 class="bottom pointer arrow-down-before">Cited By ({{ doc.citation.citing_cases.count }})</h3>
-            <div class="shown">
-                <ul>
-                    {% for case in cited_by_trunc %}
-                        <li>
-                            <a href="{{case.get_absolute_url}}">{{ case.citation.case_name|v_wrapper }},
-                                {% if case.citation.westCite %}
-                                    {{case.citation.westCite}}
-                                {% else %}
-                                    {{case.citation.docketNumber}}
-                                {% endif %}
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
-                <a class="more" href="{{ doc.get_absolute_url }}cited-by/">More...</a>
-            </div>
+            {% if doc.citation.citing_cases.count > 0 %}
+                <h3 class="bottom pointer arrow-down-before">Cited By ({{ doc.citation.citing_cases.count }})</h3>
+                <div class="shown">
+                    <ul>
+                        {% for case in cited_by_trunc %}
+                            <li>
+                                <a href="{{case.get_absolute_url}}">{{ case.citation.case_name|v_wrapper }},
+                                    {% if case.citation.westCite %}
+                                        {{case.citation.westCite}}
+                                    {% else %}
+                                        {{case.citation.docketNumber}}
+                                    {% endif %}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <a class="more" href="{{ doc.get_absolute_url }}cited-by/">More&hellip;</a>
+                </div>
+            {% else %}
+                <h3 class="bottom pointer arrow-right-before">Cited By ({{ doc.citation.citing_cases.count }})</h3>
+                <div class="hidden">
+                    <p class="bottom">
+                        No citations found for this case.
+                    </p>
+                </div>
+            {% endif %}
         </div>
         
           

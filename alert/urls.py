@@ -16,10 +16,8 @@
 
 # imports of local settings and views
 from alert import settings
-from alert.casepage.sitemap import sitemap_maker
-from alert.casepage.sitemap import flat_sitemap_maker
-from alert.casepage.views import view_case
-from alert.casepage.views import serve_static_file
+from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
+from alert.casepage.views import view_case, view_case_citations, serve_static_file
 from alert.contact.views import contact
 from alert.contact.views import thanks
 from alert.data_dumper.views import dump_index
@@ -98,21 +96,18 @@ urlpatterns = patterns('',
     # Maintenance and protest mode!
     # (r'/*', show_maintenance_warning),
 
+    # Display a case's citations page
+    url(r'^(?:.*)/(.*)/(.*)/cited-by/$',
+        view_case_citations,
+        name="view_case_citations"),
+
     # Display a case; a named URL because the get_absolute_url uses it.
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case,
         name="view_case"),
 
-    # Display a case's citations page
-    url(r'^(?:' + "|".join(pacer_codes) + ')/(.*)/(.*)/cited-by/$',
-        view_case_citations,
-        name="view_case_citations"),
-
     # Serve a static file
     (r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$',
         serve_static_file),
-
-
-
 
     # Redirect users that arrive via crt.li
     (r'^x/(.*)/$', redirect_short_url),

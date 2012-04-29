@@ -5,7 +5,6 @@ BUGS:
  - Add state courts to the front end
  - Tab index fail on saving favorite.
  - Your Notes needs pointer and proper collapsing.
- - Why does view_case and now view_case_citations truncate title variables at 100? 
  
 To do:
  - check out the outliars in the DB by date
@@ -13,6 +12,7 @@ To do:
  - Check the dates/courts in Brian's list of citation-less docs, and see if we
    missed any docs.
  - Move the crt.li apache conf over to the repo
+ - Add citation pages to sitemaps (human and computer)
    
    
 F3
