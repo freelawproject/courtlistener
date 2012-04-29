@@ -510,7 +510,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     height               : 16px;
 	width                : 16px;
 	background-position  : -16px -16px;
-    margin: 0px 2px 0px 2px;
+    margin: .7em 2px 0px 2px;
 }
 #delicious_png:hover {
 	background-position  : -16px 0px;
@@ -519,7 +519,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 	height               : 14px;
 	width                : 16px;
 	background-position  : -32px -14px;
-    margin: 0px 2px 0px 2px;
+    margin: .7em 2px 0px 2px;
 }
 #digg_png:hover {
 	background-position  : -32px 0px;
@@ -528,7 +528,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 	height               : 16px;
 	width                : 16px;
 	background-position  : -48px -16px;
-    margin: 0px 0px 0px 2px;
+    margin: .7em 2px 0px 2px;
 }
 #email_link_png:hover {
 	background-position  : -48px 0px;
@@ -537,7 +537,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     height               : 16px;
 	width                : 16px;
     background-position  : -82px -16px;
-    margin: 0px 2px 0px 2px;
+    margin: .7em 2px 0px 2px;
 }
 #facebook_png:hover {
     background-position  : -82px 0px;
@@ -546,7 +546,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 	height               : 18px;
 	width                : 18px;
 	background-position  : -64px -18px;
-    margin: 0px 2px 0px 2px;
+    margin: .7em 2px 0px 2px;
 }
 #reddit_png:hover {
 	background-position  : -64px 0px;
@@ -555,7 +555,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 	height               : 16px;
 	width                : 16px;
 	background-position  : -98px -16px;
-    margin: 0px 2px 0px 2px;
+    margin: 0.7em 2px 0px 2px;
 }
 #twitter_gif:hover {
 	background-position  : -98px 0px;
