@@ -210,6 +210,7 @@ a.button, button {
     border-color: #a6a6a6;
     background-color: #6683B7;
     color: white;
+    letter-spacing: 0.5px;
 }
 button:hover, a.button:hover {
   background-color: #7896D0;

@@ -39,7 +39,7 @@
 {% endblock %}
 
 {% block sidebar %}
-    <div class="span-5 append-2" id="sidebar">
+    <div class="span-6 append-1" id="sidebar">
         {# show the admin tools if applicable #}
         {% if user.is_superuser and doc %}
             <div class="sidebar-section">
@@ -69,7 +69,7 @@
                     <ul>
                         {% for case in cited_by_trunc %}
                             <li>
-                                <a href="{{case.get_absolute_url}}">{{ case.citation.case_name|v_wrapper }},
+                                <a href="{{case.get_absolute_url}}">{{ case.citation.case_name|truncatewords:10|v_wrapper }},
                                     {% if case.citation.westCite %}
                                         {{case.citation.westCite}}
                                     {% else %}
