@@ -266,7 +266,7 @@
         {% endif %}
         <div id="text">
             {% if doc.html_with_citations %}
-                {% doc.html_with_citations|safe %}
+                {{ doc.html_with_citations|safe }}
             {% elif doc.documentHTML %}
                 {{doc.documentHTML|safe}}
             {% else %}
