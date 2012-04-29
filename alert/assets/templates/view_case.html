@@ -267,10 +267,12 @@
         <div id="text">
             {% if doc.html_with_citations %}
                 {{ doc.html_with_citations|safe }}
-            {% elif doc.documentHTML %}
-                {{doc.documentHTML|safe}}
             {% else %}
-                <pre>{{doc.documentPlainText}}</pre>
+                {% if doc.documentHTML %}
+                    {{doc.documentHTML|safe}}
+                {% else %}
+                    <pre>{{doc.documentPlainText}}</pre>
+                {% endif %}
             {% endif %}
         </div>
     </article>
