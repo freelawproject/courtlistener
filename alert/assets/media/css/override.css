@@ -201,6 +201,9 @@ div.shown ul {
     font-size: 1.2em; 
 }
 
+#citation-filters input[type=text] {
+    width: 40px;
+}
 
 /* Button formatting */
 a.button, button {
