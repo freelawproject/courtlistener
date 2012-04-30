@@ -31,10 +31,11 @@ from django.views.decorators.cache import never_cache
 
 from datetime import date
 
+
 @never_cache
 def show_results(request):
     '''Show the results for a query
-    
+
     Implements a parallel faceted search interface with Solr as the backend.
     '''
 
@@ -163,9 +164,9 @@ def show_results(request):
                   RequestContext(request))
 
 
-
 def tools_page(request):
     return render_to_response('tools.html', {}, RequestContext(request))
+
 
 def browser_warning(request):
     return render_to_response('browser_warning.html', {}, RequestContext(request))

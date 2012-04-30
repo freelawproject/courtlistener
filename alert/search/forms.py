@@ -49,6 +49,7 @@ INPUT_FORMATS = [
     '%Y/%m', # '2006/10'
     ]
 
+
 class SearchForm(forms.Form):
     q = forms.CharField(required=False, initial='*:*')
     sort = forms.ChoiceField(
@@ -57,7 +58,7 @@ class SearchForm(forms.Form):
                          initial='dateFiled desc',
                          widget=forms.Select(
                                    attrs={'class': 'external-input',
-                                          'tabindex':'9'}))
+                                          'tabindex': '9'}))
     case_name = forms.CharField(
                         required=False,
                         initial='',
@@ -98,8 +99,9 @@ class SearchForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super(SearchForm, self).__init__(*args, **kwargs)
 
-        # Query the DB so we can build up check boxes for each court in use.  
-        courts = Court.objects.filter(in_use=True).values_list('courtUUID', 'short_name')
+        # Query the DB so we can build up check boxes for each court in use.
+        courts = Court.objects.filter(in_use=True).values_list('courtUUID',
+                                                               'short_name')
 
         if self.data.get('q') is not None:
             # If there's a q parameter, this is a refinement.
@@ -151,7 +153,7 @@ class SearchForm(forms.Form):
         '''
         Cleans up various problems with the query:
          - '' --> '*:*'
-        
+         - lowercase --> camelCase
         '''
         q = self.cleaned_data['q']
 
@@ -183,21 +185,23 @@ class SearchForm(forms.Form):
         if before and after:
             # Only do something if both fields are valid so far.
             if before < after:
-                # The user is requesting dates like this: <--b  a-->. Switch the dates
-                # so their query is like this: a-->   <--b
+                # The user is requesting dates like this: <--b  a-->. Switch
+                # the dates so their query is like this: a-->   <--b
                 cleaned_data['filed_before'] = after
                 cleaned_data['filed_after'] = before
 
         # 2. Make sure that the user has selected at least one facet for each
         #    taxonomy.
-        court_bools = [v for k, v in cleaned_data.iteritems() if k.startswith('court_')]
+        court_bools = [v for k, v in cleaned_data.iteritems()
+                       if k.startswith('court_')]
         if not any(court_bools):
             # Set all facets to true
             for key in cleaned_data.iterkeys():
                 if key.startswith('court_'):
                     cleaned_data[key] = True
 
-        stat_bools = [v for k, v in cleaned_data.iteritems() if k.startswith('stat_')]
+        stat_bools = [v for k, v in cleaned_data.iteritems()
+                      if k.startswith('stat_')]
         if not any(stat_bools):
             # Set all facets to true
             for key in cleaned_data.iterkeys():
