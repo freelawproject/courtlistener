@@ -112,7 +112,7 @@ def get_selected_field_string(cd, prefix):
     '''Pulls the selected checkboxes out of the form data, and puts it into Solr
     strings. Uses a prefix to know which items to pull out of the cleaned data.
     Check forms.py to see how the prefixes are set up.
-    
+
     Final strings are of the form "A" OR "B" OR "C", with quotes in case there 
     are spaces in the values.
     '''

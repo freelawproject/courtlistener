@@ -71,8 +71,8 @@ def make_pdf_upload_path(instance, filename):
 
 def invalidate_dumps_by_date_and_court(date, court):
     '''Deletes dump files for a court and date
-    
-    Receives court and date parameters, and then deletes any corresponding 
+
+    Receives court and date parameters, and then deletes any corresponding
     dumps.
     '''
     year, month, day = '%s' % date.year, '%02d' % date.month, '%02d' % date.day
@@ -187,7 +187,7 @@ class Citation(models.Model):
 
 class Document(models.Model):
     '''A class representing a single court opinion.
-    
+
     This must go last, since it references the above classes
     '''
     documentUUID = models.AutoField("a unique ID for each document",
@@ -198,7 +198,8 @@ class Document(models.Model):
                       choices=DOCUMENT_SOURCES,
                       blank=True)
     documentSHA1 = models.CharField(
-                      "unique ID for the document, as generated via sha1 on the PDF",
+                      "unique ID for the document, as generated via SHA1 of "
+                      "the binary file",
                       max_length=40,
                       db_index=True)
     dateFiled = models.DateField(
@@ -216,21 +217,24 @@ class Document(models.Model):
                       blank=True,
                       null=True)
     download_URL = models.URLField(
-                      "the URL on the court website where the document was originally scraped",
+                      "the URL on the court website where the document was "
+                      "originally scraped",
                       verify_exists=False,
                       db_index=True)
     time_retrieved = models.DateTimeField(
-                      "the exact date and time stamp that the document was placed into our database",
+                      "the exact date and time stamp that the document was "
+                      "placed into our database",
                       auto_now_add=True,
                       editable=False,
                       db_index=True)
     local_path = models.FileField(
-                      "the location, relative to MEDIA_ROOT, where the files are stored",
+                      "the location, relative to MEDIA_ROOT, where the files "
+                      "are stored",
                       upload_to=make_pdf_upload_path,
                       blank=True,
                       db_index=True)
     documentPlainText = models.TextField(
-                      "plain text of the document after extraction from the PDF",
+                      "plain text of the document after extraction",
                       blank=True)
     documentHTML = models.TextField(
                       "HTML of the document",
@@ -243,8 +247,12 @@ class Document(models.Model):
                       related_name="citing_cases",
                       null=True,
                       blank=True)
+    citation_count = models.IntegerField(
+                      'the number of times this document is cited by other '
+                      'cases',
+                      default=0)
     documentType = models.CharField(
-                      "the type of document, as described by document_types.txt",
+                      "the precedential status of document",
                       max_length=50,
                       blank=True,
                       choices=DOCUMENT_STATUSES)
@@ -259,6 +267,13 @@ class Document(models.Model):
     extracted_by_ocr = models.BooleanField(
                       'OCR was used to get this document content',
                       default=False)
+
+    __original_cases_cited = None
+
+    def __init__(self, *args, **kwargs):
+        # This is overridden to provide functionality to the save function.
+        super(Document, self).__init__(*args, **kwargs)
+        self.__original_cases_cited = self.cases_cited
 
     def __unicode__(self):
         if self.citation:
@@ -278,11 +293,22 @@ class Document(models.Model):
         ascii = num_to_ascii(self.documentUUID)
         return "http://crt.li/x/" + ascii
 
-    def save(self, index=True, *args, **kwargs):
+    def save(self, index=True, update_cites=True, *args, **kwargs):
         '''
         If the value of blocked changed to True, invalidate the caches
         where that value was stored. Google can later pick it up properly.
         '''
+        if self.__original_cases_cited and update_cites:
+            if self.cases_cited != self.__original_cases_cited:
+                # If the cited documents changed, recompute the citation counts
+                # for any cited cases.
+                docs = Document.objects.filter(citation__in=self.cases_cited.all())
+                for doc in docs:
+                    print "Updating document: %s" % (doc,)
+                    doc.citation_count = doc.citation.citing_cases.all().count()
+                    # We don't want an endless cascade of update_cites to happen
+                    doc.save(update_cites=False)
+
         # Run the standard save function.
         super(Document, self).save(*args, **kwargs)
 
@@ -295,7 +321,6 @@ class Document(models.Model):
         # Delete the cached sitemaps and dumps if the item is blocked.
         if self.blocked:
             invalidate_dumps_by_date_and_court(self.dateFiled, self.court_id)
-
 
     def delete(self, *args, **kwargs):
         '''
