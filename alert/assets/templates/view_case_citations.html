@@ -188,7 +188,7 @@
         </h2>
 
         <div id="cited-by-viewer">
-        <h3>Cited by {{ doc.citation.citing_cases.count }} case{{ doc.citation.citing_cases.count|pluralize }}:</h3>
+        <h3>Cited by {{ doc.citation_count }} case{{ doc.citation_count|pluralize }}:</h3>
         <hr>
         {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
                 <ul>
@@ -203,9 +203,9 @@
                             {% endif %}</a></span><br/>
                             {{ case.court }} | 
                             {{ case.dateFiled }} | 
-                            {% if case.citation.citing_cases.count != 0 %}
+                            {% if case.citation_count != 0 %}
                                 <a href="{{case.get_absolute_url}}cited-by/">
-                                    {{ case.citation.citing_cases.count }} citation{{ case.citation.citing_cases.count|pluralize }}
+                                    Cited {{ case.citation_count }} time{{ case.citation_count|pluralize }}
                                 </a>
                             {% else %}
                                 0 citations

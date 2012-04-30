@@ -18,7 +18,4 @@ F3
  - what's up with the courts I added to the DB that didn't get any F3 stuff?
  
 Process:
- 1. Migrate so the field gets added.
- 2. Update Karen's code to call the correct thing.
- 3. Update Rowyn's code to update the field when new cites are found.
- 4. Write/run the citation script.
+ 1. Update Rowyn's code to update the field when new cites are found.
