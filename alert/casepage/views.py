@@ -85,11 +85,10 @@ def view_case(request, court, pk, casename):
     except (ObjectDoesNotExist, TypeError):
         # Not favorited or anonymous user
         favorite_form = FavoriteForm(initial={'doc_id': doc.documentUUID,
-            'name' : doc.citation.case_name})
+            'name': doc.citation.case_name})
 
     # get first five most influential cases that cite this case
-    citing_docs = doc.citation.citing_cases.all()
-    cited_by_trunc = citing_docs.annotate(influence=Count('citation__citing_cases')).order_by('-influence', 'dateFiled')[:5]
+    cited_by_trunc = doc.citation.citing_cases.all().order_by('-citation_count', 'dateFiled')[:5]
 
     return render_to_response(
                   'view_case.html',
@@ -110,8 +109,7 @@ def view_case_citations(request, pk, casename):
     title = trunc(doc.citation.case_name, 100)
 
     #Get list of citing cases, ordered by influence
-    citing_docs = doc.citation.citing_cases.all()
-    citing_cases = citing_docs.annotate(influence=Count('citation__citing_cases')).order_by('-influence', 'dateFiled')
+    citing_cases = doc.citation.citing_cases.all().order_by('-citation_count', 'dateFiled')
 
     included_courts = []
     # only send to template the courts for which we have citing cases
@@ -128,7 +126,7 @@ def view_case_citations(request, pk, casename):
 
 def serve_static_file(request, file_path=''):
     '''Sends a static file to a user.
-    
+
     This serves up the static case files such as the PDFs in a way that can be
     blocked from search engines if necessary. We do four things:
      - Look up the document associated with the filepath

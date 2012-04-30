@@ -65,8 +65,8 @@
 
         {# Show cases that cite this case #}
         <div id="cited-by" class="sidebar-section">
-            {% if doc.citation.citing_cases.count > 0 %}
-                <h3 class="bottom pointer arrow-down-before">Cited By ({{ doc.citation.citing_cases.count }})</h3>
+            {% if doc.citation_count > 0 %}
+                <h3 class="bottom pointer arrow-down-before">Cited By ({{ doc.citation_count }})</h3>
                 <div class="shown">
                     <ul>
                         {% for case in cited_by_trunc %}
@@ -84,7 +84,7 @@
                     <a class="more" href="{{ doc.get_absolute_url }}cited-by/">More detail&hellip;</a>
                 </div>
             {% else %}
-                <h3 class="bottom pointer arrow-right-before">Cited By ({{ doc.citation.citing_cases.count }})</h3>
+                <h3 class="bottom pointer arrow-right-before">Cited By ({{ doc.citation_count }})</h3>
                 <div class="hidden">
                     <p class="bottom">
                         No citations found for this case.
