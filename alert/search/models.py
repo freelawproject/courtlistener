@@ -268,13 +268,6 @@ class Document(models.Model):
                       'OCR was used to get this document content',
                       default=False)
 
-    __original_cases_cited = None
-
-    def __init__(self, *args, **kwargs):
-        # This is overridden to provide functionality to the save function.
-        super(Document, self).__init__(*args, **kwargs)
-        self.__original_cases_cited = self.cases_cited
-
     def __unicode__(self):
         if self.citation:
             return self.citation.case_name
@@ -298,17 +291,6 @@ class Document(models.Model):
         If the value of blocked changed to True, invalidate the caches
         where that value was stored. Google can later pick it up properly.
         '''
-        if self.__original_cases_cited and update_cites:
-            if self.cases_cited != self.__original_cases_cited:
-                # If the cited documents changed, recompute the citation counts
-                # for any cited cases.
-                docs = Document.objects.filter(citation__in=self.cases_cited.all())
-                for doc in docs:
-                    print "Updating document: %s" % (doc,)
-                    doc.citation_count = doc.citation.citing_cases.all().count()
-                    # We don't want an endless cascade of update_cites to happen
-                    doc.save(update_cites=False)
-
         # Run the standard save function.
         super(Document, self).save(*args, **kwargs)
 

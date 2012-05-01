@@ -171,7 +171,7 @@ def scrape_court(court):
             # Save everything, but don't update Solr index yet
             cite.save(index=False)
             doc.citation = cite
-            doc.save(index=False)
+            doc.save(index=False, update_cites=False)
 
             # Extract the contents asynchronously.
             extract_doc_content.delay(doc.pk)
@@ -208,7 +208,7 @@ def main():
                       help=('The court(s) to scrape and extract. This should be in '
                             'the form of a python module or package import '
                             'from the Juriscraper library, e.g. '
-                            '"opinions.united_states.federal.ca1" or '
+                            '"juriscraper.opinions.united_states.federal.ca1" or '
                             'simply "opinions" to do all opinions.'))
     (options, args) = parser.parse_args()
 
