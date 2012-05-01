@@ -111,7 +111,9 @@
 {% block sidebar %}
     <div class="span-6 append-1" id="sidebar">
         <div class="sidebar-section">
-        <h4 class="bottom"><a href="{{ doc.get_absolute_url }}">&laquo; Back to case page</a></h4>
+        <h4 class="bottom">
+            <a href="{{ doc.get_absolute_url }}">&laquo; Back to Document</a>
+        </h4>
         </div>
         <div class="sidebar-section">
         <h3 class="bottom pointer arrow-down-before">Filters</h3>
@@ -195,7 +197,7 @@
                     {% for case in citing_cases %}
                         {# Changing the attributes on this li may break the js above. #}
                         <li class="citing-case {{ case.court.courtUUID }} {{ case.dateFiled.year|default:'0' }}">
-                            <span class="citation-name"><a href="{{case.get_absolute_url}}">{{ case.citation.case_name|v_wrapper }}
+                            <span class="citation-name"><a href="{{case.get_absolute_url}}">{{ case.citation.case_name|v_wrapper }},
                             {% if case.citation.westCite %}
                                 {{case.citation.westCite}}
                             {% else %}
@@ -208,7 +210,7 @@
                                     Cited {{ case.citation_count }} time{{ case.citation_count|pluralize }}
                                 </a>
                             {% else %}
-                                0 citations
+                                Cited 0 times 
                             {% endif %}
                         </li>
                     {% endfor %}

@@ -88,7 +88,7 @@ def view_case(request, court, pk, casename):
             'name': doc.citation.case_name})
 
     # get first five most influential cases that cite this case
-    cited_by_trunc = doc.citation.citing_cases.all().order_by('-citation_count', 'dateFiled')[:5]
+    cited_by_trunc = doc.citation.citing_cases.all().order_by('-citation_count', '-dateFiled')[:5]
 
     return render_to_response(
                   'view_case.html',
@@ -109,7 +109,7 @@ def view_case_citations(request, pk, casename):
     title = trunc(doc.citation.case_name, 100)
 
     #Get list of citing cases, ordered by influence
-    citing_cases = doc.citation.citing_cases.all().order_by('-citation_count', 'dateFiled')
+    citing_cases = doc.citation.citing_cases.all().order_by('-citation_count', '-dateFiled')
 
     included_courts = []
     # only send to template the courts for which we have citing cases

@@ -34,7 +34,7 @@ si = sunburnt.SolrInterface(settings.SOLR_URL, mode='w')
 @task
 def add_or_update_doc_object(doc):
     '''Adds a document object to the solr index.
-    
+
     This function is for use with the update_index command. It's slightly 
     different than the commands below because it expects a Django object, 
     rather than a primary key. This rejects the standard Celery advice about
