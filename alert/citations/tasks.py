@@ -74,7 +74,13 @@ def update_document(document):
             match_id = matches[0]['id']
             try:
                 matched_doc = Document.objects.get(pk=match_id)
-                # Add citation match to the document's list of cases it cites
+                # Increase citation count for matched document if it hasn't
+                # already been cited by this document.
+                if not matched_doc.citation in document.cases_cited:
+                    matched_doc.citation_count += 1
+                    matched_doc.save(index=False, update_cites=False)
+                # Add citation match to the citing document's list of cases it cites.
+                # cases_cited is a set so duplicates aren't an issue
                 document.cases_cited.add(matched_doc.citation)
                 # URL field will be used for generating inline citation html
                 citation.match_url = matched_doc.get_absolute_url()
@@ -88,6 +94,8 @@ def update_document(document):
                 continue
         else:
             if DEBUG >= 2:
+                # TODO: Don't print 1 line per citation.  Save them in a list
+                # and print in a single line at the end.
                 print "No match found for citation %s" % citation.base_citation()
     # Only create new HTML if we found citations
     if citations:
@@ -96,7 +104,7 @@ def update_document(document):
             print document.html_with_citations
 
     # Turn off solr updating; we're not changing anything in the search index
-    document.save(index=False)
+    document.save(index=False, update_cites=False)
     citation_matches = sum(matched_citations)
     name_matches = len(matched_citations) - citation_matches
 
