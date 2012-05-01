@@ -78,7 +78,7 @@ def update_document(document):
                 # already been cited by this document.
                 if not matched_doc.citation in document.cases_cited:
                     matched_doc.citation_count += 1
-                    matched_doc.save(index=False, update_cites=False)
+                    matched_doc.save(index=False)
                 # Add citation match to the citing document's list of cases it cites.
                 # cases_cited is a set so duplicates aren't an issue
                 document.cases_cited.add(matched_doc.citation)
@@ -104,7 +104,7 @@ def update_document(document):
             print document.html_with_citations
 
     # Turn off solr updating; we're not changing anything in the search index
-    document.save(index=False, update_cites=False)
+    document.save(index=False)
     citation_matches = sum(matched_citations)
     name_matches = len(matched_citations) - citation_matches
 
