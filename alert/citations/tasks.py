@@ -109,36 +109,3 @@ def update_document(document):
 def update_document_by_id(document_id):
     doc = Document.objects.get(pk=document_id)
     update_document(doc)
-
-
-@task
-def update_citation_counts(sender, instance, action, reverse, model, pk_set, **kwargs):
-    '''Catch the m2m signal, and update counts for any citations that are newly
-    cited.
-    '''
-    # Since it does a count of the citing cases, we don't care if things were
-    # added, removed or cleared.
-    if pk_set is None:
-        return
-    if not reverse:
-        if action in ['post_add', 'post_remove', 'post_clear']:
-            docs = Document.objects.filter(citation__in=pk_set)
-            for doc in docs:
-                print "Updating document %s: %s" % (doc.pk, doc)
-                doc.citation_count = doc.citation.citing_cases.all().count()
-                # We don't want an endless cascade of update_cites to happen
-                doc.save(update_cites=False, index=False)
-
-    elif reverse:
-        # Called from citing_cases
-        docs = Document.objects.filter(citation=instance)
-        for doc in docs:
-            print "Updating document %s: %s" % (doc.pk, doc)
-            if action == 'post_add':
-                doc.citation_count = doc.citation_count + len(pk_set)
-            elif action == 'post_remove':
-                doc.citation_count = max(doc.citation_count - len(pk_set), 0)
-            elif action == 'post_clear':
-                doc.citation_count = 0
-
-            doc.save(update_cites=False, index=False)
