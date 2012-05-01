@@ -171,7 +171,7 @@ def scrape_court(court):
             # Save everything, but don't update Solr index yet
             cite.save(index=False)
             doc.citation = cite
-            doc.save(index=False, update_cites=False)
+            doc.save(index=False)
 
             # Extract the contents asynchronously.
             extract_doc_content.delay(doc.pk)

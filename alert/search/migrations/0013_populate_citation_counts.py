@@ -13,7 +13,7 @@ class Migration(DataMigration):
         for doc in queryset_generator(Document.objects.all()):
             try:
                 doc.citation_count = doc.citation.citing_cases.all().count()
-                doc.save(index=False, update_cites=False)
+                doc.save(index=False)
             except AttributeError:
                 print "AttributeError: Unable to create count for document: %s" % doc
 
@@ -22,7 +22,7 @@ class Migration(DataMigration):
         # column
         for doc in queryset_generator(Document.objects.filter(citation_count__gt=0)):
             doc.citation_count = 0
-            doc.save(index=False, update_cites=False)
+            doc.save(index=False)
 
     models = {
         'search.citation': {

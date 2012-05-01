@@ -287,7 +287,7 @@ class Document(models.Model):
         ascii = num_to_ascii(self.documentUUID)
         return "http://crt.li/x/" + ascii
 
-    def save(self, index=True, update_cites=True, *args, **kwargs):
+    def save(self, index=True, *args, **kwargs):
         '''
         If the value of blocked changed to True, invalidate the caches
         where that value was stored. Google can later pick it up properly.
