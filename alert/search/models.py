@@ -245,6 +245,7 @@ class Document(models.Model):
     cases_cited = models.ManyToManyField(
                       Citation,
                       related_name="citing_cases",
+                      verbose_name="Cases cited (do not update!)",
                       null=True,
                       blank=True)
     citation_count = models.IntegerField(
