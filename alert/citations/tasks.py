@@ -76,7 +76,7 @@ def update_document(document):
                 matched_doc = Document.objects.get(pk=match_id)
                 # Increase citation count for matched document if it hasn't
                 # already been cited by this document.
-                if not matched_doc.citation in document.cases_cited:
+                if not matched_doc.citation in document.cases_cited.all():
                     matched_doc.citation_count += 1
                     matched_doc.save(index=False)
                 # Add citation match to the citing document's list of cases it cites.

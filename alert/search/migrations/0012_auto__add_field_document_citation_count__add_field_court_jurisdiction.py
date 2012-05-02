@@ -12,6 +12,7 @@ class Migration(SchemaMigration):
                       self.gf('django.db.models.fields.IntegerField')(default=0),
                       keep_default=False)
 
+
     def backwards(self, orm):
         # Deleting field 'Document.citation_count'
         db.delete_column('Document', 'citation_count')

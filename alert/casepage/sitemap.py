@@ -57,7 +57,6 @@ def sitemap_maker(request, size=250):
             except KeyError:
                 # No local_path key.
                 pass
-            print url_strs
 
             for url_str in url_strs:
                 url['location'] = url_str
