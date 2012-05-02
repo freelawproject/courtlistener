@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% load text_filters %}
+
+{# Shown on document citation pages. #}
+
+{% block title %}CourtListener.com / Cases citing {{ title }}{% endblock %}
+
+{% block footer-scripts %}
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="/media/js/jquery-1.6.2.min.js"><\/script>')</script>
+    <script type="text/javascript">
+    $('.sidebar-section h3').click(function() {
+    	// Toggles the sidebar sections
+        $(this).next('.hidden').toggle('fast');
+        $(this).next('.shown').toggle('fast');
+        $(this).toggleClass('arrow-right-before');
+        $(this).toggleClass('arrow-down-before');
+    });
+    </script>
+    <script type="text/javascript">  
+    function isBetween(num, beginning, end) {
+        return beginning <= num && num <= end;
+    }
+    
+    $('#citation-filters-submit').click(function(e) {
+        // applies filters to list of citations
+        e.preventDefault();
+        
+        var filedAfter = parseInt($('#citation-filters input').filter('input[name="filed_after"]')[0].value);
+        var filedBefore = parseInt($('#citation-filters input').filter('input[name="filed_before"]')[0].value);
+        var checkedCourts = $('#citation-filters input:not("#id_court_all")').filter(':checked');
+
+        // if none of the courts are checked, check all of them
+        if (checkedCourts.length == 0 ){
+            $('#citation-filters input[type="checkbox"]').attr('checked', true);
+            checkedCourts = $('#citation-filters input:not("#id_court_all")[type="checkbox"]');
+        }
+        
+        var allCourts = $('#citation-filters input#id_court_all').filter(':checked');
+        var citingCases = $('.citing-case');
+        var courtmatch;
+        var yearmatch;
+        var citation_classes;
+        var year;
+        
+        //console.log('there are active filters');
+        if (!filedAfter && filedAfter !== 0) {
+            filedAfter = 0;
+        }
+        if (!filedBefore && filedBefore !== 0) {
+            // arbitrary value larger than any year
+            filedBefore = 10000;
+        }
+
+        citingCases.each(function(index) {
+            // the year is always the last class, right now, or the one before 'hidden'
+            // warning: this is really hacky and likely to break
+            citation_classes = $(this).attr('class').split(' ')
+            year = citation_classes.pop()
+            if (year == 'hidden') {
+                year = citation_classes.pop();
+            }
+            yearmatch = isBetween(parseInt(year), filedAfter, filedBefore);
+            
+            // if year matches, then do court matching
+            if (yearmatch) {
+                if (checkedCourts) {
+                    courtmatch = false;
+                    for (var i in checkedCourts) {
+                        if ($(this).hasClass(checkedCourts[i].name)) {
+                            courtmatch = true;
+                            break;
+                        }
+                    }
+                }
+                else {
+                    courtmatch = true;
+                }
+            }
+            else {
+                courtmatch = false;
+            }
+            
+            if (yearmatch && courtmatch) {
+                $(this).removeClass('hidden');
+                $(this).animate({opacity: 1}, 300 );
+            }
+            else {
+                $(this).addClass('hidden');
+            }
+        }); 
+        
+    });
+    
+    $('#id_court_all').click(function() {
+        // Makes the check all box (un)check the other boxes
+        $("input.court-checkbox:not(:disabled)").attr('checked', $('#id_court_all').is(':checked'));
+    });
+    $("input.court-checkbox").click(function(){
+        if ($('input.court-checkbox:not(:disabled)').not(':checked').length == 0) {
+            // If all checkboxes will be checked once this is checked, check the check all box.
+            $("#id_court_all").attr('checked', true);
+        } else {
+            // Else, uncheck the check all.
+            $("#id_court_all").attr('checked', false);
+        }
+    });
+    </script>
+{% endblock %}
+
+{% block sidebar %}
+    <div class="span-6 append-1" id="sidebar">
+        <div class="sidebar-section">
+        <h4 class="bottom">
+            <a href="{{ doc.get_absolute_url }}">&laquo; Back to Document</a>
+        </h4>
+        </div>
+        <div class="sidebar-section">
+        <h3 class="bottom pointer arrow-down-before">Filters</h3>
+            <div class="shown">
+                <form id="citation-filters">
+                <h4 class="bottom">Filed Between</h4>
+	                <input 
+                        size="4" 
+                        maxlength="4" 
+                        autocomplete="off" 
+                        name="filed_after" 
+                        placeholder="YYYY" 
+                        type="text" 
+                        id="id_filed_after" /> and 
+                    <input 
+                        size="4" 
+                        maxlength="4" 
+                        autocomplete="off" 
+                        name="filed_before" 
+                        placeholder="YYYY" 
+                        type="text" 
+                        id="id_filed_before" />
+                
+                <hr class="space"/>                
+                <h4 class="bottom">Court</h4>
+                
+                <div class="sidebar-checkbox">
+                    <input
+                        id="id_court_all" 
+                        type="checkbox" 
+                        name="court_all" 
+                        class="court-checkbox all left"
+                        checked="checked">
+                    <label
+                        for="id_court_all"
+                        class="pointer">
+                        All Courts / Clear
+                    </label>
+                </div>
+                
+                {% for court in included_courts %}
+                    <div class="sidebar-checkbox">
+                        <input
+                            id="id_{{ court.courtUUID }}" 
+                            type="checkbox" 
+                            name="{{ court.courtUUID }}" 
+                            class="court-checkbox left"
+                            checked="checked">
+                        <label
+                            for="id_{{ court.courtUUID }}"  
+                            class="pointer">
+                            {{ court.short_name }}
+                        </label>
+                    </div>
+                {% endfor %}
+                
+                <button id="citation-filters-submit" class="button span-4">Filter Cases</button>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock sidebar %}
+
+{% block content %}
+    <article class="span-17 last">
+        <h2>
+            {{ doc.citation.case_name|v_wrapper }},
+            {% if doc.citation.westCite %}
+                {{doc.citation.westCite}}
+            {% else %}
+                {{doc.citation.docketNumber}}
+            {% endif %}
+            ({% if doc.court.citation_string != 'SCOTUS' %}{{doc.court.citation_string|nbsp}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
+        </h2>
+
+        <div id="cited-by-viewer">
+        <h3>Cited by {{ doc.citation_count }} case{{ doc.citation_count|pluralize }}:</h3>
+        <hr>
+        {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
+                <ul>
+                    {% for case in citing_cases %}
+                        {# Changing the attributes on this li may break the js above. #}
+                        <li class="citing-case {{ case.court.courtUUID }} {{ case.dateFiled.year|default:'0' }}">
+                            <span class="citation-name"><a href="{{case.get_absolute_url}}">{{ case.citation.case_name|v_wrapper }},
+                            {% if case.citation.westCite %}
+                                {{case.citation.westCite}}
+                            {% else %}
+                                {{case.citation.docketNumber}}
+                            {% endif %}</a></span><br/>
+                            {{ case.court }} | 
+                            {{ case.dateFiled }} | 
+                            {% if case.citation_count != 0 %}
+                                <a href="{{case.get_absolute_url}}cited-by/">
+                                    Cited {{ case.citation_count }} time{{ case.citation_count|pluralize }}
+                                </a>
+                            {% else %}
+                                Cited 0 times 
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+        </div>
+    </article>
+{% endblock %}
