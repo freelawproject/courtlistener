@@ -61,7 +61,10 @@ def sitemap_maker(request, size=250):
             for url_str in url_strs:
                 url['location'] = url_str
                 url['changefreq'] = 'never'
-                url['priority'] = '0.5'
+                if any(str in url_str for str in ['cited-by', 'pdf', 'doc', 'wpd']):
+                    url['priority'] = '0.4'
+                else:
+                    url['priority'] = '0.5'
                 urls.append(dict(url))
 
         xml = smart_str(loader.render_to_string('sitemap.xml',
