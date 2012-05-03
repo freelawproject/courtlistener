@@ -69,7 +69,6 @@ def delete_data_by_time_and_court(courtID, SIMULATE, delTime=None, VERBOSITY=0):
             doc.delete()
 
 
-
 def delete_all_citations(SIMULATE, VERBOSITY=0):
     '''
     Deletes all citations and their associated documents.
@@ -140,7 +139,6 @@ def main():
     parser.add_option('--allcites', action='store_true', dest='cites', default=False,
         help='Delete all citations and their associated documents from the DB')
     (options, args) = parser.parse_args()
-
 
     try:
         VERBOSITY = int(options.verbosity)

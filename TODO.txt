@@ -1,9 +1,11 @@
 BUGS:
- - New code for saving pdf makes 404s.
+ - New code for saving pdf makes 404s, and makes things not get extracted properly.
+ - Links without slashes redirect to homepage
  - HTML docs with ampersands show the ampersands in the highlighted text.
  - selecting "New Search" resets the filters to have all the statuses selected
  - Add state courts to the front end
  - Tab index fail on saving favorite.
+ 
  
 To do:
  - check out the outliars in the DB by date
@@ -16,6 +18,3 @@ F3
  - do the hand file
  - why three fiscr on coverage page, and one in facets?
  - what's up with the courts I added to the DB that didn't get any F3 stuff?
- 
-Process:
- 1. Update Rowyn's code to update the field when new cites are found.

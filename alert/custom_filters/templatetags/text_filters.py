@@ -21,8 +21,10 @@ from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
 
 import re
+from alert.tinyurl import encode_decode
 
 register = Library()
+
 
 @register.filter
 @stringfilter
@@ -66,14 +68,15 @@ def underscore_to_space(text, autoescape=None):
     return mark_safe(re.sub('_', ' ', esc(text)))
 underscore_to_space.needs_autoescape = True
 
+
 @register.filter
 @stringfilter
 def compress_whitespace(text, autoescape=None):
     '''Compress whitespace in a string as a browser does with HTML
-    
+
     For example, this:
     text   foo
-    
+
     bar    baz
     bcomes: 'text foo bar baz'
     '''
@@ -83,3 +86,15 @@ def compress_whitespace(text, autoescape=None):
         esc = lambda x: x
     return mark_safe(' '.join(text.split()))
 compress_whitespace.needs_autoescape = True
+
+
+@register.filter
+@stringfilter
+def num_to_ascii(pk, autoescape=None):
+    '''Convert a pk into a base 60 encoded string '''
+    if autoescape:
+        esc = conditional_escape
+    else:
+        esc = lambda x: x
+    return mark_safe(encode_decode.num_to_ascii(int(pk)))
+num_to_ascii.needs_autoescape = True

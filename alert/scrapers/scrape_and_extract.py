@@ -190,7 +190,7 @@ def main():
     logger.info("Starting up the scraper.")
     global die_now
 
-    # this line is used for handling SIGKILL, so things can die safely.
+    # this line is used for handling SIGTERM (CTRL+4), so things can die safely
     signal.signal(signal.SIGTERM, signal_handler)
 
     usage = 'usage: %prog -c COURTID [-d] [-r RATE]'
