@@ -28,6 +28,7 @@ from celery.decorators import task
 
 import re
 
+
 def get_document_citations(document):
     '''Identify and return citations from the html or plain text of the document.'''
     if document.documentHTML:
@@ -38,6 +39,7 @@ def get_document_citations(document):
     else:
         citations = []
     return citations
+
 
 def create_cited_html(document, citations):
     if document.documentHTML:
@@ -51,6 +53,7 @@ def create_cited_html(document, citations):
             inner_html = re.sub(citation.as_regex(), repl, inner_html)
         new_html = u'<pre class="inline">%s</pre>' % inner_html
     return new_html.encode('utf-8')
+
 
 @task
 def update_document(document):
@@ -76,7 +79,7 @@ def update_document(document):
                 matched_doc = Document.objects.get(pk=match_id)
                 # Increase citation count for matched document if it hasn't
                 # already been cited by this document.
-                if not matched_doc.citation in document.cases_cited:
+                if not matched_doc.citation in document.cases_cited.all():
                     matched_doc.citation_count += 1
                     matched_doc.save(index=False)
                 # Add citation match to the citing document's list of cases it cites.
