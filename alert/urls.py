@@ -23,7 +23,8 @@ from alert.contact.views import contact, thanks
 from alert.data_dumper.views import dump_index, serve_or_gen_dump
 from alert.favorites.views import delete_favorite, edit_favorite, \
                                   save_or_update_favorite
-from alert.feeds.views import all_courts_feed, court_feed, search_feed
+from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, \
+                              search_feed
 from alert.maintenance_warning.views import show_maintenance_warning
 from alert.pinger.views import validate_for_bing, validate_for_bing2, \
                                validate_for_google, validate_for_google2, \
@@ -153,6 +154,7 @@ urlpatterns = patterns('',
     (r'^feed/(search)/$', search_feed()), #lacks URL capturing b/c it will use GET queries.
     (r'^feed/court/all/$', all_courts_feed()),
     (r'^feed/court/(?P<court>' + '|'.join(pacer_codes) + ')/$', court_feed()),
+    (r'^feed/(?P<doc_id>.*)/cited-by/$', cited_by_feed()),
 
     # SEO-related stuff
     (r'^LiveSearchSiteAuth.xml$', validate_for_bing),

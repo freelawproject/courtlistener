@@ -23,6 +23,10 @@ from alert.lib import search_utils
 from alert.search.forms import SearchForm
 from alert.search.models import Court, Document
 from alert.lib import sunburnt
+from alert.tinyurl.encode_decode import ascii_to_num, num_to_ascii
+
+import datetime
+from alert.lib.string_utils import trunc
 
 
 class search_feed(Feed):
@@ -64,7 +68,6 @@ class search_feed(Feed):
         return item['court']
 
     def item_pubdate(self, item):
-        import datetime
         return datetime.datetime.combine(item['dateFiled'], datetime.time())
 
     def item_title(self, item):
@@ -110,7 +113,6 @@ class court_feed(Feed):
         return item['court']
 
     def item_pubdate(self, item):
-        import datetime
         return datetime.datetime.combine(item['dateFiled'], datetime.time())
 
     def item_title(self, item):
@@ -153,7 +155,6 @@ class all_courts_feed(Feed):
         return item['court']
 
     def item_pubdate(self, item):
-        import datetime
         return datetime.datetime.combine(item['dateFiled'], datetime.time())
 
     def item_title(self, item):
@@ -163,3 +164,42 @@ class all_courts_feed(Feed):
         return [item['status'], ]
 
     description_template = 'feeds/solr_desc_template.html'
+
+
+class cited_by_feed(Feed):
+    '''Creates a feed of cases that cite a case, ordered by date filed.'''
+    feed_type = Atom1Feed
+
+    # get the court info from the URL
+    def get_object(self, request, doc_id):
+        return get_object_or_404(Document, pk=ascii_to_num(doc_id))
+
+    def title(self, obj):
+        return "Cases citing %s, ordered by filing date" % trunc(str(obj.citation), 50)
+
+    def link(self, obj):
+        return '/feed/%s/cited-by/' % num_to_ascii(obj.pk)
+
+    author_name = "CourtListener.com"
+    author_email = "feeds@courtlistener.com"
+
+    def items(self, obj):
+        '''Return the latest 20 cases citing this one.'''
+        return obj.citation.citing_cases.all().order_by('-dateFiled')[:20]
+
+    def item_link(self, item):
+        return item.get_absolute_url()
+
+    def item_author_name(self, item):
+        return item.court
+
+    def item_pubdate(self, item):
+        return datetime.datetime.combine(item.dateFiled, datetime.time())
+
+    def item_title(self, item):
+        return item
+
+    def item_categories(self, item):
+        return [item.documentType, ]
+
+    description_template = 'feeds/template.html'
