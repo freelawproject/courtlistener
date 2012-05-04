@@ -28,11 +28,12 @@ from alert.search.models import Citation
 from alert.search.models import Court
 from alert.search.models import Document
 
+from celery.task.sets import subtask
 from django.core.files.base import ContentFile
 from juriscraper.GenericSite import logger
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
-from scrapers.tasks import extract_doc_content
+from scrapers.tasks import extract_doc_content, extract_by_ocr
 
 import hashlib
 import mimetypes
@@ -174,7 +175,7 @@ def scrape_court(court):
             doc.save(index=False)
 
             # Extract the contents asynchronously.
-            extract_doc_content.delay(doc.pk)
+            extract_doc_content(doc.pk, callback=subtask(extract_by_ocr))
 
             logger.info("Successfully added: %s" % site.case_names[i])
 
