@@ -1,6 +1,7 @@
 BUGS:
  - New code for saving pdf makes 404s, and makes things not get extracted properly.
  - Links without slashes redirect to homepage
+ - YYYY-MM-DD
  - HTML docs with ampersands show the ampersands in the highlighted text.
  - selecting "New Search" resets the filters to have all the statuses selected
  - Add state courts to the front end

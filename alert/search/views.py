@@ -104,10 +104,10 @@ def show_results(request):
                 # Send the user the cleaned up query
                 cd = search_form.cleaned_data
                 mutable_get['q'] = cd['q']
-                if mutable_get.get('filed_before'):
+                if mutable_get.get('filed_before') and cd.get('filed_before') is not None:
                     mutable_get['filed_before'] = date.strftime(cd['filed_before'], '%Y-%m-%d')
-                if mutable_get.get('filed_after'):
-                    mutable_get['filed_after'] = date.strftime(cd['filed_after'], '%Y-%m-%d')
+                if mutable_get.get('filed_after') and cd.get('filed_before') is not None:
+                    mutable_get['filed_after'] = date.strftime(cd['filed_after'], '%Y-%m-%d') or None
                 mutable_get['court_all'] = cd['court_all']
             # Always reset the radio box to refine
             mutable_get['refine'] = 'refine'
