@@ -163,7 +163,7 @@ urlpatterns = patterns('',
     (r'^google646349975c2495b6.html$', validate_for_google2),
     (r'^google646349975c2495b6.html$', validate_for_google3),
 
-    # Sitemap index generator
+    # Sitemaps & robots
     (r'^sitemap\.xml$', sitemap_maker),
     (r'^sitemap-flat\.xml$', flat_sitemap_maker),
     (r'^robots.txt$', robots)

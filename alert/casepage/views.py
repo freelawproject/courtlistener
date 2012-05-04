@@ -43,7 +43,6 @@ def view_case(request, court, pk, casename):
     it can populate the form on the page. If it is not a favorite, we send the
     unbound form.
     '''
-
     # Decode the id string back to an int
     pk = ascii_to_num(pk)
 
@@ -87,7 +86,7 @@ def view_case(request, court, pk, casename):
         favorite_form = FavoriteForm(initial={'doc_id': doc.documentUUID,
             'name': doc.citation.case_name})
 
-    # get first five most influential cases that cite this case
+    # get most influential cases that cite this case
     cited_by_trunc = doc.citation.citing_cases.all().order_by('-citation_count', '-dateFiled')[:5]
 
     return render_to_response(
