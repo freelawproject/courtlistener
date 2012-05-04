@@ -36,10 +36,22 @@ class FloorDateField(DateField):
         self.input_formats = input_formats
 
     def to_python(self, value):
-        if value == 'YYYY-MM-DD':
+        """
+        Validates that the input can be converted to a date. Returns a Python
+        datetime.date object.
+        """
+        if value in validators.EMPTY_VALUES or value == 'YYYY-MM-DD':
             return None
-        else:
+        if isinstance(value, datetime.datetime):
+            return value.date()
+        if isinstance(value, datetime.date):
             return value
+        for format in self.input_formats or formats.get_format('DATE_INPUT_FORMATS'):
+            try:
+                return datetime.date(*time.strptime(value, format)[:3])
+            except ValueError:
+                continue
+        raise ValidationError(self.error_messages['invalid'])
 
 
 class CeilingDateField(Field):
