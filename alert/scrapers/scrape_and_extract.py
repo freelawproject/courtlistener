@@ -142,9 +142,9 @@ def scrape_court(court):
             # Make a citation
             cite = Citation(case_name=site.case_names[i])
             if site.docket_numbers is not None:
-                 cite.docketNumber = site.docket_numbers[i]
+                cite.docketNumber = site.docket_numbers[i]
             if site.neutral_citations is not None:
-                 cite.neutral_cite = site.neutral_citations[i]
+                cite.neutral_cite = site.neutral_citations[i]
 
             # Make the document object
             doc = Document(source='C',
@@ -186,12 +186,11 @@ def scrape_court(court):
         url2Hash.save()
 
 
-
 def main():
     logger.info("Starting up the scraper.")
     global die_now
 
-    # this line is used for handling SIGKILL, so things can die safely.
+    # this line is used for handling SIGTERM (CTRL+4), so things can die safely
     signal.signal(signal.SIGTERM, signal_handler)
 
     usage = 'usage: %prog -c COURTID [-d] [-r RATE]'
@@ -209,7 +208,7 @@ def main():
                       help=('The court(s) to scrape and extract. This should be in '
                             'the form of a python module or package import '
                             'from the Juriscraper library, e.g. '
-                            '"opinions.united_states.federal.ca1" or '
+                            '"juriscraper.opinions.united_states.federal.ca1" or '
                             'simply "opinions" to do all opinions.'))
     (options, args) = parser.parse_args()
 

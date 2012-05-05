@@ -29,20 +29,38 @@ from django.forms.widgets import DateTimeInput
 
 
 class FloorDateField(DateField):
-    '''Simply overrides the DateField to give it a better name. Does nothing
-    else'''
+    '''Simply overrides the DateField to give it a better name. Corrects
+    placeholder value where browsers fail to implement it correctly.'''
     def __init__(self, input_formats=None, *args, **kwargs):
         super(FloorDateField, self).__init__(*args, **kwargs)
         self.input_formats = input_formats
 
+    def to_python(self, value):
+        """
+        Validates that the input can be converted to a date. Returns a Python
+        datetime.date object.
+        """
+        if value in validators.EMPTY_VALUES or value == 'YYYY-MM-DD':
+            return None
+        if isinstance(value, datetime.datetime):
+            return value.date()
+        if isinstance(value, datetime.date):
+            return value
+        for format in self.input_formats or formats.get_format('DATE_INPUT_FORMATS'):
+            try:
+                return datetime.date(*time.strptime(value, format)[:3])
+            except ValueError:
+                continue
+        raise ValidationError(self.error_messages['invalid'])
+
 
 class CeilingDateField(Field):
     '''Implements a DateField where partial input is accepted.
-    
-    Uses django.forms.fields.DateField as a starting point, and then allows 
+
+    Uses django.forms.fields.DateField as a starting point, and then allows
     users to input partial dates such as 2011-12. However, instead of assuming
     such dates correspond with the first of the month, it assumes that such
-    dates represent the *last* day of the month. This allows a search for all 
+    dates represent the *last* day of the month. This allows a search for all
     documents "After 2010" to work.
     '''
 
@@ -60,7 +78,7 @@ class CeilingDateField(Field):
         Validates that the input can be converted to a date. Returns a
         Python datetime.datetime object.
         """
-        if value in validators.EMPTY_VALUES:
+        if value in validators.EMPTY_VALUES or value == "YYYY-MM-DD":
             return None
         if isinstance(value, datetime.datetime):
             return value.date()

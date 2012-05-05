@@ -31,10 +31,11 @@ from django.views.decorators.cache import never_cache
 
 from datetime import date
 
+
 @never_cache
 def show_results(request):
     '''Show the results for a query
-    
+
     Implements a parallel faceted search interface with Solr as the backend.
     '''
 
@@ -103,10 +104,10 @@ def show_results(request):
                 # Send the user the cleaned up query
                 cd = search_form.cleaned_data
                 mutable_get['q'] = cd['q']
-                if mutable_get.get('filed_before'):
+                if mutable_get.get('filed_before') and cd.get('filed_before') is not None:
                     mutable_get['filed_before'] = date.strftime(cd['filed_before'], '%Y-%m-%d')
-                if mutable_get.get('filed_after'):
-                    mutable_get['filed_after'] = date.strftime(cd['filed_after'], '%Y-%m-%d')
+                if mutable_get.get('filed_after') and cd.get('filed_before') is not None:
+                    mutable_get['filed_after'] = date.strftime(cd['filed_after'], '%Y-%m-%d') or None
                 mutable_get['court_all'] = cd['court_all']
             # Always reset the radio box to refine
             mutable_get['refine'] = 'refine'
@@ -163,9 +164,9 @@ def show_results(request):
                   RequestContext(request))
 
 
-
 def tools_page(request):
     return render_to_response('tools.html', {}, RequestContext(request))
+
 
 def browser_warning(request):
     return render_to_response('browser_warning.html', {}, RequestContext(request))

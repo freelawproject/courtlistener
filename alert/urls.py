@@ -16,56 +16,37 @@
 
 # imports of local settings and views
 from alert import settings
-from alert.casepage.sitemap import sitemap_maker
-from alert.casepage.sitemap import flat_sitemap_maker
-from alert.casepage.views import view_case
-from alert.casepage.views import serve_static_file
-from alert.contact.views import contact
-from alert.contact.views import thanks
-from alert.data_dumper.views import dump_index
-from alert.data_dumper.views import serve_or_gen_dump
-from alert.favorites.views import delete_favorite
-from alert.favorites.views import edit_favorite
-from alert.favorites.views import save_or_update_favorite
-from alert.feeds.views import all_courts_feed
-from alert.feeds.views import court_feed
-from alert.feeds.views import search_feed
+from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
+from alert.casepage.views import view_case, view_case_citations, \
+                                 serve_static_file
+from alert.contact.views import contact, thanks
+from alert.data_dumper.views import dump_index, serve_or_gen_dump
+from alert.favorites.views import delete_favorite, edit_favorite, \
+                                  save_or_update_favorite
+from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, \
+                              search_feed
 from alert.maintenance_warning.views import show_maintenance_warning
-from alert.pinger.views import validate_for_bing
-from alert.pinger.views import validate_for_bing2
-from alert.pinger.views import validate_for_google
-from alert.pinger.views import validate_for_google2
-from alert.pinger.views import validate_for_google3
+from alert.pinger.views import validate_for_bing, validate_for_bing2, \
+                               validate_for_google, validate_for_google2, \
+                               validate_for_google3
 from alert.robots.views import robots
-from alert.alerts.views import delete_alert
-from alert.alerts.views import delete_alert_confirm
-from alert.alerts.views import edit_alert
+from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert
 from alert.search.models import Court
-from alert.search.views import browser_warning
-from alert.search.views import show_results
-from alert.search.views import tools_page
+from alert.search.views import browser_warning, show_results, tools_page
 from alert.tinyurl.views import redirect_short_url
-from alert.userHandling.views import confirmEmail
-from alert.userHandling.views import deleteProfile
-from alert.userHandling.views import deleteProfileDone
-from alert.userHandling.views import emailConfirmSuccess
-from alert.userHandling.views import password_change
-from alert.userHandling.views import redirect_to_settings
-from alert.userHandling.views import register
-from alert.userHandling.views import registerSuccess
-from alert.userHandling.views import requestEmailConfirmation
-from alert.userHandling.views import view_favorites
-from alert.userHandling.views import view_alerts
-from alert.userHandling.views import view_settings
+from alert.userHandling.views import confirmEmail, deleteProfile, \
+                                     deleteProfileDone, emailConfirmSuccess, \
+                                     password_change, redirect_to_settings, \
+                                     register, registerSuccess, \
+                                     requestEmailConfirmation, view_favorites, \
+                                     view_alerts, view_settings
 
 from django.conf.urls.defaults import *
 
 # for the flatfiles in the sitemap
-from django.contrib.auth.views import login as signIn
-from django.contrib.auth.views import logout as signOut
-from django.contrib.auth.views import password_reset
-from django.contrib.auth.views import password_reset_done
-from django.contrib.auth.views import password_reset_confirm
+from django.contrib.auth.views import login as signIn, logout as signOut, \
+                                      password_reset, password_reset_done, \
+                                      password_reset_confirm
 
 # enables the admin:
 from django.contrib import admin
@@ -96,13 +77,20 @@ urlpatterns = patterns('',
     (r'^bad-browser/$', browser_warning),
 
     # Maintenance and protest mode!
-    # (r'/*', show_maintenance_warning),
+    #(r'/*', show_maintenance_warning),
+
+    # Display a case's citations page
+    url(r'^(?:.*)/(.*)/(.*)/cited-by/$',
+        view_case_citations,
+        name="view_case_citations"),
 
     # Display a case; a named URL because the get_absolute_url uses it.
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case,
         name="view_case"),
+
     # Serve a static file
-    (r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$', serve_static_file),
+    (r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$',
+        serve_static_file),
 
     # Redirect users that arrive via crt.li
     (r'^x/(.*)/$', redirect_short_url),
@@ -166,6 +154,7 @@ urlpatterns = patterns('',
     (r'^feed/(search)/$', search_feed()), #lacks URL capturing b/c it will use GET queries.
     (r'^feed/court/all/$', all_courts_feed()),
     (r'^feed/court/(?P<court>' + '|'.join(pacer_codes) + ')/$', court_feed()),
+    (r'^feed/(?P<doc_id>.*)/cited-by/$', cited_by_feed()),
 
     # SEO-related stuff
     (r'^LiveSearchSiteAuth.xml$', validate_for_bing),
@@ -174,7 +163,7 @@ urlpatterns = patterns('',
     (r'^google646349975c2495b6.html$', validate_for_google2),
     (r'^google646349975c2495b6.html$', validate_for_google3),
 
-    # Sitemap index generator
+    # Sitemaps & robots
     (r'^sitemap\.xml$', sitemap_maker),
     (r'^sitemap-flat\.xml$', flat_sitemap_maker),
     (r'^robots.txt$', robots)

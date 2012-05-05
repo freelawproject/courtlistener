@@ -28,6 +28,7 @@ from celery.decorators import task
 
 import re
 
+
 def get_document_citations(document):
     '''Identify and return citations from the html or plain text of the document.'''
     if document.documentHTML:
@@ -38,6 +39,7 @@ def get_document_citations(document):
     else:
         citations = []
     return citations
+
 
 def create_cited_html(document, citations):
     if document.documentHTML:
@@ -51,6 +53,7 @@ def create_cited_html(document, citations):
             inner_html = re.sub(citation.as_regex(), repl, inner_html)
         new_html = u'<pre class="inline">%s</pre>' % inner_html
     return new_html.encode('utf-8')
+
 
 @task
 def update_document(document):
@@ -74,7 +77,13 @@ def update_document(document):
             match_id = matches[0]['id']
             try:
                 matched_doc = Document.objects.get(pk=match_id)
-                # Add citation match to the document's list of cases it cites
+                # Increase citation count for matched document if it hasn't
+                # already been cited by this document.
+                if not matched_doc.citation in document.cases_cited.all():
+                    matched_doc.citation_count += 1
+                    matched_doc.save(index=False)
+                # Add citation match to the citing document's list of cases it cites.
+                # cases_cited is a set so duplicates aren't an issue
                 document.cases_cited.add(matched_doc.citation)
                 # URL field will be used for generating inline citation html
                 citation.match_url = matched_doc.get_absolute_url()
@@ -88,6 +97,8 @@ def update_document(document):
                 continue
         else:
             if DEBUG >= 2:
+                # TODO: Don't print 1 line per citation.  Save them in a list
+                # and print in a single line at the end.
                 print "No match found for citation %s" % citation.base_citation()
     # Only create new HTML if we found citations
     if citations:
@@ -103,6 +114,7 @@ def update_document(document):
     print "  %d citations" % len(citations)
     print "  %d exact matches" % citation_matches
     print "  %d name matches" % name_matches
+
 
 @task
 def update_document_by_id(document_id):

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load text_filters %}
 
-{# Shown on document display pages. #}
+{# Shown on case pages. #}
 
 {% block title %}CourtListener.com / Cases / {{ title }}{% endblock %}
 
@@ -10,6 +10,7 @@
         {% if get_string %}
             <link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?{{ get_string }}" />
         {% endif %}
+        <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{doc|truncatewords:10}}" href="/feed/{{doc.pk|num_to_ascii}}/cited-by/">    
         <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">
         {% for court in court_facets %}
             <link rel="alternate" type="application/rss+xml" title="Atom feed for {{ court.0 }}" href="/feed/court/{{ court.4 }}/">
@@ -39,7 +40,7 @@
 {% endblock %}
 
 {% block sidebar %}
-    <div class="span-5 append-2" id="sidebar">
+    <div class="span-6 append-1" id="sidebar">
         {# show the admin tools if applicable #}
         {% if user.is_superuser and doc %}
             <div class="sidebar-section">
@@ -52,15 +53,48 @@
         {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
         <div class="{% if not favorite_form.instance.doc_id %}hidden{% endif %} sidebar-section" id="sidebar-notes">
             <div>
-                <h3 class="bottom inline arrow-down-before">Your Notes</h3>
+                <h3 class="bottom inline arrow-down-before pointer">Your Notes</h3>
                 <p class="inline" id="edit-favorite">(<a href="#favorite-editor">edit</a>)</p>
+                <div class="shown">
+                    <p id="sidebar-notes-text">
+                        {{ favorite_form.instance.notes|default:"(none)" }}
+                    </p>
+                </div>
             </div>
-            <p id="sidebar-notes-text" class="shown">
-                {{ favorite_form.instance.notes|default:"(none)" }}
-            </p>
         </div>
 
 
+        {# Show cases that cite this case #}
+        <div id="cited-by" class="sidebar-section">
+            {% if doc.citation_count > 0 %}
+                <h3 class="bottom pointer arrow-down-before">Cited By ({{ doc.citation_count }})</h3>
+                <div class="shown">
+                    <ul>
+                        {% for case in cited_by_trunc %}
+                            <li>
+                                <a href="{{case.get_absolute_url}}">{{ case.citation.case_name|truncatewords:10|v_wrapper }},
+                                    {% if case.citation.westCite %}
+                                        {{case.citation.westCite}}
+                                    {% else %}
+                                        {{case.citation.docketNumber}}
+                                    {% endif %}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <a class="more" href="{{ doc.get_absolute_url }}cited-by/">More detail&hellip;</a>
+                </div>
+            {% else %}
+                <h3 class="bottom pointer arrow-right-before">Cited By ({{ doc.citation_count }})</h3>
+                <div class="hidden">
+                    <p class="bottom">
+                        No citations found for this case.
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+        
+          
         {# Download original? #}
         <div class="sidebar-section">
             <h3 class="bottom pointer arrow-down-before">View Original</h3>
@@ -85,20 +119,19 @@
             </p>
         </div>
 
+
         {# Show the social links using sprites #}
         <div class="sidebar-section">
             <h3 class="bottom pointer arrow-right-before" id="share-header">Share</h3>
             <div class="hidden">
+                <input type="text" readonly="readonly" id="copy-input" value="{{doc.get_small_url}}"></input>
                 <a href="mailto:?subject={{title|urlencode}}%20at%20CourtListener.com&body={{doc.get_small_url}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
                 <a href="http://www.facebook.com/share.php?u={{doc.get_small_url}}&t={{title}} at CourtListener.com" target="_blank" title="Facebook" class="sprites" id="facebook_png"></a>
                 <a href="http://twitter.com/home?status={{doc.get_small_url}}" target="_blank" title="Twitter" class="sprites" id="twitter_gif"></a>
-                <a href="http://digg.com/submit?phase=2&url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Digg" class="sprites" id="digg_png"></a>
-                <a href="http://reddit.com/submit?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="Reddit" class="sprites" id="reddit_png"></a>
-                <a href="http://del.icio.us/post?url={{doc.get_small_url}}&title={{title}} at CourtListener.com" target="_blank" title="delicious" class="sprites" id="delicious_png"></a>
-                <input type="text" readonly="readonly" id="copy-input" value="{{doc.get_small_url}}"></input>
             </div>
             <hr class="space">
         </div>
+        
         
         {# Show the search refine section. This is populated with JS #}
         <div class="sidebar-section">
@@ -232,10 +265,14 @@
             <div class="clearfix"></div>
         {% endif %}
         <div id="text">
-            {% if doc.documentHTML %}
-                {{doc.documentHTML|safe}}
+            {% if doc.html_with_citations %}
+                {{ doc.html_with_citations|safe }}
             {% else %}
-                <pre>{{doc.documentPlainText}}</pre>
+                {% if doc.documentHTML %}
+                    {{doc.documentHTML|safe}}
+                {% else %}
+                    <pre>{{doc.documentPlainText}}</pre>
+                {% endif %}
             {% endif %}
         </div>
     </article>

@@ -39,7 +39,7 @@ def sitemap_maker(request, size=250):
         # Page was found, so serve that page.
         params['rows'] = size
         params['start'] = (int(page) - 1) * size
-        params['fl'] = 'absolute_url,dateFiled'
+        params['fl'] = 'absolute_url,dateFiled,local_path'
         params['sort'] = 'dateFiled asc'
         search_results_object = conn.raw_query(**params).execute()
 
@@ -47,13 +47,28 @@ def sitemap_maker(request, size=250):
         urls = []
         for result in search_results_object:
             url = {}
-            url['location'] = '%s://courtlistener.com%s' % (protocol,
-                                                            result['absolute_url'])
-            url['changefreq'] = 'never'
-            url['priority'] = '0.5'
-            urls.append(url)
+            url_strs = ['%s://courtlistener.com%s' % (protocol,
+                                                      result['absolute_url']),
+                        '%s://courtlistener.com%scited-by/' % (protocol,
+                                                               result['absolute_url'])]
+            try:
+                url_strs.append('%s://courtlistener.com/%s' % (protocol,
+                                                               result['local_path']))
+            except KeyError:
+                # No local_path key.
+                pass
 
-        xml = smart_str(loader.render_to_string('sitemap.xml', {'urlset': urls}))
+            for url_str in url_strs:
+                url['location'] = url_str
+                url['changefreq'] = 'never'
+                if any(str in url_str for str in ['cited-by', 'pdf', 'doc', 'wpd']):
+                    url['priority'] = '0.4'
+                else:
+                    url['priority'] = '0.5'
+                urls.append(dict(url))
+
+        xml = smart_str(loader.render_to_string('sitemap.xml',
+                                                {'urlset': urls}))
 
     else:
         # If no page number, thus the index page.

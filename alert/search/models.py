@@ -71,8 +71,8 @@ def make_pdf_upload_path(instance, filename):
 
 def invalidate_dumps_by_date_and_court(date, court):
     '''Deletes dump files for a court and date
-    
-    Receives court and date parameters, and then deletes any corresponding 
+
+    Receives court and date parameters, and then deletes any corresponding
     dumps.
     '''
     year, month, day = '%s' % date.year, '%02d' % date.month, '%02d' % date.day
@@ -187,7 +187,7 @@ class Citation(models.Model):
 
 class Document(models.Model):
     '''A class representing a single court opinion.
-    
+
     This must go last, since it references the above classes
     '''
     documentUUID = models.AutoField("a unique ID for each document",
@@ -198,7 +198,8 @@ class Document(models.Model):
                       choices=DOCUMENT_SOURCES,
                       blank=True)
     documentSHA1 = models.CharField(
-                      "unique ID for the document, as generated via sha1 on the PDF",
+                      "unique ID for the document, as generated via SHA1 of "
+                      "the binary file",
                       max_length=40,
                       db_index=True)
     dateFiled = models.DateField(
@@ -216,21 +217,24 @@ class Document(models.Model):
                       blank=True,
                       null=True)
     download_URL = models.URLField(
-                      "the URL on the court website where the document was originally scraped",
+                      "the URL on the court website where the document was "
+                      "originally scraped",
                       verify_exists=False,
                       db_index=True)
     time_retrieved = models.DateTimeField(
-                      "the exact date and time stamp that the document was placed into our database",
+                      "the exact date and time stamp that the document was "
+                      "placed into our database",
                       auto_now_add=True,
                       editable=False,
                       db_index=True)
     local_path = models.FileField(
-                      "the location, relative to MEDIA_ROOT, where the files are stored",
+                      "the location, relative to MEDIA_ROOT, where the files "
+                      "are stored",
                       upload_to=make_pdf_upload_path,
                       blank=True,
                       db_index=True)
     documentPlainText = models.TextField(
-                      "plain text of the document after extraction from the PDF",
+                      "plain text of the document after extraction",
                       blank=True)
     documentHTML = models.TextField(
                       "HTML of the document",
@@ -241,10 +245,15 @@ class Document(models.Model):
     cases_cited = models.ManyToManyField(
                       Citation,
                       related_name="citing_cases",
+                      verbose_name="Cases cited (do not update!)",
                       null=True,
                       blank=True)
+    citation_count = models.IntegerField(
+                      'the number of times this document is cited by other '
+                      'cases',
+                      default=0)
     documentType = models.CharField(
-                      "the type of document, as described by document_types.txt",
+                      "the precedential status of document",
                       max_length=50,
                       blank=True,
                       choices=DOCUMENT_STATUSES)
@@ -295,7 +304,6 @@ class Document(models.Model):
         # Delete the cached sitemaps and dumps if the item is blocked.
         if self.blocked:
             invalidate_dumps_by_date_and_court(self.dateFiled, self.court_id)
-
 
     def delete(self, *args, **kwargs):
         '''

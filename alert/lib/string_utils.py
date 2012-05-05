@@ -26,9 +26,6 @@
 #  ways how any modified versions differ from the original version.
 
 import re
-from django.utils.encoding import smart_str
-from django.utils.encoding import smart_unicode
-
 
 # three digits dash two digits dash four digits, not proceeded or followed 
 # by digits. Proceeding start of line (^) or following end of line ($) OK.   
@@ -36,7 +33,7 @@ SSN_AND_ITIN = re.compile('([^0-9A-Za-z-]|^)(\d{3}-\d{2}-\d{4})([^0-9A-Za-z-]|$)
 EIN = re.compile('([^0-9A-Za-z-]|^)(\d{2}-\d{7})([^0-9A-Za-z-]|$)')
 def anonymize(string):
     '''Anonymizes private information.
-    
+
     Converts SSNs, EIN and alienIDs to X's. Reports whether a modification was
     made, as a boolean.
     '''
@@ -45,9 +42,10 @@ def anonymize(string):
     modified = bool(ssn_replacements + ien_replacements)
     return string, modified
 
+
 def trunc(s, length):
     '''Truncates a string at a good length.
-    
+
     Finds the rightmost space in a string, and truncates there. Lacking such
     a space, truncates at length.
     '''
@@ -61,11 +59,12 @@ def trunc(s, length):
             end = length
         return s[0:end]
 
+
 def removeLeftMargin(s):
     '''Gets rid of left hand margin.
-    
-    Given a block of text, calculates the mode of the number of spaces before 
-    text in the doc, and then removes that number of spaces from the text. This 
+
+    Given a block of text, calculates the mode of the number of spaces before
+    text in the doc, and then removes that number of spaces from the text. This
     should not be used in the general case, but can be used in cases where a
     left-hand margin is known to exist.
     '''
@@ -96,8 +95,9 @@ def removeLeftMargin(s):
 
     return '\n'.join(lines_out)
 
+
 def removeDuplicateLines(s):
-    # Remove duplciate lines next to each other.
+    '''Remove duplicate lines next to each other.'''
     lines = s.split('\n')
     lines_out = []
     previous_line = ''

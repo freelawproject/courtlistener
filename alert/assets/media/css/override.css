@@ -162,11 +162,55 @@ nav ul li {
     color: black;
 }
 
+/* New case view styling, including citations */
+#text pre, .citation { 
+    font-family: "Helvetica Neue", Arial, Helvetica, sans-serif; 
+}
+
+/* cited by sidebar list styling */
+div.shown {
+    padding-top: 5px;
+}
+
+div.shown ul {
+    margin: 0;
+    padding: 0 0 0 17px;
+}
+
+.more { 
+    float: right; 
+}
+
+/* cited by viewer styling */
+#cited-by-viewer hr {
+    margin-bottom: 2px;
+}
+
+#cited-by-viewer ul {
+    padding: 0;
+    margin: 0;
+}
+
+#cited-by-viewer ul li {
+    list-style-type: none;
+    padding: 3px 0 2px 0;
+    border-bottom: 1pt solid #DDD;
+}
+
+.citation-name { 
+    font-size: 1.2em; 
+}
+
+#citation-filters input[type=text] {
+    width: 40px;
+}
+
 /* Button formatting */
 a.button, button {
     border-color: #a6a6a6;
     background-color: #6683B7;
     color: white;
+    letter-spacing: 0.5px;
 }
 button:hover, a.button:hover {
   background-color: #7896D0;
@@ -466,7 +510,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     height               : 16px;
 	width                : 16px;
 	background-position  : -16px -16px;
-    margin: 0px 2px 0px 2px;
+    margin: .7em 2px 0px 2px;
 }
 #delicious_png:hover {
 	background-position  : -16px 0px;
@@ -475,7 +519,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 	height               : 14px;
 	width                : 16px;
 	background-position  : -32px -14px;
-    margin: 0px 2px 0px 2px;
+    margin: .7em 2px 0px 2px;
 }
 #digg_png:hover {
 	background-position  : -32px 0px;
@@ -484,7 +528,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 	height               : 16px;
 	width                : 16px;
 	background-position  : -48px -16px;
-    margin: 0px 0px 0px 2px;
+    margin: .7em 2px 0px 2px;
 }
 #email_link_png:hover {
 	background-position  : -48px 0px;
@@ -493,7 +537,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     height               : 16px;
 	width                : 16px;
     background-position  : -82px -16px;
-    margin: 0px 2px 0px 2px;
+    margin: .7em 2px 0px 2px;
 }
 #facebook_png:hover {
     background-position  : -82px 0px;
@@ -502,7 +546,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 	height               : 18px;
 	width                : 18px;
 	background-position  : -64px -18px;
-    margin: 0px 2px 0px 2px;
+    margin: .7em 2px 0px 2px;
 }
 #reddit_png:hover {
 	background-position  : -64px 0px;
@@ -511,7 +555,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 	height               : 16px;
 	width                : 16px;
 	background-position  : -98px -16px;
-    margin: 0px 2px 0px 2px;
+    margin: 0.7em 2px 0px 2px;          
 }
 #twitter_gif:hover {
 	background-position  : -98px 0px;

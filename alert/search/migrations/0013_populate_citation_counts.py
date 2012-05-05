@@ -1,33 +1,28 @@
-# encoding: utf-8
+# -*- coding: utf-8 -*-
 import datetime
 from south.db import db
-from south.v2 import SchemaMigration
+from south.v2 import DataMigration
 from django.db import models
+from alert.search.models import Document
+from alert.lib.db_tools import queryset_generator
 
-class Migration(SchemaMigration):
 
+class Migration(DataMigration):
     def forwards(self, orm):
-
-        # Adding field 'Document.html_with_citations'
-        db.add_column('Document', 'html_with_citations', self.gf('django.db.models.fields.TextField')(default='', blank=True), keep_default=False)
-
-        # Adding M2M table for field cases_cited on 'Document'
-        db.create_table('Document_cases_cited', (
-            ('id', models.AutoField(verbose_name='ID', primary_key=True, auto_created=True)),
-            ('document', models.ForeignKey(orm['search.document'], null=False)),
-            ('citation', models.ForeignKey(orm['search.citation'], null=False))
-        ))
-        db.create_unique('Document_cases_cited', ['document_id', 'citation_id'])
-
+        # Populates the database with the citation count for each document
+        for doc in queryset_generator(Document.objects.all()):
+            try:
+                doc.citation_count = doc.citation.citing_cases.all().count()
+                doc.save(index=False)
+            except AttributeError:
+                print "AttributeError: Unable to create count for document: %s" % doc
 
     def backwards(self, orm):
-
-        # Deleting field 'Document.html_with_citations'
-        db.delete_column('Document', 'html_with_citations')
-
-        # Removing M2M table for field cases_cited on 'Document'
-        db.delete_table('Document_cases_cited')
-
+        # Write the values back to zero (the default used when creating the
+        # column
+        for doc in queryset_generator(Document.objects.filter(citation_count__gt=0)):
+            doc.citation_count = 0
+            doc.save(index=False)
 
     models = {
         'search.citation': {
@@ -37,7 +32,7 @@ class Migration(SchemaMigration):
             'docketNumber': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
             'lexisCite': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
             'neutral_cite': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
-            'slug': ('django.db.models.fields.SlugField', [], {'max_length': '50', 'null': 'True', 'db_index': 'True'}),
+            'slug': ('django.db.models.fields.SlugField', [], {'max_length': '50', 'null': 'True'}),
             'westCite': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'})
         },
         'search.court': {
@@ -54,10 +49,11 @@ class Migration(SchemaMigration):
             'start_date': ('django.db.models.fields.DateField', [], {'null': 'True', 'blank': 'True'})
         },
         'search.document': {
-            'Meta': {'ordering': "['-time_retrieved']", 'object_name': 'Document', 'db_table': "'Document'"},
+            'Meta': {'object_name': 'Document', 'db_table': "'Document'"},
             'blocked': ('django.db.models.fields.BooleanField', [], {'default': 'False', 'db_index': 'True'}),
-            'cases_cited': ('django.db.models.fields.related.ManyToManyField', [], {'symmetrical': 'False', 'related_name': "'citing_cases'", 'null': 'True', 'to': "orm['search.Citation']"}),
+            'cases_cited': ('django.db.models.fields.related.ManyToManyField', [], {'blank': 'True', 'related_name': "'citing_cases'", 'null': 'True', 'symmetrical': 'False', 'to': "orm['search.Citation']"}),
             'citation': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['search.Citation']", 'null': 'True', 'blank': 'True'}),
+            'citation_count': ('django.db.models.fields.IntegerField', [], {'default': '0'}),
             'court': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['search.Court']"}),
             'dateFiled': ('django.db.models.fields.DateField', [], {'db_index': 'True', 'null': 'True', 'blank': 'True'}),
             'date_blocked': ('django.db.models.fields.DateField', [], {'null': 'True', 'blank': 'True'}),
@@ -76,3 +72,4 @@ class Migration(SchemaMigration):
     }
 
     complete_apps = ['search']
+    symmetrical = True
