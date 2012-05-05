@@ -28,21 +28,26 @@ class Citation(object):
         self.plaintiff = None
         self.court = None
         self.year = None
-        self.match_url = "#"
+        self.match_url = None
 
     def base_citation(self):
         return u"%d %s %d" % (self.volume, self.reporter, self.page)
 
     def as_regex(self):
-        return r"%d\s+%s\s+%d" % (self.volume, self.reporter, self.page)
+        return r"%d(\s+)%s(\s+)%d" % (self.volume, self.reporter, self.page)
 
+    # TODO: Update css for no-link citations
     def as_html(self):
-        template = u'<span class="volume">%(volume)d</span> ' \
-            u'<span class="reporter">%(reporter)s</span> ' \
+        template = u'<span class="volume">%(volume)d</span>\\1' \
+            u'<span class="reporter">%(reporter)s</span>\\2' \
             u'<span class="page">%(page)d</span>'
         inner_html = template % self.__dict__
-        link = u'<a href="%s">' % self.match_url + inner_html + u'</a>'
-        return u'<span class="citation">' + link + '</span>'
+        span_class = "citaton"
+        if self.match_url:
+            inner_html = u'<a href="%s">' % self.match_url + inner_html + u'</a>'
+        else:
+            span_class += " no-link"
+        return u'<span class="%s">%s</span>' % (span_class, inner_html)
 
     def __repr__(self):
         print_string = self.base_citation()

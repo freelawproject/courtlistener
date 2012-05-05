@@ -164,7 +164,8 @@ nav ul li {
 
 /* New case view styling, including citations */
 #text pre, .citation { 
-    font-family: "Helvetica Neue", Arial, Helvetica, sans-serif; 
+    font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+    white-space: pre;
 }
 
 /* cited by sidebar list styling */
