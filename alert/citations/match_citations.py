@@ -9,10 +9,10 @@ sys.path.append("/var/www/court-listener")
 
 from django.conf import settings
 from alert.search.models import Court
+from alert.citations.find_citations import strip_punct
 from alert.lib import sunburnt
 
 from datetime import date, datetime
-import string
 
 DEBUG = True
 
@@ -42,14 +42,13 @@ def build_date_range(start_year, end_year):
     return date_range
 
 def make_name_param(defendant, plaintiff=None):
-    '''Remove punctuation tokens and return cleaned string plus its length in 
-    tokens.
+    '''Remove punctuation and return cleaned string plus its length in tokens.
     '''
     token_list = defendant.split()
     if plaintiff:
         token_list.extend(plaintiff.split())
-    # Filter out stand-alone punctuation, which Solr doesn't like
-    query_words = [t for t in token_list if t not in string.punctuation]
+    # Strip out punctuation, which Solr doesn't like
+    query_words = [strip_punct(t) for t in token_list]
     return (u' '.join(query_words), len(query_words))
 
 def reverse_match(conn, results, citing_doc):
