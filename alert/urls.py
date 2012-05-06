@@ -176,7 +176,8 @@ urlpatterns += patterns('django.views.generic.simple',
     ('^browse/$', 'redirect_to', {'url': '/'}),
     ('^opinions/' + "|".join(pacer_codes) + '|all', 'redirect_to', {'url': '/'}), # supports old URLs - added 2011-12-31
     ('^search/results/$', 'redirect_to', {'url': '/', 'query_string': True}), # supports old OpenSearch plugin - added 2012-01-27
-    ('^report/$', 'redirect_to', {'url': 'http://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf'}),
+    ('^report/2010/$', 'redirect_to', {'url': 'http://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf'}),
+    ('^report/2012/$', 'redirect_to', {'url': 'http://www.ischool.berkeley.edu/files/student_projects/mcdonald_rustad_report.pdf'}),
 )
 
 # if it's not the production site, serve the static files this way.

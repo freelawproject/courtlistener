@@ -8,13 +8,23 @@ $(document).ready(function() {
         e.preventDefault();
         var refine = $('input[name=refine]:checked').val();
         if (refine == 'new') {
-            // If it's a new query, we only perist the sort order.
+            // If it's a new query, we only persist the sort order.
             gathered = $('#id_sort');
         }
         else {
-            // Otherwise, all form fields are persisted.
-            gathered = $('.external-input:not([type=checkbox]),.external-input:checked'); 
-        }
+            // Otherwise, all form fields are persisted that are necessary
+        	var gathered = $();
+        	if ($('#id_court_all:checked').length == 0) {
+        		// All courts are not selected, therefore add the court checkboxes  
+        		gathered = gathered.add($('.court-checkbox:checked'));
+        	} 
+        	if ($('.status-checkbox:checked').length < $('.status-checkbox').length){
+            	// All statuses are not checked, therefore add the status checkboxes
+        		gathered = gathered.add($('.status-checkbox:checked'));
+        	}
+        	// Add the input boxes that aren't empty
+        	gathered = gathered.add($('.external-input:not([type=checkbox])').filter(function() { return this.value != ""; }));
+    	}
         gathered.each(function() {
            var el = $(this);
            $('<input type="hidden" name="' + el.attr('name') + '" />')
