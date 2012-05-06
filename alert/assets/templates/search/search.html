@@ -53,46 +53,42 @@
             {% endif %}
             {% if user.is_authenticated %}
                 {% if get_string %}
-                    {% if search_form.sort.value == 'dateFiled desc' %}
-                        {% if alert_form.errors %}
-                            <div class="span-4 error">
-                                <p class="bottom">Please fix the errors below.</p>
-                            </div>
-                        {% endif %}
-                        <form action="" method="post">{% csrf_token %}
-                            {{ alert_form.alertText }}
-                            <p>
-                                <label for="id_alertName">Give the alert a name</label>
-                                {% if alert_form.alertName.errors %}
-                                    <br><span class="errortext">
-                                        {% for error in alert_form.alertName.errors %}
-                                            {{ error|escape }}
-                                        {% endfor %}
-                                    </span>
-                                {% endif %}
-                                {{ alert_form.alertName }}
-                            </p>
-                            <p>
-                                <label for="id_alertFrequency">How often should we notify you?</label>
-                                {% if alert_form.alertFrequency.errors %}
-                                    <br><span class="errortext">
-                                        {% for error in alert_form.alertFrequency.errors %}
-                                            {{ error|escape }}
-                                        {% endfor %}
-                                    </span>
-                                {% endif %}<br>
-                                {{ alert_form.alertFrequency }}
-                            </p>
-                            <p>
-                                {{ alert_form.sendNegativeAlert }}
-                                <label for="id_sendNegativeAlert">Send me an email even when there are no hits</label>
-                                <br>
-                            </p>
-                            <button type="submit" class="button title" name="alertSave">Create alert</button>
-                        </form>
-                    {% else %}
-                        <p>Alerts cannot be created when the oldest results are listed first.</p>
+                    {% if alert_form.errors %}
+                        <div class="span-4 error">
+                            <p class="bottom">Please fix the errors below.</p>
+                        </div>
                     {% endif %}
+                    <form action="" method="post">{% csrf_token %}
+                        {{ alert_form.alertText }}
+                        <p class="span-6 append-1">
+                            <label for="id_alertName">Give the alert a name</label>
+                            {% if alert_form.alertName.errors %}
+                                <br><span class="errortext">
+                                    {% for error in alert_form.alertName.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}
+                            {{ alert_form.alertName }}
+                        </p>
+                        <p>
+                            <label for="id_alertFrequency">How often should we notify you?</label>
+                            {% if alert_form.alertFrequency.errors %}
+                                <br><span class="errortext">
+                                    {% for error in alert_form.alertFrequency.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}<br>
+                            {{ alert_form.alertFrequency }}
+                        </p>
+                        <p>
+                            {{ alert_form.sendNegativeAlert }}
+                            <label for="id_sendNegativeAlert">Send me an email even when there are no hits</label>
+                            <br>
+                        </p>
+                        <button type="submit" class="button title" name="alertSave">Create alert</button>
+                    </form>
                 {% else %}
                     <p>To create an alert, first place a query.</p>
                 {% endif %}

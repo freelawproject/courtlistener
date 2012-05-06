@@ -22,10 +22,11 @@ from django.template import loader
 from django.utils.encoding import smart_str
 from django.views.decorators.cache import never_cache
 
+
 @never_cache
 def sitemap_maker(request, size=250):
     '''Generate a sitemap index page
-    
+
     Counts the number of cases in the site, divides by 1,000 and provides links
     for all of them.
     '''

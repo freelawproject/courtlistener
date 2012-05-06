@@ -553,13 +553,23 @@ class Volume(object):
         return len(self.case_urls)
 
     def __getitem__(self, key):
-        for t in zip(self.case_urls[key],
-                     self.case_dates[key],
-                     self.sha1_hashes[key]):
-            print "t: %s" % t
-            return Case(self.url, *t)
+        try:
+            # Check if key is an int. If so, we do the simple thing.
+            int(key)
+            return Case(self.url,
+                       self.case_urls[key],
+                       self.case_dates[key],
+                       self.sha1_hashes[key])
+        except ValueError:
+            # If a for-reals key is provided, we zip up the items we want, and 
+            # return them.
+            for t in zip(self.case_urls[key],
+                         self.case_dates[key],
+                         self.sha1_hashes[key]):
+                return Case(self.url, *t)
 
     def __iter__(self):
+        print "Entering __iter__function."
         for i in range(i, self.__len__()):
             return Case(self.url,
                        self.case_urls[i],
@@ -574,13 +584,18 @@ class Corpus(object):
         self.url = url
         self.tree = fromstring(urllib2.urlopen(urljoin(url, "index.html")).read())
         self.volume_urls = self.tree.xpath('//table/tbody/tr/td[1]/a/@href')
+        print self.volume_urls[60]
 
     def __len__(self):
         return len(self.volume_urls)
 
     def __getitem__(self, key):
-        for vol in self.volume_urls[key]:
-             return Volume(urljoin(self.url, vol + '/index.html'))
+        try:
+            int(key)
+            return Volume(urljoin(self.url, "%s/index.html" % key))
+        except ValueError:
+            for vol in self.volume_urls[key]:
+                return Volume(urljoin(self.url, '%s/index.html' % vol))
 
     def __iter__(self):
         for volume_url in self.volume_urls:
