@@ -30,8 +30,10 @@ from django.core.mail import send_mail, EmailMultiAlternatives
 import datetime
 from optparse import OptionParser
 
+
 class InvalidDateError(Exception):
     pass
+
 
 def send_alert(userProfile, hits, verbose, simulate):
     EMAIL_SUBJECT = 'New hits for your CourtListener alerts'
@@ -39,16 +41,17 @@ def send_alert(userProfile, hits, verbose, simulate):
 
     if userProfile.plaintextPreferred:
         txt_template = loader.get_template('emails/email.txt')
-        c = Context({'hits':hits})
+        c = Context({'hits': hits})
         email_text = txt_template.render(c)
         if verbose and simulate:
             print "email_text: %s" % email_text
         if not simulate:
-            send_mail(EMAIL_SUBJECT, email_text, EMAIL_SENDER, [userProfile.user.email], fail_silently=False)
+            send_mail(EMAIL_SUBJECT, email_text, EMAIL_SENDER,
+                      [userProfile.user.email], fail_silently=False)
     else:
         txt_template = loader.get_template('emails/email.txt')
         html_template = loader.get_template('emails/email.html')
-        c = Context({'hits':hits})
+        c = Context({'hits': hits})
         email_text = txt_template.render(c)
         html_text = html_template.render(c)
         if verbose and simulate:
@@ -58,7 +61,8 @@ def send_alert(userProfile, hits, verbose, simulate):
             msg = EmailMultiAlternatives(EMAIL_SUBJECT, email_text,
                 EMAIL_SENDER, [userProfile.user.email])
             msg.attach_alternative(html_text, "text/html")
-            msg.send(fail_silently=False) # send a multi-part email
+            msg.send(fail_silently=False)  # send a multi-part email
+
 
 def get_cut_off_date(rate):
     today = datetime.date.today()
@@ -73,15 +77,16 @@ def get_cut_off_date(rate):
         cut_off_date = datetime.date(early_last_month.year, early_last_month.month, 1)
     return cut_off_date
 
+
 def emailer(rate, verbose, simulate):
     """Send out an email to every user whose alert has a new hit for a rate.
-    
+
     Look up all users that have alerts for a given period of time, and iterate
-    over them. For each of their alerts that has a hit, build up an email that 
-    contains all the hits. 
-    
-    It's tempting to lookup alerts and iterate over those instead of over the 
-    users. The problem with that is that it would send one email per *alert*, 
+    over them. For each of their alerts that has a hit, build up an email that
+    contains all the hits.
+
+    It's tempting to lookup alerts and iterate over those instead of over the
+    users. The problem with that is that it would send one email per *alert*,
     not per *user*.
     """
 
@@ -89,7 +94,7 @@ def emailer(rate, verbose, simulate):
     cut_off_date = get_cut_off_date(rate)
 
     # Query all users with alerts of the desired frequency
-    # Use the distinct method to only return one instance of each person. 
+    # Use the distinct method to only return one instance of each person.
     userProfiles = UserProfile.objects.filter(alert__alertFrequency=rate).distinct()
 
     # for each user with a daily, weekly or monthly alert...
@@ -114,6 +119,7 @@ def emailer(rate, verbose, simulate):
                 except KeyError:
                     pass
                 data['filed_after'] = cut_off_date
+                data['sort'] = 'dateFiled desc'
                 if verbose:
                     print "Data sent to SearchForm is: %s" % data
                 search_form = SearchForm(data)
@@ -122,8 +128,8 @@ def emailer(rate, verbose, simulate):
                     main_params = search_utils.build_main_query(cd)
                     main_params['rows'] = '25'
                     main_params['start'] = '0'
-                    main_params['hl.tag.pre'] = '<em>'
-                    main_params['hl.tag.post'] = '</em>'
+                    main_params['hl.tag.pre'] = '<em><strong>'
+                    main_params['hl.tag.post'] = '</strong></em>'
                     results = conn.raw_query(**main_params).execute()
                 else:
                     print "Query for alert %s was invalid" % alert.alertText
@@ -161,13 +167,15 @@ def emailer(rate, verbose, simulate):
 
     return "Done"
 
+
 def main():
     usage = "usage: %prog -r RATE [--verbose] [--simulate]"
     parser = OptionParser(usage)
     parser.add_option('-r', '--rate', dest='rate', metavar='RATE',
-        help="The rate to send emails")
+        help="The rate to send emails (%s)" % ', '.join(dict(FREQUENCY).keys()))
     parser.add_option('-v', '--verbose', action="store_true", dest='verbose',
-        default=False, help="Display variable values during execution")
+        default=False, help="Display variable values during execution (note"
+                            " that this can cause UnicodeEncodeErrors)")
     parser.add_option('-s', '--simulate', action="store_true",
         dest='simulate', default=False, help="Simulate the emails that " + \
         "would be sent, using the console backend")
@@ -175,7 +183,7 @@ def main():
     if not options.rate:
         parser.error("You must specify a rate")
     if options.rate not in dict(FREQUENCY).keys():
-        parser.error("Invalid rate. Rate must be one of: %s" % ', '.join(dict(FREQUENCY).iterkeys()))
+        parser.error("Invalid rate. Rate must be one of: %s" % ', '.join(dict(FREQUENCY).keys()))
     rate = options.rate
     verbose = options.verbose
     simulate = options.simulate

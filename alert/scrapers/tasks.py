@@ -52,7 +52,7 @@ import time
 import traceback
 
 @task
-def extract_doc_content(pk):
+def extract_doc_content(pk, callback=None):
     '''
     Given a document, we extract it, sniffing its mimetype, then store its 
     contents in the database.  Finally, we asynchronously find citations in
@@ -75,11 +75,13 @@ def extract_doc_content(pk):
         process = subprocess.Popen(["pdftotext", "-layout", "-enc", "UTF-8",
             path, "-"], shell=False, stdout=subprocess.PIPE, stderr=DEVNULL)
         content, err = process.communicate()
-        if content.strip() == '':
+        if content.strip() == '' and callback:
             # probably an image PDF. Send it to OCR
+            result = subtask(callback).delay(path)
+            '''
             result = subtask("scrapers.tasks.extract_by_ocr",
                              args=(path,),
-                             kwargs={}).apply()
+                             kwargs={}).apply()'''
             success, content = result.get()
             if success:
                 doc.extracted_by_ocr = True
@@ -178,7 +180,7 @@ def extract_by_ocr(path):
             tesseract_command = ['tesseract', '%s.tiff' % tmp_file_prefix,
                                  tmp_file_prefix, '-l', 'eng']
             process = subprocess.Popen(tesseract_command, shell=False,
-                                       stdout=DEVNULL, stderr=DEVNULL)
+                                       stdout=DEVNULL, stderr=subprocess.PIPE)
             _, err = process.communicate()
 
             if not err:

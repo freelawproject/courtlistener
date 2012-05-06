@@ -22,7 +22,7 @@ from django.conf import settings
 
 
 def make_get_string(request):
-    '''Makes a get string from the request object. If necessary, it removes 
+    '''Makes a get string from the request object. If necessary, it removes
     the pagination parameters.
     '''
     get_dict = parse_qs(request.META['QUERY_STRING'])
@@ -37,9 +37,9 @@ def make_get_string(request):
 
 
 def get_string_to_dict(get_string):
-    '''Reverses the work that the make_get_string function performs, building a 
-    dict from the get_string. 
-    
+    '''Reverses the work that the make_get_string function performs, building a
+    dict from the get_string.
+
     Used by alerts.
     '''
     get_dict = {}
@@ -50,11 +50,11 @@ def get_string_to_dict(get_string):
 
 def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
     '''Create a useful facet variable for use in a template
-    
-    This function merges the fields in the form with the facet values from Solr, 
-    creating useful variables for the front end.
+
+    This function merges the fields in the form with the facet values from
+    Solr, creating useful variables for the front end.
     We need to handle two cases:
-      1. The initial load of the page. For this we use the checked attr that 
+      1. The initial load of the page. For this we use the checked attr that
          is set on the form if there isn't a sort order in the request.
       2. The load after form submission. For this, we use the field.value().
     '''
@@ -109,11 +109,11 @@ def make_date_query(cd):
 
 
 def get_selected_field_string(cd, prefix):
-    '''Pulls the selected checkboxes out of the form data, and puts it into Solr
-    strings. Uses a prefix to know which items to pull out of the cleaned data.
-    Check forms.py to see how the prefixes are set up.
+    '''Pulls the selected checkboxes out of the form data, and puts it into
+    Solr strings. Uses a prefix to know which items to pull out of the cleaned
+    data. Check forms.py to see how the prefixes are set up.
 
-    Final strings are of the form "A" OR "B" OR "C", with quotes in case there 
+    Final strings are of the form "A" OR "B" OR "C", with quotes in case there
     are spaces in the values.
     '''
     selected_fields = ['"%s"' % k.replace(prefix, '')
@@ -134,7 +134,7 @@ def build_main_query(cd, highlight=True):
 
     if highlight:
         # Requested fields for the main query. We only need the fields here that
-        # are not requested as part of highlighting. Facet params are not set 
+        # are not requested as part of highlighting. Facet params are not set
         # here because they do not retrieve results, only counts (they are set
         # to 0 rows).
         main_params['fl'] = 'id,absolute_url,court_id,local_path,source,download_url,status,dateFiled'
@@ -159,15 +159,15 @@ def build_main_query(cd, highlight=True):
         main_params['f.lexisCite.hl.alternateField'] = 'lexisCite'
         main_params['f.court_citation_string.hl.alternateField'] = 'court_citation_string'
     else:
-        # highlighting is off, therefore we get the default fl parameter, 
-        # which gives us all fields. We could set it manually, but there's 
+        # highlighting is off, therefore we get the default fl parameter,
+        # which gives us all fields. We could set it manually, but there's
         # no need.
         pass
 
     main_fq = []
     # Case Name
     if cd['case_name'] != '' and cd['case_name'] is not None:
-        main_fq.append('caseName:' + cd['case_name'])
+        main_fq.append('caseName:(%s)' % " AND ".join(cd['case_name'].split()))
 
     # Citations
     if cd['west_cite'] != '' and cd['west_cite'] is not None:
@@ -201,7 +201,7 @@ def build_main_query(cd, highlight=True):
 
 def place_facet_queries(cd):
     '''Get facet values for the court and status filters
-    
+
     Using the search form, query Solr and get the values for the court and 
     status filters. Both of these need to be queried in a single function b/c
     they are dependent on each other. For example, when you filter using one,
@@ -220,7 +220,7 @@ def place_facet_queries(cd):
     stat_fq = []
     # Case Name
     if cd['case_name'] != '' and cd['case_name'] is not None:
-        shared_fq.append('caseName:%s' % cd['case_name'])
+        shared_fq.append('caseName:(%s)' % " AND ".join(cd['case_name'].split()))
 
     # Citations
     if cd['west_cite'] != '' and cd['west_cite'] is not None:
