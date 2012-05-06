@@ -24,6 +24,7 @@ FREQUENCY = (
     ('off', 'Off'),
 )
 
+
 # a class where alerts are held/handled.
 class Alert(models.Model):
     alertUUID = models.AutoField('a unique ID for each alert', primary_key=True)
