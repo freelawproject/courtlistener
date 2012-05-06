@@ -100,7 +100,7 @@ class SearchForm(forms.Form):
         super(SearchForm, self).__init__(*args, **kwargs)
 
         # Query the DB so we can build up check boxes for each court in use.
-        courts = Court.objects.filter(in_use=True).values_list('courtUUID',
+        self.courts = Court.objects.filter(in_use=True).values_list('courtUUID',
                                                                'short_name')
 
         if self.data.get('q') is not None:
@@ -114,7 +114,7 @@ class SearchForm(forms.Form):
                                                   label='All Courts / Clear',
                                                   required=False,
                                                   widget=forms.CheckboxInput(attrs={'class': 'external-input court-checkbox left'}))
-            for court in courts:
+            for court in self.courts:
                 self.fields['court_' + court[0]] = forms.BooleanField(
                                                               label=court[1],
                                                               required=False)
@@ -130,7 +130,7 @@ class SearchForm(forms.Form):
                                                   initial=True,
                                                   widget=forms.CheckboxInput(attrs={'checked':'checked',
                                                                                     'class':'external-input court-checkbox left'}))
-            for court in courts:
+            for court in self.courts:
                 self.fields['court_' + court[0]] = forms.BooleanField(
                                                               label=court[1],
                                                               required=False,
