@@ -42,7 +42,7 @@ class Citation(object):
             u'<span class="reporter">%(reporter)s</span>\\2' \
             u'<span class="page">%(page)d</span>'
         inner_html = template % self.__dict__
-        span_class = "citaton"
+        span_class = "citation"
         if self.match_url:
             inner_html = u'<a href="%s">' % self.match_url + inner_html + u'</a>'
         else:
