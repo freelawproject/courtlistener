@@ -16,6 +16,7 @@
 
 from django.db import models
 
+
 class urlToHash(models.Model):
     '''A class to hold URLs and the hash of their contents. This could be added 
     to the Court table, except that courts often have more than one URL they 

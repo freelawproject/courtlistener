@@ -32,7 +32,8 @@ from alert.pinger.views import validate_for_bing, validate_for_bing2, \
 from alert.robots.views import robots
 from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert
 from alert.search.models import Court
-from alert.search.views import browser_warning, show_results, tools_page
+from alert.search.views import browser_warning, show_results, tools_page, \
+                               catch_404_and_search
 from alert.tinyurl.views import redirect_short_url
 from alert.userHandling.views import confirmEmail, deleteProfile, \
                                      deleteProfileDone, emailConfirmSuccess, \
@@ -166,7 +167,10 @@ urlpatterns = patterns('',
     # Sitemaps & robots
     (r'^sitemap\.xml$', sitemap_maker),
     (r'^sitemap-flat\.xml$', flat_sitemap_maker),
-    (r'^robots.txt$', robots)
+    (r'^robots.txt$', robots),
+
+    # Catch everything else and send it to a search
+    (r'^([^/]*$)', catch_404_and_search),
 )
 
 # redirects
