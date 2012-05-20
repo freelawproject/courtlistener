@@ -114,7 +114,7 @@ def main():
             # We just do the court requested
             print "NOW PARSING COURT: %s" % court
             docs = Document.objects.filter(documentPlainText="", documentHTML="",
-                                           court__courtUUID=court, source="C",
+                                           court__courtUUID=court, source="M",
                                            dateFiled__gte=filter_time)
             extract_all_docs(docs)
 
