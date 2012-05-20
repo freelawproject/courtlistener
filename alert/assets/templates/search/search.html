@@ -2,10 +2,8 @@
 {% load text_filters %}
 {% load humanize %}
 
-{% block title %} CourtListener.com / Results / {% if request.GET.q %} {{ request.GET.q }} / {% endif %}
-    {% if results.paginator.num_pages %}
-        Page {{ results.number }} of {{ results.paginator.num_pages }}
-    {% endif %}
+{% block title %} 
+    CourtListener.com / Results / {% if request.GET.q %} {{ request.GET.q }} / {% endif %}
 {% endblock %}
 
 {% block head %}

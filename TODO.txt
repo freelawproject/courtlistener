@@ -1,8 +1,11 @@
 BUGS:
+ - need to figure out why index is not getting auto-updated.
+ - JS bug with the check all 
  - HTML docs with ampersands show the ampersands in the highlighted text.
  - selecting "New Search" resets the filters to have all the statuses selected
  - Add state courts to the front end
  - Tab index fail on saving favorite.
+ - Contribute to django sitemap headers
  
  
 To do:
@@ -11,8 +14,11 @@ To do:
  - Check the dates/courts in Brian's list of citation-less docs, and see if we
    missed any docs.
  - Move the crt.li apache conf over to the repo   
-   
-F3
- - do the hand file
- - why three fiscr on coverage page, and one in facets?
- - what's up with the courts I added to the DB that didn't get any F3 stuff?
+
+ 
+New Server:
+ - Rename columns/tables at long last
+ - Switch Apache mode
+ - Switch to PostgreSQL
+ - Sort out Email verification, if necessary.
+ - Enable all Apache sites necessary.

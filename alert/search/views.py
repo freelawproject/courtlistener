@@ -25,11 +25,25 @@ from django.core.paginator import Paginator
 from django.core.paginator import PageNotAnInteger
 from django.core.paginator import EmptyPage
 from django.shortcuts import render_to_response
-from django.shortcuts import HttpResponseRedirect
+from django.shortcuts import HttpResponsePermanentRedirect
 from django.template import RequestContext
 from django.views.decorators.cache import never_cache
 
 from datetime import date
+
+
+@never_cache
+def catch_404_and_search(request, query):
+    '''If somebody goes to a page that would normally return a 404, it's better
+    to instead redirect them to a search for that term. This increases their
+    odds of finding what they're looking for and also provides a handy
+    shortcut for advanced users.'''
+    messages.add_message(request,
+                         messages.INFO,
+                         "There's no webpage at that location, but maybe the "
+                         "results below will help you find what you're "
+                         "looking for&hellip;")
+    return HttpResponsePermanentRedirect('/?q=%s' % query)
 
 
 @never_cache
