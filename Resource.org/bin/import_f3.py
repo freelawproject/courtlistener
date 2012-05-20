@@ -24,11 +24,16 @@
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
 
+import os
+os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
+import sys
+sys.path.append("/var/www/court-listener/alert")
+sys.path.append("/var/www/court-listener")
+
+
 import dup_finder
 import f3_helpers
 import re
-import sys
-
 
 def run_dup_check(case, simulate=True):
     '''Runs a series of duplicate checking code, generating and analyzing
@@ -114,7 +119,7 @@ def import_by_hand():
     the ones it could not handle. This function takes that list, and iterates
     over it so that the documents can be imported manually.
     '''
-    simulate = True
+    simulate = False
     corpus = f3_helpers.Corpus('file:///var/www/court-listener/Resource.org/data/F3/')
     hand_file = open('../logs/hand_file.csv', 'r')
     line_placeholder = open('../logs/line_placeholder.txt', 'r+')

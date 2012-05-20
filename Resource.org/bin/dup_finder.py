@@ -17,12 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
-os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
-
-import sys
-sys.path.append("/var/www/court-listener")
-
 from django import db
 from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned
