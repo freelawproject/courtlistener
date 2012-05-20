@@ -22,7 +22,6 @@ from django.contrib import messages
 from django.contrib.auth import authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
-from django.contrib.auth.models import User
 from django.contrib.auth import login
 from django.contrib.sites.models import Site
 from django.core.mail import send_mail
@@ -37,8 +36,10 @@ import hashlib
 import random
 import re
 
+
 def redirect_to_settings(request):
     return redirect(view_settings, permanent=True)
+
 
 @login_required
 @never_cache
@@ -46,16 +47,18 @@ def view_alerts(request):
     return render_to_response('profile/alerts.html', {},
         RequestContext(request))
 
+
 @login_required
 @never_cache
 def view_favorites(request):
     return render_to_response('profile/favorites.html', {},
         RequestContext(request))
 
+
 @login_required
 @never_cache
 def view_settings(request):
-    oldEmail = request.user.email # this line has to be at the top to work.
+    oldEmail = request.user.email  # this line has to be at the top to work.
     user = request.user
     up = user.get_profile()
     userForm = UserForm(request.POST or None, instance=user)
@@ -152,6 +155,7 @@ def deleteProfileDone(request):
     return render_to_response('profile/deleted.html', {},
         RequestContext(request))
 
+
 @check_honeypot(field_name='skip_me_if_alive')
 @never_cache
 def register(request):
@@ -244,6 +248,7 @@ http://courtlistener.com/contact/." % (
         # a logical fallback
         return HttpResponseRedirect('/profile/settings/')
 
+
 @never_cache
 def registerSuccess(request):
     '''all redirect security checks should be done by now. Inform the user of
@@ -251,6 +256,7 @@ def registerSuccess(request):
     redirect_to = request.REQUEST.get('next', '')
     return render_to_response('registration/registration_complete.html',
         {'redirect_to': redirect_to}, RequestContext(request))
+
 
 @never_cache
 def confirmEmail(request, activationKey):
@@ -325,6 +331,7 @@ http://courtlistener.com/contact/." % (
         return render_to_response(
             'registration/request_email_confirmation.html', {},
             RequestContext(request))
+
 
 @never_cache
 def emailConfirmSuccess(request):
