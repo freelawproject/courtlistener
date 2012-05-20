@@ -21,12 +21,11 @@ from alert.search.forms import SearchForm
 
 from django.conf import settings
 from django.contrib import messages
-from django.core.paginator import Paginator
-from django.core.paginator import PageNotAnInteger
-from django.core.paginator import EmptyPage
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.shortcuts import render_to_response
+from django.http import HttpResponseNotFound
 from django.shortcuts import HttpResponseRedirect
-from django.template import RequestContext
+from django.template import loader, RequestContext
 from django.views.decorators.cache import never_cache
 
 from datetime import date
@@ -68,7 +67,7 @@ def show_results(request):
                                               'alertFrequency': "dly"})
 
     '''
-    Code beyond this point will be run if the alert form failed, or if the 
+    Code beyond this point will be run if the alert form failed, or if the
     submission was a GET request. Beyond this point, we run the searches.
     '''
 
@@ -77,7 +76,7 @@ def show_results(request):
         request.GET['q']
         search_form = SearchForm(request.GET)
     except KeyError:
-        # Otherwise, just run the default query
+        # No search placed. Show default form.
         search_form = SearchForm()
     # Run the query
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
@@ -162,6 +161,29 @@ def show_results(request):
                    'status_facets': status_facets, 'get_string': get_string,
                    'count': count},
                   RequestContext(request))
+
+
+def catch_404_and_search(request):
+    '''If somebody goes to a page that would normally return a 404, it's better
+    to instead redirect them to a search for that term. This increases their
+    odds of finding what they're looking for and also provides a handy
+    shortcut for advanced users.'''
+    messages.add_message(request,
+                         messages.ERROR,
+                         "There's no valid page at this location. Perhaps "
+                         "these search results will help you find what "
+                         "you're looking for&hellip;")
+    full_path = request.get_full_path().strip('/')
+    if '/' in full_path:
+        # Send to proper 404 page.
+        t = loader.get_template('404.html')
+        return HttpResponseNotFound(t.render(RequestContext(request, {'request_path': request.path})))
+    else:
+        # Place query for the URL
+        mutable_get = request.GET.copy()
+        mutable_get['q'] = full_path
+        request.GET = mutable_get
+        return HttpResponseNotFound(show_results(request))
 
 
 def tools_page(request):

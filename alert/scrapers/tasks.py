@@ -54,7 +54,7 @@ import traceback
 @task
 def extract_doc_content(pk, callback=None):
     '''
-    Given a document, we extract it, sniffing its mimetype, then store its 
+    Given a document, we extract it, sniffing its mimetype, then store its
     contents in the database.  Finally, we asynchronously find citations in
     the document content and match them to other documents.
 

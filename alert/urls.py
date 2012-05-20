@@ -56,6 +56,9 @@ admin.autodiscover()
 pacer_codes = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
 mime_types = ('pdf', 'wpd', 'txt', 'doc')
 
+# If possible, redirect 404s to a search
+handler404 = 'alert.search.views.catch_404_and_search'
+
 urlpatterns = patterns('',
     # Admin docs and site
     (r'^admin/doc/', include('django.contrib.admindocs.urls')),
@@ -166,7 +169,7 @@ urlpatterns = patterns('',
     # Sitemaps & robots
     (r'^sitemap\.xml$', sitemap_maker),
     (r'^sitemap-flat\.xml$', flat_sitemap_maker),
-    (r'^robots.txt$', robots)
+    (r'^robots.txt$', robots),
 )
 
 # redirects

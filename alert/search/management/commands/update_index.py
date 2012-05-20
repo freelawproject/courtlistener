@@ -33,6 +33,7 @@ from optparse import make_option
 import datetime
 import time
 
+
 class Command(BaseCommand):
     option_list = BaseCommand.option_list + (
         make_option('--update',
@@ -193,7 +194,7 @@ class Command(BaseCommand):
     @print_timing
     def optimize(self):
         '''Runs the Solr optimize command. 
-        
+
         Not much more than a wrapper of a wrapper (Sunburnt) of a wrapper 
         (Solr). Weird. Thankfully, Lucene isn't a wrapper of anything.
         '''

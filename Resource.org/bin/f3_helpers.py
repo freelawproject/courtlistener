@@ -24,11 +24,6 @@
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
 
-import os
-os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
-import sys
-sys.path.append("/var/www/court-listener")
-
 from juriscraper.lib.parse_dates import parse_dates
 from alert.lib.string_utils import anonymize
 from alert.search.models import Citation, Court, Document
@@ -592,6 +587,9 @@ class Corpus(object):
     def __getitem__(self, key):
         try:
             int(key)
+            if key > 456:
+                # Magic number. Volume 457 is missing.
+                key += 1
             return Volume(urljoin(self.url, "%s/index.html" % key))
         except ValueError:
             for vol in self.volume_urls[key]:
