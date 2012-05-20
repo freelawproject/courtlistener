@@ -32,8 +32,7 @@ from alert.pinger.views import validate_for_bing, validate_for_bing2, \
 from alert.robots.views import robots
 from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert
 from alert.search.models import Court
-from alert.search.views import browser_warning, show_results, tools_page, \
-                               catch_404_and_search
+from alert.search.views import browser_warning, show_results, tools_page
 from alert.tinyurl.views import redirect_short_url
 from alert.userHandling.views import confirmEmail, deleteProfile, \
                                      deleteProfileDone, emailConfirmSuccess, \
@@ -56,6 +55,9 @@ admin.autodiscover()
 # creates a list of the first element of the choices variable for the courts field
 pacer_codes = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
 mime_types = ('pdf', 'wpd', 'txt', 'doc')
+
+# If possible, redirect 404s to a search
+handler404 = 'alert.search.views.catch_404_and_search'
 
 urlpatterns = patterns('',
     # Admin docs and site
@@ -168,9 +170,6 @@ urlpatterns = patterns('',
     (r'^sitemap\.xml$', sitemap_maker),
     (r'^sitemap-flat\.xml$', flat_sitemap_maker),
     (r'^robots.txt$', robots),
-
-    # Catch everything else and send it to a search
-    (r'^([^/]*$)', catch_404_and_search),
 )
 
 # redirects
