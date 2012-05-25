@@ -26,8 +26,8 @@
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
 
-import re
 from django.utils.encoding import smart_str
+
 
 def fix_mojibake(text):
     '''Given corrupt text from pdffactory, converts it to sane text.'''
