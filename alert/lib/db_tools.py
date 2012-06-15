@@ -18,6 +18,7 @@ from datetime import datetime
 from datetime import timedelta
 from alert.settings import *
 
+
 def queryset_generator(queryset, chunksize=1000):
     '''
     from: http://djangosnippets.org/snippets/1949/
@@ -28,7 +29,8 @@ def queryset_generator(queryset, chunksize=1000):
     memory. Using the iterator() method only causes it to not preload all the
     classes.
 
-    Note that the implementation of the iterator does not support ordered query sets.
+    Note that the implementation of the iterator does not support ordered query
+    sets.
     '''
     if queryset.count() == 0:
         return
@@ -46,14 +48,15 @@ def queryset_generator(queryset, chunksize=1000):
             documentUUID = row.documentUUID
             yield row
 
+
 def queryset_generator_by_date(queryset, date_field, start_date, end_date, chunksize=7):
     '''
     Takes a queryset and chunks it by date. Useful if sorting by pk isn't
     needed. For large querysets, such sorting can be very expensive.
- 
+
     date_field is the name of the date field that should be used for chunking.
     This field should have db_index=True in your model.
-    
+
     Chunksize should be given in days, and start and end dates should be provided
     as strings in the form 2012-03-08.
     '''
