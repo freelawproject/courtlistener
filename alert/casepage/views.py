@@ -88,7 +88,8 @@ def view_case(request, court, pk, casename):
             'name': doc.citation.case_name})
 
     # get most influential cases that cite this case
-    cited_by_trunc = doc.citation.citing_cases.all().order_by('-citation_count', '-dateFiled')[:5]
+    cited_by_trunc = doc.citation.citing_cases.select_related(
+          'citation').order_by('-citation_count', '-dateFiled')[:5]
 
     return render_to_response(
                   'view_case.html',
