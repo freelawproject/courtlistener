@@ -176,7 +176,7 @@ class Command(BaseCommand):
         self.stdout.write("Adding or updating document(s) newer than %s\n" % dt)
         qs = Document.objects.filter(time_retrieved__gt=dt)
         docs = queryset_generator(qs)
-        count = len(qs)
+        count = qs.count()
         self._chunk_queryset_into_tasks(docs, count, chunksize=1000)
 
     @print_timing
