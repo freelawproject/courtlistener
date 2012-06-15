@@ -51,10 +51,108 @@ import subprocess
 import time
 import traceback
 
+
+def get_clean_body_content(content):
+    '''Parse out the body from an html string, clean it up, and send it along.
+    '''
+    parser = etree.HTMLParser()
+    tree = etree.parse(StringIO.StringIO(content), parser)
+    body = tree.xpath('//body/*')
+    content = tostring(body[0])
+
+    fontsize_regex = re.compile('font-size: .*;')
+    content = re.sub(fontsize_regex, '', content)
+
+    color_regex = re.compile('color: .*;')
+    content = re.sub(color_regex, '', content)
+    return content
+
+
+def extract_from_doc(path, DEVNULL):
+    '''Extract text from docs.
+
+    We use antiword to pull the text out of MS Doc files.
+    '''
+    process = subprocess.Popen(['antiword', path, '-i', '1'], shell=False,
+        stdout=subprocess.PIPE, stderr=DEVNULL)
+    content, err = process.communicate()
+    return content, err
+
+
+def extract_from_html(path):
+    '''Extract from html.
+
+    A simple wrapper to go get content, and send it along.
+    '''
+    try:
+        content = open(path).read()
+        content = get_clean_body_content(content)
+    except:
+        err = True
+    return content, err
+
+
+def extract_from_pdf(doc, path, DEVNULL, callback=None):
+    ''' Extract text from pdfs.
+
+    Here, we use pdftotext. If that fails, try to use tesseract under the
+    assumption it's an image-based PDF. Once tat is complete, we check for the
+    letter e in our content. If it's not there, we try to fix the mojibake
+    that ca9 sometimes creates.
+    '''
+    process = subprocess.Popen(["pdftotext", "-layout", "-enc", "UTF-8",
+        path, "-"], shell=False, stdout=subprocess.PIPE, stderr=DEVNULL)
+    content, err = process.communicate()
+    if content.strip() == '' and callback:
+        # probably an image PDF. Send it to OCR
+        result = subtask(callback).delay(path)
+        success, content = result.get()
+        if success:
+            doc.extracted_by_ocr = True
+        elif content == '' or not success:
+            content = 'Unable to extract document content.'
+    elif 'e' not in content:
+        # It's a corrupt PDF from ca9. Fix it.
+        content = fix_mojibake(unicode(content, 'utf-8', errors='ignore'))
+
+    return doc, content, err
+
+
+def extract_from_txt(path):
+    '''Extract text from plain text files.
+
+    This function is really here just for consistency.
+    '''
+    try:
+        content = open(path).read()
+    except:
+        err = True
+    return content, err
+
+
+def extract_from_wpd(doc, path, DEVNULL):
+    '''Extract text from a Word Perfect file
+
+    Yes, courts still use these, so we extract their text using wpd2html. Once
+    that's done, we pull out the body of the HTML, and do some minor cleanup
+    on it.
+    '''
+    process = subprocess.Popen(['wpd2html', path, '-'], shell=False,
+        stdout=subprocess.PIPE, stderr=DEVNULL)
+    content, err = process.communicate()
+
+    content = get_clean_body_content(content)
+
+    if 'not for publication' in content.lower():
+        doc.documentType = "Unpublished"
+
+    return doc, content, err
+
+
 @task
 def extract_doc_content(pk, callback=None):
     '''
-    Given a document, we extract it, sniffing its mimetype, then store its
+    Given a document, we extract it, sniffing its extension, then store its
     contents in the database.  Finally, we asynchronously find citations in
     the document content and match them to other documents.
 
@@ -69,85 +167,35 @@ def extract_doc_content(pk, callback=None):
     path = os.path.join(settings.MEDIA_ROOT, path)
 
     DEVNULL = open('/dev/null', 'w')
-    mimetype = path.split('.')[-1]
-    if mimetype == 'pdf':
-        # do the pdftotext work for PDFs
-        process = subprocess.Popen(["pdftotext", "-layout", "-enc", "UTF-8",
-            path, "-"], shell=False, stdout=subprocess.PIPE, stderr=DEVNULL)
-        content, err = process.communicate()
-        if content.strip() == '' and callback:
-            # probably an image PDF. Send it to OCR
-            result = subtask(callback).delay(path)
-            '''
-            result = subtask("scrapers.tasks.extract_by_ocr",
-                             args=(path,),
-                             kwargs={}).apply()'''
-            success, content = result.get()
-            if success:
-                doc.extracted_by_ocr = True
-            elif content == '' or not success:
-                content = "Unable to extract document content."
-        elif 'e' not in content:
-            # It's a corrupt PDF from ca9. Fix it.
-            content = fix_mojibake(unicode(content, 'utf-8', errors='ignore'))
-
-        doc.documentPlainText, blocked = anonymize(content)
-        if blocked:
-            doc.blocked = True
-            doc.date_blocked = date.today()
-        if err:
-            print "****Error extracting PDF text from: %s****" % (doc.citation.case_name)
-            return 1
-    elif mimetype == 'txt':
-        # read the contents of text files.
-        try:
-            content = open(path).read()
-            doc.documentPlainText, blocked = anonymize(content)
-        except:
-            print "****Error extracting plain text from: %s****" % (doc.citation.case_name)
-            return 1
-    elif mimetype == 'wpd':
-        # It's a Word Perfect file. Use the wpd2html converter, clean up
-        # the HTML and save the content to the HTML field.
-        process = subprocess.Popen(['wpd2html', path, '-'], shell=False,
-            stdout=subprocess.PIPE, stderr=DEVNULL)
-        content, err = process.communicate()
-
-        parser = etree.HTMLParser()
-        tree = etree.parse(StringIO.StringIO(content), parser)
-        body = tree.xpath('//body')
-        content = tostring(body[0]).replace('<body>', '').replace('</body>', '')
-
-        fontsizeReg = re.compile('font-size: .*;')
-        content = re.sub(fontsizeReg, '', content)
-
-        colorReg = re.compile('color: .*;')
-        content = re.sub(colorReg, '', content)
-
-        if 'not for publication' in content.lower():
-            doc.documentType = "Unpublished"
-        doc.documentHTML, blocked = anonymize(content)
-
-        if err:
-            print "****Error extracting WPD text from: " + doc.citation.case_name + "****"
-            return 1
-    elif mimetype == 'doc':
-        # read the contents of MS Doc files
-        process = subprocess.Popen(['antiword', path, '-i', '1'], shell=False,
-            stdout=subprocess.PIPE, stderr=DEVNULL)
-        content, err = process.communicate()
-        doc.documentPlainText, blocked = anonymize(content)
-        if err:
-            print "****Error extracting DOC text from: " + doc.citation.case_name + "****"
-            return 1
+    extension = path.split('.')[-1]
+    if extension == 'doc':
+        content, err = extract_from_doc(path, DEVNULL)
+    elif extension == 'html':
+        content, err = extract_from_html(path)
+    elif extension == 'pdf':
+        doc, content, err = extract_from_pdf(doc, path, DEVNULL, callback)
+    elif extension == 'txt':
+        content, err = extract_from_txt(path)
+    elif extension == 'wpd':
+        doc, content, err = extract_from_wpd(doc, path, DEVNULL)
     else:
-        print "*****Unknown mimetype: " + mimetype + ". Unable to extract content from: " + doc.citation.case_name + "****"
+        print ('*****Unable to extract content due to unknown extension: %s '
+               'on doc: %s****' % (extension, doc))
         return 2
+
+    doc.documentPlainText, blocked = anonymize(content)
+    if blocked:
+        doc.blocked = True
+        doc.date_blocked = date.today()
+
+    if err:
+        print "****Error extracting text from %s: %s****" % (extension, doc)
+        return 1
 
     try:
         doc.save()
     except Exception, e:
-        print "****Error saving text to the db for: " + doc.citation.case_name + "****"
+        print "****Error saving text to the db for: %s****" % doc
         print traceback.format_exc()
         return 3
 
@@ -162,7 +210,7 @@ def extract_doc_content(pk, callback=None):
 def extract_by_ocr(path):
     '''Extract the contents of a PDF using OCR
 
-    Convert the PDF to a tiff, then perform OCR on the tiff using Tesseract. 
+    Convert the PDF to a tiff, then perform OCR on the tiff using Tesseract.
     Take the contents and the exit code and return them to the caller.
     '''
     print "Running OCR subtask on %s" % path

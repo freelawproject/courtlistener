@@ -19,12 +19,12 @@ from alert.lib import magic
 from alert.lib import search_utils
 from alert.lib.string_utils import trunc
 from alert.search.forms import SearchForm
-from alert.search.models import Citation, Court, Document
+from alert.search.models import Court, Document
 from alert.tinyurl.encode_decode import ascii_to_num
 from alert.favorites.forms import FavoriteForm
 from alert.favorites.models import Favorite
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Count
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.http import Http404
 from django.http import HttpResponse
 from django.shortcuts import render_to_response
@@ -108,19 +108,24 @@ def view_case_citations(request, pk, casename):
     doc = get_object_or_404(Document, documentUUID=pk)
     title = trunc(doc.citation.case_name, 100)
 
-    #Get list of citing cases, ordered by influence
-    citing_cases = doc.citation.citing_cases.all().order_by('-citation_count', '-dateFiled')
+    # Get list of citing cases, ordered by influence
+    citing_cases = doc.citation.citing_cases.select_related(
+            'citation', 'court').order_by('-citation_count', '-dateFiled')
 
-    included_courts = []
-    # only send to template the courts for which we have citing cases
-    for court in Court.objects.all():
-        if citing_cases.filter(court=court):
-            included_courts.append(court)
+    paginator = Paginator(citing_cases, 20, orphans=2)
+    page = request.GET.get('page')
+    try:
+        citing_cases = paginator.page(page)
+    except (TypeError, PageNotAnInteger):
+        # TypeError can be removed in Django 1.4, where it properly will be
+        # caught upstream.
+        citing_cases = paginator.page(1)
+    except EmptyPage:
+        citing_cases = paginator.page(paginator.num_pages)
 
     return render_to_response('view_case_citations.html',
                               {'title': title, 'doc': doc,
-                               'citing_cases': citing_cases,
-                               'included_courts': included_courts},
+                               'citing_cases': citing_cases},
                               RequestContext(request))
 
 
