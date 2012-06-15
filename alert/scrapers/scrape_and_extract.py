@@ -86,7 +86,7 @@ def scrape_court(court):
 
     dup_count = 0
     for i in range(0, len(site.case_names)):
-        # Percent encode URLs
+        # Percent encode URLs (this is a Python wart)
         download_url = urllib2.quote(site.download_urls[i], safe="%/:=&?~#+!$,;'@()*[]")
 
         try:
@@ -114,19 +114,21 @@ def scrape_court(court):
             dup_found_date = site.case_dates[i]
             dup_count += 1
 
-            # If we found a dup on dup_found_date, then we can exit before 
+            # If we found a dup on dup_found_date, then we can exit before
             # parsing any prior dates.
             try:
                 already_scraped_next_date = (site.case_dates[i + 1] < dup_found_date)
             except IndexError:
                 already_scraped_next_date = True
             if already_scraped_next_date:
-                logger.info('Next case occurs prior to when we found a duplicate. Court is up to date.')
+                logger.info('Next case occurs prior to when we found a '
+                            'duplicate. Court is up to date.')
                 url2Hash.SHA1 = site.hash
                 url2Hash.save()
                 return
             elif dup_count >= 5:
-                logger.info('Found five duplicates in a row. Court is up to date.')
+                logger.info('Found five duplicates in a row. Court is up to '
+                            'date.')
                 url2Hash.SHA1 = site.hash
                 url2Hash.save()
                 return
