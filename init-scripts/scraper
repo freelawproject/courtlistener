@@ -29,8 +29,7 @@
 
 start () {
     echo -n "Starting the scraper..."
-    #daemon --command="/usr/bin/python /var/www/court-listener/alert/scrapers/scrape_and_extract.py -d -c 'juriscraper.opinions.united_states.federal'" --name=scraper --user=www-data --verbose
-    daemon --command="/usr/bin/python /var/www/court-listener/alert/scrapers/scrape_and_extract.py -d -c juriscraper.opinions.united_states.federal" --respawn --name=scraper --user=www-data --verbose
+    daemon --command="/usr/bin/python /var/www/court-listener/alert/scrapers/scrape_and_extract.py -d -c juriscraper.opinions.united_states" --respawn --name=scraper --user=www-data --verbose
     
     RETVAL=$?
     

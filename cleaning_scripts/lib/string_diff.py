@@ -67,7 +67,7 @@ def gen_diff_ratio(left, right):
 
 
 def find_best_match(results, case_name):
-    '''Returns the closest match to within a Solr result set to a known 
+    '''Returns the closest match to within a Solr result set to a known
     string.
     '''
     diff_ratios = []
@@ -80,6 +80,7 @@ def find_best_match(results, case_name):
     max_ratio = max(diff_ratios)
     i = diff_ratios.index(max_ratio)
     return results[i], max_ratio
+
 
 def find_confidences(results, case_name):
     '''Returns all matches above a threshold.

@@ -21,16 +21,17 @@ setup_environ(settings)
 from django.contrib.sitemaps import ping_google
 import sys
 
+
 def main():
     pinged = []
     sitemap_url = '/sitemap.xml'
-    for ping_url in settings.SITEMAP_PING_URLS :
+    for ping_url in settings.SITEMAP_PING_URLS:
         try:
-	    ping_google(sitemap_url, ping_url)
-            pinged.append(ping_url + " has been pinged")
-	except IOError:
-	    pinged.append("****" + ping_url + " FAILED with an IOError." + "****")
-	    print >> sys.stderr, "****" + ping_url + " FAILED with an IOError." + "****"
+            ping_google(sitemap_url, ping_url)
+            pinged.append("%s has been pinged." % ping_url)
+        except IOError:
+            pinged.append("****%s FAILED with an IOError.****" % ping_url)
+            print >> sys.stderr, "****%s FAILED with an IOError.****" % ping_url
     for foo in pinged:
         print foo
     return 0
