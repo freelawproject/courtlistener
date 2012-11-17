@@ -139,8 +139,7 @@ class Citation(models.Model):
                             max_length=50,
                             null=True)
     case_name = models.TextField("full name of the case",
-                                    blank=True,
-                                    db_index=True)
+                                    blank=True)
     docketNumber = models.CharField("the docket number",
                                     blank=True,
                                     null=True,
