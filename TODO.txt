@@ -1,0 +1,18 @@
+BUGS:
+ - JS bug with the check all 
+ - HTML docs with ampersands show the ampersands in the highlighted text.
+ - selecting "New Search" resets the filters to have all the statuses selected
+ - Add state courts to the front end
+ - Tab index fail on saving favorite.
+ 
+ 
+To do:
+ - check out the outliars in the DB by date
+ - recreate the stat_maker.py script (see bug)
+ - Check the dates/courts in Brian's list of citation-less docs, and see if we
+   missed any docs.
+ 
+New Server:
+ - Rename columns/tables at long last
+ - Sort out Email verification, if necessary.
+ - Enable all Apache sites necessary.

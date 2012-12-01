@@ -1,0 +1,19 @@
+Post-go-live:
+ - May need to run this: grant drop on django_alerts.* to 'django-alerts'@'localhost' identified by 'asdfaiwueiocOIUCWLEiasdfjLOIiaj87a23876a&^&9';
+
+
+Favorites spec:
+
+Page is loaded:
+    if user is logged in and page is favorite:
+        DONE - Display the gold star
+        DONE - In the sidebar, load any notes or tags they have for the item.
+    else:
+        display the hollow star, with a popup asking the user to log in.
+
+Favorites page is loaded:
+    List the favorites with casename, tags and notes. Provide a delete link,
+        which deletes the item with a confirm box (using the same code as above).
+        After an item is deleted, use JS to remove it from the list.
+
+Delete account mechanism needs to be updated to delete a user's favorites.
