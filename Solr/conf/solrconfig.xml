@@ -736,6 +736,8 @@
      -->
      <fragmentsBuilder name="colored" class="org.apache.solr.highlight.ScoreOrderFragmentsBuilder">
          <lst name="defaults">
+             <str name="q.op">AND</str>
+             <str name="df">text</str>
              <str name="hl.tag.pre"><![CDATA[<mark>]]></str>
              <str name="hl.tag.post"><![CDATA[</mark>]]></str>
          </lst>
