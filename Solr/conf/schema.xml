@@ -97,23 +97,24 @@
       trailing underscores (e.g. _version_) are reserved.
    -->
     <field name="id" type="string" indexed="true" stored="true" required="true" multiValued="false" />
+    <field name="_version_" type="long" indexed="true" stored="true"/>
     <field name="django_ct" type="string" indexed="true" stored="true" multiValued="false" />
     <field name="django_id" type="string" indexed="true" stored="true" multiValued="false" />
 
-    <field name="text_en_splitting_cl" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true"/>
+    <field name="text" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true"/>
     <field name="status" type="text_no_word_parts" indexed="true" stored="true" multiValued="false" />
-    <field name="court" type="text" indexed="true" stored="true" multiValued="false" />
-    <field name="court_id" type="text" indexed="true" stored="true" multiValued="false" />
+    <field name="court" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" />
+    <field name="court_id" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" />
     <field name="court_citation_string" type="string" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
     <field name="court_exact" type="string" indexed="true" stored="true" multiValued="false" />
-    <field name="caseName" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+    <field name="caseName" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
     <field name="status_exact" type="string" indexed="true" stored="true" multiValued="false" />
     <field name="dateFiled" type="date" indexed="true" stored="true" multiValued="false" />
-    <field name="docketNumber" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
-    <field name="lexisCite" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
-    <field name="westCite" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
-    <field name="caseNumber" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
-    <field name="neutralCite" type="text" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+    <field name="docketNumber" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+    <field name="lexisCite" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+    <field name="westCite" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+    <field name="caseNumber" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+    <field name="neutralCite" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
     <field name="absolute_url" type="string" indexed="false" stored="true" multiValued="false" />
     <field name="download_url" type="string" indexed="false" stored="true" multiValued="false" />
     <field name="local_path" type="string" indexed="false" stored="true" multiValued="false" />
@@ -441,6 +442,26 @@
       <analyzer class="org.apache.lucene.analysis.el.GreekAnalyzer"/>
     </fieldType>
     -->
+
+    <fieldType name="text_no_word_parts" class="solr.TextField" positionIncrementGap="100">
+        <!--  mlr: Stops words like Non-precedential from being indexed as precedential by turning off generateWordParts -->
+        <analyzer type="index">
+            <tokenizer class="solr.WhitespaceTokenizerFactory"/>
+            <filter class="solr.SynonymFilterFactory" synonyms="/var/www/court-listener/Solr/conf/synonyms.txt" ignoreCase="true"      expand="true"/>
+            <filter class="solr.StopFilterFactory" ignoreCase="true" words="/var/www/court-listener/Solr/conf/stopwords.txt"/>
+            <filter class="solr.WordDelimiterFilterFactory" generateWordParts="0" generateNumberParts="1" catenateWords="1"            catenateNumbers="1" catenateAll="0" splitOnNumerics="0"/>
+            <filter class="solr.LowerCaseFilterFactory"/>
+            <filter class="solr.RemoveDuplicatesTokenFilterFactory"/>
+        </analyzer>
+        <analyzer type="query">
+            <tokenizer class="solr.WhitespaceTokenizerFactory"/>
+            <filter class="solr.StopFilterFactory" ignoreCase="true" words="/var/www/court-listener/Solr/conf/stopwords.txt"/>
+            <filter class="solr.WordDelimiterFilterFactory" generateWordParts="0" generateNumberParts="1" catenateWords="0"            catenateNumbers="0" catenateAll="0" splitOnNumerics="0"/>
+            <filter class="solr.LowerCaseFilterFactory"/>
+            <filter class="solr.RemoveDuplicatesTokenFilterFactory"/>
+        </analyzer>
+    </fieldType>
+
 
     <!-- A text field that only splits on whitespace for exact matching of words -->
     <fieldType name="text_ws" class="solr.TextField" positionIncrementGap="100">
