@@ -29,7 +29,6 @@ from django.template import loader, RequestContext
 from django.views.decorators.cache import never_cache
 
 from datetime import date
-import json
 
 
 @never_cache
