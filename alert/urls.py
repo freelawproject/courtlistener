@@ -20,6 +20,7 @@ from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
 from alert.casepage.views import view_case, view_case_citations, \
                                  serve_static_file
 from alert.contact.views import contact, thanks
+from alert.coverage.views import coverage_graph
 from alert.data_dumper.views import dump_index, serve_or_gen_dump
 from alert.favorites.views import delete_favorite, edit_favorite, \
                                   save_or_update_favorite
@@ -170,6 +171,9 @@ urlpatterns = patterns('',
     (r'^sitemap\.xml$', sitemap_maker),
     (r'^sitemap-flat\.xml$', flat_sitemap_maker),
     (r'^robots.txt$', robots),
+
+    # Coverage
+    (r'^coverage-graph/$', coverage_graph),
 )
 
 # redirects

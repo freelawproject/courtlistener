@@ -270,3 +270,24 @@ def place_facet_queries(cd):
     stat_facet_fields = conn.raw_query(**stat_facet_params).execute().facet_counts.facet_fields
 
     return court_facet_fields, stat_facet_fields, count
+
+
+def get_court_start_year(conn, court):
+    params = {}
+    params['fq'] = ['court_exact:%s' % court.courtUUID]
+    params['sort'] = 'dateFiled asc'
+    params['rows'] = 1
+    response = conn.raw_query(**params).execute()
+    return response[0]['dateFiled'].year
+
+
+def build_coverage_query(court, start_year):
+    params = {}
+    params['facet'] = 'true'
+    params['facet.range'] = 'dateFiled'
+    params['facet.range.end'] = 'NOW/DAY'
+    params['facet.range.gap']= '+1YEAR'
+    params['rows'] = 0
+    params['facet.range.start'] = '%d-01-01T00:00:00Z' % start_year
+    params['fq'] = ['court_exact:%s' % court.courtUUID]
+    return params
