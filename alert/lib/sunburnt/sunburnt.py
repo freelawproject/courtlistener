@@ -52,18 +52,25 @@ class SolrConnection(object):
     def rollback(self):
         response = self.update("<rollback/>")
 
-    def update(self, update_doc, commit=None, commitWithin=None, softCommit=None, optimize=None, waitSearcher=None, expungeDeletes=None, maxSegments=None):
+    def update(self, update_doc, **kwargs):
         body = update_doc
         if body:
             headers = {"Content-Type":"text/xml; charset=utf-8"}
         else:
             headers = {}
+        url = self.url_for_update(**kwargs)
+        r, c = self.request(url, method="POST", body=body,
+                            headers=headers)
+        if r.status != 200:
+            raise SolrError(r, c)
+
+    def url_for_update(self, commit=None, commitWithin=None, softCommit=None, optimize=None, waitSearcher=None, expungeDeletes=None, maxSegments=None):
         extra_params = {}
         if commit is not None:
             extra_params['commit'] = "true" if commit else "false"
         if commitWithin is not None:
             try:
-                extra_params['commitWithin'] = str(float(commitWithin))
+                extra_params['commitWithin'] = str(int(commitWithin))
             except (TypeError, ValueError):
                 raise ValueError("commitWithin should be a number in milliseconds")
             if extra_params['commitWithin'] < 0:
@@ -86,26 +93,27 @@ class SolrConnection(object):
         if 'expungeDeletes' in extra_params and 'commit' not in extra_params:
             raise ValueError("Can't do expungeDeletes without commit")
         if 'maxSegments' in extra_params and 'optimize' not in extra_params:
-            raise ValueError("Can't do expungeDeletes without commit")
+            raise ValueError("Can't do maxSegments without optimize")
         if extra_params:
-            url = "%s?%s" % (self.update_url, urllib.urlencode(extra_params))
+            return "%s?%s" % (self.update_url, urllib.urlencode(sorted(extra_params.items())))
         else:
-            url = self.update_url
-        r, c = self.request(url, method="POST", body=body,
-                            headers=headers)
-        if r.status != 200:
-            raise SolrError(r, c)
+            return self.update_url
 
     def select(self, params):
-        #print "sunburnt.SolrConnection.select params: %s" % str(params)
         qs = urllib.urlencode(params)
         url = "%s?%s" % (self.select_url, qs)
         if len(url) > self.max_length_get_url:
-            warnings.warn("Long query URL encountered - POSTing instead of GETting. This query will not be cached at the HTTP layer")
-            method = "POST"
+            warnings.warn("Long query URL encountered - POSTing instead of "
+                "GETting. This query will not be cached at the HTTP layer")
+            url = self.select_url
+            kwargs = dict(
+                method="POST",
+                body=qs,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
         else:
-            method = "GET"
-        r, c = self.request(url, method=method)
+            kwargs = dict(method="GET")
+        r, c = self.request(url, **kwargs)
         if r.status != 200:
             raise SolrError(r, c)
         return c
@@ -153,6 +161,8 @@ class SolrInterface(object):
             if r.status != 200:
                 raise EnvironmentError("Couldn't retrieve schema document from server - received status code %s\n%s" % (r.status, c))
             schemadoc = StringIO.StringIO(c)
+            #for line in schemadoc:
+            #    print line
         self.schema = SolrSchema(schemadoc)
 
     def add(self, docs, chunk=100, **kwargs):

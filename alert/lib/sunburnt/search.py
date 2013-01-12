@@ -63,7 +63,7 @@ class LuceneQuery(object):
             else:
                 raise ValueError
             for subquery in self.subqueries:
-                subquery.serialize_debug(indent + 2)
+                subquery.serialize_debug(indent+2)
         print '%s%s' % (indentspace, '}')
 
     # Below, we sort all our value_sets - this is for predictability when testing.
@@ -184,7 +184,7 @@ class LuceneQuery(object):
             # Clone and rewrite to effect the boosts.
             newself = self.clone()
             newself.boosts = []
-            boost_queries = [self.Q(**kwargs) ** boost_score
+            boost_queries = [self.Q(**kwargs)**boost_score
                              for kwargs, boost_score in self.boosts]
             newself = newself | (newself & reduce(operator.or_, boost_queries))
             newself, _ = newself.normalize()
@@ -197,9 +197,9 @@ class LuceneQuery(object):
             for q in self.subqueries:
                 op_ = u'OR' if self._or else u'AND'
                 if self.child_needs_parens(q):
-                    u.append(u"(%s)" % q.__unicode__(level=level + 1, op=op_))
+                    u.append(u"(%s)"%q.__unicode__(level=level+1, op=op_))
                 else:
-                    u.append(u"%s" % q.__unicode__(level=level + 1, op=op_))
+                    u.append(u"%s"%q.__unicode__(level=level+1, op=op_))
             if self._and:
                 return u' AND '.join(u)
             elif self._or:
@@ -207,12 +207,12 @@ class LuceneQuery(object):
             elif self._not:
                 assert len(u) == 1
                 if level == 0 or (level == 1 and op == "AND"):
-                    return u'NOT %s' % u[0]
+                    return u'NOT %s'%u[0]
                 else:
-                    return u'(*:* AND NOT %s)' % u[0]
+                    return u'(*:* AND NOT %s)'%u[0]
             elif self._pow is not False:
                 assert len(u) == 1
-                return u"%s^%s" % (u[0], self._pow)
+                return u"%s^%s"%(u[0], self._pow)
             else:
                 raise ValueError
 
@@ -364,6 +364,8 @@ class BaseSearch(object):
                       'more_like_this', 'highlighter', 'faceter',
                       'sorter', 'facet_querier', 'field_limiter',)
 
+    result_constructor = dict
+
     def _init_common_modules(self):
         self.query_obj = LuceneQuery(self.schema, u'q')
         self.filter_obj = LuceneQuery(self.schema, u'fq')
@@ -466,18 +468,34 @@ class BaseSearch(object):
         # Next line is for pre-2.6.5 python
         return dict((k.encode('utf8'), v) for k, v in options.items())
 
+    def results_as(self, constructor):
+        newself = self.clone()
+        newself.result_constructor = constructor
+        return newself
+
     def transform_result(self, result, constructor):
         if constructor is not dict:
-            result.result.docs = [constructor(**d) for d in result.result.docs]
+            construct_docs = lambda docs: [constructor(**d) for d in docs]
+            result.result.docs = construct_docs(result.result.docs)
+            for key in result.more_like_these:
+                result.more_like_these[key].docs = \
+                        construct_docs(result.more_like_these[key].docs)
+            # in future, highlighting chould be made available to
+            # custom constructors; perhaps document additional
+            # arguments result constructors are required to support, or check for
+            # an optional set_highlighting method
         else:
             if result.highlighting:
                 for d in result.result.docs:
                     # if the unique key for a result doc is present in highlighting,
                     # add the highlighting for that document into the result dict
                     # (but don't override any existing content)
+                    # If unique key field is not a string field (eg int) then we need to
+                    # convert it to its solr representation
+                    unique_key = self.schema.fields[self.schema.unique_key].to_solr(d[self.schema.unique_key])
                     if 'solr_highlights' not in d and \
-                           d[self.schema.unique_key] in result.highlighting:
-                        d['solr_highlights'] = result.highlighting[d[self.schema.unique_key]]
+                           unique_key in result.highlighting:
+                        d['solr_highlights'] = result.highlighting[unique_key]
         return result
 
     def params(self):
@@ -489,22 +507,17 @@ class BaseSearch(object):
     def count(self):
         # get the total count for the current query without retrieving any results 
         # cache it, since it may be needed multiple times when used with django paginator
-        #print "Entering search.BaseSearch.count function."
-        #print "search.BaseSearch.count _count: %s" % self._count
-        #print "search.BaseSearch.count self.paginator.rows: %s" % self.paginator.rows
         if self._count is None:
             # are we already paginated? then we'll behave as if that's
             # defined our result set already.
             if self.paginator.rows is not None:
                 total_results = self.paginator.rows
             else:
-                #print "Creating a paginated response...."
                 response = self.paginate(rows=0).execute()
                 total_results = response.result.numFound
                 if self.paginator.start is not None:
                     total_results -= self.paginator.start
             self._count = total_results
-        #print "search.BaseSearch.count _count: %s" % self._count
         return self._count
 
     __len__ = count
@@ -512,8 +525,6 @@ class BaseSearch(object):
     def __getitem__(self, k):
         """Return a single result or slice of results from the query.
         """
-        # NOTE: only supports the default result constructor.
-
         # are we already paginated? if so, we'll apply this getitem to the
         # paginated result - else we'll apply it to the whole.
         offset = 0 if self.paginator.start is None else self.paginator.start
@@ -552,13 +563,14 @@ class BaseSearch(object):
             rows = stop - start
             if self.paginator.rows is not None:
                 rows = min(rows, self.paginator.rows)
-
-            if rows <= 0:
-                return []
+            rows = max(rows, 0)
 
             start += offset
 
-            return self.paginate(start=start, rows=rows).execute()[::step]
+            response = self.paginate(start=start, rows=rows).execute()
+            if step != 1:
+                response.result.docs = response.result.docs[::step]
+            return response
 
         else:
             # if not a slice, a single result is being requested
@@ -586,6 +598,7 @@ class SolrSearch(BaseSearch):
         else:
             for opt in self.option_modules:
                 setattr(self, opt, getattr(original, opt).clone())
+            self.result_constructor = original.result_constructor
 
     def options(self):
         options = super(SolrSearch, self).options()
@@ -593,7 +606,9 @@ class SolrSearch(BaseSearch):
             options['q'] = '*:*' # search everything
         return options
 
-    def execute(self, constructor=dict):
+    def execute(self, constructor=None):
+        if constructor is None:
+            constructor = self.result_constructor
         result = self.interface.search(**self.options())
         return self.transform_result(result, constructor)
 
@@ -754,10 +769,10 @@ class Options(object):
         for field_name, field_opts in self.fields.items():
             if not field_name:
                 for field_opt, v in field_opts.items():
-                    opts['%s.%s' % (self.option_name, field_opt)] = v
+                    opts['%s.%s'%(self.option_name, field_opt)] = v
             else:
                 for field_opt, v in field_opts.items():
-                    opts['f.%s.%s.%s' % (field_name, self.option_name, field_opt)] = v
+                    opts['f.%s.%s.%s'%(field_name, self.option_name, field_opt)] = v
         return opts
 
 
@@ -798,7 +813,7 @@ class HighlightOptions(Options):
             "simple.pre":unicode,
             "simple.post":unicode,
             "fragmenter":unicode,
-            "useFastVectorHighlighter":bool, 	# available as of Solr 3.1
+            "useFastVectorHighlighter":bool,	# available as of Solr 3.1
             "usePhraseHighlighter":bool,
             "highlightMultiTerm":bool,
             "regex.slop":float,
@@ -850,12 +865,12 @@ class MoreLikeThisOptions(Options):
         if query_fields is not None:
             for k, v in query_fields.items():
                 if k not in self.fields:
-                    raise SolrError("'%s' specified in query_fields but not fields" % k)
+                    raise SolrError("'%s' specified in query_fields but not fields"% k)
                 if v is not None:
                     try:
                         v = float(v)
                     except ValueError:
-                        raise SolrError("'%s' has non-numerical boost value" % k)
+                        raise SolrError("'%s' has non-numerical boost value"% k)
             self.query_fields.update(query_fields)
 
         checked_kwargs = self.check_opts(kwargs)
@@ -930,9 +945,6 @@ class PaginateOptions(Options):
             if rows < 0:
                 raise SolrError("paginator rows must be 0 or greater")
             self.rows = rows
-        #print "Updating sunburnt paginator..."
-        #print "Sunburnt paginator start: %s" % start
-        #print "Sunburnt paginator rows: %s" % rows
 
     def options(self):
         opts = {}

@@ -91,7 +91,7 @@ def show_results(request):
                                  court_facet_fields, search_form, 'court_exact', 'court_')
                 status_facets = search_utils.make_facets_variable(
                                  stat_facet_fields, search_form, 'status_exact', 'stat_')
-            except:
+            except Exception, e:
                 return render_to_response('search/search.html',
                                           {'error': True},
                                           RequestContext(request))
@@ -132,7 +132,7 @@ def show_results(request):
                              court_facet_fields, search_form, 'court_exact', 'court_')
             status_facets = search_utils.make_facets_variable(
                              stat_facet_fields, search_form, 'status_exact', 'stat_')
-        except:
+        except Exception, e:
             return render_to_response('search/search.html',
                                           {'error': True},
                                           RequestContext(request))

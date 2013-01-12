@@ -4,7 +4,11 @@ import cStringIO as StringIO
 import datetime
 import uuid
 
-import mx.DateTime
+try:
+    import mx.DateTime
+    HAS_MX_DATETIME = True
+except ImportError:
+    HAS_MX_DATETIME = False
 import pytz
 
 from .schema import solr_date, SolrSchema, SolrError, SolrUpdate, SolrDelete
@@ -21,22 +25,23 @@ samples_from_pydatetimes = {
     "2009-07-23T00:24:34.000376Z":
         [not_utc.localize(datetime.datetime(2009, 07, 23, 3, 24, 34, 376)),
          datetime.datetime(2009, 07, 23, 0, 24, 34, 376, pytz.utc)],
-    "2009-07-23T03:24:34.000000Z":
+    "2009-07-23T03:24:34Z":
         [datetime.datetime(2009, 07, 23, 3, 24, 34),
          datetime.datetime(2009, 07, 23, 3, 24, 34, tzinfo=pytz.utc)],
-    "2009-07-23T00:24:34.000000Z":
+    "2009-07-23T00:24:34Z":
         [not_utc.localize(datetime.datetime(2009, 07, 23, 3, 24, 34)),
          datetime.datetime(2009, 07, 23, 0, 24, 34, tzinfo=pytz.utc)]
     }
 
-samples_from_mxdatetimes = {
-    "2009-07-23T03:24:34.000376Z":
-        [mx.DateTime.DateTime(2009, 07, 23, 3, 24, 34.000376),
-         datetime.datetime(2009, 07, 23, 3, 24, 34, 376, pytz.utc)],
-    "2009-07-23T03:24:34.000000Z":
-        [mx.DateTime.DateTime(2009, 07, 23, 3, 24, 34),
-         datetime.datetime(2009, 07, 23, 3, 24, 34, tzinfo=pytz.utc)],
-    }
+if HAS_MX_DATETIME:
+    samples_from_mxdatetimes = {
+        "2009-07-23T03:24:34.000376Z":
+            [mx.DateTime.DateTime(2009, 07, 23, 3, 24, 34.000376),
+             datetime.datetime(2009, 07, 23, 3, 24, 34, 376, pytz.utc)],
+        "2009-07-23T03:24:34Z":
+            [mx.DateTime.DateTime(2009, 07, 23, 3, 24, 34),
+             datetime.datetime(2009, 07, 23, 3, 24, 34, tzinfo=pytz.utc)],
+        }
 
 
 samples_from_strings = {
@@ -50,20 +55,20 @@ samples_from_strings = {
     }
 
 def check_solr_date_from_date(s, date, canonical_date):
-    assert unicode(solr_date(date)) == s
+    assert unicode(solr_date(date)) == s, "Unequal representations of %r: %r and %r" % (date, unicode(solr_date(date)), s)
     check_solr_date_from_string(s, canonical_date)
 
 def check_solr_date_from_string(s, date):
     assert solr_date(s)._dt_obj == date
-
 
 def test_solr_date_from_pydatetimes():
     for k, v in samples_from_pydatetimes.items():
         yield check_solr_date_from_date, k, v[0], v[1]
 
 def test_solr_date_from_mxdatetimes():
-    for k, v in samples_from_mxdatetimes.items():
-        yield check_solr_date_from_date, k, v[0], v[1]
+    if HAS_MX_DATETIME:
+        for k, v in samples_from_mxdatetimes.items():
+            yield check_solr_date_from_date, k, v[0], v[1]
 
 def test_solr_date_from_strings():
     for k, v in samples_from_strings.items():

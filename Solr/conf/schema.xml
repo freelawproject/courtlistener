@@ -230,7 +230,7 @@
    <dynamicField name="*_tdt" type="tdate"  indexed="true"  stored="true"/>
 
    <dynamicField name="*_pi"  type="pint"    indexed="true"  stored="true"/>
-   <dynamicField name="*_c"   type="currency" indexed="true"  stored="true"/>
+   <dynamicField name="*_c"  type="currency" indexed="true"  stored="true"/>
 
    <dynamicField name="ignored_*" type="ignored" multiValued="true"/>
    <dynamicField name="attr_*" type="text_general" indexed="true" stored="true" multiValued="true"/>

@@ -12,12 +12,16 @@ class SunburntJSONEncoder(json.JSONEncoder):
         return super(SunburntJSONEncoder, self).encode(o)
 
     def default(self, obj):
+        if hasattr(obj, 'isoformat'):
+            return "%sZ" % (obj.replace(tzinfo=None).isoformat(), )
         if hasattr(obj, "strftime"):
             try:
                 microsecond = obj.microsecond
             except AttributeError:
-                microsecond = int(1000000 * math.modf(obj.second)[0])
-            return u"%s.%sZ" % (obj.isoformat(), microsecond)
+                microsecond = int(1000000*math.modf(obj.second)[0])
+            if microsecond:
+                return u"%s.%sZ" % (obj.strftime("%Y-%m-%dT%H:%M:%S"), microsecond)
+            return u"%sZ" % (obj.strftime("%Y-%m-%dT%H:%M:%S"),)
         return super(SunburntJSONEncoder, self).default(obj)
 
 def dump(obj, fp, *args, **kwargs):

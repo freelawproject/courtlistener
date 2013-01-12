@@ -9,11 +9,18 @@ import datetime
 
 from lxml.builder import E
 from lxml.etree import tostring
-import mx.DateTime
+try:
+    import mx.DateTime
+    HAS_MX_DATETIME = True
+except ImportError:
+    HAS_MX_DATETIME = False
 
 from .schema import SolrSchema, SolrError
 from .search import SolrSearch, MltSolrSearch, PaginateOptions, SortOptions, FieldLimitOptions, FacetOptions, HighlightOptions, MoreLikeThisOptions, params_from_dict
 from .strings import RawString
+from .sunburnt import SolrInterface
+
+from .test_sunburnt import MockConnection, MockResponse
 
 from nose.tools import assert_equal
 
@@ -115,17 +122,6 @@ good_query_data = {
          [("fq", u"hello\\ world"), ("q", "*:*")]),
         ),
 
-    "query":(
-        (["hello"], {},
-         [("q", u"hello")]),
-        (["hello"], {"int_field":3},
-         [("q", u"hello AND int_field:3")]),
-        (["hello", "world"], {},
-         [("q", u"hello AND world")]),
-        (["hello world"], {},
-         {"q":u"\"hello world\""}),
-        ),
-
     "filter":(
         (["hello"], {},
          [("fq", u"hello"), ("q", "*:*")]),
@@ -138,47 +134,60 @@ good_query_data = {
         ),
 
     "query":(
+        #Basic queries
+        (["hello"], {},
+         [("q", u"hello")]),
+        (["hello"], {"int_field":3},
+         [("q", u"hello AND int_field:3")]),
+        (["hello", "world"], {},
+         [("q", u"hello AND world")]),
+        (["hello world"], {},
+         [("q", u"hello\\ world")]),
+        #Test fields
+        # Boolean fields take any truth-y value
         ([], {"boolean_field":True},
-         {"q":u"boolean_field:true"}),
+         [("q", u"boolean_field:true")]),
+        ([], {"boolean_field":'true'},
+         [("q", u"boolean_field:true")]),
+        ([], {"boolean_field":1},
+         [("q", u"boolean_field:true")]),
         ([], {"boolean_field":"false"},
-         {"q":u"boolean_field:true"}), # boolean field takes any truth-y value
+         [("q", u"boolean_field:false")]),
         ([], {"boolean_field":0},
-         {"q":u"boolean_field:false"}),
+         [("q", u"boolean_field:false")]),
+        ([], {"boolean_field":False},
+         [("q", u"boolean_field:false")]),
         ([], {"int_field":3},
-         {"q":u"int_field:3"}),
+         [("q", u"int_field:3")]),
         ([], {"int_field":3.1}, # casting from float should work
-         {"q":u"int_field:3"}),
+         [("q", u"int_field:3")]),
         ([], {"sint_field":3},
-         {"q":u"sint_field:3"}),
+         [("q", u"sint_field:3")]),
         ([], {"sint_field":3.1}, # casting from float should work
-         {"q":u"sint_field:3"}),
+         [("q", u"sint_field:3")]),
         ([], {"long_field":2**31},
-         {"q":u"long_field:2147483648"}),
+         [("q", u"long_field:2147483648")]),
         ([], {"slong_field":2**31},
-         {"q":u"slong_field:2147483648"}),
+         [("q", u"slong_field:2147483648")]),
         ([], {"float_field":3.0},
-         {"q":u"float_field:3.0"}),
+         [("q", u"float_field:3.0")]),
         ([], {"float_field":3}, # casting from int should work
-         {"q":u"float_field:3.0"}),
+         [("q", u"float_field:3.0")]),
         ([], {"sfloat_field":3.0},
-         {"q":u"sfloat_field:3.0"}),
+         [("q", u"sfloat_field:3.0")]),
         ([], {"sfloat_field":3}, # casting from int should work
-         {"q":u"sfloat_field:3.0"}),
+         [("q", u"sfloat_field:3.0")]),
         ([], {"double_field":3.0},
-         {"q":u"double_field:3.0"}),
+         [("q", u"double_field:3.0")]),
         ([], {"double_field":3}, # casting from int should work
-         {"q":u"double_field:3.0"}),
+         [("q", u"double_field:3.0")]),
         ([], {"sdouble_field":3.0},
-         {"q":u"sdouble_field:3.0"}),
+         [("q", u"sdouble_field:3.0")]),
         ([], {"sdouble_field":3}, # casting from int should work
-         {"q":u"sdouble_field:3.0"}),
+         [("q", u"sdouble_field:3.0")]),
         ([], {"date_field":datetime.datetime(2009, 1, 1)},
-         {"q":u"date_field:2009-01-01T00\\:00\\:00.000000Z"}),
-        ([], {"date_field":mx.DateTime.DateTime(2009, 1, 1)},
-         {"q":u"date_field:2009-01-01T00\\:00\\:00.000000Z"}),
-        ),
-
-    "query":(
+         [("q", u"date_field:2009\\-01\\-01T00\\:00\\:00Z")]),
+        #Test ranges
         ([], {"int_field__any":True},
          [("q", u"int_field:[* TO *]")]),
         ([], {"int_field__lt":3},
@@ -198,17 +207,17 @@ good_query_data = {
         ([], {"int_field__range":(3, -3)},
          [("q", u"int_field:[\-3 TO 3]")]),
         ([], {"date_field__lt":datetime.datetime(2009, 1, 1)},
-         [("q", u"date_field:{* TO 2009\\-01\\-01T00\\:00\\:00.000000Z}")]),
+         [("q", u"date_field:{* TO 2009\\-01\\-01T00\\:00\\:00Z}")]),
         ([], {"date_field__gt":datetime.datetime(2009, 1, 1)},
-         [("q", u"date_field:{2009\\-01\\-01T00\\:00\\:00.000000Z TO *}")]),
+         [("q", u"date_field:{2009\\-01\\-01T00\\:00\\:00Z TO *}")]),
         ([], {"date_field__rangeexc":(datetime.datetime(2009, 1, 1), datetime.datetime(2009, 1, 2))},
-         [("q", "date_field:{2009\\-01\\-01T00\\:00\\:00.000000Z TO 2009\\-01\\-02T00\\:00\\:00.000000Z}")]),
+         [("q", "date_field:{2009\\-01\\-01T00\\:00\\:00Z TO 2009\\-01\\-02T00\\:00\\:00Z}")]),
         ([], {"date_field__lte":datetime.datetime(2009, 1, 1)},
-         [("q", u"date_field:[* TO 2009\\-01\\-01T00\\:00\\:00.000000Z]")]),
+         [("q", u"date_field:[* TO 2009\\-01\\-01T00\\:00\\:00Z]")]),
         ([], {"date_field__gte":datetime.datetime(2009, 1, 1)},
-         [("q", u"date_field:[2009\\-01\\-01T00\\:00\\:00.000000Z TO *]")]),
+         [("q", u"date_field:[2009\\-01\\-01T00\\:00\\:00Z TO *]")]),
         ([], {"date_field__range":(datetime.datetime(2009, 1, 1), datetime.datetime(2009, 1, 2))},
-         [("q", u"date_field:[2009\\-01\\-01T00\\:00\\:00.000000Z TO 2009\\-01\\-02T00\\:00\\:00.000000Z]")]),
+         [("q", u"date_field:[2009\\-01\\-01T00\\:00\\:00Z TO 2009\\-01\\-02T00\\:00\\:00Z]")]),
         ([], {'string_field':['hello world', 'goodbye, cruel world']},
          [("q", u"string_field:goodbye,\\ cruel\\ world AND string_field:hello\\ world")]),
         # Raw strings
@@ -216,12 +225,16 @@ good_query_data = {
          [("q", "string_field:abc\\*\\?\\?\\?")]),
         ),
     }
+if HAS_MX_DATETIME:
+    good_query_data['query'] += \
+            ([], {"date_field":mx.DateTime.DateTime(2009, 1, 1)},
+             [("q", u"date_field:2009-01-01T00\\:00\\:00Z")])
 
 def check_query_data(method, args, kwargs, output):
     solr_search = SolrSearch(interface)
     p = getattr(solr_search, method)(*args, **kwargs).params()
     try:
-        assert p == output
+        assert p == output, "Unequal: %r, %r" % (p, output)
     except AssertionError:
         if debug:
             print p
@@ -541,3 +554,110 @@ def check_mlt_query_options(fields, query_fields, kwargs, output):
 def test_mlt_query_options():
     for (fields, query_fields, kwargs, output) in mlt_query_options_data:
         yield check_mlt_query_options, fields, query_fields, kwargs, output
+
+
+class HighlightingMockResponse(MockResponse):
+    def __init__(self, highlighting, *args, **kwargs):
+        self.highlighting = highlighting
+        super(HighlightingMockResponse, self).__init__(*args, **kwargs)
+
+    def extra_response_parts(self):
+        contents = []
+        if self.highlighting:
+            contents.append(
+                    E.lst({'name':'highlighting'}, E.lst({'name':'0'}, E.arr({'name':'string_field'}, E.str('zero'))))
+                    )
+        return contents
+
+class HighlightingMockConnection(MockConnection):
+    def _handle_request(self, uri_obj, params, method, body, headers):
+        highlighting = params.get('hl') == ['true']
+        if method == 'GET' and uri_obj.path.endswith('/select/'):
+            return self.MockStatus(200), HighlightingMockResponse(highlighting, 0, 1).xml_response()
+
+highlighting_interface = SolrInterface("http://test.example.com/", http_connection=HighlightingMockConnection())
+
+solr_highlights_data = (
+    (None, dict, None),
+    (['string_field'], dict, {'string_field': ['zero']}),
+    )
+
+def check_transform_results(highlighting, constructor, solr_highlights):
+    q = highlighting_interface.query('zero')
+    if highlighting:
+        q = q.highlight(highlighting)
+    docs = q.execute(constructor=constructor).result.docs
+    assert_equal(docs[0].get('solr_highlights'), solr_highlights)
+    assert isinstance(docs[0], constructor)
+
+def test_transform_result():
+    for highlighting, constructor, solr_highlights in solr_highlights_data:
+        yield check_transform_results, highlighting, constructor, solr_highlights
+
+#Test More Like This results
+class MltMockResponse(MockResponse):
+
+    def extra_response_parts(self):
+        contents = []
+        create_doc = lambda value: E.doc(E.str({'name':'string_field'}, value))
+        #Main response result
+        contents.append(
+            E.result({'name': 'response'},
+                     create_doc('zero')
+                    )
+        )
+        #More like this results
+        contents.append(
+            E.lst({'name':'moreLikeThis'},
+                  E.result({'name': 'zero', 'numFound': '3', 'start': '0'},
+                           create_doc('one'),
+                           create_doc('two'),
+                           create_doc('three')
+                          )
+                 )
+        )
+        return contents
+
+class MltMockConnection(MockConnection):
+    def _handle_request(self, uri_obj, params, method, body, headers):
+        if method == 'GET' and uri_obj.path.endswith('/select/'):
+            return self.MockStatus(200), MltMockResponse(0, 1).xml_response()
+
+mlt_interface = SolrInterface("http://test.example.com/",
+                              http_connection=MltMockConnection())
+
+class DummyDocument(object):
+
+    def __init__(self, **kw):
+        self.kw = kw
+
+    def __repr__(self):
+        return "DummyDocument<%r>" % self.kw
+
+    def get(self, key):
+        return self.kw.get(key)
+
+def make_dummydoc(**kwargs):
+    return DummyDocument(**kwargs)
+
+solr_mlt_transform_data = (
+    (dict, dict),
+    (DummyDocument, DummyDocument),
+    (make_dummydoc, DummyDocument),
+    )
+
+def check_mlt_transform_results(constructor, _type):
+    q = mlt_interface.query('zero')
+    query = q.mlt(fields='string_field')
+    response = q.execute(constructor=constructor)
+
+    for doc in response.result.docs:
+        assert isinstance(doc, _type)
+
+    for key in response.more_like_these:
+        for doc in response.more_like_these[key].docs:
+            assert isinstance(doc, _type)
+
+def test_mlt_transform_result():
+    for constructor, _type in solr_mlt_transform_data:
+        yield check_mlt_transform_results, constructor, _type
