@@ -751,7 +751,7 @@
        of SearchComponents (see below) and supports distributed
        queries across multiple shards
     -->
-  <requestHandler name="search" class="solr.SearchHandler" default="true">
+  <requestHandler name="/select" class="solr.SearchHandler" default="true">
     <!-- mlr: This is the request handler used by CourtListener -->
     <!-- default values for query parameters can be specified, these
          will be overridden by parameters in the request
