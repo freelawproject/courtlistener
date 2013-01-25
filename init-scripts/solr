@@ -81,7 +81,9 @@ case "$1" in
         stop
     ;;
     restart)
-        restart
+        stop
+        sleep 15
+        start
     ;;
     *)
         echo $"Usage: solr {start|status|stop|restart}"

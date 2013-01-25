@@ -38,6 +38,7 @@ from alert.lib.mojibake import fix_mojibake
 from celery.decorators import task
 from celery.task.sets import subtask
 from datetime import date
+from juriscraper.GenericSite import logger
 from lxml import etree
 from lxml.etree import tostring
 
@@ -158,7 +159,6 @@ def extract_doc_content(pk, callback=None):
 
     TODO: this implementation cannot be distributed due to using local paths.
     '''
-    logger = extract_doc_content.get_logger()
     logger.info("Extracting contents of document %s" % (pk,))
 
     doc = Document.objects.get(pk=pk)
