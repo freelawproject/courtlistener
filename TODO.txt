@@ -11,8 +11,3 @@ To do:
  - recreate the stat_maker.py script (see bug)
  - Check the dates/courts in Brian's list of citation-less docs, and see if we
    missed any docs.
- 
-New Server:
- - Rename columns/tables at long last
- - Sort out Email verification, if necessary.
- - Enable all Apache sites necessary.
