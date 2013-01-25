@@ -96,7 +96,7 @@ def extract_from_pdf(doc, path, DEVNULL, callback=None):
     ''' Extract text from pdfs.
 
     Here, we use pdftotext. If that fails, try to use tesseract under the
-    assumption it's an image-based PDF. Once tat is complete, we check for the
+    assumption it's an image-based PDF. Once that is complete, we check for the
     letter e in our content. If it's not there, we try to fix the mojibake
     that ca9 sometimes creates.
     '''
