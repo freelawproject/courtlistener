@@ -1,14 +1,20 @@
 Install instructions for the courtlistener project
 --------------------------------------------------
 
-For debian-based computers:
- - copy the install.sh script to your computer
- - run it with the following command: sudo ./install.sh --install
+Previous to 2013-01-25, CL had an install script that attempted to install 
+everything on your computer for you. It was hundreds of lines long, poorly 
+maintained and when it broke (which it often did), people were usually stumped
+how to proceed. You can still find it in the repository, if you're so inclined.
 
-It will install all dependencies that are required for the software.
+Going forward, it's a hands-on approach, where you install and configure 
+everything manually. That's the bad news, because it means more work for you, 
+humble coder. The good news is that we have copious notes about how to do this, 
+and they're even in a wiki, so you can edit them if needed. 
 
-For other operating systems, where the install script will not work, the script
-should serve as good documentation of the installation process and components.
+Here they are: https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/wiki/HowTo
 
-If you work on the installation process, please consider updating the script or this
-documentation.
+Please don't hesitate to get in touch in the forum if you have questions.
+
+We encourage your changes and look forward to your contributions,
+
+Mike & Brian
