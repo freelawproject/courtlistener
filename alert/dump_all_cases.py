@@ -48,7 +48,6 @@ def dump_all_cases():
     start_date = '1754-09-01' # First American case
     end_date = '%d-%02d-%02d' % (today.year, today.month, today.day)
     # Get the documents from the database.
-    connection.cursor().execute('SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED')
     qs = Document.objects.all()
     docs_to_dump = queryset_generator_by_date(qs,
                                               'dateFiled',
