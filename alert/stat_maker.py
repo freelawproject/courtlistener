@@ -52,7 +52,6 @@ def makeStats():
             [[oldestDocInCourt, numCasesInCourt],[oldestDocInCourt2, numCasesInCourt2]]
     '''
 
-    #connection.cursor().execute('SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED')
     totalCasesQ = Document.objects.all().count()
 
     statsP = []
