@@ -87,7 +87,7 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
         return HttpResponseRedirect(os.path.join('/dumps', filepath, filename))
     except IOError:
         # Time-based dump with  no lock
-        connection.cursor().execute('SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED')
+        #connection.cursor().execute('SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED')
         if court == 'all':
             # dump everything; disable default sorting
             qs = Document.objects.all().order_by()
