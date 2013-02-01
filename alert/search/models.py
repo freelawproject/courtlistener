@@ -141,9 +141,9 @@ class Citation(models.Model):
     case_name = models.TextField("full name of the case",
                                     blank=True)
     docketNumber = models.CharField("the docket number",
+                                    max_length=100, # sometimes these are consolidated, hence they need to be long.
                                     blank=True,
-                                    null=True,
-                                    max_length=50)
+                                    null=True)
     westCite = models.CharField("WestLaw citation",
                                 max_length=50,
                                 blank=True,
