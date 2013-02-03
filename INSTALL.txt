@@ -1,0 +1,20 @@
+Install instructions for the courtlistener project
+--------------------------------------------------
+
+Previous to 2013-01-25, CL had an install script that attempted to install 
+everything on your computer for you. It was hundreds of lines long, poorly 
+maintained and when it broke (which it often did), people were usually stumped
+how to proceed. You can still find it in the repository, if you're so inclined.
+
+Going forward, it's a hands-on approach, where you install and configure 
+everything manually. That's the bad news, because it means more work for you, 
+humble coder. The good news is that we have copious notes about how to do this, 
+and they're even in a wiki, so you can edit them if needed. 
+
+Here they are: https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/wiki/HowTo
+
+Please don't hesitate to get in touch in the forum if you have questions.
+
+We encourage your changes and look forward to your contributions,
+
+Mike & Brian
