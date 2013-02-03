@@ -1,10 +1,12 @@
 from __future__ import absolute_import
 
+from alert.lib.decorators import retry
 import cgi
 import cStringIO as StringIO
 from itertools import islice
 import logging
 import socket, time, urllib, urlparse
+import urllib2
 import warnings
 
 
@@ -152,6 +154,7 @@ class SolrInterface(object):
             self.readable = False
         self.init_schema()
 
+    @retry((urllib2.URLError, socket.error), 5, 3)
     def init_schema(self):
         if self.schemadoc:
             schemadoc = self.schemadoc
