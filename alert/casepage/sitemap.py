@@ -21,13 +21,9 @@ from django.http import HttpResponse
 from django.template import loader
 from django.utils.encoding import smart_str
 from django.views.decorators.cache import never_cache
-from alert.lib.decorators import retry
-
-import urllib2
 
 
 @never_cache
-@retry(urllib2.URLError, 5, 3)
 def sitemap_maker(request, size=250):
     '''Generate a sitemap index page
 

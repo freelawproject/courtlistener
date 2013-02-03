@@ -15,9 +15,6 @@ syntax: glob
 # no private files!
 *[P|p][R|r][I|i][V|v][A|a][T|t][E|e]*
 
-# ignore the django directory
-django
-
 # the server and laptop config
 alert/assets/media/pdf
 alert/assets/media/txt
@@ -26,20 +23,14 @@ alert/assets/media/sitemaps
 alert/assets/media/doc
 alert/assets/media/dumps
 
-# the piwik install
-Piwik
-
-# the FederalReports
-Resource.org/data
-
 # the cached robots.txt from Resource.org
 alert/robots/cached_file.txt
 
 # Solr
 Solr/data
 
-# pdfdisplay
-pdfdisplay
+# Eclipse junk
+alert/.metadata
 
 syntax: regexp
 ^\.settings$
