@@ -29,6 +29,7 @@ import sys
 sys.path.append('/var/www/court-listener/alert')
 
 import settings
+from celery.task.sets import subtask
 from django.core.management import setup_environ
 setup_environ(settings)
 
@@ -37,23 +38,20 @@ from alert.lib.db_tools import queryset_generator
 from optparse import OptionParser
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
-from scrapers.tasks import extract_doc_content
+from scrapers.tasks import extract_doc_content, extract_by_ocr
 
 def fixer(simulate=False, verbose=False):
     '''OCR documents that lack content'''
     #docs = queryset_generator(Document.objects.filter(source='C', documentPlainText=''))
-    docs = Document.objects.raw('''select "documentUUID" 
-                                   from "Document"
-                                   where "source" = 'C' and  
-                                       "documentPlainText" = 'Unable to extract document content.'
-                                    ''')
+    #docs = Document.objects.raw('''select "documentUUID"  from "Document" where "source" = 'C' and "documentPlainText" ~ '^[[:space:]]*$' ''')
+    docs = Document.objects.raw('''select "documentUUID" from "Document" where "source" = 'C' and "documentPlainText" = 'Unable to extract document content.' ''')
     for doc in docs:
         if verbose:
             print "Fixing document number %s: %s" % (doc.pk, doc)
 
         if not simulate:
             # Extract the contents asynchronously.
-            extract_doc_content.delay(doc.pk)
+            extract_doc_content(doc.pk, callback=subtask(extract_by_ocr))
 
 def main():
     usage = "usage: %prog [--verbose] [---simulate]"

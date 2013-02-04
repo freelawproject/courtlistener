@@ -89,6 +89,7 @@ def extract_from_html(path):
         content = open(path).read()
         content = get_clean_body_content(content)
     except:
+        content = ''
         err = True
     return content, err
 
@@ -220,18 +221,20 @@ def extract_by_ocr(path):
         DEVNULL = open('/dev/null', 'w')
         tmp_file_prefix = os.path.join('/tmp', str(time.time()))
         image_magick_command = ['convert', '-depth', '4', '-density', '300',
-                                path, '%s.tiff' % tmp_file_prefix]
+                                '-background', 'white', '+matte', path,
+                                '%s.tiff' % tmp_file_prefix]
         process = subprocess.Popen(image_magick_command, shell=False,
                                    stdout=DEVNULL, stderr=DEVNULL)
         _, err = process.communicate()
         if not err:
+            print "ran imagemagick successfully."
             tesseract_command = ['tesseract', '%s.tiff' % tmp_file_prefix,
                                  tmp_file_prefix, '-l', 'eng']
             process = subprocess.Popen(tesseract_command, shell=False,
-                                       stdout=DEVNULL, stderr=subprocess.PIPE)
+                                       stdout=DEVNULL, stderr=DEVNULL)
             _, err = process.communicate()
-
             if not err:
+                print "ran tesseract successfully."
                 content = open('%s.txt' % tmp_file_prefix).read()
                 success = True
 
