@@ -159,8 +159,6 @@ def extract_doc_content(pk, callback=None):
 
     TODO: this implementation cannot be distributed due to using local paths.
     '''
-    print "Extracting contents of document %s" % pk
-
     doc = Document.objects.get(pk=pk)
 
     path = str(doc.local_path)
@@ -202,7 +200,6 @@ def extract_doc_content(pk, callback=None):
     # Identify and link citations within the document content
     update_document_by_id.delay(doc.pk)
 
-    print "Successfully extracted contents of document %s" % pk
     return 0
 
 
