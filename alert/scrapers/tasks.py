@@ -38,7 +38,6 @@ from alert.lib.mojibake import fix_mojibake
 from celery.decorators import task
 from celery.task.sets import subtask
 from datetime import date
-from juriscraper.GenericSite import logger
 from lxml import etree
 from lxml.etree import tostring
 
@@ -160,7 +159,7 @@ def extract_doc_content(pk, callback=None):
 
     TODO: this implementation cannot be distributed due to using local paths.
     '''
-    logger.info("Extracting contents of document %s" % (pk,))
+    print "Extracting contents of document %s" % pk
 
     doc = Document.objects.get(pk=pk)
 
@@ -203,7 +202,7 @@ def extract_doc_content(pk, callback=None):
     # Identify and link citations within the document content
     update_document_by_id.delay(doc.pk)
 
-    logger.info("Successfully extracted contents of document %s" % (pk,))
+    print "Successfully extracted contents of document %s" % pk
     return 0
 
 
