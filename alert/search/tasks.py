@@ -67,14 +67,14 @@ def add_or_update_docs(docs):
 
 @task
 def delete_doc(document_id):
-    '''Deletes the document from the index.  Called by Document delete function.
+    '''Deletes the document from the index. Called by Document delete function.
     '''
     si.delete(document_id)
     si.commit()
 
 @task
 def add_or_update_doc(document_id):
-    '''Updates the document in the index.  Called by Document save function.
+    '''Updates the document in the index. Called by Document save function.
     '''
     doc = Document.objects.get(pk=document_id)
     search_doc = SearchDocument(doc)

@@ -43,7 +43,10 @@
         {% if user.is_superuser and doc %}
             <div class="sidebar-section">
                 <h3 class="bottom arrow-down-before pointer">Admin</h3>
-                <p class="shown"><a href="/admin/search/citation/{{doc.citation_id}}/">Document &amp; Citation</a></p>
+                <p class="shown">
+                    <a href="/admin/search/document/{{doc.pk}}/">Document</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+                    <a href="/admin/search/citation/{{doc.citation_id}}/">Citation</a> 
+                </p>
             </div>
         {% endif %}
 

@@ -20,23 +20,10 @@ from alert.search.models import Document
 
 from django.contrib import admin
 
-class DocumentAdminInline(admin.StackedInline):
-    # ordering is brutal on MySQL. Don't put it here. Sorry.
-    #list_display = ('citation',)
-    #list_filter = ('court',)
-    model = Document
-    fields = ('citation', 'source', 'documentSHA1', 'dateFiled', 'court',
-              'download_URL', 'local_path', 'documentPlainText', 'documentHTML',
-              'html_with_citations', 'cases_cited',
-              'documentType', 'blocked', 'date_blocked', 'extracted_by_ocr')
-    raw_id_fields = ('citation', 'cases_cited')
-    search_fields = ['documentPlainText']
-
 
 class CitationAdmin(admin.ModelAdmin):
     # This needs to be disabled for performance reasons.
     #list_display = ('docketNumber', 'westCite', 'case_name', )
-    inlines = [DocumentAdminInline]
     search_fields = ['case_name', 'docketNumber', 'westCite']
 
 
