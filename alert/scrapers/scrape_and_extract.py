@@ -194,7 +194,7 @@ def scrape_court(court, full_crawl=False):
 
     # Update the hash if everything finishes properly.
     logger.info("%s: Successfully crawled." % site.court_id)
-    if not download_error:
+    if not download_error and not full_crawl:
         # Only update the hash if no errors occurred.
         url2Hash.SHA1 = site.hash
         url2Hash.save()
