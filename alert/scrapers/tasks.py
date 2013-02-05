@@ -229,10 +229,19 @@ def extract_by_ocr(path):
             process = subprocess.Popen(tesseract_command, shell=False,
                                        stdout=DEVNULL, stderr=DEVNULL)
             _, err = process.communicate()
-            if not err:
-                print "ran tesseract successfully."
-                content = open('%s.txt' % tmp_file_prefix).read()
+            fail_msg = "Unable to extract the content from this file. Please try reading the original."
+            try:
+                content = open('%s.txt' % tmp_file_prefix).read())
+                print "Ran OCR successfully."
+                if len(content) == 0:
+                    print "OCR finished, but no content was found in the OCR'ed file."
+                    content = fail_msg
                 success = True
+            except IOError:
+                print ("OCR was unable to finish. It's likely that we couldn't "
+                       "ingest the tiff for the file at: %s" % path)
+                content = fail_msg
+                success = False
 
     finally:
         # Remove tmp_file and the text file
