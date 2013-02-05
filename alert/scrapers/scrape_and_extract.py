@@ -74,16 +74,17 @@ def court_changed(url, hash):
         return True, url2Hash
 
 
-def scrape_court(court):
+def scrape_court(court, full_crawl=False):
     download_error = False
     site = court.Site().parse()
 
-    changed, url2Hash = court_changed(site.url, site.hash)
-    if not changed:
-        logger.info("Unchanged hash at: %s" % site.url)
-        return
-    else:
-        logger.info("Identified changed hash at: %s" % site.url)
+    if not full_crawl:
+        changed, url2Hash = court_changed(site.url, site.hash)
+        if not changed:
+            logger.info("Unchanged hash at: %s" % site.url)
+            return
+        else:
+            logger.info("Identified changed hash at: %s" % site.url)
 
     dup_count = 0
     for i in range(0, len(site.case_names)):
@@ -112,29 +113,34 @@ def scrape_court(court):
         # dup_found_date
         if exists:
             logger.info('Duplicate found at: %s' % download_url)
-            dup_found_date = site.case_dates[i]
-            dup_count += 1
 
-            # If we found a dup on dup_found_date, then we can exit before
-            # parsing any prior dates.
-            try:
-                already_scraped_next_date = (site.case_dates[i + 1] < dup_found_date)
-            except IndexError:
-                already_scraped_next_date = True
-            if already_scraped_next_date:
-                logger.info('Next case occurs prior to when we found a '
-                            'duplicate. Court is up to date.')
-                url2Hash.SHA1 = site.hash
-                url2Hash.save()
-                return
-            elif dup_count >= 5:
-                logger.info('Found five duplicates in a row. Court is up to '
-                            'date.')
-                url2Hash.SHA1 = site.hash
-                url2Hash.save()
-                return
+            if not full_crawl:
+                dup_found_date = site.case_dates[i]
+                dup_count += 1
+
+                # If we found a dup on dup_found_date, then we can exit before
+                # parsing any prior dates.
+                try:
+                    already_scraped_next_date = (site.case_dates[i + 1] < dup_found_date)
+                except IndexError:
+                    already_scraped_next_date = True
+                if already_scraped_next_date:
+                    logger.info('Next case occurs prior to when we found a '
+                                'duplicate. Court is up to date.')
+                    url2Hash.SHA1 = site.hash
+                    url2Hash.save()
+                    return
+                elif dup_count >= 5:
+                    logger.info('Found five duplicates in a row. Court is up to '
+                                'date.')
+                    url2Hash.SHA1 = site.hash
+                    url2Hash.save()
+                    return
+                else:
+                    # Not the fifth duplicate. Continue onwards.
+                    continue
             else:
-                # Not the fifth duplicate. Continue onwards.
+                # This is a full crawl with no dup aborting.
                 continue
 
         else:
@@ -217,10 +223,13 @@ def main():
                             'from the Juriscraper library, e.g. '
                             '"juriscraper.opinions.united_states.federal.ca1" or '
                             'simply "opinions" to do all opinions.'))
+    parser.add_option('-f', '--fullcrawl', dest='full_crawl',
+                      action='store_true')
     (options, args) = parser.parse_args()
 
     daemon_mode = options.daemonmode
     court_id = options.court_id
+    full_crawl = options.full_crawl
 
     try:
         rate = int(options.rate)
@@ -252,7 +261,7 @@ def main():
                              [module])
 
             try:
-                scrape_court(mod)
+                scrape_court(mod, full_crawl)
             except:
                 logger.critical('********!! CRAWLER DOWN !!***********')
                 logger.critical('*****scrape_court method failed!*****')
