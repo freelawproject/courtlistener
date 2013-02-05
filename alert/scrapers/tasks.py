@@ -231,7 +231,7 @@ def extract_by_ocr(path):
             _, err = process.communicate()
             fail_msg = "Unable to extract the content from this file. Please try reading the original."
             try:
-                content = open('%s.txt' % tmp_file_prefix).read())
+                content = open('%s.txt' % tmp_file_prefix).read()
                 print "Ran OCR successfully."
                 if len(content) == 0:
                     print "OCR finished, but no content was found in the OCR'ed file."
