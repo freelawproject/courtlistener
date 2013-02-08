@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load text_filters %}
+
+{# Shown on document citation pages. #}
+
+{% block title %}CourtListener.com / Cases citing {{ title }}{% endblock %}
+
+{% block head %}
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{doc|truncatewords:10}}" href="/feed/{{doc.pk|num_to_ascii}}/cited-by/">    
+{% endblock %}
+
+{% block sidebar %}
+    <div class="span-6 append-1" id="sidebar">
+        <div class="sidebar-section">
+            <h4 class="bottom">
+                <a href="{{ doc.get_absolute_url }}">&laquo; Back to Document</a>
+            </h4>
+        </div>
+    </div>
+{% endblock sidebar %}
+
+{% block content %}
+    <div class="span-17 last">
+        <h2>
+            {{ doc.citation.case_name|v_wrapper }},
+            {% if doc.citation.westCite %}
+                {{doc.citation.westCite}}
+            {% else %}
+                {{doc.citation.docketNumber}}
+            {% endif %}
+            ({% if doc.court.citation_string != 'SCOTUS' %}{{doc.court.citation_string|nbsp}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
+        </h2>
+
+        <div id="cited-by-viewer">
+            <h3>Cited by {{ doc.citation_count }} case{{ doc.citation_count|pluralize }}</h3>
+            <hr>
+            {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
+                <ul>
+                    {% for case in citing_cases.object_list %}
+                        {# Changing the attributes on this li may break the js above. #}
+                        <li class="citing-case {{ case.court.courtUUID }} {{ case.dateFiled.year|default:'0' }}">
+                            <span class="citation-name"><a href="{{case.get_absolute_url}}">{{ case.citation.case_name|v_wrapper }},
+                            {% if case.citation.westCite %}
+                                {{case.citation.westCite}}
+                            {% else %}
+                                {{case.citation.docketNumber}}
+                            {% endif %}</a></span><br/>
+                            {{ case.court }} | 
+                            {{ case.dateFiled }} | 
+                            {% if case.citation_count != 0 %}
+                                <a href="{{case.get_absolute_url}}cited-by/">
+                                    Cited {{ case.citation_count }} time{{ case.citation_count|pluralize }}
+                                </a>
+                            {% else %}
+                                Cited 0 times 
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+        </div>
+        
+        {# Pagination #}
+        {% if citing_cases.has_previous or citing_cases.has_next %}
+            <div class="box">
+                <div id="pagination-left">
+                    {% if citing_cases.has_previous %}
+                        <h3 class="bottom arrow-left-before">
+                            <a href="?page={{ citing_cases.previous_page_number }}" rel="prev">
+                                Previous
+                            </a>
+                        </h3>
+                    {% else %}
+                        &nbsp;
+                    {% endif %}
+                </div>
+                <div id="pagination-right">
+                    {% if citing_cases.has_next %}
+                        <h3 class="bottom arrow-right-after">
+                            <a href="?page={{ citing_cases.next_page_number }}" rel="next">Next</a>
+                        </h3>
+                    {% else %}
+                        &nbsp;
+                    {% endif %}
+                </div>
+                <div id="pagination-center">
+                    <h3 class="bottom">
+                        Page {{ citing_cases.number }} of {{ citing_cases.paginator.num_pages }}
+                    </h3>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
