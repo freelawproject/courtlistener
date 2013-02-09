@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import datetime
 from urllib import urlencode
 from urlparse import parse_qs
 
@@ -273,12 +274,20 @@ def place_facet_queries(cd):
 
 
 def get_court_start_year(conn, court):
+    '''Get the start year for a court by placing a Solr query. If a court is
+    active, but does not yet have any results, return the current year.'''
     params = {}
     params['fq'] = ['court_exact:%s' % court.courtUUID]
     params['sort'] = 'dateFiled asc'
     params['rows'] = 1
     response = conn.raw_query(**params).execute()
-    return response[0]['dateFiled'].year
+    try:
+        year = response.result.docs[0]['dateFiled'].year
+    except IndexError:
+        # Occurs when there are 0 results for an active court (rare but possible)
+        year = datetime.date.today().year
+
+    return year
 
 
 def build_coverage_query(court, start_year):
@@ -286,8 +295,9 @@ def build_coverage_query(court, start_year):
     params['facet'] = 'true'
     params['facet.range'] = 'dateFiled'
     params['facet.range.end'] = 'NOW/DAY'
-    params['facet.range.gap']= '+1YEAR'
+    params['facet.range.gap'] = '+1YEAR'
     params['rows'] = 0
     params['facet.range.start'] = '%d-01-01T00:00:00Z' % start_year
     params['fq'] = ['court_exact:%s' % court.courtUUID]
+    params['q'] = '*:*'
     return params

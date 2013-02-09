@@ -172,7 +172,7 @@ urlpatterns = patterns('',
     (r'^robots.txt$', robots),
 
     # Coverage
-    (r'^coverage-graph/$', coverage_graph),
+    (r'^coverage/$', coverage_graph),
 )
 
 # redirects
@@ -193,7 +193,7 @@ if settings.DEVELOPMENT:
         {'document_root': settings.INSTALL_ROOT + 'alert/assets/media',
         'show_indexes': True}),
     (r'^500/$', 'django.views.generic.simple.direct_to_template',
-        {'template': '500.html'}),
+        {'template': '500.html', 'private': False}),
     (r'^404/$', 'django.views.generic.simple.direct_to_template',
-        {'template': '404.html'}),
+        {'template': '404.html', 'private': False}),
 )
