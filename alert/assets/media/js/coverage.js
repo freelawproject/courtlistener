@@ -63,5 +63,5 @@ function drawGraph(court_name) {
 $(document).ready(function() {
     addNavigation();
     canvas = Raphael("graph", 710, 400);
-    drawGraph('Supreme Court');
+    drawGraph('All Courts');
 });
