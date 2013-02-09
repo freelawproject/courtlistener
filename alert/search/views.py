@@ -163,32 +163,6 @@ def show_results(request):
                   RequestContext(request))
 
 
-def catch_404_and_search(request):
-    '''If somebody goes to a page that would normally return a 404, it's better
-    to instead redirect them to a search for that term. This increases their
-    odds of finding what they're looking for and also provides a handy
-    shortcut for advanced users.'''
-    messages.add_message(request,
-                         messages.ERROR,
-                         "There's no valid page at this location. Perhaps "
-                         "these search results will help you find what "
-                         "you're looking for&hellip;")
-    full_path = request.get_full_path().strip('/')
-    if '/' in full_path:
-        # Send to proper 404 page.
-        t = loader.get_template('404.html')
-        return HttpResponseNotFound(t.render(
-                     RequestContext(request,
-                                    {'request_path': request.path,
-                                     'private': False})))
-    else:
-        # Place query for the URL
-        mutable_get = request.GET.copy()
-        mutable_get['q'] = full_path
-        request.GET = mutable_get
-        return HttpResponseNotFound(show_results(request))
-
-
 def tools_page(request):
     return render_to_response('tools.html',
                               {'private': False},
