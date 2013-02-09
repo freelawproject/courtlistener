@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}
+    CourtListener.com / Coverage
+{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="/media/css/coverage.css" type="text/css" media="screen, projection" />
+<script src="/media/js/raphael.js"></script>
+<script src="/media/js/g.raphael.js"></script>
+<script src="/media/js/g.line.js"></script>
+<script type="text/javascript">
+  var courts = {{ courts }};
+  var data = {{ coverage_data|safe }};
+</script>
+<script src="/media/js/coverage.js"></script>
+{% endblock %}
+
+{% block content %}
+<div id="nav">
+  <ul>
+  </ul>
+</div>
+<div id="graph"></div>
+</div>
+{% endblock %}

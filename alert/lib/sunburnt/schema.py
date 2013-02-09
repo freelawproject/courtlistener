@@ -637,7 +637,7 @@ class SolrDelete(object):
 
 
 class SolrFacetCounts(object):
-    members = ["facet_dates", "facet_fields", "facet_queries"]
+    members = ["facet_dates", "facet_fields", "facet_queries", "facet_ranges"]
     def __init__(self, **kwargs):
         for member in self.members:
             setattr(self, member, kwargs.get(member, ()))

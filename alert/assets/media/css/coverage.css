@@ -1,0 +1,42 @@
+#nav, #charts {
+    display: inline-block;
+    margin: 5px;
+}
+
+#nav { 
+    width: 175px;
+    float: left;
+}
+
+#nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    background:#666;
+
+}
+
+#nav li {
+    border-bottom: #fff solid;
+    border-top: #fff solid;
+    border-width: 1px;
+}
+
+#nav li:hover {
+    background: #1874CD;
+}
+
+#nav li.selected {
+    background: #1874CD;
+}
+
+#nav a {
+    color: #fff;
+    cursor: pointer;
+    display:block;
+    height:25px;
+    line-height: 25px;
+    text-indent: 8px;                   
+    text-decoration:none;
+    width:100%;
+}
