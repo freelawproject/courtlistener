@@ -52,13 +52,17 @@ def contact(request):
             email_addy = request.user.email
             full_name = request.user.get_full_name()
             form = ContactForm(
-                initial = {'name': full_name, 'email': email_addy})
+                initial={'name': full_name, 'email': email_addy})
         except:
             # for anonymous users, who lack full_names, and emails
             form = ContactForm()
 
-    return render_to_response('contact/contact_form.html', {'form': form}, RequestContext(request))
+    return render_to_response('contact/contact_form.html',
+                              {'form': form, 'private': False},
+                              RequestContext(request))
 
 
 def thanks(request):
-    return render_to_response('contact/contact_thanks.html', {}, RequestContext(request))
+    return render_to_response('contact/contact_thanks.html',
+                              {'private': False},
+                              RequestContext(request))

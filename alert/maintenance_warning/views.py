@@ -24,9 +24,9 @@ class HttpResponseTemporaryUnavailable(HttpResponse):
 @never_cache
 def show_maintenance_warning(request):
     '''Blocks access to a URL, and instead loads a maintenance warning. 
-    
+
     Uses a 503 status code, which preserves SEO. See:
     https://plus.google.com/115984868678744352358/posts/Gas8vjZ5fmB
     '''
     t = loader.get_template('maintenance/maintenance.html')
-    return HttpResponseTemporaryUnavailable(t.render(Context({})))
+    return HttpResponseTemporaryUnavailable(t.render(Context({'private': False})))

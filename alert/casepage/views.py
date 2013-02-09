@@ -96,7 +96,7 @@ def view_case(request, court, pk, casename):
                   {'title': title, 'doc': doc, 'court': ct, 'count': count,
                    'favorite_form': favorite_form, 'search_form': search_form,
                    'get_string': get_string, 'court_facets': court_facets,
-                   'status_facets': status_facets,
+                   'status_facets': status_facets, 'private': doc.blocked,
                    'cited_by_trunc': cited_by_trunc},
                   RequestContext(request))
 
@@ -124,8 +124,17 @@ def view_case_citations(request, pk, casename):
     except EmptyPage:
         citing_cases = paginator.page(paginator.num_pages)
 
+    private = False
+    if doc.blocked:
+        private = True
+    else:
+        for case in citing_cases.object_list:
+            if case.blocked:
+                private = True
+                break
+
     return render_to_response('view_case_citations.html',
-                              {'title': title, 'doc': doc,
+                              {'title': title, 'doc': doc, 'private': private,
                                'citing_cases': citing_cases},
                               RequestContext(request))
 

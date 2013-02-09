@@ -93,7 +93,7 @@ def show_results(request):
                                  stat_facet_fields, search_form, 'status_exact', 'stat_')
             except Exception, e:
                 return render_to_response('search/search.html',
-                                          {'error': True},
+                                          {'error': True, 'private': False},
                                           RequestContext(request))
 
             # Make a copy of request.GET so it is mutable, and we make
@@ -115,7 +115,7 @@ def show_results(request):
             # Invalid form, send it back
             return render_to_response(
                           'search/search.html',
-                          {'error': True},
+                          {'error': True, 'private': False},
                           RequestContext(request))
 
     else:
@@ -134,7 +134,7 @@ def show_results(request):
                              stat_facet_fields, search_form, 'status_exact', 'stat_')
         except Exception, e:
             return render_to_response('search/search.html',
-                                          {'error': True},
+                                          {'error': True, 'private': False},
                                           RequestContext(request))
 
     # Set up pagination
@@ -152,14 +152,14 @@ def show_results(request):
     except:
         # Catches any Solr errors, and simply aborts.
         return render_to_response('search/search.html',
-                                      {'error': True},
+                                      {'error': True, 'private': False},
                                       RequestContext(request))
     return render_to_response(
                   'search/search.html',
                   {'search_form': search_form, 'alert_form': alert_form,
                    'results': paged_results, 'court_facets': court_facets,
                    'status_facets': status_facets, 'get_string': get_string,
-                   'count': count},
+                   'count': count, 'private': False},
                   RequestContext(request))
 
 
@@ -177,7 +177,10 @@ def catch_404_and_search(request):
     if '/' in full_path:
         # Send to proper 404 page.
         t = loader.get_template('404.html')
-        return HttpResponseNotFound(t.render(RequestContext(request, {'request_path': request.path})))
+        return HttpResponseNotFound(t.render(
+                     RequestContext(request,
+                                    {'request_path': request.path,
+                                     'private': False})))
     else:
         # Place query for the URL
         mutable_get = request.GET.copy()
@@ -187,8 +190,12 @@ def catch_404_and_search(request):
 
 
 def tools_page(request):
-    return render_to_response('tools.html', {}, RequestContext(request))
+    return render_to_response('tools.html',
+                              {'private': False},
+                              RequestContext(request))
 
 
 def browser_warning(request):
-    return render_to_response('browser_warning.html', {}, RequestContext(request))
+    return render_to_response('browser_warning.html',
+                              {'private': False},
+                              RequestContext(request))

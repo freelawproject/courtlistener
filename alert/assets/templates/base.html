@@ -20,6 +20,16 @@
         <link rel="stylesheet" href="/media/css/style.css" type="text/css" media="screen, projection">
         <link rel="stylesheet" href="/media/css/override.css" type="text/css" media="screen, projection">
         <script src="/media/js/modernizr-2.0.6.min.js"></script>
+        {% block privacy %}
+            {% if private %}
+                <meta name="robots" content="noindex, noodp, noarchive, noimageindex" />
+            {% else %}
+                {% if private == None %}
+                    <!-- This bit of invalid HTML is to give you a loud warning. -->
+                    <h1>You did not supply the "private" variable to your template.</h1>
+                {% endif %}
+            {% endif %}
+        {% endblock %}
         <title>{% block title %}CourtListener.com{% endblock %}</title>
         {% block head %}{% endblock %}
     </head>
@@ -151,7 +161,7 @@
             </script><noscript><p><img src="http://piwik.courtlistener.com/piwik.php?idsite=1" style="border:0" alt=""/></p></noscript>
             <!-- End Piwik Tag -->
         {% endif %}
-        <!--[if lt IE 7 ]>
+        <!--[if lt IE 8 ]>
 		    <script src="//ajax.googleapis.com/ajax/libs/chrome-frame/1.0.3/CFInstall.min.js"></script>
 		    <script>window.attachEvent('onload',function(){CFInstall.check({mode:'inline', url:'/bad-browser/', cssText: 'width: 100%; height: 200px;' })})</script>
 	    <![endif]-->
