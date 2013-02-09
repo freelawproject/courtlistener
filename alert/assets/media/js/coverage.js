@@ -2,7 +2,7 @@ var graph_options = {
     gutter: 20,
     symbol: "circle",
     nostroke: false,
-    smooth: false,
+    smooth: true,
     shade: false,
     dash: "",
     axis: "0 0 1 1",
@@ -42,7 +42,7 @@ function drawGraph(court_name) {
       x.push(parseInt(value));
     });
 
-    var chart = canvas.linechart(40, 20, 700, 350, x, [y], graph_options).hover(function () {
+    var chart = canvas.linechart(40, 20, 650, 350, x, [y], graph_options).hover(function () {
 	var color = this.symbol.attr("fill");
 	var label = this.axis + ": " + this.value;
         this.popup = canvas.popup(this.x, this.y, label).insertBefore(this).attr([{stroke: color, fill: "#fff"}, { fill: "#000" }]);
@@ -56,12 +56,12 @@ function drawGraph(court_name) {
     canvas.text(385, 385, court_name).attr(label_attrs);
 
     // Y axis label
-    var y_label = canvas.text(15, 200, "Number of documents").attr(label_attrs);
+    var y_label = canvas.text(15, 200, "Number of opinions").attr(label_attrs);
     y_label.transform('r-90');
 }
 
 $(document).ready(function() {
     addNavigation();
-    canvas = Raphael("graph", 760, 400);
+    canvas = Raphael("graph", 710, 400);
     drawGraph('Supreme Court');
 });
