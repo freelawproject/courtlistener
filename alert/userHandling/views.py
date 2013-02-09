@@ -44,14 +44,14 @@ def redirect_to_settings(request):
 @login_required
 @never_cache
 def view_alerts(request):
-    return render_to_response('profile/alerts.html', {},
+    return render_to_response('profile/alerts.html', {'private': False},
         RequestContext(request))
 
 
 @login_required
 @never_cache
 def view_favorites(request):
-    return render_to_response('profile/favorites.html', {},
+    return render_to_response('profile/favorites.html', {'private': False},
         RequestContext(request))
 
 
@@ -119,8 +119,10 @@ http://courtlistener.com/contact/." % (
 
         return HttpResponseRedirect('/profile/settings/')
     return render_to_response('profile/settings.html',
-        {'profileForm': profileForm, 'userForm': userForm},
-        RequestContext(request))
+                              {'profileForm': profileForm,
+                               'userForm': userForm,
+                               'private': False},
+                              RequestContext(request))
 
 
 @login_required
@@ -147,13 +149,15 @@ def deleteProfile(request):
         request.user.delete()
         return HttpResponseRedirect('/profile/delete/done/')
 
-    return render_to_response('profile/delete.html', {},
-        RequestContext(request))
+    return render_to_response('profile/delete.html',
+                              {'private': False},
+                              RequestContext(request))
 
 
 def deleteProfileDone(request):
-    return render_to_response('profile/deleted.html', {},
-        RequestContext(request))
+    return render_to_response('profile/deleted.html',
+                              {'private': False},
+                              RequestContext(request))
 
 
 @check_honeypot(field_name='skip_me_if_alive')
@@ -241,8 +245,9 @@ http://courtlistener.com/contact/." % (
                     + redirect_to)
         else:
             form = UserCreationFormExtended()
-        return render_to_response("profile/register.html", {'form': form},
-            RequestContext(request))
+        return render_to_response("profile/register.html",
+                                  {'form': form, 'private': False},
+                                  RequestContext(request))
     else:
         # the user is already logged in, direct them to their settings page as
         # a logical fallback
@@ -255,7 +260,8 @@ def registerSuccess(request):
     their status, and redirect them.'''
     redirect_to = request.REQUEST.get('next', '')
     return render_to_response('registration/registration_complete.html',
-        {'redirect_to': redirect_to}, RequestContext(request))
+                              {'redirect_to': redirect_to, 'private': False},
+                              RequestContext(request))
 
 
 @never_cache
@@ -271,17 +277,21 @@ def confirmEmail(request, activationKey):
         if user_profile.emailConfirmed:
             # their email is already confirmed.
             return render_to_response('registration/confirm.html',
-                {'alreadyConfirmed': True}, RequestContext(request))
+                                      {'alreadyConfirmed': True, 'private': False},
+                                      RequestContext(request))
     except:
         return render_to_response('registration/confirm.html',
-            {'invalid': True}, RequestContext(request))
+                                  {'invalid': True, 'private': False},
+                                  RequestContext(request))
     if user_profile.key_expires < datetime.datetime.today():
         return render_to_response('registration/confirm.html',
-            {'expired': True}, RequestContext(request))
+                                  {'expired': True, 'private': False},
+                                  RequestContext(request))
     user_profile.emailConfirmed = True
     user_profile.save()
-    return render_to_response('registration/confirm.html', {'success': True},
-        RequestContext(request))
+    return render_to_response('registration/confirm.html',
+                              {'success': True, 'private': False},
+                              RequestContext(request))
 
 
 @login_required
@@ -292,9 +302,9 @@ def requestEmailConfirmation(request):
     up = user.get_profile()
     if up.emailConfirmed:
         # their email is already confirmed.
-        return render_to_response(
-            'registration/request_email_confirmation.html',
-            {'alreadyConfirmed': True}, RequestContext(request))
+        return render_to_response('registration/request_email_confirmation.html',
+                                  {'alreadyConfirmed': True, 'private': False},
+                                  RequestContext(request))
     else:
         # we look up the user in the user table. If we find them, we send
         # an email, and associate the new confirmation link with that
@@ -328,16 +338,16 @@ http://courtlistener.com/contact/." % (
                   'no-reply@courtlistener.com',
                   [user.email])
 
-        return render_to_response(
-            'registration/request_email_confirmation.html', {},
-            RequestContext(request))
+        return render_to_response('registration/request_email_confirmation.html',
+                                  {'private': False},
+                                  RequestContext(request))
 
 
 @never_cache
 def emailConfirmSuccess(request):
-    return render_to_response(
-        'registration/request_email_confirmation_success.html',
-        {}, RequestContext(request))
+    return render_to_response('registration/request_email_confirmation_success.html',
+                              {'private': False},
+                              RequestContext(request))
 
 
 @login_required
@@ -352,5 +362,6 @@ def password_change(request):
             return HttpResponseRedirect('/profile/password/change/')
     else:
         form = PasswordChangeForm(user=request.user)
-    return render_to_response('profile/password_form.html', {'form': form},
-        RequestContext(request))
+    return render_to_response('profile/password_form.html',
+                              {'form': form, 'private': False},
+                              RequestContext(request))

@@ -83,7 +83,8 @@ def edit_favorite(request, fave_id):
         form = FavoriteForm(instance=fave)
 
     return render_to_response('profile/edit_favorite.html',
-                              {'favorite_form': form, 'doc' : doc},
+                              {'favorite_form': form, 'doc' : doc,
+                               'private': False},
                               RequestContext(request))
 
 

@@ -103,8 +103,8 @@ urlpatterns = patterns('',
     (r'^contact/thanks/$', thanks),
 
     # Various sign in/out etc. functions as provided by django
-    url(r'^sign-in/$', signIn, name="sign-in"),
-    (r'^sign-out/$', signOut),
+    url(r'^sign-in/$', signIn, {'extra_context': {'private': False}}, name="sign-in"),
+    (r'^sign-out/$', signOut, {'extra_context': {'private': False}}),
 
     # Settings pages
     (r'^profile/$', redirect_to_settings),
@@ -128,17 +128,19 @@ urlpatterns = patterns('',
     (r'^email-confirmation/success/$', emailConfirmSuccess),
 
     # Reset password pages
-    (r'^reset-password/$', password_reset),
-    (r'^reset-password/instructions-sent/$', password_reset_done),
+    (r'^reset-password/$', password_reset, {'extra_context': {'private': False}}),
+    (r'^reset-password/instructions-sent/$', password_reset_done, {'extra_context': {'private': False}}),
     (r'^confirm-password/(?P<uidb36>.*)/(?P<token>.*)/$',
             password_reset_confirm,
-            {'post_reset_redirect': '/reset-password/complete/'}),
+            {'post_reset_redirect': '/reset-password/complete/',
+             'extra_context': {'private': False}}),
     (r'^reset-password/complete/$',
             signIn,
-            {'template_name': 'registration/password_reset_complete.html'}),
+            {'template_name': 'registration/password_reset_complete.html',
+             'extra_context': {'private': False}}),
 
     # Search pages
-    (r'^$', show_results), # the home page
+    (r'^$', show_results), # the home page!
 
     # Alert pages
     (r'^alert/edit/(\d{1,6})/$', edit_alert),

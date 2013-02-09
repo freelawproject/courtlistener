@@ -38,13 +38,15 @@ def dump_index(request):
         dump_size = size(os.path.getsize(os.path.join(DUMP_DIR, 'all.xml.gz')))
     except os.error:
         # Happens when the file is unaccessible or doesn't exist. An estimate.
-        dump_size = '2.8GB'
+        dump_size = '3.2GB'
     return render_to_response('dumps/dumps.html',
                               {'courts' : courts,
-                               'dump_size': dump_size},
+                               'dump_size': dump_size,
+                               'private': False},
                               RequestContext(request))
 
 def serve_or_gen_dump(request, court, year=None, month=None, day=None):
+    '''Serves the dump file to the user, generating it if needed.'''
     if year is None:
         if court != 'all':
             # Sanity check
