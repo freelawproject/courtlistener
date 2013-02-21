@@ -1,20 +1,3 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-# 
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-
 import sys
 
 from alert.lib import sunburnt
@@ -70,13 +53,8 @@ class Command(BaseCommand):
             dest='document',
             default=False,
             help='Take action on a list of documents using a single Celery task'),
-        make_option('--debug',
-            action='store_true',
-            dest='debug',
-            default=False,
-            help='Run the command, but take no action. Be verbose.'),
         )
-    args = "(--update | --delete) (--everything | --datetime 'YYYY-MM-DD [HH:MM:SS]' | --document <doc_id> <doc_id>) [--optimize] [--debug]"
+    args = "(--update | --delete) (--everything | --datetime 'YYYY-MM-DD [HH:MM:SS]' | --document <doc_id> <doc_id>) [--optimize]"
     help = 'Adds, updates or removes documents in the index.'
 
     def _chunk_queryset_into_tasks(self, docs, count, chunksize=1000):

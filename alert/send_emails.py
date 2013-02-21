@@ -61,7 +61,7 @@ def send_alert(userProfile, hits, verbose, simulate):
             msg = EmailMultiAlternatives(EMAIL_SUBJECT, email_text,
                 EMAIL_SENDER, [userProfile.user.email])
             msg.attach_alternative(html_text, "text/html")
-            msg.send(fail_silently=False)  # send a multi-part email
+            msg.send(fail_silently=False)
 
 
 def get_cut_off_date(rate):

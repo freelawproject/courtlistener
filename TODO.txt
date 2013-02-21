@@ -8,6 +8,5 @@ BUGS:
  
 To do:
  - check out the outliars in the DB by date
- - recreate the stat_maker.py script (see bug)
  - Check the dates/courts in Brian's list of citation-less docs, and see if we
    missed any docs.

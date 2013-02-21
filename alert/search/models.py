@@ -95,7 +95,7 @@ def invalidate_dumps_by_date_and_court(date, court):
 class Court(models.Model):
     '''A class to represent some information about each court, can be extended
     as needed.'''
-    courtUUID = models.CharField("a unique ID for each court as used in URLs",
+    courtUUID = models.CharField('a unique ID for each court as used in URLs',
                                  max_length=6,
                                  primary_key=True)
     in_use = models.BooleanField('this court is in use in CourtListener',
@@ -104,7 +104,7 @@ class Court(models.Model):
                                  null=True,
                                  db_index=True,
                                  unique=True)
-    citation_string = models.CharField("the citation abbreviation for the court",
+    citation_string = models.CharField('the citation abbreviation for the court',
                                   max_length=100,
                                   blank=True)
     short_name = models.CharField('the short name of the court',
@@ -113,7 +113,7 @@ class Court(models.Model):
     full_name = models.CharField('the full name of the court',
                                  max_length='200',
                                  blank=False)
-    URL = models.URLField("the homepage for each court")
+    URL = models.URLField('the homepage for each court')
     start_date = models.DateField("the date the court was established",
                                   blank=True,
                                   null=True)
