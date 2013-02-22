@@ -62,7 +62,7 @@ class ErrorLog(models.Model):
                                editable=False)
 
     def __unicode__(self):
-        return "%s - %s@%s %s" % (self.time_retrieved,
+        return "%s - %s@%s %s" % (self.log_time,
                                     self.log_level,
                                     self.court.courtUUID,
                                     self.message)
