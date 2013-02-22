@@ -23,7 +23,7 @@ setup_environ(settings)
 
 from alert.lib import magic
 from alert.lib.string_utils import trunc
-from alert.scrapers.models import urlToHash
+from alert.scrapers.models import urlToHash, ErrorLog
 from alert.search.models import Citation
 from alert.search.models import Court
 from alert.search.models import Document
@@ -78,6 +78,11 @@ def scrape_court(court, full_crawl=False):
     download_error = False
     site = court.Site().parse()
 
+    # Get the court object early for logging
+    # opinions.united_states.federal.ca9_u --> ca9
+    court_str = site.court_id.split('.')[-1].split('_')[0]
+    court = Court.objects.get(courtUUID=court_str)
+
     if not full_crawl:
         changed, url2Hash = court_changed(site.url, site.hash)
         if not changed:
@@ -95,12 +100,16 @@ def scrape_court(court, full_crawl=False):
             data = urllib2.urlopen(download_url).read()
             # test for empty files (thank you CA1)
             if len(data) == 0:
-                logger.warn('EmptyFileError: %s' % download_url)
-                logger.warn(traceback.format_exc())
+                msg = 'EmptyFileError: %s\n%s' % (download_url,
+                                                  traceback.format_exc())
+                logger.warn(msg)
+                ErrorLog(log_level='WARNING', court=court, message=msg).save()
                 continue
         except:
-            logger.warn('DownloadingError: %s' % download_url)
-            logger.warn(traceback.format_exc())
+            msg = 'DownloadingError: %s\n%s' % (download_url,
+                                                traceback.format_exc())
+            logger.warn(msg)
+            ErrorLog(log_level='WARNING', court=court, message=msg).save()
             continue
 
         # Make a hash of the file
@@ -131,8 +140,7 @@ def scrape_court(court, full_crawl=False):
                     url2Hash.save()
                     return
                 elif dup_count >= 5:
-                    logger.info('Found five duplicates in a row. Court is up to '
-                                'date.')
+                    logger.info('Found five duplicates in a row. Court is up to date.')
                     url2Hash.SHA1 = site.hash
                     url2Hash.save()
                     return
@@ -147,10 +155,6 @@ def scrape_court(court, full_crawl=False):
             # Not a duplicate; proceed...
             logger.info('Adding new document found at: %s' % download_url)
             dup_count = 0
-
-            # opinions.united_states.federal.ca9_u --> ca9 
-            court_str = site.court_id.split('.')[-1].split('_')[0]
-            court = Court.objects.get(courtUUID=court_str)
 
             # Make a citation
             cite = Citation(case_name=site.case_names[i])
@@ -176,9 +180,10 @@ def scrape_court(court, full_crawl=False):
                 file_name = trunc(site.case_names[i].lower(), 80) + extension
                 doc.local_path.save(file_name, cf, save=False)
             except:
-                logger.critical('Unable to save binary to disk. Deleted document: %s.'
-                                % cite.case_name)
-                logger.critical(traceback.format_exc())
+                msg = 'Unable to save binary to disk. Deleted document: %s.\n%s' % \
+                        (cite.case_name, traceback.format_exc())
+                logger.critical(msg)
+                ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
                 download_error = True
                 continue
 
@@ -263,10 +268,16 @@ def main():
             try:
                 scrape_court(mod, full_crawl)
             except:
-                logger.critical('********!! CRAWLER DOWN !!***********')
-                logger.critical('*****scrape_court method failed!*****')
-                logger.critical('********!! ACTION NEEDED !!**********')
-                logger.critical(traceback.format_exc())
+                msg = ('********!! CRAWLER DOWN !!***********\n'
+                       '*****scrape_court method failed!*****\n'
+                       '********!! ACTION NEEDED !!**********\n%s') % \
+                       traceback.format_exc()
+                logger.critical(msg)
+
+                # opinions.united_states.federal.ca9_u --> ca9
+                court_str = mod.court_id.split('.')[-1].split('_')[0]
+                court = Court.objects.get(courtUUID=court_str)
+                ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
                 i += 1
                 continue
 
