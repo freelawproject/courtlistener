@@ -57,8 +57,7 @@ class ErrorLog(models.Model):
                                  editable=False)
     court = models.ForeignKey(Court,
                                verbose_name='the court where the document was filed')
-    message = models.CharField('the message produced in the log',
-                               max_length=400,
+    message = models.TextField('the message produced in the log',
                                blank=True,
                                editable=False)
 
