@@ -7,8 +7,7 @@
                  font-weight: inherit; 
                  line-height: 1.5; 
                  font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif; 
-                 color: #222; 
-                 border: 1px solid gray; 
+                 color: #222;
                  vertical-align: baseline; 
                  font-style: inherit; 
                  background: #fff; 
@@ -47,25 +46,37 @@
                    margin: 10px;
                    padding: 0;">Result Counts</h2>
         <table style="text-align: center;">
-            <tr>
-                <th>Court</th>
-                <th>30 day count</th>
-                <th>7 day count</th>
-                <th>Today's count</th>
-            </tr>
-            {% for court, values in averages.items %}
+            <thead>
                 <tr>
-                    <td><p>{{ court }}</p></td>        
-                    <td><p>{{ values.0 }}</p></td>                        
-                    <td><p>{{ values.1 }}</p></td>
-                    <td><p>{{ values.2 }}</p></td>
+                    <th>Court</th>
+                    <th>30 day count</th>
+                    <th>7 day count</th>
+                    <th>Today's count</th>
                 </tr>
-            {% endfor %}
-            <tr>
-                {% for total in totals %}
-                    <td>{{ total }} </td>
+            </thead>
+            <tbody>
+                {% for court, values in averages.items %}
+                    <tr>
+                        <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;"><p>{{ court }}</p></td>        
+                        <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;"><p>{{ values.0 }}</p></td>                        
+                        <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;"><p>{{ values.1 }}</p></td>
+                        <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;"><p>{{ values.2 }}</p></td>
+                    </tr>
                 {% endfor %}
-            </tr>
+                <tr>
+                    {% for total in totals %}
+                        <td>{{ total }} </td>
+                    {% endfor %}
+                </tr>
+            </tbody>
         </table>
         
         <h2 style="font-size: 1.5em; 
@@ -78,18 +89,28 @@
                    margin: 10px;
                    padding: 0;">Error Counts</h2>
         <table style="text-align: center;">
-            <tr>
-                <th>Court</th>
-                <th>Critical count</th>
-                <th>Warning count</th>
-            </tr>
-            {% for court, values in errors.items %}
+            <thead>
                 <tr>
-                    <td><p>{{ court }}</p></td>        
-                    <td><p>{{ values.0 }}</p></td>                        
-                    <td><p>{{ values.1 }}</p></td>
+                    <th>Court</th>
+                    <th>Critical count</th>
+                    <th>Warning count</th>
                 </tr>
-            {% endfor %}
+            </thead>
+            <tbody>
+                {% for court, values in errors.items %}
+                    <tr>
+                        <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;"><p>{{ court }}</p></td>        
+                        <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;"><p>{{ values.0 }}</p></td>                        
+                        <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;"><p>{{ values.1 }}</p></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
         </table>
     </body>
 </html>
