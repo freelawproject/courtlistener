@@ -41,16 +41,16 @@ class Command(BaseCommand):
             result_dict[item['pk']] = item['count']
         return result_dict
 
-    def _calculate_averages(self):
+    def _calculate_counts(self):
         '''Grab the information for new documents over the past 30 days, and
-        calculate the average number of cases found for each court.
+        calculate the number of cases found for each court.
 
         Returns a dict like so:
         {'ca1':['40','42', '39'], 'ca2': ['23', '23', '0'], 'ca3':...}
 
         Note that the values in the list are:
-         0: The average for the past 30 days.
-         1: The average for the past 7 days.
+         0: The count for the past 30 days.
+         1: The count for the past 7 days.
          2: The count for today
         '''
         last_day = date.today() - timedelta(days=1)
@@ -80,8 +80,8 @@ class Command(BaseCommand):
         cts_seven_days = self._make_query_dict(cts_seven_days)
         cts_thirty_days = self._make_query_dict(cts_thirty_days)
 
-        # Combine everything and make it into pretty results.
-        averages = {}
+        # Combine everything
+        counts = {}
         totals = ['TOTAL', 0, 0, 0]
         for court in all_active_courts:
             thirty = cts_thirty_days.get(court['pk'], 0)
@@ -90,11 +90,7 @@ class Command(BaseCommand):
             totals[1] += thirty
             totals[2] += seven
             totals[3] += last
-            averages[court['pk']] = [thirty, seven, last]
-
-        # Stringify the values...
-        for i in range(1, 4):
-            totals[i] = '%.2f' % totals[i]
+            counts[court['pk']] = [thirty, seven, last]
 
         # Determine if any court has zero results for the past seven days, but
         # not for the past 30. That's usually a critical problem.
@@ -106,12 +102,10 @@ class Command(BaseCommand):
                 critical_counts = True
                 break
 
-        return averages, totals, critical_counts
+        return counts, totals, critical_counts
 
-    def generate_report(self):
-        '''Look at the errors for the day, generate and return a report.
-
-        '''
+    def _tally_errors(self):
+        '''Look at the error db and gather the latest errors from it'''
         yesterday = date.today() - timedelta(days=1)
         cts_critical = Court.objects\
                             .filter(errorlog__log_time__gt=yesterday,
@@ -137,22 +131,29 @@ class Command(BaseCommand):
             warning_count = cts_warnings.get(court['pk'], 0)
             errors[court['pk']] = [critical_count, warning_count]
 
-        averages, totals, critical_counts = self._calculate_averages()
+        return errors, bool(cts_critical)
+
+    def generate_report(self):
+        '''Look at the counts and errors, generate and return a report.
+
+        '''
+        averages, totals, critical_counts = self._calculate_counts()
+        errors, cts_critical = self._tally_errors()
 
         # Make the report!
         html_template = loader.get_template('scrapers/report.html')
         c = Context({'averages': averages, 'totals': totals, 'errors': errors})
         report = html_template.render(c)
 
-        # Sort out if the subject is critical, and add a date to it
+        # Sort out if the subject is critical and add a date to it
         subject = 'CourtListener status email for %s' % \
                                     date.strftime(date.today(), '%Y-%m-%d')
         if critical_counts or cts_critical:
-            subject = '*CRITICAL* - ' + subject
+            subject = 'CRITICAL - ' + subject
 
         return report, subject
 
-    def send_report(self, report, subject, debug=False):
+    def send_report(self, report, subject, debug=True):
         '''Send the report to the admins'''
         if debug:
             BACKEND = 'django.core.mail.backends.console.EmailBackend'
