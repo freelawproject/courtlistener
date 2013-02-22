@@ -40,6 +40,8 @@ class urlToHash(models.Model):
 
     class Meta:
         db_table = "urlToHash"
+        verbose_name = "URL Hash"
+        verbose_name_plural = "URL Hashes"
 
 
 class ErrorLog(models.Model):
