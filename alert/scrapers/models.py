@@ -53,7 +53,7 @@ class ErrorLog(models.Model):
                                           editable=False,
                                           null=True)
     log_level = models.CharField('the loglevel of the error encountered',
-                                 max_length=6,
+                                 max_length=15,
                                  editable=False)
     court = models.ForeignKey(Court,
                                verbose_name='the court where the document was filed')
