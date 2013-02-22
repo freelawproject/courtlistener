@@ -74,9 +74,9 @@ def court_changed(url, hash):
         return True, url2Hash
 
 
-def scrape_court(court, full_crawl=False):
+def scrape_court(court_module, full_crawl=False):
     download_error = False
-    site = court.Site().parse()
+    site = court_module.Site().parse()
 
     # Get the court object early for logging
     # opinions.united_states.federal.ca9_u --> ca9
@@ -275,7 +275,7 @@ def main():
                 logger.critical(msg)
 
                 # opinions.united_states.federal.ca9_u --> ca9
-                court_str = mod.court_id.split('.')[-1].split('_')[0]
+                court_str = mod.Site.__module__.split('.')[-1].split('_')[0]
                 court = Court.objects.get(courtUUID=court_str)
                 ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
                 i += 1
