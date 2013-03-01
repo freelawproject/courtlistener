@@ -55,7 +55,7 @@ admin.autodiscover()
 
 # creates a list of the first element of the choices variable for the courts field
 pacer_codes = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
-mime_types = ('pdf', 'wpd', 'txt', 'doc')
+mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html')
 
 urlpatterns = patterns('',
     # Admin docs and site
