@@ -182,7 +182,11 @@ def extract_doc_content(pk, callback=None):
                'on doc: %s****' % (extension, doc))
         return 2
 
-    doc.documentPlainText, blocked = anonymize(content)
+    if extension in ['html', 'wpd']:
+        doc.documentHTML, blocked = anonymize(content)
+    else:
+        doc.documentPlainText, blocked = anonymize(content)
+
     if blocked:
         doc.blocked = True
         doc.date_blocked = date.today()
