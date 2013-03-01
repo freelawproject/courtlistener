@@ -15,7 +15,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
-from alert.scrapers.back_scrape import court_str
 sys.path.append('/var/www/court-listener/alert')
 
 import settings
