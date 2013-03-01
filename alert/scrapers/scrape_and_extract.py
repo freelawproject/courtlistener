@@ -1,19 +1,3 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 import sys
 sys.path.append('/var/www/court-listener/alert')
 
@@ -74,10 +58,8 @@ def court_changed(url, hash):
         return True, url2Hash
 
 
-def scrape_court(court_module, full_crawl=False):
+def scrape_court(site, full_crawl=False):
     download_error = False
-    site = court_module.Site().parse()
-
     # Get the court object early for logging
     # opinions.united_states.federal.ca9_u --> ca9
     court_str = site.court_id.split('.')[-1].split('_')[0]
@@ -136,7 +118,7 @@ def scrape_court(court_module, full_crawl=False):
                 if already_scraped_next_date:
                     if court_str != 'mich':
                         # Michigan sometimes has multiple occurrences of the
-                        # same case on a page.
+                        # same case with different dates on a page.
                         logger.info('Next case occurs prior to when we found a '
                                     'duplicate. Court is up to date.')
                         url2Hash.SHA1 = site.hash
@@ -232,7 +214,8 @@ def main():
                             '"juriscraper.opinions.united_states.federal.ca1" or '
                             'simply "opinions" to do all opinions.'))
     parser.add_option('-f', '--fullcrawl', dest='full_crawl',
-                      action='store_true')
+                      action='store_true',
+                      help="Disable duplicate aborting.")
     (options, args) = parser.parse_args()
 
     daemon_mode = options.daemonmode
@@ -269,7 +252,8 @@ def main():
                              [module])
 
             try:
-                scrape_court(mod, full_crawl)
+                site = mod.Site().parse()
+                scrape_court(site, full_crawl)
             except:
                 msg = ('********!! CRAWLER DOWN !!***********\n'
                        '*****scrape_court method failed!*****\n'
