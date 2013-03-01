@@ -87,6 +87,7 @@ def extract_from_html(path):
     try:
         content = open(path).read()
         content = get_clean_body_content(content)
+        err = False
     except:
         content = ''
         err = True
