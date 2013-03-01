@@ -299,7 +299,8 @@ a:link, a:visited {
 a:visited.visitable {
     color: #9d11b3;	
 }
-a:focus, a:hover {
+/* Special case for Oregon, which has a name attr with a value of TOP. */
+a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
     color: #000099;
     text-decoration: underline;
 }
