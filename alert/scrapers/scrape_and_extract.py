@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
+from alert.scrapers.back_scrape import court_str
 sys.path.append('/var/www/court-listener/alert')
 
 import settings
@@ -134,11 +135,14 @@ def scrape_court(court_module, full_crawl=False):
                 except IndexError:
                     already_scraped_next_date = True
                 if already_scraped_next_date:
-                    logger.info('Next case occurs prior to when we found a '
-                                'duplicate. Court is up to date.')
-                    url2Hash.SHA1 = site.hash
-                    url2Hash.save()
-                    return
+                    if court_str != 'mich':
+                        # Michigan sometimes has multiple occurrences of the
+                        # same case on a page.
+                        logger.info('Next case occurs prior to when we found a '
+                                    'duplicate. Court is up to date.')
+                        url2Hash.SHA1 = site.hash
+                        url2Hash.save()
+                        return
                 elif dup_count >= 5:
                     logger.info('Found five duplicates in a row. Court is up to date.')
                     url2Hash.SHA1 = site.hash
