@@ -160,12 +160,17 @@ def scrape_court(site, full_crawl=False):
             try:
                 cf = ContentFile(data)
                 mime = magic.from_buffer(data, mime=True)
+                if mime == None:
+                    # Workaround for issue with libmagic1==5.09-2 in Ubuntu 12.04. Fixed in libmagic 5.11-2.
+                    file_str = magic.from_buffer(data)
+                    if file_str.starts_with('Composite Document File V2 Document'):
+                        mime = 'application/msword'
                 extension = mimetypes.guess_extension(mime)
                 # See issue #215 for why this must be lower-cased.
                 file_name = trunc(site.case_names[i].lower(), 80) + extension
                 doc.local_path.save(file_name, cf, save=False)
             except:
-                msg = 'Unable to save binary to disk. Deleted document: %s.\n%s' % \
+                msg = 'Unable to save binary to disk. Deleted document: % s.\n % s' % \
                         (cite.case_name, traceback.format_exc())
                 logger.critical(msg)
                 ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
