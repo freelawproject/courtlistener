@@ -40,8 +40,13 @@ DOCUMENT_STATUSES = (
     ('Published', 'Precedential'),
     ('Unpublished', 'Non-Precedential'),
     ('Errata', 'Errata'),
+    ('Memorandum Decision', 'Memorandum Decision'),
+    ('Per Curiam Opinion', 'Per Curiam Opinion'),
+    ('Separate', 'Separate Opinion'),
+    ('Signed Opinion', 'Signed Opinion'),
     ('In-chambers', 'In-chambers'),
     ('Relating-to', 'Relating-to orders'),
+    ('Unknown', 'Unknown Status'),
 )
 
 DOCUMENT_SOURCES = (
