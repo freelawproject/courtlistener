@@ -163,7 +163,7 @@ def scrape_court(site, full_crawl=False):
                 if mime == None:
                     # Workaround for issue with libmagic1==5.09-2 in Ubuntu 12.04. Fixed in libmagic 5.11-2.
                     file_str = magic.from_buffer(data)
-                    if file_str.starts_with('Composite Document File V2 Document'):
+                    if file_str.startswith('Composite Document File V2 Document'):
                         mime = 'application/msword'
                 extension = mimetypes.guess_extension(mime)
                 # See issue #215 for why this must be lower-cased.
