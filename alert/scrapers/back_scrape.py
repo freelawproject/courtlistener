@@ -37,7 +37,7 @@ def generate_sites(court_module):
                 continue
 
     elif court_str == 'mich':
-        for i in range(0, 21711):
+        for i in range(0, 868):
             try:
                 site = court_module.Site()
                 site._download_backwards(i)
