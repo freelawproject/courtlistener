@@ -166,6 +166,9 @@ def scrape_court(site, full_crawl=False):
                     if file_str.startswith('Composite Document File V2 Document'):
                         mime = 'application/msword'
                 extension = mimetypes.guess_extension(mime)
+                if extension == '.obj':
+                    # It's actually a wpd
+                    extension = '.wpd'
                 # See issue #215 for why this must be lower-cased.
                 file_name = trunc(site.case_names[i].lower(), 80) + extension
                 doc.local_path.save(file_name, cf, save=False)
