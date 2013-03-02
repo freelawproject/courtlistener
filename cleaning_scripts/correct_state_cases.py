@@ -36,7 +36,7 @@ def fixer(simulate=False, verbose=False):
                     doc.citation.case_name = doc.citation.case_name.replace('P. v.', 'People v.')
                 else:
                     doc.citation.case_name = doc.citation.case_name.replace('v. P.', 'v. People')
-                doc.save()
+                doc.citation.save()
 
     def fix_michigan(docs, left, simulate, verbose):
         for doc in docs:
@@ -51,7 +51,7 @@ def fixer(simulate=False, verbose=False):
             if not simulate:
                 if left:
                     doc.citation.case_name = doc.citation.case_name.replace('People of Mi', 'People of Michigan')
-                doc.save()
+                doc.citation.save()
 
     def fix_wva(docs, simulate, verbose):
         for doc in docs:
@@ -68,15 +68,10 @@ def fixer(simulate=False, verbose=False):
     docs = queryset_generator(Document.objects.filter(source="C", court=court, citation__case_name__contains=('P. v.')))
     fix_plaintiffs(docs, True, simulate, verbose)
 
-    # Round two! Fix appellants.
-    print "!!! ROUND TWO !!!"
-    docs = queryset_generator(Document.objects.filter(source="C", court=court, citation__case_name__contains=('v. P.')))
-    fix_plaintiffs(docs, False, simulate, verbose)
-
     # Round three! Fix the Mi cases.
     print "!!! ROUND THREE !!!"
     court = Court.objects.get(courtUUID='mich')
-    docs = queryset_generator(Document.objects.filter(source="C", court=court, citation__case_name__contains=('People of Mi%')))
+    docs = queryset_generator(Document.objects.filter(source="C", court=court, citation__case_name__startswith=('People of Mi ')))
     fix_michigan(docs, True, simulate, verbose)
 
     # Round four! Fix the statuses.
