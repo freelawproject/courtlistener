@@ -44,17 +44,14 @@ def fixer(simulate=False, verbose=False):
                 print "Fixing document number %s: %s" % (doc.pk, doc)
                 old_case_name = doc.citation.case_name
                 if left:
-                    new_case_name = old_case_name.replace('Mi ', 'Michigan ')
-                else:
-                    new_case_name = old_case_name.replace(' Mi', ' Michigan')
+                    new_case_name = old_case_name.replace('People of Mi', 'People of Michigan')
                 print "    Replacing %s" % old_case_name
                 print "         with %s" % new_case_name
 
             if not simulate:
                 if left:
-                    doc.citation.case_name = doc.citation.case_name.replace('Mi ', 'Michigan ')
-                else:
-                    doc.citation.case_name = doc.citation.case_name.replace(' Mi', ' Michigan')
+                    doc.citation.case_name = doc.citation.case_name.replace('People of Mi', 'People of Michigan')
+                doc.save()
 
     def fix_wva(docs, simulate, verbose):
         for doc in docs:
@@ -66,24 +63,24 @@ def fixer(simulate=False, verbose=False):
 
 
     # Round one! Fix plaintiffs.
+    print "!!! ROUND ONE !!!"
     court = Court.objects.get(courtUUID='cal')
     docs = queryset_generator(Document.objects.filter(source="C", court=court, citation__case_name__contains=('P. v.')))
     fix_plaintiffs(docs, True, simulate, verbose)
 
     # Round two! Fix appellants.
+    print "!!! ROUND TWO !!!"
     docs = queryset_generator(Document.objects.filter(source="C", court=court, citation__case_name__contains=('v. P.')))
     fix_plaintiffs(docs, False, simulate, verbose)
 
     # Round three! Fix the Mi cases.
+    print "!!! ROUND THREE !!!"
     court = Court.objects.get(courtUUID='mich')
-    docs = queryset_generator(Document.objects.filter(source="C", court=court, citation__case_name__contains=('Mi %')))
+    docs = queryset_generator(Document.objects.filter(source="C", court=court, citation__case_name__contains=('People of Mi%')))
     fix_michigan(docs, True, simulate, verbose)
 
-    # Round four! Fix the other Mi cases.
-    docs = queryset_generator(Document.objects.filter(source="C", court=court, citation__case_name__contains=('% Mi')))
-    fix_michigan(docs, False, simulate, verbose)
-
-    # Round five! Fix the statuses.
+    # Round four! Fix the statuses.
+    print "!!! ROUND FOUR !!!"
     court = Court.objects.get(courtUUID='wva')
     docs = queryset_generator(Document.objects.filter(documentType__in=['Memorandum Decision', 'Per Curiam Opinion', 'Signed Opinion'],
                                                       court=court))
