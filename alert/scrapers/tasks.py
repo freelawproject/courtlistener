@@ -175,7 +175,7 @@ def extract_doc_content(pk, callback=None):
         doc, content, err = extract_from_pdf(doc, path, DEVNULL, callback)
     elif extension == 'txt':
         content, err = extract_from_txt(path)
-    elif extension == 'wpd':
+    elif extension in ['wpd', 'obj']:
         doc, content, err = extract_from_wpd(doc, path, DEVNULL)
     else:
         print ('*****Unable to extract content due to unknown extension: %s '
