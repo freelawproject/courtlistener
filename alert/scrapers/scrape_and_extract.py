@@ -170,7 +170,7 @@ def scrape_court(site, full_crawl=False):
                     # It's actually a wpd
                     extension = '.wpd'
                 # See issue #215 for why this must be lower-cased.
-                file_name = trunc(site.case_names[i].lower(), 80) + extension
+                file_name = trunc(site.case_names[i].lower(), 75) + extension
                 doc.local_path.save(file_name, cf, save=False)
             except:
                 msg = 'Unable to save binary to disk. Deleted document: % s.\n % s' % \

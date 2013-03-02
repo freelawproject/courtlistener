@@ -232,8 +232,7 @@ class Document(models.Model):
                       editable=False,
                       db_index=True)
     local_path = models.FileField(
-                      "the location, relative to MEDIA_ROOT, where the files "
-                      "are stored",
+                      "the location, relative to MEDIA_ROOT, where the files are stored",
                       upload_to=make_pdf_upload_path,
                       blank=True,
                       db_index=True)
