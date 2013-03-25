@@ -34,7 +34,6 @@ from alert.robots.views import robots
 from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert
 from alert.search.models import Court
 from alert.search.views import browser_warning, show_results, tools_page
-from alert.tinyurl.views import redirect_short_url
 from alert.userHandling.views import confirmEmail, deleteProfile, \
                                      deleteProfileDone, emailConfirmSuccess, \
                                      password_change, redirect_to_settings, \
@@ -92,9 +91,6 @@ urlpatterns = patterns('',
     # Serve a static file
     (r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$',
         serve_static_file),
-
-    # Redirect users that arrive via crt.li
-    (r'^x/(.*)/$', redirect_short_url),
 
     # Contact us pages
     (r'^contact/$', contact),

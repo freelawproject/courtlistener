@@ -15,12 +15,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from alert import settings
+from alert.lib.encode_decode import ascii_to_num
 from alert.lib import magic
 from alert.lib import search_utils
 from alert.lib.string_utils import trunc
 from alert.search.forms import SearchForm
 from alert.search.models import Court, Document
-from alert.tinyurl.encode_decode import ascii_to_num
 from alert.favorites.forms import FavoriteForm
 from alert.favorites.models import Favorite
 from django.core.exceptions import ObjectDoesNotExist

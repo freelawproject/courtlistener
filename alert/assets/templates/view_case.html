@@ -16,7 +16,6 @@
             <link rel="alternate" type="application/rss+xml" title="Atom feed for {{ court.0 }}" href="/feed/court/{{ court.4 }}/">
         {% endfor %}
     {% endif %}
-    <link rel="shortlink" type="text/html" href="{{doc.get_small_url}}">
 {% endblock %}
 
 {% block footer-scripts %}
@@ -121,10 +120,10 @@
         <div class="sidebar-section">
             <h3 class="bottom pointer arrow-right-before" id="share-header">Share</h3>
             <div class="hidden">
-                <input type="text" readonly="readonly" id="copy-input" value="{{doc.get_small_url}}"></input>
-                <a href="mailto:?subject={{title|urlencode}}%20at%20CourtListener.com&body={{doc.get_small_url}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
-                <a href="http://www.facebook.com/share.php?u={{doc.get_small_url}}&t={{title}} at CourtListener.com" target="_blank" title="Facebook" class="sprites" id="facebook_png"></a>
-                <a href="http://twitter.com/home?status={{doc.get_small_url}}" target="_blank" title="Twitter" class="sprites" id="twitter_gif"></a>
+                <input type="text" readonly="readonly" id="copy-input" value="{{request.path}}"></input>
+                <a href="mailto:?subject={{title|urlencode}}%20at%20CourtListener.com&body={{request.path}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
+                <a href="http://www.facebook.com/share.php?u={{request.path}}&t={{title}} at CourtListener.com" target="_blank" title="Facebook" class="sprites" id="facebook_png"></a>
+                <a href="http://twitter.com/home?status={{request.path}}" target="_blank" title="Twitter" class="sprites" id="twitter_gif"></a>
             </div>
             <hr class="space">
         </div>
@@ -139,8 +138,7 @@
                   <hr class="space">
                 </form>
             </div>
-        </div>
-        
+        </div>  
     </div>
 {% endblock %}
 

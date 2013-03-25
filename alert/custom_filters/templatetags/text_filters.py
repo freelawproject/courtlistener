@@ -21,7 +21,7 @@ from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
 
 import re
-from alert.tinyurl import encode_decode
+from alert.lib import encode_decode
 
 register = Library()
 
