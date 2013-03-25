@@ -23,7 +23,7 @@ from alert.lib import search_utils
 from alert.search.forms import SearchForm
 from alert.search.models import Court, Document
 from alert.lib import sunburnt
-from alert.tinyurl.encode_decode import ascii_to_num, num_to_ascii
+from alert.lib.encode_decode import ascii_to_num, num_to_ascii
 
 import datetime
 from alert.lib.string_utils import trunc

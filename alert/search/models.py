@@ -1,11 +1,11 @@
 from alert import settings
 from alert.lib.string_utils import trunc
+from alert.lib.encode_decode import num_to_ascii
 
 # Celery requires imports like this. Disregard syntax error.
 #from search.tasks import delete_docs
 #from search.tasks import add_or_update_docs
 
-from alert.tinyurl.encode_decode import num_to_ascii
 from django.template.defaultfilters import slugify
 from django.utils.text import get_valid_filename
 from django.utils.encoding import smart_unicode
@@ -268,11 +268,6 @@ class Document(models.Model):
                 [str(self.court.courtUUID),
                  num_to_ascii(self.documentUUID),
                  self.citation.slug])
-
-    # source: http://stackoverflow.com/questions/1119722/base-62-conversion-in-python
-    def get_small_url(self):
-        ascii = num_to_ascii(self.documentUUID)
-        return "http://crt.li/x/" + ascii
 
     def save(self, index=True, *args, **kwargs):
         '''

@@ -31,7 +31,7 @@ from django.utils.encoding import smart_str, smart_unicode
 from alert.search.models import Court, Citation, Document
 from alert.lib.string_utils import trunc
 from alert.lib import sunburnt
-from alert.tinyurl.encode_decode import num_to_ascii
+from alert.lib.encode_decode import num_to_ascii
 from cleaning_scripts.lib.string_diff import find_confidences, gen_diff_ratio
 from juriscraper.lib.parse_dates import parse_dates
 
