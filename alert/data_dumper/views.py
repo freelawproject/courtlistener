@@ -1,19 +1,3 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 from alert.search.models import Court
 from alert.search.models import Document
 from alert.lib.db_tools import queryset_generator_by_date
@@ -22,14 +6,15 @@ from alert.lib.dump_lib import get_date_range
 from alert.lib.filesize import size
 from alert.settings import DUMP_DIR
 
-from django.db import connection
 from django.http import HttpResponseBadRequest
+from django.http import HttpResponseNotFound
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 
 import os
 from datetime import date
+
 
 def dump_index(request):
     '''Shows an index page for the dumps.'''
@@ -40,10 +25,11 @@ def dump_index(request):
         # Happens when the file is unaccessible or doesn't exist. An estimate.
         dump_size = '3.2GB'
     return render_to_response('dumps/dumps.html',
-                              {'courts' : courts,
+                              {'courts': courts,
                                'dump_size': dump_size,
                                'private': False},
                               RequestContext(request))
+
 
 def serve_or_gen_dump(request, court, year=None, month=None, day=None):
     '''Serves the dump file to the user, generating it if needed.'''
@@ -51,8 +37,8 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
         if court != 'all':
             # Sanity check
             return HttpResponseBadRequest('<h2>Error 400: Complete dumps are '
-                'not available for individual courts. Try using "all" for your '
-                'court ID instead.</h2>')
+                'not available for individual courts. Try using "all" for '
+                'your court ID instead.</h2>')
         else:
             # Serve the dump for all cases.
             return HttpResponseRedirect('/dumps/all.xml.gz')
@@ -63,12 +49,11 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
 
         # Ensure that it's a valid request.
         today = date.today()
-        today_str = '%d-%02d-%02d' % (today.year, today.month, today.day)
-        if (today_str < end_date) and (today_str < start_date):
+        if (today < end_date) and (today < start_date):
             # It's the future. They fail.
-            return HttpResponseBadRequest('<h2>Error 400: Requested date is in '
-                'the future. Please try again then.</h2>')
-        elif today_str <= end_date:
+            return HttpResponseBadRequest('<h2>Error 400: Requested date is '
+                'in the future. Please try again then.</h2>')
+        elif today <= end_date:
             # Some of the data is in the past, some could be in the future.
             return HttpResponseBadRequest('<h2>Error 400: Requested date is '
                 'partially in the future. Please try again then.</h2>')
@@ -95,11 +80,20 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
         else:
             # dump just the requested court; disable default sorting
             qs = Document.objects.filter(court=court).order_by()
-        docs_to_dump = queryset_generator_by_date(qs,
-                                                  'dateFiled',
-                                                  start_date,
-                                                  end_date)
 
-        make_dump_file(docs_to_dump, path_from_root, filename)
+        # check if there are any documents at all
+        dump_has_docs = qs.filter('dateFiled__gte': start_date,
+                                  'dateFiled__lte': end_date).exists()
+        if dump_has_docs:
+            docs_to_dump = queryset_generator_by_date(qs,
+                                                      'dateFiled',
+                                                      start_date,
+                                                      end_date)
+
+            make_dump_file(docs_to_dump, path_from_root, filename)
+        else:
+            return HttpResponseNotFound('<h2>Error 404: We do not appear to '
+                                        'have any content for your request.'
+                                        '</h2>')
 
         return HttpResponseRedirect('%s.gz' % os.path.join('/dumps', filepath, filename))

@@ -35,18 +35,15 @@ from alert.lib.dump_lib import make_dump_file
 from alert.lib.db_tools import queryset_generator_by_date
 from alert.settings import DUMP_DIR
 
-from django.db import connection
-
 
 def dump_all_cases():
     '''
-    A simple function that dumps all cases to a single dump file. Rotates out 
+    A simple function that dumps all cases to a single dump file. Rotates out
     the old file before deleting it.
     '''
-
     today = date.today()
-    start_date = '1754-09-01' # First American case
-    end_date = '%d-%02d-%02d' % (today.year, today.month, today.day)
+    start_date = date(1754, 9, 1)  # First American case
+    end_date = date(today.year, today.month, today.day)
     # Get the documents from the database.
     qs = Document.objects.all()
     docs_to_dump = queryset_generator_by_date(qs,
@@ -60,9 +57,10 @@ def dump_all_cases():
 
     return 0
 
+
 def main():
     '''Runs the script.
-    
+
     Returns 0 if successful, else returns 1.
     '''
     return dump_all_cases()
