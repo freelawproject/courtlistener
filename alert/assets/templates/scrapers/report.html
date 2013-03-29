@@ -32,7 +32,17 @@
                    font-style: inherit;
                    margin: 10px;
                    padding: 0;">Result Counts</h2>
-                   
+        
+        {% if critical_history %}
+            <p style="font-size: 1em; 
+                      font-weight: normal; 
+                      font-family: inherit; 
+                      vertical-align: baseline; 
+                      font-style: inherit; 
+                      margin: 0 0 1.5em; 
+                      padding: 0;">A court has 0 results for the past seven days and more than 10 for the past 30. This is a critical problem.</p>
+        {% endif %}
+
         <table style="text-align: center;">
             <thead>
                 <tr>
@@ -78,6 +88,17 @@
                    font-style: inherit;
                    margin: 10px;
                    padding: 0;">Error Counts</h2>
+        
+        {% if critical_today %}
+            <p style="font-size: 1em; 
+                      font-weight: normal; 
+                      font-family: inherit; 
+                      vertical-align: baseline; 
+                      font-style: inherit; 
+                      margin: 0 0 1.5em; 
+                      padding: 0;">More than 10 critical in a court today. This is a critical problem.</p>
+        {% endif %}
+                  
         <table style="text-align: center;">
             <thead>
                 <tr>

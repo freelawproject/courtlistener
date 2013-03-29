@@ -92,17 +92,17 @@ class Command(BaseCommand):
             totals[3] += last
             counts[court['pk']] = [thirty, seven, last]
 
-        # Determine if any court has zero results for the past seven days, but
-        # not for the past 30. That's usually a critical problem.
-        critical_counts = False
+        # Determine if any court has 0 results for the past seven days, but
+        # more than 10 for the past 30. That's usually a critical problem.
+        critical_history = False
         for court in all_active_courts:
             last_thirty_day_count = cts_thirty_days.get(court['pk'], 0)
             last_seven_day_count = cts_seven_days.get(court['pk'], 0)
-            if last_seven_day_count == 0 and last_thirty_day_count > 0:
-                critical_counts = True
+            if last_seven_day_count == 0 and last_thirty_day_count > 10:
+                critical_history = True
                 break
 
-        return counts, totals, critical_counts
+        return counts, totals, critical_history
 
     def _tally_errors(self):
         '''Look at the error db and gather the latest errors from it'''
@@ -124,6 +124,13 @@ class Command(BaseCommand):
         cts_critical = self._make_query_dict(cts_critical)
         cts_warnings = self._make_query_dict(cts_warnings)
 
+        # Set the critical flag if any court has more than 10 critical problems
+        critical_today = False
+        for value in cts_critical.values():
+            if value > 10:
+                critical_today = True
+                break
+
         # Make a union of the dicts
         errors = {}
         for court in all_active_courts:
@@ -131,24 +138,26 @@ class Command(BaseCommand):
             warning_count = cts_warnings.get(court['pk'], 0)
             errors[court['pk']] = [critical_count, warning_count]
 
-        return errors, bool(cts_critical)
+        return errors, critical_today
 
     def generate_report(self):
         '''Look at the counts and errors, generate and return a report.
 
         '''
-        averages, totals, critical_counts = self._calculate_counts()
-        errors, cts_critical = self._tally_errors()
+        averages, totals, critical_history = self._calculate_counts()
+        errors, critical_today = self._tally_errors()
 
         # Make the report!
         html_template = loader.get_template('scrapers/report.html')
-        c = Context({'averages': averages, 'totals': totals, 'errors': errors})
+        c = Context({'averages': averages, 'totals': totals, 'errors': errors,
+                     'critical_today': critical_today,
+                     'critical_history': critical_history})
         report = html_template.render(c)
 
         # Sort out if the subject is critical and add a date to it
         subject = 'CourtListener status email for %s' % \
                                     date.strftime(date.today(), '%Y-%m-%d')
-        if critical_counts or cts_critical:
+        if critical_history or critical_today:
             subject = 'CRITICAL - ' + subject
 
         return report, subject
