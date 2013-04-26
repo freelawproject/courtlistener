@@ -70,8 +70,8 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
 
     # See if we already have it cached.
     try:
-        _ = open(os.path.join(path_from_root, filename), 'rb')
-        return HttpResponseRedirect(os.path.join('/dumps', filepath, filename))
+        _ = open(os.path.join(path_from_root, filename + '.gz'), 'rb')
+        return HttpResponseRedirect(os.path.join('/dumps', filepath, filename + '.gz'))
     except IOError:
         # Time-based dump
         if court == 'all':
@@ -82,8 +82,8 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
             qs = Document.objects.filter(court=court).order_by()
 
         # check if there are any documents at all
-        dump_has_docs = qs.filter('dateFiled__gte': start_date,
-                                  'dateFiled__lte': end_date).exists()
+        dump_has_docs = qs.filter(dateFiled__gte=start_date,
+                                  dateFiled__lte=end_date).exists()
         if dump_has_docs:
             docs_to_dump = queryset_generator_by_date(qs,
                                                       'dateFiled',

@@ -1,19 +1,3 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 # imports of local settings and views
 from alert import settings
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
@@ -28,8 +12,7 @@ from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, \
                               search_feed
 from alert.maintenance_warning.views import show_maintenance_warning
 from alert.pinger.views import validate_for_bing, validate_for_bing2, \
-                               validate_for_google, validate_for_google2, \
-                               validate_for_google3
+                               validate_for_google, validate_for_google2
 from alert.robots.views import robots
 from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert
 from alert.search.models import Court
@@ -160,7 +143,6 @@ urlpatterns = patterns('',
     (r'^BingSiteAuth.xml$', validate_for_bing2),
     (r'^googleef3d845637ccb353.html$', validate_for_google),
     (r'^google646349975c2495b6.html$', validate_for_google2),
-    (r'^google646349975c2495b6.html$', validate_for_google3),
 
     # Sitemaps & robots
     (r'^sitemap\.xml$', sitemap_maker),

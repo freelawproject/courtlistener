@@ -48,12 +48,12 @@ def sitemap_maker(request, size=250):
         urls = []
         for result in search_results_object:
             url = {}
-            url_strs = ['%s://courtlistener.com%s' % (protocol,
+            url_strs = ['%s://www.courtlistener.com%s' % (protocol,
                                                       result['absolute_url']),
-                        '%s://courtlistener.com%scited-by/' % (protocol,
+                        '%s://www.courtlistener.com%scited-by/' % (protocol,
                                                                result['absolute_url'])]
             try:
-                url_strs.append('%s://courtlistener.com/%s' % (protocol,
+                url_strs.append('%s://www.courtlistener.com/%s' % (protocol,
                                                                result['local_path']))
             except KeyError:
                 # No local_path key.
@@ -81,9 +81,9 @@ def sitemap_maker(request, size=250):
         i = 0
         sites = []
         # For flat pages
-        sites.append('%s://courtlistener.com/sitemap-flat.xml' % protocol)
+        sites.append('%s://www.courtlistener.com/sitemap-flat.xml' % protocol)
         while i < count:
-            sites.append('%s://courtlistener.com/sitemap.xml?p=%s' % (protocol, i / size + 1))
+            sites.append('%s://www.courtlistener.com/sitemap.xml?p=%s' % (protocol, i / size + 1))
             i += size
 
         xml = loader.render_to_string('sitemap_index.xml', {'sitemaps': sites})
@@ -117,7 +117,7 @@ def flat_sitemap_maker(request):
     urls = []
     for page in flat_pages:
         url = {}
-        url['location'] = '%s://courtlistener.com%s' % (protocol,
+        url['location'] = '%s://www.courtlistener.com%s' % (protocol,
                                                         page.get_absolute_url())
         url['changefreq'] = 'monthly'
         url['priority'] = priority(page)
