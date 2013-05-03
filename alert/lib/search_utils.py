@@ -275,7 +275,8 @@ def place_facet_queries(cd):
 
 def get_court_start_year(conn, court):
     '''Get the start year for a court by placing a Solr query. If a court is
-    active, but does not yet have any results, return the current year.'''
+    active, but does not yet have any results, return the current year.
+    '''
     params = {}
     params['fq'] = ['court_exact:%s' % court.courtUUID]
     params['sort'] = 'dateFiled asc'
