@@ -1,6 +1,6 @@
 #nav, #charts {
     display: inline-block;
-    margin: 5px;
+    margin: 0px 5px 5px 5px;
 }
 
 #nav ul {
@@ -32,4 +32,12 @@
     text-decoration:none;
     margin-left: 8px;
     margin-right: 8px;
+}
+
+#graph {
+    height: 400px; 
+}
+
+#graph table {
+    width: 20%; 
 }

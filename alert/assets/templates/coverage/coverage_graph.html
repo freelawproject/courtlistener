@@ -9,8 +9,9 @@
     <script src="/media/js/raphael.js"></script>
     <script src="/media/js/g.raphael.js"></script>
     <script src="/media/js/g.line.js"></script>
+    <script src="/media/js/jquery.ba-hashchange.min.js"></script>
     <script type="text/javascript">
-      var courts = {{ courts|safe}};
+      var sorted_courts = {{ sorted_courts|safe}};
       var data = {{ coverage_data|safe }};
     </script>
     <script src="/media/js/coverage.js"></script>
@@ -29,6 +30,7 @@
 
 {% block content %}
     <div class="span-18 last">
+        <h3 class="bottom" id="graph-header"></h3>
         <div id="graph"></div>
         
         <div>
