@@ -7,7 +7,6 @@ from alert.lib.filesize import size
 from alert.settings import DUMP_DIR
 
 from django.http import HttpResponseBadRequest
-from django.http import HttpResponseNotFound
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
@@ -68,10 +67,10 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
 
     path_from_root = os.path.join(DUMP_DIR, filepath)
 
-    # See if we already have it cached.
+    # See if we already have it on disk.
     try:
-        _ = open(os.path.join(path_from_root, filename), 'rb')
-        return HttpResponseRedirect(os.path.join('/dumps', filepath, filename))
+        _ = open(os.path.join(path_from_root, filename + '.gz'), 'rb')
+        return HttpResponseRedirect(os.path.join('/dumps', filepath, filename + '.gz'))
     except IOError:
         # Time-based dump
         if court == 'all':
@@ -82,8 +81,8 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
             qs = Document.objects.filter(court=court).order_by()
 
         # check if there are any documents at all
-        dump_has_docs = qs.filter('dateFiled__gte': start_date,
-                                  'dateFiled__lte': end_date).exists()
+        dump_has_docs = qs.filter(dateFiled__gte=start_date,
+                                  dateFiled__lte=end_date).exists()
         if dump_has_docs:
             docs_to_dump = queryset_generator_by_date(qs,
                                                       'dateFiled',
@@ -92,8 +91,8 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
 
             make_dump_file(docs_to_dump, path_from_root, filename)
         else:
-            return HttpResponseNotFound('<h2>Error 404: We do not appear to '
-                                        'have any content for your request.'
-                                        '</h2>')
+            print "Bad request!"
+            return HttpResponseBadRequest('<h2>Error 400: We do not have any '
+                'data for this time period.</h2>', status=404)
 
         return HttpResponseRedirect('%s.gz' % os.path.join('/dumps', filepath, filename))
