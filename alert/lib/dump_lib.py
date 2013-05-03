@@ -49,91 +49,83 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
         z_file.write('<?xml version="1.0" encoding="utf-8"?>\n' +
                      '<opinions dumpdate="' + str(date.today()) + '">\n')
 
-        try:
-            for doc in docs_to_dump:
-                row = etree.Element("opinion")
+        for doc in docs_to_dump:
+            row = etree.Element("opinion")
+            try:
+                # These are required by the DB, and thus are safe
+                # without the try/except blocks
+                row.set('id', str(doc.documentUUID))
+                row.set('path', doc.get_absolute_url())
+                row.set('sha1', doc.documentSHA1)
+                row.set('court', doc.court.full_name)
+                row.set('download_URL', doc.download_URL)
+                row.set('time_retrieved', str(doc.time_retrieved))
+                # All are wrapped in try/except b/c the value might not be found.
                 try:
-                    # These are required by the DB, and thus are safe
-                    # without the try/except blocks
-                    row.set('id', str(doc.documentUUID))
-                    row.set('path', doc.get_absolute_url())
-                    row.set('sha1', doc.documentSHA1)
-                    row.set('court', doc.court.full_name)
-                    row.set('download_URL', doc.download_URL)
-                    row.set('time_retrieved', str(doc.time_retrieved))
-                    # All are wrapped in try/except b/c the value might not be found.
-                    try:
-                        row.set('dateFiled', str(doc.dateFiled))
-                    except:
-                        pass
-                    try:
-                        row.set('precedentialStatus', doc.documentType)
-                    except:
-                        pass
-                    try:
-                        row.set('local_path', str(doc.local_path))
-                    except:
-                        pass
-                    try:
-                        row.set('docketNumber', doc.citation.docketNumber)
-                    except:
-                        pass
-                    try:
-                        row.set('westCite', doc.citation.westCite)
-                    except:
-                        pass
-                    try:
-                        row.set('lexisCite', doc.citation.lexisCite)
-                    except:
-                        pass
-                    try:
-                        row.set('neutral_cite', doc.citation.neutral_cite)
-                    except:
-                        pass
-                    try:
-                        row.set('case_name', doc.citation.case_name)
-                    except:
-                        pass
-                    try:
-                        row.set('source', doc.get_source_display())
-                    except:
-                        pass
-                    try:
-                        row.set('blocked', str(doc.blocked))
-                    except:
-                        pass
-                    try:
-                        row.set('date_blocked', str(doc.date_blocked))
-                    except:
-                        pass
-                    try:
-                        row.set('extracted_by_ocr', str(doc.extracted_by_ocr))
-                    except:
-                        pass
+                    row.set('dateFiled', str(doc.dateFiled))
+                except:
+                    pass
+                try:
+                    row.set('precedentialStatus', doc.documentType)
+                except:
+                    pass
+                try:
+                    row.set('local_path', str(doc.local_path))
+                except:
+                    pass
+                try:
+                    row.set('docketNumber', doc.citation.docketNumber)
+                except:
+                    pass
+                try:
+                    row.set('westCite', doc.citation.westCite)
+                except:
+                    pass
+                try:
+                    row.set('lexisCite', doc.citation.lexisCite)
+                except:
+                    pass
+                try:
+                    row.set('neutral_cite', doc.citation.neutral_cite)
+                except:
+                    pass
+                try:
+                    row.set('case_name', doc.citation.case_name)
+                except:
+                    pass
+                try:
+                    row.set('source', doc.get_source_display())
+                except:
+                    pass
+                try:
+                    row.set('blocked', str(doc.blocked))
+                except:
+                    pass
+                try:
+                    row.set('date_blocked', str(doc.date_blocked))
+                except:
+                    pass
+                try:
+                    row.set('extracted_by_ocr', str(doc.extracted_by_ocr))
+                except:
+                    pass
 
-                    ids = ','.join([str(pk) for pk in doc.citation.citing_cases.all().values_list('pk', flat=True)])
-                    if len(ids) > 0:
-                        row.set('cited_by', ids)
+                ids = ','.join([str(pk) for pk in doc.citation.citing_cases.all().values_list('pk', flat=True)])
+                if len(ids) > 0:
+                    row.set('cited_by', ids)
 
-                    # Gather the doc text
-                    if doc.html_with_citations:
-                        row.text = doc.html_with_citations.translate(null_map)
-                    elif doc.documentHTML:
-                        row.text = doc.documentHTML
-                    else:
-                        row.text = doc.documentPlainText.translate(null_map)
-                except ValueError:
-                    # Null byte found. Punt.
-                    continue
+                # Gather the doc text
+                if doc.html_with_citations:
+                    row.text = doc.html_with_citations.translate(null_map)
+                elif doc.documentHTML:
+                    row.text = doc.documentHTML
+                else:
+                    row.text = doc.documentPlainText.translate(null_map)
+            except ValueError:
+                # Null byte found. Punt.
+                continue
 
-                z_file.write('  %s\n' % etree.tostring(row).encode('utf-8'))
-
-        except IndexError:
-            # Cleanup the temp files and exit. Ignore errors.
-            shutil.rmtree(os.path.join(path_from_root, temp_dir), True)
-            return HttpResponseBadRequest('<h2>Error 400: No cases found \
-                for this time period.</h2>')
-
+            z_file.write('  %s\n' % etree.tostring(row).encode('utf-8'))
 
         # Close things off
         z_file.write('</opinions>')
