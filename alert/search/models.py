@@ -152,7 +152,7 @@ class Citation(models.Model):
         time it has been saved.
         '''
         created = self.pk is None
-        if not created:
+        if created:
             # it's the first time it has been saved; generate the slug stuff
             self.slug = trunc(slugify(self.case_name), 50)
         super(Citation, self).save(*args, **kwargs)
