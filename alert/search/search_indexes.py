@@ -32,7 +32,7 @@ class SearchDocument(object):
         self.status = doc.get_documentType_display()
         self.source = doc.source
         self.download_url = doc.download_URL
-        self.local_path = str(doc.local_path)
+        self.local_path = unicode(doc.local_path)
 
         # Load the case_name field using a template to make it a concatenation
         case_name_template = loader.get_template('search/indexes/caseNumber.txt')
