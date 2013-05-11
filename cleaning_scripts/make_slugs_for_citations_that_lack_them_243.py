@@ -18,7 +18,7 @@ def fixer(simulate=False, verbose=False):
     for citation in citations:
         if verbose:
             print "Fixing %s" % citation
-        citation.slug = trunc(slugify(citation.slug), 50)
+        citation.slug = trunc(slugify(citation.case_name), 50)
         if not simulate:
             citation.save()
 
