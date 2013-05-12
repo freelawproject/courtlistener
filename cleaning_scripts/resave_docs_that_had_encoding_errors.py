@@ -1,3 +1,10 @@
+import sys
+sys.path.append('/var/www/court-listener/alert')
+
+import settings
+from django.core.management import setup_environ
+setup_environ(settings)
+
 from alert.search.models import Document
 
 live = False
