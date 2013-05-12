@@ -23,9 +23,8 @@ pdf/2012/12/11/norman_douglas_diamond_and_zaida_gole'''
 
 paths = paths.split('\n')
 
-paths = [path.split('\\')[0] for path in paths]
-
 for path in paths:
+    repr(path)
     print "Path is now: %s" % path
     docs = Document.objects.filter(local_path__startswith='path')
 
