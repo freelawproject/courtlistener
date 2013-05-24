@@ -21,7 +21,7 @@ die_now = False
 
 
 def generate_sites(court_module):
-    # opinions.united_states.federal.ca9u --> ca9 
+    # opinions.united_states.federal.ca9u --> ca9
     court_str = court_module.__name__.split('.')[-1].split('_')[0]
     if court_str == 'cafc':
         # This is a generator that cranks out a site object when called.
@@ -34,6 +34,16 @@ def generate_sites(court_module):
                 yield site
             except HTTPError, e:
                 logger.warn("Failed to download page.")
+                continue
+
+    elif 'haw' in court_str:
+        for i in range(2010, 2013):
+            try:
+                site = court_module.Site()
+                site._download_backwards(i)
+                yield site
+            except HTTPError, e:
+                logger.warn("Failed to download page")
                 continue
 
     elif court_str == 'mich':
