@@ -154,13 +154,14 @@ class Command(BaseCommand):
         """
         Given a datetime, deletes all documents in the index newer than that time.
         """
-        qs = Document.objects.filter(time_retreived__gt=dt)
+        qs = Document.objects.filter(time_retrieved__gt=dt)
         count = qs.count()
         if self._proceed_with_deletion(count):
             self.stdout.write("Deleting all document(s) newer than %s\n" % dt)
             docs = queryset_generator(qs)
             for doc in docs:
                 self.si.delete(doc)
+            self.si.commit()
 
     @print_timing
     def delete_by_query(self, query):
