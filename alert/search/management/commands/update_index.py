@@ -58,8 +58,8 @@ class Command(BaseCommand):
     help = 'Adds, updates or removes documents in the index.'
 
     def _chunk_queryset_into_tasks(self, docs, count, chunksize=1000):
-        '''Chunks the queryset passed in, and dispatches it to Celery for 
-        processing
+        '''Chunks the queryset passed in, and dispatches it to Celery for
+        adding to the index.
         '''
         processed_count = 0
         not_in_use = 0
@@ -137,13 +137,24 @@ class Command(BaseCommand):
                           'what you intended.\n')
 
     @print_timing
+    def delete_by_datetime(self, dt):
+        """
+        Given a datetime, deletes all documents in the index newer than that time.
+        """
+        self.stdout.write("Deleting all document(s) newer than %s\n" % dt)
+        qs = Document.objects.filter(time_retreived__gt=dt)
+        docs = queryset_generator(qs)
+        for doc in docs:
+            self.si.delete(doc)
+
+    @print_timing
     def add_or_update(self, *documents):
         '''
         Given a document, adds it to the index, or updates it if it's already
         in the index.
         '''
         self.stdout.write("Adding or updating document(s): %s\n" % list(documents))
-        # Use Celery to add or update the document asynrhronously
+        # Use Celery to add or update the document asynchronously
         add_or_update_docs.delay(documents)
 
     @print_timing
@@ -160,7 +171,7 @@ class Command(BaseCommand):
     @print_timing
     def add_or_update_all(self):
         '''
-        Iterates over the entire corpus, adding it to the index. Can be run on 
+        Iterates over the entire corpus, adding it to the index. Can be run on
         an empty index or an existing one. If run on an existing index,
         existing documents will be updated.
         '''
@@ -171,9 +182,9 @@ class Command(BaseCommand):
 
     @print_timing
     def optimize(self):
-        '''Runs the Solr optimize command. 
+        '''Runs the Solr optimize command.
 
-        Not much more than a wrapper of a wrapper (Sunburnt) of a wrapper 
+        Not much more than a wrapper of a wrapper (Sunburnt) of a wrapper
         (Solr). Weird. Thankfully, Lucene isn't a wrapper of anything.
         '''
         self.stdout.write('Optimizing the index...')
@@ -184,24 +195,26 @@ class Command(BaseCommand):
         self.verbosity = int(options.get('verbosity', 1))
         self.si = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
 
+        if options.get('datetime'):
+            try:
+                # Parse the date string into a datetime object
+                dt = datetime.datetime(*time.strptime(args[0],
+                                                      "%Y-%m-%d %H:%M:%S")[0:6])
+            except ValueError:
+                try:
+                    dt = datetime.datetime(*time.strptime(args[0],
+                                                          "%Y-%m-%d")[0:5])
+                except ValueError:
+                    self.stderr.write("Unable to parse time. Please use "
+                                      "format: YYYY-MM-DD HH:MM:SS or "
+                                      "YYYY-MM-DD.\n")
+
         if options.get('update_mode'):
             if self.verbosity >= 1:
                 self.stdout.write('Running in update mode...\n')
             if options.get('everything'):
                 self.add_or_update_all()
             elif options.get('datetime'):
-                try:
-                    # Parse the date string into a datetime object
-                    dt = datetime.datetime(*time.strptime(args[0],
-                                                          "%Y-%m-%d %H:%M:%S")[0:6])
-                except ValueError:
-                    try:
-                        dt = datetime.datetime(*time.strptime(args[0],
-                                                              "%Y-%m-%d")[0:5])
-                    except ValueError:
-                        self.stderr.write("Unable to parse time. Please use "
-                                          "format: YYYY-MM-DD HH:MM:SS or "
-                                          "YYYY-MM-DD.\n")
                 self.add_or_update_by_datetime(dt)
             elif options.get('document'):
                 for doc in args:
@@ -223,9 +236,7 @@ class Command(BaseCommand):
             if options.get('everything'):
                 self.delete_all()
             elif options.get('datetime'):
-                self.stderr.write('Error: Date-based deletions are not yet '
-                                  'supported.\n')
-                sys.exit(1)
+                self.delete_by_datetime(dt)
             elif options.get('document'):
                 for doc in args:
                     try:
