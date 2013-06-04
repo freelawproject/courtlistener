@@ -59,7 +59,7 @@ def court_changed(url, hash):
         return True, url2Hash
 
 
-def test_for_meta_redirections(r):
+def _test_for_meta_redirections(r):
     mime = magic.from_buffer(r.content, mime=True)
     extension = mimetypes.guess_extension(mime)
     if extension == '.html':
@@ -77,7 +77,7 @@ def follow_redirections(r, s):
     """
     Recursive function that follows meta refresh redirections if they exist.
     """
-    redirected, url = test_for_meta_redirections(r)
+    redirected, url = _test_for_meta_redirections(r)
     if redirected:
         logger.info('Following a meta redirection to: %s' % url)
         r = follow_redirections(s.get(url), s)

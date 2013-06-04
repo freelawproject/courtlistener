@@ -16,6 +16,7 @@ syntax: glob
 *[P|p][R|r][I|i][V|v][A|a][T|t][E|e]*
 
 # the server and laptop config
+alert/assets/media/html
 alert/assets/media/pdf
 alert/assets/media/txt
 alert/assets/media/wpd

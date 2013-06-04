@@ -85,7 +85,7 @@ class Court(models.Model):
     '''A class to represent some information about each court, can be extended
     as needed.'''
     courtUUID = models.CharField('a unique ID for each court as used in URLs',
-                                 max_length=6,
+                                 max_length=15,
                                  primary_key=True)
     in_use = models.BooleanField('this court is in use in CourtListener',
                                  default=False)
