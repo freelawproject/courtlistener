@@ -27,7 +27,7 @@ class urlToHash(models.Model):
     hashUUID = models.AutoField("a unique ID for each hash/url pairing",
                                 primary_key=True)
     url = models.CharField("the URL that is hashed",
-                           max_length=300,
+                           max_length=5000,
                            blank=True,
                            editable=False)
     SHA1 = models.CharField("a SHA1 of the court's website HTML",
