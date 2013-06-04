@@ -26,6 +26,7 @@ import signal
 import requests
 import time
 import traceback
+from lxml import html
 from optparse import OptionParser
 
 
@@ -58,6 +59,31 @@ def court_changed(url, hash):
         return True, url2Hash
 
 
+def test_for_meta_redirections(r):
+    mime = magic.from_buffer(r.content, mime=True)
+    extension = mimetypes.guess_extension(mime)
+    if extension == '.html':
+        html_tree = html.fromstring(r.text)
+        attr = html_tree.xpath("//meta[translate(@http-equiv, 'REFSH', 'refsh') = 'refresh']/@content")[0]
+        wait, text = attr.split(";")
+        if text.lower().startswith("url="):
+            url = text[4:]
+            return True, url
+    else:
+        return False, None
+
+
+def follow_redirections(r, s):
+    """
+    Recursive function that follows meta refresh redirections if they exist.
+    """
+    redirected, url = test_for_meta_redirections(r)
+    if redirected:
+        logger.info('Following a meta redirection to: %s' % url)
+        r = follow_redirections(s.get(url), s)
+    return r
+
+
 def scrape_court(site, full_crawl=False):
     download_error = False
     # Get the court object early for logging
@@ -86,6 +112,9 @@ def scrape_court(site, full_crawl=False):
                 logger.warn(msg)
                 ErrorLog(log_level='WARNING', court=court, message=msg).save()
                 continue
+
+            # test for and follow meta redirects
+            r = follow_redirections(r, s)
         except:
             msg = 'DownloadingError: %s\n%s' % (site.download_urls[i],
                                                 traceback.format_exc())
