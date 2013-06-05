@@ -67,11 +67,11 @@ def _test_for_meta_redirections(r):
         try:
             attr = html_tree.xpath("//meta[translate(@http-equiv, 'REFSH', 'refsh') = 'refresh']/@content")[0]
             wait, text = attr.split(";")
+            if text.lower().startswith("url="):
+                url = text[4:]
+                return True, url
         except IndexError:
             return False, None
-        if text.lower().startswith("url="):
-            url = text[4:]
-            return True, url
     else:
         return False, None
 

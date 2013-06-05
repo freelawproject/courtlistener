@@ -76,6 +76,19 @@ def generate_sites(court_module):
                 logger.warn("Failed to download page")
                 continue
 
+    elif court_str in ['nmctapp_p',
+                       'nmctapp_u',
+                       'nm_p',
+                       'nm_u']:
+        for i in range(2009, 2013):
+            try:
+                site = court_module.Site()
+                site._download_backwards(i)
+                yield site
+            except HTTPError, e:
+                logger.warn("Failed to download page")
+                continue
+
 
 def back_scrape(mod):
     global die_now
