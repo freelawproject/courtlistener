@@ -64,8 +64,11 @@ def _test_for_meta_redirections(r):
     extension = mimetypes.guess_extension(mime)
     if extension == '.html':
         html_tree = html.fromstring(r.text)
-        attr = html_tree.xpath("//meta[translate(@http-equiv, 'REFSH', 'refsh') = 'refresh']/@content")[0]
-        wait, text = attr.split(";")
+        try:
+            attr = html_tree.xpath("//meta[translate(@http-equiv, 'REFSH', 'refsh') = 'refresh']/@content")[0]
+            wait, text = attr.split(";")
+        except IndexError:
+            return False, None
         if text.lower().startswith("url="):
             url = text[4:]
             return True, url
