@@ -105,12 +105,16 @@ def scrape_court(site, full_crawl=False):
     dup_count = 0
     for i in range(0, len(site.case_names)):
         try:
+            url = site.download_urls[i]
+            if not url:
+                # Occurs when a DeferredList fetcher fails.
+                continue
             s = requests.session()
-            r = s.get(site.download_urls[i])
+            r = s.get(url)
 
             # test for empty files (thank you CA1)
             if len(r.content) == 0:
-                msg = 'EmptyFileError: %s\n%s' % (site.download_urls[i],
+                msg = 'EmptyFileError: %s\n%s' % (url,
                                                   traceback.format_exc())
                 logger.warn(msg)
                 ErrorLog(log_level='WARNING', court=court, message=msg).save()
@@ -119,7 +123,7 @@ def scrape_court(site, full_crawl=False):
             # test for and follow meta redirects
             r = follow_redirections(r, s)
         except:
-            msg = 'DownloadingError: %s\n%s' % (site.download_urls[i],
+            msg = 'DownloadingError: %s\n%s' % (url,
                                                 traceback.format_exc())
             logger.warn(msg)
             ErrorLog(log_level='WARNING', court=court, message=msg).save()

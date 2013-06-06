@@ -495,6 +495,21 @@
         }
     },
     {
+        "pk": "idahoctapp",
+        "model": "search.court",
+        "fields": {
+            "end_date": null,
+            "citation_string": "Idaho Ct. App.",
+            "short_name": "Idaho Court of Appeals",
+            "in_use": true,
+            "URL": "http://www.isc.idaho.gov/",
+            "jurisdiction": "S",
+            "full_name": "Idaho Court of Appeals",
+            "position": 359.25,
+            "start_date": null
+        }
+    },
+    {
         "pk": "ind",
         "model": "search.court",
         "fields": {
@@ -570,6 +585,36 @@
         }
     },
     {
+        "pk": "nm",
+        "model": "search.court",
+        "fields": {
+            "end_date": null,
+            "citation_string": "N.M.",
+            "short_name": "New Mexico Supreme Court",
+            "in_use": true,
+            "URL": "https://nmsupremecourt.nmcourts.gov/index.php",
+            "jurisdiction": "S",
+            "full_name": "New Mexico Supreme Court",
+            "position": 366.9,
+            "start_date": null
+        }
+    },
+    {
+        "pk": "nmctapp",
+        "model": "search.court",
+        "fields": {
+            "end_date": null,
+            "citation_string": "N.M. Ct. App.",
+            "short_name": "New Mexico Court of Appeals",
+            "in_use": true,
+            "URL": "https://coa.nmcourts.gov/index.php",
+            "jurisdiction": "S",
+            "full_name": "New Mexico Court of Appeals",
+            "position": 366.95,
+            "start_date": null
+        }
+    },
+    {
         "pk": "or",
         "model": "search.court",
         "fields": {
@@ -581,6 +626,21 @@
             "jurisdiction": "S",
             "full_name": "Oregon Supreme Court",
             "position": 367.0,
+            "start_date": null
+        }
+    },
+    {
+        "pk": "tex",
+        "model": "search.court",
+        "fields": {
+            "end_date": null,
+            "citation_string": "Tex.",
+            "short_name": "Texas Supreme Court",
+            "in_use": true,
+            "URL": "http://www.supreme.courts.state.tx.us/",
+            "jurisdiction": "S",
+            "full_name": "Texas Supreme Court",
+            "position": 368.0,
             "start_date": null
         }
     },
