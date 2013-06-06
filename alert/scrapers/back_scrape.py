@@ -26,6 +26,7 @@ die_now = False
 def generate_sites(court_module):
     # opinions.united_states.federal.ca9u --> ca9
     court_str = court_module.__name__.split('.')[-1].split('_')[0]
+    logger.info("Using court_str: \"%s\"" % court_str)
     if court_str == 'cafc':
         # This is a generator that cranks out a site object when called.
         # Useful because doing it this way won't load each site object
@@ -79,10 +80,7 @@ def generate_sites(court_module):
                 logger.warn("Failed to download page")
                 continue
 
-    elif court_str in ['nmctapp_p',
-                       'nmctapp_u',
-                       'nm_p',
-                       'nm_u']:
+    elif court_str in ['nmctapp', 'nm']:
         for i in range(2009, 2013):
             try:
                 site = court_module.Site()
@@ -116,7 +114,6 @@ def back_scrape(mod):
 
 
 def main():
-    logger.info("Starting up the scraper.")
     global die_now
 
     # this line is used for handling SIGKILL, so things can die safely.
