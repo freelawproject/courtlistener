@@ -14,7 +14,7 @@ import signal
 import traceback
 from datetime import date
 from dateutil.rrule import rrule
-from dateutil.rrule import DAILY
+from dateutil.rrule import DAILY, MONTHLY
 from optparse import OptionParser
 from requests import HTTPError
 
@@ -71,6 +71,18 @@ def generate_sites(court_module):
 
     elif court_str == 'mont':
         for i in range(1972, 2014):
+            try:
+                site = court_module.Site()
+                site._download_backwards(i)
+                yield site
+            except HTTPError, e:
+                logger.warn("Failed to download page")
+                continue
+
+    elif court_str == 'nd':
+        start = date(1996,09,01)
+        end = date(2013, 6, 01)
+        for i in rrule(MONTHLY, dtstart=start, until=end):
             try:
                 site = court_module.Site()
                 site._download_backwards(i)
