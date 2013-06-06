@@ -13,6 +13,9 @@ from juriscraper.lib.importer import build_module_list
 
 import signal
 import traceback
+from datetime import date
+from dateutil.rrule import rrule
+from dateutil.rrule import DAILY
 from optparse import OptionParser
 from requests import HTTPError
 
@@ -81,6 +84,18 @@ def generate_sites(court_module):
                        'nm_p',
                        'nm_u']:
         for i in range(2009, 2013):
+            try:
+                site = court_module.Site()
+                site._download_backwards(i)
+                yield site
+            except HTTPError, e:
+                logger.warn("Failed to download page")
+                continue
+
+    elif court_str == 'tex':
+        start = date(1997, 10, 2)
+        end = date(2013, 6, 5)
+        for i in rrule(DAILY, dtstart=start, until=end):
             try:
                 site = court_module.Site()
                 site._download_backwards(i)
