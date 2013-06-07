@@ -80,8 +80,8 @@ def generate_sites(court_module):
                 continue
 
     elif court_str == 'nd':
-        start = date(1996,09,01)
-        end = date(2013, 6, 01)
+        start = date(1996, 9, 1)
+        end = date(2013, 6, 1)
         for i in rrule(MONTHLY, dtstart=start, until=end):
             try:
                 site = court_module.Site()
