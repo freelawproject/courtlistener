@@ -13,52 +13,41 @@ from alert.lib.mojibake import fix_mojibake
 from celery.decorators import task
 from celery.task.sets import subtask
 from datetime import date
-from lxml import etree
-from lxml.etree import tostring
+from lxml.html.clean import Cleaner
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
 from citations.tasks import update_document_by_id
 
 import os
-import re
-import StringIO
 import subprocess
 import time
 import traceback
 
 
 def get_clean_body_content(content):
-    '''Parse out the body from an html string, clean it up, and send it along.
-    '''
-    parser = etree.HTMLParser()
-    tree = etree.parse(StringIO.StringIO(content), parser)
-    body = tree.xpath('//body/*')
-    content = tostring(body[0])
-
-    fontsize_regex = re.compile('font-size: .*;')
-    content = re.sub(fontsize_regex, '', content)
-
-    color_regex = re.compile('color: .*;')
-    content = re.sub(color_regex, '', content)
-    return content
+    """Parse out the body from an html string, clean it up, and send it along.
+    """
+    cleaner = Cleaner(style=True,
+                      remove_tags=['a', 'body', 'font', 'noscript'])
+    return cleaner.clean_html(content)
 
 
 def extract_from_doc(path, DEVNULL):
-    '''Extract text from docs.
+    """Extract text from docs.
 
     We use antiword to pull the text out of MS Doc files.
-    '''
+    """
     process = subprocess.Popen(['antiword', path, '-i', '1'], shell=False,
-        stdout=subprocess.PIPE, stderr=DEVNULL)
+                               stdout=subprocess.PIPE, stderr=DEVNULL)
     content, err = process.communicate()
     return content, err
 
 
 def extract_from_html(path):
-    '''Extract from html.
+    """Extract from html.
 
     A simple wrapper to go get content, and send it along.
-    '''
+    """
     try:
         content = open(path).read()
         content = get_clean_body_content(content)
@@ -70,13 +59,13 @@ def extract_from_html(path):
 
 
 def extract_from_pdf(doc, path, DEVNULL, callback=None):
-    ''' Extract text from pdfs.
+    """ Extract text from pdfs.
 
     Here, we use pdftotext. If that fails, try to use tesseract under the
     assumption it's an image-based PDF. Once that is complete, we check for the
     letter e in our content. If it's not there, we try to fix the mojibake
     that ca9 sometimes creates.
-    '''
+    """
     process = subprocess.Popen(["pdftotext", "-layout", "-enc", "UTF-8",
         path, "-"], shell=False, stdout=subprocess.PIPE, stderr=DEVNULL)
     content, err = process.communicate()
@@ -96,10 +85,10 @@ def extract_from_pdf(doc, path, DEVNULL, callback=None):
 
 
 def extract_from_txt(path):
-    '''Extract text from plain text files.
+    """Extract text from plain text files.
 
     This function is really here just for consistency.
-    '''
+    """
     try:
         content = open(path).read()
     except:
@@ -108,12 +97,12 @@ def extract_from_txt(path):
 
 
 def extract_from_wpd(doc, path, DEVNULL):
-    '''Extract text from a Word Perfect file
+    """Extract text from a Word Perfect file
 
     Yes, courts still use these, so we extract their text using wpd2html. Once
     that's done, we pull out the body of the HTML, and do some minor cleanup
     on it.
-    '''
+    """
     process = subprocess.Popen(['wpd2html', path, '-'], shell=False,
         stdout=subprocess.PIPE, stderr=DEVNULL)
     content, err = process.communicate()
@@ -128,13 +117,13 @@ def extract_from_wpd(doc, path, DEVNULL):
 
 @task
 def extract_doc_content(pk, callback=None):
-    '''
+    """
     Given a document, we extract it, sniffing its extension, then store its
     contents in the database.  Finally, we asynchronously find citations in
     the document content and match them to other documents.
 
     TODO: this implementation cannot be distributed due to using local paths.
-    '''
+    """
     doc = Document.objects.get(pk=pk)
 
     path = str(doc.local_path)
@@ -185,11 +174,11 @@ def extract_doc_content(pk, callback=None):
 
 @task
 def extract_by_ocr(path):
-    '''Extract the contents of a PDF using OCR
+    """Extract the contents of a PDF using OCR
 
     Convert the PDF to a tiff, then perform OCR on the tiff using Tesseract.
     Take the contents and the exit code and return them to the caller.
-    '''
+    """
     print "Running OCR subtask on %s" % path
     content = ''
     success = False
