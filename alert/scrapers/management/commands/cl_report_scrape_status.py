@@ -15,34 +15,34 @@ from optparse import make_option
 class Command(BaseCommand):
     option_list = BaseCommand.option_list + (
         make_option('--debug',
-            action='store_true',
-            dest='debug',
-            default=False,
-            help='Run the command, but take no action. Be verbose and send '
-                 'email to the console.'),
-        )
+                    action='store_true',
+                    dest='debug',
+                    default=False,
+                    help='Run the command, but take no action. Be verbose and send '
+                         'email to the console.'),
+    )
     args = '[--debug]'
     help = 'Generates a report and sends it to the administrators.'
 
     def _num_weekdays(self, start_date, end_date=date.today()):
-        '''Calculates the number of weekdays between start_date and end_date
+        """Calculates the number of weekdays between start_date and end_date
 
         From: http://stackoverflow.com/questions/3615375/
-        '''
-        daygenerator = (start_date + timedelta(x + 1) for x in
+        """
+        day_generator = (start_date + timedelta(x + 1) for x in
                         xrange((end_date - start_date).days))
-        return sum(1 for day in daygenerator if day.weekday() < 5)
+        return sum(1 for day in day_generator if day.weekday() < 5)
 
     def _make_query_dict(self, query_list):
-        '''Reformat the results into dicts.
-        '''
+        """Reformat the results into dicts.
+        """
         result_dict = {}
         for item in query_list:
             result_dict[item['pk']] = item['count']
         return result_dict
 
     def _calculate_counts(self):
-        '''Grab the information for new documents over the past 30 days, and
+        """Grab the information for new documents over the past 30 days, and
         calculate the number of cases found for each court.
 
         Returns a dict like so:
@@ -52,28 +52,28 @@ class Command(BaseCommand):
          0: The count for the past 30 days.
          1: The count for the past 7 days.
          2: The count for today
-        '''
+        """
         last_day = date.today() - timedelta(days=1)
         seven_days_ago = date.today() - timedelta(days=7)
         thirty_days_ago = date.today() - timedelta(days=30)
 
         # This makes a mess of queries, but gets everything we need.
-        cts_last_day = Court.objects\
-                            .filter(document__dateFiled__gt=last_day)\
-                            .annotate(count=Count('document__pk'))\
-                            .values('pk', 'count')
-        cts_seven_days = Court.objects\
-                              .filter(document__dateFiled__gt=seven_days_ago)\
-                              .annotate(count=Count('document__pk'))\
-                              .values('pk', 'count')
-        cts_thirty_days = Court.objects\
-                               .filter(document__dateFiled__gt=thirty_days_ago)\
-                               .annotate(count=Count('document__pk'))\
-                               .values('pk', 'count')
+        cts_last_day = Court.objects \
+            .filter(document__dateFiled__gt=last_day) \
+            .annotate(count=Count('document__pk')) \
+            .values('pk', 'count')
+        cts_seven_days = Court.objects \
+            .filter(document__dateFiled__gt=seven_days_ago) \
+            .annotate(count=Count('document__pk')) \
+            .values('pk', 'count')
+        cts_thirty_days = Court.objects \
+            .filter(document__dateFiled__gt=thirty_days_ago) \
+            .annotate(count=Count('document__pk')) \
+            .values('pk', 'count')
 
         # Needed because annotation calls above don't return courts with no new
         # opinions
-        all_active_courts = Court.objects.filter(in_use=True).values('pk')
+        all_active_courts = Court.objects.filter(in_use=True).values('pk').order_by('position')
 
         # Reformat the results into dicts...
         cts_last_day = self._make_query_dict(cts_last_day)
@@ -107,18 +107,18 @@ class Command(BaseCommand):
     def _tally_errors(self):
         '''Look at the error db and gather the latest errors from it'''
         yesterday = date.today() - timedelta(days=1)
-        cts_critical = Court.objects\
-                            .filter(errorlog__log_time__gt=yesterday,
-                                    errorlog__log_level="CRITICAL")\
-                            .annotate(count=Count('errorlog__pk'))\
-                            .values('pk', 'count')
-        cts_warnings = Court.objects\
-                            .filter(errorlog__log_time__gt=yesterday,
-                                    errorlog__log_level="WARNING")\
-                            .annotate(count=Count('errorlog__pk'))\
-                            .values('pk', 'count')
+        cts_critical = Court.objects \
+            .filter(errorlog__log_time__gt=yesterday,
+                    errorlog__log_level="CRITICAL") \
+            .annotate(count=Count('errorlog__pk')) \
+            .values('pk', 'count')
+        cts_warnings = Court.objects \
+            .filter(errorlog__log_time__gt=yesterday,
+                    errorlog__log_level="WARNING") \
+            .annotate(count=Count('errorlog__pk')) \
+            .values('pk', 'count')
 
-        all_active_courts = Court.objects.filter(in_use=True).values('pk')
+        all_active_courts = Court.objects.filter(in_use=True).values('pk').order_by('position')
 
         # Reformat as dicts...
         cts_critical = self._make_query_dict(cts_critical)
@@ -156,7 +156,7 @@ class Command(BaseCommand):
 
         # Sort out if the subject is critical and add a date to it
         subject = 'CourtListener status email for %s' % \
-                                    date.strftime(date.today(), '%Y-%m-%d')
+                  date.strftime(date.today(), '%Y-%m-%d')
         if critical_history or critical_today:
             subject = 'CRITICAL - ' + subject
 

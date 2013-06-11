@@ -79,7 +79,7 @@ def generate_sites(court_module):
                 logger.warn("Failed to download page")
                 continue
 
-    elif court_str == 'nd':
+    elif court_str in ['nd', 'ndctapp']:
         start = date(1996, 9, 1)
         end = date(2013, 6, 1)
         for i in rrule(MONTHLY, dtstart=start, until=end):
