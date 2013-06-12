@@ -95,7 +95,17 @@ def generate_sites(court_module):
         for i in range(2009, 2013):
             try:
                 site = court_module.Site()
-                site._download_backwards(i.date())
+                site._download_backwards(i)
+                yield site
+            except HTTPError, e:
+                logger.warn("Failed to download page")
+                continue
+
+    elif court_str == 'sd':
+        for i in range(1996, 2013):
+            try:
+                site = court_module.Site()
+                site._download_backwards(i)
                 yield site
             except HTTPError, e:
                 logger.warn("Failed to download page")
@@ -107,7 +117,7 @@ def generate_sites(court_module):
         for i in rrule(DAILY, dtstart=start, until=end):
             try:
                 site = court_module.Site()
-                site._download_backwards(i)
+                site._download_backwards(i.date())
                 yield site
             except HTTPError, e:
                 logger.warn("Failed to download page")
