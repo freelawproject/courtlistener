@@ -14,6 +14,6 @@
 
 {# This code must match the code in document_caseNumber.txt #}
 {{ object.citation.docketNumber|default_if_none:"" }}
-{{ object.citation.westCite|default_if_none:"" }}
-{{ object.citation.lexisCite|default_if_none:"" }} 
+{{ object.citation.west_cite|default_if_none:"" }}
+{{ object.citation.lexisCite|default_if_none:"" }}
 {{ object.citation.neutral_cite|default_if_none:"" }}

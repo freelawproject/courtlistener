@@ -43,8 +43,8 @@ def db_corrector(simulate, verbose):
     docs = queryset_generator(Document.objects.filter(source = 'R'))
     for doc in docs:
         if verbose:
-            print "Assigning %s to westCite on doc %s" % (doc.citation.docketNumber, doc.documentUUID)
-        doc.citation.westCite = doc.citation.docketNumber
+            print "Assigning %s to west_cite on doc %s" % (doc.citation.docketNumber, doc.documentUUID)
+        doc.citation.west_cite = doc.citation.docketNumber
 
         # Gather the docket number
         try:

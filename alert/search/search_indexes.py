@@ -26,7 +26,7 @@ class SearchDocument(object):
         except AttributeError, NoReverseMatch:
             raise InvalidDocumentError
         self.docketNumber = doc.citation.docketNumber
-        self.westCite = doc.citation.westCite
+        self.westCite = doc.citation.west_cite
         self.lexisCite = doc.citation.lexisCite
         self.neutralCite = doc.citation.neutral_cite
         self.status = doc.get_documentType_display()

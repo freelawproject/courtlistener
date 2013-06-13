@@ -133,7 +133,7 @@ class Citation(models.Model):
                                     max_length=100, # sometimes these are consolidated, hence they need to be long.
                                     blank=True,
                                     null=True)
-    westCite = models.CharField("WestLaw citation",
+    west_cite = models.CharField("WestLaw federal citation",
                                 max_length=50,
                                 blank=True,
                                 null=True)

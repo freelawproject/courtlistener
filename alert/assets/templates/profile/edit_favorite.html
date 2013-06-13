@@ -24,8 +24,8 @@
             <h3 class="bottom alt">
                     <a href="{{doc.get_absolute_url}}">
                         {{ doc.citation.case_name }},
-                        {% if doc.citation.westCite != '' and doc.citation.westCite != None %}
-                            {{doc.citation.westCite}}
+                        {% if doc.citation.west_cite != '' and doc.citation.west_cite != None %}
+                            {{doc.citation.west_cite}}
                         {% else %}
                             {{doc.citation.docketNumber}}
                         {% endif %}
@@ -49,7 +49,7 @@
                     {% endif %}
                 </p>
                 <p>
-                    {% if doc.citation.westCite != ''  and doc.citation.westCite != None and doc.citation.docketNumber %}
+                    {% if doc.citation.west_cite != ''  and doc.citation.west_cite != None and doc.citation.docketNumber %}
                         <strong>Docket Number: </strong>
                         {{ doc.citation.docketNumber }}
                     {% endif %}

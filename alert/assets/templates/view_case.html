@@ -10,7 +10,7 @@
         {% if get_string %}
             <link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?{{ get_string }}" />
         {% endif %}
-        <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{doc|truncatewords:10}}" href="/feed/{{doc.pk|num_to_ascii}}/cited-by/">    
+        <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{doc|truncatewords:10}}" href="/feed/{{doc.pk|num_to_ascii}}/cited-by/">
         <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">
         {% for court in court_facets %}
             <link rel="alternate" type="application/rss+xml" title="Atom feed for {{ court.0 }}" href="/feed/court/{{ court.4 }}/">
@@ -40,7 +40,7 @@
                 <h3 class="bottom arrow-down-before pointer">Admin</h3>
                 <p class="shown">
                     <a href="/admin/search/document/{{doc.pk}}/">Document</a> &nbsp;&nbsp;|&nbsp;&nbsp;
-                    <a href="/admin/search/citation/{{doc.citation_id}}/">Citation</a> 
+                    <a href="/admin/search/citation/{{doc.citation_id}}/">Citation</a>
                 </p>
             </div>
         {% endif %}
@@ -69,8 +69,8 @@
                         {% for case in cited_by_trunc %}
                             <li>
                                 <a href="{{case.get_absolute_url}}">{{ case.citation.case_name|truncatewords:10|v_wrapper }},
-                                    {% if case.citation.westCite %}
-                                        {{case.citation.westCite}}
+                                    {% if case.citation.west_cite %}
+                                        {{case.citation.west_cite}}
                                     {% else %}
                                         {{case.citation.docketNumber}}
                                     {% endif %}
@@ -89,8 +89,8 @@
                 </div>
             {% endif %}
         </div>
-        
-          
+
+
         {# Download original? #}
         <div class="sidebar-section">
             <h3 class="bottom pointer arrow-down-before">View Original</h3>
@@ -127,8 +127,8 @@
             </div>
             <hr class="space">
         </div>
-        
-        
+
+
         {# Show the search refine section. This is populated with JS #}
         <div class="sidebar-section">
             <h3 class="pointer arrow-right-before">Refine your search</h3>
@@ -138,7 +138,7 @@
                   <hr class="space">
                 </form>
             </div>
-        </div>  
+        </div>
     </div>
 {% endblock %}
 
@@ -152,8 +152,8 @@
         {% endif %}
         <h2>
             {{ doc.citation.case_name|v_wrapper }},
-            {% if doc.citation.westCite %}
-                {{doc.citation.westCite}}
+            {% if doc.citation.west_cite %}
+                {{doc.citation.west_cite}}
             {% else %}
                 {{doc.citation.docketNumber}}
             {% endif %}
@@ -242,7 +242,7 @@
                 <span class="meta-data-header">Neutral citation:</span>
                 <span class="meta-data-value">{{ doc.citation.neutral_cite }}</span>
             {% endif %}
-            {% if doc.citation.westCite and doc.citation.docketNumber %}
+            {% if doc.citation.west_cite and doc.citation.docketNumber %}
                 <strong>Docket Number: </strong>
                 {{ doc.citation.docketNumber }}
             {% endif %}
