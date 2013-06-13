@@ -2,7 +2,7 @@
 {% load text_filters %}
 {% load humanize %}
 
-{% block title %} 
+{% block title %}
     CourtListener.com / Results / {% if request.GET.q %} {{ request.GET.q }} / {% endif %}
 {% endblock %}
 
@@ -192,7 +192,7 @@
             {% if not error %}
                 <h2 class="alt">Your search
                     {% if request.GET.q != "" %}
-                        &mdash; <strong>{{ request.GET.q }}</strong> &mdash; 
+                        &mdash; <strong>{{ request.GET.q }}</strong> &mdash;
                     {% endif %}
                     had no results.</h2>
                 <p class="bottom">Search tips:</p>
@@ -201,11 +201,11 @@
                     <li>Try fewer filters</li>
                     <li>Remove quotes if you used them</li>
                 </ul>
-                <p>Our <a href="/coverage/">coverage page</a> details which cases we 
-                have. If you expected more results than this, <a href="/contact/">let us know</a>! 
+                <p>Our <a href="/coverage/">coverage page</a> details which cases we
+                have. If you expected more results than this, <a href="/contact/">let us know</a>!
                 We value your feedback.</p>
             {% else %}
-                <h2 class="alt">Your search 
+                <h2 class="alt">Your search
                     {% if request.GET.q != "" %}
                         &mdash; <strong>{{ request.GET.q }}</strong> &mdash;
                     {% endif %}
@@ -216,7 +216,7 @@
                     <li>Our system is down and can't respond</li>
                     <li>Some other reason</li>
                 </ul>
-                <p>We log these errors and work to resolve them, but if you think we can benefit from your experience, don't hesitate to <a href="/contact/">let us know</a>! We value your feedback.</p>                
+                <p>We log these errors and work to resolve them, but if you think we can benefit from your experience, don't hesitate to <a href="/contact/">let us know</a>! We value your feedback.</p>
             {% endif %}
         {% endif %}
 

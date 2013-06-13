@@ -78,7 +78,7 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 except:
                     pass
                 try:
-                    row.set('westCite', doc.citation.westCite)
+                    row.set('west_cite', doc.citation.west_cite)
                 except:
                     pass
                 try:
@@ -130,7 +130,7 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
         # Close things off
         z_file.write('</opinions>')
 
-    # Delete the old archive, then replace it with the new one. Deleting 
+    # Delete the old archive, then replace it with the new one. Deleting
     # shouldn't necessary according to the Python documentation, but in testing
     # I'm not seeing file clobbering happen.
     try:
@@ -144,7 +144,7 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
     os.rename(os.path.join(path_from_root, temp_dir, filename),
               os.path.join(path_from_root, filename) + '.gz')
 
-    # Remove the directory, but only if it's empty. 
+    # Remove the directory, but only if it's empty.
     os.rmdir(os.path.join(path_from_root, temp_dir))
 
     return os.path.join(path_from_root, filename)

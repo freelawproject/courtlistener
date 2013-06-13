@@ -319,13 +319,13 @@ def scrape_and_parse():
             if DEBUG >= 4:
                 print "Court is: %s" % court
 
-            # next: westCite, docketNumber and caseName. Full casename is gotten later.
-            westCite = caseLinks[j].text
+            # next: west_cite, docketNumber and caseName. Full casename is gotten later.
+            west_cite = caseLinks[j].text
             docketNumber = absCaseLink.split('.')[-2]
             caseName = caseLinks[j].get('title')
 
             caseName, documentType = exceptional_cleaner(caseName)
-            cite, new = hasDuplicate(caseName, westCite, docketNumber)
+            cite, new = hasDuplicate(caseName, west_cite, docketNumber)
             if cite.caseNameShort == '':
                 # No luck getting the case name
                 savedCaseNameShort = check_fix_list(sha1Hash, case_name_short_dict)
@@ -350,7 +350,7 @@ def scrape_and_parse():
 
             if DEBUG >= 4:
                 print "documentType: " + documentType
-                print "westCite: " + cite.westCite
+                print "west_cite: " + cite.west_cite
                 print "docketNumber: " + cite.docketNumber
                 print "caseName: " + cite.caseNameFull
 

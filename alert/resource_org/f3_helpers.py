@@ -49,7 +49,7 @@ BROWSER = 'firefox'
 
 def add_case(case):
     '''Add the case to the database.
-    
+
     '''
     simulate = False
     # Get the court
@@ -58,7 +58,7 @@ def add_case(case):
     # Make a citation
     cite = Citation(case_name=case.case_name,
                     docketNumber=case.docket_number,
-                    westCite=case.west_cite)
+                    west_cite=case.west_cite)
 
     # Make the document object
     doc = Document(source='R',
@@ -81,14 +81,14 @@ def add_case(case):
 
 def merge_cases_simple(case, target_id):
     '''Add `case` to the database, merging with target_id
-     
+
      Merging is done along the following algorithm:
      - SHA1 is preserved from CL
      - The HTML from PRO gets added to CL's DB.
      - CL's title is preserved (it tends to be better)
      - The source field for the document is changed to CR (court and PRO)
      - The west citation is added to CL's DB from PRO
-     - Block status is determined according to the indexing pipeline    
+     - Block status is determined according to the indexing pipeline
     '''
     simulate = False
     print "Target_id: %s" % target_id
@@ -97,7 +97,7 @@ def merge_cases_simple(case, target_id):
     print "        %s" % doc.citation.case_name
 
     doc.source = 'CR'
-    doc.citation.westCite = case.west_cite
+    doc.citation.west_cite = case.west_cite
     doc.documentHTML, blocked = anonymize(case.body)
     if blocked:
         doc.blocked = True
@@ -109,7 +109,7 @@ def merge_cases_simple(case, target_id):
 
 def merge_cases_complex(case, target_ids):
     '''Merge data from PRO with multiple cases that seem to be a match.
-    
+
     The process here is a conservative one. We take *only* the information
     from PRO that is not already in CL in any form, and add only that.
     '''
@@ -120,7 +120,7 @@ def merge_cases_complex(case, target_ids):
         print "        %s" % doc.citation.case_name
 
         doc.source = 'CR'
-        doc.citation.westCite = case.west_cite
+        doc.citation.west_cite = case.west_cite
 
         if not simulate:
             doc.citation.save()
@@ -128,7 +128,7 @@ def merge_cases_complex(case, target_ids):
 
 def find_same_docket_numbers(case, candidates):
     '''Identify the candidates that have the same docket numbers as the case.
-    
+
     '''
     new_docket_number = case.docket_number
     same_docket_numbers = []
@@ -138,7 +138,7 @@ def find_same_docket_numbers(case, candidates):
     return same_docket_numbers
 
 def filter_by_stats(candidates, stats):
-    '''Looks at the candidates and their stats, and filters out obviously 
+    '''Looks at the candidates and their stats, and filters out obviously
     different candidates.
     '''
     filtered_stats = stats[0:2]
@@ -286,7 +286,7 @@ class Case(object):
 
     def _check_fix_list(self, sha1, fix_dict):
         '''Given a sha1, return the correction for a case. Return false if no values.
-    
+
         Corrections are strings that the parser can interpret as needed. Items are
         written to this file the first time the cases are imported, and this file
         can be used to import F3 into later systems.
@@ -563,7 +563,7 @@ class Volume(object):
                        self.case_dates[key],
                        self.sha1_hashes[key])
         except ValueError:
-            # If a for-reals key is provided, we zip up the items we want, and 
+            # If a for-reals key is provided, we zip up the items we want, and
             # return them.
             for t in zip(self.case_urls[key],
                          self.case_dates[key],

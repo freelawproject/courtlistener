@@ -49,9 +49,9 @@ def update_document(document):
     # List for tracking number of citation vs. name matches
     matched_citations = []
     for citation in citations:
-        # Resource.org docs contain their own citation in the html text, which 
+        # Resource.org docs contain their own citation in the html text, which
         # we don't want to include
-        if citation.base_citation() == document.citation.westCite:
+        if citation.base_citation() == document.citation.west_cite:
             continue
         matches, is_citation_match = match_citations.match_citation(citation,
                                                                     document)

@@ -23,8 +23,8 @@ from django.contrib import admin
 
 class CitationAdmin(admin.ModelAdmin):
     # This needs to be disabled for performance reasons.
-    #list_display = ('docketNumber', 'westCite', 'case_name', )
-    search_fields = ['case_name', 'docketNumber', 'westCite']
+    #list_display = ('docketNumber', 'west_cite', 'case_name', )
+    search_fields = ['case_name', 'docketNumber', 'west_cite']
 
 
 class DocumentAdmin(admin.ModelAdmin):
