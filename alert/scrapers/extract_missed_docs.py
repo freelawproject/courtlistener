@@ -2,17 +2,17 @@
 # -*- coding: utf-8 -*-
 # This software and any associated files are copyright 2010 Brian Carver and
 # Michael Lissner.
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
@@ -31,6 +31,7 @@ import sys
 sys.path.append('/var/www/court-listener/alert')
 
 import settings
+from celery.task.sets import subtask
 from django.core.management import setup_environ
 from django.core.exceptions import ObjectDoesNotExist
 setup_environ(settings)
@@ -39,7 +40,7 @@ from alert.search.models import Court
 from alert.search.models import Document
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
-from scrapers.tasks import extract_doc_content
+from scrapers.tasks import extract_doc_content, extract_by_ocr
 
 import datetime
 import time
@@ -54,7 +55,7 @@ def extract_all_docs(docs):
     else:
         print "%s documents in this court." % (num_docs,)
         for doc in docs:
-            extract_doc_content.delay(doc.pk)
+            extract_doc_content.delay(doc.pk, callback=subtask(extract_by_ocr))
 
 
 def main():
