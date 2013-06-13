@@ -1,19 +1,19 @@
-{% if object.documentHTML %}
+{% if object.html %}
     {# if the HTML exists we do it, but not the plaintext #}
-    {{ object.documentHTML|striptags|default_if_none:"" }}
+    {{ object.html|striptags|default_if_none:"" }}
 {% else %}
-    {{ object.documentPlainText|default_if_none:"" }}
+    {{ object.plain_text|default_if_none:"" }}
 {% endif %}
 
 {{ object.citation.case_name|default_if_none:"" }}
-{{ object.documentType|default_if_none:"" }}
-{{ object.documentSHA1|default_if_none:"" }}
+{{ object.precedential_status|default_if_none:"" }}
+{{ object.sha1|default_if_none:"" }}
 {{ object.court.full_name|default_if_none:"" }}
 {{ object.court.citation_string|default_if_none:"" }}
 {{ object.court.courtUUID|default_if_none:"" }}
 
 {# This code must match the code in document_caseNumber.txt #}
-{{ object.citation.docketNumber|default_if_none:"" }}
+{{ object.citation.docket_number|default_if_none:"" }}
 {{ object.citation.west_cite|default_if_none:"" }}
-{{ object.citation.lexisCite|default_if_none:"" }}
+{{ object.citation.lexis_cite|default_if_none:"" }}
 {{ object.citation.neutral_cite|default_if_none:"" }}

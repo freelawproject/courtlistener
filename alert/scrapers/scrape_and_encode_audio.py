@@ -195,7 +195,7 @@ def makeAudioFromUrl(url, audioLink):
 
     if created:
         # we only do this if it's new
-        audio.documentSHA1 = sha1Hash
+        audio.sha1 = sha1Hash
         audio.download_URL = url
 
     error = False
@@ -299,7 +299,7 @@ def hasDuplicate(caseNum, caseName):
 
     # check for duplicates, make the object in their absence
     cite, created = Citation.objects.get_or_create(
-        caseNameShort=str(caseNameShort), docketNumber=str(caseNum))
+        caseNameShort=str(caseNameShort), docket_number=str(caseNum))
 
     if caseNameShort == caseName:
         # no truncation.
@@ -330,7 +330,7 @@ def getPDFContent(docs):
         if err: RESULT += "Error parsing file: " + doc.citation.caseNameShort
 
         # add the anonymized plain text to the DB!
-        doc.documentPlainText = anonymize(smart_str(content))
+        doc.plain_text = anonymize(smart_str(content))
         try:
             doc.save()
         except:
@@ -386,7 +386,7 @@ def scrapeCourt(courtID):
 
         caseDateRegex = re.compile("(\d{2}/\d{2}/\d{4})",
             re.VERBOSE | re.DOTALL)
-        docketNumberRegex = re.compile("(\d{2}-.*?\W)(.*)$")
+        docket_numberRegex = re.compile("(\d{2}-.*?\W)(.*)$")
 
         # incredibly, this RSS feed is in cron order, so new stuff is at the
         # end. Mind blowing.
@@ -420,25 +420,25 @@ def scrapeCourt(courtID):
                 dupCount = 0
 
             # otherwise, we continue
-            doc.documentType = documentType
+            doc.precedential_status = precedential_status
 
             # next: caseDate
             caseDate = caseDateRegex.search(descriptions[i].text).group(1)
             splitDate = caseDate.split('/')
             caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                 int(splitDate[1]))
-            doc.dateFiled = caseDate
+            doc.date_filed = caseDate
 
-            # next: docketNumber
-            docketNumber = docketNumberRegex.search(caseNamesAndNumbers[i].text)\
+            # next: docket_number
+            docket_number = docket_numberRegex.search(caseNamesAndNumbers[i].text)\
                 .group(1)
 
             # next: caseNameShort
-            caseNameShort = docketNumberRegex.search(caseNamesAndNumbers[i].text)\
+            caseNameShort = docket_numberRegex.search(caseNamesAndNumbers[i].text)\
                 .group(2)
 
             # check for dups, make the object if necessary, otherwise, get it
-            cite, created = hasDuplicate(docketNumber, caseNameShort)
+            cite, created = hasDuplicate(docket_number, caseNameShort)
 
             # last, save evrything (pdf, citation and document)
             doc.citation = cite
@@ -486,10 +486,10 @@ def scrapeCourt(courtID):
                     caseLink = i.get('href')
                     caseLink = aTagsRegex.search(caseLink).group(1)
                     try:
-                        docketNumbers = caseNumRegex.search(caseLink).group(1)
+                        docket_numbers = caseNumRegex.search(caseLink).group(1)
                     except:
-                        docketNumbers = ""
-                    aTagsEncoded.append(docketNumbers)
+                        docket_numbers = ""
+                    aTagsEncoded.append(docket_numbers)
 
                 # if it's DAEMONMODE, see if the court has changed
                 changed = courtChanged(url, str(aTagsEncoded))
@@ -526,18 +526,18 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # using caseLink, we can get the docketNumber and documentType
+                # using caseLink, we can get the docket_number and precedential_status
                 caseNum = caseNumRegex.search(caseLink).group(1)
                 if VERBOSITY >= 2:
                     print "caseNum: " + str(caseNum)
 
                 # and the docType
-                documentType = caseNumRegex.search(caseLink).group(2)
-                if 'opn' in documentType:
+                precedential_status = caseNumRegex.search(caseLink).group(2)
+                if 'opn' in precedential_status:
                     # it's unpublished
-                    doc.documentType = "Published"
-                elif 'so' in documentType:
-                    doc.documentType = "Unpublished"
+                    doc.precedential_status = "Published"
+                elif 'so' in precedential_status:
+                    doc.precedential_status = "Unpublished"
 
                 # next, the caseNameShort (there's probably a better way to do this.
                 caseNameShort = aTags[i].parent.parent.nextSibling.nextSibling\
@@ -552,7 +552,7 @@ def scrapeCourt(courtID):
                 splitDate = caseDate.split('-')
                 caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
-                doc.dateFiled = caseDate
+                doc.date_filed = caseDate
 
                 # check for duplicates, make the object in their absence
                 cite, created = hasDuplicate(caseNum, caseNameShort)
@@ -636,12 +636,12 @@ def scrapeCourt(courtID):
 
                 caseNameShort = aTags[i].contents[0]
 
-                # caseDate and docketNumber
+                # caseDate and docket_number
                 junk = aTags[i].previous.previous.previous
                 try:
                     # this error seems to happen upon dups...not sure why yet
                     caseDate = regexII.search(junk).group(0)
-                    docketNumber = regexIII.search(junk).group(0)
+                    docket_number = regexIII.search(junk).group(0)
                 except:
                     i += 1
                     continue
@@ -650,15 +650,15 @@ def scrapeCourt(courtID):
                 splitDate = caseDate.split('/')
                 caseDate = datetime.date(int("20" + splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
-                doc.dateFiled = caseDate
+                doc.date_filed = caseDate
 
                 # Make a decision about the docType.
                 if "recprec.htm" in str(url):
-                    doc.documentType = "Published"
+                    doc.precedential_status = "Published"
                 elif "recnon2day.htm" in str(url):
-                    doc.documentType = "Unpublished"
+                    doc.precedential_status = "Unpublished"
 
-                cite, created = hasDuplicate(docketNumber, caseNameShort)
+                cite, created = hasDuplicate(docket_number, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
@@ -734,18 +734,18 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # using caselink, we can get the docketNumber and documentType
+                # using caselink, we can get the docket_number and precedential_status
                 fileName = caseLink.split('/')[-1]
-                docketNumber, documentType = fileName.split('.')[0:2]
-                # the docketNumber needs a hyphen inserted after the second digit
-                docketNumber = docketNumber[0:2] + "-" + docketNumber[2:]
+                docket_number, precedential_status = fileName.split('.')[0:2]
+                # the docket_number needs a hyphen inserted after the second digit
+                docket_number = docket_number[0:2] + "-" + docket_number[2:]
 
-                if documentType == 'U':
-                    doc.documentType = 'Unpublished'
-                elif documentType == 'P':
-                    doc.documentType = 'Published'
+                if precedential_status == 'U':
+                    doc.precedential_status = 'Unpublished'
+                elif precedential_status == 'P':
+                    doc.precedential_status = 'Published'
                 else:
-                    doc.documentType = ""
+                    doc.precedential_status = ""
 
                 # next, we do the caseDate and caseNameShort, so we can quit before
                 # we get too far along.
@@ -762,10 +762,10 @@ def scrapeCourt(courtID):
                 splitDate = caseDate.split('/')
                 caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
-                doc.dateFiled = caseDate
+                doc.date_filed = caseDate
 
                 # let's check for duplicates before we proceed
-                cite, created = hasDuplicate(docketNumber, caseNameShort)
+                cite, created = hasDuplicate(docket_number, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
@@ -808,7 +808,7 @@ def scrapeCourt(courtID):
                 '__VIEWSTATE'       : '/wEPDwULLTEwOTU2NTA2NDMPZBYCAgEPZBYKAgEPDxYIHgtDZWxsUGFkZGluZ2YeC0NlbGxTcGFjaW5nZh4JQmFja0NvbG9yCRcQJ/8eBF8hU0ICiIAYZGQCAw8PFggfAGYfAWYfAgmZzP//HwMCiIAYZGQCGQ9kFgYCAg8PFgQfAgqHAR8DAghkZAIEDw8WBB8CCocBHwMCCGRkAgYPDxYEHwIKhwEfAwIIZGQCGw9kFooBAgIPDxYEHwIKhwEfAwIIZGQCBA8PFgQfAgqHAR8DAghkZAIGDw8WBB8CCocBHwMCCGRkAggPDxYEHwIKhwEfAwIIZGQCCg8PFgQfAgqHAR8DAghkZAIMDw8WBB8CCocBHwMCCGRkAg4PDxYEHwIKhwEfAwIIZGQCEA8PFgQfAgqHAR8DAghkZAISDw8WBB8CCocBHwMCCGRkAhQPDxYEHwIKhwEfAwIIZGQCFg8PFgQfAgqHAR8DAghkZAIYDw8WBB8CCocBHwMCCGRkAhoPDxYEHwIKhwEfAwIIZGQCHA8PFgQfAgqHAR8DAghkZAIeDw8WBB8CCocBHwMCCGRkAiAPDxYEHwIKhwEfAwIIZGQCIg8PFgQfAgqHAR8DAghkZAIkDw8WBB8CCocBHwMCCGRkAiYPDxYEHwIKhwEfAwIIZGQCKA8PFgQfAgqHAR8DAghkZAIqDw8WBB8CCocBHwMCCGRkAiwPDxYEHwIKhwEfAwIIZGQCLg8PFgQfAgqHAR8DAghkZAIwDw8WBB8CCocBHwMCCGRkAjIPDxYEHwIKhwEfAwIIZGQCNA8PFgQfAgqHAR8DAghkZAI2Dw8WBB8CCocBHwMCCGRkAjgPDxYEHwIKhwEfAwIIZGQCOg8PFgQfAgqHAR8DAghkZAI8Dw8WBB8CCocBHwMCCGRkAj4PDxYEHwIKhwEfAwIIZGQCQA8PFgQfAgqHAR8DAghkZAJCDw8WBB8CCocBHwMCCGRkAkQPDxYEHwIKhwEfAwIIZGQCRg8PFgQfAgqHAR8DAghkZAJIDw8WBB8CCocBHwMCCGRkAkoPDxYEHwIKhwEfAwIIZGQCTA8PFgQfAgqHAR8DAghkZAJODw8WBB8CCocBHwMCCGRkAlAPDxYEHwIKhwEfAwIIZGQCUg8PFgQfAgqHAR8DAghkZAJUDw8WBB8CCocBHwMCCGRkAlYPDxYEHwIKhwEfAwIIZGQCWA8PFgQfAgqHAR8DAghkZAJaDw8WBB8CCocBHwMCCGRkAlwPDxYEHwIKhwEfAwIIZGQCXg8PFgQfAgqHAR8DAghkZAJgDw8WBB8CCocBHwMCCGRkAmIPDxYEHwIKhwEfAwIIZGQCZA8PFgQfAgqHAR8DAghkZAJmDw8WBB8CCocBHwMCCGRkAmgPDxYEHwIKhwEfAwIIZGQCag8PFgQfAgqHAR8DAghkZAJsDw8WBB8CCocBHwMCCGRkAm4PDxYEHwIKhwEfAwIIZGQCcA8PFgQfAgqHAR8DAghkZAJyDw8WBB8CCocBHwMCCGRkAnQPDxYEHwIKhwEfAwIIZGQCdg8PFgQfAgqHAR8DAghkZAJ4Dw8WBB8CCocBHwMCCGRkAnoPDxYEHwIKhwEfAwIIZGQCfA8PFgQfAgqHAR8DAghkZAJ+Dw8WBB8CCocBHwMCCGRkAoABDw8WBB8CCocBHwMCCGRkAoIBDw8WBB8CCocBHwMCCGRkAoQBDw8WBB8CCocBHwMCCGRkAoYBDw8WBB8CCocBHwMCCGRkAogBDw8WBB8CCocBHwMCCGRkAooBDw8WBB8CCocBHwMCCGRkAh0PEGRkFgECAmRkcx2JRvTiy039dck7+vdOCUS6J5s=',
                 'txtBeginDate'      : startDate,
                 'txtEndDate'        : '',
-                'txtDocketNumber'   : '',
+                'txtdocket_number'   : '',
                 'txtTitle='         : '',
                 'btnSearch'         : 'Search',
                 '__EVENTVALIDATION' : '/wEWCALd2o3pAgLH8d2nDwKAzfnNDgLChrRGAr2b+P4BAvnknLMEAqWf8+4KAqC3sP0KVcw25xdB1YPfbcUwUCqEYjQqaqM=',
@@ -864,13 +864,13 @@ def scrapeCourt(courtID):
                 # three non-precedential and three precedential from this court.
                 if unpubRegex.search(str(aTags[i])) == None:
                     # it's published, else it's unpublished
-                    documentType = "Published"
+                    precedential_status = "Published"
                     numP += 1
                 else:
-                    documentType = "Unpublished"
+                    precedential_status = "Unpublished"
                     numQ += 1
-                if VERBOSITY >= 2: print "documentType: " + documentType
-                doc.documentType = documentType
+                if VERBOSITY >= 2: print "precedential_status: " + precedential_status
+                doc.precedential_status = precedential_status
 
                 if not created:
                     # it's an oldie, punt!
@@ -885,8 +885,8 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # using caseLink, we can get the docketNumber and documentType
-                docketNumber = aTags[i].contents[0]
+                # using caseLink, we can get the docket_number and precedential_status
+                docket_number = aTags[i].contents[0]
 
                 # next, we do the caseDate
                 caseDate = aTags[i].next.next.contents[0].contents[0]
@@ -895,14 +895,14 @@ def scrapeCourt(courtID):
                 splitDate = caseDate.split('/')
                 caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
-                doc.dateFiled = caseDate
+                doc.date_filed = caseDate
 
                 # next, we do the caseNameShort
                 caseNameShort = aTags[i].next.next.next.next.next.contents[0]\
                     .contents[0]
 
-                # now that we have the docketNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(docketNumber, caseNameShort)
+                # now that we have the docket_number and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docket_number, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
@@ -984,16 +984,16 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # using caseLink, we can get the docketNumber and documentType
-                docketNumber = aTags[i].next.next.next.next.next.contents[0]
+                # using caseLink, we can get the docket_number and precedential_status
+                docket_number = aTags[i].next.next.next.next.next.contents[0]
 
-                # using the filename, we can determine the documentType...
+                # using the filename, we can determine the precedential_status...
                 fileName = aTags[i].contents[0]
                 if 'n' in fileName:
                     # it's unpublished
-                    doc.documentType = "Unpublished"
+                    doc.precedential_status = "Unpublished"
                 elif 'p' in fileName:
-                    doc.documentType = "Published"
+                    doc.precedential_status = "Published"
 
                 # next, we can do the caseDate
                 caseDate = aTags[i].next.next.next.next.next.next.next.next\
@@ -1004,14 +1004,14 @@ def scrapeCourt(courtID):
                 splitDate = caseDate.split('/')
                 caseDate = datetime.date(int(splitDate[0]), int(splitDate[1]),
                     int(splitDate[2]))
-                doc.dateFiled = caseDate
+                doc.date_filed = caseDate
 
                 # next, the caseNameShort (there's probably a better way to do this.
                 caseNameShort = aTags[i].next.next.next.next.next.next.next.next\
                     .next.next.next
 
-                # now that we have the docketNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(docketNumber, caseNameShort)
+                # now that we have the docket_number and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docket_number, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
@@ -1036,7 +1036,7 @@ def scrapeCourt(courtID):
         ct = Court.objects.get(courtUUID='ca7')
 
         for url in urls:
-            # if these strings change, check that documentType still gets set correctly.
+            # if these strings change, check that precedential_status still gets set correctly.
             dataStrings = ("yr=&num=&Submit=Past+Week&dtype=Opinion&scrid=Select+a+Case",
                 "yr=&num=&Submit=Past+Week&dtype=Nonprecedential+Disposition&scrid=Select+a+Case",)
 
@@ -1085,8 +1085,8 @@ def scrapeCourt(courtID):
                     else:
                         dupCount = 0
 
-                    # using caseLink, we can get the docketNumber and documentType
-                    docketNumber = aTags[i].previous.previous.previous.previous.previous\
+                    # using caseLink, we can get the docket_number and precedential_status
+                    docket_number = aTags[i].previous.previous.previous.previous.previous\
                         .previous.previous.previous.previous.previous
 
                     # next up: caseDate
@@ -1095,7 +1095,7 @@ def scrapeCourt(courtID):
                     splitDate = caseDate.split('/')
                     caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                         int(splitDate[1]))
-                    doc.dateFiled = caseDate
+                    doc.date_filed = caseDate
 
                     # next up: caseNameShort
                     caseNameShort = aTags[i].previous.previous.previous.previous\
@@ -1103,12 +1103,12 @@ def scrapeCourt(courtID):
 
                     # next up: docStatus
                     if "type=Opinion" in dataString:
-                        doc.documentType = "Published"
+                        doc.precedential_status = "Published"
                     elif "type=Nonprecedential+Disposition" in dataString:
-                        doc.documentType = "Unpublished"
+                        doc.precedential_status = "Unpublished"
 
-                    # now that we have the docketNumber and caseNameShort, we can dup check
-                    cite, created = hasDuplicate(docketNumber, caseNameShort)
+                    # now that we have the docket_number and caseNameShort, we can dup check
+                    cite, created = hasDuplicate(docket_number, caseNameShort)
 
                     # last, save evrything (pdf, citation and document)
                     doc.citation = cite
@@ -1174,16 +1174,16 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # using caseLink, we can get the docketNumber and documentType
+                # using caseLink, we can get the docket_number and precedential_status
                 junk = aTags[i].contents[0]
-                docketNumber = caseNumRegex.search(junk).group(1) + "-" + \
+                docket_number = caseNumRegex.search(junk).group(1) + "-" + \
                     caseNumRegex.search(junk).group(2)
 
-                documentType = caseNumRegex.search(junk).group(3).upper()
-                if documentType == 'U':
-                    doc.documentType = 'Unpublished'
-                elif documentType == 'P':
-                    doc.documentType = 'Published'
+                precedential_status = caseNumRegex.search(junk).group(3).upper()
+                if precedential_status == 'U':
+                    doc.precedential_status = 'Unpublished'
+                elif precedential_status == 'P':
+                    doc.precedential_status = 'Published'
 
                 # caseDate is next on the block
                 junk = str(aTags[i].next.next.next)
@@ -1195,10 +1195,10 @@ def scrapeCourt(courtID):
                 splitDate = caseDate.split('/')
                 caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
-                doc.dateFiled = caseDate
+                doc.date_filed = caseDate
 
-                # now that we have the docketNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(docketNumber, caseNameShort)
+                # now that we have the docket_number and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docket_number, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
@@ -1236,11 +1236,11 @@ def scrapeCourt(courtID):
 
             if url == urls[0]:
                 caseLinks = tree.xpath('//table[3]/tbody/tr/td/a')
-                docketNumbers = tree.xpath('//table[3]/tbody/tr/td[2]/label')
+                docket_numbers = tree.xpath('//table[3]/tbody/tr/td[2]/label')
                 caseDates = tree.xpath('//table[3]/tbody/tr/td[6]/label')
             elif url == urls[1]:
                 caseLinks = tree.xpath('//table[3]/tbody/tr/td/a')
-                docketNumbers = tree.xpath('//table[3]/tbody/tr/td[2]/label')
+                docket_numbers = tree.xpath('//table[3]/tbody/tr/td[2]/label')
                 caseDates = tree.xpath('//table[3]/tbody/tr/td[7]/label')
 
             if DAEMONMODE:
@@ -1288,30 +1288,30 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # next, we'll do the docketNumber
-                docketNumber = docketNumbers[i].text
-                if VERBOSITY >= 2: print "Docket Number is: " + docketNumber
+                # next, we'll do the docket_number
+                docket_number = docket_numbers[i].text
+                if VERBOSITY >= 2: print "Docket Number is: " + docket_number
 
                 # next up: document type (static for now)
                 if 'memoranda' in url:
-                    doc.documentType = "Unpublished"
+                    doc.precedential_status = "Unpublished"
                 elif 'opinions' in url:
-                    doc.documentType = "Published"
-                if VERBOSITY >= 2: print "Document type is: " + doc.documentType
+                    doc.precedential_status = "Published"
+                if VERBOSITY >= 2: print "Document type is: " + doc.precedential_status
 
                 # next up: caseDate
                 splitDate = caseDates[i].text.split('/')
                 caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
-                doc.dateFiled = caseDate
+                doc.date_filed = caseDate
                 if VERBOSITY >= 2: print "CaseDate is: " + str(caseDate)
 
                 #next up: caseNameShort
                 caseNameShort = titlecase(caseLinks[i].text.lower())
                 if VERBOSITY >= 2: print "CaseNameShort is: " + caseNameShort + "\n\n"
 
-                # now that we have the docketNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(docketNumber, caseNameShort)
+                # now that we have the docket_number and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docket_number, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
@@ -1360,7 +1360,7 @@ def scrapeCourt(courtID):
 
             caseDateRegex = re.compile("(\d{2}/\d{2}/\d{4})",
                 re.VERBOSE | re.DOTALL)
-            docketNumberRegex = re.compile("(\d{2}-\d{4})(.*)$")
+            docket_numberRegex = re.compile("(\d{2}-\d{4})(.*)$")
 
             i = 0
             dupCount = 0
@@ -1396,9 +1396,9 @@ def scrapeCourt(courtID):
                 # next: docType (this order of if statements IS correct)
                 docType = docTypes[i].text.strip()
                 if "unpublished" in docType.lower():
-                    doc.documentType = "Unpublished"
+                    doc.precedential_status = "Unpublished"
                 elif "published" in docType.lower():
-                    doc.documentType = "Published"
+                    doc.precedential_status = "Published"
                 else:
                     # it's an errata, or something else we don't care about
                     i += 1
@@ -1409,20 +1409,20 @@ def scrapeCourt(courtID):
                 splitDate = caseDate.split('/')
                 caseDate = datetime.date(int(splitDate[2]), int(splitDate[0]),
                     int(splitDate[1]))
-                doc.dateFiled = caseDate
+                doc.date_filed = caseDate
                 if VERBOSITY >= 2: print "Case date is: " + str(caseDate)
 
-                # next: docketNumber
-                docketNumber = docketNumberRegex.search(descriptions[i].text)\
+                # next: docket_number
+                docket_number = docket_numberRegex.search(descriptions[i].text)\
                     .group(1)
-                if VERBOSITY >= 2: print "Case number is: " + docketNumber
+                if VERBOSITY >= 2: print "Case number is: " + docket_number
 
                 # next: caseNameShort
                 caseNameShort = caseNames[i].text
                 if VERBOSITY >= 2: print "Case name is: " + caseNameShort
 
                 # check for dups, make the object if necessary, otherwise, get it
-                cite, created = hasDuplicate(docketNumber, caseNameShort)
+                cite, created = hasDuplicate(docket_number, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
@@ -1477,12 +1477,12 @@ def scrapeCourt(courtID):
             tree = fromstring(html)
 
             if 'unpub' in url:
-                docketNumbers = tree.xpath('//table[3]//table//table/tr[1]/td[2]')
+                docket_numbers = tree.xpath('//table[3]//table//table/tr[1]/td[2]')
                 caseLinks = tree.xpath('//table[3]//table//table/tr[3]/td[2]/a')
                 caseDates = tree.xpath('//table[3]//table//table/tr[4]/td[2]')
                 caseNames = tree.xpath('//table[3]//table//table/tr[6]/td[2]')
             elif 'opinion' in url:
-                docketNumbers = tree.xpath('//table[3]//td[3]//table/tr[1]/td[2]')
+                docket_numbers = tree.xpath('//table[3]//td[3]//table/tr[1]/td[2]')
                 caseLinks = tree.xpath('//table[3]//td[3]//table/tr[3]/td[2]/a')
                 caseDates = tree.xpath('//table[3]//td[3]//table/tr[4]/td[2]')
                 caseNames = tree.xpath('//table[3]//td[3]//table/tr[6]/td[2]')
@@ -1497,7 +1497,7 @@ def scrapeCourt(courtID):
 
             i = 0
             dupCount = 0
-            while i < len(docketNumbers):
+            while i < len(docket_numbers):
                 caseLink = caseLinks[i].get('href')
 
                 myFile, doc, created, error = makeAudioFromUrl(caseLink, ct)
@@ -1521,22 +1521,22 @@ def scrapeCourt(courtID):
                     dupCount = 0
 
                 if 'unpub' in url:
-                    doc.documentType = "Unpublished"
+                    doc.precedential_status = "Unpublished"
                 elif 'opinion' in url:
-                    doc.documentType = "Published"
-                if VERBOSITY >= 2: print "documentType: " + str(doc.documentType)
+                    doc.precedential_status = "Published"
+                if VERBOSITY >= 2: print "precedential_status: " + str(doc.precedential_status)
 
                 cleanDate = clean_string(caseDates[i].text)
-                doc.dateFiled = datetime.datetime(*strptime(cleanDate, "%m-%d-%Y")[0:5])
-                if VERBOSITY >= 2: print "dateFiled: " + str(doc.dateFiled)
+                doc.date_filed = datetime.datetime(*strptime(cleanDate, "%m-%d-%Y")[0:5])
+                if VERBOSITY >= 2: print "date_filed: " + str(doc.date_filed)
 
                 caseNameShort = caseNames[i].text
-                docketNumber = docketNumbers[i].text
+                docket_number = docket_numbers[i].text
 
-                cite, created = hasDuplicate(docketNumber, caseNameShort)
+                cite, created = hasDuplicate(docket_number, caseNameShort)
                 if VERBOSITY >= 2:
                     print "caseNameShort: " + cite.caseNameShort
-                    print "docketNumber: " + cite.docketNumber + "\n"
+                    print "docket_number: " + cite.docket_number + "\n"
 
                 doc.citation = cite
                 doc.local_path.save(trunc(clean_string(caseNameShort), 80) + ".pdf", myFile)
@@ -1602,21 +1602,21 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # using caseLink, we can get the docketNumber
-                docketNumber = caseNumRegex.search(caseLink).group(1)
+                # using caseLink, we can get the docket_number
+                docket_number = caseNumRegex.search(caseLink).group(1)
 
                 # we can hard-code this b/c the D.C. Court paywalls all
                 # unpublished opinions.
-                doc.documentType = "Published"
+                doc.precedential_status = "Published"
 
                 # caseDate is next on the block
                 caseDate = datetime.date.today()
-                doc.dateFiled = caseDate
+                doc.date_filed = caseDate
 
                 caseNameShort = aTags[i].next.next.next
 
-                # now that we have the docketNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(docketNumber, caseNameShort)
+                # now that we have the docket_number and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docket_number, caseNameShort)
 
                 # if that goes well, we save to the DB
                 doc.citation = cite
@@ -1695,15 +1695,15 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                # next: docketNumber
-                docketNumber = trTags[i].td.nextSibling.nextSibling.contents[0]
+                # next: docket_number
+                docket_number = trTags[i].td.nextSibling.nextSibling.contents[0]
 
-                # next: dateFiled
-                dateFiled = trTags[i].td.contents[0].strip()
-                splitDate = dateFiled.split("-")
-                dateFiled = datetime.date(int(splitDate[0]), int(splitDate[1]),
+                # next: date_filed
+                date_filed = trTags[i].td.contents[0].strip()
+                splitDate = date_filed.split("-")
+                date_filed = datetime.date(int(splitDate[0]), int(splitDate[1]),
                     int(splitDate[2]))
-                doc.dateFiled = dateFiled
+                doc.date_filed = date_filed
 
                 # next: caseNameShort
                 caseNameShort = trTags[i].td.nextSibling.nextSibling.nextSibling\
@@ -1712,19 +1712,19 @@ def scrapeCourt(courtID):
                     .replace('[ERRATA]', '').replace('[CORRECTED]', '')
                 caseNameShort = titlecase(caseNameShort.lower())
 
-                # next: documentType
-                documentType = trTags[i].td.nextSibling.nextSibling.nextSibling\
+                # next: precedential_status
+                precedential_status = trTags[i].td.nextSibling.nextSibling.nextSibling\
                     .nextSibling.nextSibling.nextSibling.nextSibling.nextSibling\
                     .contents[0].strip()
                 # normalize the RESULT for our internal purposes...
-                if documentType == "Nonprecedential":
-                    documentType = "Unpublished"
-                elif documentType == "Precedential":
-                    documentType = "Published"
-                doc.documentType = documentType
+                if precedential_status == "Nonprecedential":
+                    precedential_status = "Unpublished"
+                elif precedential_status == "Precedential":
+                    precedential_status = "Published"
+                doc.precedential_status = precedential_status
 
-                # now that we have the docketNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(docketNumber, caseNameShort)
+                # now that we have the docket_number and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docket_number, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite
@@ -1756,15 +1756,15 @@ def scrapeCourt(courtID):
 
             if 'slipopinion' in url:
                 caseLinks = tree.xpath('//table/tr/td[4]/a')
-                docketNumbers = tree.xpath('//table/tr/td[3]')
+                docket_numbers = tree.xpath('//table/tr/td[3]')
                 caseDates = tree.xpath('//table/tr/td[2]')
             elif 'in-chambers' in url:
                 caseLinks = tree.xpath('//table/tr/td[3]/a')
-                docketNumbers = tree.xpath('//table/tr/td[2]')
+                docket_numbers = tree.xpath('//table/tr/td[2]')
                 caseDates = tree.xpath('//table/tr/td[1]')
             elif 'relatingtoorders' in url:
                 caseLinks = tree.xpath('//table/tr/td[3]/a')
-                docketNumbers = tree.xpath('//table/tr/td[2]')
+                docket_numbers = tree.xpath('//table/tr/td[2]')
                 caseDates = tree.xpath('//table/tr/td[1]')
 
             if DAEMONMODE:
@@ -1806,19 +1806,19 @@ def scrapeCourt(courtID):
                 else:
                     dupCount = 0
 
-                docketNumber = docketNumbers[i].text
-                if VERBOSITY >= 2: print "docketNumber: " + docketNumber
+                docket_number = docket_numbers[i].text
+                if VERBOSITY >= 2: print "docket_number: " + docket_number
 
                 caseNameShort = caseLinks[i].text
                 if VERBOSITY >= 2: print "caseNameShort: " + caseNameShort
 
                 if 'slipopinion' in url:
-                    doc.documentType = "Published"
+                    doc.precedential_status = "Published"
                 elif 'in-chambers' in url:
-                    doc.documentType = "In-chambers"
+                    doc.precedential_status = "In-chambers"
                 elif 'relatingtoorders' in url:
-                    doc.documentType = "Relating-to"
-                if VERBOSITY >= 2: print "documentType: " + doc.documentType
+                    doc.precedential_status = "Relating-to"
+                if VERBOSITY >= 2: print "precedential_status: " + doc.precedential_status
 
                 try:
                     if '/' in caseDates[i].text:
@@ -1828,13 +1828,13 @@ def scrapeCourt(courtID):
                     year = int("20" + splitDate[2])
                     caseDate = datetime.date(year, int(splitDate[0]),
                         int(splitDate[1]))
-                    doc.dateFiled = caseDate
+                    doc.date_filed = caseDate
                     if VERBOSITY >= 2: print "caseDate: " + str(caseDate)
                 except:
                     RESULT += "Error obtaining date field for " + caseLink
 
-                # now that we have the docketNumber and caseNameShort, we can dup check
-                cite, created = hasDuplicate(docketNumber, caseNameShort)
+                # now that we have the docket_number and caseNameShort, we can dup check
+                cite, created = hasDuplicate(docket_number, caseNameShort)
 
                 # last, save evrything (pdf, citation and document)
                 doc.citation = cite

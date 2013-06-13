@@ -47,7 +47,7 @@ def dump_all_cases():
     # Get the documents from the database.
     qs = Document.objects.all()
     docs_to_dump = queryset_generator_by_date(qs,
-                                              'dateFiled',
+                                              'date_filed',
                                               start_date,
                                               end_date)
 

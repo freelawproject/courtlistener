@@ -41,14 +41,14 @@ import re
 
 def cleaner(simulate=False, verbose=False):
     '''Re-run the anonymize function across the whole corpus.
-    
-    The anonymize function was previously missing any documents that contained 
+
+    The anonymize function was previously missing any documents that contained
     punctuation before or after an ID. This script re-runs the function, fixing
     the error.
     '''
     docs = queryset_generator(Document.objects.all())
     for doc in docs:
-        text = doc.documentPlainText
+        text = doc.plain_text
         clean_lines = []
         any_mods = []
         for line in text.split('\n'):
@@ -66,7 +66,7 @@ def cleaner(simulate=False, verbose=False):
                 clean_lines.append(line)
 
         if not simulate and any(any_mods):
-            doc.documentPlainText = '\n'.join(clean_lines)
+            doc.plain_text = '\n'.join(clean_lines)
             doc.blocked = True
             doc.date_blocked = date.today()
             doc.save()

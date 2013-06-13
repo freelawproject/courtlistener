@@ -48,12 +48,12 @@ import urllib2
 
 DEBUG = True
 
-def build_date_range(dateFiled, range=5):
+def build_date_range(date_filed, range=5):
     '''Build a date range to be handed off to a solr query
 
     '''
-    after = dateFiled - datetime.timedelta(days=5)
-    before = dateFiled + datetime.timedelta(days=6)
+    after = date_filed - datetime.timedelta(days=5)
+    before = date_filed + datetime.timedelta(days=6)
     date_range = '[%sZ TO %sZ]' % (after.isoformat(),
                                    before.isoformat())
     return date_range
@@ -76,7 +76,7 @@ def load_stopwords():
     stopwords_file.close()
     return stopwords
 
-def make_solr_query(content, caseName, court, dateFiled, num_q_words=5, DEBUG=False):
+def make_solr_query(content, caseName, court, date_filed, num_q_words=5, DEBUG=False):
     '''Grab words from the content and returns them to the caller.
 
     This function attempts to choose words from the content that would return
@@ -87,7 +87,7 @@ def make_solr_query(content, caseName, court, dateFiled, num_q_words=5, DEBUG=Fa
     '''
     main_params = {}
     main_params['fq'] = ['court_exact:%s' % court,
-                         'dateFiled:%s' % build_date_range(dateFiled)]
+                         'dateFiled:%s' % build_date_range(date_filed)]
     main_params['rows'] = 100
     stopwords = load_stopwords()
     words = content.split()
@@ -149,15 +149,15 @@ def make_solr_query(content, caseName, court, dateFiled, num_q_words=5, DEBUG=Fa
     return main_params
 
 def get_dup_stats(case):
-    '''The heart of the duplicate algorithm. Returns stats about the case as 
+    '''The heart of the duplicate algorithm. Returns stats about the case as
     compared to other cases already in the system. Other methods can call this
     one, and can make decisions based on the stats generated here.
-    
+
     If no likely duplicates are encountered, stats are returned as zeroes.
-    
+
     Process:
         1. Refine the possible result set down to just a few candidates.
-        2. Determine their likelihood of being duplicates according to a 
+        2. Determine their likelihood of being duplicates according to a
            number of measures:
             - Similarity of case name
             - Similarity of docket number
@@ -166,7 +166,7 @@ def get_dup_stats(case):
     stats = []
     DEBUG = True
 
-    ###################################### 
+    ######################################
     # 1: Refine by date, court and words #
     ######################################
     num_q_words = 5
@@ -183,7 +183,7 @@ def get_dup_stats(case):
                                       num_q_words)
         conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
         search_candidates = conn.raw_query(**main_params).execute()
-        # Refine to only documents gathered from the court website. Cannot do 
+        # Refine to only documents gathered from the court website. Cannot do
         # this in the query since this field is stored not indexed.
         candidates = []
         for candidate in search_candidates:
@@ -205,7 +205,7 @@ def get_dup_stats(case):
     # 2: Attempt filtering by docket number #
     #########################################
     # Two-step process. First we see if we have any exact hits.
-    # Second, if there were exact hits, we forward those onwards. If not, we 
+    # Second, if there were exact hits, we forward those onwards. If not, we
     # forward everything.
     remaining_candidates = []
     new_docket_number = re.sub("\D", "", case.docket_number)
@@ -288,20 +288,20 @@ def import_and_report_records():
     # do this 1000 times
     for doc in docs:
         court = doc.court_id
-        date = doc.dateFiled
+        date = doc.date_filed
         casename = doc.citation.caseNameFull
-        docketNumber = doc.citation.docketNumber
-        content = doc.documentPlainText
+        docket_number = doc.citation.docket_number
+        content = doc.plain_text
         id = num_to_ascii(doc.pk)
         if content == "":
             # HTML content!
-            content = doc.documentHTML
+            content = doc.html
             br = re.compile(r'<br/?>')
             content = br.sub(' ', content)
             p = re.compile(r'<.*?>')
             content = p.sub('', content)
 
-        dups = check_dup(court, date, casename, content, docketNumber, id, True)
+        dups = check_dup(court, date, casename, content, docket_number, id, True)
 
         if len(dups) > 0:
             # duplicate(s) were found, write them out to a log

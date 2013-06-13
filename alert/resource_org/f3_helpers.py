@@ -57,18 +57,18 @@ def add_case(case):
 
     # Make a citation
     cite = Citation(case_name=case.case_name,
-                    docketNumber=case.docket_number,
+                    docket_number=case.docket_number,
                     west_cite=case.west_cite)
 
     # Make the document object
     doc = Document(source='R',
-                   documentSHA1=case.sha1_hash,
-                   dateFiled=case.case_date,
+                   sha1=case.sha1_hash,
+                   date_filed=case.case_date,
                    court=court,
                    download_URL=case.download_url,
-                   documentType=case.precedential_status)
+                   precedential_status=case.precedential_status)
 
-    doc.documentHTML, blocked = anonymize(case.body)
+    doc.html, blocked = anonymize(case.body)
     if blocked:
         doc.blocked = True
         doc.date_blocked = datetime.date.today()
@@ -98,7 +98,7 @@ def merge_cases_simple(case, target_id):
 
     doc.source = 'CR'
     doc.citation.west_cite = case.west_cite
-    doc.documentHTML, blocked = anonymize(case.body)
+    doc.html, blocked = anonymize(case.body)
     if blocked:
         doc.blocked = True
         doc.date_blocked = datetime.date.today()
@@ -174,12 +174,12 @@ def need_dup_check_for_date_and_court(case):
     The following MySQL is from the server, and indicates the earliest scraped
     documents in each court:
 
-        mysql> select court_id, min(dateFiled)
+        mysql> select court_id, min(date_filed)
                from Document
                where source = 'C'
                group by court_id;
         +----------+----------------+
-        | court_id | min(dateFiled) |
+        | court_id | min(date_filed) |
         +----------+----------------+
         | ca1      | 1993-01-05     |
         | ca10     | 1995-09-01     |

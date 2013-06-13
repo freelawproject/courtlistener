@@ -15,10 +15,10 @@ import re
 
 def get_document_citations(document):
     '''Identify and return citations from the html or plain text of the document.'''
-    if document.documentHTML:
-        citations = find_citations.get_citations(document.documentHTML)
-    elif document.documentPlainText:
-        citations = find_citations.get_citations(document.documentPlainText,
+    if document.html:
+        citations = find_citations.get_citations(document.html)
+    elif document.plain_text:
+        citations = find_citations.get_citations(document.plain_text,
                                                  html=False)
     else:
         citations = []
@@ -26,12 +26,12 @@ def get_document_citations(document):
 
 
 def create_cited_html(document, citations):
-    if document.documentHTML:
-        new_html = document.documentHTML
+    if document.html:
+        new_html = document.html
         for citation in citations:
             new_html = re.sub(citation.as_regex(), citation.as_html(), new_html)
-    elif document.documentPlainText:
-        inner_html = document.documentPlainText
+    elif document.plain_text:
+        inner_html = document.plain_text
         for citation in citations:
             repl = u'</pre>%s<pre class="inline">' % citation.as_html()
             inner_html = re.sub(citation.as_regex(), repl, inner_html)

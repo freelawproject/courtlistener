@@ -70,13 +70,13 @@ def mkdir_p(path):
 
 def update_date(doc, simulate):
     time.sleep(1)
-    # take the doc, check its dateFiled field, make a hardlink to the PDF
+    # take the doc, check its date_filed field, make a hardlink to the PDF
     # location, and update the database
-    if doc.dateFiled != None:
-        dateFiled = doc.dateFiled
+    if doc.date_filed != None:
+        date_filed = doc.date_filed
     else:
         # break from this function.
-        print "\n***No dateFiled value for doc: " + str(doc.documentUUID) + ". Punting.***\n"
+        print "\n***No date_filed value for doc: " + str(doc.documentUUID) + ". Punting.***\n"
         return(1)
     if doc.local_path != "":
         local_path = doc.local_path
@@ -89,7 +89,7 @@ def update_date(doc, simulate):
     old = os.path.join(root, str(local_path))
 
     # new link
-    year, month, day = str(dateFiled).split("-")
+    year, month, day = str(date_filed).split("-")
     filename = os.path.basename(old)
     new = os.path.join(root, "pdf", year, month, day, filename)
 

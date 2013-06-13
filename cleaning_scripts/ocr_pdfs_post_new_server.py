@@ -42,9 +42,9 @@ from scrapers.tasks import extract_doc_content, extract_by_ocr
 
 def fixer(simulate=False, verbose=False):
     '''OCR documents that lack content'''
-    #docs = queryset_generator(Document.objects.filter(source='C', documentPlainText=''))
-    #docs = Document.objects.raw('''select "documentUUID"  from "Document" where "source" = 'C' and "documentPlainText" ~ '^[[:space:]]*$' ''')
-    docs = Document.objects.raw('''select "documentUUID" from "Document" where "source" = 'C' and "documentPlainText" = 'Unable to extract document content.' ''')
+    #docs = queryset_generator(Document.objects.filter(source='C', plain_text=''))
+    #docs = Document.objects.raw('''select "documentUUID"  from "Document" where "source" = 'C' and "plain_text" ~ '^[[:space:]]*$' ''')
+    docs = Document.objects.raw('''select "documentUUID" from "Document" where "source" = 'C' and "plain_text" = 'Unable to extract document content.' ''')
     for doc in docs:
         if verbose:
             print "Fixing document number %s: %s" % (doc.pk, doc)

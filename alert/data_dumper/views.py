@@ -81,11 +81,11 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
             qs = Document.objects.filter(court=court).order_by()
 
         # check if there are any documents at all
-        dump_has_docs = qs.filter(dateFiled__gte=start_date,
-                                  dateFiled__lte=end_date).exists()
+        dump_has_docs = qs.filter(date_filed__gte=start_date,
+                                  date_filed__lte=end_date).exists()
         if dump_has_docs:
             docs_to_dump = queryset_generator_by_date(qs,
-                                                      'dateFiled',
+                                                      'date_filed',
                                                       start_date,
                                                       end_date)
 

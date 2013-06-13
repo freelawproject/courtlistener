@@ -104,8 +104,8 @@ def match_citation(citation, citing_doc):
         end_year = date.today().year
         if citation.reporter in REPORTER_DATES:
             start_year, end_year = REPORTER_DATES[citation.reporter]
-        if citing_doc.dateFiled:
-            end_year = min(end_year, citing_doc.dateFiled.year)
+        if citing_doc.date_filed:
+            end_year = min(end_year, citing_doc.date_filed.year)
     date_param = 'dateFiled:%s' % build_date_range(start_year, end_year)
     main_params['fq'].append(date_param)
     if not citation.court and citation.reporter in ["U.S.", "U. S."]:

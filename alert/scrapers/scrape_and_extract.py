@@ -133,7 +133,7 @@ def scrape_court(site, full_crawl=False):
         sha1_hash = hashlib.sha1(r.content).hexdigest()
 
         # using the hash, check for a duplicate in the db.
-        exists = Document.objects.filter(documentSHA1=sha1_hash).exists()
+        exists = Document.objects.filter(sha1=sha1_hash).exists()
 
         # If the doc is a dup, increment the dup_count variable and set the
         # dup_found_date
@@ -179,17 +179,17 @@ def scrape_court(site, full_crawl=False):
             # Make a citation
             cite = Citation(case_name=site.case_names[i])
             if site.docket_numbers is not None:
-                cite.docketNumber = site.docket_numbers[i]
+                cite.docket_number = site.docket_numbers[i]
             if site.neutral_citations is not None:
                 cite.neutral_cite = site.neutral_citations[i]
 
             # Make the document object
             doc = Document(source='C',
-                           documentSHA1=sha1_hash,
-                           dateFiled=site.case_dates[i],
+                           sha1=sha1_hash,
+                           date_filed=site.case_dates[i],
                            court=court,
                            download_URL=site.download_urls[i],
-                           documentType=site.precedential_statuses[i])
+                           precedential_status=site.precedential_statuses[i])
 
             # Make and associate the file object
             try:

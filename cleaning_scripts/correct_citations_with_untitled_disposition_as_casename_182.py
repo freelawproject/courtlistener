@@ -51,7 +51,7 @@ def cleaner(simulate=False, verbose=False):
     be live in the search system.
     '''
     queryset = Document.search.query('@casename "unpublished disposition"')
-    docs = queryset.set_options(mode="SPH_MATCH_EXTENDED2").order_by('-dateFiled')
+    docs = queryset.set_options(mode="SPH_MATCH_EXTENDED2").order_by('-date_filed')
     if verbose:
         print "%s results found." % (docs.count())
 
@@ -65,7 +65,7 @@ def cleaner(simulate=False, verbose=False):
             doc.citation.caseNameFull = casename
             doc.citation.caseNameShort = trunc(casename, 100)
             doc.citation.slug = trunc(slugify(casename), 50)
-            doc.documentType = "Unpublished"
+            doc.precedential_status = "Unpublished"
             if not simulate:
                 doc.citation.save()
                 doc.save()

@@ -15,8 +15,8 @@ class SearchDocument(object):
 
         # Standard fields
         self.id = doc.pk
-        if doc.dateFiled is not None:
-            self.dateFiled = datetime.combine(doc.dateFiled, time())
+        if doc.date_filed is not None:
+            self.dateFiled = datetime.combine(doc.date_filed, time())
         self.court = doc.court.short_name
         self.court_id = doc.court.courtUUID
         self.court_citation_string = doc.court.citation_string
@@ -25,11 +25,11 @@ class SearchDocument(object):
             self.absolute_url = doc.get_absolute_url()
         except AttributeError, NoReverseMatch:
             raise InvalidDocumentError
-        self.docketNumber = doc.citation.docketNumber
+        self.docketNumber = doc.citation.docket_number
         self.westCite = doc.citation.west_cite
-        self.lexisCite = doc.citation.lexisCite
+        self.lexisCite = doc.citation.lexis_cite
         self.neutralCite = doc.citation.neutral_cite
-        self.status = doc.get_documentType_display()
+        self.status = doc.get_precedential_status_display()
         self.source = doc.source
         self.download_url = doc.download_URL
         self.local_path = unicode(doc.local_path)
@@ -45,5 +45,5 @@ class SearchDocument(object):
         self.text = text_template.render(c).translate(null_map)
 
         # Faceting fields
-        self.status_exact = doc.get_documentType_display()
+        self.status_exact = doc.get_precedential_status_display()
         self.court_exact = doc.court.courtUUID

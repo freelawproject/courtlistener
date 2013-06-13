@@ -53,8 +53,8 @@ def cleaner(simulate=False, verbose=True):
         if verbose:
             print "http://courtlistener.com" + doc.get_absolute_url()
         # Correct the text
-        text = doc.documentPlainText
-        doc.documentPlainText = fix_mojibake(text)
+        text = doc.plain_text
+        doc.plain_text = fix_mojibake(text)
 
         # Save the case
         if not simulate:

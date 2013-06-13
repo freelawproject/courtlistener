@@ -105,18 +105,18 @@ def main():
                 # This catches all exceptions regardless of their trigger, so
                 # if one court dies, the next isn't affected.
                 try:
-                    docs = Document.objects.filter(documentPlainText="", documentHTML="",
+                    docs = Document.objects.filter(plain_text="", html="",
                                                    court__courtUUID=court, source="C",
-                                                   dateFiled__gte=filter_time)
+                                                   date_filed__gte=filter_time)
                     extract_all_docs(docs)
                 except Exception:
                     print '*****Uncaught error parsing court*****\n"' + traceback.format_exc() + "\n\n"
         else:
             # We just do the court requested
             print "NOW PARSING COURT: %s" % court
-            docs = Document.objects.filter(documentPlainText="", documentHTML="",
+            docs = Document.objects.filter(plain_text="", html="",
                                            court__courtUUID=court, source="M",
-                                           dateFiled__gte=filter_time)
+                                           date_filed__gte=filter_time)
             extract_all_docs(docs)
 
     exit(0)

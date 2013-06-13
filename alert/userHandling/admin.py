@@ -36,11 +36,11 @@ class DocumentAdmin(admin.ModelAdmin):
     # ordering is brutal on MySQL. Don't put it here. Sorry.
     #list_display = ('citation',)
     #list_filter = ('court',)
-    fields = ('source', 'documentSHA1', 'dateFiled', 'court',
+    fields = ('source', 'sha1', 'date_filed', 'court',
               'excerptSummary', 'download_URL',
-              'local_path', 'documentPlainText', 'documentHTML',
-              'documentType',)
-    search_fields = ['@documentPlainText']
+              'local_path', 'plain_text', 'html',
+              'precedential_status',)
+    search_fields = ['@plain_text']
 
 
 class FavoriteAdmin(admin.ModelAdmin):
