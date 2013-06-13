@@ -141,6 +141,10 @@ class Citation(models.Model):
                                  max_length=50,
                                  blank=True,
                                  null=True)
+    west_state_cite = models.CharField("WestLaw state citation",
+                                       max_length=50,
+                                       blank=True,
+                                       null=True)
     neutral_cite = models.CharField('Neutral citation',
                                       max_length=50,
                                       blank=True,
