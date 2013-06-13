@@ -26,9 +26,9 @@
             {% if doc.citation.west_cite %}
                 {{doc.citation.west_cite}}
             {% else %}
-                {{doc.citation.docketNumber}}
+                {{doc.citation.docket_number}}
             {% endif %}
-            ({% if doc.court.citation_string != 'SCOTUS' %}{{doc.court.citation_string|nbsp}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
+            ({% if doc.court.citation_string != 'SCOTUS' %}{{doc.court.citation_string|nbsp}}&nbsp;{% endif %}{{doc.date_filed|date:"Y"}})
         </h2>
 
         <div id="cited-by-viewer">
@@ -38,15 +38,15 @@
                 <ul>
                     {% for case in citing_cases.object_list %}
                         {# Changing the attributes on this li may break the js above. #}
-                        <li class="citing-case {{ case.court.courtUUID }} {{ case.dateFiled.year|default:'0' }}">
+                        <li class="citing-case {{ case.court.courtUUID }} {{ case.date_filed.year|default:'0' }}">
                             <span class="citation-name"><a href="{{case.get_absolute_url}}">{{ case.citation.case_name|v_wrapper }},
                             {% if case.citation.west_cite %}
                                 {{case.citation.west_cite}}
                             {% else %}
-                                {{case.citation.docketNumber}}
+                                {{case.citation.docket_number}}
                             {% endif %}</a></span><br/>
                             {{ case.court }} |
-                            {{ case.dateFiled }} |
+                            {{ case.date_filed }} |
                             {% if case.citation_count != 0 %}
                                 <a href="{{case.get_absolute_url}}cited-by/">
                                     Cited {{ case.citation_count }} time{{ case.citation_count|pluralize }}

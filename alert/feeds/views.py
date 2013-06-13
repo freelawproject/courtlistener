@@ -185,7 +185,7 @@ class cited_by_feed(Feed):
 
     def items(self, obj):
         '''Return the latest 20 cases citing this one.'''
-        return obj.citation.citing_cases.all().order_by('-dateFiled')[:20]
+        return obj.citation.citing_cases.all().order_by('-date_filed')[:20]
 
     def item_link(self, item):
         return item.get_absolute_url()
@@ -194,12 +194,12 @@ class cited_by_feed(Feed):
         return item.court
 
     def item_pubdate(self, item):
-        return datetime.datetime.combine(item.dateFiled, datetime.time())
+        return datetime.datetime.combine(item.date_filed, datetime.time())
 
     def item_title(self, item):
         return item
 
     def item_categories(self, item):
-        return [item.documentType, ]
+        return [item.precedential_status, ]
 
     description_template = 'feeds/template.html'

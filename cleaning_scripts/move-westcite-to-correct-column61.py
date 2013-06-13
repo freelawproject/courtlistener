@@ -33,7 +33,7 @@ def db_corrector(simulate, verbose):
 
     This one-off script iterates over all documents currently in the system
     that were imported from resource.org, and moves their citation information
-    from the caseNumber field to the docketNumber field.
+    from the caseNumber field to the docket_number field.
 
     Once that is complete, it pulls the HTML for the document, and extracts
     the docket number from it, if possible. Since we already have the West
@@ -43,19 +43,19 @@ def db_corrector(simulate, verbose):
     docs = queryset_generator(Document.objects.filter(source = 'R'))
     for doc in docs:
         if verbose:
-            print "Assigning %s to west_cite on doc %s" % (doc.citation.docketNumber, doc.documentUUID)
-        doc.citation.west_cite = doc.citation.docketNumber
+            print "Assigning %s to west_cite on doc %s" % (doc.citation.docket_number, doc.documentUUID)
+        doc.citation.west_cite = doc.citation.docket_number
 
         # Gather the docket number
         try:
-            htmlTree = fromstring(doc.documentHTML)
+            htmlTree = fromstring(doc.html)
             docket = htmlTree.xpath('//p[@class = "docket"]')[0].text
             docket = docket.replace('No. ', '').strip('.')
-            doc.citation.docketNumber = docket
+            doc.citation.docket_number = docket
         except IndexError:
             if verbose:
                 print "Failed to get docket number from text."
-            doc.citation.docketNumber = None
+            doc.citation.docket_number = None
         if not simulate:
             doc.citation.save()
 

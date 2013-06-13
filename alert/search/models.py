@@ -44,12 +44,12 @@ DOCUMENT_SOURCES = (
 
 def make_pdf_upload_path(instance, filename):
     """Return a string like pdf/2010/08/13/foo_v._var.pdf, with the date set
-    as the dateFiled for the case."""
+    as the date_filed for the case."""
     # this code NOT cross platform. Use os.path.join or similar to fix.
     mimetype = filename.split('.')[-1] + '/'
 
     try:
-        path = mimetype + instance.dateFiled.strftime("%Y/%m/%d/") + \
+        path = mimetype + instance.date_filed.strftime("%Y/%m/%d/") + \
             get_valid_filename(filename)
     except AttributeError:
         # The date is unknown for the case. Use today's date.
@@ -124,12 +124,12 @@ class Court(models.Model):
 class Citation(models.Model):
     citationUUID = models.AutoField("a unique ID for each citation",
                                     primary_key=True)
-    slug = models.SlugField("URL that the document should map to",
+    slug = models.SlugField("URL that the document should map to (the slug)",
                             max_length=50,
                             null=True)
     case_name = models.TextField("full name of the case",
                                     blank=True)
-    docketNumber = models.CharField("the docket number",
+    docket_number = models.CharField("the docket number",
                                     max_length=100, # sometimes these are consolidated, hence they need to be long.
                                     blank=True,
                                     null=True)
@@ -137,7 +137,7 @@ class Citation(models.Model):
                                 max_length=50,
                                 blank=True,
                                 null=True)
-    lexisCite = models.CharField("LexisNexis citation",
+    lexis_cite = models.CharField("LexisNexis federal citation",
                                  max_length=50,
                                  blank=True,
                                  null=True)
@@ -185,12 +185,12 @@ class Document(models.Model):
                       max_length=3,
                       choices=DOCUMENT_SOURCES,
                       blank=True)
-    documentSHA1 = models.CharField(
+    sha1 = models.CharField(
                       "unique ID for the document, as generated via SHA1 of "
                       "the binary file",
                       max_length=40,
                       db_index=True)
-    dateFiled = models.DateField(
+    date_filed = models.DateField(
                       "the date filed by the court",
                       blank=True,
                       null=True,
@@ -220,10 +220,10 @@ class Document(models.Model):
                       upload_to=make_pdf_upload_path,
                       blank=True,
                       db_index=True)
-    documentPlainText = models.TextField(
+    plain_text = models.TextField(
                       "plain text of the document after extraction",
                       blank=True)
-    documentHTML = models.TextField(
+    html = models.TextField(
                       "HTML of the document",
                       blank=True)
     html_with_citations = models.TextField(
@@ -239,7 +239,7 @@ class Document(models.Model):
                       'the number of times this document is cited by other '
                       'cases',
                       default=0)
-    documentType = models.CharField(
+    precedential_status = models.CharField(
                       "the precedential status of document",
                       max_length=50,
                       blank=True,
@@ -285,7 +285,7 @@ class Document(models.Model):
 
         # Delete the cached sitemaps and dumps if the item is blocked.
         if self.blocked:
-            invalidate_dumps_by_date_and_court(self.dateFiled, self.court_id)
+            invalidate_dumps_by_date_and_court(self.date_filed, self.court_id)
 
     def delete(self, *args, **kwargs):
         '''
@@ -302,7 +302,7 @@ class Document(models.Model):
         delete_doc.delay(self.pk)
 
         # Invalidate the sitemap and dump caches
-        invalidate_dumps_by_date_and_court(self.dateFiled, self.court_id)
+        invalidate_dumps_by_date_and_court(self.date_filed, self.court_id)
 
     class Meta:
         db_table = "Document"

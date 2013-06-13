@@ -81,9 +81,9 @@ def check_fix_list(sha1, fix_dict):
 
 def exceptional_cleaner(caseName):
     '''Cleans common Resource.org special cases off of case names, and
-    sets the documentType for a document.
+    sets the precedential_status for a document.
 
-    Returns caseName, documentType
+    Returns caseName, precedential_status
     '''
     caseName = caseName.lower()
     ca1regex = re.compile('(unpublished disposition )?notice: first circuit local rule 36.2\(b\)6 states unpublished opinions may be cited only in related cases.?')
@@ -101,44 +101,44 @@ def exceptional_cleaner(caseName):
     # Clean off special cases
     if 'first circuit' in caseName:
         caseName = re.sub(ca1regex, '', caseName)
-        documentType = 'Unpublished'
+        precedential_status = 'Unpublished'
     elif 'second circuit' in caseName:
         caseName = re.sub(ca2regex, '', caseName)
-        documentType = 'Unpublished'
+        precedential_status = 'Unpublished'
     elif 'third circuit' in caseName:
         caseName = re.sub(ca3regex, '', caseName)
-        documentType = 'Unpublished'
+        precedential_status = 'Unpublished'
     elif 'fourth circuit' in caseName:
         caseName = re.sub(ca4regex, '', caseName)
-        documentType = 'Unpublished'
+        precedential_status = 'Unpublished'
     elif 'fifth circuit' in caseName:
         caseName = re.sub(ca5regex, '', caseName)
-        documentType = 'Unpublished'
+        precedential_status = 'Unpublished'
     elif 'sixth circuit' in caseName:
         caseName = re.sub(ca6regex, '', caseName)
-        documentType = 'Unpublished'
+        precedential_status = 'Unpublished'
     elif 'seventh circuit' in caseName:
         caseName = re.sub(ca7regex, '', caseName)
-        documentType = 'Unpublished'
+        precedential_status = 'Unpublished'
     elif 'eighth circuit' in caseName:
         caseName = re.sub(ca8regex, '', caseName)
-        documentType = 'Unpublished'
+        precedential_status = 'Unpublished'
     elif 'ninth circuit' in caseName:
         caseName = re.sub(ca9regex, '', caseName)
-        documentType = 'Unpublished'
+        precedential_status = 'Unpublished'
     elif 'tenth circuit' in caseName:
         caseName = re.sub(ca10regex, '', caseName)
-        documentType = 'Unpublished'
+        precedential_status = 'Unpublished'
     elif 'd.c. circuit' in caseName:
         caseName = re.sub(cadcregex, '', caseName)
-        documentType = 'Unpublished'
+        precedential_status = 'Unpublished'
     elif 'federal circuit' in caseName:
         caseName = re.sub(cafcregex, '', caseName)
-        documentType = 'Unpublished'
+        precedential_status = 'Unpublished'
     else:
-        documentType = 'Published'
+        precedential_status = 'Published'
 
-    return caseName, documentType
+    return caseName, precedential_status
 
 
 def scrape_and_parse():
@@ -221,7 +221,7 @@ def scrape_and_parse():
                 print "SHA1 is: %s" % sha1Hash
 
             # using the caselink from above, and the volumeURL, we can get the
-            # documentHTML
+            # html
             absCaseLink = urljoin(volumeURL, caseLink)
             html = urllib2.urlopen(absCaseLink).read()
             htmlTree = fromstring(html)
@@ -319,13 +319,13 @@ def scrape_and_parse():
             if DEBUG >= 4:
                 print "Court is: %s" % court
 
-            # next: west_cite, docketNumber and caseName. Full casename is gotten later.
+            # next: west_cite, docket_number and caseName. Full casename is gotten later.
             west_cite = caseLinks[j].text
-            docketNumber = absCaseLink.split('.')[-2]
+            docket_number = absCaseLink.split('.')[-2]
             caseName = caseLinks[j].get('title')
 
-            caseName, documentType = exceptional_cleaner(caseName)
-            cite, new = hasDuplicate(caseName, west_cite, docketNumber)
+            caseName, precedential_status = exceptional_cleaner(caseName)
+            cite, new = hasDuplicate(caseName, west_cite, docket_number)
             if cite.caseNameShort == '':
                 # No luck getting the case name
                 savedCaseNameShort = check_fix_list(sha1Hash, case_name_short_dict)
@@ -349,9 +349,9 @@ def scrape_and_parse():
                 cite.save()
 
             if DEBUG >= 4:
-                print "documentType: " + documentType
+                print "precedential_status: " + precedential_status
                 print "west_cite: " + cite.west_cite
-                print "docketNumber: " + cite.docketNumber
+                print "docket_number: " + cite.docket_number
                 print "caseName: " + cite.caseNameFull
 
             # date is kinda tricky...details here:
@@ -444,7 +444,7 @@ def scrape_and_parse():
 
             try:
                 doc, created = Document.objects.get_or_create(
-                    documentSHA1=sha1Hash, court=court)
+                    sha1=sha1Hash, court=court)
             except MultipleObjectsReturned:
                 # this shouldn't happen now that we're using SHA1 as the dup
                 # check, but the old data is problematic, so we must catch this.
@@ -452,14 +452,14 @@ def scrape_and_parse():
 
             if created:
                 # we only do this if it's new
-                doc.documentHTML = body
-                doc.documentSHA1 = sha1Hash
+                doc.html = body
+                doc.sha1 = sha1Hash
                 doc.download_URL = "http://bulk.resource.org/courts.gov/c/F2/"\
                     + str(i + 178) + "/" + caseLink
-                doc.dateFiled = caseDate
+                doc.date_filed = caseDate
                 doc.source = "R"
 
-                doc.documentType = documentType
+                doc.precedential_status = precedential_status
                 doc.citation = cite
                 doc.save()
 

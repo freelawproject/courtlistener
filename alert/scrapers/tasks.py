@@ -110,7 +110,7 @@ def extract_from_wpd(doc, path, DEVNULL):
     content = get_clean_body_content(content)
 
     if 'not for publication' in content.lower():
-        doc.documentType = "Unpublished"
+        doc.precedential_status = "Unpublished"
 
     return doc, content, err
 
@@ -147,9 +147,9 @@ def extract_doc_content(pk, callback=None):
         return 2
 
     if extension in ['html', 'wpd']:
-        doc.documentHTML, blocked = anonymize(content)
+        doc.html, blocked = anonymize(content)
     else:
-        doc.documentPlainText, blocked = anonymize(content)
+        doc.plain_text, blocked = anonymize(content)
 
     if blocked:
         doc.blocked = True

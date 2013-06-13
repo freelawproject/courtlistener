@@ -1,8 +1,8 @@
 {% if obj.source == "C" or obj.source == "M" %}
-    <pre>{{obj.documentPlainText|linebreaksbr|truncatewords:"500"|stringformat:"s"}}</pre><br>
+    <pre>{{obj.plain_text|linebreaksbr|truncatewords:"500"|stringformat:"s"}}</pre><br>
 {% endif %}
 {% if obj.source == "R" %}
-    {{obj.documentHTML|safe|truncatewords:"500"}}<br>
+    {{obj.html|safe|truncatewords:"500"}}<br>
 {% endif %}
 
 <a href="{{obj.get_absolute_url}}">Original document</a>

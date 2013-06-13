@@ -39,13 +39,13 @@ MP3_SAMPLE_RATES = (
 
 def make_upload_path(instance, filename):
     """Return a string like audio/2010/08/13/foo_v._var.mp3, with the date set
-    as the dateFiled for the case."""
+    as the date_filed for the case."""
 
     # get the doc that has this audio file as a foreign key.
     doc = Document.object.get(audio = instance.id)
 
     # this code NOT cross platform. Use os.path.join or similar to fix.
-    return 'audio/' + doc.dateFiled.strftime("%Y/%m/%d/") + \
+    return 'audio/' + doc.date_filed.strftime("%Y/%m/%d/") + \
         get_valid_filename(filename)
 
 

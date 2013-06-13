@@ -56,17 +56,17 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 # without the try/except blocks
                 row.set('id', str(doc.documentUUID))
                 row.set('path', doc.get_absolute_url())
-                row.set('sha1', doc.documentSHA1)
+                row.set('sha1', doc.sha1)
                 row.set('court', doc.court.full_name)
                 row.set('download_URL', doc.download_URL)
                 row.set('time_retrieved', str(doc.time_retrieved))
                 # All are wrapped in try/except b/c the value might not be found.
                 try:
-                    row.set('dateFiled', str(doc.dateFiled))
+                    row.set('date_filed', str(doc.date_filed))
                 except:
                     pass
                 try:
-                    row.set('precedentialStatus', doc.documentType)
+                    row.set('precedential_status', doc.precedential_status)
                 except:
                     pass
                 try:
@@ -74,7 +74,7 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 except:
                     pass
                 try:
-                    row.set('docketNumber', doc.citation.docketNumber)
+                    row.set('docket_number', doc.citation.docket_number)
                 except:
                     pass
                 try:
@@ -82,7 +82,7 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 except:
                     pass
                 try:
-                    row.set('lexisCite', doc.citation.lexisCite)
+                    row.set('lexis_cite', doc.citation.lexis_cite)
                 except:
                     pass
                 try:
@@ -117,10 +117,10 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 # Gather the doc text
                 if doc.html_with_citations:
                     row.text = doc.html_with_citations.translate(null_map)
-                elif doc.documentHTML:
-                    row.text = doc.documentHTML
+                elif doc.html:
+                    row.text = doc.html
                 else:
-                    row.text = doc.documentPlainText.translate(null_map)
+                    row.text = doc.plain_text.translate(null_map)
             except ValueError:
                 # Null byte found. Punt.
                 continue

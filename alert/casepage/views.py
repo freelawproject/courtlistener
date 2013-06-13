@@ -89,7 +89,7 @@ def view_case(request, court, pk, casename):
 
     # get most influential cases that cite this case
     cited_by_trunc = doc.citation.citing_cases.select_related(
-          'citation').order_by('-citation_count', '-dateFiled')[:5]
+          'citation').order_by('-citation_count', '-date_filed')[:5]
 
     return render_to_response(
                   'view_case.html',
@@ -111,7 +111,7 @@ def view_case_citations(request, pk, casename):
 
     # Get list of citing cases, ordered by influence
     citing_cases = doc.citation.citing_cases.select_related(
-            'citation', 'court').order_by('-citation_count', '-dateFiled')
+            'citation', 'court').order_by('-citation_count', '-date_filed')
 
     paginator = Paginator(citing_cases, 20, orphans=2)
     page = request.GET.get('page')

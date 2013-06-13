@@ -1,5 +1,5 @@
 {# This code must match the code in document_text.txt #}
-{{ object.citation.docketNumber|default_if_none:"" }}
+{{ object.citation.docket_number|default_if_none:"" }}
 {{ object.citation.west_cite|default_if_none:"" }}
-{{ object.citation.lexisCite|default_if_none:"" }}
+{{ object.citation.lexis_cite|default_if_none:"" }}
 {{ object.citation.neutral_cite|default_if_none:""}}

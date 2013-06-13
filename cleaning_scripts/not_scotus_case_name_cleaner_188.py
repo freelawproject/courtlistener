@@ -42,7 +42,7 @@ import re
 
 
 def cleaner(simulate=False, verbose=False):
-    docs = queryset_generator(Document.objects.filter(dateFiled__gt = '1993-08-02'))
+    docs = queryset_generator(Document.objects.filter(date_filed__gt = '1993-08-02'))
     for doc in docs:
         caseNameShortOrig = doc.citation.caseNameShort
         caseNameFullOrig = doc.citation.caseNameFull

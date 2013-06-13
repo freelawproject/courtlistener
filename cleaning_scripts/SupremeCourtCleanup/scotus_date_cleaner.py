@@ -137,7 +137,7 @@ def cleaner(simulate=False, verbose=False):
                 # Update the date in the DB, this is a no brainer
                 if not simulate:
                     splitDate = csv_date_published.split('-')
-                    results[0].dateFiled = datetime.date(int(splitDate[0]),
+                    results[0].date_filed = datetime.date(int(splitDate[0]),
                         int(splitDate[1]), int(splitDate[2]))
                     results[0].save()
 
@@ -154,7 +154,7 @@ def cleaner(simulate=False, verbose=False):
                     # Update the date in the DB. Human says to.
                     if not simulate:
                         splitDate = csv_date_published.split('-')
-                        results[0].dateFiled = datetime.date(int(splitDate[0]),
+                        results[0].date_filed = datetime.date(int(splitDate[0]),
                             int(splitDate[1]), int(splitDate[2]))
                         results[0].save()
 
@@ -197,7 +197,7 @@ def cleaner(simulate=False, verbose=False):
                 # Update the date in the DB
                 if not simulate:
                     splitDate = csv_date_published.split('-')
-                    results[i].dateFiled = datetime.date(int(splitDate[0]),
+                    results[i].date_filed = datetime.date(int(splitDate[0]),
                         int(splitDate[1]), int(splitDate[2]))
                     results[i].save()
 

@@ -72,7 +72,7 @@
                                     {% if case.citation.west_cite %}
                                         {{case.citation.west_cite}}
                                     {% else %}
-                                        {{case.citation.docketNumber}}
+                                        {{case.citation.docket_number}}
                                     {% endif %}
                                 </a>
                             </li>
@@ -155,9 +155,9 @@
             {% if doc.citation.west_cite %}
                 {{doc.citation.west_cite}}
             {% else %}
-                {{doc.citation.docketNumber}}
+                {{doc.citation.docket_number}}
             {% endif %}
-            ({% if doc.court.citation_string != 'SCOTUS' %}{{doc.court.citation_string|nbsp}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
+            ({% if doc.court.citation_string != 'SCOTUS' %}{{doc.court.citation_string|nbsp}}&nbsp;{% endif %}{{doc.date_filed|date:"Y"}})
         </h2>
         <div id="modal-rel">
             {# Modal box for saving the favorite #}
@@ -223,16 +223,16 @@
         <h3>{{court}}</h3>
         <p class="bottom">
             <strong>Date Filed:</strong>
-            {% if doc.dateFiled %}
-                {{doc.dateFiled|date:"l, F jS, Y"}}
+            {% if doc.date_filed %}
+                {{doc.date_filed|date:"l, F jS, Y"}}
             {% else %}
                 Unknown date
             {% endif %}
         </p>
         <p class="bottom">
             <strong>Status: </strong>
-            {% if doc.documentType %}
-                {{doc.get_documentType_display}}
+            {% if doc.precedential_status %}
+                {{doc.get_precedential_status_display}}
             {% else %}
                 Unknown
             {% endif %}
@@ -242,13 +242,13 @@
                 <span class="meta-data-header">Neutral citation:</span>
                 <span class="meta-data-value">{{ doc.citation.neutral_cite }}</span>
             {% endif %}
-            {% if doc.citation.west_cite and doc.citation.docketNumber %}
+            {% if doc.citation.west_cite and doc.citation.docket_number %}
                 <strong>Docket Number: </strong>
-                {{ doc.citation.docketNumber }}
+                {{ doc.citation.docket_number }}
             {% endif %}
         </p>
         <p>
-            <strong title="SHA1 Hash of the binary or text">Fingerprint:</strong> {{doc.documentSHA1}}
+            <strong title="SHA1 Hash of the binary or text">Fingerprint:</strong> {{doc.sha1}}
         </p>
         <br>
         {% if doc.extracted_by_ocr %}
@@ -263,10 +263,10 @@
             {% if doc.html_with_citations %}
                 {{ doc.html_with_citations|safe }}
             {% else %}
-                {% if doc.documentHTML %}
-                    {{doc.documentHTML|safe}}
+                {% if doc.html %}
+                    {{doc.html|safe}}
                 {% else %}
-                    <pre>{{doc.documentPlainText}}</pre>
+                    <pre>{{doc.plain_text}}</pre>
                 {% endif %}
             {% endif %}
         </div>
