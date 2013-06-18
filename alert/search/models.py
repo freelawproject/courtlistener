@@ -10,7 +10,6 @@ from django.template.defaultfilters import slugify
 from django.utils.text import get_valid_filename
 from django.utils.encoding import smart_unicode
 from django.db import models
-import glob
 import os
 
 # changes here need to be mirrored in the coverage page view and Solr configs
@@ -306,7 +305,8 @@ class Document(models.Model):
         delete_doc.delay(self.pk)
 
         # Invalidate the sitemap and dump caches
-        invalidate_dumps_by_date_and_court(self.date_filed, self.court_id)
+        if self.date_filed:
+            invalidate_dumps_by_date_and_court(self.date_filed, self.court_id)
 
     class Meta:
         db_table = "Document"
