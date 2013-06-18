@@ -41,6 +41,7 @@ def create_cited_html(document, citations):
 
 @task
 def update_document(document):
+    logger = update_document.get_logger()
     print "%s at http://courtlistener.com/admin/search/citation/%s/" % \
         (document.citation.case_name, document.citation.pk)
 

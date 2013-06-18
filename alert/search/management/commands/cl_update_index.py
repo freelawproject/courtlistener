@@ -137,7 +137,7 @@ class Command(BaseCommand):
         """
         Deletes all documents from the database.
         """
-        count = self.si.query('*:*').count()
+        count = self.si.query(text='*:*').count()
 
         if self._proceed_with_deletion(count):
             self.stdout.write('Removing all documents from your index because '

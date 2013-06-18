@@ -18,6 +18,7 @@ from lxml.html.clean import Cleaner
 # adding alert to the front of this breaks celery. Ignore pylint error.
 from citations.tasks import update_document_by_id
 
+import glob
 import os
 import subprocess
 import time
@@ -91,6 +92,7 @@ def extract_from_txt(path):
     """
     try:
         content = open(path).read()
+        err = False
     except:
         err = True
     return content, err
@@ -103,8 +105,8 @@ def extract_from_wpd(doc, path, DEVNULL):
     that's done, we pull out the body of the HTML, and do some minor cleanup
     on it.
     """
-    process = subprocess.Popen(['wpd2html', path, '-'], shell=False,
-        stdout=subprocess.PIPE, stderr=DEVNULL)
+    process = subprocess.Popen(['wpd2html', path], shell=False,
+                               stdout=subprocess.PIPE, stderr=DEVNULL)
     content, err = process.communicate()
 
     content = get_clean_body_content(content)
@@ -172,6 +174,43 @@ def extract_doc_content(pk, callback=None):
     return 0
 
 
+def convert_to_tiff(path, tmp_file_prefix):
+    image_magick_command = ['convert', '-depth', '4', '-density', '300',
+                            '-background', 'white', '+matte', path,
+                            '%s.tiff' % tmp_file_prefix]
+    magick_out = subprocess.check_output(image_magick_command,
+                                         stderr=subprocess.STDOUT)
+    print "Converted to tiffs successfully."
+    return magick_out
+
+
+def convert_to_pngs(path, tmp_file_prefix):
+    image_magick_command = ['convert', '-depth', '4', '-density', '300',
+                            '-background', 'white', '+matte', path,
+                            '%s.png' % tmp_file_prefix]
+    magick_out = subprocess.check_output(image_magick_command,
+                                         stderr=subprocess.STDOUT)
+    print "Converted to pngs successfully."
+    return magick_out
+
+
+def convert_to_txt(tmp_file_prefix, image_type):
+    if image_type == 'tiffs':
+        tesseract_command = ['tesseract', '%s.tiff' % tmp_file_prefix,
+                             tmp_file_prefix, '-l', 'eng']
+        tess_out = subprocess.check_output(tesseract_command,
+                                           stderr=subprocess.STDOUT)
+    elif image_type == 'pngs':
+        for png in sorted(glob.glob('%s*' % tmp_file_prefix)):
+            if 'tiff' not in png:
+                tesseract_command = ['tesseract', png, png[:-4], '-l', 'eng']
+                tess_out = subprocess.check_output(tesseract_command,
+                                                   stderr=subprocess.STDOUT)
+
+    print "Ran Tesseract successfully."
+    return tess_out
+
+
 @task
 def extract_by_ocr(path):
     """Extract the contents of a PDF using OCR
@@ -182,35 +221,63 @@ def extract_by_ocr(path):
     print "Running OCR subtask on %s" % path
     content = ''
     success = False
+    image_type = 'tiffs'
     try:
-        DEVNULL = open('/dev/null', 'w')
+        # The logic here is to try doing OCR with tiffs, and to fall back to
+        # pngs if necessary. Depending on how each step goes, we either
+        # proceed or abort.
         tmp_file_prefix = os.path.join('/tmp', str(time.time()))
-        image_magick_command = ['convert', '-depth', '4', '-density', '300',
-                                '-background', 'white', '+matte', path,
-                                '%s.tiff' % tmp_file_prefix]
-        process = subprocess.Popen(image_magick_command, shell=False,
-                                   stdout=DEVNULL, stderr=DEVNULL)
-        _, err = process.communicate()
-        if not err:
-            print "ran imagemagick successfully."
-            tesseract_command = ['tesseract', '%s.tiff' % tmp_file_prefix,
-                                 tmp_file_prefix, '-l', 'eng']
-            process = subprocess.Popen(tesseract_command, shell=False,
-                                       stdout=DEVNULL, stderr=DEVNULL)
-            _, err = process.communicate()
-            fail_msg = "Unable to extract the content from this file. Please try reading the original."
+        fail_msg = "Unable to extract the content from this file. Please try reading the original."
+        try:
+            convert_to_tiff(path, tmp_file_prefix)
+        except subprocess.CalledProcessError:
+            print "Something failed while converting to tiffs."
+            print "Attempting with pngs."
             try:
-                content = open('%s.txt' % tmp_file_prefix).read()
-                print "Ran OCR successfully."
-                if len(content) == 0:
-                    print "OCR finished, but no content was found in the OCR'ed file."
-                    content = fail_msg
-                success = True
-            except IOError:
-                print ("OCR was unable to finish. It's likely that we couldn't "
-                       "ingest the tiff for the file at: %s" % path)
+                convert_to_pngs(path, tmp_file_prefix)
+                image_type = 'pngs'
+            except subprocess.CalledProcessError:
+                print "Failed to convert to pngs."
                 content = fail_msg
                 success = False
+
+        try:
+            convert_to_txt(tmp_file_prefix, image_type)
+        except subprocess.CalledProcessError:
+            print "Failed to run OCR on the %s" % image_type
+            if image_type == 'tiffs':
+                # We haven't tried pngs yet, try them.
+                try:
+                    convert_to_pngs(path, tmp_file_prefix)
+                    image_type = 'pngs'
+                except subprocess.CalledProcessError:
+                    # All is lost.
+                    print "Failed to convert to pngs."
+                    print "Unable to complete OCR pipeline."
+                    content = fail_msg
+                    success = False
+                try:
+                    convert_to_txt(tmp_file_prefix, image_type)
+                except subprocess.CalledProcessError:
+                    # All is lost.
+                    print "Failed to run OCR on the %s." % image_type
+                    print "Unable to complete OCR pipeline."
+                    content = fail_msg
+                    success = False
+
+        try:
+            if image_type == 'tiffs':
+                content = open('%s.txt' % tmp_file_prefix).read()
+            elif image_type == 'pngs':
+                for txt_file in sorted(glob.glob('%s*' % tmp_file_prefix)):
+                    if 'txt' in txt_file:
+                        content += open(txt_file).read()
+            success = True
+        except IOError:
+            print ("OCR was unable to finish due to not having a txt file created. "
+                   "This usually happens when Tesseract cannot ingest the tiff file at: %" % path)
+            content = fail_msg
+            success = False
 
     finally:
         # Remove tmp_file and the text file
