@@ -5,7 +5,7 @@ import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alert.scrapers.scrape_and_extract import scrape_court, signal_handler
+from alert.scrapers.management.commands.cl_scrape_and_extract import Command
 
 from juriscraper.GenericSite import logger
 from juriscraper.lib.importer import build_module_list
@@ -131,14 +131,14 @@ def back_scrape(mod):
             logger.info("The scraper has stopped.")
             sys.exit(1)
         site.parse()
-        scrape_court(site, full_crawl=True)
+        Command.scrape_court(site, full_crawl=True)
 
 
 def main():
     global die_now
 
     # this line is used for handling SIGKILL, so things can die safely.
-    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGTERM, Command.signal_handler)
 
     usage = 'usage: %prog -c COURTID'
     parser = OptionParser(usage)

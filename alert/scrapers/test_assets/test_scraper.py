@@ -1,18 +1,20 @@
 from datetime import date
 from datetime import datetime
-
+from django.conf import settings
 from juriscraper.GenericSite import GenericSite
+from os.path import join
 
 
 class Site(GenericSite):
     def __init__(self):
         super(Site, self).__init__()
         self.court_id = self.__module__
-        self.url = 'http://localhost:8080/scrapers/test_assets/test_court.xml'
+        self.url = join(settings.INSTALL_ROOT, 'alert/scrapers/test_assets/test_court.xml')
+        self.method = 'LOCAL'
 
     def _get_download_urls(self):
         path = '//opinion/url/text()'
-        return ['http://localhost:8080/scrapers/test_assets/%s' % url for
+        return ['scrapers/test_assets/%s' % url for
                 url in self.html.xpath(path)]
 
     def _get_case_names(self):

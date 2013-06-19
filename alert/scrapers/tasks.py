@@ -141,7 +141,7 @@ def extract_doc_content(pk, callback=None):
         doc, content, err = extract_from_pdf(doc, path, DEVNULL, callback)
     elif extension == 'txt':
         content, err = extract_from_txt(path)
-    elif extension in ['wpd']:
+    elif extension == 'wpd':
         doc, content, err = extract_from_wpd(doc, path, DEVNULL)
     else:
         print ('*****Unable to extract content due to unknown extension: %s '
@@ -171,7 +171,7 @@ def extract_doc_content(pk, callback=None):
     # Identify and link citations within the document content
     update_document_by_id.delay(doc.pk)
 
-    return 0
+    return doc
 
 
 def convert_to_tiff(path, tmp_file_prefix):
@@ -180,7 +180,6 @@ def convert_to_tiff(path, tmp_file_prefix):
                             '%s.tiff' % tmp_file_prefix]
     magick_out = subprocess.check_output(image_magick_command,
                                          stderr=subprocess.STDOUT)
-    print "Converted to tiffs successfully."
     return magick_out
 
 
@@ -190,7 +189,6 @@ def convert_to_pngs(path, tmp_file_prefix):
                             '%s.png' % tmp_file_prefix]
     magick_out = subprocess.check_output(image_magick_command,
                                          stderr=subprocess.STDOUT)
-    print "Converted to pngs successfully."
     return magick_out
 
 
@@ -206,8 +204,6 @@ def convert_to_txt(tmp_file_prefix, image_type):
                 tesseract_command = ['tesseract', png, png[:-4], '-l', 'eng']
                 tess_out = subprocess.check_output(tesseract_command,
                                                    stderr=subprocess.STDOUT)
-
-    print "Ran Tesseract successfully."
     return tess_out
 
 
@@ -218,7 +214,6 @@ def extract_by_ocr(path):
     Convert the PDF to a tiff, then perform OCR on the tiff using Tesseract.
     Take the contents and the exit code and return them to the caller.
     """
-    print "Running OCR subtask on %s" % path
     content = ''
     success = False
     image_type = 'tiffs'
@@ -231,20 +226,16 @@ def extract_by_ocr(path):
         try:
             convert_to_tiff(path, tmp_file_prefix)
         except subprocess.CalledProcessError:
-            print "Something failed while converting to tiffs."
-            print "Attempting with pngs."
             try:
                 convert_to_pngs(path, tmp_file_prefix)
                 image_type = 'pngs'
             except subprocess.CalledProcessError:
-                print "Failed to convert to pngs."
                 content = fail_msg
                 success = False
 
         try:
             convert_to_txt(tmp_file_prefix, image_type)
         except subprocess.CalledProcessError:
-            print "Failed to run OCR on the %s" % image_type
             if image_type == 'tiffs':
                 # We haven't tried pngs yet, try them.
                 try:
@@ -252,16 +243,12 @@ def extract_by_ocr(path):
                     image_type = 'pngs'
                 except subprocess.CalledProcessError:
                     # All is lost.
-                    print "Failed to convert to pngs."
-                    print "Unable to complete OCR pipeline."
                     content = fail_msg
                     success = False
                 try:
                     convert_to_txt(tmp_file_prefix, image_type)
                 except subprocess.CalledProcessError:
                     # All is lost.
-                    print "Failed to run OCR on the %s." % image_type
-                    print "Unable to complete OCR pipeline."
                     content = fail_msg
                     success = False
 

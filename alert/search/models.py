@@ -41,7 +41,7 @@ DOCUMENT_SOURCES = (
 )
 
 
-def make_pdf_upload_path(instance, filename):
+def make_upload_path(instance, filename):
     """Return a string like pdf/2010/08/13/foo_v._var.pdf, with the date set
     as the date_filed for the case."""
     # this code NOT cross platform. Use os.path.join or similar to fix.
@@ -220,7 +220,7 @@ class Document(models.Model):
                       db_index=True)
     local_path = models.FileField(
                       "the location, relative to MEDIA_ROOT, where the files are stored",
-                      upload_to=make_pdf_upload_path,
+                      upload_to=make_upload_path,
                       blank=True,
                       db_index=True)
     plain_text = models.TextField(
