@@ -236,6 +236,7 @@ class Command(BaseCommand):
                     self.stderr.write('Unable to parse time. Please use '
                                       'format: YYYY-MM-DD HH:MM:SS or '
                                       'YYYY-MM-DD.\n')
+                    sys.exit(1)
 
         if options.get('update_mode'):
             if self.verbosity >= 1:

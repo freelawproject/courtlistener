@@ -1,31 +1,21 @@
 import hashlib
-import SimpleHTTPServer
-import SocketServer
-import threading
+import os
 
-
-from datetime import date, timedelta
-from django.conf import settings
-from django.test import TestCase
+from alert.lib.string_utils import trunc
 from alert.lib import sunburnt
 from alert.scrapers.DupChecker import DupChecker
 from alert.scrapers.models import urlToHash
-from alert.scrapers.scrape_and_extract import scrape_court
+from alert.scrapers.management.commands.cl_scrape_and_extract import Command
+from alert.scrapers.tasks import extract_doc_content
+from alert.scrapers.tasks import extract_by_ocr
 from alert.scrapers.test_assets import test_scraper
 from alert.search.models import Court, Document
-from juriscraper.GenericSite import GenericSite
-
-
-PORT = 8080
-
-
-class TestServer(SocketServer.TCPServer):
-    allow_reuse_address = True
-
-
-class SilentHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
-    def log_message(self, format, *args):
-        pass
+from alert import settings
+from celery.task.sets import subtask
+from datetime import date, timedelta
+from django.conf import settings
+from django.core.files.base import ContentFile
+from django.test import TestCase
 
 
 class SetupException(Exception):
@@ -38,15 +28,7 @@ class IngestionTest(TestCase):
 
     def ingest_documents(self):
         site = test_scraper.Site().parse()
-        scrape_court(site)
-
-    @classmethod
-    def setUpClass(cls):
-        # Set up a simple server for the crawler to hit
-        cls.httpd = TestServer(('', PORT), SilentHandler)
-        httpd_thread = threading.Thread(target=cls.httpd.serve_forever)
-        httpd_thread.daemon = True
-        httpd_thread.start()
+        Command.scrape_court(site)
 
     def setUp(self):
         # Clear the Solr index
@@ -54,6 +36,8 @@ class IngestionTest(TestCase):
         if self.si.query(text='*:*').count() > 1000:
             raise SetupException('Solr has more than 1000 items. Will not empty as part of a test.')
         self.si.delete_all()
+
+        self.court = Court.objects.get(pk='test')
 
     def tearDown(self):
         # Clear the Solr index
@@ -63,35 +47,33 @@ class IngestionTest(TestCase):
         site = test_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 6)
 
-
     def test_content_extraction(self):
-        #self.ingest_documents()
-        pass
+        site = test_scraper.Site().parse()
 
-    def test_wpd_extraction(self):
-        '''
-        doc = Document.objects.get(local_path__endswith='wpd')
-        extract_doc_content(doc.pk, callback=subtask(extract_by_ocr))
-        self.assertIn('indiana', doc.html.lower())
-        '''
-        pass
+        test_strings = ['supreme',
+                        'intelligence',
+                        'indiana',
+                        'reagan',
+                        'indiana',
+                        'fidelity']
+        for i in range(0, len(site.case_names)):
+            path = os.path.join(settings.INSTALL_ROOT, 'alert', site.download_urls[i])
+            with open(path) as f:
+                content = f.read()
+                cf = ContentFile(content)
+                extension = Command().get_extension(content)
+            doc = Document(date_filed=site.case_dates[i],
+                           court=self.court)
+            file_name = trunc(site.case_names[i].lower(), 75) + extension
+            doc.local_path.save(file_name, cf, save=False)
+            doc.save(index=False)
+            doc = extract_doc_content(doc.pk, callback=subtask(extract_by_ocr))
+            if extension in ['.html', '.wpd']:
+                self.assertIn(test_strings[i], doc.html.lower())
+            else:
+                self.assertIn(test_strings[i], doc.plain_text.lower())
 
-
-    def test_doc_extraction(self):
-        pass
-
-
-    def test_pdf_extraction(self):
-        pass
-
-    def test_pdf_ocr_extraction(self):
-        pass
-
-    def test_html_extraction(self):
-        pass
-
-    def test_txt_extraction(self):
-        pass
+            doc.delete()
 
 
 class DupcheckerTest(TestCase):
@@ -162,7 +144,7 @@ class DupcheckerTest(TestCase):
         for dup_checker in self.dup_checkers:
             doc = Document(sha1=content_hash, court=self.court)
             doc.save()
-            onwards = dup_checker.should_we_continue(content, date.today(), date.today())
+            onwards = dup_checker.should_we_continue(content_hash, date.today(), date.today())
             if dup_checker.full_crawl:
                 self.assertTrue(onwards, "DupChecker says to abort during a full crawl.")
             else:
@@ -178,7 +160,7 @@ class DupcheckerTest(TestCase):
             doc = Document(sha1=content_hash, court=self.court)
             doc.save()
             # Note that the next case occurs prior to the current one
-            onwards = dup_checker.should_we_continue(content, date.today(), date.today() - timedelta(days=1))
+            onwards = dup_checker.should_we_continue(content_hash, date.today(), date.today() - timedelta(days=1))
             if dup_checker.full_crawl:
                 self.assertTrue(onwards, "DupChecker says to abort during a full crawl.")
             else:

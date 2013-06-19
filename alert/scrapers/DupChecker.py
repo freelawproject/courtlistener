@@ -1,4 +1,3 @@
-import hashlib
 from alert.scrapers.models import urlToHash
 from alert.search.models import Document
 
@@ -15,8 +14,18 @@ class DupChecker(dict):
         self.last_found_date = None
 
     def _increment(self, current_date):
+        """Increments the dup_count and sets the correct date for the latest dup."""
         self.last_found_date = current_date
         self.dup_count += 1
+
+    def reset(self):
+        """Resets the dup counter and date"""
+        self.dup_count = 0
+        self.last_found_date = None
+
+    def update_site_hash(self, hash):
+        self.url2Hash.SHA1 = hash
+        self.url2Hash.save()
 
     def _court_changed(self, url, hash):
         """Determines whether a court website has changed since we last saw it.
@@ -52,15 +61,12 @@ class DupChecker(dict):
             # If it's a full crawl, we don't care about the hash. We do not abort no matter what.
             return False
 
-    def should_we_continue(self, content, current_date, next_date):
+    def should_we_continue(self, content_hash, current_date, next_date):
         """Checks if a we have a document with identical content in the CL corpus by making a hash of the data and
         attempting to look that up.
         """
-        # Make a hash of the data
-        sha1_hash = hashlib.sha1(content).hexdigest()
-
         # using the hash, check for a duplicate in the db.
-        exists = Document.objects.filter(sha1=sha1_hash).exists()
+        exists = Document.objects.filter(sha1=content_hash).exists()
         if exists and not self.full_crawl:
             logger.info('Duplicate found at: %s' % current_date)
             self._increment(current_date)
@@ -86,7 +92,3 @@ class DupChecker(dict):
                 return True
         else:
             return True
-
-    def reset(self):
-        """Resets the dup counter"""
-        self.dup_count = 0

@@ -25,14 +25,14 @@
 #  within this covered work and you are required to mark in reasonable
 #  ways how any modified versions differ from the original version.
 
-# Debug daemon using the -f flag to run it in the foreground. 
+# Debug daemon using the -f flag to run it in the foreground.
 
 start () {
     echo -n "Starting the scraper..."
-    daemon --command="/usr/bin/python /var/www/court-listener/alert/scrapers/scrape_and_extract.py -d -c juriscraper.opinions.united_states" --respawn --name=scraper --user=www-data --verbose
-    
+    daemon --command="/usr/bin/python /var/www/court-listener/alert/manage.py scrape_and_extract -d -c juriscraper.opinions.united_states" --respawn --name=scraper --user=www-data --verbose
+
     RETVAL=$?
-    
+
     if [ $RETVAL = 0 ]
     then
         echo "done."
@@ -46,7 +46,7 @@ stop () {
     echo -n "Stopping the scraper..."
     daemon --stop --name=scraper --user=www-data
     RETVAL=$?
-    
+
     if [ $RETVAL = 0 ]
     then
         echo "done."
@@ -60,12 +60,12 @@ restart () {
     echo -n "Stopping the scraper..."
     daemon --stop --name=scraper --user=www-data
     sleep 1
-    
+
     while true
     do
         # Check if it's still running...
         daemon --running --name=scraper --user=www-data
-        RETVAL=$?    
+        RETVAL=$?
         if [ $RETVAL != '0' ]
         then
             echo "done."
@@ -76,7 +76,7 @@ restart () {
             sleep 1
         fi
     done
-    
+
 }
 
 status () {
