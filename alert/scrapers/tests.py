@@ -9,6 +9,7 @@ from alert.scrapers.management.commands.cl_scrape_and_extract import Command
 from alert.scrapers.tasks import extract_doc_content
 from alert.scrapers.test_assets import test_scraper
 from alert.search.models import Citation, Court, Document
+from alert.search.tests import clear_solr
 from alert import settings
 from celery.task.sets import subtask
 from datetime import date, timedelta
@@ -18,12 +19,6 @@ from django.test import TestCase
 # Gotta have the bad import here for celery
 from scrapers.tasks import extract_by_ocr
 
-
-class SetupException(Exception):
-    def __init__(self, message):
-        Exception.__init__(self, message)
-
-
 class IngestionTest(TestCase):
     fixtures = ['test_court.json']
 
@@ -32,23 +27,16 @@ class IngestionTest(TestCase):
         Command.scrape_court(site)
 
     def setUp(self):
-        # Clear the Solr index
+        # Clear Solr
         self.si = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
-        response = self.si.raw_query(**{'q': '*:*'}).execute()
-        count = response.result.numFound
-        if 0 < count <= 10000:
-            self.si.delete_all()
-            self.si.commit()
-        elif count > 10000:
-            raise SetupException('Solr has more than 10000 items. Will not empty as part of a test.')
+        clear_solr(self.si)
 
         # Set up a handy court object
         self.court = Court.objects.get(pk='test')
 
     def tearDown(self):
         # Clear the Solr index
-        self.si.delete_all()
-        self.si.commit()
+        clear_solr(self.si)
 
     def test_parsing_xml_document_to_site_object(self):
         """Does a basic parse of a site reveal the right number of items?"""
@@ -90,7 +78,7 @@ class IngestionTest(TestCase):
     def test_solr_ingestion_and_deletion(self):
         """Do items get added to the Solr index when they are ingested?"""
         site = test_scraper.Site().parse()
-        path = os.path.join(settings.INSTALL_ROOT, 'alert', site.download_urls[0])  # a PDF
+        path = os.path.join(settings.INSTALL_ROOT, 'alert', site.download_urls[0])  # a simple PDF
         with open(path) as f:
             content = f.read()
             cf = ContentFile(content)
