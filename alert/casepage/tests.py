@@ -1,49 +1,39 @@
-# -*- coding: utf-8 -*-
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-# 
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-#  Under Sections 7(a) and 7(b) of version 3 of the GNU Affero General Public
-#  License, that license is supplemented by the following terms:
-#
-#  a) You are required to preserve this legal notice and all author
-#  attributions in this program and its accompanying documentation.
-#
-#  b) You are prohibited from misrepresenting the origin of any material
-#  within this covered work and you are required to mark in reasonable
-#  ways how any modified versions differ from the original version.
-"""
-This file demonstrates two different styles of tests (one doctest and one
-unittest). These will both pass when you run "manage.py test".
-
-Replace these with more appropriate tests for your application.
-"""
-
+from alert.lib import sunburnt
+from alert.search.models import Citation, Court, Document
+from alert.search.tests import clear_solr
+from alert.scrapers.test_assets import test_scraper
 from django.test import TestCase
+from django.test.client import Client
 
-class SimpleTest(TestCase):
-    def test_basic_addition(self):
-        """
-        Tests that 1 + 1 always equals 2.
-        """
-        self.failUnlessEqual(1 + 1, 2)
+from alert import settings
 
-__test__ = {"doctest": """
-Another way to test that 1 + 1 is equal to 2.
 
->>> 1 + 1 == 2
-True
-"""}
+class ViewDocumentTest(TestCase):
+    fixtures = ['test_court.json']
 
+    def setUp(self):
+        # Set up some handy variables
+        self.court = Court.objects.get(pk='test')
+        self.client = Client()
+
+        # Add a document to the index
+        site = test_scraper.Site().parse()
+        cite = Citation(case_name=site.case_names[0],
+                        docket_number=site.docket_numbers[0],
+                        neutral_cite=site.neutral_citations[0],
+                        west_cite=site.west_citations[0])
+        cite.save(index=False)
+        doc = Document(date_filed=site.case_dates[0],
+                       court=self.court,
+                       citation=cite,
+                       precedential_status=site.precedential_statuses[0])
+        self.doc = doc.save(index=False)
+
+    def tearDown(self):
+        Document.objects.all().delete()
+
+    def test_simple_url_check_for_document(self):
+        """Does the page load properly?"""
+        response = self.client.get('/test/2/asdf/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Tarrant', response.content)
