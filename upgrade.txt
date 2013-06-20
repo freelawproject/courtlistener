@@ -8,6 +8,10 @@ most recent at the top.
 ----------------------------
 
 2013-06-20:
+ - The add_citations script has been converted to a management command. Any previous usages of it will need to be
+   updated to use manage.py cl_add_citations_to_docs. It remains mostly API compatible, but management commands do
+   not support variable numbers of arguments so the doc_ids parameter is now doc_id. It takes an int instead of an
+   iterable.
  -
 
 
