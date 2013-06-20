@@ -65,8 +65,18 @@ INSTALLED_APPS.extend([
 DUMP_DIR = '/var/www/court-listener/alert/assets/media/dumps/'
 
 # Celery settings for production sites
-#BROKER_USER = 'celery'
-#BROKER_PASSWORD = ''
+#BROKER_URL = 'amqp://celery:password@localhost:5672//celery'
+#CELERYD_CONCURRENCY = 24
 
-# In a development machine, this setting makes a broker (like RabbitMQ) unnecessary
+# In a development machine, these setting makes a broker (like RabbitMQ) unnecessary
 CELERY_ALWAYS_EAGER = True
+CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
+
+
+# Test speed-ups
+SOUTH_TESTS_MIGRATE = False
+if 'test' in sys.argv:
+    # Does DB in memory during tests
+    DATABASES['default'] = {'ENGINE': 'django.db.backends.sqlite3'}
+
+
