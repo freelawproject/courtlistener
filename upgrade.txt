@@ -1,0 +1,27 @@
+This file contains notes for upgrades when special instructions are necessary. In general, simply doing an
+
+hg pull -u
+
+is all that's necessary. In the case that special instructions are needed, we will attempt to put them here, with the
+most recent at the top.
+
+----------------------------
+
+2013-06-19:
+ - Numerous changes to the models have been made to rename variables. Please update your database after pulling the
+   code. Note that this may take some time (untested on large DBs):
+
+   manage.py migrate search
+
+ - The dependency on the requests library has been updated to version 1.2.3:
+
+   sudo pip uninstall requests
+   sudo apt-get purge python-requests
+   sudo pip install requests==1.2.3
+
+ - The scrape_and_extract.py script has been converted to the cl_scrape_and_extract management command. It is API
+   compatible in terms of args, but any jobs calling the script will need to be updated.
+
+
+
+

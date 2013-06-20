@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]> <html class="no-js ie6 lt8 lt7 oldie" lang="en"> <![endif]-->
+<!--[if IE 7]>    <html class="no-js ie7 lt8 oldie" lang="en"> <![endif]-->
+<!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en"> <!--<![endif]-->
+    <head>
+        <meta charset="utf-8"/>
+        <meta http-equiv="Content-Language" content="en"/>
+        <meta name="language" content="en_us"/>
+        <meta name="description" content="Create alerts, search for and browse the latest court opinions. Updated automatically with the latest court documents."/>
+        <link rel="author" href="/humans.txt" type="text/plain"/>
+        
+        <meta name="viewport" content="width=device-width,initial-scale=1"/>
+        <link rel="search" type="application/opensearchdescription+xml" title="CourtListener" href="/media/xml/opensearch.xml" />
+        <meta name="application-name" content="CourtListener"/>
+        <meta name="msapplication-tooltip" content="Create alerts, search for and browse the latest court opinions."/>
+        <meta name="msapplication-starturl" content="http://courtlistener.com"/>
+        <meta name="msapplication-navbutton-color" content="#6683B7"/>
+    
+        <link rel="stylesheet" href="/media/css/style.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="/media/css/override.css" type="text/css" media="screen, projection">
+        <script src="/media/js/modernizr-2.0.6.min.js"></script>
+        {% block privacy %}
+            {% if private %}
+                <meta name="robots" content="noindex, noodp, noarchive, noimageindex" />
+            {% else %}
+                {% if private == None %}
+                    <!-- This bit of invalid HTML is to give you a loud warning. -->
+                    <h1>You did not supply the "private" variable to your template.</h1>
+                {% endif %}
+            {% endif %}
+        {% endblock %}
+        <title>{% block title %}CourtListener.com{% endblock %}</title>
+        {% block head %}{% endblock %}
+    </head>
+
+    <body> 
+        <div class="container">
+            {% block header %}
+                <header class="header-container span-24">
+                    <div class="span-7 header" id="header">
+                        <a href="/" tabindex="1">
+                            {% block logo %}
+                                <img src="/media/images/png/logo.png"
+                                     alt="CourtListener logo"
+                                     width="252"
+                                     height="28"/>
+                            {% endblock %}
+                        </a>
+                        
+                        {% block main-nav %}
+                            {% if user.is_authenticated %}
+                                <nav>
+                                    <ul>
+                                        <li><a href="/profile/alerts/" tabindex="2">Alerts</a></li>
+                                        <li><a href="/profile/favorites/" tabindex="3">Favorites</a></li>
+                                        <li><a href="/profile/" tabindex="4">Profile</a></li>
+                                        <li><a href="/sign-out/" tabindex="5">Sign out</a></li>
+                                    </ul>
+                                </nav>
+                            {% else %}
+                                <nav>
+                                    <ul>
+                                        <li><a href="/about/" tabindex="2">About</a></li>
+                                        <li><a href="/coverage/" tabindex="3">Coverage</a></li>
+                                        {% if request.path != "/sign-out/" %}
+                                            <li>
+                                                <a href="{%url sign-in %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}" tabindex="4">
+                                                    Sign in / Register
+                                                </a>
+                                            </li>
+                                        {% else %}
+                                            <li><a href="{%url sign-in %}" tabindex="4">Sign in / Register</a></li>
+                                        {% endif %}
+                                    </ul>
+                                </nav>
+                            {% endif %}
+                        {% endblock %}
+                    </div>
+
+                    {% block search-form %}
+                    <div class="span-17 last" id="searchform">
+                        {% include "search/search_form_snippet.html" %}
+                    </div>
+                    {% endblock %}
+                </header>
+                <hr>
+            {% endblock %}
+
+            {% block sidebar %}
+                <div class="span-6 append-1" id="sidebar">
+                </div>
+            {% endblock %}
+            
+            {# for the settings pages #}
+            {% block nav %}{% endblock %}
+            
+            {% block content %}
+                <div class="span-17 last" id="content">
+                    <p>Your content seems to be missing! This is never good.</p>
+                </div>
+            {% endblock %}
+            
+            {% block footer %}
+                <div class="span-24 last">
+                    <hr class="space">
+                    <hr>
+                </div>
+                <footer class="span-24 last">
+                    <span class="footer-item">
+                        <a href="/about/">About</a>
+                    </span>
+                    <span class="footer-item">
+                        <a href="/dump-info/">Data Dumps</a>
+                    </span>
+                    <span class="footer-item">
+                        <a href="/tools/">Tools</a>
+                    </span>
+                    <span class="footer-item">
+                        <a href="/contribute/">Contribute</a>
+                    </span>
+                    <span class="footer-item">
+                        <a href="/coverage/">Coverage</a>
+                    </span>
+                    <span class="footer-item">
+                        <a href="/removal/">Removal</a>
+                    </span>
+                    <span class="footer-item">
+                        <a href="/terms/">Terms &amp; Privacy</a>
+                    </span>
+                    <span class="footer-item">
+                        <a href="/sitemap/">Sitemap</a>
+                    </span>
+                    <span class="footer-item">
+                        <a href="/contact/">Contact / Engage</a>
+                    </span>
+                </footer>
+            {% endblock %}
+        </div>
+        
+        {# Set up jquery to be on every page. Doesn't hurt thanks to caching #}
+        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
+        <script>window.jQuery || document.write('<script src="/media/js/jquery-1.6.2.min.js"><\/script>')</script>
+        
+        {# Allows your own scripts in the footer. #}
+        {% block footer-scripts %}{% endblock %}
+        
+        {% if not user.is_superuser  %}
+            <!-- Piwik -->
+            <script type="text/javascript">
+            Modernizr.load({
+            	load: 'http://piwik.courtlistener.com/piwik.js',
+            	complete: function() {
+            		try {
+            			var piwikTracker = Piwik.getTracker('http://piwik.courtlistener.com/piwik.php', 1);
+            			piwikTracker.trackPageView();
+                        piwikTracker.enableLinkTracking();
+            		} catch(err) {}
+            	}
+            });
+            </script><noscript><p><img src="http://piwik.courtlistener.com/piwik.php?idsite=1" style="border:0" alt=""/></p></noscript>
+            <!-- End Piwik Tag -->
+        {% endif %}
+        <!--[if lt IE 8 ]>
+		    <script src="//ajax.googleapis.com/ajax/libs/chrome-frame/1.0.3/CFInstall.min.js"></script>
+		    <script>window.attachEvent('onload',function(){CFInstall.check({mode:'inline', url:'/bad-browser/', cssText: 'width: 100%; height: 200px;' })})</script>
+	    <![endif]-->
+    </body>
+</html>
