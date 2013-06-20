@@ -1,20 +1,10 @@
-import os
-
-from alert.lib.string_utils import trunc
 from alert.lib import sunburnt
 from alert.search.models import Citation, Court, Document
-from alert.scrapers.management.commands.cl_scrape_and_extract import Command
-from alert.scrapers.tasks import extract_doc_content
 from alert.scrapers.test_assets import test_scraper
-from celery.task.sets import subtask
-from django.core.files.base import ContentFile
 from django.test import TestCase
 from django.test.client import Client
 
 from alert import settings
-
-# Gotta have the bad import here for celery
-from scrapers.tasks import extract_by_ocr
 
 
 class SetupException(Exception):
@@ -47,11 +37,6 @@ class SearchTest(TestCase):
 
         # Add a document to the index
         site = test_scraper.Site().parse()
-        path = os.path.join(settings.INSTALL_ROOT, 'alert', site.download_urls[0])  # a simple PDF
-        with open(path) as f:
-            content = f.read()
-            cf = ContentFile(content)
-            extension = Command().get_extension(content)
         cite = Citation(case_name=site.case_names[0],
                         docket_number=site.docket_numbers[0],
                         neutral_cite=site.neutral_citations[0],
@@ -61,12 +46,11 @@ class SearchTest(TestCase):
                        court=self.court,
                        citation=cite,
                        precedential_status=site.precedential_statuses[0])
-        file_name = trunc(site.case_names[0].lower(), 75) + extension
-        doc.local_path.save(file_name, cf, save=False)
-        doc.save(index=False)
-        extract_doc_content(doc.pk, callback=subtask(extract_by_ocr))
+        self.doc = doc.save()
 
     def tearDown(self):
+        self.doc.delete()
+
         clear_solr(self.si)
 
     def test_a_simple_text_query(self):
