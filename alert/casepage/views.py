@@ -48,7 +48,7 @@ def view_case(request, court, pk, casename):
     pk = ascii_to_num(pk)
 
     # Look up the court, document, title and favorite information
-    doc = get_object_or_404(Document, sha1=pk)
+    doc = get_object_or_404(Document, pk=pk)
     ct = get_object_or_404(Court, courtUUID=court)
     title = trunc(doc.citation.case_name, 100)
     user = request.user
