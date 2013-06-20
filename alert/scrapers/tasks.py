@@ -159,14 +159,14 @@ def extract_doc_content(pk, callback=None):
 
     if err:
         print "****Error extracting text from %s: %s****" % (extension, doc)
-        return 1
+        return doc
 
     try:
         doc.save()
     except Exception, e:
         print "****Error saving text to the db for: %s****" % doc
         print traceback.format_exc()
-        return 3
+        return doc
 
     # Identify and link citations within the document content
     update_document_by_id.delay(doc.pk)

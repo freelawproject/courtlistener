@@ -229,6 +229,15 @@ class SolrInterface(object):
         if not self.readable:
             raise TypeError("This Solr instance is only for writing")
         r = RawSolrSearch(self)
+
+        try:
+            if type(args[0]) == dict:
+                # A developer forgot to unpack the dict when calling this.
+                raise TypeError('Passing a dict to raw_query is not supported. '
+                                'Parameters must be either keyword-value pairs or unpacked using **.')
+        except IndexError:
+            # No args has len 0, no problems here, onwards we go.
+            pass
         if len(args) + len(kwargs) > 0:
             return r.query(*args, **kwargs)
         else:
