@@ -106,6 +106,14 @@ MESSAGE_TAGS = {
 # Solr settings
 SOLR_URL = 'http://127.0.0.1:8983/solr'
 
+
+# Public celery settings
+# Rate limits aren't used, so disable them across the board for better performance
+CELERY_DISABLE_RATE_LIMITS = True
+CELERY_SEND_TASK_ERROR_EMAILS = True
+
+
+
 # email settings
 SERVER_EMAIL = 'noreply@courtlistener.com'
 DEFAULT_FROM_EMAIL = 'noreply@courtlistener.com'

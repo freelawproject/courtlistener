@@ -22,11 +22,6 @@ most recent at the top.
  - The scrape_and_extract.py script has been converted to the cl_scrape_and_extract management command. It is API
    compatible in terms of args, but any jobs calling the script will need to be updated.
 
-TODO:
- - Write some tests of the search application.
- - Get Celery stuff logging properly.
- - Fix the settings files so that Celery stuff is appropriately placed.
-
 
 
 
