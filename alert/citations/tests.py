@@ -1,16 +1,13 @@
-"""
-This file demonstrates writing tests using the unittest module. These will pass
-when you run "manage.py test".
-
-Replace this with more appropriate tests for your application.
-"""
-
+from alert.citations.reporter_tokenizer import tokenize
 from django.test import TestCase
 
 
-class SimpleTest(TestCase):
-    def test_basic_addition(self):
-        """
-        Tests that 1 + 1 always equals 2.
-        """
-        self.assertEqual(1 + 1, 2)
+class CiteTest(TestCase):
+
+
+    def test_reporter_tokenizer(self):
+        self.assertEqual(tokenize('See Roe v. Wade, 410 U. S. 113 (1973)'),
+                         ['See', 'Roe', 'v.', 'Wade,', '410', 'U. S.', '113', '(1973)'])
+        self.assertEqual(tokenize('Foo bar eats grue, 232 Vet. App. (2003)'),
+                         ['Foo', 'bar', 'eats', 'grue,', '232', 'Vet. App.', '(2003)'])
+

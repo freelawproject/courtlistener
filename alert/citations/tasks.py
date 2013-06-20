@@ -1,12 +1,12 @@
 import sys
+
 sys.path.append('/var/www/court-listener/alert')
 
 from alert import settings
 from django.core.management import setup_environ
 setup_environ(settings)
 
-from alert.citations import find_citations
-from alert.citations import match_citations
+from alert.citations import match_citations, find_citations
 from alert.search.models import Document
 from celery.decorators import task
 
