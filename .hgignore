@@ -11,6 +11,7 @@ syntax: glob
 *.class
 *.pyc
 *~
+*.iml
 
 # no private files!
 *[P|p][R|r][I|i][V|v][A|a][T|t][E|e]*
