@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block sidebar %}{% endblock %}
+
+{% block nav %}
+    <div class="span-24 last">
+        <div class="box round header">
+            <h3 class="bottom">
+                <span class="{% block nav-alerts %}inactive{% endblock %} settings-nav-item"><a href="/profile/alerts/">Alerts</a></span>
+                <span class="favorite-off sprites"></span>
+                <span class="{% block nav-favorites %}inactive{% endblock %} settings-nav-item"><a href="/profile/favorites/">Favorites</a></span>
+                <span class="{% block nav-account %}inactive{% endblock %} settings-nav-item"><a href="/profile/settings/">Account</a></span></span>
+                <span class="{% block nav-password %}inactive{% endblock %} settings-nav-item"><a href="/profile/password/change">Password</a></span>
+            </h3>
+        </div>
+    </div>
+{% endblock %}
+

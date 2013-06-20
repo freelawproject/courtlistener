@@ -1,0 +1,82 @@
+ADMINS = (
+    ('Admin Name', 'admin@example.com'),
+    ('Admin2 Name2', 'admin2@example.com'),
+)
+
+MANAGERS = ADMINS
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2', # Add 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
+        'NAME': 'courtlistener',                      # Or path to database file if using sqlite3.
+        'USER': 'django',                      # Not used with sqlite3.
+        'PASSWORD': '',                  # Not used with sqlite3.
+        'HOST': '',                      # Set to empty string for localhost. Not used with sqlite3.
+        'PORT': '',                      # Set to empty string for default. Not used with sqlite3.
+    }
+}
+
+# Make this unique, and don't share it with anybody.
+SECRET_KEY = ''
+
+# URL prefix for admin media -- CSS, JavaScript and images. Make sure to use a
+# trailing slash.
+# Examples: "http://foo.com/media/", "/media/".
+ADMIN_MEDIA_PREFIX = '/media/adminMedia/'
+
+# Local time zone for this installation. Choices can be found here:
+# http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
+# although not all choices may be available on all operating systems.
+# If running in a Windows environment this must be set to the same as your
+# system time zone.
+TIME_ZONE = 'America/Los_Angeles'
+MEDIA_ROOT = '/var/www/court-listener/alert/assets/media/'
+
+DEBUG = False
+
+TEMPLATE_DIRS = (
+    # put strings here, like "home/html/django_templates" or "C:/www/django/templates".
+    # Always use forward slashes, evn on Windows.
+    # Don't forget to use absolute paths, not relative paths.
+    '/var/www/court-listener/alert/assets/templates/',
+)
+
+
+TEMPLATE_DEBUG = DEBUG
+
+DEVELOPMENT = False
+
+# Commented so default is used.
+#EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Disabled b/c there seem to be issues with how this is implemented by Django itself.
+#CACHE_BACKEND = 'memcached://127.0.0.1:11211/'
+
+# this setting helps with settings elsewhere...include a trailing slash!
+INSTALL_ROOT = '/var/www/court-listener/'
+
+INTERNAL_IPS = ('127.0.0.1',)
+DEBUG_TOOLBAR_CONFIG = {'INTERCEPT_REDIRECTS': False}
+
+INSTALLED_APPS.extend([
+    'debug_toolbar',
+])
+
+DUMP_DIR = '/var/www/court-listener/alert/assets/media/dumps/'
+
+# Celery settings for production sites
+#BROKER_URL = 'amqp://celery:password@localhost:5672//celery'
+#CELERYD_CONCURRENCY = 24
+
+# In a development machine, these setting makes a broker (like RabbitMQ) unnecessary
+CELERY_ALWAYS_EAGER = True
+CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
+
+
+# Test speed-ups
+SOUTH_TESTS_MIGRATE = False
+if 'test' in sys.argv:
+    # Does DB in memory during tests
+    DATABASES['default'] = {'ENGINE': 'django.db.backends.sqlite3'}
+
+

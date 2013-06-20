@@ -1,0 +1,24 @@
+Pages are in the FF panorama thing.
+
+Requirements:
+ - Result counts;
+    - more than 1,000 results --> 23,223 results
+    - page 23 of 2,324
+ - Filters for:
+    - Casename
+    - West Cite
+    - Docket number
+    - Court
+    - Status
+    - Filed date
+ - Sort by:
+    - Date ascending/descending
+    - Relevance
+
+Questions:
+ - how to clear out a query, if the main search box refines rather than starts a new query?
+ - JS datepicker? How to format dates?
+
+References:
+ - placeholder: https://github.com/mathiasbynens/Placeholder-jQuery-Plugin
+ -

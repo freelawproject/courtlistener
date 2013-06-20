@@ -1,0 +1,123 @@
+{% load humanize %}
+{% load widget_tweaks %}
+
+<form action="/" method="get" id="search-form">
+    <div id="search-container">
+        <table>
+            <tbody>
+                <tr>
+                    <td>
+                        <input class="{% if count == 0 or error %}auto-focus{% endif %} wide-title"
+                            value="{{ search_form.q.value|default:'' }}"
+                            name="q"
+                            id="id_q"
+                            autocomplete="off"
+                            type="text"
+                            tabindex="5">
+                     </td>
+                    <td>
+                        <button type="submit"
+                            class="button title"
+                            name="search"
+                            id="search-button"
+                            tabindex="6">Search</button>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2">
+                        <div class="left"><a href="/search/advanced-techniques/" id="advanced" tabindex="8">Advanced</a></div>
+                        <div class="right">
+                            {% for choice in search_form.refine.field.choices %}
+	                            <label for="id_{{ search_form.refine.html_name }}_{{ forloop.counter0 }}" class="pointer">
+	                                <input
+	                                    type="radio"
+	                                    id="id_{{ search_form.refine.html_name }}_{{ forloop.counter0 }}"
+	                                    value="{{ choice.0 }}"
+	                                    name="{{ search_form.refine.html_name }}"
+                                        tabindex="7"
+	                                    {% if choice.0 == search_form.refine.value %}checked="checked"{% endif %}>
+	                                    {{ choice.1 }}
+	                            </label>
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        {% if not error %}
+	        <div id="extra-search-fields">
+	            {{ search_form.sort }}
+	            <div id="extra-sidebar-fields">
+	                <h4 class="bottom">Case name</h4>
+	                {{ search_form.case_name }}
+	                <hr class="space">
+	                <h4 class="bottom">United States Courts</h4>
+
+                    <div class="sidebar-checkbox">
+                        {{ search_form.court_all }}
+	                    <label
+	                        for="id_court_all"
+	                        class="pointer {% if count == 0 %}gray{% endif %}">
+                            {{ search_form.court_all.label }}&nbsp;<span class="gray small">({{ count|intcomma }})</span>
+                        </label>
+	                </div>
+	                {% for court in court_facets %}
+	                    <div class="sidebar-checkbox">
+                            <input
+                                id="id_{{ court.1 }}" 
+                                type="checkbox" 
+                                name="{{ court.1 }}" 
+                                class="external-input court-checkbox left"
+                                {% if court.3 %}checked="checked"{% endif %} >
+                            <label
+                                for="id_{{ court.1 }}"  
+                                class="pointer {% if court.2 == 0 %}gray{% endif %}">
+                                {{ court.0 }}&nbsp;<span class="gray small">({{ court.2|intcomma }})</span>
+                            </label>
+	                    </div>
+	                {% endfor %}
+	                
+	                <hr class="space">
+	                <h4 class="bottom">Precedential Status</h4>
+	                {% for status in status_facets %}
+	                    <div class="sidebar-checkbox">
+	                        <input
+	                            id="id_{{ status.1 }}"
+	                            type="checkbox"
+	                            name="{{ status.1 }}"
+	                            class="external-input status-checkbox left"
+                                {% if status.3 %}checked="checked"{% endif %} >
+	                        <label
+	                            for="id_{{ status.1 }}"
+	                            class="pointer {% if status.2 == 0 %}gray{% endif %}">
+                                <div>{{ status.0 }}&nbsp;<span class="gray small">({{ status.2|intcomma }})</span></div>
+                             </label>
+	                    </div>
+	                {% endfor %}
+	                <button 
+	                    type="submit" 
+	                    class="button title span-4" 
+	                    name="apply-filters">Apply Filters</button>
+	                <hr class="space">
+	                <h4 class="bottom">Filed From</h4>
+	                <p class="bottom span-6">{{ search_form.filed_after }}</p>
+	                <h4 class="bottom">Filed To</h4>
+	                <p class="bottom span-6">{{ search_form.filed_before }}</p>
+	                
+	                <hr class="space">
+	                <h4 class="bottom">West Citation</h4>
+	                <p class="bottom">{{ search_form.west_cite }}</p>
+                    <h4 class="bottom">Neutral Citation</h4>
+                    <p class="bottom">{{ search_form.neutral_cite }}</p>
+	                <h4 class="bottom">Docket Number</h4>
+	                <p class="bottom">{{ search_form.docket_number }}</p>
+                    <button 
+                        type="submit" 
+                        class="button title span-5" 
+                        name="search">Search</button>
+	            </div>
+	        </div>
+        {% endif %}
+        {# search_form #}
+    </div>
+</form>
