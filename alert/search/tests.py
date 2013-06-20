@@ -42,11 +42,11 @@ class SearchTest(TestCase):
                         neutral_cite=site.neutral_citations[0],
                         west_cite=site.west_citations[0])
         cite.save(index=False)
-        doc = Document(date_filed=site.case_dates[0],
-                       court=self.court,
-                       citation=cite,
-                       precedential_status=site.precedential_statuses[0])
-        self.doc = doc.save()
+        self.doc = Document(date_filed=site.case_dates[0],
+                            court=self.court,
+                            citation=cite,
+                            precedential_status=site.precedential_statuses[0])
+        self.doc.save()
 
     def tearDown(self):
         self.doc.delete()

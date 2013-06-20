@@ -1,11 +1,7 @@
-from alert.lib import sunburnt
 from alert.search.models import Citation, Court, Document
-from alert.search.tests import clear_solr
 from alert.scrapers.test_assets import test_scraper
 from django.test import TestCase
 from django.test.client import Client
-
-from alert import settings
 
 
 class ViewDocumentTest(TestCase):
@@ -23,14 +19,14 @@ class ViewDocumentTest(TestCase):
                         neutral_cite=site.neutral_citations[0],
                         west_cite=site.west_citations[0])
         cite.save(index=False)
-        doc = Document(date_filed=site.case_dates[0],
-                       court=self.court,
-                       citation=cite,
-                       precedential_status=site.precedential_statuses[0])
-        self.doc = doc.save(index=False)
+        self.doc = Document(date_filed=site.case_dates[0],
+                            court=self.court,
+                            citation=cite,
+                            precedential_status=site.precedential_statuses[0])
+        self.doc.save(index=False)
 
     def tearDown(self):
-        Document.objects.all().delete()
+        self.doc.delete()
 
     def test_simple_url_check_for_document(self):
         """Does the page load properly?"""
