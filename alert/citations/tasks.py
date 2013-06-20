@@ -41,11 +41,11 @@ def create_cited_html(document, citations):
 
 @task
 def update_document(document):
-    logger = update_document.get_logger()
-    print "%s at http://courtlistener.com/admin/search/citation/%s/" % \
-        (document.citation.case_name, document.citation.pk)
+    DEBUG = 0
+    if DEBUG >= 1:
+        print "%s at http://courtlistener.com/admin/search/citation/%s/" % \
+            (document.citation.case_name, document.citation.pk)
 
-    DEBUG = 2
     citations = get_document_citations(document)
     # List for tracking number of citation vs. name matches
     matched_citations = []
@@ -95,10 +95,10 @@ def update_document(document):
     document.save(index=False)
     citation_matches = sum(matched_citations)
     name_matches = len(matched_citations) - citation_matches
-
-    print "  %d citations" % len(citations)
-    print "  %d exact matches" % citation_matches
-    print "  %d name matches" % name_matches
+    if DEBUG >= 1:
+        print "  %d citations" % len(citations)
+        print "  %d exact matches" % citation_matches
+        print "  %d name matches" % name_matches
 
 
 @task

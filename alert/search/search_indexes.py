@@ -6,7 +6,8 @@ from django.template import loader
 
 class InvalidDocumentError(Exception):
     "The document could not be formed"
-    pass
+    def __init__(self, message):
+        Exception.__init__(self, message)
 
 class SearchDocument(object):
     def __init__(self, doc):
@@ -23,8 +24,10 @@ class SearchDocument(object):
         try:
             self.caseName = doc.citation.case_name
             self.absolute_url = doc.get_absolute_url()
-        except AttributeError, NoReverseMatch:
-            raise InvalidDocumentError
+        except AttributeError:
+            raise InvalidDocumentError("Unable to save to index due to missing Citation object.")
+        except NoReverseMatch:
+            raise InvalidDocumentError("Unable to save to index due to missing absolute url.")
         self.docketNumber = doc.citation.docket_number
         self.westCite = doc.citation.west_cite
         self.lexisCite = doc.citation.lexis_cite
@@ -36,7 +39,7 @@ class SearchDocument(object):
 
         # Load the case_name field using a template to make it a concatenation
         case_name_template = loader.get_template('search/indexes/caseNumber.txt')
-        c = Context({ 'object': doc })
+        c = Context({'object': doc })
         self.caseNumber = case_name_template.render(c)
 
         # Load the document text using a template for cleanup and concatenation

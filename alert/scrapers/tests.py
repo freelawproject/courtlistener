@@ -7,15 +7,16 @@ from alert.scrapers.DupChecker import DupChecker
 from alert.scrapers.models import urlToHash
 from alert.scrapers.management.commands.cl_scrape_and_extract import Command
 from alert.scrapers.tasks import extract_doc_content
-from alert.scrapers.tasks import extract_by_ocr
 from alert.scrapers.test_assets import test_scraper
-from alert.search.models import Court, Document
+from alert.search.models import Citation, Court, Document
 from alert import settings
 from celery.task.sets import subtask
 from datetime import date, timedelta
-from django.conf import settings
 from django.core.files.base import ContentFile
 from django.test import TestCase
+
+# Gotta have the bad import here for celery
+from scrapers.tasks import extract_by_ocr
 
 
 class SetupException(Exception):
@@ -33,21 +34,29 @@ class IngestionTest(TestCase):
     def setUp(self):
         # Clear the Solr index
         self.si = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
-        if self.si.query(text='*:*').count() > 1000:
-            raise SetupException('Solr has more than 1000 items. Will not empty as part of a test.')
-        self.si.delete_all()
+        response = self.si.raw_query(**{'q': '*:*'}).execute()
+        count = response.result.numFound
+        if 0 < count <= 10000:
+            self.si.delete_all()
+            self.si.commit()
+        elif count > 10000:
+            raise SetupException('Solr has more than 10000 items. Will not empty as part of a test.')
 
+        # Set up a handy court object
         self.court = Court.objects.get(pk='test')
 
     def tearDown(self):
         # Clear the Solr index
         self.si.delete_all()
+        self.si.commit()
 
     def test_parsing_xml_document_to_site_object(self):
+        """Does a basic parse of a site reveal the right number of items?"""
         site = test_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 6)
 
     def test_content_extraction(self):
+        """Do all of the supported mimetypes get extracted to text successfully, including OCR?"""
         site = test_scraper.Site().parse()
 
         test_strings = ['supreme',
@@ -62,8 +71,11 @@ class IngestionTest(TestCase):
                 content = f.read()
                 cf = ContentFile(content)
                 extension = Command().get_extension(content)
+            cite = Citation(case_name=site.case_names[i])
+            cite.save(index=False)
             doc = Document(date_filed=site.case_dates[i],
-                           court=self.court)
+                           court=self.court,
+                           citation=cite)
             file_name = trunc(site.case_names[i].lower(), 75) + extension
             doc.local_path.save(file_name, cf, save=False)
             doc.save(index=False)
@@ -74,6 +86,27 @@ class IngestionTest(TestCase):
                 self.assertIn(test_strings[i], doc.plain_text.lower())
 
             doc.delete()
+
+    def test_solr_ingestion_and_deletion(self):
+        """Do items get added to the Solr index when they are ingested?"""
+        site = test_scraper.Site().parse()
+        path = os.path.join(settings.INSTALL_ROOT, 'alert', site.download_urls[0])  # a PDF
+        with open(path) as f:
+            content = f.read()
+            cf = ContentFile(content)
+            extension = Command().get_extension(content)
+        cite = Citation(case_name=site.case_names[0])
+        cite.save(index=False)
+        doc = Document(date_filed=site.case_dates[0],
+                       court=self.court,
+                       citation=cite)
+        file_name = trunc(site.case_names[0].lower(), 75) + extension
+        doc.local_path.save(file_name, cf, save=False)
+        doc.save(index=False)
+        extract_doc_content(doc.pk, callback=subtask(extract_by_ocr))
+        response = self.si.raw_query(**{'q': 'supreme'}).execute()
+        count = response.result.numFound
+        self.assertEqual(count, 1, "There were %s items found when there should have been 1" % count)
 
 
 class DupcheckerTest(TestCase):
@@ -143,7 +176,7 @@ class DupcheckerTest(TestCase):
         content_hash = hashlib.sha1(content).hexdigest()
         for dup_checker in self.dup_checkers:
             doc = Document(sha1=content_hash, court=self.court)
-            doc.save()
+            doc.save(index=False)
             onwards = dup_checker.should_we_continue(content_hash, date.today(), date.today())
             if dup_checker.full_crawl:
                 self.assertTrue(onwards, "DupChecker says to abort during a full crawl.")
@@ -158,7 +191,7 @@ class DupcheckerTest(TestCase):
         content_hash = hashlib.sha1(content).hexdigest()
         for dup_checker in self.dup_checkers:
             doc = Document(sha1=content_hash, court=self.court)
-            doc.save()
+            doc.save(index=False)
             # Note that the next case occurs prior to the current one
             onwards = dup_checker.should_we_continue(content_hash, date.today(), date.today() - timedelta(days=1))
             if dup_checker.full_crawl:

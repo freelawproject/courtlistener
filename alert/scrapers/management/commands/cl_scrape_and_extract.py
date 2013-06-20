@@ -11,7 +11,6 @@ from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
 from juriscraper.GenericSite import logger
 from juriscraper.lib.importer import build_module_list
-from juriscraper.tests import MockRequest
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
 from scrapers.tasks import extract_doc_content, extract_by_ocr

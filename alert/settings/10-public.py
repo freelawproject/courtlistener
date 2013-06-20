@@ -50,7 +50,7 @@ MIDDLEWARE_CLASSES = (
 
 ROOT_URLCONF = 'alert.urls'
 
-# Needed by Celery to avoid using relative path imports. See: 
+# Needed by Celery to avoid using relative path imports. See:
 # http://docs.celeryq.org/en/latest/userguide/tasks.html#automatic-naming-and-relative-imports
 import os
 import sys
@@ -105,18 +105,6 @@ MESSAGE_TAGS = {
 
 # Solr settings
 SOLR_URL = 'http://127.0.0.1:8983/solr'
-
-# Celery settings - see private file for user/pass
-BROKER_HOST = "localhost"
-BROKER_PORT = 5672
-BROKER_VHOST = "/celery"
-CELERYD_CONCURRENCY = 24
-# Sets the backend to AMPQ, since it supports automatic result expiration.
-CELERY_RESULT_BACKEND = 'amqp'
-# Rate limits aren't used, so disable them across the board for better 
-# performance
-CELERY_DISABLE_RATE_LIMITS = True
-CELERY_SEND_TASK_ERROR_EMAILS = True
 
 # email settings
 SERVER_EMAIL = 'noreply@courtlistener.com'
