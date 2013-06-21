@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import sys
+from lxml.etree import XMLSyntaxError
+
 sys.path.append('/var/www/court-listener/alert')
 
 from alert import settings
@@ -30,7 +32,10 @@ def get_clean_body_content(content):
     """
     cleaner = Cleaner(style=True,
                       remove_tags=['a', 'body', 'font', 'noscript'])
-    return cleaner.clean_html(content)
+    try:
+        return cleaner.clean_html(content)
+    except XMLSyntaxError:
+        return "Unable to extract the content from this file. Please try reading the original."
 
 
 def extract_from_doc(path, DEVNULL):

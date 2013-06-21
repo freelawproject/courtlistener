@@ -26,11 +26,9 @@ def generate_sites(court_module):
     # opinions.united_states.federal.ca9u --> ca9
     court_str = court_module.__name__.split('.')[-1].split('_')[0]
     logger.info("Using court_str: \"%s\"" % court_str)
-    if court_str == 'cafc':
-        # This is a generator that cranks out a site object when called.
-        # Useful because doing it this way won't load each site object
-        # with HTML until it's called.
-        for i in range(0, 185):
+
+    def site_yielder(iterator):
+        for i in iterator:
             try:
                 site = court_module.Site()
                 site._download_backwards(i)
@@ -39,89 +37,30 @@ def generate_sites(court_module):
                 logger.warn("Failed to download page.")
                 continue
 
+    if court_str == 'cafc':
+        site_yielder(range(0, 185))
     elif 'haw' in court_str:
-        for i in range(2010, 2013):
-            try:
-                site = court_module.Site()
-                site._download_backwards(i)
-                yield site
-            except HTTPError, e:
-                logger.warn("Failed to download page")
-                continue
-
+        site_yielder(range(2010, 2013))
     elif court_str == 'mich':
-        for i in range(0, 868):
-            try:
-                site = court_module.Site()
-                site._download_backwards(i)
-                yield site
-            except HTTPError, e:
-                logger.warn("Failed to download page")
-                continue
-
+        site_yielder(range(0, 868))
     elif court_str == 'miss':
-        for i in range(1990, 2012):
-            try:
-                site = court_module.Site()
-                site._download_backwards(i)
-                yield site
-            except HTTPError, e:
-                logger.warn("Failed to download page")
-                continue
-
+        site_yielder(range(1990, 2012))
     elif court_str == 'mont':
-        for i in range(1972, 2014):
-            try:
-                site = court_module.Site()
-                site._download_backwards(i)
-                yield site
-            except HTTPError, e:
-                logger.warn("Failed to download page")
-                continue
-
+        site_yielder(range(1972, 2014))
+    elif 'neb' in court_str:
+        site_yielder(range(0, 11))
     elif court_str in ['nd', 'ndctapp']:
         start = date(1996, 9, 1)
         end = date(2013, 6, 1)
-        for i in rrule(MONTHLY, dtstart=start, until=end):
-            try:
-                site = court_module.Site()
-                site._download_backwards(i.date())
-                yield site
-            except HTTPError, e:
-                logger.warn("Failed to download page")
-                continue
-
+        site_yielder([i.date() for i in rrule(MONTHLY, dtstart=start, until=end)])
     elif court_str in ['nmctapp', 'nm']:
-        for i in range(2009, 2013):
-            try:
-                site = court_module.Site()
-                site._download_backwards(i)
-                yield site
-            except HTTPError, e:
-                logger.warn("Failed to download page")
-                continue
-
+        site_yielder(range(2009, 2013))
     elif court_str == 'sd':
-        for i in range(1996, 2013):
-            try:
-                site = court_module.Site()
-                site._download_backwards(i)
-                yield site
-            except HTTPError, e:
-                logger.warn("Failed to download page")
-                continue
-
+        site_yielder(range(1996, 2013))
     elif court_str == 'tex':
         start = date(1997, 10, 2)
         end = date(2013, 6, 5)
-        for i in rrule(DAILY, dtstart=start, until=end):
-            try:
-                site = court_module.Site()
-                site._download_backwards(i.date())
-                yield site
-            except HTTPError, e:
-                logger.warn("Failed to download page")
-                continue
+        site_yielder([i.date() for i in rrule(DAILY, dtstart=start, until=end)])
 
 
 def back_scrape(mod):
