@@ -169,10 +169,14 @@ class Command(BaseCommand):
 
                     # Make a citation
                     cite = Citation(case_name=site.case_names[i])
-                    if site.docket_numbers is not None:
+                    if site.docket_numbers:
                         cite.docket_number = site.docket_numbers[i]
-                    if site.neutral_citations is not None:
+                    if site.neutral_citations:
                         cite.neutral_cite = site.neutral_citations[i]
+                    if site.west_citations:
+                        cite.west_cite = site.west_citations[i]
+                    if site.west_state_citations:
+                        cite.west_state_cite = site.west_state_citations[i]
 
                     # Make the document object
                     doc = Document(source='C',
