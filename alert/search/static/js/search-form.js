@@ -1,4 +1,7 @@
 $(document).ready(function() {
+    var cited_gt = $('#id_cited_gt');
+    var cited_lt = $('#id_cited_lt');
+
     $('#extra-sidebar-fields').prependTo('#sidebar-facet-placeholder');
     $('#extra-sidebar-fields').show();
 
@@ -6,6 +9,12 @@ $(document).ready(function() {
         // Overrides the submit buttons so that they gather the correct
         // form elements before submission.
         e.preventDefault();
+
+        // Empty the sliders if they are both at their max
+        if (cited_gt.val() == 0 && cited_lt.val() == 10000){
+            cited_gt.val("");
+            cited_lt.val("");
+        }
 
         // Gather all form fields that are necessary
         var gathered = $();
@@ -31,6 +40,12 @@ $(document).ready(function() {
         document.location = '/?' + $('#search-form').serialize();
     });
 
+    if (cited_gt.val() == "") {
+        cited_gt.val(0);
+    }
+    if (cited_lt.val() == ""){
+        cited_lt.val(10000);
+    }
     $(function() {
         // Load up the slider in the UI
         $("#slider-range").slider({
@@ -38,20 +53,22 @@ $(document).ready(function() {
             min: 0,
             max: 10000,
             step: 10,
-            values: [$("#id_citeCount_gt").val(),
-                $("#id_citeCount_lt").val()],
+            values: [cited_gt.val(),
+                     cited_lt.val()],
             slide: function(event, ui) {
                 // Update the text
-                $("#citation-count").text( "(" + ui.values[0] + " - " + ui.values[1] + ")");
-                // Update the form fields
-                $("#id_citeCount_gt").val(ui.values[0]);
-                $("#id_citeCount_lt").val(ui.values[1]);
+                if (ui.values[0] == 0 && ui.values[1] == 10000){
+                    $('#citation-count').text("(Any)");
+                } else {
+                    $("#citation-count").text( "(" + ui.values[0] + " - " + ui.values[1] + ")");
+                }
+                cited_gt.val(ui.values[0]);
+                cited_lt.val(ui.values[1]);
             }
         });
     });
-    if (($("#id_citeCount_gt").val() != 0 && $("#id_citeCount_gt").val() != undefined) ||
-        ($("#id_citeCount_lt").val() != 10000 && $("#id_citeCount_lt").val() != undefined)) {
-        $('#citation-count').text("(" + $("#id_citeCount_gt").val() + " - " + $("#id_citeCount_lt").val() + ")")
+    if (cited_gt.val() != 0 || cited_lt.val() != 10000) {
+        $('#citation-count').text("(" + $("#id_cited_gt").val() + " - " + $("#id_cited_lt").val() + ")")
     }
 
     $('#id_court_all').click(function() {
