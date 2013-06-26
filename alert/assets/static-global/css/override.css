@@ -53,7 +53,7 @@ span.bold {
 }
 
 .gray {
-    color: gray;	
+    color: gray;
 }
 
 .left {
@@ -163,7 +163,7 @@ nav ul li {
 }
 
 /* New case view styling, including citations */
-#text pre, .citation { 
+#text pre, .citation {
     font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
     white-space: pre;
 }
@@ -178,8 +178,8 @@ div.shown ul {
     padding: 0 0 0 17px;
 }
 
-.more { 
-    float: right; 
+.more {
+    float: right;
 }
 
 /* cited by viewer styling */
@@ -198,8 +198,8 @@ div.shown ul {
     border-bottom: 1pt solid #DDD;
 }
 
-.citation-name { 
-    font-size: 1.2em; 
+.citation-name {
+    font-size: 1.2em;
 }
 
 /* Button formatting */
@@ -229,7 +229,7 @@ a.button:active {
 
 div.sidebar-checkbox {
     padding-top: 2px;
-    padding-bottom: 2px; 
+    padding-bottom: 2px;
 }
 
 div.sidebar-checkbox label {
@@ -249,7 +249,7 @@ div.sidebar-checkbox input {
 }
 
 input.court-checkbox, input.status-checkbox {
-    top: 0px; 
+    top: 0px;
 }
 
 /* Results page */
@@ -279,7 +279,7 @@ input.court-checkbox, input.status-checkbox {
 }
 #pagination-left {
     float: left;
-    width: 200px;	
+    width: 200px;
 }
 #pagination-center {
 	margin: auto;
@@ -297,7 +297,7 @@ a:link, a:visited {
     text-decoration: none;
 }
 a:visited.visitable {
-    color: #9d11b3;	
+    color: #9d11b3;
 }
 /* Special case for Oregon, which has a name attr with a value of TOP. */
 a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
@@ -455,46 +455,46 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 
 /* Sprites and arrows */
 .sprites {
-    background-image     : url("/media/images/png/social-sprite.png");
+    background-image     : url("/static/png/social-sprite.png");
     background-color     : transparent;
     background-repeat    : no-repeat;
     display: inline;
     float: left;
 }
-.arrow-down-before:before { 
+.arrow-down-before:before {
     content: '';
-    display: inline-block;  
-    border-color: #6683B7 transparent transparent transparent; 
+    display: inline-block;
+    border-color: #6683B7 transparent transparent transparent;
     border-style: solid;
     border-width: 8px 5px 5px 5px;
     height: 0;
     margin: 2px 5px 0 0;
     width: 0;
 }
-.arrow-right-before:before { 
+.arrow-right-before:before {
     content: '';
-    display: inline-block;  
-    border-color: transparent transparent transparent #6683B7; 
+    display: inline-block;
+    border-color: transparent transparent transparent #6683B7;
     border-style: solid;
     border-width: 5px 5px 5px 8px;
     height: 0;
     margin: 0 2px 4px 0;
     width: 0;
 }
-.arrow-left-before:before { 
+.arrow-left-before:before {
     content: '';
-    display: inline-block;  
-    border-color: transparent #6683B7 transparent transparent; 
+    display: inline-block;
+    border-color: transparent #6683B7 transparent transparent;
     border-style: solid;
     border-width: 5px 8px 5px 5px;
     height: 0;
     margin: 0 2px 2px 0;
     width: 0;
 }
-.arrow-right-after:after { 
+.arrow-right-after:after {
     content: '';
-    display: inline-block;  
-    border-color: transparent transparent transparent #6683B7; 
+    display: inline-block;
+    border-color: transparent transparent transparent #6683B7;
     border-style: solid;
     border-width: 5px 5px 5px 8px;
     height: 0;
@@ -553,7 +553,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 	height               : 16px;
 	width                : 16px;
 	background-position  : -98px -16px;
-    margin: 0.7em 2px 0px 2px;          
+    margin: 0.7em 2px 0px 2px;
 }
 #twitter_gif:hover {
 	background-position  : -98px 0px;

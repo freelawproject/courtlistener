@@ -1,3 +1,4 @@
+import traceback
 from alert.alerts.forms import CreateAlertForm
 from alert.lib import search_utils
 from alert.lib import sunburnt
@@ -14,10 +15,10 @@ from django.views.decorators.cache import never_cache
 
 @never_cache
 def show_results(request):
-    '''Show the results for a query
+    """Show the results for a query
 
     Implements a parallel faceted search interface with Solr as the backend.
-    '''
+    """
 
     # Create a search string that does not contain the page numbers
     get_string = search_utils.make_get_string(request)
@@ -59,7 +60,7 @@ def show_results(request):
     except KeyError:
         # No search placed. Show default form.
         search_form = SearchForm()
-    # Run the query
+        # Run the query
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     if search_form.is_bound:
         if search_form.is_valid():
@@ -69,9 +70,9 @@ def show_results(request):
                 court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(cd)
                 # Create facet variables that can be used in our templates
                 court_facets = search_utils.make_facets_variable(
-                                 court_facet_fields, search_form, 'court_exact', 'court_')
+                    court_facet_fields, search_form, 'court_exact', 'court_')
                 status_facets = search_utils.make_facets_variable(
-                                 stat_facet_fields, search_form, 'status_exact', 'stat_')
+                    stat_facet_fields, search_form, 'status_exact', 'stat_')
             except Exception, e:
                 return render_to_response('search/search.html',
                                           {'error': True, 'private': False},
@@ -88,21 +89,21 @@ def show_results(request):
                     # Don't use strftime since it won't work prior to 1900.
                     before = cd['filed_before']
                     mutable_get['filed_before'] = '%s-%02d-%02d' % \
-                                        (before.year, before.month, before.day)
+                                                  (before.year, before.month, before.day)
                 if mutable_get.get('filed_after') and cd.get('filed_before') is not None:
                     after = cd['filed_after']
                     mutable_get['filed_after'] = '%s-%02d-%02d' % \
-                                        (after.year, after.month, after.day)
+                                                 (after.year, after.month, after.day)
                 mutable_get['court_all'] = cd['court_all']
-            # Always reset the radio box to refine
+                # Always reset the radio box to refine
             mutable_get['refine'] = 'refine'
             search_form = SearchForm(mutable_get)
         else:
             # Invalid form, send it back
             return render_to_response(
-                          'search/search.html',
-                          {'error': True, 'private': False},
-                          RequestContext(request))
+                'search/search.html',
+                {'error': True, 'private': False},
+                RequestContext(request))
 
     else:
         # Unbound form, first time the user has seen the page.
@@ -115,13 +116,13 @@ def show_results(request):
             court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(initial_values)
             # Create facet variables that can be used in our templates
             court_facets = search_utils.make_facets_variable(
-                             court_facet_fields, search_form, 'court_exact', 'court_')
+                court_facet_fields, search_form, 'court_exact', 'court_')
             status_facets = search_utils.make_facets_variable(
-                             stat_facet_fields, search_form, 'status_exact', 'stat_')
+                stat_facet_fields, search_form, 'status_exact', 'stat_')
         except Exception, e:
             return render_to_response('search/search.html',
-                                          {'error': True, 'private': False},
-                                          RequestContext(request))
+                                      {'error': True, 'private': False},
+                                      RequestContext(request))
 
     # Set up pagination
     try:
@@ -138,15 +139,15 @@ def show_results(request):
     except:
         # Catches any Solr errors, and simply aborts.
         return render_to_response('search/search.html',
-                                      {'error': True, 'private': False},
-                                      RequestContext(request))
+                                  {'error': True, 'private': False},
+                                  RequestContext(request))
     return render_to_response(
-                  'search/search.html',
-                  {'search_form': search_form, 'alert_form': alert_form,
-                   'results': paged_results, 'court_facets': court_facets,
-                   'status_facets': status_facets, 'get_string': get_string,
-                   'count': count, 'private': False},
-                  RequestContext(request))
+        'search/search.html',
+        {'search_form': search_form, 'alert_form': alert_form,
+         'results': paged_results, 'court_facets': court_facets,
+         'status_facets': status_facets, 'get_string': get_string,
+         'count': count, 'private': False},
+        RequestContext(request))
 
 
 def tools_page(request):

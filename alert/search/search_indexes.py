@@ -4,10 +4,12 @@ from django.core.urlresolvers import NoReverseMatch
 from django.template import Context
 from django.template import loader
 
+
 class InvalidDocumentError(Exception):
-    "The document could not be formed"
+    """The document could not be formed"""
     def __init__(self, message):
         Exception.__init__(self, message)
+
 
 class SearchDocument(object):
     def __init__(self, doc):
@@ -18,6 +20,7 @@ class SearchDocument(object):
         self.id = doc.pk
         if doc.date_filed is not None:
             self.dateFiled = datetime.combine(doc.date_filed, time())
+        self.citeCount = doc.citation_count
         self.court = doc.court.short_name
         self.court_id = doc.court.courtUUID
         self.court_citation_string = doc.court.citation_string
@@ -28,8 +31,10 @@ class SearchDocument(object):
             raise InvalidDocumentError("Unable to save to index due to missing Citation object.")
         except NoReverseMatch:
             raise InvalidDocumentError("Unable to save to index due to missing absolute url.")
+        self.judge = doc.judges
+        self.suitNature = doc.nature_of_suit
         self.docketNumber = doc.citation.docket_number
-        self.westCite = doc.citation.west_cite
+        self.westCite = "%s %s" % (doc.citation.west_cite, doc.citation.west_state_cite)
         self.lexisCite = doc.citation.lexis_cite
         self.neutralCite = doc.citation.neutral_cite
         self.status = doc.get_precedential_status_display()
@@ -39,12 +44,12 @@ class SearchDocument(object):
 
         # Load the case_name field using a template to make it a concatenation
         case_name_template = loader.get_template('search/indexes/caseNumber.txt')
-        c = Context({'object': doc })
+        c = Context({'object': doc})
         self.caseNumber = case_name_template.render(c)
 
         # Load the document text using a template for cleanup and concatenation
         text_template = loader.get_template('search/indexes/text.txt')
-        c = Context({ 'object': doc })
+        c = Context({'object': doc})
         self.text = text_template.render(c).translate(null_map)
 
         # Faceting fields

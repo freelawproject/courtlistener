@@ -11,6 +11,8 @@
         <docket_number></docket_number>
         <neutral_cite></neutral_cite>
         <west_cite></west_cite>
+        <west_state_cite></west_state_cite>
+        <nature_of_suit></nature_of_suit>
     </opinion>
     -->
 
@@ -23,6 +25,8 @@
         <docket_number>11-889</docket_number>
         <neutral_cite>2013 SCOTUS 44</neutral_cite>
         <west_cite>4 fake_west 44</west_cite>
+        <west_state_cite>4 Neb. 33</west_state_cite>
+        <nature_of_suit>copyright</nature_of_suit>
     </opinion>
     <opinion>
         <!-- A PDF requiring OCR -->

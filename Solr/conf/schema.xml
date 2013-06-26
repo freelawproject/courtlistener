@@ -96,44 +96,50 @@
       and back compatibility is not guaranteed.  Names with both leading and
       trailing underscores (e.g. _version_) are reserved.
    -->
-    <field name="id" type="string" indexed="true" stored="true" required="true" multiValued="false" />
-    <field name="_version_" type="long" indexed="true" stored="true"/>
-    <field name="django_ct" type="string" indexed="true" stored="true" multiValued="false" />
-    <field name="django_id" type="string" indexed="true" stored="true" multiValued="false" />
+     <field name="id" type="string" indexed="true" stored="true" required="true" multiValued="false" />
+     <field name="_version_" type="long" indexed="true" stored="true"/>
+     <field name="django_ct" type="string" indexed="true" stored="true" multiValued="false" />
+     <field name="django_id" type="string" indexed="true" stored="true" multiValued="false" />
 
-    <field name="text" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true"/>
-    <field name="status" type="text_no_word_parts" indexed="true" stored="true" multiValued="false" />
-    <field name="court" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" />
-    <field name="court_id" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" />
-    <field name="court_citation_string" type="string" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
-    <field name="court_exact" type="string" indexed="true" stored="true" multiValued="false" />
-    <field name="caseName" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
-    <field name="status_exact" type="string" indexed="true" stored="true" multiValued="false" />
-    <field name="dateFiled" type="date" indexed="true" stored="true" multiValued="false" />
-    <field name="docketNumber" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
-    <field name="lexisCite" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
-    <field name="westCite" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
-    <field name="caseNumber" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
-    <field name="neutralCite" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
-    <field name="absolute_url" type="string" indexed="false" stored="true" multiValued="false" />
-    <field name="download_url" type="string" indexed="false" stored="true" multiValued="false" />
-    <field name="local_path" type="string" indexed="false" stored="true" multiValued="false" />
-    <field name="source" type="string" indexed="false" stored="true" multiValued="false" />
+     <field name="text" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true"/>
+     <field name="status" type="text_no_word_parts" indexed="true" stored="true" multiValued="false" />
+     <field name="court" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" />
+     <field name="court_id" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" />
+     <field name="court_citation_string" type="string" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+     <field name="caseName" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+
+     <field name="dateFiled" type="date" indexed="true" stored="true" multiValued="false" />
+     <field name="citeCount" type="tint" indexed="true" stored="true" multiValued="false" />
+
+     <field name="docketNumber" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+     <field name="lexisCite" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+     <field name="westCite" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+     <field name="caseNumber" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+     <field name="neutralCite" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+     <field name="judge" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+     <field name="suitNature" type="text_en_splitting_cl" indexed="true" stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+
+     <field name="court_exact" type="string" indexed="true" stored="true" multiValued="false" />
+     <field name="status_exact" type="string" indexed="true" stored="true" multiValued="false" />
+     <field name="absolute_url" type="string" indexed="false" stored="true" multiValued="false" />
+     <field name="download_url" type="string" indexed="false" stored="true" multiValued="false" />
+     <field name="local_path" type="string" indexed="false" stored="true" multiValued="false" />
+     <field name="source" type="string" indexed="false" stored="true" multiValued="false" />
 
 
-    <!-- mlr
-    <field name="sku" type="text_en_splitting_tight" indexed="true" stored="true" omitNorms="true"/>
-    <field name="name" type="text_general" indexed="true" stored="true"/>
-    <field name="manu" type="text_general" indexed="true" stored="true" omitNorms="true"/>
-    <field name="cat" type="string" indexed="true" stored="true" multiValued="true"/>
-    <field name="features" type="text_general" indexed="true" stored="true" multiValued="true"/>
-    <field name="includes" type="text_general" indexed="true" stored="true" termVectors="true" termPositions="true" termOffsets="true" />
-    <field name="weight" type="float" indexed="true" stored="true"/>
-    <field name="price"  type="float" indexed="true" stored="true"/>
-    <field name="popularity" type="int" indexed="true" stored="true" />
-    <field name="inStock" type="boolean" indexed="true" stored="true" />
-    <field name="store" type="location" indexed="true" stored="true"/>
-    -->
+     <!-- mlr
+     <field name="sku" type="text_en_splitting_tight" indexed="true" stored="true" omitNorms="true"/>
+     <field name="name" type="text_general" indexed="true" stored="true"/>
+     <field name="manu" type="text_general" indexed="true" stored="true" omitNorms="true"/>
+     <field name="cat" type="string" indexed="true" stored="true" multiValued="true"/>
+     <field name="features" type="text_general" indexed="true" stored="true" multiValued="true"/>
+     <field name="includes" type="text_general" indexed="true" stored="true" termVectors="true" termPositions="true" termOffsets="true" />
+     <field name="weight" type="float" indexed="true" stored="true"/>
+     <field name="price"  type="float" indexed="true" stored="true"/>
+     <field name="popularity" type="int" indexed="true" stored="true" />
+     <field name="inStock" type="boolean" indexed="true" stored="true" />
+     <field name="store" type="location" indexed="true" stored="true"/>
+     -->
 
     <!-- Common metadata fields, named specifically to match up with
       SolrCell metadata when parsing rich documents such as Word, PDF.

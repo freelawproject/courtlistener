@@ -19,7 +19,7 @@
 {% endblock %}
 
 {% block footer-scripts %}
-    <script type="text/javascript" src="/media/js/search-form.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}js/search-form.js"></script>
     <script type="text/javascript">
        $(document).ready(function() {
            $('.auto-focus:first').focus();
