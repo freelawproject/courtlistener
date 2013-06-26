@@ -95,8 +95,7 @@ def show_results(request):
                     mutable_get['filed_after'] = '%s-%02d-%02d' % \
                                                  (after.year, after.month, after.day)
                 mutable_get['court_all'] = cd['court_all']
-                # Always reset the radio box to refine
-            mutable_get['refine'] = 'refine'
+
             search_form = SearchForm(mutable_get)
         else:
             # Invalid form, send it back

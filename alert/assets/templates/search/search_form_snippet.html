@@ -26,21 +26,8 @@
             </tr>
             <tr>
                 <td colspan="2">
-                    <div class="left"><a href="/search/advanced-techniques/" id="advanced" tabindex="8">Advanced</a>
-                    </div>
-                    <div class="right">
-                        {% for choice in search_form.refine.field.choices %}
-                            <label for="id_{{ search_form.refine.html_name }}_{{ forloop.counter0 }}" class="pointer">
-                                <input
-                                    type="radio"
-                                    id="id_{{ search_form.refine.html_name }}_{{ forloop.counter0 }}"
-                                    value="{{ choice.0 }}"
-                                    name="{{ search_form.refine.html_name }}"
-                                    tabindex="7"
-                                    {% if choice.0 == search_form.refine.value %}checked="checked"{% endif %}>
-                                {{ choice.1 }}
-                            </label>
-                        {% endfor %}
+                    <div class="left">
+                        <a href="/search/advanced-techniques/" id="advanced" tabindex="8">Advanced</a>
                     </div>
                 </td>
             </tr>
@@ -51,9 +38,9 @@
                 {{ search_form.sort }}
                 <div id="extra-sidebar-fields">
                     <h4 class="bottom">Case name</h4>
-                    {{ search_form.case_name }}
+                    <p class="bottom span-6">{{ search_form.case_name }}</p>
                     <h4 class="bottom">Judge</h4>
-                    {{ search_form.judge }}
+                    <p class="bottom span-6">{{ search_form.judge }}</p>
                     <hr class="space">
                     <h4 class="bottom">United States Courts</h4>
 
@@ -101,22 +88,26 @@
                     {% endfor %}
                     <hr class="space">
                     <h4 class="bottom">Filed From</h4>
-
                     <p class="bottom span-6">{{ search_form.filed_after }}</p>
                     <h4 class="bottom">Filed To</h4>
-
                     <p class="bottom span-6">{{ search_form.filed_before }}</p>
 
                     <hr class="space">
                     <h4 class="bottom">West Citation</h4>
-
                     <p class="bottom">{{ search_form.west_cite }}</p>
                     <h4 class="bottom">Neutral Citation</h4>
-
                     <p class="bottom">{{ search_form.neutral_cite }}</p>
                     <h4 class="bottom">Docket Number</h4>
-
                     <p class="bottom">{{ search_form.docket_number }}</p>
+
+                    <div class="span-5">
+                        {{ search_form.citeCount_gt }}
+                        {{ search_form.citeCount_lt }}
+                        <h4 class="bottom inline">Citation Count</h4>
+                        <span type="text" id="citation-count" class="gray small bottom">(Any)</span>
+                    </div>
+                    <div id="slider-range" class="span-5 bottom"></div>
+
                     <button
                             type="submit"
                             class="button title span-5"

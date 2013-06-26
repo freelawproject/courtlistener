@@ -6,28 +6,23 @@ $(document).ready(function() {
         // Overrides the submit buttons so that they gather the correct
         // form elements before submission.
         e.preventDefault();
-        var refine = $('input[name=refine]:checked').val();
-        if (refine == 'new') {
-            // If it's a new query, we only persist the sort order.
-            gathered = $('#id_sort');
+
+        // Gather all form fields that are necessary
+        var gathered = $();
+        if ($('#id_court_all:checked').length == 0) {
+            // Add the court checkboxes that are selected
+            gathered = gathered.add($('.court-checkbox:checked'));
         }
-        else {
-            // Otherwise, all form fields are persisted that are necessary
-            var gathered = $();
-            if ($('#id_court_all:checked').length == 0) {
-                // All courts are not selected, therefore add the court checkboxes
-                gathered = gathered.add($('.court-checkbox:checked'));
-            }
-            if ($('.status-checkbox:checked').length < $('.status-checkbox').length) {
-                // All statuses are not checked, therefore add the status checkboxes
-                gathered = gathered.add($('.status-checkbox:checked'));
-            }
-            // Add the input boxes that aren't empty
-            gathered = gathered.add($('.external-input:not([type=checkbox])').filter(function () {
-                return this.value != "";
-            }));
+        if ($('.status-checkbox:checked').length < $('.status-checkbox').length) {
+            // Add the status checkboxes that are selected
+            gathered = gathered.add($('.status-checkbox:checked'));
         }
+        // Add the input boxes that aren't empty
+        gathered = gathered.add($('.external-input:not([type=checkbox])').filter(function () {
+            return this.value != "";
+        }));
         gathered.each(function () {
+            // Make and submit a hidden input element for all gathered fields
             var el = $(this);
             $('<input type="hidden" name="' + el.attr('name') + '" />')
                 .val(el.val())
@@ -35,6 +30,29 @@ $(document).ready(function() {
         });
         document.location = '/?' + $('#search-form').serialize();
     });
+
+    $(function() {
+        // Load up the slider in the UI
+        $("#slider-range").slider({
+            range: true,
+            min: 0,
+            max: 10000,
+            step: 10,
+            values: [$("#id_citeCount_gt").val(),
+                $("#id_citeCount_lt").val()],
+            slide: function(event, ui) {
+                // Update the text
+                $("#citation-count").text( "(" + ui.values[0] + " - " + ui.values[1] + ")");
+                // Update the form fields
+                $("#id_citeCount_gt").val(ui.values[0]);
+                $("#id_citeCount_lt").val(ui.values[1]);
+            }
+        });
+    });
+    if (($("#id_citeCount_gt").val() != 0 && $("#id_citeCount_gt").val() != undefined) ||
+        ($("#id_citeCount_lt").val() != 10000 && $("#id_citeCount_lt").val() != undefined)) {
+        $('#citation-count').text("(" + $("#id_citeCount_gt").val() + " - " + $("#id_citeCount_lt").val() + ")")
+    }
 
     $('#id_court_all').click(function() {
         // Makes the check all box (un)check the other boxes

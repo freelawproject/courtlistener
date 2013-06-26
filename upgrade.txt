@@ -5,7 +5,7 @@ hg pull -u
 is all that's necessary. In the case that special instructions are needed, we will attempt to put them here, with the
 most recent at the top.
 
-We welcome a conversion of these notes to an automated process using Fabric.
+We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
@@ -16,6 +16,8 @@ TODO:
  - Add to dumps, search_index, database, form fields, views, tests
  - Does the citation extractor re-save the document in Solr?
  - Check that apache works properly
+ - Why does the logo seem to be unclickable on the left half?
+ - Fix the refine section on case pages
 
 2013-06-24:
  - judges and nature_of_suit have been added to the Document model. Please migrate with:

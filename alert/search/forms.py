@@ -1,19 +1,3 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 from alert.search.fields import CeilingDateField
 from alert.search.fields import FloorDateField
 from alert.search.models import Court
@@ -21,11 +5,6 @@ from alert.search.models import DOCUMENT_STATUSES
 from django import forms
 
 import re
-
-REFINE_CHOICES = (
-    ('new', 'New search'),
-    ('refine', 'Keep filters'),
-)
 
 SORT_CHOICES = (
     ('score desc', 'Relevance'),
@@ -36,19 +15,19 @@ SORT_CHOICES = (
 )
 
 INPUT_FORMATS = [
-    '%Y-%m-%d', # '2006-10-25'
-    '%Y-%m', # '2006-10'
-    '%Y', # '2006'
-    '%m-%d-%Y', # '10-25-2006'
-    '%m-%Y', # '10-2006'
-    '%m-%d-%y', # '10-25-06'
-    '%m-%y', # '10-06'
-    '%m/%d/%Y', # '10/25/2006'
-    '%m/%Y', # '10/2006'
-    '%m/%d/%y', # '10/25/06'
-    '%m/%y', # '10/06'
-    '%Y/%m/%d', # '2006/10/26'
-    '%Y/%m', # '2006/10'
+    '%Y-%m-%d',  # '2006-10-25'
+    '%Y-%m',     # '2006-10'
+    '%Y',        # '2006'
+    '%m-%d-%Y',  # '10-25-2006'
+    '%m-%Y',     # '10-2006'
+    '%m-%d-%y',  # '10-25-06'
+    '%m-%y',     # '10-06'
+    '%m/%d/%Y',  # '10/25/2006'
+    '%m/%Y',     # '10/2006'
+    '%m/%d/%y',  # '10/25/06'
+    '%m/%y',     # '10/06'
+    '%Y/%m/%d',  # '2006/10/26'
+    '%Y/%m',     # '2006/10'
 ]
 
 
@@ -79,6 +58,15 @@ class SearchForm(forms.Form):
             attrs={'class': 'span-5 external-input',
                    'autocomplete': 'off',
                    'tabindex': '11'}
+        )
+    )
+    court_all = forms.BooleanField(
+        label='All Courts / Clear',
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(
+            attrs={'checked': 'checked',
+                   'class': 'external-input court-checkbox left'}
         )
     )
     filed_after = FloorDateField(
@@ -120,59 +108,53 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
+    cited_gt = forms.CharField(
+        required=False,
+        initial=0,
+        widget=forms.HiddenInput(
+            attrs={'class': 'external-input'}
+        )
+    )
+    cited_lt = forms.CharField(
+        required=False,
+        initial=10000,
+        widget=forms.HiddenInput(
+            attrs={'class': 'external-input'}
+        )
+    )
 
     def __init__(self, *args, **kwargs):
         super(SearchForm, self).__init__(*args, **kwargs)
+        """Normally we wouldn't need to use __init__ in a form object like this, however, since we are generating
+        checkbox fields with dynamic names coming from the database, we need to interact directly with the fields dict.
+        If it were possible to dynamically generate variable names (without using exec), we could do this work without
+        init, but since it's "only" possible to dynamically generate dict keys (as done below), we have to work directly
+        with the fields dict, which is available only in init.
+        """
 
         # Query the DB so we can build up check boxes for each court in use.
-        self.courts = Court.objects.filter(in_use=True).values_list('courtUUID',
-                                                                    'short_name')
+        courts = Court.objects.filter(in_use=True).values_list('courtUUID', 'short_name')
 
-        if self.data.get('q') is not None:
-            # If there's a q parameter, this is a refinement.
-            self.fields['refine'] = forms.ChoiceField(
-                choices=REFINE_CHOICES,
-                required=False,
-                initial='refine',
-                widget=forms.RadioSelect(attrs={'tabindex': '7'}))
-            self.fields['court_all'] = forms.BooleanField(
-                label='All Courts / Clear',
-                required=False,
-                widget=forms.CheckboxInput(attrs={'class': 'external-input court-checkbox left'}))
-            for court in self.courts:
-                self.fields['court_' + court[0]] = forms.BooleanField(
-                    label=court[1],
-                    required=False)
-            for status in DOCUMENT_STATUSES:
-                self.fields['stat_' + status[1]] = forms.BooleanField(
-                    label=status[1],
-                    required=False)
-        else:
-            # It's a new query, check all the boxes.
-            self.fields['court_all'] = forms.BooleanField(
-                label='All Courts / Clear',
+        for court in courts:
+            self.fields['court_' + court[0]] = forms.BooleanField(
+                label=court[1],
                 required=False,
                 initial=True,
-                widget=forms.CheckboxInput(attrs={'checked': 'checked',
-                                                  'class': 'external-input court-checkbox left'}))
-            for court in self.courts:
-                self.fields['court_' + court[0]] = forms.BooleanField(
-                    label=court[1],
-                    required=False,
-                    initial=True,
-                    widget=forms.CheckboxInput(attrs={'checked': 'checked'}))
-            for status in DOCUMENT_STATUSES:
-                if status[1] == 'Precedential':
-                    initial = True
-                    attrs = {'checked': 'checked'}
-                else:
-                    initial = False
-                    attrs = {}
-                self.fields['stat_' + status[1]] = forms.BooleanField(
-                    label=status[1],
-                    required=False,
-                    initial=initial,
-                    widget=forms.CheckboxInput(attrs=attrs))
+                widget=forms.CheckboxInput(attrs={'checked': 'checked'})
+            )
+        for status in DOCUMENT_STATUSES:
+            if status[1] == 'Precedential':
+                initial = True
+                attrs = {'checked': 'checked'}
+            else:
+                initial = False
+                attrs = {}
+            self.fields['stat_' + status[1]] = forms.BooleanField(
+                label=status[1],
+                required=False,
+                initial=initial,
+                widget=forms.CheckboxInput(attrs=attrs)
+            )
 
     def clean_q(self):
         """

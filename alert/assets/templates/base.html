@@ -19,6 +19,7 @@
 
         <link rel="stylesheet" href="{{ STATIC_URL }}css/style.css" type="text/css" media="screen, projection">
         <link rel="stylesheet" href="{{ STATIC_URL }}css/override.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="{{ STATIC_URL }}css/jquery-ui-1.10.3.custom.css" type="text/css" media="screen, projection">
         <script src="{{ STATIC_URL }}js/modernizr-2.0.6.min.js"></script>
         {% block privacy %}
             {% if private %}
@@ -141,6 +142,7 @@
         {# Set up jquery to be on every page. Doesn't hurt thanks to caching #}
         <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
         <script>window.jQuery || document.write('<script src="{{ STATIC_URL }}js/jquery-1.6.2.min.js"><\/script>')</script>
+        <script type="text/javascript" src="{{ STATIC_URL }}js/jquery-ui-1.10.3.custom.min.js"></script>
 
         {# Allows your own scripts in the footer. #}
         {% block footer-scripts %}{% endblock %}

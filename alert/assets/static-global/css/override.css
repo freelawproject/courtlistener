@@ -92,7 +92,7 @@ span.bold {
 }
 
 mark {
-	/* Needs extra declarations for old browsers */
+    /* Needs extra declarations for old browsers */
     background-color: #ffffbf;
 }
 
@@ -250,6 +250,12 @@ div.sidebar-checkbox input {
 
 input.court-checkbox, input.status-checkbox {
     top: 0px;
+}
+#citation-count {
+    float: right;
+}
+#slider-range {
+    margin: 0.5em;
 }
 
 /* Results page */
@@ -571,6 +577,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 	width                : 16px;
 	background-position  : -114px 0px;
 }
+
 
 /* Highlights images that need height/width */
 img:not([width]):not([height]) {
