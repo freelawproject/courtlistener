@@ -1,19 +1,3 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 import datetime
 from urllib import urlencode
 from urlparse import parse_qs
@@ -23,9 +7,9 @@ from django.conf import settings
 
 
 def make_get_string(request):
-    '''Makes a get string from the request object. If necessary, it removes
+    """Makes a get string from the request object. If necessary, it removes
     the pagination parameters.
-    '''
+    """
     get_dict = parse_qs(request.META['QUERY_STRING'])
     try:
         del get_dict['page']
@@ -38,11 +22,11 @@ def make_get_string(request):
 
 
 def get_string_to_dict(get_string):
-    '''Reverses the work that the make_get_string function performs, building a
+    """Reverses the work that the make_get_string function performs, building a
     dict from the get_string.
 
     Used by alerts.
-    '''
+    """
     get_dict = {}
     for k, v in parse_qs(get_string).iteritems():
         get_dict[k] = v[0]
@@ -50,7 +34,7 @@ def get_string_to_dict(get_string):
 
 
 def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
-    '''Create a useful facet variable for use in a template
+    """Create a useful facet variable for use in a template
 
     This function merges the fields in the form with the facet values from
     Solr, creating useful variables for the front end.
@@ -58,7 +42,7 @@ def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
       1. The initial load of the page. For this we use the checked attr that
          is set on the form if there isn't a sort order in the request.
       2. The load after form submission. For this, we use the field.value().
-    '''
+    """
     facets = []
     solr_facet_values = dict(solr_facet_values[solr_field])
     # Are any of the checkboxes checked?
@@ -69,14 +53,14 @@ def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
         try:
             count = solr_facet_values[field.html_name.replace(prefix, '')]
         except KeyError:
-            # Happens when a field is iterated on that doesn't exist in the 
+            # Happens when a field is iterated on that doesn't exist in the
             # facets variable
             continue
 
         if no_facets_selected:
             checked = True
         else:
-            if field.value() == 'on' or field.value() == True:
+            if field.value() == 'on' or field.value() is True:
                 checked = True
             else:
                 checked = False
@@ -91,7 +75,7 @@ def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
 
 
 def make_date_query(cd):
-    '''Given the cleaned data from a form, return a valid Solr fq string'''
+    """Given the cleaned data from a form, return a valid Solr fq string"""
     before = cd['filed_before']
     after = cd['filed_after']
     if any([before, after]):
@@ -110,16 +94,16 @@ def make_date_query(cd):
 
 
 def get_selected_field_string(cd, prefix):
-    '''Pulls the selected checkboxes out of the form data, and puts it into
+    """Pulls the selected checkboxes out of the form data, and puts it into
     Solr strings. Uses a prefix to know which items to pull out of the cleaned
     data. Check forms.py to see how the prefixes are set up.
 
     Final strings are of the form "A" OR "B" OR "C", with quotes in case there
     are spaces in the values.
-    '''
+    """
     selected_fields = ['"%s"' % k.replace(prefix, '')
                        for k, v in cd.iteritems()
-                       if (k.startswith(prefix) and v == True)]
+                       if (k.startswith(prefix) and v is True)]
 
     selected_field_string = ' OR '.join(selected_fields)
     return selected_field_string
@@ -166,9 +150,11 @@ def build_main_query(cd, highlight=True):
         pass
 
     main_fq = []
-    # Case Name
+    # Case Name and judges
     if cd['case_name'] != '' and cd['case_name'] is not None:
         main_fq.append('caseName:(%s)' % " AND ".join(cd['case_name'].split()))
+    if cd['judge'] != '' and cd['judge'] is not None:
+        main_fq.append('judge:(%s)' % 'AND '.join(cd['judge'].split()))
 
     # Citations
     if cd['west_cite'] != '' and cd['west_cite'] is not None:
@@ -201,13 +187,13 @@ def build_main_query(cd, highlight=True):
 
 
 def place_facet_queries(cd):
-    '''Get facet values for the court and status filters
+    """Get facet values for the court and status filters
 
-    Using the search form, query Solr and get the values for the court and 
+    Using the search form, query Solr and get the values for the court and
     status filters. Both of these need to be queried in a single function b/c
     they are dependent on each other. For example, when you filter using one,
     you need to change the values of the other.
-    '''
+    """
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     shared_facet_params = {}
     court_facet_params = {}
@@ -274,9 +260,9 @@ def place_facet_queries(cd):
 
 
 def get_court_start_year(conn, court):
-    '''Get the start year for a court by placing a Solr query. If a court is
+    """Get the start year for a court by placing a Solr query. If a court is
     active, but does not yet have any results, return the current year.
-    '''
+    """
     params = {}
     params['fq'] = ['court_exact:%s' % court.courtUUID]
     params['sort'] = 'dateFiled asc'

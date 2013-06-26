@@ -17,12 +17,9 @@ from alert.robots.views import robots
 from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert
 from alert.search.models import Court
 from alert.search.views import browser_warning, show_results, tools_page
-from alert.userHandling.views import confirmEmail, deleteProfile, \
-                                     deleteProfileDone, emailConfirmSuccess, \
-                                     password_change, redirect_to_settings, \
-                                     register, registerSuccess, \
-                                     requestEmailConfirmation, view_favorites, \
-                                     view_alerts, view_settings
+from alert.userHandling.views import confirmEmail, deleteProfile, deleteProfileDone, emailConfirmSuccess, \
+    password_change, redirect_to_settings, register, registerSuccess, requestEmailConfirmation, view_favorites, \
+    view_alerts, view_settings
 
 from django.conf.urls.defaults import *
 
@@ -44,19 +41,19 @@ urlpatterns = patterns('',
     (r'^admin/doc/', include('django.contrib.admindocs.urls')),
     (r'^admin/', include(admin.site.urls)),
 
-    # favicon and apple touch icons
+    # favicon and apple touch icons (needed in urls.py because they have to be at the root)
     (r'^favicon\.ico$', 'django.views.generic.simple.redirect_to',
-            {'url': '/media/images/ico/favicon.ico'}),
+        {'url': '/static/ico/favicon.ico'}),
     (r'^apple-touch-icon\.png$', 'django.views.generic.simple.redirect_to',
-            {'url': '/media/images/png/apple-touch-icon.png'}),
+        {'url': '/static/png/apple-touch-icon.png'}),
     (r'^apple-touch-icon-57x57-precomposed\.png$', 'django.views.generic.simple.redirect_to',
-            {'url': '/media/images/png/apple-touch-icon-57x57-precomposed.png'}),
+        {'url': '/static/png/apple-touch-icon-57x57-precomposed.png'}),
     (r'^apple-touch-icon-72x72-precomposed\.png$', 'django.views.generic.simple.redirect_to',
-            {'url': '/media/images/png/apple-touch-icon-72x72-precomposed.png'}),
+        {'url': '/static/png/apple-touch-icon-72x72-precomposed.png'}),
     (r'^apple-touch-icon-114x114-precomposed\.png$', 'django.views.generic.simple.redirect_to',
-            {'url': '/media/images/png/apple-touch-icon-114x114-precomposed.png'}),
+        {'url': '/static/png/apple-touch-icon-114x114-precomposed.png'}),
     (r'^apple-touch-icon-precomposed\.png$', 'django.views.generic.simple.redirect_to',
-            {'url': '/media/images/png/apple-touch-icon-precomposed.png'}),
+        {'url': '/static/png/apple-touch-icon-precomposed.png'}),
     (r'^bad-browser/$', browser_warning),
 
     # Maintenance and protest mode!
@@ -107,17 +104,13 @@ urlpatterns = patterns('',
     # Reset password pages
     (r'^reset-password/$', password_reset, {'extra_context': {'private': False}}),
     (r'^reset-password/instructions-sent/$', password_reset_done, {'extra_context': {'private': False}}),
-    (r'^confirm-password/(?P<uidb36>.*)/(?P<token>.*)/$',
-            password_reset_confirm,
-            {'post_reset_redirect': '/reset-password/complete/',
-             'extra_context': {'private': False}}),
-    (r'^reset-password/complete/$',
-            signIn,
-            {'template_name': 'registration/password_reset_complete.html',
-             'extra_context': {'private': False}}),
+    (r'^confirm-password/(?P<uidb36>.*)/(?P<token>.*)/$', password_reset_confirm,
+     {'post_reset_redirect': '/reset-password/complete/', 'extra_context': {'private': False}}),
+    (r'^reset-password/complete/$', signIn, {'template_name': 'registration/password_reset_complete.html',
+                                             'extra_context': {'private': False}}),
 
     # Search pages
-    (r'^$', show_results), # the home page!
+    (r'^$', show_results),  # the home page!
 
     # Alert pages
     (r'^alert/edit/(\d{1,6})/$', edit_alert),
@@ -162,16 +155,4 @@ urlpatterns += patterns('django.views.generic.simple',
     ('^search/results/$', 'redirect_to', {'url': '/', 'query_string': True}), # supports old OpenSearch plugin - added 2012-01-27
     ('^report/2010/$', 'redirect_to', {'url': 'http://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf'}),
     ('^report/2012/$', 'redirect_to', {'url': 'http://www.ischool.berkeley.edu/files/student_projects/mcdonald_rustad_report.pdf'}),
-)
-
-# if it's not the production site, serve the static files this way.
-if settings.DEVELOPMENT:
-    urlpatterns += patterns('',
-    (r'^media/(?P<path>.*)$', 'django.views.static.serve',
-        {'document_root': settings.INSTALL_ROOT + 'alert/assets/media',
-        'show_indexes': True}),
-    (r'^500/$', 'django.views.generic.simple.direct_to_template',
-        {'template': '500.html', 'private': False}),
-    (r'^404/$', 'django.views.generic.simple.direct_to_template',
-        {'template': '404.html', 'private': False}),
 )

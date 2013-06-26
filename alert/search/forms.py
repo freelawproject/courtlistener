@@ -23,15 +23,17 @@ from django import forms
 import re
 
 REFINE_CHOICES = (
-        ('new', 'New search'),
-        ('refine', 'Keep filters'),
-    )
+    ('new', 'New search'),
+    ('refine', 'Keep filters'),
+)
 
 SORT_CHOICES = (
-        ('score desc', 'Relevance'),
-        ('dateFiled desc', 'Date: newest first'),
-        ('dateFiled asc', 'Date: oldest first'),
-    )
+    ('score desc', 'Relevance'),
+    ('dateFiled desc', 'Newest first'),
+    ('dateFiled asc', 'Oldest first'),
+    ('citeCount desc', 'Most cited first'),
+    ('citeCount asc', 'Least cited first'),
+)
 
 INPUT_FORMATS = [
     '%Y-%m-%d', # '2006-10-25'
@@ -47,114 +49,138 @@ INPUT_FORMATS = [
     '%m/%y', # '10/06'
     '%Y/%m/%d', # '2006/10/26'
     '%Y/%m', # '2006/10'
-    ]
+]
 
 
 class SearchForm(forms.Form):
     q = forms.CharField(required=False, initial='*:*')
     sort = forms.ChoiceField(
-                         choices=SORT_CHOICES,
-                         required=False,
-                         initial='dateFiled desc',
-                         widget=forms.Select(
-                                   attrs={'class': 'external-input',
-                                          'tabindex': '9'}))
+        choices=SORT_CHOICES,
+        required=False,
+        initial='dateFiled desc',
+        widget=forms.Select(
+            attrs={'class': 'external-input',
+                   'tabindex': '9'}
+        )
+    )
     case_name = forms.CharField(
-                        required=False,
-                        initial='',
-                        widget=forms.TextInput(
-                                   attrs={'class': 'span-5 external-input',
-                                          'autocomplete': 'off',
-                                          'tabindex': '10'}))
+        required=False,
+        initial='',
+        widget=forms.TextInput(
+            attrs={'class': 'span-5 external-input',
+                   'autocomplete': 'off',
+                   'tabindex': '10'}
+        )
+    )
+    judge = forms.CharField(
+        required=False,
+        initial='',
+        widget=forms.TextInput(
+            attrs={'class': 'span-5 external-input',
+                   'autocomplete': 'off',
+                   'tabindex': '11'}
+        )
+    )
     filed_after = FloorDateField(
-                        required=False,
-                        input_formats=INPUT_FORMATS,
-                        widget=forms.TextInput(
-                                   attrs={'placeholder': 'YYYY-MM-DD',
-                                          'class': 'span-3 external-input',
-                                          'autocomplete': 'off'}))
+        required=False,
+        input_formats=INPUT_FORMATS,
+        widget=forms.TextInput(
+            attrs={'placeholder': 'YYYY-MM-DD',
+                   'class': 'span-3 external-input',
+                   'autocomplete': 'off'}
+        )
+    )
     filed_before = CeilingDateField(
-                        required=False,
-                        input_formats=INPUT_FORMATS,
-                        widget=forms.TextInput(
-                                   attrs={'placeholder': 'YYYY-MM-DD',
-                                          'class': 'span-3 external-input',
-                                          'autocomplete': 'off'}))
+        required=False,
+        input_formats=INPUT_FORMATS,
+        widget=forms.TextInput(
+            attrs={'placeholder': 'YYYY-MM-DD',
+                   'class': 'span-3 external-input',
+                   'autocomplete': 'off'}
+        )
+    )
     west_cite = forms.CharField(
-                        required=False,
-                        widget=forms.TextInput(
-                                   attrs={'class': 'span-5 external-input',
-                                          'autocomplete': 'off'}))
+        required=False,
+        widget=forms.TextInput(
+            attrs={'class': 'span-5 external-input',
+                   'autocomplete': 'off'}
+        )
+    )
     neutral_cite = forms.CharField(
-                        required=False,
-                        widget=forms.TextInput(
-                                   attrs={'class': 'span-5 external-input',
-                                          'autocomplete': 'off'}))
+        required=False,
+        widget=forms.TextInput(
+            attrs={'class': 'span-5 external-input',
+                   'autocomplete': 'off'}
+        )
+    )
     docket_number = forms.CharField(
-                        required=False,
-                        widget=forms.TextInput(
-                                   attrs={'class': 'span-5 external-input',
-                                          'autocomplete': 'off'}))
+        required=False,
+        widget=forms.TextInput(
+            attrs={'class': 'span-5 external-input',
+                   'autocomplete': 'off'}
+        )
+    )
 
     def __init__(self, *args, **kwargs):
         super(SearchForm, self).__init__(*args, **kwargs)
 
         # Query the DB so we can build up check boxes for each court in use.
         self.courts = Court.objects.filter(in_use=True).values_list('courtUUID',
-                                                               'short_name')
+                                                                    'short_name')
 
         if self.data.get('q') is not None:
             # If there's a q parameter, this is a refinement.
             self.fields['refine'] = forms.ChoiceField(
-                                              choices=REFINE_CHOICES,
-                                              required=False,
-                                              initial='refine',
-                                              widget=forms.RadioSelect(attrs={'tabindex': '7'}))
+                choices=REFINE_CHOICES,
+                required=False,
+                initial='refine',
+                widget=forms.RadioSelect(attrs={'tabindex': '7'}))
             self.fields['court_all'] = forms.BooleanField(
-                                                  label='All Courts / Clear',
-                                                  required=False,
-                                                  widget=forms.CheckboxInput(attrs={'class': 'external-input court-checkbox left'}))
+                label='All Courts / Clear',
+                required=False,
+                widget=forms.CheckboxInput(attrs={'class': 'external-input court-checkbox left'}))
             for court in self.courts:
                 self.fields['court_' + court[0]] = forms.BooleanField(
-                                                              label=court[1],
-                                                              required=False)
+                    label=court[1],
+                    required=False)
             for status in DOCUMENT_STATUSES:
                 self.fields['stat_' + status[1]] = forms.BooleanField(
-                                                              label=status[1],
-                                                              required=False)
+                    label=status[1],
+                    required=False)
         else:
             # It's a new query, check all the boxes.
             self.fields['court_all'] = forms.BooleanField(
-                                                  label='All Courts / Clear',
-                                                  required=False,
-                                                  initial=True,
-                                                  widget=forms.CheckboxInput(attrs={'checked':'checked',
-                                                                                    'class':'external-input court-checkbox left'}))
+                label='All Courts / Clear',
+                required=False,
+                initial=True,
+                widget=forms.CheckboxInput(attrs={'checked': 'checked',
+                                                  'class': 'external-input court-checkbox left'}))
             for court in self.courts:
                 self.fields['court_' + court[0]] = forms.BooleanField(
-                                                              label=court[1],
-                                                              required=False,
-                                                              initial=True,
-                                                              widget=forms.CheckboxInput(attrs={'checked':'checked'}))
+                    label=court[1],
+                    required=False,
+                    initial=True,
+                    widget=forms.CheckboxInput(attrs={'checked': 'checked'}))
             for status in DOCUMENT_STATUSES:
                 if status[1] == 'Precedential':
                     initial = True
-                    attrs = {'checked':'checked'}
+                    attrs = {'checked': 'checked'}
                 else:
                     initial = False
                     attrs = {}
                 self.fields['stat_' + status[1]] = forms.BooleanField(
-                                                              label=status[1],
-                                                              required=False,
-                                                              initial=initial,
-                                                              widget=forms.CheckboxInput(attrs=attrs))
+                    label=status[1],
+                    required=False,
+                    initial=initial,
+                    widget=forms.CheckboxInput(attrs=attrs))
 
     def clean_q(self):
-        '''
+        """
         Cleans up various problems with the query:
          - '' --> '*:*'
          - lowercase --> camelCase
-        '''
+         - '|' --> ' OR '
+        """
         q = self.cleaned_data['q']
 
         if q == '' or q == '*':
@@ -167,6 +193,7 @@ class SearchForm(forms.Form):
         q = re.sub('casenumber', 'caseNumber', q)
         q = re.sub('docketnumber', 'docketNumber', q)
         q = re.sub('neutralcite', 'neutralCite', q)
+        q = re.sub('citecount', 'citeCount', q)
 
         # Make pipes work
         q = re.sub('\|', ' OR ', q)
@@ -174,9 +201,9 @@ class SearchForm(forms.Form):
         return q
 
     def clean(self):
-        '''
+        """
         Handles validation fixes that need to be performed across fields.
-        '''
+        """
         cleaned_data = self.cleaned_data
 
         # 1. Make sure that the dates do this |--> <--| rather than <--| |-->

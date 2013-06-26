@@ -35,18 +35,21 @@ class SearchTest(TestCase):
         # Clear Solr
         clear_solr(self.si)
 
-        # Add a document to the index
-        site = test_scraper.Site().parse()
-        cite = Citation(case_name=site.case_names[0],
-                        docket_number=site.docket_numbers[0],
-                        neutral_cite=site.neutral_citations[0],
-                        west_cite=site.west_citations[0])
-        cite.save(index=False)
-        self.doc = Document(date_filed=site.case_dates[0],
-                            court=self.court,
-                            citation=cite,
-                            precedential_status=site.precedential_statuses[0])
-        self.doc.save()
+        # Add two documents to the index, but don't extract their contents
+        self.site = test_scraper.Site().parse()
+        cite_counts = (4, 6)
+        for i in range(0, 1):
+            cite = Citation(case_name=self.site.case_names[i],
+                            docket_number=self.site.docket_numbers[i],
+                            neutral_cite=self.site.neutral_citations[i],
+                            west_cite=self.site.west_citations[i])
+            cite.save(index=False)
+            self.doc = Document(date_filed=self.site.case_dates[i],
+                                court=self.court,
+                                citation=cite,
+                                precedential_status=self.site.precedential_statuses[i],
+                                citation_count=cite_counts[i])
+            self.doc.save()
 
     def tearDown(self):
         self.doc.delete()
@@ -90,9 +93,13 @@ class SearchTest(TestCase):
 
     def test_a_west_citation_query(self):
         """Can we query by citation number?"""
-        response = self.client.get('/', {'q': '*:*', 'west_cite': '44'})
-        self.assertIn('Tarrant Regional Water District',
-                      response.content)
+        get_dicts = [{'q': '*:*', 'west_cite': '44'},
+                     {'q': 'westCite:44'},
+                     {'q': 'westcite:44'}]  # Tests query field lower-casing
+        for get_dict in get_dicts:
+            response = self.client.get('/', get_dict)
+            self.assertIn('Tarrant Regional Water District',
+                          response.content)
 
     def test_a_neutral_citation_query(self):
         """Can we query by neutral citation numbers?"""
@@ -106,6 +113,36 @@ class SearchTest(TestCase):
                                          'filed_after': '1890'})
         self.assertEqual(200, response.status_code)
 
+    def test_a_judge_query(self):
+        """Can we query by judge name?"""
+        response = self.client.get('/', {'q': '*:*', 'judge': 'david'})
+        self.assertIn('Tarrant Regional Water District',
+                      response.content)
+        response = self.client.get('/', {'q': 'judge:david'})
+        self.assertIn('Tarrant Regional Water District',
+                      response.content)
 
+    def test_a_nature_of_suit_query(self):
+        """Can we query by nature of suit?"""
+        response = self.client.get('/', {'q': 'suitNature:copyright'})
+        self.assertIn('Tarrant Regional Water District',
+                      response.content)
 
+    def test_citation_filtering(self):
+        """Can we find Documents by citation filtering?"""
+        msg = "%s case back when filtering by citation count."
+        response = self.client.get('/', {'q': '*:*', 'citeCount_lt': 5, 'citeCount_gt': 3})
+        self.assertIn('Tarrant Regional Water District',
+                      response.content, msg=msg % 'Did not get')
+        response = self.client.get('/', {'q': '*:*', 'citeCount_lt': 10, 'citeCount_gt': 8})
+        self.assertNotIn('Tarrant Regional Water District',
+                         response.content, msg=msg % 'Got')
 
+    def test_citation_ordering(self):
+        """Can the results be re-ordered by citation count?"""
+        response = self.client.get('/', {'q': '*:*', 'sort': 'citeCount desc'})
+        self.assertTrue(response.content.index('Disclosure') < response.content.index('Tarrant'),
+                        msg="'Disclosure' should come BEFORE 'Tarrant' when ordered by descending citeCount.")
+        response = self.client.content.get('/', {'q': '*:*', 'sort': 'citeCount asc'})
+        self.assertTrue(response.index('Disclosure') > response.content.index('Tarrant'),
+                        msg="'Disclosure' should come AFTER 'Tarrant' when ordered by ascending citeCount.")

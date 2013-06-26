@@ -1,9 +1,3 @@
-# .hgignore file
-
-# Seperated into two sections, glob, and regexp
-# Globs are shell-style regular expressions, as distinct from perl-style
-
-
 # Beginning with the globs
 syntax: glob
 
@@ -16,7 +10,7 @@ syntax: glob
 # no private files!
 *[P|p][R|r][I|i][V|v][A|a][T|t][E|e]*
 
-# the server and laptop config
+# Downloaded and generated assets
 alert/assets/media/html
 alert/assets/media/pdf
 alert/assets/media/txt
@@ -24,6 +18,7 @@ alert/assets/media/wpd
 alert/assets/media/sitemaps
 alert/assets/media/doc
 alert/assets/media/dumps
+alert/assets/static
 
 # the cached robots.txt from Resource.org
 alert/robots/cached_file.txt

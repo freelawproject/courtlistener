@@ -19,9 +19,9 @@
 {% endblock %}
 
 {% block footer-scripts %}
-    <script defer type="text/javascript" src="/media/js/jquery.NobleCount.min.js"></script>
-    <script defer type="text/javascript" src="/media/js/save-favorites.js"></script>
-    <script type="text/javascript" src="/media/js/search-form.js"></script>
+    <script defer type="text/javascript" src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+    <script defer type="text/javascript" src="{{ STATIC_URL }}js/save-favorites.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}js/search-form.js"></script>
     <script type="text/javascript">
         // Handles the clipboard action.
         $(document).ready(function() {
