@@ -131,10 +131,10 @@ class SearchTest(TestCase):
     def test_citation_filtering(self):
         """Can we find Documents by citation filtering?"""
         msg = "%s case back when filtering by citation count."
-        response = self.client.get('/', {'q': '*:*', 'citeCount_lt': 5, 'citeCount_gt': 3})
+        response = self.client.get('/', {'q': '*:*', 'cited_lt': 5, 'cited_gt': 3})
         self.assertIn('Tarrant Regional Water District',
                       response.content, msg=msg % 'Did not get')
-        response = self.client.get('/', {'q': '*:*', 'citeCount_lt': 10, 'citeCount_gt': 8})
+        response = self.client.get('/', {'q': '*:*', 'cited_lt': 10, 'cited_gt': 8})
         self.assertNotIn('Tarrant Regional Water District',
                          response.content, msg=msg % 'Got')
 
