@@ -13,11 +13,11 @@ TODO:
  - Add west_state_cite to the UI (?) and to the Solr index.
  - Add judges
  - Add nature of suit
- - Add to dumps, search_index, database, form fields, views, tests
- - Does the citation extractor re-save the document in Solr?
+ - Add new fields to dumps, search_index, database, form fields, views, tests
+ - Does the citation extractor re-save the document in Solr -- i.e., do we get the citation counts after a standard
+   crawl into Solr?
  - Check that apache works properly
- - Why does the logo seem to be unclickable on the left half?
- - Fix the refine section on case pages
+ - Sort out getting rid of the *:* at last
 
 2013-06-24:
  - judges and nature_of_suit have been added to the Document model. Please migrate with:

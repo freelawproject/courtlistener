@@ -32,7 +32,10 @@ INPUT_FORMATS = [
 
 
 class SearchForm(forms.Form):
-    q = forms.CharField(required=False, initial='*:*')
+    q = forms.CharField(
+        required=False,
+        initial='*:*'
+    )
     sort = forms.ChoiceField(
         choices=SORT_CHOICES,
         required=False,
@@ -129,7 +132,7 @@ class SearchForm(forms.Form):
         checkbox fields with dynamic names coming from the database, we need to interact directly with the fields dict.
         If it were possible to dynamically generate variable names (without using exec), we could do this work without
         init, but since it's "only" possible to dynamically generate dict keys (as done below), we have to work directly
-        with the fields dict, which is available only in init.
+        with the fields dict, which is available only in init. So it goes...
         """
 
         # Query the DB so we can build up check boxes for each court in use.
