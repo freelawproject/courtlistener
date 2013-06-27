@@ -11,8 +11,6 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
-TODO:
- - make notes on settings
 
 2013-06-27:
  - This release will require downtime and will put your site into management mode upon pulling it.
@@ -29,10 +27,11 @@ TODO:
      manage.py cl_update_index --update --everything
      sudo servce scraper start
 
-   There have also been changes to the settings to enable staticfiles as indicated below. Please make the following
-   changes to your settings:
+   There have also been changes to the settings to enable staticfiles as indicated below, and settings have been
+   overhauled to make them much simpler.
 
-
+   To effect the changes to settings, copy 05-private.example to 05-private.py, and edit it as needed. Once complete,
+   delete 20-private.py.
 
    At this point your system should be upgraded, and you can disable the management mode in urls.py, then restart apache
    again.
