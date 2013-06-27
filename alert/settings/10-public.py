@@ -143,8 +143,8 @@ MEDIA_ROOT = os.path.join(INSTALL_ROOT, 'alert/assets/media/')
 
 # Static files configuration...
 STATIC_URL = '/static/'
+STATICFILES_DIRS = (os.path.join(INSTALL_ROOT, 'alert/assets/static-global/'),)
 STATIC_ROOT = os.path.join(INSTALL_ROOT, 'alert/assets/static/')
-STATIC_FILES_DIRS = (os.path.join(INSTALL_ROOT, 'alert/assets/static-global/'),)
 
 # Where should the data dumps be stored?
 DUMP_DIR = os.path.join(INSTALL_ROOT, 'alert/assets/media/dumps/')
