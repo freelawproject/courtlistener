@@ -211,7 +211,7 @@ class Command(BaseCommand):
         self.stdout.write("Adding or updating all documents...\n")
         docs = queryset_generator(Document.objects.all())
         count = Document.objects.all().count()
-        self._chunk_queryset_into_tasks(docs, count, chunksize=1000)
+        self._chunk_queryset_into_tasks(docs, count, chunksize=10000)
 
     @print_timing
     def optimize(self):
