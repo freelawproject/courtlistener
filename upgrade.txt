@@ -1,7 +1,7 @@
 This file contains notes for upgrades when special instructions are necessary. In general, simply doing:
 
 hg pull -u
-manage.py collectstatic
+sudo -u www-data /var/www/court-listener/alert/manage.py collectstatic
 manage.py migrate
 
 is all that's necessary. In the case that special instructions are needed, we will attempt to put them here, with the
@@ -31,7 +31,7 @@ We welcome a conversion of these notes to a better process using Fabric.
    overhauled to make them much simpler.
 
    To effect the changes to settings, copy 05-private.example to 05-private.py, and edit it as needed. Once complete,
-   delete 20-private.py.
+   delete 20-private.py or rename it with a different extension, if you need a backup.
 
    At this point your system should be upgraded, and you can disable the management mode in urls.py, then restart apache
    again.

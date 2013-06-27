@@ -91,6 +91,11 @@ class Command(BaseCommand):
     def _chunk_queryset_into_tasks(self, docs, count, chunksize=1000):
         """Chunks the queryset passed in, and dispatches it to Celery for
         adding to the index.
+
+        Potential performance improvements:
+         - Postgres is quiescent when Solr is popping tasks from Celery, instead, it should be fetching the next 1,000
+         - The wait loop (while not result.ready()) polls for the results, at a 1s interval. Could this be reduced or
+           somehow eliminated while keeping Celery's tasks list from running away?
         """
         processed_count = 0
         not_in_use = 0
@@ -137,7 +142,7 @@ class Command(BaseCommand):
         """
         Deletes all documents from the database.
         """
-        count = self.si.query(text='*:*').count()
+        count = self.si.raw_query({'q': '*:*'}).count()
 
         if self._proceed_with_deletion(count):
             self.stdout.write('Removing all documents from your index because '
