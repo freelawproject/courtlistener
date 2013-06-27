@@ -5,7 +5,7 @@ from alert.lib.string_utils import trunc
 from alert.lib import sunburnt
 from alert.scrapers.DupChecker import DupChecker
 from alert.scrapers.models import urlToHash
-from alert.scrapers.management.commands.cl_scrape_and_extract import Command
+from alert.scrapers.management.commands.cl_scrape_and_extract import get_extension
 from alert.scrapers.tasks import extract_doc_content
 from alert.scrapers.test_assets import test_scraper
 from alert.search.models import Citation, Court, Document
@@ -58,7 +58,7 @@ class IngestionTest(TestCase):
             with open(path) as f:
                 content = f.read()
                 cf = ContentFile(content)
-                extension = Command().get_extension(content)
+                extension = get_extension(content)
             cite = Citation(case_name=site.case_names[i])
             cite.save(index=False)
             doc = Document(date_filed=site.case_dates[i],
@@ -82,7 +82,7 @@ class IngestionTest(TestCase):
         with open(path) as f:
             content = f.read()
             cf = ContentFile(content)
-            extension = Command().get_extension(content)
+            extension = get_extension(content)
         cite = Citation(case_name=site.case_names[0])
         cite.save(index=False)
         doc = Document(date_filed=site.case_dates[0],

@@ -1,6 +1,8 @@
-This file contains notes for upgrades when special instructions are necessary. In general, simply doing an
+This file contains notes for upgrades when special instructions are necessary. In general, simply doing:
 
 hg pull -u
+manage.py collectstatic
+manage.py migrate
 
 is all that's necessary. In the case that special instructions are needed, we will attempt to put them here, with the
 most recent at the top.
@@ -10,31 +12,43 @@ We welcome a conversion of these notes to a better process using Fabric.
 ----------------------------
 
 TODO:
- - Add west_state_cite to the UI (?) and to the Solr index.
- - Add judges
- - Add nature of suit
- - Add new fields to dumps, search_index, database, form fields, views, tests
- - Does the citation extractor re-save the document in Solr -- i.e., do we get the citation counts after a standard
-   crawl into Solr?
- - Check that apache works properly
- - Sort out getting rid of the *:* at last
+ - make notes on settings
 
-2013-06-24:
- - judges and nature_of_suit have been added to the Document model. Please migrate with:
+2013-06-27:
+ - This release will require downtime and will put your site into management mode upon pulling it.
+ - judge, suitNature and citeCount have been added to the Solr configuration. judges and nature_of_suit have been added
+   to the Document model.Unfortunately, these require a recrawl of the database into the Solr index and a migration of
+   the database. To realize these changes:
 
+     sudo -u www-data pull -u
+     sudo service apache2 restart # Welcome to management mode.
+     sudo servce scraper stop
      manage.py migrate search
+     manage.py cl_update_index --delete --everything
+     sudo service solr restart
+     manage.py cl_update_index --update --everything
+     sudo servce scraper start
+
+   There have also been changes to the settings to enable staticfiles as indicated below. Please make the following
+   changes to your settings:
+
+
+
+   At this point your system should be upgraded, and you can disable the management mode in urls.py, then restart apache
+   again.
 
  - We've moved to using django.contrib.staticfiles[1]. This introduces better management of static files and moves CL
    towards standard Django practices in versions >= 1.3, but presents several changes for the project:
-    - When deploying, if there are new commands that must be run XXX
+    - When deploying, there are new commands that must be run if there are any new static files:
+       manage.py collectstatic
     - The locations of static files have been distributed to either the app they correspond with or to a new directory,
       "alert/assets/static-global", that contains static items that have a global scope across apps. Within each app
       there is a /static/ directory where their own static files should go. Files are not served from these locations,
       but are instead collected into the "alert/assets/static/" directory upon deploying the app.
     - Changes have been made to the apache configuration which will make it serve files from the new location. These
-      changes require that Apache be restarted after pulling from hg. TODO: Is this true?
-    - urls.py has been simplified, since django.contrib.staticfiles serves static files easily when
-      settings['DEBUG'] = True.
+      changes require that Apache be restarted after pulling from hg.
+    - urls.py has been simplified, since django.contrib.staticfiles serves static files automatically when
+      DEBUG == True.
     - Nearly all templates have been altered to use this app, introducing the possibility of missing images, css or JS.
 
  [1]: https://docs.djangoproject.com/en/1.3/howto/static-files/#staticfiles-in-templates
@@ -50,7 +64,7 @@ TODO:
  - Numerous changes to the models have been made to rename variables. Please update your database after pulling the
    code. This should be an instant migration in PostGres.
 
-   manage.py migrate search
+     manage.py migrate search
 
  - The dependency on the requests library has been updated to version 1.2.3:
 

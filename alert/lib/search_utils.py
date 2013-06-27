@@ -92,6 +92,15 @@ def make_date_query(cd):
         return ""
     return 'dateFiled:%s' % date_filter
 
+def make_cite_count_query(cd):
+    """Given the cleaned data from a form, return a valid Solr fq string"""
+    start = cd['cited_gt']
+    end = cd['cited_lt']
+    if start or end:
+        return 'citeCount:[%s TO %s]' % (start, end)
+    else:
+        return ""
+
 
 def get_selected_field_string(cd, prefix):
     """Pulls the selected checkboxes out of the form data, and puts it into
@@ -112,7 +121,7 @@ def get_selected_field_string(cd, prefix):
 def build_main_query(cd, highlight=True):
     main_params = {}
     # Build up all the queries needed
-    main_params['q'] = cd['q']
+    main_params['q'] = cd['q'] or '*:*'
 
     # Sorting for the main query
     main_params['sort'] = cd.get('sort', '')
@@ -122,12 +131,14 @@ def build_main_query(cd, highlight=True):
         # are not requested as part of highlighting. Facet params are not set
         # here because they do not retrieve results, only counts (they are set
         # to 0 rows).
-        main_params['fl'] = 'id,absolute_url,court_id,local_path,source,download_url,status,dateFiled'
+        main_params['fl'] = 'id,absolute_url,court_id,local_path,source,download_url,status,dateFiled,citeCount'
 
         # Highlighting for the main query.
         main_params['hl'] = 'true'
-        main_params['hl.fl'] = 'text,caseName,westCite,neutralCite,docketNumber,lexisCite,court_citation_string'
+        main_params['hl.fl'] = 'text,caseName,judge,suitNature,westCite,neutralCite,docketNumber,lexisCite,court_citation_string'
         main_params['f.caseName.hl.fragListBuilder'] = 'single'
+        main_params['f.judge.hl.fragListBuilder'] = 'single'
+        main_params['f.suitNature.hl.fragListBuilder'] = 'single'
         main_params['f.westCite.hl.fragListBuilder'] = 'single'
         main_params['f.neutralCite.hl.fragListBuilder'] = 'single'
         main_params['f.docketNumber.hl.fragListBuilder'] = 'single'
@@ -138,6 +149,8 @@ def build_main_query(cd, highlight=True):
         main_params['f.text.hl.alternateField'] = 'text'
         main_params['f.text.hl.maxAlternateFieldLength'] = '500'
         main_params['f.caseName.hl.alternateField'] = 'caseName'
+        main_params['f.judge.hl.alternateField'] = 'judge'
+        main_params['f.suitNature.hl.alternateField'] = 'suitNature'
         main_params['f.westCite.hl.alternateField'] = 'westCite'
         main_params['f.neutralCite.hl.alternateField'] = 'neutralCite'
         main_params['f.docketNumber.hl.alternateField'] = 'docketNumber'
@@ -151,22 +164,26 @@ def build_main_query(cd, highlight=True):
 
     main_fq = []
     # Case Name and judges
-    if cd['case_name'] != '' and cd['case_name'] is not None:
+    if cd['case_name']:
         main_fq.append('caseName:(%s)' % " AND ".join(cd['case_name'].split()))
-    if cd['judge'] != '' and cd['judge'] is not None:
-        main_fq.append('judge:(%s)' % 'AND '.join(cd['judge'].split()))
+    if cd['judge']:
+        main_fq.append('judge:(%s)' % ' AND '.join(cd['judge'].split()))
 
     # Citations
-    if cd['west_cite'] != '' and cd['west_cite'] is not None:
+    if cd['west_cite']:
         main_fq.append('westCite:' + cd['west_cite'])
-    if cd['docket_number'] != '' and cd['docket_number'] is not None:
+    if cd['docket_number']:
         main_fq.append('docketNumber:' + cd['docket_number'])
-    if cd['neutral_cite'] != '' and cd['neutral_cite'] is not None:
+    if cd['neutral_cite']:
         main_fq.append('neutralCite:' + cd['neutral_cite'])
 
     # Dates
     date_query = make_date_query(cd)
     main_fq.append(date_query)
+
+    # Citation count
+    cite_count_query = make_cite_count_query(cd)
+    main_fq.append(cite_count_query)
 
     # Facet filters
     selected_courts_string = get_selected_field_string(cd, 'court_')
@@ -200,7 +217,7 @@ def place_facet_queries(cd):
     stat_facet_params = {}
 
     # Build up all the queries needed
-    shared_facet_params['q'] = cd['q']
+    shared_facet_params['q'] = cd['q'] or '*:*'
 
     shared_fq = []
     court_fq = []

@@ -7,7 +7,7 @@ from django import forms
 import re
 
 SORT_CHOICES = (
-    ('score desc', 'Relevance'),
+    ('score desc', 'Keyword relevance'),
     ('dateFiled desc', 'Newest first'),
     ('dateFiled asc', 'Oldest first'),
     ('citeCount desc', 'Most cited first'),
@@ -33,8 +33,7 @@ INPUT_FORMATS = [
 
 class SearchForm(forms.Form):
     q = forms.CharField(
-        required=False,
-        initial='*:*'
+        required=False
     )
     sort = forms.ChoiceField(
         choices=SORT_CHOICES,
@@ -162,14 +161,10 @@ class SearchForm(forms.Form):
     def clean_q(self):
         """
         Cleans up various problems with the query:
-         - '' --> '*:*'
          - lowercase --> camelCase
          - '|' --> ' OR '
         """
         q = self.cleaned_data['q']
-
-        if q == '' or q == '*':
-            q = '*:*'
 
         # Fix fields to work in all lowercase
         q = re.sub('casename', 'caseName', q)

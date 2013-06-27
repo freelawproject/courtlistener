@@ -121,8 +121,9 @@
         {% endif %}
 
         {% if results.paginator.count > 0 %}
-            <h2 id="result-count">{{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }}</h2>
+            <h2 id="result-count" class="bottom">{{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }}</h2>
             <div id="result-order-chooser-placeholder"></div>
+            <span class="small gray span-17 last top">{{ results.object_list.QTime }}ms</span>
             <hr class="space"/>
             {% for result in results.object_list %}
                 <article>
@@ -139,27 +140,6 @@
                     </h3>
 
                     <p class="bottom">
-                        {% if result.download_url or result.local_path %}
-                            {% if result.source != 'R' %}
-                                <span class="meta-data-header">View Original:</span>
-                                <span class="meta-data-value">
-                                    {% if result.download_url %}
-                                        <a href="{{ result.download_url }}" class="visitable" rel="external noreferrer" tabindex="-1">From the court</a>
-                                    {% endif %}
-                                    {% if result.download_url and result.local_path %}
-                                        &nbsp;&nbsp;|&nbsp;&nbsp;
-                                    {% endif %}
-                                    {% if result.local_path %}
-                                        <a href="/{{ result.local_path }}" class="visitable" tabindex="-1">Our backup</a>
-                                    {% endif %}
-                                </span>
-                            {% else %}
-                                <span class="meta-data-value"><strong>No downloadable versions.</strong></span>
-                            {% endif %}
-                        {% else %}
-                            <span class="meta-data-value"><strong>No downloadable versions.</strong></span>
-                        {% endif %}
-
                         <span class="meta-data-header">Date Filed:</span>
                         <time class="meta-data-value" datetime="{{ result.dateFiled|date:'Y-m-d'}}" pubdate>
                             {% if result.dateFiled %}
@@ -170,8 +150,6 @@
                         </time>
                         <span class="meta-data-header">Status:</span>
                         <span class="meta-data-value">{{ result.status }}</span>
-                    </p>
-                    <p class="bottom">
                         {% if result.solr_highlights.neutralCite.0 != '' and result.solr_highlights.neutralCite.0 != None %}
                             <span class="meta-data-header">Neutral Citation:</span>
                             <span class="meta-data-value">{{ result.solr_highlights.neutralCite.0|safe }}</span>
@@ -181,6 +159,25 @@
                             <span class="meta-data-value">{{ result.solr_highlights.docketNumber.0|safe }}</span>
                         {% endif %}
                     </p>
+                    <p class="bottom">
+                        {% if result.solr_highlights.judge.0 %}
+                            <span class="meta-data-header">Judge:</span>
+                            <span class="meta-data-value">{{ result.solr_highlights.judge.0|safe }}</span>
+                        {%  endif %}
+                        {% if result.solr_highlights.suitNature.0 %}
+                            <span class="meta-data-header">Nature of suit:</span>
+                            <span class="meta-data-value">{{ result.solr_highlights.suitNature.0|safe }}</span>
+                        {%  endif %}
+                    </p>
+                    {% if result.citeCount > 0 %}
+                        <p class="bottom">
+                            <span class="meta-data-value">
+                                <a href="{{ result.absolute_url }}cited-by/?{{ request.META.QUERY_STRING }}">
+                                    Cited {{ result.citeCount|intcomma }} times
+                                </a>
+                            </span>
+                        </p>
+                    {% endif %}
                     <p>
                         {% if request.GET.q %}&hellip;{% endif %}{% for frag in result.solr_highlights.text %}
                            {{ frag|safe|underscore_to_space }}&hellip;

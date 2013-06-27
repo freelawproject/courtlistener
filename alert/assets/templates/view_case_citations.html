@@ -13,7 +13,7 @@
     <div class="span-6 append-1" id="sidebar">
         <div class="sidebar-section">
             <h4 class="bottom">
-                <a href="{{ doc.get_absolute_url }}">&laquo; Back to Document</a>
+                <a href="{{ doc.get_absolute_url }}?{{ request.META.QUERY_STRING }}">&laquo; Back to Document</a>
             </h4>
         </div>
     </div>
