@@ -7,27 +7,18 @@ import os
 import sys
 sys.path.append(os.getcwd())
 
-# Language code for this installation. All choices can be found here:
-# http://www.i18nguy.com/unicode/language-identifiers.html
-LANGUAGE_CODE = 'en-us'
-
 SITE_ID = 1
 
 # If you set this to False, Django will make some optimizations so as not
 # to load the internationalization machinery.
 USE_I18N = False
-
-
-# URL that handles the media served from MEDIA_ROOT. Make sure to use a
-# trailing slash if there is a path component (optional in other cases).
-# Examples: "http://media.lawrence.com", "http://example.com/media/"
-MEDIA_URL = ''
+DEFAULT_CHARSET = 'utf-8'
+LANGUAGE_CODE = 'en-us'
 
 # List of callables that know how to import templates from various sources.
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',
     'django.template.loaders.app_directories.Loader',
-#     'django.template.loaders.eggs.Loader',
 )
 
 TEMPLATE_CONTEXT_PROCESSORS = (
@@ -64,6 +55,7 @@ INSTALLED_APPS = [
     'django.contrib.sitemaps',
     'django.contrib.staticfiles',
     'djcelery',
+    'debug_toolbar',
     'south',
     'alerts',
     'casepage',
@@ -94,38 +86,92 @@ AUTH_PROFILE_MODULE = 'userHandling.UserProfile'
 # These remap some of the the messages constants to correspond with blueprint
 from django.contrib.messages import constants as message_constants
 MESSAGE_TAGS = {
-    message_constants.DEBUG : 'notice',
-    message_constants.INFO : 'notice',
-    message_constants.WARNING : 'error',
+    message_constants.DEBUG: 'notice',
+    message_constants.INFO: 'notice',
+    message_constants.WARNING: 'error',
 }
 
-# Solr settings
+########
+# Solr #
+########
 SOLR_URL = 'http://127.0.0.1:8983/solr'
 
 
-# Public celery settings
-# Rate limits aren't used, so disable them across the board for better performance
+##########
+# CELERY #
+##########
+if DEVELOPMENT:
+    # In a development machine, these setting make sense
+    CELERY_ALWAYS_EAGER = True
+    CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
+    CELERYD_CONCURRENCY = 2
+else:
+    # Celery settings for production sites
+    BROKER_URL = 'amqp://celery:%s@localhost:5672//celery' % CELERY_PASSWORD
+    CELERYD_CONCURRENCY = 24
+
+# Rate limits aren't ever used, so disable them across the board for better performance
 CELERY_DISABLE_RATE_LIMITS = True
 CELERY_SEND_TASK_ERROR_EMAILS = True
 
 
+#########
+# Email #
+#########
+if DEVELOPMENT:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
-# email settings
 SERVER_EMAIL = 'noreply@courtlistener.com'
 DEFAULT_FROM_EMAIL = 'noreply@courtlistener.com'
 
+
+#######
+# SEO #
+#######
 SITEMAP_PING_URLS = (
     'http://search.yahooapis.com/SiteExplorerService/V1/ping',
     'http://www.google.com/webmasters/tools/ping',
     'http://www.bing.com/webmaster/ping.aspx',
 )
 
-# Disabled b/c there are issues with how CACHE_MIDDLEWARE_ANONYMOUS_ONLY is implemented.
-#CACHE_MIDDLEWARE_SECONDS = (60*15)
-#CACHE_MIDDLEWARE_KEY_PREFIX = "alert"
-#CACHE_MIDDLEWARE_ANONYMOUS_ONLY = True
 
-DEFAULT_CHARSET = 'utf-8'
+###############
+# Directories #
+###############
+MEDIA_ROOT = os.path.join(INSTALL_ROOT, 'alert/assets/media/')
 
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
+# Static files configuration...
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(INSTALL_ROOT, 'alert/assets/static/')
+STATIC_FILES_DIRS = (os.path.join(INSTALL_ROOT, 'alert/assets/static-global/'),)
+
+# Where should the data dumps be stored?
+DUMP_DIR = os.path.join(INSTALL_ROOT, 'alert/assets/media/dumps/')
+
+TEMPLATE_DIRS = (
+    # Don't forget to use absolute paths, not relative paths.
+    os.path.join(INSTALL_ROOT, 'alert/assets/templates/'),
+)
+
+
+######################
+# Various and Sundry #
+######################
+if DEVELOPMENT:
+    SESSION_COOKIE_SECURE = False
+    SESSION_COOKIE_DOMAIN = '127.0.0.1'
+    CSRF_COOKIE_SECURE = False
+    # For debug_toolbar
+    INTERNAL_IPS = ('127.0.0.1',)
+    DEBUG_TOOLBAR_CONFIG = {'INTERCEPT_REDIRECTS': True}
+    # For tests
+    SOUTH_TESTS_MIGRATE = False
+    if 'test' in sys.argv:
+        # Does DB in memory during tests
+        DATABASES['default'] = {'ENGINE': 'django.db.backends.sqlite3'}
+else:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    DEBUG_TOOLBAR_CONFIG = {'INTERCEPT_REDIRECTS': False}
+
+
