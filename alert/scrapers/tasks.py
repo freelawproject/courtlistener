@@ -167,7 +167,7 @@ def extract_doc_content(pk, callback=None):
         return doc
 
     try:
-        doc.save()
+        doc.save(index=False)
     except Exception, e:
         print "****Error saving text to the db for: %s****" % doc
         print traceback.format_exc()

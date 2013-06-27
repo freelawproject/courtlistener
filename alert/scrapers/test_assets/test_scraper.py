@@ -41,3 +41,11 @@ class Site(GenericSite):
     def _get_west_citations(self):
         path = '//opinion/west_cite/text()'
         return list(self.html.xpath(path))
+
+    def _get_nature_of_suit(self):
+        path = '//opinion/nature_of_suit/text()'
+        return list(self.html.xpath(path))
+
+    def _get_judges(self):
+        path = '//opinion/judge/text()'
+        return list(self.html.xpath(path))

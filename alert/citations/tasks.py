@@ -92,7 +92,7 @@ def update_document(document):
             print document.html_with_citations
 
     # Turn off solr updating; we're not changing anything in the search index
-    document.save(index=False)
+    document.save(index=True)
     citation_matches = sum(matched_citations)
     name_matches = len(matched_citations) - citation_matches
     if DEBUG >= 1:
@@ -103,5 +103,6 @@ def update_document(document):
 
 @task
 def update_document_by_id(document_id):
+    """This is not an OK way to do id-based tasks. Needs to be refactored."""
     doc = Document.objects.get(pk=document_id)
     update_document(doc)

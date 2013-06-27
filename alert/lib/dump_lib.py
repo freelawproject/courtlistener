@@ -94,6 +94,14 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 except:
                     pass
                 try:
+                    row.set('judges', doc.judges)
+                except:
+                    pass
+                try:
+                    row.set('nature_of_suit', doc.nature_of_suit)
+                except:
+                    pass
+                try:
                     row.set('source', doc.get_source_display())
                 except:
                     pass

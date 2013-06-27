@@ -13,6 +13,28 @@ from django.template import RequestContext
 from django.views.decorators.cache import never_cache
 
 
+def _clean_form(request, cd):
+    """Returns cleaned up values as a Form object.
+    """
+    # Make a copy of request.GET so it is mutable
+    mutable_get = request.GET.copy()
+
+    # Send the user the cleaned up query
+    mutable_get['q'] = cd['q']
+    if mutable_get.get('filed_before') and cd.get('filed_before') is not None:
+        # Don't use strftime since it won't work prior to 1900.
+        before = cd['filed_before']
+        mutable_get['filed_before'] = '%s-%02d-%02d' % \
+                                      (before.year, before.month, before.day)
+    if mutable_get.get('filed_after') and cd.get('filed_before') is not None:
+        after = cd['filed_after']
+        mutable_get['filed_after'] = '%s-%02d-%02d' % \
+                                     (after.year, after.month, after.day)
+    mutable_get['court_all'] = cd['court_all']
+
+    return SearchForm(mutable_get)
+
+
 @never_cache
 def show_results(request):
     """Show the results for a query
@@ -52,17 +74,10 @@ def show_results(request):
     Code beyond this point will be run if the alert form failed, or if the
     submission was a GET request. Beyond this point, we run the searches.
     '''
-
-    try:
-        # Bind the search form if a search has been placed
-        request.GET['q']
-        search_form = SearchForm(request.GET)
-    except KeyError:
-        # No search placed. Show default form.
-        search_form = SearchForm()
-        # Run the query
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
-    if search_form.is_bound:
+    if len(request.GET) > 0:
+        # A query was performed. Bind the search form.
+        search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
             try:
@@ -78,25 +93,8 @@ def show_results(request):
                                           {'error': True, 'private': False},
                                           RequestContext(request))
 
-            # Make a copy of request.GET so it is mutable, and we make
-            # some adjustments that we want to see in the rendered form.
-            mutable_get = request.GET.copy()
-            if search_form.is_valid():
-                # Send the user the cleaned up query
-                cd = search_form.cleaned_data
-                mutable_get['q'] = cd['q']
-                if mutable_get.get('filed_before') and cd.get('filed_before') is not None:
-                    # Don't use strftime since it won't work prior to 1900.
-                    before = cd['filed_before']
-                    mutable_get['filed_before'] = '%s-%02d-%02d' % \
-                                                  (before.year, before.month, before.day)
-                if mutable_get.get('filed_after') and cd.get('filed_before') is not None:
-                    after = cd['filed_after']
-                    mutable_get['filed_after'] = '%s-%02d-%02d' % \
-                                                 (after.year, after.month, after.day)
-                mutable_get['court_all'] = cd['court_all']
+            search_form = _clean_form(request, cd)
 
-            search_form = SearchForm(mutable_get)
         else:
             # Invalid form, send it back
             return render_to_response(
@@ -105,23 +103,20 @@ def show_results(request):
                 RequestContext(request))
 
     else:
-        # Unbound form, first time the user has seen the page.
-        try:
-            # Gather the initial values
-            initial_values = {}
-            for k, v in dict(search_form.fields).iteritems():
-                initial_values[k] = v.initial
-            results_si = conn.raw_query(**search_utils.build_main_query(initial_values))
-            court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(initial_values)
-            # Create facet variables that can be used in our templates
-            court_facets = search_utils.make_facets_variable(
-                court_facet_fields, search_form, 'court_exact', 'court_')
-            status_facets = search_utils.make_facets_variable(
-                stat_facet_fields, search_form, 'status_exact', 'stat_')
-        except Exception, e:
-            return render_to_response('search/search.html',
-                                      {'error': True, 'private': False},
-                                      RequestContext(request))
+        # No search placed. Show default page after placing the needed queries.
+        search_form = SearchForm()
+
+        # Gather the initial values
+        initial_values = {}
+        for k, v in dict(search_form.fields).iteritems():
+            initial_values[k] = v.initial
+        # Make the queries
+        results_si = conn.raw_query(**search_utils.build_main_query(initial_values))
+        court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(initial_values)
+        court_facets = search_utils.make_facets_variable(
+            court_facet_fields, search_form, 'court_exact', 'court_')
+        status_facets = search_utils.make_facets_variable(
+            stat_facet_fields, search_form, 'status_exact', 'stat_')
 
     # Set up pagination
     try:

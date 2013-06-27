@@ -78,7 +78,7 @@
                             </li>
                         {% endfor %}
                     </ul>
-                    <a class="more" href="{{ doc.get_absolute_url }}cited-by/">More detail&hellip;</a>
+                    <a class="more" href="{{ doc.get_absolute_url }}cited-by/?{{ request.META.QUERY_STRING }}">More detail&hellip;</a>
                 </div>
             {% else %}
                 <h3 class="bottom pointer arrow-right-before">Cited By ({{ doc.citation_count }})</h3>
@@ -245,6 +245,18 @@
             {% if doc.citation.west_cite and doc.citation.docket_number %}
                 <strong>Docket Number: </strong>
                 {{ doc.citation.docket_number }}
+            {% endif %}
+        </p>
+        <p class="bottom">
+            {%  if doc.judges %}
+                <span class="meta-data-header">Judges:</span>
+                <span class="meta-data-value">{{ doc.judges }}</span>
+            {% endif %}
+        </p>
+        <p class="bottom">
+            {%  if doc.nature_of_suit %}
+                <span class="meta-data-header">Nature of suit:</span>
+                <span class="meta-data-value">{{ doc.nature_of_suit }}</span>
             {% endif %}
         </p>
         <p>

@@ -152,6 +152,7 @@ def scrape_court(site, full_crawl=False):
                 if site.west_state_citations:
                     cite.west_state_cite = site.west_state_citations[i]
 
+
                 # Make the document object
                 doc = Document(source='C',
                                sha1=sha1_hash,
@@ -174,6 +175,11 @@ def scrape_court(site, full_crawl=False):
                     ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
                     download_error = True
                     continue
+
+                if site.judges:
+                    doc.judges = site.judges[i]
+                if site.nature_of_suit:
+                    doc.nature_of_suit = site.nature_of_suit[i]
 
                 # Save everything, but don't update Solr index yet
                 cite.save(index=False)

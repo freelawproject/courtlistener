@@ -34,13 +34,17 @@ class SearchDocument(object):
         self.judge = doc.judges
         self.suitNature = doc.nature_of_suit
         self.docketNumber = doc.citation.docket_number
-        self.westCite = "%s %s" % (doc.citation.west_cite, doc.citation.west_state_cite)
         self.lexisCite = doc.citation.lexis_cite
         self.neutralCite = doc.citation.neutral_cite
         self.status = doc.get_precedential_status_display()
         self.source = doc.source
         self.download_url = doc.download_URL
         self.local_path = unicode(doc.local_path)
+
+        # Load the westCite field using a template to make a concatenation
+        west_cite_template = loader.get_template('search/indexes/westCite.txt')
+        c = Context({'object': doc})
+        self.westCite = west_cite_template._render(c)
 
         # Load the case_name field using a template to make it a concatenation
         case_name_template = loader.get_template('search/indexes/caseNumber.txt')
