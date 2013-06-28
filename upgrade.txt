@@ -11,6 +11,11 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
+TODO:
+ - Select a specific court, then press search. Note that the All Courts is checked.
+    - Change the sort order, and note that the court selection is gone.
+ - Unblock google.
+
 
 2013-06-27:
  - This release will require downtime and will put your site into management mode upon pulling it.
@@ -24,6 +29,7 @@ We welcome a conversion of these notes to a better process using Fabric.
      manage.py migrate search
      manage.py cl_update_index --delete --everything
      sudo service solr restart
+     sudo service celeryd restart
      manage.py cl_update_index --update --everything
      sudo servce scraper start
 

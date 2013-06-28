@@ -122,8 +122,9 @@ class Command(BaseCommand):
                 # The jobs finished - clean things up for the next round
                 subtasks = []
 
-                # Do a commit every 1000 items, for good measure.
-                self.si.commit()
+                if (processed_count % 50000 == 0) or last_document:
+                    # Do a commit every 50000 items, for good measure.
+                    self.si.commit()
 
             self.stdout.write("\rProcessed %d of %d.   Not in use: %d" %
                               (processed_count, count, not_in_use))
@@ -211,7 +212,7 @@ class Command(BaseCommand):
         self.stdout.write("Adding or updating all documents...\n")
         docs = queryset_generator(Document.objects.all())
         count = Document.objects.all().count()
-        self._chunk_queryset_into_tasks(docs, count, chunksize=10000)
+        self._chunk_queryset_into_tasks(docs, count, chunksize=1000)
 
     @print_timing
     def optimize(self):
