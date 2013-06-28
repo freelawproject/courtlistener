@@ -1,5 +1,6 @@
 2013-06-27:
-Re-index to add citation counts, judges and suitNature. 894,000 docs,
+Re-index to add citation counts, judges and suitNature. 894,000 docs, about
+2-3 hours.
 
 
 2013-01-11:

@@ -11,7 +11,7 @@ $(document).ready(function() {
         e.preventDefault();
 
         // Empty the sliders if they are both at their max
-        if (cited_gt.val() == 0 && cited_lt.val() == 10000){
+        if (cited_gt.val() == 0 && cited_lt.val() == 15000){
             cited_gt.val("");
             cited_lt.val("");
         }
@@ -44,20 +44,20 @@ $(document).ready(function() {
         cited_gt.val(0);
     }
     if (cited_lt.val() == ""){
-        cited_lt.val(10000);
+        cited_lt.val(15000);
     }
     $(function() {
         // Load up the slider in the UI
         $("#slider-range").slider({
             range: true,
             min: 0,
-            max: 10000,
+            max: 15000,
             step: 10,
             values: [cited_gt.val(),
                      cited_lt.val()],
             slide: function(event, ui) {
                 // Update the text
-                if (ui.values[0] == 0 && ui.values[1] == 10000){
+                if (ui.values[0] == 0 && ui.values[1] == 15000){
                     $('#citation-count').text("(Any)");
                 } else {
                     $("#citation-count").text( "(" + ui.values[0] + " - " + ui.values[1] + ")");
@@ -67,7 +67,7 @@ $(document).ready(function() {
             }
         });
     });
-    if (cited_gt.val() != 0 || cited_lt.val() != 10000) {
+    if (cited_gt.val() != 0 || cited_lt.val() != 15000) {
         $('#citation-count').text("(" + $("#id_cited_gt").val() + " - " + $("#id_cited_lt").val() + ")")
     }
 

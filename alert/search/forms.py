@@ -119,7 +119,7 @@ class SearchForm(forms.Form):
     )
     cited_lt = forms.CharField(
         required=False,
-        initial=10000,
+        initial=15000,
         widget=forms.HiddenInput(
             attrs={'class': 'external-input'}
         )
