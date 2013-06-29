@@ -22,6 +22,7 @@ from alert.userHandling.views import confirmEmail, deleteProfile, deleteProfileD
     view_alerts, view_settings
 
 from django.conf.urls.defaults import *
+from django.views.generic import RedirectView
 
 # for the flatfiles in the sitemap
 from django.contrib.auth.views import login as signIn, logout as signOut, \
@@ -147,12 +148,10 @@ urlpatterns = patterns('',
 )
 
 # redirects
-urlpatterns += patterns('django.views.generic.simple',
-    ('^privacy/$', 'redirect_to', {'url': '/terms/#privacy'}),
-    ('^removal/$', 'redirect_to', {'url': '/terms/#removal'}),
-    ('^browse/$', 'redirect_to', {'url': '/'}),
-    ('^opinions/' + "|".join(pacer_codes) + '|all', 'redirect_to', {'url': '/'}), # supports old URLs - added 2011-12-31
-    ('^search/results/$', 'redirect_to', {'url': '/', 'query_string': True}), # supports old OpenSearch plugin - added 2012-01-27
-    ('^report/2010/$', 'redirect_to', {'url': 'http://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf'}),
-    ('^report/2012/$', 'redirect_to', {'url': 'http://www.ischool.berkeley.edu/files/student_projects/mcdonald_rustad_report.pdf'}),
+urlpatterns += patterns(
+    ('^privacy/$', RedirectView.as_view(url='/terms/#privacy')),
+    ('^removal/$', RedirectView.as_view(url='/terms/#removal')),
+    ('^browse/$', RedirectView.as_view(url='/')),
+    ('^report/2010/$', RedirectView.as_view(url='https://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf')),
+    ('^report/2012/$', RedirectView.as_view(url='https://www.ischool.berkeley.edu/files/student_projects/mcdonald_rustad_report.pdf')),
 )
