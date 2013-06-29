@@ -225,6 +225,8 @@ def place_facet_queries(cd):
     # Case Name
     if cd['case_name'] != '' and cd['case_name'] is not None:
         shared_fq.append('caseName:(%s)' % " AND ".join(cd['case_name'].split()))
+    if cd['judge']:
+        shared_fq.append('judge:(%s)' % ' AND '.join(cd['judge'].split()))
 
     # Citations
     if cd['west_cite'] != '' and cd['west_cite'] is not None:
@@ -237,6 +239,10 @@ def place_facet_queries(cd):
     # Dates
     date_query = make_date_query(cd)
     shared_fq.append(date_query)
+
+    # Citation count
+    cite_count_query = make_cite_count_query(cd)
+    shared_fq.append(cite_count_query)
 
     # Faceting
     shared_facet_params['rows'] = '0'

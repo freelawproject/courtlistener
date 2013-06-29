@@ -12,9 +12,8 @@ We welcome a conversion of these notes to a better process using Fabric.
 ----------------------------
 
 TODO:
- - Select a specific court, then press search. Note that the All Courts is checked.
-    - Change the sort order, and note that the court selection is gone.
- - Unblock google.
+
+ - /report/2012/ isn't working...just redirecting to the homepage.
 
 
 2013-06-27:

@@ -67,8 +67,7 @@ class SearchForm(forms.Form):
         required=False,
         initial=True,
         widget=forms.CheckboxInput(
-            attrs={'checked': 'checked',
-                   'class': 'external-input court-checkbox left'}
+            attrs={'class': 'external-input court-checkbox left'}
         )
     )
     filed_after = FloorDateField(
