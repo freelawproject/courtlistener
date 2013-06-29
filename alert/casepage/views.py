@@ -37,13 +37,13 @@ import os
 
 @never_cache
 def view_case(request, court, pk, casename):
-    '''Take a court and an ID, and return the document.
+    """Take a court and an ID, and return the document.
 
     We also test if the document ID is a favorite for the user, and send data
     as such. If it's a favorite, we send the bound form for the favorite so
     it can populate the form on the page. If it is not a favorite, we send the
     unbound form.
-    '''
+    """
     # Decode the id string back to an int
     pk = ascii_to_num(pk)
 
@@ -140,7 +140,7 @@ def view_case_citations(request, pk, casename):
 
 
 def serve_static_file(request, file_path=''):
-    '''Sends a static file to a user.
+    """Sends a static file to a user.
 
     This serves up the static case files such as the PDFs in a way that can be
     blocked from search engines if necessary. We do four things:
@@ -148,7 +148,7 @@ def serve_static_file(request, file_path=''):
      - Check if it's blocked
      - If blocked, we set the x-robots-tag HTTP header
      - Serve up the file using Apache2's xsendfile
-    '''
+    """
     doc = get_object_or_404(Document, local_path=file_path)
     file_name = file_path.split('/')[-1]
     file_loc = os.path.join(settings.MEDIA_ROOT, file_path.encode('utf-8'))

@@ -11,10 +11,6 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
-TODO:
-
- - /report/2012/ isn't working...just redirecting to the homepage.
-
 
 2013-06-27:
  - This release will require downtime and will put your site into management mode upon pulling it.
