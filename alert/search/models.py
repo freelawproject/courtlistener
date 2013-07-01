@@ -313,13 +313,16 @@ class Document(models.Model):
         contained it. Note that this doesn't get called when an entire queryset
         is deleted, but that should be OK.
         """
-        # Delete the item.
+        # Get the ID for later use
+        doc_id_was = self.pk
+
+        # Delete the item from the DB.
         super(Document, self).delete(*args, **kwargs)
 
         # Update the search index.
         # Import is here to avoid looped import problem
         from search.tasks import delete_doc
-        delete_doc.delay(self.pk)
+        delete_doc.delay(doc_id_was)
 
         # Invalidate the sitemap and dump caches
         if self.date_filed:
