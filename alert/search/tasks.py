@@ -17,7 +17,7 @@ si = sunburnt.SolrInterface(settings.SOLR_URL, mode='w')
 
 @task
 def add_or_update_doc_object(doc):
-    '''Adds a document object to the solr index.
+    """Adds a document object to the solr index.
 
     This function is for use with the update_index command. It's slightly
     different than the commands below because it expects a Django object,
@@ -25,7 +25,7 @@ def add_or_update_doc_object(doc):
     not passing objects around, but thread safety shouldn't be an issue since
     this is only used by the update_index command, and we want to query and
     build the SearchDocument objects in the task, not in its caller.
-    '''
+    """
     try:
         search_doc = SearchDocument(doc)
         si.add(search_doc)
@@ -51,8 +51,10 @@ def add_or_update_docs(docs):
 
 @task
 def delete_doc(document_id):
-    '''Deletes the document from the index. Called by Document delete function.
-    '''
+    """Deletes the document from the index.
+
+    Called by Document delete function and from models.py when an item is deleted.
+    """
     if document_id is not None:
         # document_id can be set to None when the item was never properly saved in the DB.
         # In that case, it never got a pk, which means it would not have one to provide here.
@@ -61,8 +63,8 @@ def delete_doc(document_id):
 
 @task
 def add_or_update_doc(document_id):
-    '''Updates the document in the index. Called by Document save function.
-    '''
+    """Updates the document in the index. Called by Document save function.
+    """
     doc = Document.objects.get(pk=document_id)
     search_doc = SearchDocument(doc)
     si.add(search_doc)
@@ -70,9 +72,9 @@ def add_or_update_doc(document_id):
 
 @task
 def update_cite(citation_id):
-    '''If a citation and a document are both updated simultaneously, we will
+    """If a citation and a document are both updated simultaneously, we will
     needlessly update the index twice. No easy way around it.
-    '''
+    """
     cite = Citation.objects.get(pk=citation_id)
     for doc in cite.document_set.all():
         search_doc = SearchDocument(doc)
