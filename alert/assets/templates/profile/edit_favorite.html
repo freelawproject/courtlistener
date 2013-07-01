@@ -1,0 +1,92 @@
+{% extends "profile/nav.html" %}
+{% load text_filters %}
+
+{% block title %}CourtListener.com / Profile / Alerts / Edit{% endblock %}
+{% block search-form %}{% endblock %}
+
+{% block footer-scripts %}
+    <script defer type="text/javascript" src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+    <script defer type="text/javascript" src="{{ STATIC_URL }}js/save-favorites-profile.js"></script>
+{% endblock %}
+
+{% block nav-favorites %}active{% endblock %}
+
+{% block content %}
+    <div class="span-17 last" id="content">
+        {% if form.errors %}
+            <div class="span-10 error">
+                <p class="bottom">There were errors with your submission.</p>
+            </div>
+            <div class="span-7 last">&nbsp;</div>
+        {% endif %}
+
+        <div class="span-10">
+            <h3 class="bottom alt">
+                    <a href="{{doc.get_absolute_url}}">
+                        {{ doc.citation.case_name }},
+                        {% if doc.citation.west_cite != '' and doc.citation.west_cite != None %}
+                            {{doc.citation.west_cite}}
+                        {% else %}
+                            {{doc.citation.docket_number}}
+                        {% endif %}
+                        ({% if doc.court.citation_string != 'SCOTUS' %}{{doc.court.citation_string|nbsp}}&nbsp;{% endif %}{{doc.date_filed|date:"Y"}})
+                    </a>
+                </h3>
+                <p class="bottom">
+                    <strong>Date Filed:</strong>
+                    {% if doc.date_filed %}
+                        {{doc.date_filed|date:"l, F jS, Y"}}
+                    {% else %}
+                        Unknown date
+                    {% endif %}
+                </p>
+                <p class="bottom">
+                    <strong>Status: </strong>
+                    {% if doc.precedential_status %}
+                        {{doc.get_precedential_status_display}}
+                    {% else %}
+                        Unknown
+                    {% endif %}
+                </p>
+                <p>
+                    {% if doc.citation.west_cite != ''  and doc.citation.west_cite != None and doc.citation.docket_number %}
+                        <strong>Docket Number: </strong>
+                        {{ doc.citation.docket_number }}
+                    {% endif %}
+                </p>
+            <form action="" method="POST">{% csrf_token %}
+                {{ favorite_form.doc_id }}
+                <p class="bottom">
+                    <label for="id_name">Name</label>
+                    {% if favorite_form.name.errors %}
+                        <br><span class="errortext">
+                            {% for error in favorite_form.name.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                    {{ favorite_form.name }}
+                </p>
+                <p class="bottom">
+                    <label for="id_favorite_notes">Notes</label>
+                    {% if favorite_form.notes.errors %}
+                        <br><span class="errortext">
+                            {% for error in favorite_form.notes.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                    {{ favorite_form.notes }}
+                    <p class="top right"><span id="characters-remaining"></span> characters remaining</p>
+                </p>
+
+                <button type="submit" class="button title save-favorite-button" name="saveFavorite" id="saveFavorite" tabindex='3'>
+                    Save favorite
+                </button>
+                <p id="save-favorite-delete" class="bottom fake-link inline" tabindex="4">Delete this favorite</a>
+                </p>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
