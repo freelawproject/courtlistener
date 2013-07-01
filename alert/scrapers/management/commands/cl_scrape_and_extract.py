@@ -197,13 +197,11 @@ def scrape_court(site, full_crawl=False):
 
                 logger.info("Successfully added: %s" % site.case_names[i])
 
-
-
         # Update the hash if everything finishes properly.
         logger.info("%s: Successfully crawled." % site.court_id)
         if not download_error and not full_crawl:
             # Only update the hash if no errors occurred.
-            dup_checker.update_site_hash(sha1_hash)
+            dup_checker.update_site_hash(site.hash)
 
 
 class Command(BaseCommand):
