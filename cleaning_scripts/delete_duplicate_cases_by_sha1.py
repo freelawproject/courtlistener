@@ -1960,14 +1960,17 @@ bad_shas = ('0010826ccdb81f239979cf6f9ebea37e1a31a03f',
 
 
 def fixer(simulate=False, verbose=False):
-    for sha in bad_shas:
+    delete_count = 0
+    for sha in bad_shas[0:1]:
         docs = Document.objects.filter(sha1=sha).order_by('time_retrieved')
         print "Deleting %s docs with sha1 of: %s" % (len(docs) - 1, sha)
         for doc in docs[1:]:
             print "  --> Document %s has been deleted." % doc.pk
             # Delete all but the first doc.
             if not simulate:
+                delete_count += 1
                 doc.delete()
+    print "%s items deleted, holy cow." % delete_count
 
 def main():
     usage = "usage: %prog [--verbose] [---simulate]"
