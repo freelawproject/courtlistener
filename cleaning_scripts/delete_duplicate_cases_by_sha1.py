@@ -1,9 +1,11 @@
 import sys
+
 sys.path.append('/var/www/court-listener/alert')
 
 import settings
 from celery.task.sets import subtask
 from django.core.management import setup_environ
+
 setup_environ(settings)
 
 from search.models import Document, Court
@@ -12,6 +14,7 @@ from optparse import OptionParser
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
 from scrapers.tasks import extract_doc_content, extract_by_ocr
+from search.tasks import delete_doc
 
 # A list of bad cases, found with the following query
 # select
@@ -1959,7 +1962,7 @@ bad_shas = ('0010826ccdb81f239979cf6f9ebea37e1a31a03f',
             'ffd26bcc3ec72a6459e3f82f4f1255a6865bd769',)
 
 
-def fixer(simulate=False, verbose=False):
+def fixer_orig(simulate=False, verbose=False):
     delete_count = 0
     for sha in bad_shas:
         docs = Document.objects.filter(sha1=sha).order_by('time_retrieved')
@@ -1972,14 +1975,25 @@ def fixer(simulate=False, verbose=False):
                 doc.delete()
     print "%s items deleted, holy cow." % delete_count
 
+
+def fixer(simulate=False, verbose=False):
+    """The items didn't get deleted the first time because the deletion task didn't work properly. Thus, we must
+    delete manually"""
+    with open('ids_to_delete.txt', 'r') as ids:
+        for id in ids:
+            print "Deleting %s from index." % id
+            if not simulate:
+                delete_doc.delay(int(id))
+
+
 def main():
     usage = "usage: %prog [--verbose] [---simulate]"
     parser = OptionParser(usage)
     parser.add_option('-v', '--verbose', action="store_true", dest='verbose',
-        default=False, help="Display log during execution")
+                      default=False, help="Display log during execution")
     parser.add_option('-s', '--simulate', action="store_true",
-        dest='simulate', default=False, help=("Simulate the corrections without "
-        "actually making them."))
+                      dest='simulate', default=False, help=("Simulate the corrections without "
+                                                            "actually making them."))
     (options, args) = parser.parse_args()
 
     verbose = options.verbose
@@ -1991,6 +2005,7 @@ def main():
         print "*******************************************"
 
     return fixer(simulate, verbose)
+
 
 if __name__ == '__main__':
     main()
