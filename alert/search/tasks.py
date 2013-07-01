@@ -54,12 +54,16 @@ def delete_doc(document_id):
     """Deletes the document from the index.
 
     Called by Document delete function and from models.py when an item is deleted.
+
+    Note that putting a line like...
+
+      if document_id is not None:
+
+    ...will mean that models.py deletions won't work. We've had a bug with that in
+    the past, so exercise caution when tweaking this function.
     """
-    if document_id is not None:
-        # document_id can be set to None when the item was never properly saved in the DB.
-        # In that case, it never got a pk, which means it would not have one to provide here.
-        si.delete(document_id)
-        si.commit()
+    si.delete(document_id)
+    si.commit()
 
 @task
 def add_or_update_doc(document_id):
