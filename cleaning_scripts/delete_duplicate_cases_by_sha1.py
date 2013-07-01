@@ -1981,9 +1981,10 @@ def fixer(simulate=False, verbose=False):
     delete manually"""
     with open('ids_to_delete.txt', 'r') as ids:
         for id in ids:
+            id = int(id.strip())
             print "Deleting %s from index." % id
             if not simulate:
-                delete_doc.delay(int(id))
+                delete_doc.delay(id)
 
 
 def main():
