@@ -135,9 +135,16 @@ def scrape_court(site, full_crawl=False):
 
             # Make a hash of the data
             sha1_hash = hashlib.sha1(r.content).hexdigest()
-            onwards = dup_checker.should_we_continue(sha1_hash, current_date, next_date)
+            onwards = dup_checker.should_we_continue_break_or_carry_on(sha1_hash, current_date, next_date)
 
-            if onwards:
+            if onwards == 'CONTINUE':
+                # It's a duplicate, but we haven't hit any thresholds yet.
+                continue
+            elif onwards == 'BREAK':
+                # It's a duplicate, and we hit a date or dup_count threshold.
+                dup_checker.update_site_hash(sha1_hash)
+                break
+            elif onwards == 'CARRY_ON':
                 logger.info('Adding new document found at: %s' % site.download_urls[i])
                 dup_checker.reset()
 
@@ -151,7 +158,6 @@ def scrape_court(site, full_crawl=False):
                     cite.west_cite = site.west_citations[i]
                 if site.west_state_citations:
                     cite.west_state_cite = site.west_state_citations[i]
-
 
                 # Make the document object
                 doc = Document(source='C',
@@ -191,10 +197,7 @@ def scrape_court(site, full_crawl=False):
 
                 logger.info("Successfully added: %s" % site.case_names[i])
 
-            else:
-                # No need to continue this Site.
-                dup_checker.update_site_hash(sha1_hash)
-                break
+
 
         # Update the hash if everything finishes properly.
         logger.info("%s: Successfully crawled." % site.court_id)

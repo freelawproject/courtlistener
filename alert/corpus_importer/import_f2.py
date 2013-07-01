@@ -1,21 +1,5 @@
 #!/usr/bin/env python
 
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 import os
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 
@@ -27,8 +11,7 @@ from django import db
 from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned
 from django.template.defaultfilters import slugify
-from django.utils.encoding import smart_str, smart_unicode
-from alert.search.models import Court, Citation, Document
+from alert.search.models import Court, Document
 from alert.lib.parse_dates import parse_dates
 from juriscraper.lib.string_utils import trunc
 from alert.lib.scrape_tools import hasDuplicate
@@ -43,7 +26,7 @@ import urllib2
 
 
 def load_fix_files():
-    '''Loads the fix files into memory so they can be accessed efficiently.'''
+    """Loads the fix files into memory so they can be accessed efficiently."""
     court_fix_file = open('../logs/f2_court_fix_file.txt', 'r')
     date_fix_file = open('../logs/f2_date_fix_file.txt', 'r')
     case_name_short_fix_file = open('../logs/f2_short_case_name_fix_file.txt', 'r')
@@ -67,12 +50,12 @@ def load_fix_files():
 
 
 def check_fix_list(sha1, fix_dict):
-    ''' Given a sha1, return the correction for a case. Return false if no values.
+    """ Given a sha1, return the correction for a case. Return false if no values.
 
     Corrections are strings that the parser can interpret as needed. Items are
     written to this file the first time the cases are imported, and this file
     can be used to import F2 into later systems.
-    '''
+    """
     try:
         return fix_dict[sha1].strip()
     except KeyError:
@@ -80,11 +63,11 @@ def check_fix_list(sha1, fix_dict):
 
 
 def exceptional_cleaner(caseName):
-    '''Cleans common Resource.org special cases off of case names, and
+    """Cleans common Resource.org special cases off of case names, and
     sets the precedential_status for a document.
 
     Returns caseName, precedential_status
-    '''
+    """
     caseName = caseName.lower()
     ca1regex = re.compile('(unpublished disposition )?notice: first circuit local rule 36.2\(b\)6 states unpublished opinions may be cited only in related cases.?')
     ca2regex = re.compile('(unpublished disposition )?notice: second circuit local rule 0.23 states unreported opinions shall not be cited or otherwise used in unrelated cases.?')
@@ -142,14 +125,14 @@ def exceptional_cleaner(caseName):
 
 
 def scrape_and_parse():
-    '''Traverses the dumps from resource.org, and puts them in the DB.
+    """Traverses the dumps from resource.org, and puts them in the DB.
 
     Probably lots of ways to go about this, but I think the easiest will be the following:
      - look at the index page of all volumes, and follow all the links it has.
      - for each volume, look at its index page, and follow the link to all cases
      - for each case, collect information wisely.
      - put it all in the DB
-    '''
+    """
 
     # begin by loading up the fix files into memory
     court_fix_dict, date_fix_dict, case_name_short_dict = load_fix_files()
@@ -438,9 +421,8 @@ def scrape_and_parse():
             # Used during the next iteration as the default value
             saved_caseDate = caseDate
 
-
             if DEBUG >= 3:
-                print "caseDate is: %s" % (caseDate)
+                print "caseDate is: %s" % caseDate
 
             try:
                 doc, created = Document.objects.get_or_create(

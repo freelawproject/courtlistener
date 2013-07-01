@@ -5,7 +5,7 @@ from alert.lib.string_utils import trunc
 from alert.lib import sunburnt
 from alert.scrapers.DupChecker import DupChecker
 from alert.scrapers.models import urlToHash
-from alert.scrapers.management.commands.cl_scrape_and_extract import get_extension
+from alert.scrapers.management.commands.cl_scrape_and_extract import get_extension, scrape_court
 from alert.scrapers.tasks import extract_doc_content
 from alert.scrapers.test_assets import test_scraper
 from alert.search.models import Citation, Court, Document
@@ -19,12 +19,13 @@ from django.test import TestCase
 # Gotta have the bad import here for celery
 from scrapers.tasks import extract_by_ocr
 
+
 class IngestionTest(TestCase):
     fixtures = ['test_court.json']
 
     def ingest_documents(self):
         site = test_scraper.Site().parse()
-        Command.scrape_court(site)
+        scrape_court(site)
 
     def setUp(self):
         # Clear Solr
@@ -130,7 +131,8 @@ class DupcheckerTest(TestCase):
             if dup_checker.full_crawl:
                 self.assertFalse(abort, "DupChecker says to abort during a full crawl.")
             else:
-                self.assertTrue(abort, "DupChecker says not to abort on a court that's been crawled before with the same hash")
+                self.assertTrue(abort,
+                                "DupChecker says not to abort on a court that's been crawled before with the same hash")
 
             dup_checker.url2Hash.delete()
 
@@ -148,44 +150,54 @@ class DupcheckerTest(TestCase):
 
             dup_checker.url2Hash.delete()
 
-    def test_should_we_continue_with_an_empty_database(self):
+    def test_should_we_continue_break_or_carry_on_with_an_empty_database(self):
         for dup_checker in self.dup_checkers:
-            onwards = dup_checker.should_we_continue('content', date.today(), date.today() - timedelta(days=1))
+            onwards = dup_checker.should_we_continue_break_or_carry_on('content', date.today(),
+                                                                       date.today() - timedelta(days=1))
             if not dup_checker.full_crawl:
                 self.assertTrue(onwards, "DupChecker says to abort during a full crawl.")
             else:
                 count = Document.objects.all().count()
                 self.assertTrue(onwards, "DupChecker says to abort on dups when the database has %s Documents." % count)
 
-    def test_should_we_continue_with_a_dup_found(self):
+    def test_should_we_continue_break_or_carry_on_with_a_dup_found(self):
+        # Set the dup_threshold to zero for this test
         self.dup_checkers = [DupChecker(self.court, full_crawl=True, dup_threshold=0),
                              DupChecker(self.court, full_crawl=False, dup_threshold=0)]
         content = "this is dummy content that we hash"
         content_hash = hashlib.sha1(content).hexdigest()
         for dup_checker in self.dup_checkers:
+            # Create a document, then use the dup_cheker to see if it exists.
             doc = Document(sha1=content_hash, court=self.court)
             doc.save(index=False)
-            onwards = dup_checker.should_we_continue(content_hash, date.today(), date.today())
+            onwards = dup_checker.should_we_continue_break_or_carry_on(content_hash, date.today(), date.today())
             if dup_checker.full_crawl:
-                self.assertTrue(onwards, "DupChecker says to abort during a full crawl.")
+                self.assertEqual(onwards, 'CONTINUE',
+                                 'DupChecker says to %s during a full crawl.' % onwards)
             else:
-                self.assertFalse(onwards, "DupChecker says to continue but there should be a duplicate in the database. "
-                                          "dup_count is %s, and dup_threshold is %s" % (dup_checker.dup_count,
-                                                                                        dup_checker.dup_threshold))
+                self.assertEqual(onwards, 'BREAK',
+                                 "DupChecker says to %s but there should be a duplicate in the database. "
+                                 "dup_count is %s, and dup_threshold is %s" % (onwards,
+                                                                               dup_checker.dup_count,
+                                                                               dup_checker.dup_threshold))
             doc.delete()
 
-    def test_should_we_continue_with_dup_found_and_older_date(self):
+    def test_should_we_continue_break_or_carry_on_with_dup_found_and_older_date(self):
         content = "this is dummy content that we hash"
         content_hash = hashlib.sha1(content).hexdigest()
         for dup_checker in self.dup_checkers:
             doc = Document(sha1=content_hash, court=self.court)
             doc.save(index=False)
             # Note that the next case occurs prior to the current one
-            onwards = dup_checker.should_we_continue(content_hash, date.today(), date.today() - timedelta(days=1))
+            onwards = dup_checker.should_we_continue_break_or_carry_on(content_hash, date.today(),
+                                                                       date.today() - timedelta(days=1))
             if dup_checker.full_crawl:
-                self.assertTrue(onwards, "DupChecker says to abort during a full crawl.")
+                self.assertEqual(onwards, 'CONTINUE',
+                                 'DupChecker says to %s during a full crawl.' % onwards)
             else:
-                self.assertFalse(onwards, "DupChecker says to continue but there should be a duplicate in the database. "
-                                          "dup_count is %s, and dup_threshold is %s" % (dup_checker.dup_count,
-                                                                                        dup_checker.dup_threshold))
+                self.assertEqual(onwards, 'BREAK',
+                                 "DupChecker says to %s but there should be a duplicate in the database. "
+                                 "dup_count is %s, and dup_threshold is %s" % (onwards,
+                                                                               dup_checker.dup_count,
+                                                                               dup_checker.dup_threshold))
             doc.delete()

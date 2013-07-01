@@ -61,13 +61,24 @@ class DupChecker(dict):
             # If it's a full crawl, we don't care about the hash. We do not abort no matter what.
             return False
 
-    def should_we_continue(self, content_hash, current_date, next_date):
+    def should_we_continue_break_or_carry_on(self, content_hash, current_date, next_date):
         """Checks if a we have a document with identical content in the CL corpus by making a hash of the data and
-        attempting to look that up.
+        attempting to look that up. Depending on the result of that, we either CONTINUE to the next item, we CARRY_ON
+        with adding this item to the DB or we BREAK from the court entirely.
+
+        Following logic applies:
+         - if we have the item already
+            - and if the next date is before this date
+            - or if this is our duplicate threshold is exceeded
+                - break
+            - otherwise
+                - continue
+         - if not
+            - carry on
         """
         # using the hash, check for a duplicate in the db.
         exists = Document.objects.filter(sha1=content_hash).exists()
-        if exists and not self.full_crawl:
+        if exists:
             logger.info('Duplicate found at: %s' % current_date)
             self._increment(current_date)
 
@@ -77,18 +88,21 @@ class DupChecker(dict):
                 already_scraped_next_date = (next_date < current_date)
             else:
                 already_scraped_next_date = True
-            if already_scraped_next_date:
-                if self.court.pk != 'mich':
-                    # Michigan sometimes has multiple occurrences of the
-                    # same case with different dates on a page.
-                    logger.info('Next case occurs prior to when we found a '
-                                'duplicate. Court is up to date.')
-                    return False
-            elif self.dup_count >= self.dup_threshold:
-                logger.info('Found %s duplicates in a row. Court is up to date.' % self.dup_threshold)
-                return False
+            if not self.full_crawl:
+                if already_scraped_next_date:
+                    if self.court.pk == 'mich':
+                        # Michigan sometimes has multiple occurrences of the
+                        # same case with different dates on a page.
+                        return 'CONTINUE'
+                    else:
+                        logger.info('Next case occurs prior to when we found a '
+                                    'duplicate. Court is up to date.')
+                        return 'BREAK'
+                elif self.dup_count >= self.dup_threshold:
+                    logger.info('Found %s duplicates in a row. Court is up to date.' % self.dup_count)
+                    return 'BREAK'
             else:
                 # Not the fifth duplicate. Continue onwards.
-                return True
+                return 'CONTINUE'
         else:
-            return True
+            return 'CARRY_ON'

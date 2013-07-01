@@ -1,29 +1,3 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-#  Under Sections 7(a) and 7(b) of version 3 of the GNU Affero General Public
-#  License, that license is supplemented by the following terms:
-#
-#  a) You are required to preserve this legal notice and all author
-#  attributions in this program and its accompanying documentation.
-#
-#  b) You are prohibited from misrepresenting the origin of any material
-#  within this covered work and you are required to mark in reasonable
-#  ways how any modified versions differ from the original version.
-
 import dup_finder
 import f3_helpers
 import re
@@ -31,19 +5,19 @@ import sys
 
 
 def run_dup_check(case, simulate=True):
-    '''Runs a series of duplicate checking code, generating and analyzing
+    """Runs a series of duplicate checking code, generating and analyzing
     stats about whether the case is a duplicate.
-    
-    '''
+
+    """
     print "Running dup check..."
-    # stats takes the form: [count_from_search] or 
+    # stats takes the form: [count_from_search] or
     #                       [count_from_search,
     #                        count_from_docket_num,
     #                        [case_name_diff_1, diff_2, diff_3, etc],
     #                        [content_length_percent_diff_1, 2, 3],
     #                        [content_diff_1, 2, 3]
     #                       ]
-    # candidates is a list of 0 to n possible duplicates 
+    # candidates is a list of 0 to n possible duplicates
     stats, candidates = dup_finder.get_dup_stats(case)
     if len(candidates) == 0:
         print "  No candidates found. Adding the opinion."
@@ -52,7 +26,7 @@ def run_dup_check(case, simulate=True):
     elif (re.sub("(\D|0)", "", case.docket_number) == \
                 re.sub("(\D|0)", "", candidates[0]['docketNumber'])) and \
                 (len(candidates) == 1):
-        # If the docket numbers are identical, and there was only 
+        # If the docket numbers are identical, and there was only
         # one result
         print "  Match made on docket number of single candidate. Merging the opinions."
         if not simulate:
@@ -67,7 +41,7 @@ def run_dup_check(case, simulate=True):
             target_ids = [can['id'] for can in f3_helpers.find_same_docket_numbers(case, candidates)]
             f3_helpers.merge_cases_complex(case, target_ids)
     else:
-        # Possible duplicate, filter out obviously bad cases, and 
+        # Possible duplicate, filter out obviously bad cases, and
         # then pass forward for manual review if necessary.
         filtered_candidates, stats = f3_helpers.filter_by_stats(candidates, stats)
         if len(filtered_candidates) == 0:
@@ -107,13 +81,13 @@ def run_dup_check(case, simulate=True):
 
 
 def import_by_hand():
-    '''Iterates over the hand_file list, and presents them to a human for 
+    """Iterates over the hand_file list, and presents them to a human for
     resolution
-    
+
     The automated importer was unable to resolve all cases, and made a list of
     the ones it could not handle. This function takes that list, and iterates
     over it so that the documents can be imported manually.
-    '''
+    """
     simulate = False
     corpus = f3_helpers.Corpus('file:///var/www/court-listener/Resource.org/data/F3/')
     hand_file = open('/var/www/court-listener/Resource.org/logs/hand_file.csv', 'r')
@@ -140,14 +114,14 @@ def import_by_hand():
 
 
 def import_f3():
-    '''Iterate over the F3 documents and import them. 
-    
+    """Iterate over the F3 documents and import them.
+
     A couple complications belie what would otherwise be a simple process:
      1. Duplicate detection. This is done by filtering by query and then
-        refining the results that are found. For more details, see the 
-        dup_finder code. 
+        refining the results that are found. For more details, see the
+        dup_finder code.
      2. Merging duplicate documents. See their code in the f3_helpers module.
-    '''
+    """
     simulate = False
     corpus = f3_helpers.Corpus('/var/www/court-listener/Resource.org/data/F3/')
     vol_file = open('/var/www/court-listener/Resource.org/logs/vol_file.txt', 'r+')
