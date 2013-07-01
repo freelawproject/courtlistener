@@ -11,6 +11,7 @@ from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
 from juriscraper.GenericSite import logger
 from juriscraper.lib.importer import build_module_list
+from requests.exceptions import SSLError
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
 from scrapers.tasks import extract_doc_content, extract_by_ocr
@@ -108,7 +109,11 @@ def scrape_court(site, full_crawl=False):
                     # Occurs when a DeferredList fetcher fails.
                     continue
                 s = requests.session()
-                r = s.get(url)
+                try:
+                    r = s.get(url)
+                except SSLError:
+                    # Washington has a certificate we can't understand.
+                    r = s.get(url, verify=False)
 
                 # test for empty files (thank you CA1)
                 if len(r.content) == 0:
