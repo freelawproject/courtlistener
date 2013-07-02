@@ -79,7 +79,7 @@ class DupChecker(dict):
         # using the hash, check for a duplicate in the db.
         exists = Document.objects.filter(sha1=content_hash).exists()
         if exists:
-            logger.info('Duplicate found at: %s' % current_date)
+            logger.info('Duplicate found on date: %s, with sha1: %s' % (current_date, content_hash))
             self._increment(current_date)
 
             # If the next date in the Site object is less than (before) the current date, we needn't continue
