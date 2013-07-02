@@ -92,6 +92,39 @@ def get_extension(content):
     return extension
 
 
+def get_binary_content(download_url):
+    if not download_url:
+        # Occurs when a DeferredList fetcher fails.
+        msg = 'NoDownloadUrlError: %s\n%s' % (download_url, traceback.format_exc())
+        return msg, None
+    # noinspection PyBroadException
+    try:
+        s = requests.session()
+        headers = {'User-Agent': 'CourtListener'}
+        try:
+            r = s.get(download_url,
+                      headers=headers)
+        except SSLError:
+            # Washington has a certificate we don't understand.
+            r = s.get(download_url,
+                      verify=False,
+                      headers=headers)
+
+        # test for empty files (thank you CA1)
+        if len(r.content) == 0:
+            msg = 'EmptyFileError: %s\n%s' % (download_url, traceback.format_exc())
+            return msg, r
+
+        # test for and follow meta redirects
+        r = follow_redirections(r, s)
+    except:
+        msg = 'DownloadingError: %s\n%s' % (download_url, traceback.format_exc())
+        return msg, r
+
+    # Success!
+    return '', r
+
+
 def scrape_court(site, full_crawl=False):
     download_error = False
     # Get the court object early for logging
@@ -103,33 +136,12 @@ def scrape_court(site, full_crawl=False):
     abort = dup_checker.abort_by_url_hash(site.url, site.hash)
     if not abort:
         for i in range(0, len(site.case_names)):
-            try:
-                url = site.download_urls[i]
-                if not url:
-                    # Occurs when a DeferredList fetcher fails.
-                    continue
-                s = requests.session()
-                try:
-                    r = s.get(url)
-                except SSLError:
-                    # Washington has a certificate we can't understand.
-                    r = s.get(url, verify=False)
-
-                # test for empty files (thank you CA1)
-                if len(r.content) == 0:
-                    msg = 'EmptyFileError: %s\n%s' % (url,
-                                                      traceback.format_exc())
-                    logger.warn(msg)
-                    ErrorLog(log_level='WARNING', court=court, message=msg).save()
-                    continue
-
-                # test for and follow meta redirects
-                r = follow_redirections(r, s)
-            except:
-                msg = 'DownloadingError: %s\n%s' % (url,
-                                                    traceback.format_exc())
+            msg, r = get_binary_content(site.download_urls[i])
+            if msg:
                 logger.warn(msg)
-                ErrorLog(log_level='WARNING', court=court, message=msg).save()
+                ErrorLog(log_level='WARNING',
+                         court=court,
+                         message=msg).save()
                 continue
 
             current_date = site.case_dates[i]
@@ -150,6 +162,7 @@ def scrape_court(site, full_crawl=False):
                 dup_checker.update_site_hash(sha1_hash)
                 break
             elif onwards == 'CARRY_ON':
+                # Not a duplicate, carry on
                 logger.info('Adding new document found at: %s' % site.download_urls[i])
                 dup_checker.reset()
 
