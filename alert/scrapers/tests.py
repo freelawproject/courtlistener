@@ -5,7 +5,8 @@ from alert.lib.string_utils import trunc
 from alert.lib import sunburnt
 from alert.scrapers.DupChecker import DupChecker
 from alert.scrapers.models import urlToHash
-from alert.scrapers.management.commands.cl_scrape_and_extract import get_extension, scrape_court
+from alert.scrapers.management.commands.cl_scrape_and_extract import get_extension
+from alert.scrapers.management.commands.cl_scrape_and_extract import scrape_court
 from alert.scrapers.tasks import extract_doc_content
 from alert.scrapers.test_assets import test_scraper
 from alert.search.models import Citation, Court, Document
