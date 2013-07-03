@@ -41,7 +41,7 @@ class DocumentAdmin(admin.ModelAdmin):
 
 class CourtAdmin(admin.ModelAdmin):
     list_display = ('full_name', 'short_name', 'position', 'in_use',
-                    'courtUUID')
+                    'courtUUID', 'notes',)
 
 admin.site.register(Document, DocumentAdmin)
 admin.site.register(Court, CourtAdmin)
