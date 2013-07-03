@@ -116,6 +116,9 @@ class Court(models.Model):
         "the jurisdiction of the court",
         max_length=3,
         choices=JURISDICTIONS)
+    notes = models.TextField(
+        "any notes about coverage or anything else",
+        blank=True)
 
     def __unicode__(self):
         return self.full_name
