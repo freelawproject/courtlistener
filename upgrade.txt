@@ -12,6 +12,13 @@ We welcome a conversion of these notes to a better process using Fabric.
 ----------------------------
 
 
+2013-07-03:
+ - Adds a notes field to the Courts model. Migrate your database with:
+
+    manage.py migrate search
+
+   And you'll be good to go.
+
 2013-06-27:
  - This release will require downtime and will put your site into management mode upon pulling it.
  - judge, suitNature and citeCount have been added to the Solr configuration. judges and nature_of_suit have been added
