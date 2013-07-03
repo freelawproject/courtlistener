@@ -10,7 +10,7 @@ import signal
 import traceback
 from datetime import date
 from dateutil.rrule import rrule
-from dateutil.rrule import DAILY, MONTHLY
+from dateutil.rrule import DAILY, WEEKLY, MONTHLY
 from optparse import make_option
 from requests import HTTPError
 
@@ -43,7 +43,11 @@ class Command(BaseCommand):
         court_str = mod.__name__.split('.')[-1].split('_')[0]
         logger.info("Using court_str: \"%s\"" % court_str)
 
-        if court_str == 'cafc':
+        if court_str == 'ca4':
+            start = date(1996, 1, 1)
+            end = date(2010, 4, 1)
+            return self.site_yielder([i.date() for i in rrule(WEEKLY, dtstart=start, until=end)], mod)
+        elif court_str == 'cafc':
             return self.site_yielder(range(0, 185), mod)
         elif 'haw' in court_str:
             return self.site_yielder(range(2010, 2013), mod)
