@@ -1,0 +1,3 @@
+{# This code must match the code in search/indexes/text.txt #}
+{{ object.citation.west_cite|default_if_none:"" }}
+{{ object.citation.west_state_cite|default_if_none:""}}
