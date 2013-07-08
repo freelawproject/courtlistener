@@ -24,6 +24,7 @@ class FloorDateField(DateField):
         Validates that the input can be converted to a date. Returns a Python
         datetime.date object.
         """
+        value = value.strip()
         if value in validators.EMPTY_VALUES or value == 'YYYY-MM-DD':
             return None
         if isinstance(value, datetime.datetime):
@@ -47,7 +48,6 @@ class CeilingDateField(Field):
     dates represent the *last* day of the month. This allows a search for all
     documents "After 2010" to work.
     """
-
     widget = DateTimeInput
     default_error_messages = {
         'invalid': _(u'Enter a valid date/time.'),
@@ -62,6 +62,7 @@ class CeilingDateField(Field):
         Validates that the input can be converted to a date. Returns a
         Python datetime.datetime object.
         """
+        value = value.strip()
         if value in validators.EMPTY_VALUES or value == "YYYY-MM-DD":
             return None
         if isinstance(value, datetime.datetime):
