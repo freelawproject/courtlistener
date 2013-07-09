@@ -11,6 +11,11 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
+2013-07-07:
+ - The piwik configuration has been merged into the virtual host for the main site. If you are using piwik, you will
+   need to restart your apache server to enable this configuration. After this change, piwik will be located at
+   /piwik rather than as a subdomain.
+
 
 2013-07-03:
  - Adds a notes field to the Courts model. Migrate your database with:
