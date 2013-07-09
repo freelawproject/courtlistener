@@ -152,7 +152,21 @@ def scrape_court(site, full_crawl=False):
 
             # Make a hash of the data
             sha1_hash = hashlib.sha1(r.content).hexdigest()
-            onwards = dup_checker.should_we_continue_break_or_carry_on(sha1_hash, current_date, next_date)
+            if court_str in ['nev_u']:
+                # Nevada's non-precedential cases have different SHA1 sums every time.
+                onwards = dup_checker.should_we_continue_break_or_carry_on(
+                    current_date,
+                    next_date,
+                    lookup_value=site.download_urls[i],
+                    lookup_by='download_URL'
+                )
+            else:
+                onwards = dup_checker.should_we_continue_break_or_carry_on(
+                    current_date,
+                    next_date,
+                    lookup_value=sha1_hash,
+                    lookup_by='sha1'
+                )
 
             if onwards == 'CONTINUE':
                 # It's a duplicate, but we haven't hit any thresholds yet.

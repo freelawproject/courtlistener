@@ -153,8 +153,10 @@ class DupcheckerTest(TestCase):
 
     def test_should_we_continue_break_or_carry_on_with_an_empty_database(self):
         for dup_checker in self.dup_checkers:
-            onwards = dup_checker.should_we_continue_break_or_carry_on('content', date.today(),
-                                                                       date.today() - timedelta(days=1))
+            onwards = dup_checker.should_we_continue_break_or_carry_on(date.today(),
+                                                                       date.today() - timedelta(days=1),
+                                                                       lookup_value='content',
+                                                                       lookup_by='sha1')
             if not dup_checker.full_crawl:
                 self.assertTrue(onwards, "DupChecker says to abort during a full crawl.")
             else:
@@ -171,7 +173,10 @@ class DupcheckerTest(TestCase):
             # Create a document, then use the dup_cheker to see if it exists.
             doc = Document(sha1=content_hash, court=self.court)
             doc.save(index=False)
-            onwards = dup_checker.should_we_continue_break_or_carry_on(content_hash, date.today(), date.today())
+            onwards = dup_checker.should_we_continue_break_or_carry_on(date.today(),
+                                                                       date.today(),
+                                                                       lookup_value=content_hash,
+                                                                       lookup_by='sha1')
             if dup_checker.full_crawl:
                 self.assertEqual(onwards, 'CONTINUE',
                                  'DupChecker says to %s during a full crawl.' % onwards)
@@ -190,8 +195,10 @@ class DupcheckerTest(TestCase):
             doc = Document(sha1=content_hash, court=self.court)
             doc.save(index=False)
             # Note that the next case occurs prior to the current one
-            onwards = dup_checker.should_we_continue_break_or_carry_on(content_hash, date.today(),
-                                                                       date.today() - timedelta(days=1))
+            onwards = dup_checker.should_we_continue_break_or_carry_on(date.today(),
+                                                                       date.today() - timedelta(days=1),
+                                                                       lookup_value=content_hash,
+                                                                       lookup_by='sha1')
             if dup_checker.full_crawl:
                 self.assertEqual(onwards, 'CONTINUE',
                                  'DupChecker says to %s during a full crawl.' % onwards)
