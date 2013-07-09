@@ -151,16 +151,16 @@
             <!-- Piwik -->
             <script type="text/javascript">
             Modernizr.load({
-            	load: 'http://piwik.courtlistener.com/piwik.js',
+            	load: 'https://www.courtlistener.com/piwik/piwik.js',
             	complete: function() {
             		try {
-            			var piwikTracker = Piwik.getTracker('http://piwik.courtlistener.com/piwik.php', 1);
+            			var piwikTracker = Piwik.getTracker('https://www.courtlistener.com/piwik/piwik.php', 1);
             			piwikTracker.trackPageView();
                         piwikTracker.enableLinkTracking();
             		} catch(err) {}
             	}
             });
-            </script><noscript><p><img src="http://piwik.courtlistener.com/piwik.php?idsite=1" style="border:0" alt=""/></p></noscript>
+            </script><noscript><p><img src="https://www.courtlistener.com/piwik/piwik.php?idsite=1" style="border:0" alt=""/></p></noscript>
             <!-- End Piwik Tag -->
         {% endif %}
         <!--[if lt IE 8 ]>
