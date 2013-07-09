@@ -3,7 +3,8 @@
 
 {# Shown on document citation pages. #}
 
-{% block title %}CourtListener.com / Cases citing {{ title }}{% endblock %}
+{% block title %}Cases citing {{ title }} - CourtListener.com{% endblock %}
+{% block description %}{{ title }}{% endblock %}
 
 {% block head %}
     <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{doc|truncatewords:10}}" href="/feed/{{doc.pk|num_to_ascii}}/cited-by/">

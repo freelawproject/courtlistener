@@ -1,19 +1,3 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 from alert import settings
 from alert.lib.encode_decode import ascii_to_num
 from alert.lib import magic
@@ -35,6 +19,20 @@ from django.views.decorators.cache import never_cache
 import os
 
 
+def _make_title(doc):
+    """Generate an SEO friendly title"""
+    title_parts = [trunc(doc.citation.case_name, 100)]
+    if doc.citation.west_cite:
+        title_parts.append(doc.citation.west_cite)
+    if doc.citation.west_state_cite:
+        title_parts.append(doc.citation.west_state_cite)
+    if doc.citation.lexis_cite:
+        title_parts.append(doc.citation.lexis_cite)
+    if doc.citation.neutral_cite:
+        title_parts.append(doc.citation.neutral_cite)
+    return ', '.join(title_parts)
+
+
 @never_cache
 def view_case(request, court, pk, casename):
     """Take a court and an ID, and return the document.
@@ -50,7 +48,7 @@ def view_case(request, court, pk, casename):
     # Look up the court, document, title and favorite information
     doc = get_object_or_404(Document, pk=pk)
     ct = get_object_or_404(Court, pk=court)
-    title = trunc(doc.citation.case_name, 100)
+    title = _make_title(doc)
     user = request.user
 
     if request.GET:
@@ -107,7 +105,7 @@ def view_case_citations(request, pk, casename):
 
     # Look up the document, title
     doc = get_object_or_404(Document, documentUUID=pk)
-    title = trunc(doc.citation.case_name, 100)
+    title = _make_title(doc)
 
     # Get list of citing cases, ordered by influence
     citing_cases = doc.citation.citing_cases.select_related(
