@@ -152,7 +152,7 @@ def scrape_court(site, full_crawl=False):
 
             # Make a hash of the data
             sha1_hash = hashlib.sha1(r.content).hexdigest()
-            if court_str in ['nev_u']:
+            if court_str == 'nev' and site.precedential_statuses[i] == 'Unpublished':
                 # Nevada's non-precedential cases have different SHA1 sums every time.
                 onwards = dup_checker.should_we_continue_break_or_carry_on(
                     current_date,
