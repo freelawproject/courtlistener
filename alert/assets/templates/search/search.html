@@ -3,7 +3,7 @@
 {% load humanize %}
 
 {% block title %}
-    CourtListener.com / Results / {% if request.GET.q %} {{ request.GET.q }} / {% endif %}
+    Search Results{% if request.GET.q %} for {{ request.GET.q }}{% endif %} - CourtListener.com
 {% endblock %}
 
 {% block head %}

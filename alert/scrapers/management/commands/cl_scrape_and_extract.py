@@ -295,7 +295,7 @@ class Command(BaseCommand):
             wait = (rate * 60) / num_courts
             i = 0
             while i < num_courts:
-                # this catches SIGINT, so the code can be killed safely.
+                # this catches SIGTERM, so the code can be killed safely.
                 if die_now:
                     logger.info("The scraper has stopped.")
                     sys.exit(1)

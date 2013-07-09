@@ -83,7 +83,7 @@ class DupChecker(dict):
             exists = Document.objects.filter(download_URL=lookup_value).exists()
 
         if exists:
-            logger.info('Duplicate found on date: %s, with sha1: %s' % (current_date, lookup_value))
+            logger.info('Duplicate found on date: %s, with lookup value: %s' % (current_date, lookup_value))
             self._increment(current_date)
 
             # If the next date in the Site object is less than (before) the current date, we needn't continue
