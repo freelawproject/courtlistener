@@ -44,7 +44,9 @@ class Command(BaseCommand):
         logger.info("Using court_str: \"%s\"" % court_str)
 
         if court_str == 'ca4':
-            start = date(1996, 1, 1)
+            #start = date(1996, 1, 1)
+            #start = date(1998, 11, 23)
+            start  = date (1998, 11, 23)
             end = date(2010, 4, 1)
             return self.site_yielder([i.date() for i in rrule(WEEKLY, dtstart=start, until=end)], mod)
         elif court_str == 'cafc':
