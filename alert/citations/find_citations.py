@@ -6,6 +6,7 @@ import re
 import sys
 
 from juriscraper.lib.html_utils import get_visible_text
+from alert.citations import constants
 import reporter_tokenizer
 
 FORWARD_SEEK = 20
@@ -187,12 +188,9 @@ def extract_base_citation(words, reporter_index):
     """Given a list of words and the index of a federal reporter, look before and after
     for volume and page number.  If found, construct and return a Citation object."""
     reporter = words[reporter_index]
-    # Get rid of extra space so that we only have one version to check
-    if reporter == 'U. S.':
-        reporter = 'U.S.'
     if words[reporter_index - 1].isdigit():
         volume = int(words[reporter_index - 1])
-    else: # No volume, therefore not a valid citation
+    else:  # No volume, therefore not a valid citation
         return None
     page_str = words[reporter_index + 1]
     if page_str.find(',') == len(page_str) - 1:
@@ -200,7 +198,7 @@ def extract_base_citation(words, reporter_index):
         page_str = page_str[:-1]
     if page_str.isdigit():
         page = int(page_str)
-    else: # No page, therefore not a valid citation
+    else:  # No page, therefore not a valid citation
         return None
 
     return Citation(reporter, page, volume)
@@ -216,7 +214,7 @@ def get_citations(text, html=True):
     # citations must have a volume before and a page number after the reporter.
     for i in xrange(1, len(words) - 1):
         # Find reporter
-        if words[i] in reporter_tokenizer.REPORTERS:
+        if words[i] in constants.REPORTERS:
             citation = extract_base_citation(words, i)
             if citation is None:
                 # Not a valid citation; continue looking
