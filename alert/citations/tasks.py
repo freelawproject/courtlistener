@@ -54,8 +54,8 @@ def update_document(document):
         # we don't want to include
         if citation.base_citation() == document.citation.west_cite:
             continue
-        matches, is_citation_match = match_citations.match_citation(citation,
-                                                                    document)
+        matches, is_citation_match = match_citations.match_citation(citation, document)
+
         # TODO: Figure out what to do if there's more than one
         if len(matches) == 1:
             matched_citations.append(is_citation_match)
@@ -91,7 +91,7 @@ def update_document(document):
         if DEBUG >= 3:
             print document.html_with_citations
 
-    # Turn off solr updating; we're not changing anything in the search index
+    # Update Solr because we now have citation counts and such in the index.
     document.save(index=True)
     citation_matches = sum(matched_citations)
     name_matches = len(matched_citations) - citation_matches
