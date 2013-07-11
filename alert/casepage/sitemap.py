@@ -60,9 +60,8 @@ def sitemap_maker(request, size=250):
         count = search_results_object.result.numFound
 
         i = 0
-        sites = []
+        sites = ['%s://www.courtlistener.com/sitemap-flat.xml' % protocol]
         # For flat pages
-        sites.append('%s://www.courtlistener.com/sitemap-flat.xml' % protocol)
         while i < count:
             sites.append('%s://www.courtlistener.com/sitemap.xml?p=%s' % (protocol, i / size + 1))
             i += size
@@ -97,11 +96,9 @@ def flat_sitemap_maker(request):
     flat_pages = FlatPage.objects.all()
     urls = []
     for page in flat_pages:
-        url = {}
-        url['location'] = '%s://www.courtlistener.com%s' % (protocol,
-                                                        page.get_absolute_url())
-        url['changefreq'] = 'monthly'
-        url['priority'] = priority(page)
+        url = {'location': '%s://www.courtlistener.com%s' % (protocol, page.get_absolute_url()),
+               'changefreq': 'monthly',
+               'priority': priority(page)}
         urls.append(url)
 
     xml = smart_str(loader.render_to_string('sitemap.xml', {'urlset': urls}))
