@@ -5,11 +5,7 @@
 # URL: <http://nltk.sourceforge.net>
 
 import re
-
-# List of Federal Reporters
-REPORTERS = ["U.S.", "U. S.", "S. Ct.", "L. Ed. 2d", "L. Ed.", "F.3d",
-             "F.2d", "F. Supp. 2d", "F. Supp.", "F.", "F.R.D.", "B.R.",
-             "Vet. App.", "M.J.", "Fed. Cl.", "Ct. Int'l Trade", "T.C."]
+from alert.citations.constants import REPORTERS, VARIATIONS
 
 REGEX = "|".join(map(re.escape, REPORTERS))
 
@@ -17,7 +13,7 @@ REPORTER_RE = re.compile("(%s)" % REGEX)
 
 
 def tokenize(text):
-    '''Tokenize text using regular expressions in the following steps:
+    """Tokenize text using regular expressions in the following steps:
          -Split the text by the occurrences of patterns which match a federal
           reporter, including the reporter strings as part of the resulting list.
          -Perform simple tokenization (whitespace split) on each of the non-reporter
@@ -26,10 +22,13 @@ def tokenize(text):
        Example:
        >>>tokenize('See Roe v. Wade, 410 U. S. 113 (1973)')
        ['See', 'Roe', 'v.', 'Wade,', '410', 'U. S.', '113', '(1973)']
-    '''
+    """
     strings = REPORTER_RE.split(text)
     words = []
     for string in strings:
+        # Normalize spaces up front
+        if string in VARIATIONS.keys:
+            string = VARIATIONS[string]
         if string in REPORTERS:
             words.append(string)
         else:
