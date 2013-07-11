@@ -11,6 +11,11 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
+2013-07-09:
+ - TODO: Does the fact that lawbox cases lack a URL cause an issue in the UI or can they be treated like the Resource.org cases?
+ - TODO: If we do case merging, the source field should be LBM ("LawBox Merged.")
+
+
 2013-07-07:
  - The piwik configuration has been merged into the virtual host for the main site. If you are using piwik, you will
    need to restart your apache server to enable this configuration. After this change, piwik will be located at
