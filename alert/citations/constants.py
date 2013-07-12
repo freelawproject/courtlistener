@@ -1,12 +1,14 @@
 from datetime import date
 
 # Reporters currently covered in the CourtListener database
+# Note that these are used in the tokenizer as part of a regular expression. That regex matches tokens in the order of
+# this list. As a result, it's vital that later editions of reporters come before earlier ones.
 CL_REPORTERS = [
     # Supreme Court
     'U.S.',
     'S. Ct.',
-    'L. Ed.',
     'L. Ed. 2d',
+    'L. Ed.',
     'Dall.',
     'Cranch',
     'Wheat.',
@@ -16,11 +18,11 @@ CL_REPORTERS = [
     'Wall.',
 
     # Federal appellate
-    'F.',
-    'F.2d',
     'F.3d',
-    'F. Supp.',
+    'F.2d',
+    'F.',
     'F. Supp. 2d',
+    'F. Supp.',
     'Fed. Cl.',         # Court of Federal Claims
     'Ct. Cl.',          # Court of Federal Claims
     'B.R.',             # Bankruptcy Reporter
@@ -30,34 +32,66 @@ CL_REPORTERS = [
     "Ct. Int'l Trade",  # Court of International Trade
 
     # State regional reporters
+    'N.E.2d',
     'N.E.',
-    'A.',
-    'A.2d',
     'A.3d',
-    'S.E.',
+    'A.2d',
+    'A.',
     'S.E.2d',
-    'So.',
-    'So. 2d',
+    'S.E.',
     'So. 3d',
-    'S.W.',
-    'S.W.2d',
+    'So. 2d',
+    'So.',
     'S.W.3d',
-    'N.W.',
+    'S.W.2d',
+    'S.W.',
     'N.W.2d',
-    'P.',
-    'P.2d',
+    'N.W.',
     'P.3d',
-    'N.Y.S.',
+    'P.2d',
+    'P.',
+
+    # Special State reporters.
+    # Note that these must be listed before the N.Y. reporter so that N.Y.3d has the edge over N.Y.
+    'Cal. Rptr. 3d',
+    'Cal. Rptr. 2d',
+    'Cal. Rptr.',
+    'Cal. App. 4th',
+    'Cal. App. 3d',
+    'Cal. App. 2d',
+    'Cal. App. Supp. 3d',
+    'Cal. App. Supp. 2d',
+    'Cal. App. Supp.',
+    'Cal. App.',
+    'N.Y.3d',  # New York Reports
+    'N.Y.2d',
+    'N.Y.',
+    'N.Y.S.3d',  # New York Supplement Reports
     'N.Y.S.2d',
-    'N.Y.S.3d',
+    'N.Y.S.',
+    'A.D.3d',  # NY Appellate Division Reports
+    'A.D.2d',
+    'A.D.',
+    'Misc. 3d',  # NY Miscellaneous Reports
+    'Misc. 2d',
+    'Misc.',
+    'NY Slip Op',
+
+    # Advance citations
+    'Nev. Adv. Op. No.',
 
     # State reporters
     'Ala.',
     'Alaska',
+    'Ariz. App.',
     'Ariz.',
     'Ark.',
+    'Cal. 4th',
+    'Cal. 3d',
+    'Cal. 2d',
     'Cal.',
     'Colo.',
+    'Conn. App.',
     'Conn.',
     'D.C.',
     'Del.',
@@ -65,13 +99,19 @@ CL_REPORTERS = [
     'Ga.',
     'Haw.',
     'Idaho',
+    'Ill. Dec.',
+    'Ill. App. 3d',
+    'Ill. App. 2d',
+    'Ill. App.',
     'Ill.',
     'Ind.',
     'Iowa',
+    'Kan. App. 2d',
     'Kan.',
     'Ky.',
     'La.',
     'Mass.',
+    'Md. App.',
     'Md.',
     'Me.',
     'Mich.',
@@ -82,6 +122,8 @@ CL_REPORTERS = [
     'N.C.',
     'N.D.',
     'N.H.',
+    'N.J. Tax',
+    'N.J. Super.',
     'N.J.',
     'N.M.',
     'N.Y.',
@@ -90,6 +132,8 @@ CL_REPORTERS = [
     'Ohio',
     'Okla.',
     'Or.',
+    'Pa. Commonwealth Ct.',
+    'Pa. Superior Ct.',
     'Pa.',
     'Puerto Rico',
     'R.I.',
@@ -101,89 +145,184 @@ CL_REPORTERS = [
     'Va.',
     'Vt.',
     'W.Va.',
+    'Wn. 2d',  # Washington reporters
+    'Wn. App.',
+    'Wn.',
     'Wash.',
     'Wis.',
     'Wyo.',
+
+    # Neutral citations
+    'AZ',
+    'CO',
+    'FL',
+    'LA',
+    'ME',
+    'MS',
+    'MT',
+    'ND App'
+    'ND',
+    'NMCA',
+    'NMCERT',
+    'NMSC',  # New Mexico Supreme Court
+    'NM',
+    'OH',
+    'OK CR',
+    'OK CIV APP',
+    'OK',
+    'SD',
+    'PA',
+    'UT App',
+    'UT',
+    'VT',
+    'WI',
+    'WY',
 ]
 
 # List of Federal Reporters
-REPORTERS = [
-    "U.S.",
-    "S. Ct.",
-    "L. Ed.",
-    "L. Ed. 2d",
-    "F.",
-    "F.2d",
-    "F.3d",
-    "F. Supp.",
-    "F. Supp. 2d",
-    "F.R.D.",
-    "B.R.",
-    "Vet. App.",
-    "M.J.",
-    "Fed. Cl.",
-    "Ct. Int'l Trade",
-    "T.C."
-]
+REPORTERS = CL_REPORTERS
 
 # We normalize spaces and other errors people make
+# See note on REPORTERS for ordering of this list.
 VARIATIONS = {
     # Supreme Court
     'U. S.': 'U.S.',
     'S.Ct': 'S. Ct.',
-    'L.Ed.': 'L. Ed.',
     'L.Ed.2d': 'L. Ed. 2d',
     'L.Ed. 2d': 'L. Ed. 2d',
     'L. Ed.2d': 'L. Ed. 2d',
+    'L.Ed.': 'L. Ed.',
 
     # Federal appellate
-    'F. 2d': 'F.2d',
     'F. 3d': 'F.3d',
-    'F.Supp.': 'F. Supp.',
+    'F. 2d': 'F.2d',
     'F.Supp.2d': 'F. Supp. 2d',
     'F.Supp. 2d': 'F. Supp. 2d',
     'F. Supp.2d': 'F. Supp. 2d',
+    'F.Supp.': 'F. Supp.',
     'Fed.Cl.': 'Fed. Cl.',
     'Ct.Cl.': 'Ct. Cl.',
     'B. R.': 'B.R.',
+    'BR': 'B.R.',
     'T. C.': 'T.C.',
     'M. J.': 'M.J.',
     'Vet.App.': 'Vet. App.',
     "Ct.Int'l Trade": "Ct. Int'l Trade",
 
     # State regional reporters
+    'N. E. 2d': 'N.E.2d',
+    'N.E. 2d': 'N.E.2d',
+    'N. E.2d': 'N.E.2d',
+    'NE 2d': 'N.E.2d',
     'N. E.': 'N.E.',
     'A. 2d': 'A.2d',
     'A. 3d': 'A.3d',
-    'S. E.': 'S.E.',
     'S.E. 2d': 'S.E.2d',
     'S. E. 2d': 'S.E.2d',
     'S. E.2d': 'S.E.2d',
+    'S. E.': 'S.E.',
     'So.2d': 'So. 2d',
     'So.3d': 'So. 3d',
-    'S. W.': 'S.W.',
     'S. W. 2d': 'S.W.2d',
     'S.W. 2d': 'S.W.2d',
     'S. W.2d': 'S.W.2d',
     'S. W. 3d': 'S.W.3d',
     'S.W. 3d': 'S.W.3d',
     'S. W.3d': 'S.W.3d',
-    'N. W.': 'N.W.',
+    'S. W.': 'S.W.',
     'N. W. 2d': 'N.W.2d',
     'N.W. 2d': 'N.W.2d',
     'N. W.2d': 'N.W.2d',
+    'N. W.': 'N.W.',
     'P. 2d': 'P.2d',
     'P. 3d': 'P.3d',
-    'N.Y.S. 2d': 'N.Y.S.2d',
+
+    # State special reporters
+    'Cal. Rptr. 3d': 'Cal. Rptr. 3d',
+    'Cal.Rptr. 3d': 'Cal. Rptr. 3d',
+    'Cal. Rptr.3d': 'Cal. Rptr. 3d',
+    'Cal. Rptr. 2d': 'Cal. Rptr. 2d',
+    'Cal.Rptr. 2d': 'Cal. Rptr. 2d',
+    'Cal. Rptr.2d': 'Cal. Rptr. 2d',
+    'Cal.Rptr.': 'Cal. Rptr.',
+    'Cal.4th': 'Cal. 4th',
+    'Cal.3d': 'Cal. 3d',
+    'Cal.2d': 'Cal. 2d',
+    'Cal.App.4th': 'Cal. App. 4th',
+    'Cal. App.4th': 'Cal. App. 4th',
+    'Cal.App. 4th': 'Cal. App. 4th',
+    'Cal.App.3d': 'Cal. App. 3d',
+    'Cal. App.3d': 'Cal. App. 3d',
+    'Cal.App. 3d': 'Cal. App. 3d',
+    'Cal.App.2d': 'Cal. App. 2d',
+    'Cal. App.2d': 'Cal. App. 2d',
+    'Cal.App. 2d': 'Cal. App. 2d',
+    'Cal.App.': 'Cal. App.',
+    'Cal.App.3d Supp.': 'Cal. App. Supp. 3d',  # People get the order of these wrong.
+    'Cal.App. 3d Supp.': 'Cal. App. Supp. 3d',
+    'Cal.App.2d Supp.': 'Cal. App. Supp. 2d',
+    'Cal.App. 2d Supp.': 'Cal. App. Supp. 2d',
+    'Cal.App. Supp. 3d': 'Cal. App. Supp. 3d',  # These are the correct order (wrong spacing).
+    'Cal.App. Supp.3d': 'Cal. App. Supp. 3d',
+    'Cal.App. Supp. 2d': 'Cal. App. Supp. 2d',
+    'Cal.App. Supp.2d': 'Cal. App. Supp. 2d',
+    'Cal.App.Supp.': 'Cal. App. Supp.',
+    'Ill.Dec.': 'Ill. Dec.',
+    'Ill. App.3d': 'Ill. App. 3d',
+    'Ill. App.2d': 'Ill. App. 2d',
+    'Kan.App.2d': 'Kan. App. 2d',
+    'Kan.App. 2d': 'Kan. App. 2d',
+    'Kan. App.2d': 'Kan. App. 2d',
+    'Kan.App.': 'Kan. App.',
+    'N.Y. 3d': 'N.Y.3d',
+    'NY 3d': 'N.Y.3d',
+    'N.Y. 2d': 'N.Y.2d',
+    'NY 2d': 'N.Y.2d',
+    'N. Y.': 'N.Y.',
     'N.Y.S. 3d': 'N.Y.S.3d',
+    'NYS 3d': 'N.Y.S.3d',
+    'N.Y.S. 2d': 'N.Y.S.2d',
+    'NYS 2d': 'N.Y.S.2d',
+    'A.D. 3d': 'A.D.3d',
+    'AD 3d': 'A.D.3d',
+    'A.D. 2d': 'A.D.2d',
+    'AD 2d': 'A.D.2d',
+    'Misc.3d': 'Misc. 3d',
+    'Misc 3d': 'Misc. 3d',
+    'Misc.2d': 'Misc. 2d',
+    'Misc 2d': 'Misc. 2d',
+    'Wn.2d': 'Wn. 2d',
+    'Wn.App.': 'Wn. App.',
 }
 
 REPORTER_DATES = {
+    # Federal appeals
     'F.': (1880, 1924),
     'F.2d': (1924, 1993),
     'F.3d': (1999, date.today().year),
     'F. Supp.': (1933, 1998),
     'F. Supp. 2d': (1998, date.today().year),
     'L. Ed.': (1790, 1956),
-    'L. Ed. 2d.': (1956, date.today().year)
+    'L. Ed. 2d.': (1956, date.today().year),
+
+    # State regional reporters
+    'P.': (1883, 1931),
+    'P.2d': (1931, 2000),
+    'P.3d': (2000, date.today().year),
+
+
+    # State special
+    'Cal. Rptr.': (1959, 1991),
+    'Cal. Rptr. 2d': (1991, 2003),
+    'Cal. Rptr. 3d': (2003, date.today().year),
+
+    # State
+    'Cal.': (1850, 1934),
+    'Cal. 2d': (1934, 1969),
+    'Cal. 3d': (1969, 1991),
+    'Cal. 4th': (1991, date.today().year),
+    'Cal. App.': (1905, 1934),
+    'Cal. App. 2d': (1934-1969),
+    'Cal. App. 3d': (1969, 1991),
+    'Cal. App. 4th': (1991, date.today().year),
 }

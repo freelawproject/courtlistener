@@ -14,6 +14,11 @@ We welcome a conversion of these notes to a better process using Fabric.
 2013-07-09:
  - TODO: Does the fact that lawbox cases lack a URL cause an issue in the UI or can they be treated like the Resource.org cases?
  - TODO: If we do case merging, the source field should be LBM ("LawBox Merged.")
+ - TODO: In the constants.py file, I've reassigned REPORTERS = CL_REPORTERS. This should get ironed out.
+ - TODO: Investigate whether it's worth reworking the citation finder so that it better understands neutral citations.
+         For example, right now a citation like 2012 NM 3 will get 3 as citation.page, and will get 2012 as
+         citation.volume
+
 
 
 2013-07-07:

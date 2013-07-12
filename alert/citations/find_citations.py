@@ -11,7 +11,7 @@ import reporter_tokenizer
 
 FORWARD_SEEK = 20
 
-BACKWARD_SEEK = 70 # Average case name length in the db is 67
+BACKWARD_SEEK = 70  # Average case name length in the db is 67
 
 STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed",
                "remanded", "see", "granted", "dismissed"]
@@ -21,6 +21,7 @@ class Citation(object):
     """Convenience class which represents a single citation found in a document.
 
     """
+
     def __init__(self, reporter, page, volume, extra=None, defendant=None,
                  plaintiff=None, court=None, year=None, match_url=None):
         self.reporter = reporter
@@ -42,8 +43,8 @@ class Citation(object):
     # TODO: Update css for no-link citations
     def as_html(self):
         template = u'<span class="volume">%(volume)d</span>\\1' \
-            u'<span class="reporter">%(reporter)s</span>\\2' \
-            u'<span class="page">%(page)d</span>'
+                   u'<span class="reporter">%(reporter)s</span>\\2' \
+                   u'<span class="page">%(page)d</span>'
         inner_html = template % self.__dict__
         span_class = "citation"
         if self.match_url:
@@ -146,7 +147,12 @@ def add_post_citation(citation, words, reporter_index):
     for start in xrange(reporter_index + 2, min(reporter_index + FORWARD_SEEK, len(words))):
         if words[start].startswith('('):
             for end in xrange(start, start + FORWARD_SEEK):
-                if words[end].find(')') > -1:
+                try:
+                    has_ending_paren = (words[end].find(')') > -1)
+                except IndexError:
+                    # Happens with words like "(1982"
+                    break
+                if has_ending_paren:
                     # Sometimes the paren gets split from the preceding content
                     if words[end].startswith(')'):
                         citation.year = get_year(words[end - 1])
@@ -204,12 +210,11 @@ def extract_base_citation(words, reporter_index):
     return Citation(reporter, page, volume)
 
 
-def get_citations(text, html=True):
+def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
     if html:
         text = get_visible_text(text)
     words = reporter_tokenizer.tokenize(text)
     citations = []
-    previous_end_position = 0
     # Exclude first and last tokens when looking for reporters, because valid
     # citations must have a volume before and a page number after the reporter.
     for i in xrange(1, len(words) - 1):
@@ -219,13 +224,11 @@ def get_citations(text, html=True):
             if citation is None:
                 # Not a valid citation; continue looking
                 continue
-            end_position = add_post_citation(citation, words, i)
-            add_defendant(citation, words, i)
+            if do_post_citation:
+                add_post_citation(citation, words, i)
+            if do_defendant:
+                add_defendant(citation, words, i)
             citations.append(citation)
-
-            # Advance the counter; no need to re-check tokens in this citation
-            i = end_position
-            previous_end_position = end_position + 1
 
     return citations
 
@@ -236,15 +239,18 @@ def getFileContents(filename):
     f.close()
     return text
 
+
 def getCitationsFromFile(filename):
     contents = getFileContents(filename)
     return get_citations(contents)
+
 
 def getCitationsFromFiles(filenames):
     citations = []
     for filename in filenames:
         citations.extend(getCitationsFromFile(filename))
     return citations
+
 
 def main():
     citations = []
@@ -256,6 +262,7 @@ def main():
             if not (filename.endswith("xml") or filename.endswith("pdf")):
                 filenames.append(path + "/" + filename)
         citations = getCitationsFromFiles(filenames)
+
 
 if __name__ == "__main__":
     main()
