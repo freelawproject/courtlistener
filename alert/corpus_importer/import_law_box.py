@@ -1,7 +1,9 @@
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 import os
 import re
+import traceback
 from lxml import html
+from alert.citations.find_citations import get_citations
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 
@@ -15,9 +17,24 @@ from lxml.html import tostring
 
 from alert.search.models import Document, Citation
 
+DEBUG = 1
 
-def get_west_cite(html_tree):
-    return None
+
+def get_west_cite(complete_html_tree):
+    path = '//center//text()'
+    text = ' '.join(complete_html_tree.xpath(path))
+    citations = get_citations(text, html=False, do_post_citation=False, do_defendant=False)
+    if not citations:
+        path = '//title/text()'
+        text = complete_html_tree.xpath(path)[0]
+        citations = get_citations(text, html=False, do_post_citation=False, do_defendant=False)
+        if not citations:
+            raise
+    if DEBUG >= 1:
+        cite_strs = [str(cite) for cite in citations]
+        print "Citations found: %s" % ', '.join(cite_strs)
+
+    return citations
 
 
 def get_case_name(complete_html_tree):
@@ -26,6 +43,8 @@ def get_case_name(complete_html_tree):
     s = complete_html_tree.xpath(path)[0].rsplit('-', 1)[0].rsplit(',', 1)[0]
     # returns 'In re 221A Holding Corp., Inc.'
     s = harmonize(clean_string(titlecase(s)))
+    if DEBUG >= 1:
+        print "Case name: %s" % s
     return s
 
 
@@ -42,6 +61,9 @@ def get_docket_number(html_tree):
 
 
 def get_court_object(html_tree):
+    """
+       1. Commonwealth Court of Pennsylvania: https://en.wikipedia.org/wiki/Commonwealth_Court_of_Pennsylvania
+    """
     return None
 
 
@@ -85,7 +107,7 @@ def import_law_box_case(case_path):
         precedential_status=get_precedential_status(clean_html_tree)
     )
     cite = Citation(
-        west_cite=get_west_cite(case_path),
+        west_cite=get_west_cite(complete_html_tree),
         case_name=get_case_name(complete_html_tree),
         docket_number=get_docket_number(clean_html_tree)
     )
@@ -104,13 +126,6 @@ def readable_dir(prospective_dir):
         raise argparse.ArgumentTypeError("readable_dir:{0} is not a readable dir".format(prospective_dir))
 
 
-def case_generator(dir_root):
-    """Yield cases, one by one to the importer by recursing and iterating the import directory"""
-    for root, dirnames, filenames in os.walk(dir_root):
-        for filename in fnmatch.filter(filenames, '*'):
-            yield os.path.join(root, filename)
-
-
 def check_duplicate(doc):
     """Return true if it should be saved, else False"""
     return True
@@ -120,12 +135,49 @@ def main():
     parser = argparse.ArgumentParser(description='Import the corpus provided by lawbox')
     parser.add_argument('-s', '--simulate', default=False, required=False, action='store_true',
                         help='Run the code in simulate mode, making no permanent changes.')
-    parser.add_argument('-r', '--root', type=readable_dir, default='/sata/lawbox/dump/',
+    parser.add_argument('-d', '--dir', type=readable_dir,
                         help='The directory where the lawbox dump can be found.')
+    parser.add_argument('-l', '--line', type=int, default=1, required=False,
+                        help='If provided, this will be the line number in the index file where we resume processing.')
+    parser.add_argument('-r', '--resume', default=False, required=False, action='store_true',
+                        help='Use the saved marker to resume operation where it last failed.')
     args = parser.parse_args()
 
-    for case_path in case_generator(args.root):
-        doc = import_law_box_case(case_path)
+    if args.dir:
+        def case_generator(dir_root):
+            """Yield cases, one by one to the importer by recursing and iterating the import directory"""
+            for root, dirnames, filenames in os.walk(dir_root):
+                for filename in fnmatch.filter(filenames, '*'):
+                    yield os.path.join(root, filename)
+        cases = case_generator(args.root)
+        i = 0
+    else:
+        def case_generator(line_number):
+            """Yield cases from the index file."""
+            index_file = open('index.txt')
+            for i, line in enumerate(index_file):
+                if i > line_number:
+                    yield line.strip()
+        if args.resume:
+            with open('lawbox_progress_marker.txt') as marker:
+                resume_point = int(marker.read().strip())
+            cases = case_generator(resume_point)
+            i = resume_point
+        else:
+            cases = case_generator(args.line)
+            i = args.line
+
+    for case_path in cases:
+        if DEBUG >= 1:
+            print "Doing case (%s): file://%s" % (i, case_path)
+        try:
+            doc = import_law_box_case(case_path)
+            i += 1
+        finally:
+            traceback.format_exc()
+            with open('lawbox_progress_marker.txt', 'w') as marker:
+                marker.write(str(i))
+
         save_it = check_duplicate(doc)  # Need to write this method?
         #exit()
         if save_it and not args.simulate:

@@ -7,9 +7,11 @@
 import re
 from alert.citations.constants import REPORTERS, VARIATIONS
 
-REGEX = "|".join(map(re.escape, REPORTERS))
+REGEX_REPORTERS = "|".join(map(re.escape, REPORTERS))
+REGEX_VARIATIONS = '|'.join(map(re.escape, VARIATIONS.keys()))
 
-REPORTER_RE = re.compile("(%s)" % REGEX)
+# Note that VARIATIONS must come first so it has the first opportunity to match.
+REPORTER_RE = re.compile("(%s|%s)" % (REGEX_VARIATIONS, REGEX_REPORTERS))
 
 
 def tokenize(text):
@@ -27,7 +29,7 @@ def tokenize(text):
     words = []
     for string in strings:
         # Normalize spaces up front
-        if string in VARIATIONS.keys:
+        if string in VARIATIONS.keys():
             string = VARIATIONS[string]
         if string in REPORTERS:
             words.append(string)
