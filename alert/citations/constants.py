@@ -109,6 +109,7 @@ CL_REPORTERS = [
     'Ind.',
     'Iowa',
     'Kan. App. 2d',
+    'Kan. App.',
     'Kan.',
     'Ky.',
     'La.',
@@ -138,10 +139,10 @@ CL_REPORTERS = [
     'Ohio',
     'Okla.',
     'Or.',
-    'Pa. Commonwealth Ct.',
-    'Pa. Superior Ct.',
+    'Pa. Commw.',
+    'Pa. Super.',
     'Pa.',
-    'Puerto Rico',
+    'P.R.',
     'R.I.',
     'S.C.',
     'S.D.',
@@ -152,14 +153,16 @@ CL_REPORTERS = [
     'Va.',
     'Vt.',
     'W.Va.',
-    'Wn. App.',    # Washington Appellate Reports
-    'Wash. Terr.'  # Washington Territory Reports
-    'Wn. 2d',      # Washington Reports (Supreme Court, 2d series)
-    'Wash.',       # Washington Reports (Supreme Court, 1st series)
+    'Wash. Terr.',  # Washington Territory Reports
+    'Wash. App.',
+    'Wash. 2d',
+    'Wash.',
     'Wis. 2d',
     'Wis.',
     'Wyo.',
+]
 
+NEUTRAL_CITATIONS = [
     # Neutral citations
     'AZ',
     'CO',
@@ -189,7 +192,7 @@ CL_REPORTERS = [
 ]
 
 # List of Federal Reporters
-REPORTERS = CL_REPORTERS
+REPORTERS = CL_REPORTERS.extend(NEUTRAL_CITATIONS)
 
 # We normalize spaces and other errors people make
 # See note on REPORTERS for ordering of this list.
@@ -250,10 +253,10 @@ VARIATIONS = {
     'P. 3d': 'P.3d',
 
     # State special reporters
-    'Cal. Rptr. 3d': 'Cal. Rptr. 3d',
+    'Cal.Rptr.3d': 'Cal. Rptr. 3d',
     'Cal.Rptr. 3d': 'Cal. Rptr. 3d',
     'Cal. Rptr.3d': 'Cal. Rptr. 3d',
-    'Cal. Rptr. 2d': 'Cal. Rptr. 2d',
+    'Cal.Rptr.2d': 'Cal. Rptr. 2d',
     'Cal.Rptr. 2d': 'Cal. Rptr. 2d',
     'Cal. Rptr.2d': 'Cal. Rptr. 2d',
     'Cal.Rptr.': 'Cal. Rptr.',
@@ -308,6 +311,13 @@ VARIATIONS = {
     'Wn.App.': 'Wn. App.',
 
     # State citations
+    'Pa. Commonwealth Ct.': 'Pa. Commw.',
+    'Pa. Superior Ct.': 'Pa. Super.',
+    'Puerto Rico': 'P.R.',
+    'Wn. Terr.': 'Wash. Terr.',  # Normalize Washington reporters (local rules?)
+    'Wn. App.': 'Wash. App.',
+    'Wn. 2d': 'Wash. 2d',
+    'Wn': 'Wash',
     'Wis.2d': 'Wis. 2d',
 
     # State neutral citations
