@@ -20,14 +20,14 @@ CL_REPORTERS = [
     # Federal appellate
     'F.3d',
     'F.2d',
-    'F.',
     'F. Supp. 2d',
     'F. Supp.',
+    'F.',
     'Fed. Cl.',         # Court of Federal Claims
     'Ct. Cl.',          # Court of Federal Claims
     'B.R.',             # Bankruptcy Reporter
     'T.C.',             # Tax Court
-    'M.J.',             # Military Service Court of Criminal Appeals
+    'M.J.',             # Military Justice
     'Vet. App.',        # Veterans Appeals
     "Ct. Int'l Trade",  # Court of International Trade
 
@@ -76,6 +76,7 @@ CL_REPORTERS = [
     'Misc. 2d',
     'Misc.',
     'NY Slip Op',
+    'Ohio St. 3d',
 
     # Advance citations
     'Nev. Adv. Op. No.',
@@ -96,6 +97,7 @@ CL_REPORTERS = [
     'D.C.',
     'Del.',
     'Fla.',
+    'Ga. App.',
     'Ga.',
     'Haw.',
     'Idaho',
@@ -110,15 +112,18 @@ CL_REPORTERS = [
     'Kan.',
     'Ky.',
     'La.',
+    'Mass. App. Ct.',
     'Mass.',
     'Md. App.',
     'Md.',
     'Me.',
+    'Mich. App.',
     'Mich.',
     'Minn.',
     'Miss.',
     'Mo.',
     'Mont.',
+    'N.C. App.',
     'N.C.',
     'N.D.',
     'N.H.',
@@ -127,6 +132,7 @@ CL_REPORTERS = [
     'N.J.',
     'N.M.',
     'N.Y.',
+    'Neb. App.',
     'Neb.',
     'Nev.',
     'Ohio',
@@ -142,13 +148,15 @@ CL_REPORTERS = [
     'Tenn.',
     'Tex.',
     'Utah',
+    'Va. App.',
     'Va.',
     'Vt.',
     'W.Va.',
-    'Wn. 2d',  # Washington reporters
-    'Wn. App.',
-    'Wn.',
-    'Wash.',
+    'Wn. App.',    # Washington Appellate Reports
+    'Wash. Terr.'  # Washington Territory Reports
+    'Wn. 2d',      # Washington Reports (Supreme Court, 2d series)
+    'Wash.',       # Washington Reports (Supreme Court, 1st series)
+    'Wis. 2d',
     'Wis.',
     'Wyo.',
 
@@ -160,7 +168,7 @@ CL_REPORTERS = [
     'ME',
     'MS',
     'MT',
-    'ND App'
+    'ND App',
     'ND',
     'NMCA',
     'NMCERT',
@@ -175,6 +183,7 @@ CL_REPORTERS = [
     'UT App',
     'UT',
     'VT',
+    'WI App',
     'WI',
     'WY',
 ]
@@ -220,6 +229,7 @@ VARIATIONS = {
     'S.E. 2d': 'S.E.2d',
     'S. E. 2d': 'S.E.2d',
     'S. E.2d': 'S.E.2d',
+    'SE 2d': 'S.E.2d',
     'S. E.': 'S.E.',
     'So.2d': 'So. 2d',
     'So.3d': 'So. 3d',
@@ -229,10 +239,12 @@ VARIATIONS = {
     'S. W. 3d': 'S.W.3d',
     'S.W. 3d': 'S.W.3d',
     'S. W.3d': 'S.W.3d',
+    'SW 3d': 'S.W.3d',
     'S. W.': 'S.W.',
     'N. W. 2d': 'N.W.2d',
     'N.W. 2d': 'N.W.2d',
     'N. W.2d': 'N.W.2d',
+    'NW 2d': 'N.W.2d',
     'N. W.': 'N.W.',
     'P. 2d': 'P.2d',
     'P. 3d': 'P.3d',
@@ -291,38 +303,66 @@ VARIATIONS = {
     'Misc 3d': 'Misc. 3d',
     'Misc.2d': 'Misc. 2d',
     'Misc 2d': 'Misc. 2d',
+    'Ohio St.3d': 'Ohio St. 3d',
     'Wn.2d': 'Wn. 2d',
     'Wn.App.': 'Wn. App.',
+
+    # State citations
+    'Wis.2d': 'Wis. 2d',
+
+    # State neutral citations
+    '-Ohio-': 'Ohio',
 }
 
 REPORTER_DATES = {
     # Federal appeals
-    'F.': (1880, 1924),
-    'F.2d': (1924, 1993),
-    'F.3d': (1999, date.today().year),
-    'F. Supp.': (1933, 1998),
-    'F. Supp. 2d': (1998, date.today().year),
-    'L. Ed.': (1790, 1956),
-    'L. Ed. 2d.': (1956, date.today().year),
+    'F.': (date(1880, 1, 1),
+           date(1924, 12, 31)),
+    'F.2d': (date(1924, 1, 1),
+             date(1993, 12, 31)),
+    'F.3d': (date(1993, 1, 1),
+             date.today()),
+    'F. Supp.': (date(1933, 1, 1),
+                 date(1998, 12, 31)),
+    'F. Supp. 2d': (date(1998, 1, 1),
+                    date.today()),
+    'L. Ed.': (date(1790, 1, 1),
+               date(1956, 12, 31)),
+    'L. Ed. 2d.': (date(1956, 1, 1),
+                   date.today()),
 
     # State regional reporters
-    'P.': (1883, 1931),
-    'P.2d': (1931, 2000),
-    'P.3d': (2000, date.today().year),
+    'P.': (date(1883, 1, 1),
+           date(1931, 12, 31)),
+    'P.2d': (date(1931, 1, 1),
+             date(2000, 12, 31)),
+    'P.3d': (date(2000, 1, 1),
+             date.today()),
 
 
     # State special
-    'Cal. Rptr.': (1959, 1991),
-    'Cal. Rptr. 2d': (1991, 2003),
-    'Cal. Rptr. 3d': (2003, date.today().year),
+    'Cal. Rptr.': (date(1959, 1, 1),
+                   date(1991, 12, 31)),
+    'Cal. Rptr. 2d': (date(1991, 1, 1),
+                      date(2003, 12, 31)),
+    'Cal. Rptr. 3d': (date(2003, 1, 1),
+                      date.today()),
 
     # State
-    'Cal.': (1850, 1934),
-    'Cal. 2d': (1934, 1969),
-    'Cal. 3d': (1969, 1991),
-    'Cal. 4th': (1991, date.today().year),
-    'Cal. App.': (1905, 1934),
-    'Cal. App. 2d': (1934-1969),
-    'Cal. App. 3d': (1969, 1991),
-    'Cal. App. 4th': (1991, date.today().year),
+    'Cal.': (date(1850, 1, 1),
+             date(1934, 12, 31)),
+    'Cal. 2d': (date(1934, 1, 1),
+                date(1969, 12, 31)),
+    'Cal. 3d': (date(1969, 1, 1),
+                date(1991, 12, 31)),
+    'Cal. 4th': (date(1991, 1, 1),
+                 date.today()),
+    'Cal. App.': (date(1905, 1, 1),
+                  date(1934, 12, 31)),
+    'Cal. App. 2d': (date(1934, 1, 1),
+                     date(1969, 12, 31)),
+    'Cal. App. 3d': (date(1969, 1, 1),
+                     date(1991, 12, 31)),
+    'Cal. App. 4th': (date(1991, 1, 1),
+                      date.today()),
 }
