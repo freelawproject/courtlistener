@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'alerts',
     'casepage',
     'citations',
+    'corpus_importer',
     'contact',
     'coverage',
     'custom_filters',
