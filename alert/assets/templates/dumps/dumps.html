@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Data Dumps - CourtListener.com{% endblock %}
+{% block search-form %}{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div class="span-13 append-2">
+        <h2 id="about">XML Data Dumps</h2>
+        <p>For hackers and legal analysts, we provide XML dumps of our data.
+        We generate these files the first time they are requested, so some files
+        may be very fast, while others may need to be created for you, which
+        can take a moment. Dump files are available by the year, month and day.
+        For each time period, individual dump files are available for each court,
+        as well as a single file containing opinions from all courts.</p>
+
+        <p>The XML information in the dumps should be self-explanatory, and can be
+        discussed in <a href="https://groups.google.com/forum/#!forum/courtlistener-discuss">
+        our forum</a>.</p>
+
+        <p>All time stamps are Pacific Standard Time.</p>
+
+
+        <h3 id="usage">Using the Dumps</h3>
+        <p>Annual, monthly or daily dumps can be accessed at
+        http://courtlistener.com/dump-api/<strong>year/month/day/court</strong>.xml.gz.</p>
+        <p class="bottom">For example, let's look at ways to access the First Circuit of Appeals (<strong>ca1</strong>):</p>
+        <ul>
+            <li>All ca1 cases from 2009: <a href="/dump-api/2009/ca1.xml.gz">
+                http://courtlistner.com/dump-api/<strong>2009/ca1</strong>.xml.gz</a></li>
+            <li>All ca1 cases from June 2009: <a href="/dump-api/2009/06/ca1.xml.gz">
+                http://courtlistner.com/dump-api/2009/<strong>06</strong>/ca1.xml.gz</a></li>
+            <li>All ca1 cases from June 9, 2009: <a href="/dump-api/2009/06/09/ca1.xml.gz">
+                http://courtlistner.com/dump-api/2009/06/<strong>09</strong>/ca1.xml.gz</a></li>
+        </ul>
+
+        <p>If you would like <strong>all</strong> cases for a given time period,
+        you can use <strong>all</strong> for the court name. For example,
+        <a href="/dump-api/2009/06/09/all.xml.gz">
+        http://courtlistener.com/dump-api/2009/06/09/<strong>all</strong>.xml.gz</a>
+        returns all of the cases from June 9, 2009 (across all courts).</p>
+
+        <p>We also provide a dump of all cases up through the last day
+        of the previous month. To obtain this dump, simply omit the date
+        in your query, and use <strong>all</strong> for the court name:
+        <a href="/dump-api/all.xml.gz">http://courtlistener.com/dump-api/all.xml.gz</a>.
+        This dump is currently very large ({{dump_size}}). It's currently not
+        possible to obtain complete dumps for individual courts.</p>
+
+        <h3>Privacy Concerns</h3>
+        <p>As is explained in our <a href="/removal/">removal policy</a>, we
+        have blocked search engines from indexing many of the cases available
+        in these dumps. As you work with this data, please be cognizant of the
+        privacy and safety issues involved.</p>
+
+        <p>If you wish to respect the privacy wishes of the parties involved,
+        there is a field for each case, "<strong>blocked</strong>," which
+        describes whether we have blocked search engines from indexing the case.
+        The simple thing for you to do in your project is to continue blocking
+        such cases.</p>
+
+        <p>For our approach to blocking, please see our <a href="/removal/">removal
+        policy</a> and our <a href="http://michaeljaylissner.com/blog/respecting-privacy-while-providing-hundreds-of-thousands-of-public-documents">
+        technical and policy</a> discussion of the issues.</p>
+
+
+        <h3>Copyright</h3>
+        <p>
+            <a rel="license" href="http://creativecommons.org/publicdomain/mark/1.0/">
+                <img src="http://i.creativecommons.org/p/mark/1.0/88x31.png" alt="Public Domain Mark" height="31" width="88"/>
+            </a>
+            <br />Our dumps are free of known copyright restrictions.
+        </p>
+
+        <h3>Feedback and Updates</h3>
+        <p>To stay up to date about this API or to give us feedback, please stay in touch in
+        <a href="https://groups.google.com/forum/#!forum/courtlistener-discuss">our forum</a>.</p>
+    </div>
+
+    <div class="span-9 last">
+        <h3>Available Courts</h3>
+        <p class="bottom">The available court names, in order of start date, are:</p>
+        <ul>
+            <li><strong><a href="/opinions/all/">all</a></strong> - All courts</li>
+            {% for court in courts %}
+                <li>
+                    <strong><a href="/?q=&case_name=&court_{{court.courtUUID}}=on&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Relating-to+orders=on&filed_after=&filed_before=&west_cite=&neutral_cite=&docket_number=&sort=score+desc">{{court.courtUUID}}</a></strong> - {{court.full_name}}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endblock %}

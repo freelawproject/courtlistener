@@ -1,0 +1,44 @@
+/* the humans responsible & colophon */
+/* humanstxt.org */
+
+
+/* TEAM */
+    Concept and Guidance: Brian Carver
+    Site: http://sharealike.org
+    Twitter: @brianwc
+    Location: Berkeley, CA
+
+    Design and Development: Michael Lissner
+    Site: http://michaeljaylissner.com
+    Twitter: @mlissner
+    Location: Berkeley, CA
+
+
+/* SITE */
+  Standards: HTML5, CSS3
+  Components:
+        Text Extraction: Antiword, libwpd-tools, pdf2text
+        Code: Celery, Django, jQuery (NobelCount), lxml,
+              Mercurial, RabbitMQ, requests, sunburnt, titlecase
+        Display: Silk icons, Blueprint CSS
+        Infrastructure: Apache2, Linux, Postgres, Solr
+  Source: https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/overview
+
+
+
+                       ````
+                .:+oo++//++osso+/. -+++////+++.
+             -+ys/-`         ./yy+  `./mmmm/``
+           -sys:               `oo     ymmy
+          +yyo`                 `+`    ymmy
+         +yyy`                         ymms
+        -yyy+                          ymms
+        +yyy:                          ymms
+        +sss:                          ymms
+        /sss+                          ydds
+        `ssss.                         sdds
+         -syyo`                  ``    sdds
+          .oyys-                `s/    ydds            `+`
+            :shhs:`           `/ys`    yddh`          .hs
+              .:oyys+:-....-/oyys.  `./ddddy/:--.---:odd.
+                  `.-::///::-.`    -///////////////////-
