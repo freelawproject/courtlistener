@@ -1,20 +1,4 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-from alert.settings import LOGIN_REDIRECT_URL
+from alert.settings import ADMINS, LOGIN_REDIRECT_URL
 from alert.userHandling.forms import *
 from alert.honeypot.decorators import check_honeypot
 
@@ -163,7 +147,7 @@ def deleteProfileDone(request):
 @check_honeypot(field_name='skip_me_if_alive')
 @never_cache
 def register(request):
-    '''allow only an anonymous user to register'''
+    """allow only an anonymous user to register"""
     redirect_to = request.REQUEST.get('next', '')
     if 'sign-in' in redirect_to:
         # thus, we don't redirect people back to the sign-in form
@@ -224,13 +208,12 @@ def register(request):
 
                 # Send an email with the confirmation link
                 current_site = Site.objects.get_current()
-                email_subject = 'Confirm your account on ' + \
-                    str(current_site.name)
+                email_subject = 'Confirm your account on %s' % current_site.name
                 email_body = "Hello, %s, and thanks for signing up for an \
 account!\n\nTo send you emails, we need you to activate your account with \
 CourtListener.com. To activate your account, click this link within 5 days:\
-\n\nhttp://courtlistener.com/email/confirm/%s\n\nThanks for using our site,\
-\n\nThe CourtListener team\n\n\
+\n\nhttps://www.courtlistener.com/email/confirm/%s\n\nThanks for using our site,\
+\n\nThe CourtListener Team\n\n\
 -------------------\n\
 For questions or comments, please see our contact page, \
 http://courtlistener.com/contact/." % (
@@ -241,8 +224,7 @@ http://courtlistener.com/contact/." % (
                           'no-reply@courtlistener.com',
                           [new_user.email])
 
-                return HttpResponseRedirect('/register/success/?next=' \
-                    + redirect_to)
+                return HttpResponseRedirect('/register/success/?next=%s' % redirect_to)
         else:
             form = UserCreationFormExtended()
         return render_to_response("profile/register.html",
@@ -256,8 +238,8 @@ http://courtlistener.com/contact/." % (
 
 @never_cache
 def registerSuccess(request):
-    '''all redirect security checks should be done by now. Inform the user of
-    their status, and redirect them.'''
+    """all redirect security checks should be done by now. Inform the user of
+    their status, and redirect them."""
     redirect_to = request.REQUEST.get('next', '')
     return render_to_response('registration/registration_complete.html',
                               {'redirect_to': redirect_to, 'private': False},
@@ -266,31 +248,46 @@ def registerSuccess(request):
 
 @never_cache
 def confirmEmail(request, activationKey):
-    '''Confirms email addresses for a user.
+    """Confirms email addresses for a user and sends an email to the admins.
 
     Checks if a hash in a confirmation link is valid, and if so validates the
-    user's email address as valid. All code paths verified. mlissner,
-    2010-07-22
-    '''
+    user's email address as valid.
+    """
     try:
         user_profile = UserProfile.objects.get(activationKey=activationKey)
-        if user_profile.emailConfirmed:
-            # their email is already confirmed.
-            return render_to_response('registration/confirm.html',
-                                      {'alreadyConfirmed': True, 'private': False},
-                                      RequestContext(request))
-    except:
+    except UserProfile.DoesNotExist:
         return render_to_response('registration/confirm.html',
-                                  {'invalid': True, 'private': False},
+                                  {'invalid': True, 'private': True},
                                   RequestContext(request))
+
+    if user_profile.emailConfirmed:
+        # their email is already confirmed.
+        return render_to_response('registration/confirm.html',
+                                  {'alreadyConfirmed': True, 'private': True},
+                                  RequestContext(request))
+
     if user_profile.key_expires < datetime.datetime.today():
         return render_to_response('registration/confirm.html',
-                                  {'expired': True, 'private': False},
+                                  {'expired': True, 'private': True},
                                   RequestContext(request))
+
+    # Tests pass; Save the profile
     user_profile.emailConfirmed = True
     user_profile.save()
+
+    # Send an email letting the admins know there's somebody to say hi to
+    email_subject = 'New user confirmed on CourtListener: %s' % user_profile.user.username
+    email_body = "A new user has signed up on CourtListener.com! Maybe we should say hi?\n\n" \
+                 "Their email address is: %s\n\n" \
+                 "Sincerely,\n\n" \
+                 "The bots at CourtListener" % (user_profile.user.email)
+    send_mail(email_subject,
+              email_body,
+              'no-reply@courtlistener.com',
+              [a[1] for a in ADMINS])
+
     return render_to_response('registration/confirm.html',
-                              {'success': True, 'private': False},
+                              {'success': True, 'private': True},
                               RequestContext(request))
 
 
