@@ -192,7 +192,8 @@ NEUTRAL_CITATIONS = [
 ]
 
 # List of Federal Reporters
-REPORTERS = CL_REPORTERS.extend(NEUTRAL_CITATIONS)
+CL_REPORTERS.extend(NEUTRAL_CITATIONS)
+REPORTERS = CL_REPORTERS
 
 # We normalize spaces and other errors people make
 # See note on REPORTERS for ordering of this list.
@@ -317,7 +318,7 @@ VARIATIONS = {
     'Wn. Terr.': 'Wash. Terr.',  # Normalize Washington reporters (local rules?)
     'Wn. App.': 'Wash. App.',
     'Wn. 2d': 'Wash. 2d',
-    'Wn': 'Wash',
+    'Wn': 'Wash.',
     'Wis.2d': 'Wis. 2d',
 
     # State neutral citations
