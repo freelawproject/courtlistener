@@ -22,6 +22,7 @@ We welcome a conversion of these notes to a better process using Fabric.
    TODO: Note that citations aren't always unique! For example, you can have a Dal. Citation that is either from Dallas'
          Supreme Court Reports or from Dallas' Pennsylvania Reports. Make sure that date filtering can handle this. This
          can even happen within the same court. So, Fed.R. can refer to either F. or F.2d.
+   TODO: Purge CL_REPORTERS, REPORTER_DATES
 
 
 

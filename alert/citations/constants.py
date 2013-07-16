@@ -1139,7 +1139,7 @@ REPORTERS = {
                         'NYS 3d': 'N.Y.S.3d',
                         'N.Y.S. 2d': 'N.Y.S.2d', },
          'editions': {'N.Y.S.': (date(1888, 1, 1), date(1937, 12, 31)),
-                      'N.Y.S.2d': (date(1938, 1, 1), date())},
+                      'N.Y.S.2d': (date(1938, 1, 1), date.today())},
          'mlz_jurisdiction': 'us;ny'},],
     'Lock. Rev. Cas.':
         [{'name': 'Lockwood\'s Reversed Cases',
@@ -1484,7 +1484,7 @@ REPORTERS = {
                         'Ohio St.3d': 'Ohio St. 3d', },
          'editions': {'Ohio St.': (date(1840, 1, 1), date(1964, 12, 31)),
                       'Ohio St. 2d': (date(1965, 1, 1), date(1991, 12, 31)),
-                      'Ohio St. 3d': (date(1991), date.today()), },
+                      'Ohio St. 3d': (date(1991, 1, 1), date.today()), },
          'mlz_jurisdiction': 'us;oh'},],
     'Ohio App.':
         [{'name': 'Ohio Appellate Reports',

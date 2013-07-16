@@ -15,10 +15,9 @@ class DocumentAdmin(admin.ModelAdmin):
     # ordering is brutal on MySQL. Don't put it here. Sorry.
     #list_display = ('citation',)
     #list_filter = ('court',)
-    fields = ('citation', 'source', 'sha1', 'date_filed', 'court',
-              'download_URL', 'local_path', 'plain_text', 'html',
-              'html_with_citations', 'cases_cited',
-              'precedential_status', 'blocked', 'date_blocked', 'extracted_by_ocr')
+    fields = ('citation', 'source', 'sha1', 'date_filed', 'court', 'download_URL', 'local_path', 'plain_text', 'html',
+              'html_with_citations', 'cases_cited', 'precedential_status', 'nature_of_suit', 'blocked', 'date_blocked',
+              'extracted_by_ocr')
     raw_id_fields = ('citation', 'cases_cited')
     search_fields = ['plain_text']
 
