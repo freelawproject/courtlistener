@@ -132,7 +132,6 @@ REPORTERS = {
          'editions': {'F. Supp.':    (date(1932, 1, 1), date(1988, 12, 31)),
                       'F. Supp. 2d': (date(1988, 1, 1), date.today()),},
          'mlz_jurisdiction': 'us'},
-
     'Fed. Cl.':
         {'name': 'United States Claims Court Reporter',
          'variations': {},
@@ -432,136 +431,514 @@ REPORTERS = {
          'editions': {'Conn. Cir. Ct': (date(1961, 1, 1), date(1974, 12, 31))},
          'mlz_jurisdiction': 'us;ct'},
 
-    'D.C.':
-        {'name': '',
+    'Harrington':
+        {'name': 'Harrington',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'Harrington': (date(1832, 1, 1), date(1855, 12, 31))},
+         'mlz_jurisdiction': 'us;de'},
+    'Houston':
+        {'name': 'Houston',
+         'variations': {},
+         'editions': {'Houston': (date(1855, 1, 1), date(1893, 12, 31))},
+         'mlz_jurisdiction': 'us;de'},
+    'Marvel':
+        {'name': 'Marvel',
+         'variations': {},
+         'editions': {'Marvel': (date(1893, 1, 1), date(1897, 12, 31))},
+         'mlz_jurisdiction': 'us;de'},
+    'Pennewill':
+        {'name': 'Pennewill',
+         'variations': {},
+         'editions': {'Pennewill': (date(1897, 1, 1), date(1909, 12, 31))},
+         'mlz_jurisdiction': 'us;de'},
+    'Boyce':
+        {'name': 'Boyce',
+         'variations': {},
+         'editions': {'Boyce': (date(1909, 1, 1), date(1920, 12, 31))},
+         'mlz_jurisdiction': 'us;de'},
     'Del.':
-        {'name': '',
+        {'name': 'Delaware Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
+         'editions': {'Del.': (date(1920, 1, 1), date(1966, 12, 31))},
+         'mlz_jurisdiction': 'us;de'},
+    'Del. Cas.':
+        {'name': 'Delaware Cases',
+         'variations': {},
+         'editions': {'Del. Cas.': (date(1792, 1, 1), date(1830, 12, 31))},
          'mlz_jurisdiction': ''},
+    'Del. Ch.':
+        {'name': 'Delaware Chancery Reports',
+         'variations': {},
+         'editions': {'Del. Ch.': (date(1814, 1, 1), date(1968, 12, 31))},
+         'mlz_jurisdiction': 'us;de'},
+
+    'U.S. App. D.C.':
+        {'name': 'United States Court of Appeals Reports',
+         'variations': {},
+         'editions': {'U.S. App. D.C.': (date(1941, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;dc'},
+    'App. D.C.':
+        {'name': 'Appeal Cases, District of Colombia',
+         'variations': {},
+         'editions': {'App. D.C.': (date(1893, 1, 1), date(1941, 12, 31))},
+         'mlz_jurisdiction': 'us;dc'},
+    'Cranch':
+        {'name': 'District of Columbia Reports, Cranch',
+         'variations': {},
+         'editions': {'Cranch': (date(1801, 1, 1), date(1841, 12, 31))},
+         'mlz_jurisdiction': 'us;dc'},
+    'Hay. & Haz.':
+        {'name': 'District of Columbia Reports, Hayward & Hazelton',
+         'variations': {},
+         'editions': {'Hay. & Haz.': (date(1841, 1, 1), date(1862, 12, 31))},
+         'mlz_jurisdiction': ''},
+    'Mackey':
+        {'name': 'District of Columbia Reports, Mackey',
+         'variations': {},
+         'editions': {'Mackey': (date(1863, 1, 1), date(1872, 12, 31))},
+         'mlz_jurisdiction': 'us;dc'},
+    'MacArth.':
+        {'name': 'District of Columbia Reports, MacArthur',
+         'variations': {},
+         'editions': {'MacArth.': (date(1873, 1, 1), date(1879, 12, 31))},
+         'mlz_jurisdiction': 'us;dc'},
+    'MacArth. & M.':
+        {'name': 'District of Columbia Reports, MacArthur and Mackey',
+         'variations': {},
+         'editions': {'MacArth. & M.': (date(1879, 1, 1), date(1880, 12, 31))},
+         'mlz_jurisdiction': 'us;dc'},
+    'Mackey':
+        {'name': 'District of Columbia Reports, Mackey',
+         'variations': {},
+         'editions': {'Mackey': (date(1880, 1, 1), date(1892, 12, 31))},
+         'mlz_jurisdiction': 'us;dc'},
+    'Tuck. & Cl.':
+        {'name': 'District of Columbia Reports, Tucker and Clephane',
+         'variations': {},
+         'editions': {'Tuck. & Cl.': (date(1892, 1, 1), date(1893, 12, 31))},
+         'mlz_jurisdiction': 'us;dc'},
+
     'Fla.':
-        {'name': '',
+        {'name': 'Florida Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'Ga. App.':
-        {'name': '',
+         'editions': {'Fla.': (date(1846, 1, 1), date(1948, 12, 31))},
+         'mlz_jurisdiction': 'us;fl'},
+    'Fla. L. Weekly':
+        {'name': 'Florida Law Weekly',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'Fla. L. Weekly': (date(1978, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;fl'},
+    'Fla. Supp.':
+        {'name': 'Florida Supplement',
+         'variations': {},
+         'editions': {'Fla. Supp.': (date(1948, 1, 1), date(1981, 12, 31)),
+                      'Fla. Supp. 2d': (date(1983, 1, 1), date(1992, 12, 31))},
+         'mlz_jurisdiction': 'us;fl'},
+    'Fla. L. Weekly Supp.':
+        {'name': 'Florida Law Weekly Supplement',
+         'variations': {},
+         'editions': {'Fla. L. Weekly Supp.': (date(1992, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;fl'},
+
     'Ga.':
-        {'name': '',
+        {'name': 'Georgia Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'Ga.': (date(1846, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;ga'},
+    'Ga. App.':
+        {'name': 'Georgia Appeals Reports',
+         'variations': {},
+         'editions': {'Ga. App.': (date(1907, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;ga'},
+
     'Haw.':
-        {'name': '',
+        {'name': 'Hawaii Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'Haw.': (date(1847, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;hi'},
+    'Haw. App.':
+        {'name': 'Hawaii Appellate Reports',
+         'variations': {},
+         'editions': {'Haw. App.': (date(1980, 1, 1), date(1994, 12, 31))},
+         'mlz_jurisdiction': 'us;hi'},
+
     'Idaho':
-        {'name': '',
+        {'name': 'Idaho Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'Idaho': (date(1982, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;id'},
+
     'Ill. Dec.':
-        {'name': '',
+        {'name': 'West\'s Illinois Decisions',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'Ill. App. 3d':
-        {'name': '',
-         'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'Ill. App. 2d':
-        {'name': '',
-         'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'Ill. Dec.': (date(1976, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;il'},
     'Ill. App.':
-        {'name': '',
+        {'name': 'Illinois Appellate Court Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         # needs research
+         'editions': {'Ill. App.':    (date(1877, 1, 1), date.today()),
+                      'Ill. App. 2d': (date(1877, 1, 1), date.today()),
+                      'Ill. App. 3d': (date(1877, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;il'},
+    'Ill. Ct. Cl.':
+        {'name': 'Illinois Court of Claims Reports',
+         'variations': {},
+         'editions': {'Ill. Ct. Cl.': (date(1889, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;il'},
+    'Breese':
+        {'name': 'Illinois Reports, Breese',
+         'variations': {},
+         'editions': {'Breese': (date(1819, 1, 1), date(1831, 12, 31))},
+         'mlz_jurisdiction': 'us;il'},
+    'Scam.':
+        {'name': 'Illinois Reports, Scammon',
+         'variations': {},
+         'editions': {'Scam.': (date(1832, 1, 1), date(1843, 12, 31))},
+         'mlz_jurisdiction': 'us;il'},
+    'Gilm.':
+        {'name': 'Illinois Reports, Gilman',
+         'variations': {},
+         'editions': {'Gilm.': (date(1844, 1, 1), date(1849, 12, 31))},
+         'mlz_jurisdiction': 'us;il'},
     'Ill.':
-        {'name': '',
+        {'name': 'Illinois Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'Ill.': (date(1849, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;il'},
+
+
     'Ind.':
-        {'name': '',
+        {'name': 'Indiana Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'Ind.': (date(1848, 1, 1), date(1981, 12, 31))},
+         'mlz_jurisdiction': 'us;in'},
+    'Blackf.':
+        {'name': 'Indiana Reports, Blackford',
+         'variations': {},
+         'editions': {'Blackf.': (date(1817, 1, 1), date(1847, 12, 31))},
+         'mlz_jurisdiction': 'us;in'},
+    'Ind. App.':
+        {'name': 'Indiana Court of Appeals Reports',
+         'variations': {},
+         'editions': {'Ind. App.': (date(1890, 1, 1), date(1979, 12, 31))},
+         'mlz_jurisdiction': 'us;in'},
+
+    'Bradf.':
+        {'name': 'Iowa Reports, Bradford',
+         'variations': {},
+         'editions': {'Bradf.': (date(1838, 1, 1), date(1841, 12, 31))},
+         'mlz_jurisdiction': 'us;ia'},
+    'Morris':
+        {'name': 'Iowa Reports, Morris',
+         'variations': {},
+         'editions': {'Morris': (date(1839, 1, 1), date(1846, 12, 31))},
+         'mlz_jurisdiction': 'us;ia'},
+    'Greene':
+        {'name': 'Iowa Reports, Greene',
+         'variations': {},
+         'editions': {'Greene': (date(1847, 1, 1), date(1854, 12, 31))},
+         'mlz_jurisdiction': 'ui;ia'},
     'Iowa':
-        {'name': '',
+        {'name': 'Iowa Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'Kan. App. 2d':
-        {'name': '',
+         'editions': {'Iowa': (date(1855, 1, 1), date(1968, 12, 31))},
+         'mlz_jurisdiction': 'us;ia'},
+
+    'McCahon':
+        {'name': 'Kansas Reports, McCahon',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'Kan. App.':
-        {'name': '',
-         'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'McCahon': (date(1858, 1, 1), date(1868, 12, 31))},
+         'mlz_jurisdiction': 'us;ks'},
     'Kan.':
-        {'name': '',
+        {'name': 'Kansas Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'Kan.': (date(1862, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;ks'},
+    'Kan. App.':
+        {'name': 'Kansas Court of Appeals Reports',
+         'variations': {},
+         # These dates *are* from the Bluebook.
+         'editions': {'Kan. App.': (date(1895, 1, 1), date(1901, 12, 31)),
+                      'Kan. App. 2d': (date(1977, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;ks'},
+
+    'Hughes':
+        {'name': 'Kentucky Reports, Hughes',
+         'variations': {},
+         'editions': {'Hughes': (date(1785, 1, 1), date(1801, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'Sneed':
+        {'name': 'Kentucky Reports, Sneed',
+         'variations': {},
+         'editions': {'Sneed': (date(1801, 1, 1), date(1805, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'Hard.':
+        {'name': 'Kentucky Reports, Hardin',
+         'variations': {},
+         'editions': {'Hard.': (date(1805, 1, 1), date(1808, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'Bibb':
+        {'name': 'Kentucky Reports, Bibb',
+         'variations': {},
+         'editions': {'Bibb': (date(1808, 1, 1), date(1817, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'A.K. Marsh.':
+        {'name': 'Kentucky Reports, Marshall, A.K.',
+         'variations': {},
+         'editions': {'A.K. Marsh.': (date(1817, 1, 1), date(1821, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'Litt. Sel. Cas.':
+        {'name': 'Kentucky Reports, Littell\'s Selected Cases',
+         'variations': {},
+         'editions': {'Litt. Sel. Cas.': (date(1795, 1, 1), date(1821, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'Litt.':
+        {'name': 'Kentucky Reports, Littell',
+         'variations': {},
+         'editions': {'Litt.': (date(1822, 1, 1), date(1824, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'T.B. Mon.':
+        {'name': 'Kentucky Reports, Monroe, T.B.',
+         'variations': {},
+         'editions': {'T.B. Mon.': (date(1824, 1, 1), date(1828, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'J.J. Marsh.':
+        {'name': 'Kentucky Reports, Marshall, J.J.',
+         'variations': {},
+         'editions': {'J.J. Marsh.': (date(1829, 1, 1), date(1832, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'Dana':
+        {'name': 'Kentucky Reports, Dana',
+         'variations': {},
+         'editions': {'Dana': (date(1833, 1, 1), date(1840, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'B. Mon.':
+        {'name': 'Kentucky Reports, Monroe, Ben',
+         'variations': {},
+         'editions': {'B. Mon.': (date(1840, 1, 1), date(1857, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'Met.':
+        {'name': 'Kentucky Reports, Metcalf',
+         'variations': {},
+         'editions': {'Met.': (date(1858, 1, 1), date(1863, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'Duv.':
+        {'name': 'Kentucky Reports, Duvall',
+         'variations': {},
+         'editions': {'Duv.': (date(1863, 1, 1), date(1866, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'Bush':
+        {'name': 'Kentucky Reports, Bush',
+         'variations': {},
+         'editions': {'Bush': (date(1866, 1, 1), date(1879, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
     'Ky.':
-        {'name': '',
+        {'name': 'Kentucky Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'Ky.': (date(1879, 1, 1), date(1951, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'Ky. Op.':
+        {'name': 'Kentucky Opinions',
+         'variations': {},
+         'editions': {'Ky. Op.': (date(1864, 1, 1), date(1886, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'Ky. L. Rptr.':
+        {'name': 'Kentucky Law Reporter',
+         'variations': {},
+         'editions': {'Ky. L. Rptr.': (date(1880, 1, 1), date(1908, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'Ky. App.':
+        {'name': 'Kentucky Appellate Reporter',
+         'variations': {},
+         'editions': {'Ky. App.': (date(1994, 1, 1), date(2000, 12, 31))},
+         'mlz_jurisdiction': 'us;ky'},
+    'Ky. L. Summ.':
+        {'name': 'Kentucky Law Summary',
+         'variations': {},
+         'editions': {'Ky. L. Summ.': (date(1966, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;ky'},
+
     'La.':
-        {'name': '',
+        {'name': 'Louisiana Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'Mass. App. Ct.':
-        {'name': '',
+         'editions': {'La.': (date(1830, 1, 1), date(1972, 12, 31))},  # Has a gap from 1841 to 1901
+         'mlz_jurisdiction': 'us;la'},
+    'Mart.':
+        {'name': 'Louisiana Reports, Martin',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'Mass.':
-        {'name': '',
+         'editions': {'Mart.': (date(1809, 1, 1), date(1830, 12, 31))},
+         'mlz_jurisdiction': 'us;la'},
+    'Rob.':
+        {'name': 'Louisiana Reports, Robinson',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'Md. App.':
-        {'name': '',
+         'editions': {'Rob.': (date(1841, 1, 1), date(1846, 12, 31))},
+         'mlz_jurisdiction': 'us;la'},
+    'La. Ann.':
+        {'name': 'Louisiana Annual Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'Md.':
-        {'name': '',
+         'editions': {'La. Ann.': (date(1846, 1, 1), date(1900, 12, 31))},
+         'mlz_jurisdiction': 'us;la'},
+    'McGl.':
+        {'name': 'Louisiana Court of Appeals Reports, McGloin',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'McGl.': (date(1881, 1, 1), date(1884, 12, 31))},
+         'mlz_jurisdiction': 'us;la'},
+    'Gunby':
+        {'name': 'Louisiana Court of Appeals Reports, Gunby',
+         'variations': {},
+         'editions': {'Gunby': (date(1885, 1, 1), date(1885, 12, 31))},
+         'mlz_jurisdiction': 'us;la'},
+    'Teiss.':
+        {'name': 'Louisiana Court of Appeals Reports, Teisser',
+         'variations': {},
+         'editions': {'Teiss.': (date(1903, 1, 1), date(1917, 12, 31))},
+         'mlz_jurisdiction': 'us;la'},
+    'Pelt.':
+        {'name': 'Peltier\'s Opinions, Parish at Orleans',
+         'variations': {},
+         'editions': {'Pelt.': (date(1917, 1, 1), date(1924, 12, 31))},
+         'mlz_jurisdiction': 'us;la'},
+    'La. App.':
+        {'name': 'Louisiana Court of Appeals Reports',
+         'variations': {},
+         'editions': {'La. App.': (date(1924, 1, 1), date(1932, 12, 31))},
+         'mlz_jurisdiction': 'us;la'},
+
     'Me.':
-        {'name': '',
+        {'name': 'Maine Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'Mich. App.':
-        {'name': '',
+         'editions': {'Me.': (date(1820, 1, 1), date(1965, 12, 31))},
+         'mlz_jurisdiction': 'us;me'},
+
+    'H. & McH.':
+        {'name': 'Maryland Reports, Harris and McHenry',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'H. & McH.': (date(1770, 1, 1), date(1799, 12, 31))},  # Gap from 1774 to 1780
+         'mlz_jurisdiction': 'us;md'},
+    'H. & J.':
+        {'name': 'Maryland Reports, Harris and Johnson',
+         'variations': {},
+         'editions': {'H. & J.': (date(1800, 1, 1), date(1826, 12, 31))},
+         'mlz_jurisdiction': 'us;md'},
+    'H. & G.':
+        {'name': 'Maryland Reports, Harris and Gill',
+         'variations': {},
+         'editions': {'H. & G.': (date(1826, 1, 1), date(1829, 12, 31))},
+         'mlz_jurisdiction': 'us;md'},
+    'G. & J.':
+        {'name': 'Maryland Reports, Gill & Johnson',
+         'variations': {},
+         'editions': {'G. & J.': (date(1829, 1, 1), date(1842, 12, 31))},
+         'mlz_jurisdiction': 'us;md'},
+    'Gill':
+        {'name': 'Maryland Reports, Gill',
+         'variations': {},
+         'editions': {'Gill': (date(1843, 1, 1), date(1851, 12, 31))},
+         'mlz_jurisdiction': 'us;md'},
+    'Md.':
+        {'name': 'Maryland Reports',
+         'variations': {},
+         'editions': {'Md.': (date(1851, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;md'},
+    'Md. App.':
+        {'name': 'Maryland Appellate Reports',
+         'variations': {},
+         'editions': {'Md. App.': (date(1967, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;md'},
+
+    'Will.':
+        {'name': 'Massachusetts Reports, Williams',
+         'variations': {},
+         'editions': {'Will.': (date(1804, 1, 1), date(1805, 12, 31))},
+         'mlz_jurisdiction': 'us;ma'},
+    'Tyng':
+        {'name': 'Massachusetts Reports, Tyng',
+         'variations': {},
+         'editions': {'Tyng': (date(1806, 1, 1), date(1822, 12, 31))},
+         'mlz_jurisdiction': 'us;ma'},
+    'Pick.':
+        {'name': 'Massachusetts Reports, Pickering',
+         'variations': {},
+         'editions': {'Pick.': (date(1822, 1, 1), date(1839, 12, 31))},
+         'mlz_jurisdiction': 'us;ma'},
+    'Met.':
+        {'name': 'Massachusetts Reports, Metcalf',
+         'variations': {},
+         'editions': {'Met.': (date(1840, 1, 1), date(1847, 12, 31))},
+         'mlz_jurisdiction': 'us;ma'},
+    'Cush.':
+        {'name': 'Massachusetts Reports, Cushing',
+         'variations': {},
+         'editions': {'Cush.': (date(1848, 1, 1), date(1853, 12, 31))},
+         'mlz_jurisdiction': 'us;ma'},
+    'Gray':
+        {'name': 'Massachusetts Reports, Gray',
+         'variations': {},
+         'editions': {'Gray': (date(1854, 1, 1), date(1860, 12, 31))},
+         'mlz_jurisdiction': 'us;ma'},
+    'Allen':
+        {'name': 'Massachusetts Reports, Allen',
+         'variations': {},
+         'editions': {'Allen': (date(1861, 1, 1), date(1867, 12, 31))},
+         'mlz_jurisdiction': 'us;ma'},
+    'Mass.':
+        {'name': 'Massachusetts Reports',
+         'variations': {},
+         'editions': {'Mass.': (date(1867, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;ma'},
+    'Mass. App. Ct.':
+        {'name': 'Massachusetts Appeals Court Reports',
+         'variations': {},
+         'editions': {'Mass. App. Ct.': (date(1972, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;ma'},
+    'Mass. Supp.':
+        {'name': 'Massachusetts Reports Supplement',
+         'variations': {},
+         'editions': {'Mass. Supp.': (date(1980, 1, 1), date(1983, 12, 31))},
+         'mlz_jurisdiction': 'us;ma'},
+    'Mass. App. Dec.':
+        {'name': 'Massachusetts Appellate Decisions',
+         'variations': {},
+         'editions': {'Mass. App. Dec.': (date(1941, 1, 1), date(1977, 12, 31))},
+         'mlz_jurisdiction': 'us;ma'},
+    'Mass. App. Div.':
+        {'name': 'Reports of Massachusetts Appellate Division',
+         'variations': {},
+         'editions': {'Mass. App. Div.': (date(1936, 1, 1), date.today())},  # Gap from 1950 to 1980
+         'mlz_jurisdiction': 'us;ma'},
+
+    'Blume Sup. Ct. Trans.':
+        {'name': 'Blume, Supreme Court Transactions',
+         'variations': {},
+         'editions': {'Blume Sup. Ct. Trans.': (date(1805, 1, 1), date(1836, 12, 31))},
+         'mlz_jurisdiction': 'us;mi'},
+    'Blume Unrep. Op.':
+        {'name': 'Blume, Unreported Opinions',
+         'variations': {},
+         'editions': {'Blume Unrep. Op.': (date(1836, 1, 1), date(1843, 12, 31))},
+         'mlz_jurisdiction': 'us;mi'},
+    'Doug.':
+        {'name': 'Michigan Reports, Douglass',
+         'variations': {},
+         'editions': {'Doug.': (date(1843, 1, 1), date(1847, 12, 31))},
+         'mlz_jurisdiction': 'us;mi'},
     'Mich.':
-        {'name': '',
+        {'name': 'Michigan Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'Mich.': (date(1847, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;mi'},
+    'Mich. App.':
+        {'name': 'Michigan Appeals Reports',
+         'variations': {},
+         'editions': {'Mich. App.': (date(1965, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;mi'},
+    'Mich. Ct. Cl.':
+        {'name': 'Michigan Court of Claims Reports',
+         'variations': {},
+         'editions': {'Mich. Ct. Cl.': (date(1938, 1, 1), date(1942, 12, 31))},
+         'mlz_jurisdiction': 'us;mi'},
+
     'Minn.':
         {'name': '',
          'variations': {},
