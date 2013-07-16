@@ -10,7 +10,7 @@ sys.path.append("/var/www/court-listener")
 
 from django.conf import settings
 from alert.search.models import Court
-from alert.citations.constants import CL_REPORTERS, REPORTER_DATES
+from alert.citations.constants import REPORTERS
 from alert.citations.find_citations import strip_punct
 from alert.lib import sunburnt
 

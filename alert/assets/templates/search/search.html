@@ -166,7 +166,11 @@
                         {%  endif %}
                         {% if result.solr_highlights.suitNature.0 %}
                             <span class="meta-data-header">Nature of suit:</span>
-                            <span class="meta-data-value">{{ result.solr_highlights.suitNature.0|safe }}</span>
+                            <span class="meta-data-value">
+                                <a href="?q=suitNature:{{ result.solr_highlights.suitNature.0|safe }}">
+                                    {{ result.solr_highlights.suitNature.0|safe }}
+                                </a>
+                            </span>
                         {%  endif %}
                     </p>
                     {% if result.citeCount > 0 %}
