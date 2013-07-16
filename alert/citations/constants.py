@@ -223,7 +223,7 @@ REPORTERS = {
                         'SW 2d': 'S.W.2d',
                         'SW 3d': 'S.W.3d',},
          'editions': {'S.W.': (date(1886, 1, 1), date(1928, 12, 31)),
-                      'S.W.2d': (date(1928, 1, 1), date(1999, 12, 31))
+                      'S.W.2d': (date(1928, 1, 1), date(1999, 12, 31)),
                       'S.W.3d': (date(1999, 1, 1), date.today())},
          'mlz_jurisdiction': 'us'},
     'N.W.':
@@ -940,70 +940,126 @@ REPORTERS = {
          'mlz_jurisdiction': 'us;mi'},
 
     'Minn.':
-        {'name': '',
+        {'name': 'Minnesota Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'Minn.': (date(1851, 1, 1), date(1977, 12, 31))},
+         'mlz_jurisdiction': 'us;mn'},
+
+    'Walker':
+        {'name': 'Mississippi Reports, Walker',
+         'variations': {},
+         'editions': {'Walker': (date(1818, 1, 1), date(1832, 12, 31))},
+         'mlz_jurisdiction': 'us;ms'},
+    'Howard':
+        {'name': 'Mississippi Reports, Howard',
+         'variations': {},
+         'editions': {'Howard': (date(1834, 1, 1), date(1843, 12, 31))},
+         'mlz_jurisdiction': 'us;ms'},
+    'S. & M.':
+        {'name': 'Mississippi Reports, Smedes and Marshall',
+         'variations': {},
+         'editions': {'S. & M.': (date(1843, 1, 1), date(1850, 12, 31))},
+         'mlz_jurisdiction': 'us;ms'},
     'Miss.':
-        {'name': '',
+        {'name': 'Mississippi Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'Miss.': (date(1851, 1, 1), date(1966, 12, 31))},
+         'mlz_jurisdiction': 'us;ms'},
+
     'Mo.':
-        {'name': '',
+        {'name': 'Missouri Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'Mo.': (date(1821, 1, 1), date(1956, 12, 31))},
+         'mlz_jurisdiction': 'us;mo'},
+    'Mo. App.':
+        {'name': 'Missouri Appeals Reports',
+         'variations': {},
+         'editions': {'Mo. App.': (date(1876, 1, 1), date(1954, 12, 31))},
+         'mlz_jurisdiction': 'us;mo'},
+
     'Mont.':
-        {'name': '',
+        {'name': 'Montana Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'N.C. App.':
-        {'name': '',
+         'editions': {'Mont.': (date(1868, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;mt'},
+    'State Rptr.':
+        {'name': 'State Reporter',  # Who named this?
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'N.C.':
-        {'name': '',
+         'editions': {'State Rptr.': (date(1945, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;mt'},
+
+    'Neb.':
+        {'name': 'Nebraska Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'N.D.':
-        {'name': '',
+         'editions': {'Neb.': (date(1860, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;ne'},
+    'Neb. Ct. App.':
+        {'name': 'Nebraska Court of Appeals Reports',
+         'variations': {'Neb. App.': 'Neb. Ct. App.'},
+         'editions': {'Neb. Ct. App.': (date(1922, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;ne'},
+
+    'Nev.':
+        {'name': 'Nevada Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'Nev.': (date(1865, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;nv'},
+
     'N.H.':
-        {'name': '',
+        {'name': 'New Hampshire Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'N.J. Tax':
-        {'name': '',
-         'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'N.J. Super.':
-        {'name': '',
-         'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'N.H.': (date(1816, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;nh'},
+
     'N.J.':
-        {'name': '',
+        {'name': 'New Jersey Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'N.J.': (date(1948, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;nj'},
+    'N.J.L.':
+        {'name': 'New Jersey Law Reports',
+         'variations': {},
+         'editions': {'N.J.L.': (date(1790, 1, 1), date(1948, 12, 31))},
+         'mlz_jurisdiction': 'us;nj'},
+    'N.J. Eq.':
+        {'name': 'New Jersey Equity Reports',
+         'variations': {},
+         'editions': {'N.J. Eq.': (date(1830, 1, 1), date(1948, 12, 31))},
+         'mlz_jurisdiction': 'us;nj'},
+    'N.J. Misc.':
+        {'name': 'New Jersey Miscellaneous Reports',
+         'variations': {},
+         'editions': {'N.J. Misc.': (date(1923, 1, 1), date(1949, 12, 31))},
+         'mlz_jurisdiction': 'us;nj'},
+    'N.J. Super.':
+        {'name': 'New Jersey Superior Court Reports',
+         'variations': {},
+         'editions': {'N.J. Super.': (date(1948, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;nj'},
+    'N.J. Tax':
+        {'name': 'New Jersey Tax Court',
+         'variations': {},
+         'editions': {'N.J. Tax.': (date(1979, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;nj'},
+    'N.J. Admin.':
+        {'name': 'New Jersey Administrative Reports',
+         'variations': {},
+         # Dates need research
+         'editions': {'N.J. Admin.': (date(1982, 1, 1), date.today()),
+                      'N.J. Admin. 2d': (date(1982, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;nj'},
+
+    'Gild.':
+        {'name': 'Gildersleeve Reports',
+         'variations': {},
+         'editions': {'Gild.': (date(1883, 1, 1), date(1889, 12, 31))},
+         'mlz_jurisdiction': 'us;nm'},
     'N.M.':
-        {'name': '',
+        {'name': 'New Mexico Reports',
          'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
-    'N.Y.':
-        {'name': '',
-         'variations': {},
-         'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
-         'mlz_jurisdiction': ''},
+         'editions': {'N.M.': (date(1890, 1, 1), date.today())},
+         'mlz_jurisdiction': 'us;nm'},
+
     'N.Y.':
         {'name': 'New York Reports',
          'variations': {},
@@ -1012,12 +1068,142 @@ REPORTERS = {
                       'N.Y.3d': (date(2004, 1, 1), date.today())},
          'mlz_jurisdiction': 'us;ny'},
     'N.Y.S.':
-    {'name': 'New York Supplement',
+        {'name': 'New York Supplement',
          'variations': {'New York Supp.': 'N.Y.S.',
                         'NYS': 'N.Y.S.',
                         'NYS 2d': 'N.Y.S.2d', },
          'editions': {'N.Y.S.': (date(1888, 1, 1), date(1937, 12, 31)),
                       'N.Y.S.2d': (date(1938, 1, 1), date())},
+         'mlz_jurisdiction': 'us;ny'},
+    'Lock. Rev. Cas.':
+        {'name': 'Lockwood\'s Reversed Cases',
+         'variations': {},
+         'editions': {'Lock. Rev. Cas.': (date(1799, 1, 1), date(1847, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Denio':
+        {'name': 'Denio\'s Reports',
+         'variations': {},
+         'editions': {'Denio': (date(1845, 1, 1), date(1848, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Hill & Den.':
+        {'name': 'Hill and Denio Supplement (Lalor)',
+         'variations': {},
+         'editions': {'Hill & Den.': (date(1842, 1, 1), date(1844, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Hill':
+        {'name': 'Hill\'s Reports',
+         'variations': {},
+         'editions': {'Hill': (date(1841, 1, 1), date(1844, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Edm. Sel. Cas.':
+        {'name': 'Edmond\'s Select Cases',
+         'variations': {},
+         'editions': {'Edm. Sel. Cas.': (date(1834, 1, 1), date(1853, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Yates Sel. Cas.':
+        {'name': 'Yates\' Select Cases',
+         'variations': {},
+         'editions': {'Yates Sel. Cas.': (date(1809, 1, 1), date(1809, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Ant. N.P. Cas.':
+        {'name': 'Anthon\'s Nisi Prius Cases',
+         'variations': {},
+         'editions': {'Ant. N.P. Cas.': (date(1807, 1, 1), date(1851, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Wend.':
+        {'name': 'Wendell\'s Reports',
+         'variations': {},
+         'editions': {'Wend.': (date(1828, 1, 1), date(1841, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Cow.':
+        {'name': 'Cowen\'s Reports',
+         'variations': {},
+         'editions': {'Cow.': (date(1823, 1, 1), date(1829, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Johns.':
+        {'name': 'Johnson\'s Reports',
+         'variations': {},
+         'editions': {'Johns.': (date(1806, 1, 1), date(1823, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Cai. R.':
+        {'name': 'Caines\' Reports',
+         'variations': {},
+         'editions': {'Cai. R.': (date(1803, 1, 1), date(1805, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Cai. Cas.':
+        {'name': 'Caines\' Cases',
+         'variations': {},
+         'editions': {'Cai. Cas.': (date(1796, 1, 1), date(1805, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Cole. & Cai. Cas.':
+        {'name': 'Coleman & Caines\' Cases',
+         'variations': {},
+         'editions': {'Cole. & Cai. Cas.': (date(1794, 1, 1), date(1805, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Johns. Cas.':
+        {'name': 'Johnson\'s Cases',
+         'variations': {},
+         'editions': {'Johns. Cas.': (date(1799, 1, 1), date(1803, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Cole. Cas.':
+        {'name': 'Coleman\'s Cases',
+         'variations': {},
+         'editions': {'Cole. Cas.': (date(1791, 1, 1), date(1800, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Edw. Ch.':
+        {'name': 'Edwards\' Chancery Reports',
+         'variations': {},
+         'editions': {'Edw. Ch.': (date(1831, 1, 1), date(1850, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Barb. Ch.':
+        {'name': 'Barbour\'s Chancery Reports',
+         'variations': {},
+         'editions': {'Barb. Ch.': (date(1845, 1, 1), date(1848, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Sand. Ch.':
+        {'name': 'Sandford\'s Chancery Reports',
+         'variations': {},
+         'editions': {'Sand. Ch.': (date(1843, 1, 1), date(1847, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Sarat. Ch. Sent.':
+        {'name': 'Saratoga Chancery Sentinel',
+         'variations': {},
+         'editions': {'Sarat. Ch. Sent.': (date(1841, 1, 1), date(1847, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Paige Ch.':
+        {'name': 'Paige\'s Chancery Reports',
+         'variations': {},
+         'editions': {'Paige Ch.': (date(1828, 1, 1), date(1845, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Cl. Ch.':
+        {'name': 'Clarke\'s Chancery Reports',
+         'variations': {},
+         'editions': {'Cl. Ch.': (date(1839, 1, 1), date(1841, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Hoff. Ch.':
+        {'name': 'Hoffman\'s Chancery Reports',
+         'variations': {},
+         'editions': {'Hoff. Ch.': (date(1838, 1, 1), date(1840, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Hopk. Ch.':
+        {'name': 'Hopkins\' Chancery Reports',
+         'variations': {},
+         'editions': {'Hopk. Ch.': (date(1823, 1, 1), date(1826, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Lans. Ch.':
+        {'name': 'Lansing\'s Chancery Reports',
+         'variations': {},
+         'editions': {'Lans. Ch.': (date(1824, 1, 1), date(1826, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Johns. Ch.':
+        {'name': 'Johnsons\' Chancery Reports',
+         'variations': {},
+         'editions': {'Johns. Ch.': (date(1814, 1, 1), date(1823, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'N.Y. Ch. Ann.':
+        {'name': 'New York Chancery Reports Annotated',
+         'variations': {},
+         'editions': {'N.Y. Ch. Ann.': (date(1814, 1, 1), date(1847, 12, 31))},
          'mlz_jurisdiction': 'us;ny'},
     'A.D.':
         {'name': 'New York Supreme Court Appellate Division Reports',
@@ -1034,29 +1220,64 @@ REPORTERS = {
                       'A.D.2d': (date(1955, 1, 1), date(2004, 12, 31)),
                       'A.D.3d': (date(2003, 1, 1), date.today())},
          'mlz_jurisdiction': 'us;ny'},
+    'N.Y. Sup. Ct.':
+        {'name': 'Supreme Court Reports',
+         'variations': {},
+         'editions': {'N.Y. Sup. Ct.': (date(1873, 1, 1), date(1896, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Lans.':
+        {'name': 'Lansing\'s Reports',
+         'variations': {},
+         'editions': {'Lans.': (date(1869, 1, 1), date(1873, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Barb.':
+        {'name': 'Barbour\'s Supreme Court Reports',
+         'variations': {},
+         'editions': {'Barb.': (date(1847, 1, 1), date(1877, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
     'Misc.':
         {'name': 'New York Miscellaneous Reports',
          'variations': {},
          'editions': {'Misc.': (date(1892, 1, 1), date(1955, 12, 31)),
-                      'Misc. 2d': (date(1955, 1, 1), date(2004, 12, 31)), # http://www.antiqbook.com/boox/law/59388.shtml
+                      'Misc. 2d': (date(1955, 1, 1), date(2004, 12, 31)),
+                      # http://www.antiqbook.com/boox/law/59388.shtml
                       'Misc. 3d': (date(2004, 1, 1), date.today())},
          'mlz_jurisdiction': 'us;ny'},
+    'Abb. N. Cas.':
+        {'name': 'Abbott\'s New Cases',
+         'variations': {},
+         'editions': {'Abb. N. Cas.': (date(1876, 1, 1), date(1894, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'Abb. Pr.':
+        {'name': 'Abbott\'s Practice Reports',
+         'variations': {},
+         'editions': {'Abb. Pr.': (date(1854, 1, 1), date(1875, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
+    'How. Pr.':
+        {'name': 'Howard\'s Practice Reports',
+         'variations': {},
+         'editions': {'How. Pr.': (date(1844, 1, 1), date(1886, 12, 31))},
+         'mlz_jurisdiction': 'us;ny'},
 
-    'Neb. App.':
+
+    'N.C. App.':
         {'name': '',
          'variations': {},
          'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
          'mlz_jurisdiction': ''},
-    'Neb.':
+
+    'N.C.':
         {'name': '',
          'variations': {},
          'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
          'mlz_jurisdiction': ''},
-    'Nev.':
+
+    'N.D.':
         {'name': '',
          'variations': {},
          'editions': {'': (date(1, 1, 1), date(1, 12, 31))},
          'mlz_jurisdiction': ''},
+
     'Ohio':
         {'name': '',
          'variations': {},
@@ -1235,8 +1456,7 @@ NEUTRAL_CITATIONS = [
 ]
 
 # List of Federal Reporters
-CL_REPORTERS.extend(NEUTRAL_CITATIONS)
-REPORTERS = CL_REPORTERS
+#REPORTERS.extend(NEUTRAL_CITATIONS)
 
 # We normalize spaces and other errors people make
 # See note on REPORTERS for ordering of this list.
@@ -1365,7 +1585,7 @@ VARIATIONS = {
 
 
 
-
+REPORTER_DATES = {
     # State
     'Cal.': (date(1850, 1, 1),
              date(1934, 12, 31)),
