@@ -1,3 +1,4 @@
+from urlparse import urljoin
 from alert.lib import magic
 from alert.lib.string_utils import trunc
 from alert.scrapers.models import ErrorLog
@@ -49,6 +50,9 @@ def test_for_meta_redirections(r):
             wait, text = attr.split(";")
             if text.lower().startswith("url="):
                 url = text[4:]
+                if not url.startswith('http'):
+                    # Relative URL, adapt
+                    url = urljoin(r.url, url)
                 return True, url
         except IndexError:
             return False, None

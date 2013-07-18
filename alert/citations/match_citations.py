@@ -83,20 +83,16 @@ def case_name_query(conn, params, citation, citing_doc):
 
 
 def match_citation(citation, citing_doc):
-    # First, check and see whether we even have documents from this reporter
-    if not citation.reporter in CL_REPORTERS:
-        return [], True
-        # TODO: Create shared solr connection to use across multiple citations/documents
+    # TODO: Create shared solr connection to use across multiple citations/documents
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     main_params = {'fq': []}
     # Set up filter paramters
     if citation.year:
         start_year = end_year = citation.year
     else:
-        start_year = 1754 # Earliest case in the db
+        start_year = 1754  # Earliest case in the db
         end_year = date.today().year
-        if citation.reporter in REPORTER_DATES:
-            start_year, end_year = REPORTER_DATES[citation.reporter]
+        start_year, end_year = REPORTER_DATES[citation.reporter]
         if citing_doc.date_filed:
             end_year = min(end_year, citing_doc.date_filed.year)
     date_param = 'dateFiled:%s' % build_date_range(start_year, end_year)
