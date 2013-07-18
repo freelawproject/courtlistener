@@ -12,6 +12,16 @@ import datetime
      - In reporters with multiple series, if multiple volumes have the same dates, this indicates that the point where
        one series ends and the other begins is unknown. These are good areas for research.
 
+    Current Version:
+     - 1.0 - Has all common Blue Book reporters, with their variations from the Cardiff database.
+
+    Future Versions:
+     - 1.1 - All dates are dialed in to the nearest year for every edition of every reporter (some still require
+             research beyond what Blue Book provides).
+     - 1.2 - All dates are dialed into the correct day for every edition of every reporter.
+     - 1.x - International Reporters added?
+           - Other features?
+
 '''
 
 REPORTERS = {'A.': [{'cite_type': 'state_regional',
@@ -195,9 +205,9 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                          'variations': {}}],
              'B.T.A.M. (P-H)': [{'editions': {'B.T.A.M. (P-H)': (datetime.date(1928, 1, 1),
                                                                  datetime.date(1942, 12, 31))},
-                                'mlz_jurisdiction': 'us',
-                                'name': 'Board of Tax Appeals Memorandum Decisions',
-                                'variations': {}}],
+                                 'mlz_jurisdiction': 'us',
+                                 'name': 'Board of Tax Appeals Memorandum Decisions',
+                                 'variations': {}}],
              'Bail.': [{'cite_type': 'state',
                         'editions': {'Bail.': (datetime.date(1828, 1, 1),
                                                datetime.date(1832, 12, 31))},
@@ -2256,7 +2266,8 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                                      'editions': {'P.R. Offic. Trans.': (datetime.date(1978, 1, 1),
                                                                          datetime.date.today())},
                                      'mlz_jurisdiction': 'us;pr',
-                                     'name': 'Official Translations of the Opinions of the Supreme Court of Puerto Rico',
+                                     'name': 'Official Translations of the Opinions of the Supreme Court of '
+                                             'Puerto Rico',
                                      'variations': {}}],
              'P.R. Sent.': [{'cite_type': 'state',
                              'editions': {'P.R. Sent.': (datetime.date(1899, 1, 1),
@@ -2364,7 +2375,7 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                             'mlz_jurisdiction': 'us;pa',
                             'name': 'Pennsylvania State Reports, Penrose and Watts',
                             'variations': {'P.& W.': 'Pen. & W.',
-                                           'P.R.': 'Pen. & W.',
+                                           'P.R.': 'Pen. & W.',  # This is duplicated with P.R.
                                            'Penr.& W.': 'Pen. & W.'}}],
              'Pennewill': [{'cite_type': 'state',
                             'editions': {'Pennewill': (datetime.date(1897, 1, 1),
@@ -2473,7 +2484,7 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                                                          datetime.date(1832, 12, 31))},
                              'mlz_jurisdiction': 'us;sc',
                              'name': "South Carolina Reports, Richardson's Cases",
-                             'variations': {'Rich.Cas.(S.C.)': 'Rich. Cas.',}}],
+                             'variations': {'Rich.Cas.(S.C.)': 'Rich. Cas.', }}],
              'Rich. Eq.': [{'cite_type': 'state',
                             'editions': {'Rich. Eq.': (datetime.date(1844, 1, 1),
                                                        datetime.date(1868, 12, 31))},
@@ -2518,7 +2529,8 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                           'editions': {'Robards': (datetime.date(1862, 1, 1),
                                                    datetime.date(1865, 12, 31))},
                           'mlz_jurisdiction': 'us;tx',
-                          'name': 'Synopses of the Decisions of the Supreme Court of Texas Arising from Restraints by Conscript and Other Military Authorities (Robards)',
+                          'name': 'Synopses of the Decisions of the Supreme Court of Texas Arising from Restraints '
+                                  'by Conscript and Other Military Authorities (Robards)',
                           'variations': {'Rob.': 'Robards',
                                          'Rob.Cons.Cas.(Tex.)': 'Robards',
                                          'Rob.Consc.Cas.': 'Robards',
@@ -3081,7 +3093,8 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                              'editions': {'White & W.': (datetime.date(1876, 1, 1),
                                                          datetime.date(1883, 12, 31))},
                              'mlz_jurisdiction': 'us;tx',
-                             'name': 'Condensed Reports of Decisions in Civil Causes in the Court of Appeals of Texas (White & Wilson)',
+                             'name': 'Condensed Reports of Decisions in Civil Causes in the Court of Appeals of Texas '
+                                     '(White & Wilson)',
                              'variations': {'Tex.A.Civ.': 'White & W.',
                                             'Tex.A.Civ.Cas.': 'White & W.',
                                             'Tex.App.': 'White & W.',
@@ -3104,7 +3117,8 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                          'editions': {'Wilson': (datetime.date(1883, 1, 1),
                                                  datetime.date(1892, 12, 31))},
                          'mlz_jurisdiction': 'us;tx',
-                         'name': 'Condensed Reports of Decisions in Civil Causes in the Court of Appeals of Texas (Wilson)',
+                         'name': 'Condensed Reports of Decisions in Civil Causes in the Court of Appeals of Texas '
+                                 '(Wilson)',
                          'variations': {}}],
              'Win.': [{'cite_type': 'state',
                        'editions': {'Win.': (datetime.date(1863, 1, 1),
@@ -3150,3 +3164,35 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                        'variations': {'Tenn.(Yer.)': 'Yer.',
                                       'Yerg.': 'Yer.',
                                       'Yerg.(Tenn.)': 'Yer.'}}]}
+
+
+def suck_out_variations_only(reporters):
+    """Builds a dictionary of variations to canonical reporters.
+
+    The dictionary takes the form of:
+        {
+         'A. 2d': ['A.2d'],
+         'P.R.': ['Pen. & W.', 'P.R.R.', 'P.'],
+        }
+
+    In other words, it's a dictionary that maps each variation to a list of
+    reporters that it could be possibly referring to.
+    """
+    variations_out = {}
+    for reporter_key, data_list in reporters.items():
+        # For each reporter key...
+        for data in data_list:
+            # For each book it maps to...
+            for variation_key, variation_value in data['variations'].items():
+                try:
+                    variations_list = variations_out[variation_key]
+                    if variation_value not in variations_list:
+                        variations_list.append(variation_value)
+                except KeyError:
+                    # The item wasn't there; add it.
+                    variations_out[variation_key] = [variation_value]
+
+    return variations_out
+
+
+VARIATIONS_ONLY = suck_out_variations_only(REPORTERS)
