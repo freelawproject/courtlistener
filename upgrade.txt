@@ -22,7 +22,21 @@ We welcome a conversion of these notes to a better process using Fabric.
          Supreme Court Reports or from Dallas' Pennsylvania Reports. Make sure that date filtering can handle this. This
          can even happen within the same court. So, Fed.R. can refer to either F. or F.2d.
    TODO: Purge CL_REPORTERS, REPORTER_DATES
+   TODO: Change the DB to support better granularity of citations:
+            - Add the new fields to the model and migrate it.
+            - Update the crawler and other code to properly map to the new fiedls
+            - Remove West Cite from the front end (make it say simply citation)
+            - Update Solr and investigate how to swap in a better index.
+            - Update the advanced search page notes
 
+2013-07-25:
+ - The database has been updated to support the lawbox use case and to support much greater citation granularity.
+   Migrate your database with:
+
+    manage.py migrate search
+
+   The Solr backend has been updated to remove the westCite field and rename it as simply "citation". The old field
+   will continue working for one year, though Alerts have been updated.
 
 
 2013-07-07:
