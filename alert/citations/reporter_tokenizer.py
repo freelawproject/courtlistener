@@ -5,13 +5,36 @@
 # URL: <http://nltk.sourceforge.net>
 
 import re
-from alert.citations.constants import REPORTERS, VARIATIONS
+from alert.citations.constants import EDITIONS, REPORTERS, VARIATIONS_ONLY
 
-REGEX_REPORTERS = "|".join(map(re.escape, REPORTERS))
-REGEX_VARIATIONS = '|'.join(map(re.escape, VARIATIONS.keys()))
+# We need to build a REGEX that has all the variations and the reporters in order from longest to shortest.
+REGEX_LIST = EDITIONS.keys() + VARIATIONS_ONLY.keys()
+REGEX_LIST.sort(key=len, reverse=True)
+REGEX_STR = '|'.join(map(re.escape, REGEX_LIST))
+REPORTER_RE = re.compile("(%s)" % REGEX_STR)
 
-# Note that VARIATIONS must come first so it has the first opportunity to match.
-REPORTER_RE = re.compile("(%s|%s)" % (REGEX_VARIATIONS, REGEX_REPORTERS))
+
+def normalize_variation(string):
+    """Gets the best possible canonicalization of a variant spelling of a reporter.
+
+    Variations map to lists of one or more result, and we need to figure out which is best. Usually, this can be
+    accomplished using the year of the item.
+    """
+    if string in VARIATIONS_ONLY.keys():
+        if len(VARIATIONS_ONLY[string]) == 1:
+            # Simple case
+            return VARIATIONS_ONLY[string][0]
+        else:
+            # Hard case, resolve the variation or return as is.
+            # TODO: This must be fixed or else all resolutionsn are resolved the same way --> BAD!
+            #       Once fixed, it will probably need to be removed from the tokenizer, and moved
+            #       down the pipeline.
+            return VARIATIONS_ONLY[string][0]
+    else:
+        # Not a variant
+        return string
+
+
 
 
 def tokenize(text):
@@ -23,17 +46,15 @@ def tokenize(text):
 
        Example:
        >>>tokenize('See Roe v. Wade, 410 U. S. 113 (1973)')
-       ['See', 'Roe', 'v.', 'Wade,', '410', 'U. S.', '113', '(1973)']
+       ['See', 'Roe', 'v.', 'Wade,', '410', 'U.S.', '113', '(1973)']
     """
     strings = REPORTER_RE.split(text)
     words = []
     for string in strings:
-        # Normalize spaces up front
-        if string in VARIATIONS.keys():
-            string = VARIATIONS[string]
-        if string in REPORTERS:
+        if string in EDITIONS.keys() + VARIATIONS_ONLY.keys():
             words.append(string)
         else:
+            # Normalize spaces
             words.extend(_tokenize(string))
     return words
 

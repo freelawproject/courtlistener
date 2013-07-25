@@ -6,7 +6,7 @@ import re
 import sys
 
 from juriscraper.lib.html_utils import get_visible_text
-from alert.citations import constants
+from alert.citations.constants import EDITIONS, REPORTERS, VARIATIONS_ONLY
 import reporter_tokenizer
 
 FORWARD_SEEK = 20
@@ -22,9 +22,15 @@ class Citation(object):
 
     """
 
-    def __init__(self, reporter, page, volume, extra=None, defendant=None,
-                 plaintiff=None, court=None, year=None, match_url=None):
+    def __init__(self, reporter, page, volume, canonical_reporter=None, lookup_index=None,
+                 extra=None, defendant=None, plaintiff=None, court=None, year=None, match_url=None):
+        # Note: It will be tempting to resolve reporter variations in the __init__ function, but, alas, you cannot,
+        #       because often reporter variations refer to one of several reporters (e.g. P.R. could be a variant of
+        #       either ['Pen. & W.', 'P.R.R.', 'P.']).
+
         self.reporter = reporter
+        self.canonical_reporter = canonical_reporter
+        self.lookup_index = lookup_index
         self.volume = volume
         self.page = page
         self.extra = extra
@@ -191,23 +197,266 @@ def add_defendant(citation, words, reporter_index):
 
 
 def extract_base_citation(words, reporter_index):
-    """Given a list of words and the index of a federal reporter, look before and after
-    for volume and page number.  If found, construct and return a Citation object."""
+    """Construct and return a citation object from a list of "words"
+
+    Given a list of words and the index of a federal reporter, look before and after
+    for volume and page number.  If found, construct and return a Citation object.
+    """
     reporter = words[reporter_index]
     if words[reporter_index - 1].isdigit():
         volume = int(words[reporter_index - 1])
-    else:  # No volume, therefore not a valid citation
+    else:
+        # No volume, therefore not a valid citation
         return None
     page_str = words[reporter_index + 1]
-    if page_str.find(',') == len(page_str) - 1:
-        # Strip off ending comma, which occurs when there is a page range next
-        page_str = page_str[:-1]
+    # Strip off ending comma, which occurs when there is a page range next
+    page_str = page_str.strip(',')
     if page_str.isdigit():
         page = int(page_str)
-    else:  # No page, therefore not a valid citation
+    else:
+        # No page, therefore not a valid citation
         return None
 
     return Citation(reporter, page, volume)
+
+
+def is_date_in_reporter(editions, year):
+    """Checks whether a year falls within the range of 1 to n editions of a reporter
+
+    Editions will look something like:
+        'editions': {'S.E.': (datetime.date(1887, 1, 1),
+                              datetime.date(1939, 12, 31)),
+                     'S.E.2d': (datetime.date(1939, 1, 1),
+                                datetime.date.today())},
+    """
+    for start, end in editions.values():
+        if start.year <= year <= end.year:
+            return True
+    return False
+
+
+def disambiguate_reporters(citations):
+    """A second, from scratch, approach to converting a list of citations to a list of unambiguous ones.
+
+    Goal is to figure out:
+     - citation.canonical_reporter
+     - citation.lookup_index
+
+    And there are a few things that can be ambiguous:
+     - More than one variation.
+     - More than one reporter for the key.
+     - Could be an edition (or not)
+     - All combinations of the above:
+        - More than one variation.
+        - More than one variation, with more than one reporter for the key.
+        - More than one variation, with more than one reporter for the key, which is an edition.
+        - More than one variation, which is an edition
+        - ...
+
+    For variants, we just need to sort out the canonical_reporter
+    """
+    unambiguous_citations = []
+    for citation in citations:
+        # Non-variant items (P.R.R., A.2d, Wash., etc.)
+        if REPORTERS.get(EDITIONS.get(citation.reporter)) is not None:
+            if len(REPORTERS[EDITIONS[citation.reporter]]) == 1:
+                # Single reporter, easy-peasy.
+                citation.canonical_reporter = EDITIONS[citation.reporter]
+                citation.lookup_index = 0
+                unambiguous_citations.append(citation)
+                continue
+            else:
+                # Multiple books under this key, but which is correct?
+                if citation.year:
+                    # attempt resolution by date
+                    possible_citations = []
+                    for i in range(0, len(REPORTERS[EDITIONS[citation.reporter]])):
+                        if is_date_in_reporter(REPORTERS[EDITIONS[citation.reporter]][i]['editions'], citation.year):
+                            possible_citations.append((citation.reporter, i,))
+                    if len(possible_citations) == 1:
+                        # We were able to identify only one hit after filtering by year.
+                        citation.canonical_reporter = EDITIONS[possible_citations[0][0]]
+                        citation.reporter = possible_citations[0][0]
+                        citation.lookup_index = possible_citations[0][1]
+                        unambiguous_citations.append(citation)
+                        continue
+
+        # Try doing a variation of an edition.
+        elif VARIATIONS_ONLY.get(citation.reporter) is not None:
+            if len(VARIATIONS_ONLY[citation.reporter]) == 1:
+                # Only one variation -- great, use it.
+                if len(REPORTERS[EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]]) == 1:
+                    # It's a single reporter under a misspelled key.
+                    citation.canonical_reporter = EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]
+                    citation.reporter = VARIATIONS_ONLY[citation.reporter][0]
+                    citation.lookup_index = 0
+                    unambiguous_citations.append(citation)
+                    continue
+                else:
+                    # Multiple reporters under a single misspelled key (e.g. Wn.2d --> Wash --> Va Reports, Wash or
+                    #                                                   Washington Reports).
+                    if citation.year:
+                        # attempt resolution by date
+                        possible_citations = []
+                        for i in range(0, len(REPORTERS[EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]])):
+                            if is_date_in_reporter(REPORTERS[EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]][i]['editions'],
+                                                   citation.year):
+                                possible_citations.append((citation.reporter, i,))
+                        if len(possible_citations) == 1:
+                            # We were able to identify only one hit after filtering by year.
+                            citation.canonical_reporter = EDITIONS[VARIATIONS_ONLY[possible_citations[0][0]][0]]
+                            citation.reporter = VARIATIONS_ONLY[possible_citations[0][0]][0]
+                            citation.lookup_index = possible_citations[0][1]
+                            unambiguous_citations.append(citation)
+                            continue
+                    # Attempt resolution by unique variation (e.g. Cr. can only be Cranch[0])
+                    possible_citations = []
+                    for i in range(0, len(REPORTERS[EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]])):
+                        for variation in REPORTERS[EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]][i]['variations'].items():
+                            if variation[0] == citation.reporter:
+                                possible_citations.append((variation[1], i))
+                    if len(possible_citations) == 1:
+                        # We were able to find a single match after filtering by variation.
+                        citation.canonical_reporter = EDITIONS[possible_citations[0][0]]
+                        citation.reporter = possible_citations[0][0]
+                        citation.lookup_index = possible_citations[0][1]
+                        unambiguous_citations.append(citation)
+                        continue
+            else:
+                # Multiple variations, deal with them.
+                possible_citations = []
+                for reporter_key in VARIATIONS_ONLY[citation.reporter]:
+                    for i in range(0, len(REPORTERS[EDITIONS[reporter_key]])):
+                        # This inner loop works regardless of the number of reporters under the key.
+                        if is_date_in_reporter(REPORTERS[EDITIONS[reporter_key]][i]['editions'], citation.year):
+                            possible_citations.append((reporter_key, i,))
+                if len(possible_citations) == 1:
+                    # We were able to identify only one hit after filtering by year.
+                    citation.canonical_reporter = EDITIONS[possible_citations[0][0]]
+                    citation.reporter = possible_citations[0][0]
+                    citation.lookup_index = possible_citations[0][1]
+                    unambiguous_citations.append(citation)
+                    continue
+
+    # At this point, unambiguous_citations is populated with the easy cases, and we need to work out the hard ones.
+    for citation in citations:
+        if citation not in unambiguous_citations:
+            # Try matching by year.
+            if True:
+                # It's a matter of figuring out which
+                pass
+
+            else:
+                # Unable to disambiguate, just add it anyway so we can return it.
+                unambiguous_citations.append(citation)
+
+    return unambiguous_citations
+
+
+
+def disambiguate_reporters_orig(citations):
+    """Using a list of citations from an opinion, disambiguate any that are not clear.
+
+    See test cases for examples of each code path, as this is a fairly complex bit of code.
+    """
+    unambiguous_citations = []
+    # Are any of the citations already unambiguous?
+    for citation in citations:
+        # Case 1: The correct abbreviation for a reporter (P.R.R)
+        if REPORTERS.get(citation.reporter) is not None and \
+                        len(REPORTERS[citation.reporter]) == 1:
+            citation.canonical_reporter = citation.reporter
+            citation.lookup_index = 0
+            unambiguous_citations.append(citation)
+            continue
+
+        # Case 2: A simple variant to resolve (U. S.)
+        if VARIATIONS_ONLY.get(citation.reporter) is not None and \
+                        len(VARIATIONS_ONLY.get(citation.reporter)) == 1 and \
+                        REPORTERS.get(VARIATIONS_ONLY[citation.reporter][0]) is not None and \
+                        len(REPORTERS.get(VARIATIONS_ONLY[citation.reporter][0])) == 1:
+            # The reporter appears in the VARIATIONS_ONLY variable, resolves to only one possible variant, and
+            # that reporter is unambiguous.
+            citation.canonical_reporter = VARIATIONS_ONLY.get(citation.reporter)[0]
+            citation.reporter = VARIATIONS_ONLY.get(citation.reporter)[0]
+            citation.lookup_index = 0
+            unambiguous_citations.append(citation)
+            continue
+
+        # Case 3: An edition to resolve, but not a variant (A.2d)
+        if VARIATIONS_ONLY.get(citation.reporter) is None and \
+                        len(REPORTERS.get(EDITIONS.get(citation.reporter))) == 1:
+            citation.canonical_reporter = EDITIONS[citation.reporter]
+            citation.lookup_index = 0
+            unambiguous_citations.append(citation)
+            continue
+
+        # Case 4: An simple variant of an edition (A. 2d)
+        if VARIATIONS_ONLY.get(citation.reporter) is not None and \
+                        len(VARIATIONS_ONLY[citation.reporter]) == 1 and \
+                        len(REPORTERS[EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]]) == 1:
+            citation.canonical_reporter = EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]
+            citation.reporter = VARIATIONS_ONLY[citation.reporter][0]
+            citation.lookup_index = 0
+            unambiguous_citations.append(citation)
+            continue
+
+        # Case 5: A variant that's resolvable by year alone (what about a variant of an edition?)
+        if VARIATIONS_ONLY.get(citation.reporter) is not None and \
+                        len(VARIATIONS_ONLY[citation.reporter]) > 1 and \
+                        citation.year is not None:
+            possible_citations = []
+            for reporter_key in VARIATIONS_ONLY[citation.reporter]:
+                for i in range(0, len(REPORTERS[EDITIONS[reporter_key]])):
+                    if is_date_in_reporter(REPORTERS[EDITIONS[reporter_key]][i]['editions'], citation.year):
+                        possible_citations.append((reporter_key, i,))
+            if len(possible_citations) == 1:
+                # We were able to identify only one hit after filtering by year.
+                citation.canonical_reporter = EDITIONS[possible_citations[0][0]]
+                citation.reporter = possible_citations[0][0]
+                citation.lookup_index = possible_citations[0][1]
+                unambiguous_citations.append(citation)
+                continue
+
+
+        # Case 6: A unique variant of an otherwise ambiguous reporter
+        try:
+            an_unambiguous_variant_of_an_edition = (len(VARIATIONS_ONLY.get(citation.reporter)) == 1)
+        except TypeError:
+            # Happens when None is returned to len() -- indicating that the item has no variations
+            an_unambiguous_variant_of_an_edition = False
+        if an_unambiguous_variant_of_an_edition:
+            # Test the variations for each of the items to see if more than one matches.
+            matches_count = 0
+            for i in range(0, len(REPORTERS[EDITIONS[VARIATIONS_ONLY.get(citation.reporter)[0]]])):
+                if citation.reporter in REPORTERS[EDITIONS[VARIATIONS_ONLY.get(citation.reporter)[0]]][i]['variations']:
+                    matches_count += 1
+                    citation.reporter = VARIATIONS_ONLY.get(citation.reporter)[0]
+                    citation.canonical_reporter = VARIATIONS_ONLY.get(citation.reporter)[0]
+                    citation.lookup_index = i
+            if matches_count == 1:
+                # Only one hit. Use it and continue.
+                unambiguous_citations.append(citation)
+                continue
+            else:
+                # More than one hit. Try another approach
+                citation.canonical_reporter = None
+                citation.lookup_index = None
+
+    # At this point, unambiguous_citations is populated with the easy cases, and we need to work out
+    # the hard cases.
+    for citation in citations:
+        if citation not in unambiguous_citations:
+            # Try matching by year.
+            if True:
+                # It's a matter of figuring out which
+                pass
+
+            else:
+                # Unable to disambiguate, just add it anyway so we can return it.
+                unambiguous_citations.append(citation)
+
+    return unambiguous_citations
 
 
 def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
@@ -219,7 +468,7 @@ def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
     # citations must have a volume before and a page number after the reporter.
     for i in xrange(1, len(words) - 1):
         # Find reporter
-        if words[i] in constants.REPORTERS:
+        if words[i] in (EDITIONS.keys() + VARIATIONS_ONLY.keys()):
             citation = extract_base_citation(words, i)
             if citation is None:
                 # Not a valid citation; continue looking
@@ -229,6 +478,9 @@ def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
             if do_defendant:
                 add_defendant(citation, words, i)
             citations.append(citation)
+
+    # Disambiguate all the reporters
+    citations = disambiguate_reporters(citations)
 
     return citations
 
@@ -258,7 +510,8 @@ def main():
         path = sys.argv[1]
         filenames = []
         for filename in os.listdir(path):
-            if len(filenames) > 100: break
+            if len(filenames) > 100:
+                break
             if not (filename.endswith("xml") or filename.endswith("pdf")):
                 filenames.append(path + "/" + filename)
         citations = getCitationsFromFiles(filenames)

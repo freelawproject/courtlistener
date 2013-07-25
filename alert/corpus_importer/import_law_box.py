@@ -5,7 +5,7 @@ import re
 import subprocess
 import traceback
 from lxml import html
-from alert.citations.constants import REPORTER_DATES
+from alert.citations.constants import EDITIONS, REPORTERS
 from alert.citations.find_citations import get_citations
 from datetime import date, timedelta
 
@@ -26,9 +26,11 @@ DEBUG = 2
 
 
 def get_west_cite(complete_html_tree):
-    path = '//center//text()'
-    text = ' '.join(complete_html_tree.xpath(path))
-    citations = get_citations(text, html=False, do_post_citation=False, do_defendant=False)
+    path = '//center[descendant::text()[not(starts-with(normalize-space(.), "No.") or starts-with(normalize-space(.), "Case No.") or starts-with(normalize-space(.), "Record No."))]]'
+    citations = []
+    for e in complete_html_tree.xpath(path):
+        text = tostring(e, method='text', encoding='unicode')
+        citations.extend(get_citations(text, html=False, do_defendant=False))
     if not citations:
         path = '//title/text()'
         text = complete_html_tree.xpath(path)[0]
@@ -36,8 +38,8 @@ def get_west_cite(complete_html_tree):
         if not citations:
             raise
     if DEBUG >= 1:
-        cite_strs = [str(cite) for cite in citations]
-        print "  Citations found: %s" % ', '.join(cite_strs)
+        cite_strs = [str(cite.__dict__) for cite in citations]
+        print "  Citations found: %s" % ',\n                   '.join(cite_strs)
 
     return citations
 
@@ -53,14 +55,19 @@ def get_case_name(complete_html_tree):
     return s
 
 
-def get_date_filed(clean_html_tree, citations):
+def get_date_filed(clean_html_tree, citations, case_path=None):
     path = '//center[descendant::text()[not(starts-with(normalize-space(.), "No.") or starts-with(normalize-space(.), "Case No.") or starts-with(normalize-space(.), "Record No."))]]'
 
-    reporters = [citation.reporter for citation in citations]
+    reporter_keys = [citation.reporter for citation in citations]
     range_dates = []
-    for reporter in reporters:
-        if REPORTER_DATES.get(reporter):
-            range_dates.extend(REPORTER_DATES.get(reporter))
+    for reporter_key in reporter_keys:
+        for reporter in REPORTERS.get(EDITIONS.get(reporter_key)):
+            try:
+                range_dates.extend(reporter['editions'][reporter_key])
+            except KeyError:
+                # Fails when a reporter_key points to more than one reporter, one of which doesn't have the edition
+                # queried. For example, Wash. 2d isn't in REPORTERS['Wash.']['editions'][0].
+                pass
     if range_dates:
         start, end = min(range_dates) - timedelta(weeks=20 * 52), max(range_dates) + timedelta(weeks=20 * 52)
         if end > date.today():
@@ -83,7 +90,30 @@ def get_date_filed(clean_html_tree, citations):
             # If it has unicode is crashes dateutil's parser, but is unlikely to be the date.
             pass
 
+    # Additional approaches to getting the date(s)
     if not dates:
+        # Try to grab the year from the citations, if it's the same in all of them.
+        years = set([citation.year for citation in citations if citation.year])
+        if len(years) == 1:
+            dates.append(date(list(years)[0], 1, 1))
+    if not dates:
+        # Special cases...sigh.
+        for e in clean_html_tree.xpath(path):
+            text = tostring(e, method='text', encoding='unicode')
+            if 'December, 1924' in text:
+                dates.append(date(1924, 12, 1))
+            elif '38 Cal.App.2d 215 (1040)' in text:
+                dates.append(date(1940, 3, 29))
+            elif 'September 28, 1336' in text:
+                dates.append(date(1936, 9, 28))
+            elif 'June 21, 1944.8' in text:
+                dates.append(date(1944, 6, 21))
+            if dates:
+                break
+    if not dates:
+        # Still no luck?
+        if DEBUG >= 2:
+            subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
         raise
 
     if DEBUG >= 1:
@@ -184,7 +214,7 @@ def import_law_box_case(case_path):
         sha1=sha1,
         #court=get_court_object(html_tree),
         html=clean_html_str,
-        date_filed=get_date_filed(clean_html_tree, citations),
+        date_filed=get_date_filed(clean_html_tree, citations, case_path),
         precedential_status=get_precedential_status(clean_html_tree)
     )
 
@@ -253,7 +283,7 @@ def main():
 
     for case_path in cases:
         if DEBUG >= 1:
-            print "Doing case (%s): file://%s" % (i, case_path)
+            print "\nDoing case (%s): file://%s" % (i, case_path)
         try:
             doc = import_law_box_case(case_path)
             i += 1

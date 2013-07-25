@@ -1225,10 +1225,12 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                         'variations': {'Id.': 'Idaho', 'Ida.': 'Idaho'}}],
              'Ill.': [{'cite_type': 'state',
                        'editions': {'Ill.': (datetime.date(1849, 1, 1),
-                                             datetime.date.today())},
+                                             datetime.date.today()),
+                                    'Ill. 2d': (datetime.date(1849, 1, 1),
+                                                datetime.date.today())},
                        'mlz_jurisdiction': 'us;il',
                        'name': 'Illinois Reports',
-                       'variations': {}}],
+                       'variations': {'Ill.2d': 'Ill. 2d'}}],
              'Ill. App.': [{'cite_type': 'state',
                             'editions': {'Ill. App.': (datetime.date(1877, 1, 1),
                                                        datetime.date.today()),
@@ -1242,7 +1244,7 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                                            'Ill. App.3d': 'Ill. App. 3d',
                                            'Ill.A.': 'Ill. App.',
                                            'Ill.A.2d': 'Ill. App. 2d',
-                                           'Ill.A.3d': 'Ill. App. 3d'}}],
+                                           'Ill.A.3d': 'Ill. App. 3d',}}],
              'Ill. Ct. Cl.': [{'cite_type': 'state',
                                'editions': {'Ill. Ct. Cl.': (datetime.date(1889, 1, 1),
                                                              datetime.date.today())},
@@ -2046,14 +2048,14 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                      'name': 'Oklahoma Neutral Citation',
                      'variations': {}}],
              'OK CIV APP': [{'cite_type': 'neutral',
-                             'editions': {'OKCIVAPP': (datetime.date(1750, 1, 1),
+                             'editions': {'OK CIV APP': (datetime.date(1750, 1, 1),
                                                        datetime.date.today())},
                              'mlz_jurisdiction': 'us;ok',
                              'name': 'Oklahoma Neutral Citation (Civic Appeals)',
                              'variations': {}}],
              'OK CR': [{'cite_type': 'neutral',
-                        'editions': {'OKCR': (datetime.date(1750, 1, 1),
-                                              datetime.date.today())},
+                        'editions': {'OK CR': (datetime.date(1750, 1, 1),
+                                               datetime.date.today())},
                         'mlz_jurisdiction': 'us;ok',
                         'name': 'Oklahoma Neutral Citation',
                         'variations': {}}],
@@ -3172,6 +3174,7 @@ def suck_out_variations_only(reporters):
     The dictionary takes the form of:
         {
          'A. 2d': ['A.2d'],
+         ...
          'P.R.': ['Pen. & W.', 'P.R.R.', 'P.'],
         }
 
@@ -3195,4 +3198,33 @@ def suck_out_variations_only(reporters):
     return variations_out
 
 
+def suck_out_editions(reporters):
+    """Builds a dictionary mapping edition keys to their root name.
+
+    The dictionary takes the form of:
+        {
+         'A.':   'A.',
+         'A.2d': 'A.',
+         'A.3d': 'A.',
+         'A.D.': 'A.D.',
+         ...
+        }
+
+    In other words, this lets you go from an edition match to its parent key.
+    """
+    editions_out = {}
+    for reporter_key, data_list in reporters.items():
+        # For each reporter key...
+        for data in data_list:
+            # For each book it maps to...
+            for edition_key, edition_value in data['editions'].items():
+                try:
+                    editions_out[edition_key]
+                except KeyError:
+                    # The item wasn't there; add it.
+                    editions_out[edition_key] = reporter_key
+    return editions_out
+
+
 VARIATIONS_ONLY = suck_out_variations_only(REPORTERS)
+EDITIONS = suck_out_editions(REPORTERS)
