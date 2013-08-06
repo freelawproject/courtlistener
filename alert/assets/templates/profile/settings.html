@@ -1,0 +1,142 @@
+{% extends "profile/nav.html" %}
+
+{% block title %}Account Settings - CourtListener.com{% endblock %}
+{% block search-form %}{% endblock %}
+
+{% block nav-account %}active{% endblock %}
+
+{% block content %}
+    <div class="span-24 last">
+        {# if their email address was just changed, tell them.#}
+        {% if messages %}
+            <div class="span-17 last">
+                <div class="span-10">
+                    {% for message in messages %}
+                        <p class="bottom {{message.tags}}">{{message|safe}}</p>
+                    {% endfor %}
+                </div>
+                <div class="span-6 last">&nbsp;</div>
+            </div>
+        {% else %}
+            {% if not request.user.get_profile.emailConfirmed %}
+                <div class="span-17 last">
+                    <div class="span-10">
+                        <p class="bottom notice">Your email address has not been confirmed. To receive alerts, you must <a href="/email-confirmation/request/">confirm your email address</a>.</p>
+                    </div>
+                    <div class="span-6 last">&nbsp;</div>
+                </div>
+            {% endif %}
+        {% endif %}
+
+
+        {% if userForm.errors or profileForm.errors %}
+            <div class="span-17 last">
+                <div class="span-10">
+                    <p class="bottom error">There were errors with your submission.</p>
+                </div>
+                <div class="span-6 last">&nbsp;</div>
+            </div>
+        {% endif %}
+    </div>
+
+
+
+    <div class="span-24 last content">
+        <form action="" method="post">{% csrf_token %}
+            <p>
+                <label for="id_first_name">First name</label>
+                {% if userForm.first_name.errors %}
+                    <span class="errortext">
+                        {% for error in userForm.first_name.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ userForm.first_name }}
+            </p>
+            <p>
+                <label for="id_last_name">Last name</label>
+                {% if userForm.last_name.errors %}
+                    <span class="errortext">
+                        {% for error in userForm.last_name.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ userForm.last_name }}
+            </p>
+            <p>
+                <label for="id_email">Email*</label>
+                {% if userForm.email.errors %}
+                    <span class="errortext">
+                        {% for error in userForm.email.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ userForm.email }}
+            </p>
+            <p>
+                <label for="id_employer">Employer</label>
+                {% if profileForm.employer.errors %}
+                    <span class="errortext">
+                        {% for error in profileForm.employer.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ profileForm.employer }}
+            </p>
+            <p>
+                <label for="id_barmembership">Bar memberships (hold control to select more than one)</label>
+                {% if profileForm.barmembership.errors %}
+                    <span class="errortext">
+                        {% for error in profileForm.barmembership.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ profileForm.barmembership }}
+            </p>
+            <p>
+                <label for="id_location">Location (city, state)</label>
+                {% if profileForm.location.errors %}
+                    <span class="errortext">
+                        {% for error in profileForm.location.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ profileForm.location }}
+            </p>
+            <p>
+                {{ profileForm.plaintextPreferred }}
+                <label for="id_plaintextPreferred">I prefer plain text emails</label>
+                {% if profileForm.plaintextPreferred.errors %}
+                    <span class="errortext">
+                        {% for error in profileForm.plaintextPreferred.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}
+
+            </p>
+            <p>
+                {{ profileForm.wantsNewsletter }}
+                <label for="id_wantsNewsletter">Send me the newsletter (low volume)</label>
+                {% if profileForm.wantsNewsletter.errors %}
+                    <span class="errortext">
+                        {% for error in profileForm.wantsNewsletter.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}
+            </p>
+            <input type="hidden" value="{{user.username}}" name="user" id="id_user">
+            <button type="submit" class="button">Save</button>
+            <a href="/profile/delete">Delete my account</a> {# part of the form so that it lines up nicely. #}
+        </form>
+
+
+    </div>
+{% endblock %}

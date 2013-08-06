@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Send Email Confirmation - CourtListener.com{% endblock %}
+
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+    <script type="text/javascript">
+	    $(document).ready(function() {
+		    $('.auto-focus:first').focus();
+	    });
+     </script>
+{% endblock %}
+
+{% block content %}
+    <div class="span-17 last" id="content">
+        {% if alreadyConfirmed %}
+            <div class="span-17 last">
+                <h2>Already confirmed</h2>
+                <p class="bottom">That email address is already confirmed.
+                    <a href="/profile/settings/">Proceed to your account</a>.
+                </p>
+            </div>
+        {% else %}
+            <div class="span-17 last">
+                <h2>Email confirmation sent</h2>
+                <p>We have sent a confirmation message to your email address.
+                    To continue receiving emails, please verify your email address within five days.</p>
+            </div>
+        {% endif %}
+
+        <br><p>If you are unable to confirm your email address, please
+            <a href="/contact/">contact us</a> for assistance.</p>
+    </div>
+{% endblock %}

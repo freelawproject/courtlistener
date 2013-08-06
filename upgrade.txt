@@ -1,0 +1,120 @@
+This file contains notes for upgrades when special instructions are necessary. In general, simply doing:
+
+hg pull -u
+sudo -u www-data /var/www/court-listener/alert/manage.py collectstatic
+manage.py migrate
+
+is all that's necessary. In the case that special instructions are needed, we will attempt to put them here, with the
+most recent at the top.
+
+We welcome a conversion of these notes to a better process using Fabric.
+
+----------------------------
+
+2013-07-09:
+ - TODO: Does the fact that lawbox cases lack a URL cause an issue in the UI or can they be treated like the Resource.org cases?
+ - TODO: If we do case merging, the source field should be LBM ("LawBox Merged.")
+ - TODO: Investigate whether it's worth reworking the citation finder so that it better understands neutral citations.
+         For example, right now a citation like 2012 NM 3 will get 3 as citation.page, and will get 2012 as
+         citation.volume
+   TODO: Update match_citation to use date fields as return values from the REPORTER_DATES lookup.
+   TODO: Note that citations aren't always unique! For example, you can have a Dal. Citation that is either from Dallas'
+         Supreme Court Reports or from Dallas' Pennsylvania Reports. Make sure that date filtering can handle this. This
+         can even happen within the same court. So, Fed.R. can refer to either F. or F.2d.
+   TODO: Purge CL_REPORTERS, REPORTER_DATES
+   TODO: Change the DB to support better granularity of citations:
+            - Add the new fields to the model and migrate it.
+            - Update the crawler and other code to properly map to the new fiedls
+            - Remove West Cite from the front end (make it say simply citation)
+            - Update Solr and investigate how to swap in a better index.
+            - Update the advanced search page notes
+
+2013-07-25:
+ - The database has been updated to support the lawbox use case and to support much greater citation granularity.
+   Migrate your database with:
+
+    manage.py migrate search
+
+   The Solr backend has been updated to remove the westCite field and rename it as simply "citation". The old field
+   will continue working for one year, though Alerts have been updated.
+
+
+2013-07-07:
+ - The piwik configuration has been merged into the virtual host for the main site. If you are using piwik, you will
+   need to restart your apache server to enable this configuration. After this change, piwik will be located at
+   /piwik rather than as a subdomain.
+
+
+2013-07-03:
+ - Adds a notes field to the Courts model. Migrate your database with:
+
+    manage.py migrate search
+
+   And you'll be good to go.
+
+2013-06-27:
+ - This release will require downtime and will put your site into management mode upon pulling it.
+ - judge, suitNature and citeCount have been added to the Solr configuration. judges and nature_of_suit have been added
+   to the Document model.Unfortunately, these require a recrawl of the database into the Solr index and a migration of
+   the database. To realize these changes:
+
+     sudo -u www-data pull -u
+     sudo service apache2 restart # Welcome to management mode.
+     sudo servce scraper stop
+     manage.py migrate search
+     manage.py cl_update_index --delete --everything
+     sudo service solr restart
+     sudo service celeryd restart
+     manage.py cl_update_index --update --everything
+     sudo servce scraper start
+
+   There have also been changes to the settings to enable staticfiles as indicated below, and settings have been
+   overhauled to make them much simpler.
+
+   To effect the changes to settings, copy 05-private.example to 05-private.py, and edit it as needed. Once complete,
+   delete 20-private.py or rename it with a different extension, if you need a backup.
+
+   At this point your system should be upgraded, and you can disable the management mode in urls.py, then restart apache
+   again.
+
+ - We've moved to using django.contrib.staticfiles[1]. This introduces better management of static files and moves CL
+   towards standard Django practices in versions >= 1.3, but presents several changes for the project:
+    - When deploying, there are new commands that must be run if there are any new static files:
+       manage.py collectstatic
+    - The locations of static files have been distributed to either the app they correspond with or to a new directory,
+      "alert/assets/static-global", that contains static items that have a global scope across apps. Within each app
+      there is a /static/ directory where their own static files should go. Files are not served from these locations,
+      but are instead collected into the "alert/assets/static/" directory upon deploying the app.
+    - Changes have been made to the apache configuration which will make it serve files from the new location. These
+      changes require that Apache be restarted after pulling from hg.
+    - urls.py has been simplified, since django.contrib.staticfiles serves static files automatically when
+      DEBUG == True.
+    - Nearly all templates have been altered to use this app, introducing the possibility of missing images, css or JS.
+
+ [1]: https://docs.djangoproject.com/en/1.3/howto/static-files/#staticfiles-in-templates
+
+
+2013-06-20:
+ - The add_citations script has been converted to a management command. Any previous usages of it will need to be
+   updated to use manage.py cl_add_citations_to_docs. It remains mostly API compatible, but management commands do
+   not support variable numbers of arguments so the doc_ids parameter is now doc_id. It takes an int instead of an
+   iterable.
+
+2013-06-19:
+ - Numerous changes to the models have been made to rename variables. Please update your database after pulling the
+   code. This should be an instant migration in PostGres.
+
+     manage.py migrate search
+
+ - The dependency on the requests library has been updated to version 1.2.3:
+
+   sudo pip uninstall requests
+   sudo apt-get purge python-requests
+   sudo pip install requests==1.2.3
+
+ - The scrape_and_extract.py script has been converted to the cl_scrape_and_extract management command. It is API
+   compatible in terms of args, but any jobs calling the script will need to be updated.
+
+
+
+

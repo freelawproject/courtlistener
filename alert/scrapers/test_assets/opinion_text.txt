@@ -1,0 +1,637 @@
+                        United States Court of Appeals
+
+
+                     FOR THE DISTRICT OF COLUMBIA CIRCUIT
+
+
+           Argued September 3, 1997      Decided November 7, 1997 
+
+
+                                 No. 96-7169
+
+
+                Ideal Electronic Security Co., Inc., et al., 
+
+                          Appellants/Cross-Appellees
+
+
+                                      v.
+
+
+                  International Fidelity Insurance Company, 
+
+                           Appellee/Cross-Appellant
+
+
+                              Consolidated with
+
+                                 No. 96-7186
+
+
+                Appeals from the United States District Court 
+
+                        for the District of Columbia 
+
+                               (No. 94cv00385)
+
+
+     John W. Karr argued the cause and filed the briefs for 
+appellants/cross-appellees.
+
+
+
+     Neil L. Henrichsen argued the cause and filed the briefs 
+for appellee/cross-appellant.
+
+     Before:  Edwards, Chief Judge, Sentelle and Randolph, 
+Circuit Judges.
+
+     Opinion for the Court filed by Chief Judge Edwards.
+
+     Edwards, Chief Judge:  This case involves a claim under an 
+indemnity agreement by a surety company, appellee Interna-
+tional Fidelity Insurance Co. ("IFIC" or "surety"), against 
+the holders of a payment bond, appellants Ideal Electronic 
+Security Co., Inc., et al. ("Ideal").  Upon securing the pay-
+ment bond, Ideal agreed to indemnify IFIC against any 
+losses or expenses, including attorney's fees incurred to de-
+fend against claims arising under the bond.  In this case, 
+IFIC seeks recovery of attorney's fees incurred by the surety 
+in defending a claim brought by Modern Electric, Inc. ("Mod-
+ern") against appellants for an alleged underpayment on 
+subcontracted work.  The appellants claim (1) that because 
+the surety failed to justify the hiring of counsel, no attorney's 
+fees should be awarded and (2) that even if a claim for 
+attorney's fees is warranted, the surety failed to demonstrate 
+that the amount sought in this case is reasonable.
+
+     The District Court found that IFIC is entitled to fees for 
+its defense of appellants on the claim brought by Modern;  
+however, because IFIC asserted that certain billing state-
+ments supporting the claim for fees were protected by the 
+attorney-client privilege (and redacted portions of some bill-
+ing statements), the District Court reduced the award of fees 
+for the amounts covered by the purportedly privileged mate-
+rials.  Ideal contends that it was entitled to review all billing 
+statements, so that it would be in a position to show that the 
+surety's arrangements with counsel were both unnecessary 
+and unreasonable.  The surety cross-appeals, claiming that 
+the District Court erred in reducing the award of attorney's 
+fees by the amounts covered by privileged documents.
+
+     The contract claims arising under the disputed indemnity 
+agreement are governed by the law of the District of Colum-
+bia.  Under D.C. law, once a party's contractual entitlement 
+
+
+
+to attorney's fees has been ascertained, it is within the trial 
+court's sound discretion to determine a reasonable fee award.  
+In the instant case, we find that the District Court was 
+correct in holding that the surety was entitled to claim 
+attorney's fees, but abused its discretion in assessing the 
+amount due to IFIC.
+
+     Appellants are entitled to full discovery of information 
+underlying the claim for fees;  only after obtaining such 
+discovery will the appellants be in a position to assess the 
+reasonableness of IFIC's position and then present to the 
+court any legitimate challenges to the surety's claim.  The 
+reasonableness of any portion of the billing statements can 
+only be determined by examining all billing statements per-
+taining to the legal services provided as a whole.  Appellee 
+effectively waived its attorney-client privilege with regard to 
+all communications going to the reasonableness of the fees 
+claimed when it placed the purportedly privileged matters in 
+dispute by claiming indemnification for the attorney's fees.  
+Accordingly, we remand the case to allow appellants an 
+opportunity to challenge the reasonableness of IFIC's claim 
+for fees following full disclosure of the redacted portions of 
+the billing statements.  If IFIC declines to disclose the 
+redacted portions of the billing statements, then the entire 
+claim for fees must be denied by the District Court.
+
+                                I. Background
+
+
+     The Miller Act requires payment bonding to assure pay-
+ments to subcontractors on construction work undertaken for 
+the United States.  40 U.S.C. ss 270a-270f (1994).  Ideal and 
+its principals, Cora Williams and Kenneth Rogers, entered 
+into a contract with the United States to replace or repair 
+electrical transformers at the Walter Reed Army Medical 
+Center in Washington, D.C.  Since the contract was of a type 
+governed by the Miller Act, Ideal was required to obtain a 
+payment bond to secure the contract.  IFIC provided bond-
+ing for the base year, July 29, 1991 to July 28, 1992.  In order 
+to induce IFIC to provide the payment bond, Ideal entered 
+into an indemnity agreement in which it agreed, under certain 
+
+
+
+conditions, to indemnify IFIC against any losses or expenses 
+arising from the payment bond, including attorney's fees 
+incurred in defending against claims arising under the bond 
+and costs incurred in enforcing the terms of the indemnity 
+agreement itself.  See Agreements of Indemnity at p 2, re-
+printed in Appendix of Appellee/Cross-Appellant at 21, 25 
+(hereinafter "Indemnity Agreement").
+
+     This litigation commenced when a subcontractor on the 
+Walter Reed project, Modern, sued both Ideal and IFIC, 
+claiming that Ideal had underpaid Modern for subcontracted 
+work.  Modern brought this suit in the United States District 
+Court for the District of Maryland, invoking that court's 
+jurisdiction under the Miller Act, 40 U.S.C. s 270b, which 
+provides a federal cause of action for persons supplying labor 
+and materials on federal construction projects to collect pay-
+ment under the bonds required by 40 U.S.C. s 270a.  The 
+suit was subsequently transferred to the District Court for 
+the District of Columbia.
+
+     IFIC formally tendered its defense to Ideal, upon the 
+condition that Ideal first deposit with IFIC cash or collateral 
+in the amount of $300,000 to cover its potential liability as 
+surety, including its attorney's fees.  See Memorandum Opin-
+ion at 4-5 (May 3, 1996) (hereinafter "Mem. Op.").  Ideal 
+declined to provide the requested reserve payment;  as a 
+consequence, IFIC mounted its own defense against Modern's 
+claims.  Id. at 5.  After discovery proceedings and two hear-
+ings, the District Court granted IFIC's motion for summary 
+judgment dismissing Modern's claims against IFIC.  Id. at 5-
+6.
+
+     IFIC asserted the indemnification claim at issue in this 
+appeal in a cross-claim against Ideal and a third-party com-
+plaint against Ideal's principals.  On October 13, 1995, the 
+District Court denied a motion by IFIC for summary judg-
+ment on its indemnification claim.  A jury trial was held on 
+April 25 and 26, 1996.  At the conclusion of the trial, the 
+District Court granted IFIC's motion for judgment as a 
+matter of law pursuant to Fed. R. Civ. P. 50(a)(1).  See Mem. 
+Op.;  Order Awarding Attorney's Fees (July 1, 1996).  In 
+
+
+
+supporting its claim for attorney's fees, IFIC submitted bill-
+ing statements from counsel.  However, over the objection of 
+Ideal, IFIC redacted portions of the billing statements, con-
+tending that the undisclosed materials were protected by the 
+attorney-client privilege.  The District Court resolved this 
+dispute by awarding fees only for the unredacted portions of 
+the billing statements.  Mem. Op. at 11-12.  Subsequently, 
+IFIC filed a motion for additional fees incurred in prosecut-
+ing the indemnity action.  The District Court summarily 
+denied this motion, stating simply that "the judgment already 
+awarded to IFIC is reasonable compensation for legal work 
+that was necessary to protect IFIC's position."  Order Deny-
+ing Additional Attorney's Fees (July 18, 1996).
+
+     Ideal appeals the District Court's judgment as a matter of 
+law on the question of liability and on the reasonableness of 
+the amount of fees awarded.  IFIC cross-appeals the District 
+Court's denial of fees based on redacted billing statements 
+and also the court's denial of fees incurred in prosecuting the 
+indemnity action.
+
+                                 II. Analysis
+
+
+A. Choice of Law 
+
+     Before turning to the merits of the parties' appeals, we 
+must first determine which law governs the case.  This 
+appeal involves a state contract claim which is in federal court 
+under supplemental jurisdiction.  The Miller Act provides a 
+federal cause of action for subcontractors and suppliers on 
+construction projects governed by the Act to collect on pay-
+ment bonds required by the Act.  40 U.S.C. s 270b (1994);  
+F.D. Rich Co. v. United States ex rel. Indus. Lumber Co., 417 
+U.S. 116, 127 (1974).  Accordingly, Modern's suit against 
+Ideal and IFIC was properly brought in federal district court 
+under the court's federal question jurisdiction.  Although 
+contract claims between the various parties to a case brought 
+under the Miller Act may be heard by the federal court 
+hearing the Miller Act claim, the appended contract claims 
+are governed by state, not federal, law.  See, e.g., United 
+States ex rel. J.W. Briggs v. Grubb, 358 F.2d 508, 515 (9th 
+
+
+
+Cir. 1966) (local law rather than federal law is applicable to 
+cross-complaint under a Miller Act bond);  Western Casualty 
+& Surety Co. v. Biggs, 217 F.2d 163, 165 (7th Cir. 1954) (suit 
+by surety against general contractors as principals on pay-
+ment bond was not an action under the Miller Act, since the 
+Act provides only for an action on the payment bond by one 
+who has furnished labor and material and has not been paid).
+
+     When deciding state-law claims under diversity or supple-
+mental jurisdiction, federal courts apply the choice-of-law 
+rules of the jurisdiction in which they sit.  See Lee v. Flint-
+kote Co., 593 F.2d 1275, 1278-79 n.14 (D.C. Cir. 1979).  The 
+District of Columbia has adopted the Restatement (Second) of 
+Conflict of Laws s 188.  Finance America Corp. v. Moyler, 
+494 A.2d 926, 929 & n.7 (D.C. 1985).  Where, as here, the 
+parties to a contract have not specified which law governs 
+their agreement, the Restatement approach requires the 
+court to weigh various jurisdictions' contacts with the transac-
+tion at issue and to determine which has the most substantial 
+interest in the matter.  According to the record, IFIC is 
+domiciled in New Jersey, Appellants Williams and Rogers are 
+domiciled in Virginia, Ideal is domiciled in the District of 
+Columbia, the indemnity agreement was entered into in the 
+District of Columbia, and the subject matter of the contract 
+(the bond) secures construction taking place in the District of 
+Columbia.  On balance, and in the absence of any arguments 
+by the parties to the contrary, we hold that interpretation of 
+the indemnity agreement is controlled by D.C. law.
+
+B. Judgment as a Matter of Law in Favor of IFIC
+
+     We review de novo the District Court's order granting 
+IFIC's motion for judgment as a matter of law.  Hendry v. 
+Pelland, 73 F.3d 397, 400 (D.C. Cir. 1996).  We can affirm the 
+District Court's judgment only if we find "no legally sufficient 
+evidentiary basis for a reasonable jury to find for" Ideal 
+under applicable D.C. law, "considering the evidence in the 
+light most favorable to [Ideal] and making all reasonable 
+inferences in [its] favor."  Id. at 400;  Fed. R. Civ. P. 50(a)(1).
+
+
+
+     Under D.C. law, contractual provisions providing for the 
+indemnification of attorney's fees are generally enforceable in 
+accordance with the intentions of the contracting parties, 
+unless enforcement would be contrary to public policy.  Wis-
+consin Ave. Assocs. v. 2720 Wisconsin Ave. Coop. Ass'n, 441 
+A.2d 956, 964-65 (D.C. 1982);  FDIC v. Bender, 1997 WL 
+582901, *3 (D.C. Cir. Sept. 23, 1997).  "Whether an attorneys 
+fees award is available is a matter of contract interpretation 
+by the trial judge, unless there is an ambiguity that needs to 
+be resolved to determine the intention of the parties.  In that 
+case, the entitlement question must be resolved by the fact-
+finder."  Urban Masonry Corp. v. N&N Contractors, Inc., 
+676 A.2d 26, 33 (D.C. 1996) (citations omitted).
+
+     The parties' indemnity agreement provides a "good faith" 
+standard for determining whether Ideal is obligated to indem-
+nify IFIC for attorney's fees:
+
+     the Surety shall be entitled to charge for any and all 
+     disbursements made by it in good faith in or about the 
+     matters herein contemplated by this Agreement under 
+     the belief that it is or was liable for the sums and 
+     amounts so disbursed, or that it was necessary or expedi-
+     ent to make such disbursements, whether or not such 
+     liability, necessity or expediency existed;  and [ ] vouch-
+     ers or other evidence of any such payments made by the 
+     Surety shall be prima facie evidence of the fact and 
+     amount of the liability to the Surety.
+
+Indemnity Agreement at p 2. However, the parties dispute 
+exactly what this good faith standard requires.  IFIC con-
+tends that it is entitled to attorney's fees absent any showing 
+of fraud or bad faith.  Brief of Appellee/Cross-Appellant at 
+12.  Ideal argues that the agreement's good faith standard 
+requires something more than the mere absence of fraud.  
+Rather, Ideal asserts that, in order to be entitled to indemni-
+ty for any resulting attorney's fees under the parties' agree-
+ment, IFIC must show (1) that its decision to retain separate 
+counsel to defend against Modern's claims was reasonable 
+and (2) that the services rendered by counsel were reason-
+able.  Brief of Appellants/Cross-Appellees at 7-8.
+
+
+
+     There is no clear precedent under District of Columbia law 
+defining the scope of a contractual "good faith" standard of 
+the sort at issue here.  However, courts in other jurisdictions 
+have indicated that, as a general matter, a surety must show 
+something akin to reasonable necessity when seeking attor-
+ney's fees under an indemnity agreement.  For example, the 
+Fifth Circuit, applying Mississippi law, has held that
+
+     [A]n indemnity agreement is not a blank check;  it does 
+     not entitle the surety [ ] to reimbursement for legal fees 
+     which are unreasonable or unnecessary.  To hold other-
+     wise would allow [a surety] to retain counsel and to 
+     charge attorneys' fees against the indemnitor even when 
+     the surety [ ] does not require a separate legal defense to 
+     protect its interests.  The indemnity contract cannot 
+     reasonably be construed as requiring the indemnitee to 
+     bear the cost of such redundant representation.
+
+Jackson v. Hollowell, 685 F.2d 961, 966 (5th Cir. 1982).  See 
+also Sentry Ins. Co. v. Davison Fuel & Dock Co., 396 N.E.2d 
+1071, 1074 (Ohio Ct. App. 1978) (rejecting all claims for 
+recovery of fees under indemnity agreement's good faith 
+standard for services which were simultaneously being ren-
+dered competently by the principal's counsel);  Central Tow-
+ers Apts. v. Martin, 453 S.W.2d 789, 799-800 (Tenn. Ct. App. 
+1969) (probing the reasonableness and necessity of a surety's 
+incurred attorney's fees, given the identity of interests be-
+tween principal and surety in the indemnity context).  But 
+see Wilson & Co. v. Walsenburg Sand & Gravel Co., 779 P.2d 
+1386, 1387 (Colo. Ct. App. 1989) (interpreting plain meaning 
+of similar good faith standard in similar indemnity agreement 
+as limiting defenses against liability to bad faith or fraud).
+
+     In any case, we need not resolve the contract interpretation 
+issue because, even if the District of Columbia Court of 
+Appeals were to interpret the agreement's good faith stan-
+dard to require a showing of reasonableness, or if a jury were 
+to find that the good faith standard was intended by the 
+parties to include a showing of reasonableness, no reasonable 
+fact-finder could find that IFIC's decision to hire counsel to 
+defend against Modern's suit was unreasonable under the 
+
+
+
+uncontested facts of this case.  Accordingly, we hold that 
+judgment in favor of IFIC is appropriate pursuant to Rule 
+50(a)(1) with regard to the liability question of whether Ideal 
+is required, under the parties' indemnity agreement, to in-
+demnify IFIC for attorneys' fees incurred by IFIC to defend 
+itself against Modern's claims.
+
+     Ideal alleges that IFIC's decision to mount its own defense 
+against Modern's claims was unreasonable because Modern's 
+claims against IFIC were obviously without merit and, more-
+over, Ideal had offered to defend IFIC against these claims.  
+In essence, Ideal contends that IFIC did not need to hire 
+counsel to mount a defense against Modern's claims because 
+it could have relied on Ideal to defend these claims, even 
+though Ideal was unwilling or unable to meet IFIC's demand 
+for a reserve payment to cover IFIC's alleged liability to 
+Modern.
+
+     This court resolved a similar claim in Carroll v. National 
+Surety Co., 24 F.2d 268 (D.C. Cir. 1928).  In that case, as 
+here, a construction contractor entered into an indemnity 
+agreement in order to induce a surety to provide a payment 
+bond for a construction project.  Id. at 269.  The relevant 
+language in the indemnity agreement in Carroll was virtually 
+identical to the relevant contract language at issue here.  Id. 
+at 269-70.  In Carroll, the surety was sued for payment 
+under the bond.  The surety, believing that it had no defense 
+to the claims, settled the claims and then sought indemnifica-
+tion for the settlement costs from the contractor pursuant to 
+their indemnity agreement.  Id.  The contractor disputed the 
+surety's indemnification claim, alleging, among other things, 
+that the surety was mistaken in its belief that it had no 
+defense to the subcontractors' claims and that, in fact, it had 
+a complete defense.  Id. at 270.  The contractor further 
+argued that, since it had notified the surety that it was willing 
+and able to mount a complete defense to the subcontractors' 
+claims, the surety's settlement of the claims was voluntary 
+and thus the contractor should not be required to indemnify 
+the settlement costs.  Id.  This court rejected the contrac-
+tor's arguments, holding that the contractor's notification to 
+the surety that it was ready to furnish a complete defense to 
+
+
+
+the claims against the surety did not deprive the surety of the 
+right to compromise the claims where the indemnity agree-
+ment authorized such a compromise.  Under the parties' 
+indemnity agreement, the surety waived this right only on the 
+condition that the contractor deposit with the surety satisfac-
+tory collateral for the payment of any judgment which might 
+be entered against it.  Since the contractor had not tendered 
+such a deposit, the surety had acted within its rights under 
+the indemnity agreement to settle the claims brought against 
+it under the bond and to seek indemnity from its principal for 
+the same.  Id. at 270-71.  Similarly, Ideal's offer to mount a 
+complete defense to Modern's claims against IFIC did not 
+deprive IFIC of its right to mount its own defense against 
+these claims and then look to Ideal to indemnify its litigation 
+costs.
+
+     Ideal does not offer any persuasive arguments that IFIC's 
+decision to retain counsel to defend against Modern's suit was 
+unreasonable.  Regardless of the purported strength or 
+weakness of Modern's claims against IFIC, no reasonable 
+fact-finder could find that IFIC's decision to hire separate 
+counsel to defend against Modern's claims was unreasonable, 
+in light of Ideal's inability or unwillingness to post satisfacto-
+ry collateral to cover the amount for which Modern sought to 
+hold IFIC liable.
+
+C. Reasonableness of the Fee Award
+
+     Although it was not unreasonable for IFIC to retain coun-
+sel to defend against Modern's claims, that is not the end of 
+our inquiry.  The second question at issue concerns the 
+reasonableness of the fee amount claimed by IFIC.
+
+     The District of Columbia Court of Appeals has long held, 
+and this court has acknowledged, that once a contractual 
+entitlement to attorney's fees has been ascertained, the deter-
+mination of a reasonable fee award is for the trial court in 
+light of the relevant circumstances.  Bender, 1997 WL 582901 
+at *3 (applying D.C. law).  Where a claim for attorney's fees 
+arises from a private contract provision, such a claim does not 
+embody a right to trial by jury.  McGuire v. Russell Miller, 
+
+
+
+Inc., 1 F.3d 1306, 1313-15 (2d Cir. 1993);  Kudon v. f.m.e. 
+Corp., 547 A.2d 976, 978-80 (D.C. 1988).  Rather, the reason-
+ableness of an attorney's fees award is within the sound 
+discretion of the trial court and is reviewed only for abuse of 
+discretion.  Singer v. Shannon & Luchs Co., 779 F.2d 69, 70 
+(D.C. Cir. 1985).
+
+     Even when attorney's fees are stipulated in an agreement, 
+the trial court may still inquire into the reasonableness of the 
+fees claimed under an indemnity agreement if those fees are 
+challenged.  Columbia Plaza Corp. v. Security Nat'l Bank, 
+676 F.2d 780, 791 (D.C. Cir. 1982) (applying D.C. law).  A 
+contractual provision stipulating how the amount of the attor-
+ney's fees award shall be calculated "creates a rebuttable 
+presumption that the stipulated amount is reasonable."  
+Bender, 1997 WL 582901 at *5.  However, if a stipulated fee 
+is properly challenged, "the district court [is] obliged under 
+District law to award only reasonable fees, with reasonable-
+ness a determination to be made by the judge."  Id. at *6.
+
+     IFIC points to two provisions of the parties' agreement 
+which, in its view, limits the standard of reasonableness.  
+First, IFIC notes that the agreement provides that the surety 
+may sometimes recover disbursements even when there is no 
+showing of "liability, necessity or expediency."  See Indemni-
+ty Agreement at p 2.  The parties' agreement allows charges 
+only for "disbursements made ... in good faith," however.  
+Id.  As for attorney's fees (as distinguished from disburse-
+ments to settle claims), the parties agreed at oral argument 
+that disbursements for attorney's fees can only be found to be 
+in good faith if the legal work for which the charges are made 
+was reasonable and necessary to the surety's defense.  Al-
+though IFIC obviously has some discretion under the parties' 
+agreement to decide about the scope of the legal work for 
+which it contracts, any decisions to pay counsel must pass a 
+test of reasonableness in order to be in good faith.  Indeed, if 
+good faith in this context did not include reasonableness, the 
+indemnitee would have no incentive to police its attorneys' 
+activities and charges, since it could simply dump any and all 
+charges billed onto the indemnitor.  Such a result would 
+make no sense.
+
+
+
+     Second, IFIC argues that the indemnity agreement's provi-
+sion that "vouchers or other evidence of any payments made 
+by the Surety shall be prima facie evidence of the fact and 
+amount of the liability to the Surety," Indemnity Agreement 
+at p 2, requires Ideal to indemnify it for the full amount of the 
+attorney billing statements submitted.  This argument fails 
+upon assertion, for the contract provision relied on by IFIC 
+says only that "vouchers" shall be "prima facie evidence of 
+the fact and amount of liability to the Surety."  This confirms 
+that something more than evidence of mere payment will be 
+required if a charge is challenged.  Thus, this provision is 
+hardly conclusive with regard to the amount of a reasonable 
+fee award, but rather simply shifts to Ideal the burden of 
+proving that the fees claimed are excessive.
+
+     IFIC's redaction of portions of the billing statements with-
+holds from Ideal information essential to Ideal's efforts to 
+meet this burden.  The District Court attempted to resolve 
+this issue by awarding attorney's fees only for the unredacted 
+portions of the billing statements.  This is not an adequate 
+solution.  As a practical matter, the reasonableness of any 
+portion of the billing statement can only be determined by 
+examining all billing statements pertaining to the legal ser-
+vices provided as a whole.  The reasonableness of any one 
+entry on an attorney's billing statement is likely to be in-
+formed by other charges incurred for the same general 
+service.  For example, the court needs to determine:  Has the 
+attorney over-charged for its services by expending a ridicu-
+lous amount of total time on a simple research task?  Did the 
+work undertaken encompass issues and tasks outside the 
+scope of the question being litigated?  Was each task under-
+taken a necessary and reasonable component of a reasonable 
+litigation strategy?  In this case, the general service at issue 
+is IFIC's defense against Modern's claims and its related 
+cross-claim against Ideal.  Ideal has the right to challenge 
+whether IFIC's disbursements for attorney's fees pertaining 
+to this general service as a whole were reasonable.
+
+     Ideal is entitled to discover the information it requires to 
+appraise the reasonableness of the amount of fees requested 
+by IFIC, including the nature and extent of the work done by 
+
+
+
+IFIC's counsel on various phases of the case, so that it may 
+present to the court any legitimate challenges to IFIC's 
+claim.  See National Ass'n of Concerned Veterans v. Secre-
+tary of Defense, 675 F.2d 1319, 1329 (D.C. Cir. 1982).  IFIC 
+may opt to withhold billing statements under a claim of 
+attorney-client privilege;  however, where IFIC's assertion of 
+a privilege results in the withholding of information necessary 
+to Ideal's defense to IFIC's claim against it, the privilege 
+must give way to Ideal's right to mount a defense.  Under 
+the common-law doctrine of implied waiver, the attorney-
+client privilege is waived when the client places otherwise 
+privileged matters in controversy.  See 6 James W. Moore, et 
+al., Moore's Federal Practice s 26.49[5] (3d ed. 1997).  This 
+court explained the rationale underlying the implied waiver 
+doctrine in In re Sealed Case, 676 F.2d 793 (D.C. Cir. 1982):
+
+     Implied waiver deals with an abuse of a privilege....  
+     Where society has subordinated its interest in the search 
+     for truth in favor of allowing certain information to 
+     remain confidential, it need not allow that confidentiality 
+     to be used as a tool for manipulation of the truth-seeking 
+     process....  [A party asserting attorney-client privilege] 
+     cannot be allowed, after disclosing as much as he pleases, 
+     to withhold the remainder.
+
+Id. at 807 (quotation omitted).  This is particularly true 
+where, as here, a party partially discloses the allegedly 
+privileged information in support of its claim against another, 
+but then asserts the privilege as a basis for withholding from 
+its opponent the remainder of the information which is neces-
+sary to defend against the claim.  Accord United States v. 
+Western Elec. Co., 132 F.R.D. 1, 3 (D.D.C. 1990) (where client 
+placed counsel's actions at issue, client was precluded from 
+asserting work-product privilege as to any documents that 
+undermined client's position while at the same time producing 
+work-product that supported position);  Byers v. Burleson, 
+100 F.R.D. 436, 440 (D.D.C. 1983) (attorney-client privilege 
+impliedly waived where privileged information is necessary to 
+resolve precise issue which party asserting privilege interject-
+ed into the case);  Wender v. United Services Auto. Ass'n, 434 
+
+
+
+A.2d 1372, 1374 (D.C. 1981) (by asserting its reliance on 
+advice of counsel as a material element of its defense, party 
+waived the attorney-client privilege with respect to all com-
+munications to or from counsel concerning the transaction).
+
+     By claiming indemnification of attorney's fees from Ideal 
+and offering the billing statements as evidence of the same, 
+IFIC waived its attorney-client privilege with respect to the 
+redacted portions of the billing statements and any other 
+communications going to the reasonableness of the amount of 
+the fee award.  See In re Sealed Case, 877 F.2d 976, 980-81 
+(D.C. Cir. 1989) ("[A] waiver of the privilege in an attorney-
+client communication extends to all other communications 
+relating to the same subject matter.") (quotations omitted).  
+If IFIC opts to claim indemnity for attorney's fees from 
+Ideal, it must disclose the billing statements itemizing those 
+fees in its entirety, notwithstanding its claim that portions of 
+the billing statements are privileged.  If IFIC's claim of 
+attorney-client privilege would otherwise have been valid, the 
+information could perhaps be examined by Ideal under seal, 
+but in camera review by the court alone is insufficient.  Thus, 
+although "the nature and amount of proof necessary to deter-
+mine reasonableness" is included within the trial court's scope 
+of discretion in determining a reasonable fee award, Bender, 
+1997 WL 582901 at *4, we hold that the District Court abused 
+this discretion in failing to require IFIC to disclose the 
+unredacted portions of the billing statements.
+
+                               III. Conclusion
+
+
+     We affirm the District Court's judgment finding Ideal 
+liable, under the parties' indemnity agreement, for attorney's 
+fees incurred by IFIC in defending against Modern's claims, 
+but reverse and remand for determination of a reasonable fee 
+award.  Although the reasonableness of the fee award is 
+ultimately within the District Court's discretion, Ideal must 
+first be allowed an opportunity to challenge the reasonable-
+ness of the fees following full disclosure of the billing state-
+ments.  If IFIC continues to withhold the information, then 
+its claim for attorney's fees should be dismissed in its entire-
+ty.
+
+
+
+     On remand, the fees denied by the District Court's July 18, 
+1996 order should be considered together with the fees at 
+issue in the July 1, 1996 order, since all of these fees were 
+allegedly incurred in pursuit of the same case.  In addition, 
+the court must provide reasons to justify its determination of 
+a reasonable award so that a reviewing court can evaluate 
+whether it acted within its discretion.  Singer, 779 F.2d at 
+70-71.  Computation of a reasonable attorney's fee award 
+requires more than simply a report of the number of hours 
+spent and the hourly rate.  It also requires the court's 
+assessment of, among other things, the time and labor rea-
+sonably required by the case, the skill demanded by the 
+novelty or complexity of the issues, and the incentive effects 
+on future cases.  Thus, for example, the court should exclude 
+charges billed for services which were unnecessary to IFIC's 
+defense against Modern's claims or its related indemnity 
+claim.  See id. at 71 (district court must justify awarding fees 
+for work on issues that appellants argue are ineligible for 
+compensation).
+
+So ordered.
+
+
