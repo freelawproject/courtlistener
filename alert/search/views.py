@@ -137,11 +137,16 @@ def show_results(request):
                                   RequestContext(request))
     return render_to_response(
         'search/search.html',
-        {'search_form': search_form, 'alert_form': alert_form,
-         'results': paged_results, 'court_facets': court_facets,
-         'status_facets': status_facets, 'get_string': get_string,
-         'count': count, 'private': False},
-        RequestContext(request))
+        {'search_form': search_form,
+         'alert_form': alert_form,
+         'results': paged_results,
+         'court_facets': court_facets,
+         'status_facets': status_facets,
+         'get_string': get_string,
+         'count': count,
+         'private': False},
+        RequestContext(request)
+    )
 
 
 def tools_page(request):

@@ -70,13 +70,7 @@
                     <ul>
                         {% for case in cited_by_trunc %}
                             <li>
-                                <a href="{{case.get_absolute_url}}">{{ case.citation.case_name|truncatewords:10|v_wrapper }},
-                                    {% if case.citation.west_cite %}
-                                        {{case.citation.west_cite}}
-                                    {% else %}
-                                        {{case.citation.docket_number}}
-                                    {% endif %}
-                                </a>
+                                <a href="{{case.get_absolute_url}}">{{ case.citation.case_name|truncatewords:10|v_wrapper }}</a>
                             </li>
                         {% endfor %}
                     </ul>
@@ -153,13 +147,7 @@
             <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-off" title="Save/edit favorite"></a>
         {% endif %}
         <h2>
-            {{ doc.citation.case_name|v_wrapper }},
-            {% if doc.citation.west_cite %}
-                {{doc.citation.west_cite}}
-            {% else %}
-                {{doc.citation.docket_number}}
-            {% endif %}
-            ({% if doc.court.citation_string != 'SCOTUS' %}{{doc.court.citation_string|nbsp}}&nbsp;{% endif %}{{doc.date_filed|date:"Y"}})
+            {{ caption|safe|v_wrapper }}
         </h2>
         <div id="modal-rel">
             {# Modal box for saving the favorite #}
@@ -240,13 +228,15 @@
             {% endif %}
         </p>
         <p class="bottom">
-            {% if doc.citation.neutral_cite %}
-                <span class="meta-data-header">Neutral citation:</span>
-                <span class="meta-data-value">{{ doc.citation.neutral_cite }}</span>
+            {% if citation_string %}
+                <span class="meta-data-header">Citations: </span>
+                <span class="meta-data-value">{{ citation_string }}</span>
             {% endif %}
-            {% if doc.citation.west_cite and doc.citation.docket_number %}
-                <strong>Docket Number: </strong>
-                {{ doc.citation.docket_number }}
+        </p>
+        <p class="bottom">
+            {% if doc.citation.docket_number %}
+                <span class="meta-data-header">Docket Number: </span>
+                <span class="meta-data-value">{{ doc.citation.docket_number }}</span>
             {% endif %}
         </p>
         <p class="bottom">

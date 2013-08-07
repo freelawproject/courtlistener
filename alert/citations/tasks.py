@@ -1,4 +1,5 @@
 import sys
+from alert.casepage.views import make_citation_string
 
 sys.path.append('/var/www/court-listener/alert')
 
@@ -52,7 +53,7 @@ def update_document(document):
     for citation in citations:
         # Resource.org docs contain their own citation in the html text, which
         # we don't want to include
-        if citation.base_citation() == document.citation.west_cite:
+        if citation.base_citation() in make_citation_string(document):
             continue
         matches, is_citation_match = match_citations.match_citation(citation, document)
 

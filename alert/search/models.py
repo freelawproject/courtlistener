@@ -129,8 +129,9 @@ class Court(models.Model):
 
 
 class Citation(models.Model):
-    citationUUID = models.AutoField("a unique ID for each citation",
-                                    primary_key=True)
+    citationUUID = models.AutoField(
+        "a unique ID for each citation",
+        primary_key=True)
     slug = models.SlugField(
         "URL that the document should map to (the slug)",
         max_length=50,
@@ -143,18 +144,58 @@ class Citation(models.Model):
         max_length=100, # sometimes these are consolidated, hence they need to be long.
         blank=True,
         null=True)
-    west_cite = models.CharField(
-        "WestLaw federal citation",
+    federal_cite_one = models.CharField(
+        "Primary federal citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    federal_cite_two = models.CharField(
+        "Secondary federal citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    federal_cite_three = models.CharField(
+        "Tertiary federal citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    state_cite_one = models.CharField(
+        "Primary state citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    state_cite_two = models.CharField(
+        "Secondary state citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    state_cite_three = models.CharField(
+        "Tertiary state citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    state_cite_regional = models.CharField(
+        "Regional citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    specialty_cite_one = models.CharField(
+        "Specialty citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    scotus_early_cite = models.CharField(
+        "Early SCOTUS citation",
         max_length=50,
         blank=True,
         null=True)
     lexis_cite = models.CharField(
-        "LexisNexis federal citation",
+        "Lexis Nexus citation (e.g. 1 LEXIS 38237)",
         max_length=50,
         blank=True,
         null=True)
-    west_state_cite = models.CharField(
-        "WestLaw state citation",
+    westlaw_cite = models.CharField(
+        "WestLaw citation (e.g. 22 WL 238)",
         max_length=50,
         blank=True,
         null=True)
