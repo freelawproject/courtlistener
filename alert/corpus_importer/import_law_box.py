@@ -108,6 +108,8 @@ def get_date_filed(clean_html_tree, citations, case_path=None):
                 dates.append(date(1936, 9, 28))
             elif 'June 21, 1944.8' in text:
                 dates.append(date(1944, 6, 21))
+            elif 'Nov. 16, 1567' in text:
+                dates.append(date(1967, 11, 16))
             if dates:
                 break
     if not dates:
@@ -219,7 +221,7 @@ def import_law_box_case(case_path):
     )
 
     cite = Citation(
-        west_cite=citations,
+        federal_cite_one=citations,
         case_name=get_case_name(complete_html_tree),
         docket_number=get_docket_number(clean_html_tree, case_path=case_path)
     )
