@@ -4,17 +4,17 @@
 
 Thank you for your interest in Free Law Project (the "Project"), a project
 co-founded by Brian Carver and Michael Lissner. In order to clarify the
-intellectual property license granted with Contributions from any person or
-entity, Free Law Project must have a Contributor License Agreement ("CLA") on
-file that has been signed by each Contributor, indicating agreement to the
-license terms below. This license is for your protection as a Contributor as
-well as the protection of Free Law Project and our users; it does not change
-your rights to use your own Contributions for any other purpose.
+copyright, patent, and trademark permissions granted with Contributions from
+any person or entity, the Project must have a Contributor License Agreement
+("CLA") on file that has been signed by each Contributor, indicating agreement
+to the terms below. This Agreement is for your protection as well as the
+protection of the Project and its users; it does not change your rights
+to use your own Contributions for any other purpose.
 
 If you have not already done so, please complete and sign, then scan and email
 a pdf file of this Agreement to bcarver@courtlistener.com. Alternatively, you
 may send it by facsimile to Free Law Project at +1-510-642-5814 or may send an
-original signed Agreement to Brian W. Carver, UC Berkeley School of Information,
+original signed agreement to Brian W. Carver, UC Berkeley School of Information,
 102 South Hall #4600 Berkeley, CA 94720-4600, U.S.A. Please read this document
 carefully before signing and keep a copy for your records.
 
@@ -33,11 +33,14 @@ carefully before signing and keep a copy for your records.
   E-Mail:    ______________________________________________________
 
 You accept and agree to the following terms and conditions for Your present and
-future Contributions submitted to the Project. In return, the Project shall not
-use Your Contributions in a way that is contrary to the public benefit or
-inconsistent with universal access to public court documents. For details, see
-the ByLaws of the Project at:
- - http://freelawproject.org/non-profit-documents/
+future Contributions submitted to the Project. In return, the Project promises 
+that the Work in which your Contribution is accepted, or any work "based on the
+Work" will, if distributed by the Project, be distributed under the terms of a
+license recognized by the Free Software Foundation as a Free Software license
+or a subsequent version of such a license. Notwithstanding the foregoing, the
+Project may, in addition, distribute the Work, or any work "based on the Work"
+under other terms as well, so long as the very same Work is made available
+under the terms of a Free Software license as well.
 
 Except for the license granted herein to the Project and recipients of software
 distributed by the Project, You reserve all right, title, and interest in and
@@ -90,12 +93,12 @@ to Your Contributions.
    Contribution or Work shall terminate as of the date such litigation is
    filed.
 
-4. You represent that you are legally entitled to grant the above license. If
-   your employer(s) has rights to intellectual property that you create that
-   includes your Contributions, you represent that you have received permission
-   to make Contributions on behalf of that employer, that your employer has
-   waived such rights for your Contributions to the Project, or that your
-   employer has executed a separate Corporate CLA with the Project.
+4. You represent that you are legally entitled to grant the above licenses. If
+   your employer(s) has rights to works that you create that includes your
+   Contributions, you represent that you have received permission to make
+   Contributions on behalf of that employer, that your employer has waived
+   such rights for your Contributions to the Project, or that your employer
+   has executed a separate CLA with the Project.
 
 5. You represent that each of Your Contributions is Your original creation
    (see section 7 for submissions on behalf of others).  You represent that
