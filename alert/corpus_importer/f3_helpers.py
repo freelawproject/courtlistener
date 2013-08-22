@@ -1,8 +1,7 @@
 import os
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 import sys
-sys.path.append("/var/www/court-listener")
-sys.path.append('/var/www/court-listener/alert')
+sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
 
 from juriscraper.lib.parse_dates import parse_dates
 from alert.lib.string_utils import anonymize
@@ -217,12 +216,18 @@ class Case(object):
         # Non-core data attributes
         self.url_element = url_element
         self.tree = fromstring(urllib2.urlopen(urljoin(base_url, url_element.get('href'))).read())
-        self.court_fix_dict = self._load_fix_file('/var/www/court-listener/Resource.org/logs/f3_court_fix_file.txt')
-        self.date_fix_dict = self._load_fix_file('/var/www/court-listener/Resource.org/logs/f3_date_fix_file.txt')
-        self.case_name_dict = self._load_fix_file('/var/www/court-listener/Resource.org/logs/f3_short_case_name_fix_file.txt')
-        self.court_fix_file = open('/var/www/court-listener/Resource.org/logs/f3_court_fix_file.txt', 'a')
-        self.date_fix_file = open('/var/www/court-listener/Resource.org/logs/f3_date_fix_file.txt', 'a')
-        self.case_name_fix_file = open('/var/www/court-listener/Resource.org/logs/f3_short_case_name_fix_file.txt', 'a')
+        self.court_fix_dict = self._load_fix_file('%s/Resource.org/logs/f3_court_fix_file.txt' %
+                                                  os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+        self.date_fix_dict = self._load_fix_file('%s/Resource.org/logs/f3_date_fix_file.txt' %
+                                                 os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+        self.case_name_dict = self._load_fix_file('%s/Resource.org/logs/f3_short_case_name_fix_file.txt' %
+                                                  os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+        self.court_fix_file = open('%s/Resource.org/logs/f3_court_fix_file.txt' %
+                                   os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'), 'a')
+        self.date_fix_file = open('%s/Resource.org/logs/f3_date_fix_file.txt' %
+                                  os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'), 'a')
+        self.case_name_fix_file = open('%s/Resource.org/logs/f3_short_case_name_fix_file.txt' %
+                                       os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'), 'a')
         self.saved_court = ''
 
         # Core data attributes

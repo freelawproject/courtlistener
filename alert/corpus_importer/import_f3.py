@@ -1,3 +1,4 @@
+import os
 import dup_finder
 import f3_helpers
 import re
@@ -89,9 +90,12 @@ def import_by_hand():
     over it so that the documents can be imported manually.
     """
     simulate = False
-    corpus = f3_helpers.Corpus('file:///var/www/court-listener/Resource.org/data/F3/')
-    hand_file = open('/var/www/court-listener/Resource.org/logs/hand_file.csv', 'r')
-    line_placeholder = open('/var/www/court-listener/Resource.org/logs/line_placeholder.txt', 'r+')
+    corpus = f3_helpers.Corpus('file://%s/Resource.org/data/F3/' %
+                               os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+    hand_file = open('%s/Resource.org/logs/hand_file.csv' %
+                     os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'), 'r')
+    line_placeholder = open('%s/Resource.org/logs/line_placeholder.txt' %
+                            os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'), 'r+')
     try:
         line_num_done = int(line_placeholder.readline())
     except ValueError:
@@ -108,7 +112,8 @@ def import_by_hand():
         case = volume[int(case_num)]
         run_dup_check(case, simulate)
         line_num_done += 1
-        line_placeholder = open('/var/www/court-listener/Resource.org/logs/line_placeholder.txt', 'w')
+        line_placeholder = open('%s/Resource.org/logs/line_placeholder.txt' %
+                                os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'), 'w')
         line_placeholder.write(str(line_num_done))
         line_placeholder.close()
 
@@ -123,10 +128,14 @@ def import_f3():
      2. Merging duplicate documents. See their code in the f3_helpers module.
     """
     simulate = False
-    corpus = f3_helpers.Corpus('/var/www/court-listener/Resource.org/data/F3/')
-    vol_file = open('/var/www/court-listener/Resource.org/logs/vol_file.txt', 'r+')
-    case_file = open('/var/www/court-listener/Resource.org/logs/case_file.txt', 'r+')
-    stat_file = open('/var/www/court-listener/Resource.org/logs/training_stats.csv', 'a')
+    corpus = f3_helpers.Corpus('%s/Resource.org/data/F3/' %
+                               os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+    vol_file = open('%s/Resource.org/logs/vol_file.txt' %
+                    os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'), 'r+')
+    case_file = open('%s/Resource.org/logs/case_file.txt' %
+                     os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'), 'r+')
+    stat_file = open('%s/Resource.org/logs/training_stats.csv' %
+                     os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'), 'a')
     try:
         volume_num = int(vol_file.readline())
     except ValueError:
@@ -153,12 +162,14 @@ def import_f3():
 
             # save our location within the volume
             j += 1
-            case_file = open('/var/www/court-listener/Resource.org/logs/case_file.txt', 'w')
+            case_file = open('%s/Resource.org/logs/case_file.txt' %
+                             os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'), 'w')
             case_file.write(str(j))
             case_file.close()
         # save our location within the corpus
         volume_num += 1
-        vol_file = open('/var/www/court-listener/Resource.org/logs/vol_file.txt', 'w')
+        vol_file = open('%s/Resource.org/logs/vol_file.txt' %
+                        os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'), 'w')
         vol_file.write(str(volume_num))
         vol_file.close()
 

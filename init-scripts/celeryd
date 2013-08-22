@@ -5,7 +5,7 @@
 #
 # :Usage: /etc/init.d/celeryd {start|stop|force-reload|restart|try-restart|status}
 #
-# :Configuration file: /var/www/court-listener/alert/settings/celeryd.sh
+# :Configuration file: $CL_INSTALL_ROOT/alert/settings/celeryd.sh
 #
 # To configure celeryd you probably need to tell it where to chdir.
 #
@@ -34,11 +34,11 @@ chown celery:celery $RUN_DIR
 
 # /etc/init.d/celeryd: start and stop the celery task worker daemon.
 
-CELERY_DEFAULTS=${CELERY_DEFAULTS:-"/var/www/court-listener/alert/settings/celeryd.sh"}
+CELERY_DEFAULTS=${CELERY_DEFAULTS:-"$CL_INSTALL_ROOT/alert/settings/celeryd.sh"}
 
 test -f "$CELERY_DEFAULTS" && . "$CELERY_DEFAULTS"
-if [ -f "/var/www/court-listener/alert/settings/celeryd.sh" ]; then
-    . /var/www/court-listener/alert/settings/celeryd.sh
+if [ -f "$CL_INSTALL_ROOT/alert/settings/celeryd.sh" ]; then
+    . $CL_INSTALL_ROOT/alert/settings/celeryd.sh
 fi
 
 CELERYD_PID_FILE=${CELERYD_PID_FILE:-${CELERYD_PIDFILE:-$DEFAULT_PID_FILE}}

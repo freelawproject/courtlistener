@@ -2,7 +2,7 @@ import os
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 
 import sys
-sys.path.append("/var/www/court-listener")
+sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
 
 from django import db
 from django.conf import settings
@@ -35,7 +35,8 @@ def load_stopwords():
     an array.
     """
     #  /usr/local/sphinx/bin/indexer -c sphinx-scraped-only.conf scraped-document --buildstops word_freq.txt 5000 --buildfreqs
-    stopwords_file = open('/var/www/court-listener/alert/resource_org/word_freq.5000.txt', 'r')
+    stopwords_file = open('%s/alert/resource_org/word_freq.5000.txt' %
+                          os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'), 'r')
     stopwords = []
     for word in stopwords_file:
         try:
