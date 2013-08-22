@@ -1,7 +1,8 @@
 import os
 import sys
 
-sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 from alert import settings
 from django.core.management import setup_environ
@@ -15,7 +16,7 @@ import re
 
 
 def get_document_citations(document):
-    '''Identify and return citations from the html or plain text of the document.'''
+    """Identify and return citations from the html or plain text of the document."""
     if document.html:
         citations = find_citations.get_citations(document.html)
     elif document.plain_text:

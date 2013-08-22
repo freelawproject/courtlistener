@@ -61,12 +61,14 @@
                     </tbody>
                 </table>
                 <form action="/" method="post">{% csrf_token %}
-                <button type="submit" class="button">Make new alert</button>
+                    <button type="submit" class="button">Make new alert</button>
+                </form>
             </div>
         {% else %}
             <h3>You have not made any alerts.</h3>
             <form action="/" method="get">
-            <button type="submit" class="button">Make new alert</button>
+                <button type="submit" class="button">Make new alert</button>
+            </form>
         {% endif %}
     </div>
 {% endblock %}

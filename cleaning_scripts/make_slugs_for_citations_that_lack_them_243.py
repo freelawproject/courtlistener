@@ -1,6 +1,6 @@
-import os
 import sys
-sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
 from django.core.management import setup_environ
@@ -13,7 +13,7 @@ from optparse import OptionParser
 
 
 def fixer(simulate=False, verbose=False):
-    '''If a Citation lacks a slug, we make one for it.'''
+    """If a Citation lacks a slug, we make one for it."""
     citations = Citation.objects.filter(slug=None)
 
     for citation in citations:
@@ -43,7 +43,6 @@ def main():
         print "*******************************************"
 
     return fixer(simulate, verbose)
-    exit(0)
 
 if __name__ == '__main__':
     main()

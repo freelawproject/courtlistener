@@ -1,15 +1,14 @@
 import os
 import sys
-sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
-from celery.task.sets import subtask
 from django.core.management import setup_environ
 
 setup_environ(settings)
 
 from search.models import Document, Court
-from alert.lib.db_tools import queryset_generator
 from optparse import OptionParser
 
 # adding alert to the front of this breaks celery. Ignore pylint error.

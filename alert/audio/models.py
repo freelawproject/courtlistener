@@ -1,5 +1,4 @@
 from django.db import models
-from django.utils.text import get_valid_filename
 # from search.models import Document
 
 

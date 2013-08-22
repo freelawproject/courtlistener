@@ -1,7 +1,7 @@
-import os
 import socket
 import sys
-sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 from alert import settings
 from django.core.management import setup_environ

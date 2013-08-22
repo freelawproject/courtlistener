@@ -14,9 +14,7 @@ os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 import argparse
 import fnmatch
 import hashlib
-from lxml.etree import XMLSyntaxError
 from lxml.html.clean import Cleaner
-import os
 from lxml.html import tostring
 
 from alert.search.models import Document, Citation

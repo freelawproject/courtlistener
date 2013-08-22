@@ -1,4 +1,4 @@
-'''
+"""
 Process is as follows:
     For each row in the CSV:
         extract the case number from the row (caseNum = line.split("|")[0]
@@ -22,11 +22,11 @@ Spec/features:
       detail to revert a change.
     - simulate mode allows the user to generate the messages and logs without
       editing the DB
-'''
+"""
 
-import os
 import sys
-sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
 from django.core.management import setup_environ
@@ -61,11 +61,11 @@ def remove_words(phrase):
 
 
 def gen_diff_ratio(case_name_left, case_name_right):
-    '''
+    """
     Genrates a difference between two strings, in this case case_names.
     Returns a value between 0 and 1. 0 means the strings are totally diffferent.
     1 means they are identical.
-    '''
+    """
     # Remove common strings from all case names /before/ comparison.
     # Doing so lowers the opportunity for false positives.
     case_name_left = remove_words(case_name_left)
@@ -216,7 +216,6 @@ def main():
         print "*******************************************"
 
     return cleaner(simulate, verbose)
-    exit(0)
 
 
 if __name__ == '__main__':

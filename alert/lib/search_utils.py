@@ -17,7 +17,7 @@ def make_get_string(request):
         pass
     get_string = urlencode(get_dict, True)
     if len(get_string) > 0:
-        get_string = get_string + '&'
+        get_string += '&'
     return get_string
 
 
@@ -286,10 +286,7 @@ def get_court_start_year(conn, court):
     """Get the start year for a court by placing a Solr query. If a court is
     active, but does not yet have any results, return the current year.
     """
-    params = {}
-    params['fq'] = ['court_exact:%s' % court.courtUUID]
-    params['sort'] = 'dateFiled asc'
-    params['rows'] = 1
+    params = {'fq': ['court_exact:%s' % court.courtUUID], 'sort': 'dateFiled asc', 'rows': 1}
     response = conn.raw_query(**params).execute()
     try:
         year = response.result.docs[0]['dateFiled'].year
@@ -301,13 +298,7 @@ def get_court_start_year(conn, court):
 
 
 def build_coverage_query(court, start_year):
-    params = {}
-    params['facet'] = 'true'
-    params['facet.range'] = 'dateFiled'
-    params['facet.range.end'] = 'NOW/DAY'
-    params['facet.range.gap'] = '+1YEAR'
-    params['rows'] = 0
-    params['facet.range.start'] = '%d-01-01T00:00:00Z' % start_year
-    params['fq'] = ['court_exact:%s' % court.courtUUID]
-    params['q'] = '*:*'
+    params = {'facet': 'true', 'facet.range': 'dateFiled', 'facet.range.end': 'NOW/DAY', 'facet.range.gap': '+1YEAR',
+              'rows': 0, 'facet.range.start': '%d-01-01T00:00:00Z' % start_year,
+              'fq': ['court_exact:%s' % court.courtUUID], 'q': '*:*'}
     return params

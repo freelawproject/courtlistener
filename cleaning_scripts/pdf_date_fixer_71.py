@@ -1,6 +1,7 @@
 import os
 import sys
-sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
 from django.core.management import setup_environ
@@ -8,10 +9,10 @@ setup_environ(settings)
 
 from alert.search.models import Document
 from optparse import OptionParser
-import gc, errno, os, os.path, string, time
+import gc, errno, string, time
 
 def queryset_generator(queryset, chunksize=100):
-    '''
+    """
     from: http://djangosnippets.org/snippets/1949/
     Iterate over a Django Queryset ordered by the primary key
 
@@ -21,7 +22,7 @@ def queryset_generator(queryset, chunksize=100):
     classes.
 
     Note that the implementation of the iterator does not support ordered query sets.
-    '''
+    """
     documentUUID = 0
     last_pk = queryset.order_by('-documentUUID')[0].documentUUID
     queryset = queryset.order_by('documentUUID')
@@ -47,17 +48,17 @@ def update_date(doc, simulate):
     time.sleep(1)
     # take the doc, check its date_filed field, make a hardlink to the PDF
     # location, and update the database
-    if doc.date_filed != None:
+    if doc.date_filed is not None:
         date_filed = doc.date_filed
     else:
         # break from this function.
         print "\n***No date_filed value for doc: " + str(doc.documentUUID) + ". Punting.***\n"
-        return(1)
+        return 1
     if doc.local_path != "":
         local_path = doc.local_path
     else:
         print "\n***No local_path value for doc: " + str(doc.documentUUID) + ". Punting.***\n"
-        return(2)
+        return 2
     root = settings.MEDIA_ROOT
 
     # old link

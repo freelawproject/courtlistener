@@ -1,6 +1,6 @@
-import os
 import sys
-sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
 from django.core.management import setup_environ
@@ -11,15 +11,14 @@ from alert.lib.db_tools import queryset_generator
 from alert.lib.string_utils import anonymize
 from optparse import OptionParser
 from datetime import date
-import re
 
 def cleaner(simulate=False, verbose=False):
-    '''Re-run the anonymize function across the whole corpus.
+    """Re-run the anonymize function across the whole corpus.
 
     The anonymize function was previously missing any documents that contained
     punctuation before or after an ID. This script re-runs the function, fixing
     the error.
-    '''
+    """
     docs = queryset_generator(Document.objects.all())
     for doc in docs:
         text = doc.plain_text
@@ -65,7 +64,6 @@ def main():
         print "*******************************************"
 
     return cleaner(simulate, verbose)
-    exit(0)
 
 
 if __name__ == '__main__':

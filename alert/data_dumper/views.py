@@ -16,7 +16,7 @@ from datetime import date
 
 
 def dump_index(request):
-    '''Shows an index page for the dumps.'''
+    """Shows an index page for the dumps."""
     courts = Court.objects.filter(in_use=True).order_by('start_date')
     try:
         dump_size = size(os.path.getsize(os.path.join(DUMP_DIR, 'all.xml.gz')))
@@ -31,7 +31,7 @@ def dump_index(request):
 
 
 def serve_or_gen_dump(request, court, year=None, month=None, day=None):
-    '''Serves the dump file to the user, generating it if needed.'''
+    """Serves the dump file to the user, generating it if needed."""
     if year is None:
         if court != 'all':
             # Sanity check

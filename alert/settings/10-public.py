@@ -7,6 +7,9 @@ import os
 import sys
 sys.path.append(os.getcwd())
 
+# Loads the variable INSTALL_ROOT
+execfile('/etc/courtlistener')
+
 SITE_ID = 1
 
 # If you set this to False, Django will make some optimizations so as not
@@ -64,6 +67,7 @@ INSTALLED_APPS = [
     'contact',
     'coverage',
     'custom_filters',
+    'donate',
     'favorites',
     'honeypot',
     'lib',

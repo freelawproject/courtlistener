@@ -1,6 +1,7 @@
 import os
 import sys
-sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 from alert import settings
 from django.core.management import setup_environ
@@ -25,17 +26,17 @@ def toggle_blocked_status(url, block_or_unblock, simulate, verbose):
 
     docs = Document.objects.filter(download_URL=url)
     if verbose:
-        print "Searched for: %s" % (url)
+        print "Searched for: %s" % url
         print "Found %s cases." % (len(docs))
     for doc in docs:
         if block_or_unblock == 'block':
             if verbose:
-                print "Blocking: %s" % (url)
+                print "Blocking: %s" % url
             doc.blocked = True
             doc.date_blocked = datetime.date.today()
         elif block_or_unblock == "unblock":
             if verbose:
-                print "Unblocking: %s" % (url)
+                print "Unblocking: %s" % url
             doc.blocked = False
             doc.date_blocked = None
         if not simulate:
@@ -50,7 +51,7 @@ def compare_files(new_file_content, old_file_content, verbose):
     results = list(d.compare(old_file_content, new_file_content))
 
     if verbose:
-        print "Differences %s" % (results)
+        print "Differences %s" % results
     return results
 
 
