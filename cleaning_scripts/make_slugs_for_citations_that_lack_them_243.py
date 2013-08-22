@@ -1,5 +1,6 @@
+import os
 import sys
-sys.path.append('/var/www/court-listener/alert')
+sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
 
 import settings
 from django.core.management import setup_environ

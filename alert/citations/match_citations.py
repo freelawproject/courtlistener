@@ -6,7 +6,7 @@ os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 
 import sys
 
-sys.path.append("/var/www/court-listener")
+sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
 
 from django.conf import settings
 from alert.search.models import Court

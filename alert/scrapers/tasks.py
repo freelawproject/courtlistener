@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 
+import os
 import sys
 from lxml.etree import XMLSyntaxError
 
-sys.path.append('/var/www/court-listener/alert')
+sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
 
 from alert import settings
 from django.core.management import setup_environ

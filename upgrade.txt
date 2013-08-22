@@ -1,7 +1,7 @@
 This file contains notes for upgrades when special instructions are necessary. In general, simply doing:
 
 hg pull -u
-sudo -u www-data /var/www/court-listener/alert/manage.py collectstatic
+sudo -u www-data $CL_INSTALL_ROOT/alert/manage.py collectstatic
 manage.py migrate
 
 is all that's necessary. In the case that special instructions are needed, we will attempt to put them here, with the

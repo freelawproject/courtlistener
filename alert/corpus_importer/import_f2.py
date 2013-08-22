@@ -5,7 +5,7 @@ os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 
 import sys
 # append these to the path to make the dev machines and the server happy (respectively)
-sys.path.append("/var/www/court-listener")
+sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
 
 from django import db
 from django.conf import settings
@@ -148,7 +148,7 @@ def scrape_and_parse():
     vol_file = open('../logs/vol_file.txt', 'r+')
     case_file = open('../logs/case_file.txt', 'r+')
 
-    url = "file:///var/www/court-listener/Resource.org/F2/index.html"
+    url = "file://%s/Resource.org/F2/index.html" % os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener')
     openedURL = urllib2.urlopen(url)
     content = openedURL.read()
     openedURL.close()
