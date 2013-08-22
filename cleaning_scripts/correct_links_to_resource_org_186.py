@@ -1,6 +1,6 @@
-import os
 import sys
-sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
 from django.core.management import setup_environ
@@ -12,15 +12,14 @@ from lib.string_utils import clean_string
 from lib.string_utils import harmonize
 from lib.string_utils import titlecase
 from optparse import OptionParser
-import re
 
 
 def link_fixer(link):
-    '''Fixes the errors in a link
+    """Fixes the errors in a link
 
     Orig:  http://bulk.resource.org/courts.gov/c/US/819/996.F2d.311.html
     Fixed: http://bulk.resource.org/courts.gov/c/F2/996/996.F2d.311.html
-    '''
+    """
     # Very crude and lazy replacement of US with F2
     link_parts = link.split('US')
     fixed = 'F2'.join(link_parts)
@@ -64,7 +63,6 @@ def main():
         print "*******************************************"
 
     return cleaner(simulate, verbose)
-    exit(0)
 
 
 if __name__ == '__main__':

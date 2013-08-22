@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-import os
 import sys
-sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
 from django.core.management import setup_environ
@@ -17,7 +17,7 @@ from optparse import OptionParser
 conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
 
 def cleaner(simulate=False, verbose=True):
-    '''Fix cases that have mojibake as a result of pdffactory 3.51.'''
+    """Fix cases that have mojibake as a result of pdffactory 3.51."""
 
     # Find all the cases using Solr
     results_si = conn.raw_query(**{'q': u'ÚÑÎ'})
@@ -53,7 +53,6 @@ def main():
         print "*******************************************"
 
     return cleaner(simulate, verbose)
-    exit(0)
 
 if __name__ == '__main__':
     main()

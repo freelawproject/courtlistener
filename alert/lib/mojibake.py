@@ -30,7 +30,7 @@ from django.utils.encoding import smart_str
 
 
 def fix_mojibake(text):
-    '''Given corrupt text from pdffactory, converts it to sane text.'''
+    """Given corrupt text from pdffactory, converts it to sane text."""
 
     letter_map = {
                   u'¿':'a',
@@ -100,7 +100,6 @@ def fix_mojibake(text):
                   u'æ':':',
                   u'å':';',
                   u'Ž':"'",
-                  u'•':"'",
                   u'•':"'", # s/b double quote, but identical to single.
                   u'Œ':"'", # s/b double quote, but identical to single.
                   u'ó':'-', # dash

@@ -1,4 +1,3 @@
-import traceback
 from alert.alerts.forms import CreateAlertForm
 from alert.lib import search_utils
 from alert.lib import sunburnt

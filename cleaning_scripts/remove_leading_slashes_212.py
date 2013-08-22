@@ -1,6 +1,6 @@
-import os
 import sys
-sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
 from django.core.management import setup_environ
@@ -12,7 +12,7 @@ from optparse import OptionParser
 
 
 def fixer(simulate=False, verbose=False):
-    '''Remove leading slashes by running the new and improved harmonize/clean_string scipts'''
+    """Remove leading slashes by running the new and improved harmonize/clean_string scipts"""
     docs = Document.objects.raw(r'''select Document.documentUUID
                                     from Document, Citation
                                     where Document.citation_id = Citation.citationUUID and
@@ -45,7 +45,6 @@ def main():
         print "*******************************************"
 
     return fixer(simulate, verbose)
-    exit(0)
 
 if __name__ == '__main__':
     main()

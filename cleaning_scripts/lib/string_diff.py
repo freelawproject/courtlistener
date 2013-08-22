@@ -50,11 +50,11 @@ def remove_words(phrase):
 
 
 def gen_diff_ratio(left, right):
-    '''
+    """
     Genrates a difference between two strings
     Returns a value between 0 and 1. 0 means the strings are totally different.
     1 means they are identical.
-    '''
+    """
     # Remove common strings from all case names /before/ comparison.
     # Doing so lowers the opportunity for false positives.
     left = remove_words(left)
@@ -67,9 +67,9 @@ def gen_diff_ratio(left, right):
 
 
 def find_best_match(results, case_name):
-    '''Returns the closest match to within a Solr result set to a known
+    """Returns the closest match to within a Solr result set to a known
     string.
-    '''
+    """
     diff_ratios = []
     for result in results:
         # Calculate its diff_ratio, and add it to an array
@@ -83,11 +83,11 @@ def find_best_match(results, case_name):
 
 
 def find_confidences(results, case_name):
-    '''Returns all matches above a threshold.
+    """Returns all matches above a threshold.
 
     This is nearly identical to find_best_match, but returns any good matches
     in an array, and returns their confidence thresholds in a second array.
-    '''
+    """
     diff_ratios = []
     for result in results:
         # Calculate its diff_ratio, and add it to an array

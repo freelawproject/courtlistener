@@ -4,10 +4,10 @@ from alert.search.models import Court
 
 
 class urlToHash(models.Model):
-    '''A class to hold URLs and the hash of their contents. This could be added
+    """A class to hold URLs and the hash of their contents. This could be added
     to the Court table, except that courts often have more than one URL they
     parse.
-    '''
+    """
     hashUUID = models.AutoField("a unique ID for each hash/url pairing",
                                 primary_key=True)
     url = models.CharField("the URL that is hashed",
@@ -29,9 +29,9 @@ class urlToHash(models.Model):
 
 
 class ErrorLog(models.Model):
-    '''A class to hold scraper errors. Items are added by the scraper and
+    """A class to hold scraper errors. Items are added by the scraper and
     removed by the scraper's status monitor.
-    '''
+    """
     log_time = models.DateTimeField(
         'the exact date and time of the error',
         auto_now_add=True,

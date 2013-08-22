@@ -4,7 +4,8 @@ import os
 import sys
 from lxml.etree import XMLSyntaxError
 
-sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 from alert import settings
 from django.core.management import setup_environ
@@ -22,7 +23,6 @@ from lxml.html.clean import Cleaner
 from citations.tasks import update_document_by_id
 
 import glob
-import os
 import subprocess
 import time
 import traceback
@@ -268,7 +268,7 @@ def extract_by_ocr(path):
             success = True
         except IOError:
             print ("OCR was unable to finish due to not having a txt file created. "
-                   "This usually happens when Tesseract cannot ingest the tiff file at: %" % path)
+                   "This usually happens when Tesseract cannot ingest the tiff file at: %s" % path)
             content = fail_msg
             success = False
 

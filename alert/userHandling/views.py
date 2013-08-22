@@ -28,8 +28,9 @@ def redirect_to_settings(request):
 @login_required
 @never_cache
 def view_alerts(request):
-    return render_to_response('profile/alerts.html', {'private': False},
-        RequestContext(request))
+    return render_to_response('profile/alerts.html',
+                              {'private': False},
+                              RequestContext(request))
 
 
 @login_required
@@ -86,7 +87,7 @@ http://courtlistener.com/contact/." % (
                 'Your settings were saved successfully. To continue ' +
                 'receiving emails, please confirm your new email address ' +
                 'by checking your email within five days.')
-        elif up.emailConfirmed == False:
+        elif not up.emailConfirmed:
             # they didn't just change their email, but it isn't confirmed.
             messages.add_message(request, messages.INFO,
                 'Your email address has not been confirmed. To receive ' +
@@ -280,7 +281,7 @@ def confirmEmail(request, activationKey):
     email_body = "A new user has signed up on CourtListener.com! Maybe we should say hi?\n\n" \
                  "Their email address is: %s\n\n" \
                  "Sincerely,\n\n" \
-                 "The bots at CourtListener" % (user_profile.user.email)
+                 "The bots at CourtListener" % user_profile.user.email
     send_mail(email_subject,
               email_body,
               'no-reply@courtlistener.com',

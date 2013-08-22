@@ -1,6 +1,6 @@
-import os
 import sys
-sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
 from django.core.management import setup_environ
@@ -11,13 +11,13 @@ from optparse import OptionParser
 
 
 def fixer(simulate=False, verbose=False):
-    '''If an alert is set up to query ALL courts with them individually listed,
-    simply strip out all the court values.'''
+    """If an alert is set up to query ALL courts with them individually listed,
+    simply strip out all the court values."""
     alerts = Alert.objects.filter(alertText__contains='court_all')
 
     for alert in alerts:
         if verbose:
-            print "Fixing alert %s" % (alert)
+            print "Fixing alert %s" % alert
             print "  Old query: %s" % alert.alertText
         q = alert.alertText
         q_parts = q.split('&')
@@ -48,7 +48,6 @@ def main():
         print "*******************************************"
 
     return fixer(simulate, verbose)
-    exit(0)
 
 if __name__ == '__main__':
     main()

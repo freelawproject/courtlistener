@@ -1,6 +1,6 @@
-import os
 import sys
-sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
 from celery.task.sets import subtask
@@ -8,14 +8,13 @@ from django.core.management import setup_environ
 setup_environ(settings)
 
 from search.models import Document
-from alert.lib.db_tools import queryset_generator
 from optparse import OptionParser
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
 from scrapers.tasks import extract_doc_content, extract_by_ocr
 
 def fixer(simulate=False, verbose=False):
-    '''OCR documents that lack content'''
+    """OCR documents that lack content"""
     #docs = queryset_generator(Document.objects.filter(source='C', plain_text=''))
     #docs = Document.objects.raw('''select "documentUUID"  from "Document" where "source" = 'C' and "plain_text" ~ '^[[:space:]]*$' ''')
     docs = Document.objects.raw('''select "documentUUID" from "Document" where "source" = 'C' and "plain_text" = 'Unable to extract document content.' ''')
@@ -46,7 +45,6 @@ def main():
         print "*******************************************"
 
     return fixer(simulate, verbose)
-    exit(0)
 
 if __name__ == '__main__':
     main()

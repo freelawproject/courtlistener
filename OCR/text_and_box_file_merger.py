@@ -32,11 +32,11 @@ import itertools
 
 
 def merge_file(text_file, box_file):
-    '''Merges a text file with a box file so it doesn't have to be done manually.
+    """Merges a text file with a box file so it doesn't have to be done manually.
 
     We take each char from the text file, and each line from the box file, and
     simply line them up. If there are more lines from either, they'll end up
-    at the end.'''
+    at the end."""
 
     # Get the text from the text file and put it in an array
     text = codecs.open(text_file, 'r', 'utf-8').read()

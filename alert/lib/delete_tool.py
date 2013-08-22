@@ -1,6 +1,6 @@
-import os
 import sys
-sys.path.append(os.getenv('CL_INSTALL_ROOT', '/var/www/courtlistener'))
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
 from django.core.management import setup_environ
@@ -19,9 +19,9 @@ from optparse import OptionParser
 
 
 def delete_data_by_time_and_court(courtID, SIMULATE, delTime=None, VERBOSITY=0):
-    '''
+    """
     Deletes data for a court. If a time is given, uses that time as a constraint.
-    '''
+    """
     if delTime is not None:
         if VERBOSITY >= 1:
             print "Deleting data newer than %s for court %s" % (delTime, courtID)
@@ -37,16 +37,16 @@ def delete_data_by_time_and_court(courtID, SIMULATE, delTime=None, VERBOSITY=0):
             docs = queryset_generator(Document.objects.filter(court=courtID))
 
     if VERBOSITY >= 1:
-        print "Deleting %s documents from the database." % (count)
+        print "Deleting %s documents from the database." % count
     if (not SIMULATE) and (count != 0):
         for doc in docs:
             doc.delete()
 
 
 def delete_all_citations(SIMULATE, VERBOSITY=0):
-    '''
+    """
     Deletes all citations and their associated documents.
-    '''
+    """
     if VERBOSITY >= 1:
         print "Deleting all citations and associated documents."
     cites = Citation.objects.all()
@@ -62,12 +62,12 @@ def delete_all_citations(SIMULATE, VERBOSITY=0):
 
 
 def delete_orphaned_citations(SIMULATE, VERBOSITY=0):
-    '''
+    """
     Deletes all citations that don't have a document associated with them.
 
     This is brutally inefficient, iterating over ALL citations in the DB, and
     performing one query per citation.
-    '''
+    """
     if VERBOSITY >= 1:
         print "Deleting all citations that are not associated with a document."
     cites = Citation.objects.all()
@@ -86,14 +86,14 @@ def delete_orphaned_citations(SIMULATE, VERBOSITY=0):
 
 
 def main():
-    '''Manipulates the database in convenient ways.
+    """Manipulates the database in convenient ways.
 
     This script has some basic commands that allow manipulations of the database
     in somewhat more convenient ways than provided through other utilities.
 
     Yes, it's possible to get into MySQL, and to delete things, but it's easier
     and cleaner to delete things this way.
-    '''
+    """
 
     usage = "usage: %prog -c COURT  (-d | -o | --allcites) [-t time] [-v VERBOSITY] [-s]"
     parser = OptionParser(usage)

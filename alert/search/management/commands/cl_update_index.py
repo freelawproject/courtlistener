@@ -104,7 +104,7 @@ class Command(BaseCommand):
             # Make a search doc, and add it to the index
             if self.verbosity >= 2:
                 self.stdout.write('Indexing document %s' % doc.pk)
-            if doc.court.in_use == True:
+            if doc.court.in_use:
                 subtasks.append(add_or_update_doc_object.subtask((doc,)))
                 processed_count += 1
             else:

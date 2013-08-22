@@ -12,13 +12,13 @@ from django.utils.datastructures import MultiValueDictKeyError
 
 @login_required
 def save_or_update_favorite(request):
-    '''Uses ajax to save or update a favorite.
+    """Uses ajax to save or update a favorite.
 
     Receives a request as an argument, and then uses that plus POST data to
     create or update a favorite in the database for a specific user. If the user
     already has the document favorited, it updates the favorite with the new
     information. If not, it creates a new favorite.
-    '''
+    """
     if request.is_ajax():
         # If it's an ajax request, gather the data from the form, save it to
         # the DB, and then return a success code.
@@ -52,9 +52,9 @@ def save_or_update_favorite(request):
 
 @login_required
 def edit_favorite(request, fave_id):
-    '''Provide a form for the user to update alerts, or do so if submitted via
+    """Provide a form for the user to update alerts, or do so if submitted via
     POST
-    '''
+    """
 
     try:
         fave_id = int(fave_id)
@@ -90,10 +90,10 @@ def edit_favorite(request, fave_id):
 
 @login_required
 def delete_favorite(request):
-    '''Delete a user's favorite
+    """Delete a user's favorite
 
     Deletes a favorite for a user using an ajax call and post data.
-    '''
+    """
     if request.is_ajax():
         # If it's an ajax request, gather the data from the form, save it to
         # the DB, and then return a success code.
