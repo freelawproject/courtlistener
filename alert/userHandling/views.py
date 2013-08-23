@@ -1,3 +1,4 @@
+from alert.donate.models import Donation
 from alert.settings import ADMINS, LOGIN_REDIRECT_URL
 from alert.userHandling.forms import *
 from alert.honeypot.decorators import check_honeypot
@@ -37,7 +38,7 @@ def view_alerts(request):
 @never_cache
 def view_favorites(request):
     return render_to_response('profile/favorites.html', {'private': False},
-        RequestContext(request))
+                              RequestContext(request))
 
 
 @login_required
@@ -68,7 +69,7 @@ def view_settings(request):
             # Send the email.
             current_site = Site.objects.get_current()
             email_subject = 'Email changed successfully on ' + \
-                str(current_site.name)
+                            str(current_site.name)
             email_body = "Hello, %s,\n\nYou have successfully changed your \
 email address at %s. Please confirm this change by clicking the following \
 link within 5 days:\n\nhttp://courtlistener.com/email/confirm/%s\n\n\
@@ -84,19 +85,19 @@ http://courtlistener.com/contact/." % (
                       [newEmail])
 
             messages.add_message(request, messages.SUCCESS,
-                'Your settings were saved successfully. To continue ' +
-                'receiving emails, please confirm your new email address ' +
-                'by checking your email within five days.')
+                                 'Your settings were saved successfully. To continue ' +
+                                 'receiving emails, please confirm your new email address ' +
+                                 'by checking your email within five days.')
         elif not up.emailConfirmed:
             # they didn't just change their email, but it isn't confirmed.
             messages.add_message(request, messages.INFO,
-                'Your email address has not been confirmed. To receive ' +
-                'alerts, you must <a href="/email-confirmation/request/">' +
-                'confirm your email address</a>.')
+                                 'Your email address has not been confirmed. To receive ' +
+                                 'alerts, you must <a href="/email-confirmation/request/">' +
+                                 'confirm your email address</a>.')
         else:
             # if the email wasn't changed, simply inform of success.
             messages.add_message(request, messages.SUCCESS,
-                'Your settings were saved successfully.')
+                                 'Your settings were saved successfully.')
 
         # New email address and changes above are saved here.
         profileForm.save()
@@ -170,36 +171,42 @@ def register(request):
         if request.method == 'POST':
             form = UserCreationFormExtended(request.POST)
             if form.is_valid():
-                # it seems like I should use this, but it's causing trouble...
                 cd = form.cleaned_data
 
                 username = cd['username']
                 password = cd['password1']
                 email = cd['email']
-                fname = cd['first_name']
-                lname = cd['last_name']
+                first_name = cd['first_name']
+                last_name = cd['last_name']
 
                 # make a new user that is active, but has not confirmed their
                 # email.
                 new_user = User.objects.create_user(username, email, password)
-                new_user.first_name = fname
-                new_user.last_name = lname
+                new_user.first_name = first_name
+                new_user.last_name = last_name
                 new_user.save()
 
                 # Build the activation key for the new account
                 salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-                activationKey = hashlib.sha1(salt + new_user.username)\
+                activationKey = hashlib.sha1(salt + new_user.username) \
                     .hexdigest()
-                key_expires = datetime.datetime.today() + datetime\
+                key_expires = datetime.datetime.today() + datetime \
                     .timedelta(5)
 
                 # associate a new UserProfile associated with the new user
                 # this makes it so every time we call get_profile(), we can be
                 # sure there is a profile waiting for us (a good thing).
-                up = UserProfile(user=new_user,
-                                 activationKey=activationKey,
-                                 key_expires=key_expires)
+                up = UserProfile(
+                    user=new_user,
+                    activationKey=activationKey,
+                    key_expires=key_expires,
+                )
                 up.save()
+
+                # Find any donations this person may have made before signing up
+                # and associate them with the profile
+                donations = Donation.objects.filter(email_address=email)
+                up.donation.add(*donations)
 
                 # Log the user in (pulled from the login view and here:
                 # http://bitbucket.org/ubernostrum/django-registration/src/\
@@ -356,7 +363,7 @@ def password_change(request):
         if form.is_valid():
             form.save()
             messages.add_message(request, messages.SUCCESS,
-                'Your password was changed successfully.')
+                                 'Your password was changed successfully.')
             return HttpResponseRedirect('/profile/password/change/')
     else:
         form = PasswordChangeForm(user=request.user)

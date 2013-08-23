@@ -1,24 +1,8 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-
 from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.localflavor.us.models import USStateField
 from alert.alerts.models import Alert
+from alert.donate.models import Donation
 from alert.favorites.models import Favorite
 
 # a class where bar memberships are held and handled.
@@ -58,8 +42,14 @@ class UserProfile(models.Model):
         verbose_name='the bar memberships held by the user',
         blank=True,
         null=True)
-    alert = models.ManyToManyField(Alert,
+    alert = models.ManyToManyField(
+        Alert,
         verbose_name='the alerts created by the user',
+        blank=True,
+        null=True)
+    donation = models.ManyToManyField(
+        Donation,
+        verbose_name='the donations made by the user',
         blank=True,
         null=True)
     favorite = models.ManyToManyField(Favorite,

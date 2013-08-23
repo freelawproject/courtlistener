@@ -6,6 +6,7 @@ from alert.casepage.views import view_case, view_case_citations, \
 from alert.contact.views import contact, thanks
 from alert.coverage.views import coverage_graph
 from alert.data_dumper.views import dump_index, serve_or_gen_dump
+from alert.donate.views import view_donations
 from alert.favorites.views import delete_favorite, edit_favorite, \
                                   save_or_update_favorite
 from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, \
@@ -86,6 +87,7 @@ urlpatterns = patterns('',
     url(r'^profile/settings/$', view_settings, name='view_settings'),
     (r'^profile/favorites/$', view_favorites),
     (r'^profile/alerts/$', view_alerts),
+    (r'^profile/donations/$', view_donations),
     (r'^profile/password/change/$', password_change),
     (r'^profile/delete/$', deleteProfile),
     (r'^profile/delete/done/$', deleteProfileDone),
