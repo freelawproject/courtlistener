@@ -24,7 +24,6 @@ class FloorDateField(DateField):
         Validates that the input can be converted to a date. Returns a Python
         datetime.date object.
         """
-        value = value.strip()
         if value in validators.EMPTY_VALUES or value == 'YYYY-MM-DD':
             return None
         if isinstance(value, datetime.datetime):
@@ -33,6 +32,7 @@ class FloorDateField(DateField):
             return value
         for format in self.input_formats or formats.get_format('DATE_INPUT_FORMATS'):
             try:
+                value = value.strip()
                 return datetime.date(*time.strptime(value, format)[:3])
             except ValueError:
                 continue
@@ -62,7 +62,6 @@ class CeilingDateField(Field):
         Validates that the input can be converted to a date. Returns a
         Python datetime.datetime object.
         """
-        value = value.strip()
         if value in validators.EMPTY_VALUES or value == "YYYY-MM-DD":
             return None
         if isinstance(value, datetime.datetime):
@@ -71,6 +70,7 @@ class CeilingDateField(Field):
             return value
         for format in self.input_formats or formats.get_format('DATETIME_INPUT_FORMATS'):
             try:
+                value = value.strip()
                 valid_date = datetime.date(*time.strptime(value, format)[:3])
             except ValueError:
                 continue
