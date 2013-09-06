@@ -30,6 +30,9 @@ SECRET_KEY = 'your-secret-key'
 if not DEVELOPMENT:
     CELERY_PASSWORD = 'your-celery-password'
 
+# Payment secrets
+DWOLLA_SECRET_KEY = ''
+
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
 # although not all choices may be available on all operating systems.

@@ -149,7 +149,7 @@ MEDIA_ROOT = os.path.join(INSTALL_ROOT, 'alert/assets/media/')
 # Static files configuration...
 STATIC_URL = '/static/'
 STATICFILES_DIRS = (os.path.join(INSTALL_ROOT, 'alert/assets/static-global/'),)
-STATIC_ROOT = os.path.join(INSTALL_ROOT, 'alert/assets/static/')
+STATIC_ROOT = os.path.join(INSTALL_ROOT, 'alert/assets/static/')  # This is where things get collected to
 
 # Where should the data dumps be stored?
 DUMP_DIR = os.path.join(INSTALL_ROOT, 'alert/assets/media/dumps/')
@@ -158,6 +158,20 @@ TEMPLATE_DIRS = (
     # Don't forget to use absolute paths, not relative paths.
     os.path.join(INSTALL_ROOT, 'alert/assets/templates/'),
 )
+
+
+############
+# Payments #
+############
+PAYMENT_REDIRECT = 'https://www.courtlistener.com/donate/thanks/'
+PAYMENT_CANCELLATION = 'https://www.courtlistener.com/donate/cancel/'
+DWOLLA_CALLBACK = 'https://www.courtlistener.com/donate/callbacks/dwolla/'
+PAYPAL_CALLBACK = 'https://www.courtlistener.com/donate/callbacks/paypal/'
+DWOLLA_REDIRECT = 'https://www.courtlistener.com/donate/dwolla/complete/'
+if DEVELOPMENT:
+    PAYMENT_TESTING_MODE = True
+else:
+    PAYMENT_TESTING_MODE = False
 
 
 ######################
@@ -169,7 +183,7 @@ if DEVELOPMENT:
     CSRF_COOKIE_SECURE = False
     # For debug_toolbar
     INTERNAL_IPS = ('127.0.0.1',)
-    DEBUG_TOOLBAR_CONFIG = {'INTERCEPT_REDIRECTS': True}
+    DEBUG_TOOLBAR_CONFIG = {'INTERCEPT_REDIRECTS': False}
     # For tests
     SOUTH_TESTS_MIGRATE = False
     if 'test' in sys.argv:

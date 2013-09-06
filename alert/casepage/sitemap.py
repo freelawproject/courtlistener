@@ -14,8 +14,6 @@ def sitemap_maker(request, size=250):
     Counts the number of cases in the site, divides by 1,000 and provides links
     for all of them.
     """
-    protocol = request.is_secure() and 'https' or 'http'
-
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     params = {'q': '*:*'}
     page = request.GET.get("p", False)
@@ -31,19 +29,19 @@ def sitemap_maker(request, size=250):
         urls = []
         for result in search_results_object:
             url = {}
-            url_strs = ['%s://www.courtlistener.com%s' % (protocol, result['absolute_url'])]
+            url_strs = ['https://www.courtlistener.com%s' % result['absolute_url']]
             if int(result['citeCount']) > 0:
                 # Only include this page if there are citations.
-                url_strs.append('%s://www.courtlistener.com%scited-by/' % (protocol, result['absolute_url']))
+                url_strs.append('https://www.courtlistener.com%scited-by/' % result['absolute_url'])
             try:
-                url_strs.append('%s://www.courtlistener.com/%s' % (protocol, result['local_path']))
+                url_strs.append('https://www.courtlistener.com/%s' % result['local_path'])
             except KeyError:
                 # No local_path key.
                 pass
 
             for url_str in url_strs:
                 url['location'] = url_str
-                url['changefreq'] = 'never'
+                url['changefreq'] = 'yearly'
                 if any(str in url_str for str in ['cited-by', 'pdf', 'doc', 'wpd']):
                     url['priority'] = '0.4'
                 else:
@@ -60,10 +58,13 @@ def sitemap_maker(request, size=250):
         count = search_results_object.result.numFound
 
         i = 0
-        sites = ['%s://www.courtlistener.com/sitemap-flat.xml' % protocol]
+        sites = [
+            'https://www.courtlistener.com/sitemap-flat.xml',
+            'https://www.courtlistener.com/sitemap-donate.xml',
+        ]
         # For flat pages
         while i < count:
-            sites.append('%s://www.courtlistener.com/sitemap.xml?p=%s' % (protocol, i / size + 1))
+            sites.append('https://www.courtlistener.com/sitemap.xml?p=%s' % (i / size + 1))
             i += size
 
         xml = loader.render_to_string('sitemap_index.xml', {'sitemaps': sites})
@@ -92,11 +93,10 @@ def flat_sitemap_maker(request):
         else:
             return 0.2
 
-    protocol = request.is_secure() and 'https' or 'http'
     flat_pages = FlatPage.objects.all()
     urls = []
     for page in flat_pages:
-        url = {'location': '%s://www.courtlistener.com%s' % (protocol, page.get_absolute_url()),
+        url = {'location': 'https://www.courtlistener.com%s' % (page.get_absolute_url()),
                'changefreq': 'monthly',
                'priority': priority(page)}
         urls.append(url)

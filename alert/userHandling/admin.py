@@ -4,7 +4,7 @@ from alert.userHandling.models import *
 
 
 def getEmailConfirmed(obj):
-    return obj.get_profile().emailConfirmed
+    return obj.get_profile().email_confirmed
 getEmailConfirmed.short_description = "Email Confirmed?"
 
 

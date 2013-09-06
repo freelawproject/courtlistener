@@ -11,7 +11,18 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
-2013-07-09:
+DONATION PROJECT
+    - PRE DEPLOY:
+        - TODO: Make sure the scrapers are working properly again (see error logs in VM)
+        - TODO: Make the annual reminder
+
+    - POST DEPLOY:
+        - TODO: Test the "Try Donating Again" button that comes up when you cancel a Dwolla payment.
+        - TODO: Make sure that the location field gets mapped into city/state properly
+
+
+
+LAWBOX PROJECT
  - TODO: Does the fact that lawbox cases lack a URL cause an issue in the UI or can they be treated like the Resource.org cases?
  - TODO: If we do case merging, the source field should be LBM ("LawBox Merged.")
  - TODO: Investigate whether it's worth reworking the citation finder so that it better understands neutral citations.
@@ -28,6 +39,17 @@ We welcome a conversion of these notes to a better process using Fabric.
             - Remove West Cite from the front end (make it say simply citation)
             - Update Solr and investigate how to swap in a better index.
             - Update the advanced search page notes
+
+2013-08-27:
+ - the user profiles have been updated to support donations. Update your database with:
+
+    manage.py migrate donate
+    manage.py migrate userHandling
+ - we've added payment support, which introduces a new dependency. Install it with:
+
+    sudo pip install --index-url https://code.stripe.com --upgrade stripe
+
+ -
 
 2013-07-25:
  - The database has been updated to support the lawbox use case and to support much greater citation granularity.

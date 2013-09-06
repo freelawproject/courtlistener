@@ -263,7 +263,7 @@ class Document(models.Model):
         'the number of times this document is cited by other cases',
         default=0)
     precedential_status = models.CharField(
-        "the precedential status of document",
+        'the precedential status of document',
         max_length=50,
         blank=True,
         choices=DOCUMENT_STATUSES)
