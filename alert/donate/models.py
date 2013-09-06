@@ -1,15 +1,21 @@
 from django.db import models
+from datetime import date
 
-FREQUENCY = (
-    ('m', 'Monthly'),
-    ('1', 'One time'),
-)
 PROVIDERS = (
-    ('paypal', 'Paypal'),
     ('dwolla', 'Dwolla'),
-    ('bitpay', 'BitPay'),
-    ('stripe', 'Stripe'),
+    ('paypal', 'PayPal'),
+    ('cc', 'Credit Card'),
     ('check', 'Check'),
+)
+PAYMENT_STATUSES = (
+    (0, 'AWAITING_PAYMENT'),
+    (1, 'UNKNOWN_ERROR'),
+    (2, 'COMPLETED'),  # This does not mean we get the money, must await "PROCESSED" for that.
+    (3, 'CANCELLED'),
+    (4, 'PROCESSED'),
+    (5, 'PENDING'),
+    (6, 'FAILED'),
+    (7, 'RECLAIMED'),
 )
 
 
@@ -24,39 +30,41 @@ class Donation(models.Model):
         editable=False,
         db_index=True
     )
-    email_address = models.EmailField(
-        max_length=254  # According to Django docs.
+    clearing_date = models.DateTimeField(
+        null=True,
+        blank=True,
     )
-    frequency = models.CharField(
-        choices=FREQUENCY,
-        max_length=10
-    )
-    renew_annually = models.BooleanField(
+    send_annual_reminder = models.BooleanField(
+        'Send me a reminder to donate again in one year',
         default=False,
     )
     amount = models.DecimalField(
-        max_digits=9,
-        decimal_places=2,
-    )
-    total = models.DecimalField(
-        'For repeating donations, this is how much has been donated so far',
         max_digits=10,
         decimal_places=2,
-    )
-    currency = models.CharField(
-        max_length=10,
+        default=None,
     )
     payment_provider = models.CharField(
         max_length=50,
         choices=PROVIDERS,
+        default=None,
+    )
+    payment_id = models.CharField(
+        'Internal ID used during a transaction',
+        max_length=64,
+    )
+    transaction_id = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+    )
+    status = models.SmallIntegerField(
+        max_length=2,
+        choices=PAYMENT_STATUSES,
     )
     referrer = models.TextField(
-        'GET or HTTP referrer'
+        'GET or HTTP referrer',
+        blank=True,
     )
 
     def __unicode__(self):
-        if self.frequency == '1':
-            repetition = 'does not repeat'
-        elif self.frequency == 'a':
-            repetition = 'repeats %s' % self.get_frequency_display()
-        return '%s%s by %s that %s' % (self.amount, self.currency, self.email_address, repetition)
+        return '%s: $%s, %s' % (self.get_payment_provider_display(), self.amount, self.get_status_display())

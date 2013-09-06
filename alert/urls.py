@@ -1,12 +1,16 @@
 # imports of local settings and views
 from alert import settings
+from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
 from alert.casepage.views import view_case, view_case_citations, \
                                  serve_static_file
 from alert.contact.views import contact, thanks
 from alert.coverage.views import coverage_graph
 from alert.data_dumper.views import dump_index, serve_or_gen_dump
-from alert.donate.views import view_donations
+from alert.donate.sitemap import donate_sitemap_maker
+from alert.donate.views import view_donations, donate
+from alert.donate.dwolla import process_dwolla_callback, donate_dwolla_complete, process_dwolla_transaction_status_callback
+from alert.donate.paypal import process_paypal_callback
 from alert.favorites.views import delete_favorite, edit_favorite, \
                                   save_or_update_favorite
 from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, \
@@ -19,7 +23,7 @@ from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert
 from alert.search.models import Court
 from alert.search.views import browser_warning, show_results, tools_page
 from alert.userHandling.views import confirmEmail, deleteProfile, deleteProfileDone, emailConfirmSuccess, \
-    password_change, redirect_to_settings, register, registerSuccess, requestEmailConfirmation, view_favorites, \
+    password_change, redirect_to_settings, register, register_success, request_email_confirmation, view_favorites, \
     view_alerts, view_settings
 
 from django.conf.urls.defaults import *
@@ -79,7 +83,12 @@ urlpatterns = patterns('',
     (r'^contact/thanks/$', thanks),
 
     # Various sign in/out etc. functions as provided by django
-    url(r'^sign-in/$', signIn, {'extra_context': {'private': False}}, name="sign-in"),
+    url(
+        r'^sign-in/$',
+        signIn,
+        {'authentication_form': ConfirmedEmailAuthenticationForm, 'extra_context': {'private': False}},
+        name="sign-in"
+    ),
     (r'^sign-out/$', signOut, {'extra_context': {'private': False}}),
 
     # Settings pages
@@ -92,7 +101,7 @@ urlpatterns = patterns('',
     (r'^profile/delete/$', deleteProfile),
     (r'^profile/delete/done/$', deleteProfileDone),
     url(r'^register/$', register, name="register"),
-    (r'^register/success/$', registerSuccess),
+    (r'^register/success/$', register_success),
 
     # Favorites pages
     (r'^favorite/create-or-update/$', save_or_update_favorite),
@@ -101,7 +110,7 @@ urlpatterns = patterns('',
 
     # Registration pages
     (r'^email/confirm/([0-9a-f]{40})/$', confirmEmail),
-    (r'^email-confirmation/request/$', requestEmailConfirmation),
+    (r'^email-confirmation/request/$', request_email_confirmation),
     (r'^email-confirmation/success/$', emailConfirmSuccess),
 
     # Reset password pages
@@ -143,10 +152,18 @@ urlpatterns = patterns('',
     # Sitemaps & robots
     (r'^sitemap\.xml$', sitemap_maker),
     (r'^sitemap-flat\.xml$', flat_sitemap_maker),
+    (r'^sitemap-donate\.xml$', donate_sitemap_maker),
     (r'^robots.txt$', robots),
 
     # Coverage
     (r'^coverage/$', coverage_graph),
+
+    # Donations
+    (r'^donate/$', donate),
+    (r'^donate/dwolla/complete/$', donate_dwolla_complete),
+    (r'^donate/callbacks/dwolla/$', process_dwolla_callback),
+    (r'^donate/callbacks/dwolla/transaction-status/$', process_dwolla_transaction_status_callback),
+    (r'^donate/callbacks/paypal/$', process_paypal_callback),
 )
 
 # redirects

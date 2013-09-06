@@ -315,15 +315,20 @@ class Command(BaseCommand):
                     site = mod.Site().parse()
                     scrape_court(site, full_crawl)
                 except Exception, e:
-                    msg = ('********!! CRAWLER DOWN !!***********\n'
-                           '*****scrape_court method failed!*****\n'
-                           '********!! ACTION NEEDED !!**********\n%s') % traceback.format_exc()
-                    logger.critical(msg)
+                    # noinspection PyBroadException
+                    try:
+                        msg = ('********!! CRAWLER DOWN !!***********\n'
+                               '*****scrape_court method failed!*****\n'
+                               '********!! ACTION NEEDED !!**********\n%s') % traceback.format_exc()
+                        logger.critical(msg)
 
-                    # opinions.united_states.federal.ca9_u --> ca9
-                    court_str = mod.Site.__module__.split('.')[-1].split('_')[0]
-                    court = Court.objects.get(courtUUID=court_str)
-                    ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
+                        # opinions.united_states.federal.ca9_u --> ca9
+                        court_str = mod.Site.__module__.split('.')[-1].split('_')[0]
+                        court = Court.objects.get(courtUUID=court_str)
+                        ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
+                    except Exception, e:
+                        # This is very important. Without this, an exception above will crash the caller.
+                        pass
                 finally:
                     time.sleep(wait)
                     last_court_in_list = (i == (num_courts - 1))

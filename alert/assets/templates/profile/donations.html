@@ -18,39 +18,22 @@
                     </div>
                     <div class="span-6 last">&nbsp;</div>
                 </div>
-            {% else %}
-                {% if not request.user.get_profile.emailConfirmed %}
-                    <div class="span-17 last">
-                        <div class="span-10">
-                            <p class="bottom notice">Your email address has not been confirmed. To receive alerts and
-                                see your donations you need to <a href="/email-confirmation/request/">confirm your email
-                                address</a>.</p>
-                        </div>
-                        <div class="span-6 last">&nbsp;</div>
-                    </div>
-                {% endif %}
             {% endif %}
         </div>
-        {% if request.user.get_profile.emailConfirmed and user.get_profile.donation.all %}
+        {% if user.get_profile.donation.all %}
             <div class="span-24 last content">
                 <table class="settings-table">
                     <thead>
                         <tr>
                             <th>Amount</th>
-                            <th>Frequency</th>
-                            <th>Renews Annually</th>
-                            <th>Total So Far</th>
-                            <th>Initial Date</th>
+                            <th>Date</th>
                             <th>Via</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for donation in user.get_profile.donation.all %}
                         <tr>
-                            <td>{{ donation.amount }}{{ donation.currency }}</td>
-                            <td>{{ donation.get_frequency_display }}</td>
-                            <td>{{ donation.renew_annually|yesno|title }}</td>
-                            <td>{{ donation.total_amount|default:"0.00" }}{{ donation.currency }}</td>
+                            <td>${{ donation.amount }}</td>
                             <td>{{ donation.date_created|date:"D, n/j/Y" }}</td>
                             <td>{{ donation.get_payment_provider_display }}</td>
                         </tr>
@@ -70,9 +53,6 @@
                 in part by people like you. We run a very lean budget and your donations go towards paying our full time
                 developers, server costs and fund raising efforts.</p>
             <p>To learn more or support our cause, visit <a href="/donate?referrer=profile">our donations page</a>.</p>
-            {%  if not request.user.get_profile.emailConfirmed %}
-                <p>Note: For privacy reasons, donations will not appear here until your email address is confirmed.</p>
-            {% endif %}
         {% endif %}
     </div>
 {% endblock %}
