@@ -135,11 +135,11 @@ def build_main_query(cd, highlight=True):
 
         # Highlighting for the main query.
         main_params['hl'] = 'true'
-        main_params['hl.fl'] = 'text,caseName,judge,suitNature,westCite,neutralCite,docketNumber,lexisCite,court_citation_string'
+        main_params['hl.fl'] = 'text,caseName,judge,suitNature,citation,neutralCite,docketNumber,lexisCite,court_citation_string'
         main_params['f.caseName.hl.fragListBuilder'] = 'single'
         main_params['f.judge.hl.fragListBuilder'] = 'single'
         main_params['f.suitNature.hl.fragListBuilder'] = 'single'
-        main_params['f.westCite.hl.fragListBuilder'] = 'single'
+        main_params['f.citation.hl.fragListBuilder'] = 'single'
         main_params['f.neutralCite.hl.fragListBuilder'] = 'single'
         main_params['f.docketNumber.hl.fragListBuilder'] = 'single'
         main_params['f.lexisCite.hl.fragListBuilder'] = 'single'
@@ -151,7 +151,7 @@ def build_main_query(cd, highlight=True):
         main_params['f.caseName.hl.alternateField'] = 'caseName'
         main_params['f.judge.hl.alternateField'] = 'judge'
         main_params['f.suitNature.hl.alternateField'] = 'suitNature'
-        main_params['f.westCite.hl.alternateField'] = 'westCite'
+        main_params['f.citation.hl.alternateField'] = 'citation'
         main_params['f.neutralCite.hl.alternateField'] = 'neutralCite'
         main_params['f.docketNumber.hl.alternateField'] = 'docketNumber'
         main_params['f.lexisCite.hl.alternateField'] = 'lexisCite'
@@ -170,8 +170,8 @@ def build_main_query(cd, highlight=True):
         main_fq.append('judge:(%s)' % ' AND '.join(cd['judge'].split()))
 
     # Citations
-    if cd['west_cite']:
-        main_fq.append('westCite:' + cd['west_cite'])
+    if cd['citation']:
+        main_fq.append('citation:' + cd['citation'])
     if cd['docket_number']:
         main_fq.append('docketNumber:' + cd['docket_number'])
     if cd['neutral_cite']:
@@ -229,11 +229,11 @@ def place_facet_queries(cd):
         shared_fq.append('judge:(%s)' % ' AND '.join(cd['judge'].split()))
 
     # Citations
-    if cd['west_cite'] != '' and cd['west_cite'] is not None:
-        shared_fq.append('westCite:%s' % cd['west_cite'])
-    if cd['docket_number'] != '' and cd['docket_number'] is not None:
+    if cd['citation']:
+        shared_fq.append('citation:%s' % cd['citation'])
+    if cd['docket_number']:
         shared_fq.append('docketNumber:%s' % cd['docket_number'])
-    if cd['neutral_cite'] != '' and cd['neutral_cite'] is not None:
+    if cd['neutral_cite']:
         shared_fq.append('neutralCite:%s' % cd['neutral_cite'])
 
     # Dates

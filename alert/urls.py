@@ -1,5 +1,6 @@
 # imports of local settings and views
 from alert import settings
+from alert.api.views import court_index
 from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
 from alert.casepage.views import view_case, view_case_citations, \
@@ -130,6 +131,9 @@ urlpatterns = patterns('',
     (r'^alert/delete/confirm/(\d{1,6})/$', delete_alert_confirm),
     (r'^tools/$', tools_page),
 
+    # The API
+    (r'^api/jurisdictions/$', court_index),
+
     # Dump index and generation pages
     (r'^dump-info/$', dump_index),
     (r'^dump-api/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
@@ -138,7 +142,7 @@ urlpatterns = patterns('',
     (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
 
     # Feeds
-    (r'^feed/(search)/$', search_feed()), #lacks URL capturing b/c it will use GET queries.
+    (r'^feed/(search)/$', search_feed()),  #lacks URL capturing b/c it will use GET queries.
     (r'^feed/court/all/$', all_courts_feed()),
     (r'^feed/court/(?P<court>' + '|'.join(pacer_codes) + ')/$', court_feed()),
     (r'^feed/(?P<doc_id>.*)/cited-by/$', cited_by_feed()),

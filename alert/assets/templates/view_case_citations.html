@@ -23,13 +23,7 @@
 {% block content %}
     <div class="span-17 last">
         <h2>
-            {{ doc.citation.case_name|v_wrapper }},
-            {% if doc.citation.west_cite %}
-                {{doc.citation.west_cite}}
-            {% else %}
-                {{doc.citation.docket_number}}
-            {% endif %}
-            ({% if doc.court.citation_string != 'SCOTUS' %}{{doc.court.citation_string|nbsp}}&nbsp;{% endif %}{{doc.date_filed|date:"Y"}})
+            {{ caption|safe|v_wrapper }}
         </h2>
 
         <div id="cited-by-viewer">
@@ -39,13 +33,13 @@
                 <ul>
                     {% for case in citing_cases.object_list %}
                         {# Changing the attributes on this li may break the js above. #}
-                        <li class="citing-case {{ case.court.courtUUID }} {{ case.date_filed.year|default:'0' }}">
-                            <span class="citation-name"><a href="{{case.get_absolute_url}}">{{ case.citation.case_name|v_wrapper }},
-                            {% if case.citation.west_cite %}
-                                {{case.citation.west_cite}}
-                            {% else %}
-                                {{case.citation.docket_number}}
-                            {% endif %}</a></span><br/>
+                        <li class="citing-case">
+                            <span class="citation-name">
+                                <a href="{{case.get_absolute_url}}">
+                                    {{ caption|v_wrapper }}
+                                </a>
+                            </span>
+                            <br/>
                             {{ case.court }} |
                             {{ case.date_filed }} |
                             {% if case.citation_count != 0 %}

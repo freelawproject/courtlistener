@@ -75,11 +75,47 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 except:
                     pass
                 try:
-                    row.set('west_cite', doc.citation.west_cite)
+                    row.set('federal_cite_one', doc.citation.federal_cite_one)
+                except:
+                    pass
+                try:
+                    row.set('federal_cite_two', doc.citation.federal_cite_two)
+                except:
+                    pass
+                try:
+                    row.set('federal_cite_three', doc.citation.federal_cite_three)
+                except:
+                    pass
+                try:
+                    row.set('state_cite_one', doc.citation.state_cite_one)
+                except:
+                    pass
+                try:
+                    row.set('state_cite_two', doc.citation.state_cite_two)
+                except:
+                    pass
+                try:
+                    row.set('state_cite_three', doc.citation.state_cite_three)
+                except:
+                    pass
+                try:
+                    row.set('state_cite_regional', doc.citation.state_cite_regional)
+                except:
+                    pass
+                try:
+                    row.set('specialty_cite_one', doc.citation.specialty_cite_one)
+                except:
+                    pass
+                try:
+                    row.set('scotus_early_cite', doc.citation.scotus_early_cite)
                 except:
                     pass
                 try:
                     row.set('lexis_cite', doc.citation.lexis_cite)
+                except:
+                    pass
+                try:
+                    row.set('westlaw_cite', doc.citation.westlaw_cite)
                 except:
                     pass
                 try:

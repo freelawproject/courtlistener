@@ -16,17 +16,17 @@ def contact(request):
 
             # pull the email addresses out of the MANAGERS tuple
             i = 0
-            emailAddys = []
+            email_addresses = []
             while i < len(settings.MANAGERS):
-                emailAddys.append(settings.MANAGERS[i][1])
+                email_addresses.append(settings.MANAGERS[i][1])
                 i += 1
 
             # send the email to the MANAGERS
             send_mail(
-                "Message from " + cd['name'] + " at CourtListener.com",
+                'Message from %s at CourtListener.com: %s' % (cd['name'], cd['subject']),
                 cd['message'],
                 cd.get('email', 'noreply@example.com'),
-                emailAddys,)
+                email_addresses,)
             # we must redirect after success to avoid problems with people using the refresh button.
             return HttpResponseRedirect('/contact/thanks/')
     else:
@@ -42,7 +42,8 @@ def contact(request):
             form = ContactForm()
 
     return render_to_response('contact/contact_form.html',
-                              {'form': form, 'private': False},
+                              {'form': form,
+                               'private': False},
                               RequestContext(request))
 
 

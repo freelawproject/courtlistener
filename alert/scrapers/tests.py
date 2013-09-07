@@ -10,7 +10,7 @@ from alert.scrapers.management.commands.cl_scrape_and_extract import scrape_cour
 from alert.scrapers.tasks import extract_doc_content
 from alert.scrapers.test_assets import test_scraper
 from alert.search.models import Citation, Court, Document
-from alert.search.tests import clear_solr
+from alert.search.tests import create_solr_core, delete_solr_core
 from alert import settings
 from celery.task.sets import subtask
 from datetime import date, timedelta
@@ -29,16 +29,16 @@ class IngestionTest(TestCase):
         scrape_court(site)
 
     def setUp(self):
-        # Clear Solr
+        # Remap the SOLR_URL and create a Solr Core for testing
+        settings.SOLR_URL = 'http://127.0.0.1:8983/solr/test_core'
         self.si = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
-        clear_solr(self.si)
+        create_solr_core('test_core')
 
         # Set up a handy court object
         self.court = Court.objects.get(pk='test')
 
     def tearDown(self):
-        # Clear the Solr index
-        clear_solr(self.si)
+        delete_solr_core('test_core')
 
     def test_parsing_xml_document_to_site_object(self):
         """Does a basic parse of a site reveal the right number of items?"""

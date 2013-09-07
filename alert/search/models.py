@@ -12,7 +12,14 @@ import os
 # Note that spaces cannot be used in the keys, or else the SearchForm won't work
 JURISDICTIONS = (
     ('F', 'Federal'),
-    ('S', 'State'),
+    ('FB', 'Federal Bankruptcy'),
+    ('FD', 'Federal District'),
+    ('FS', 'Federal Special'),
+    ('S', 'State Supreme'),
+    ('SA', 'State Appellate'),
+    ('SS', 'State Special'),
+    ('C', 'Committee'),
+    ('T', 'Testing'),
 )
 
 DOCUMENT_STATUSES = (
@@ -33,7 +40,8 @@ DOCUMENT_SOURCES = (
     ('R', 'resource.org'),
     ('CR', 'court website merged with resource.org'),
     ('LB', 'lawbox'),
-    ('LBM', 'lawbox merged with previous document'),
+    ('LBM', 'lawbox merged with court'),
+    ('LBRM', 'lawbox merged with resource.org'),
     ('M', 'manual input'),
     ('A', 'internet archive'),
 )
@@ -85,10 +93,15 @@ class Court(models.Model):
         'a unique ID for each court as used in URLs',
         max_length=15,
         primary_key=True)
-    in_use = models.BooleanField('this court is in use in CourtListener',
-                                 default=False)
+    date_modified = models.DateTimeField(
+        auto_now=True,
+        editable=False,
+        db_index=True,
+        null=True)
+    in_use = models.BooleanField(
+        'this court is in use in CourtListener',
+        default=False)
     position = models.FloatField(
-        'a float that can be used to order the courts',
         null=True,
         db_index=True,
         unique=True)
@@ -105,9 +118,10 @@ class Court(models.Model):
         max_length='200',
         blank=False)
     URL = models.URLField('the homepage for each court')
-    start_date = models.DateField("the date the court was established",
-                                  blank=True,
-                                  null=True)
+    start_date = models.DateField(
+        "the date the court was established",
+        blank=True,
+        null=True)
     end_date = models.DateField(
         "the date the court was abolished",
         blank=True,
@@ -129,8 +143,9 @@ class Court(models.Model):
 
 
 class Citation(models.Model):
-    citationUUID = models.AutoField("a unique ID for each citation",
-                                    primary_key=True)
+    citationUUID = models.AutoField(
+        "a unique ID for each citation",
+        primary_key=True)
     slug = models.SlugField(
         "URL that the document should map to (the slug)",
         max_length=50,
@@ -143,18 +158,58 @@ class Citation(models.Model):
         max_length=100, # sometimes these are consolidated, hence they need to be long.
         blank=True,
         null=True)
-    west_cite = models.CharField(
-        "WestLaw federal citation",
+    federal_cite_one = models.CharField(
+        "Primary federal citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    federal_cite_two = models.CharField(
+        "Secondary federal citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    federal_cite_three = models.CharField(
+        "Tertiary federal citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    state_cite_one = models.CharField(
+        "Primary state citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    state_cite_two = models.CharField(
+        "Secondary state citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    state_cite_three = models.CharField(
+        "Tertiary state citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    state_cite_regional = models.CharField(
+        "Regional citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    specialty_cite_one = models.CharField(
+        "Specialty citation",
+        max_length=50,
+        blank=True,
+        null=True)
+    scotus_early_cite = models.CharField(
+        "Early SCOTUS citation",
         max_length=50,
         blank=True,
         null=True)
     lexis_cite = models.CharField(
-        "LexisNexis federal citation",
+        "Lexis Nexus citation (e.g. 1 LEXIS 38237)",
         max_length=50,
         blank=True,
         null=True)
-    west_state_cite = models.CharField(
-        "WestLaw state citation",
+    westlaw_cite = models.CharField(
+        "WestLaw citation (e.g. 22 WL 238)",
         max_length=50,
         blank=True,
         null=True)
@@ -196,8 +251,24 @@ class Document(models.Model):
 
     This must go last, since it references the above classes
     """
-    documentUUID = models.AutoField("a unique ID for each document",
-                                    primary_key=True)
+    documentUUID = models.AutoField(
+        "a unique ID for each document",
+        primary_key=True)
+    time_retrieved = models.DateTimeField(
+        "the original creation date for the item",
+        auto_now_add=True,
+        editable=False,
+        db_index=True)
+    date_modified = models.DateTimeField(
+        auto_now=True,
+        editable=False,
+        db_index=True,
+        null=True)
+    date_filed = models.DateField(
+        "the date filed by the court",
+        blank=True,
+        null=True,
+        db_index=True)
     source = models.CharField(
         "the source of the document",
         max_length=3,
@@ -207,11 +278,6 @@ class Document(models.Model):
         "unique ID for the document, as generated via SHA1 of "
         "the binary file",
         max_length=40,
-        db_index=True)
-    date_filed = models.DateField(
-        "the date filed by the court",
-        blank=True,
-        null=True,
         db_index=True)
     court = models.ForeignKey(
         Court,
@@ -226,12 +292,6 @@ class Document(models.Model):
         "the URL on the court website where the document was "
         "originally scraped",
         verify_exists=False,
-        db_index=True)
-    time_retrieved = models.DateTimeField(
-        "the exact date and time stamp that the document was "
-        "placed into our database",
-        auto_now_add=True,
-        editable=False,
         db_index=True)
     local_path = models.FileField(
         "the location, relative to MEDIA_ROOT, where the files are stored",
