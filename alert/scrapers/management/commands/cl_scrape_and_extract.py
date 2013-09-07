@@ -191,7 +191,7 @@ def scrape_court(site, full_crawl=False):
                 if site.neutral_citations:
                     cite.neutral_cite = site.neutral_citations[i]
                 if site.west_citations:
-                    cite.west_cite = site.west_citations[i]
+                    cite.federal_cite_one = site.west_citations[i]
                 if site.west_state_citations:
                     cite.west_state_cite = site.west_state_citations[i]
 

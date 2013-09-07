@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'debug_toolbar',
     'south',
     'alerts',
+    'api',
     'casepage',
     'citations',
     'corpus_importer',
@@ -99,7 +100,8 @@ MESSAGE_TAGS = {
 ########
 # Solr #
 ########
-SOLR_URL = 'http://127.0.0.1:8983/solr'
+SOLR_URL = 'http://127.0.0.1:8983/solr/collection1'
+#SOLR_URL = 'http://127.0.0.1:8983/solr/swap_core'
 
 
 ##########
@@ -127,8 +129,8 @@ CELERY_SEND_TASK_ERROR_EMAILS = True
 if DEVELOPMENT:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
-SERVER_EMAIL = 'noreply@courtlistener.com'
-DEFAULT_FROM_EMAIL = 'noreply@courtlistener.com'
+SERVER_EMAIL = 'CourtListener <noreply@courtlistener.com>'
+DEFAULT_FROM_EMAIL = 'CourtListener <noreply@courtlistener.com>'
 
 
 #######

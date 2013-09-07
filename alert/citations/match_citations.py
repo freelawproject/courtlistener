@@ -111,7 +111,7 @@ def match_citation(citation, citing_doc):
     main_params['fq'].append('status:Precedential')
 
     # Take 1: Use citation
-    citation_param = 'westCite:"%s"' % citation.base_citation()
+    citation_param = 'citation:"%s"' % citation.base_citation()
     main_params['fq'].append(citation_param)
     results = conn.raw_query(**main_params).execute()
     if len(results) == 1:

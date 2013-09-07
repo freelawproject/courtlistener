@@ -8,8 +8,15 @@ class Favorite(models.Model):
         Document,
         verbose_name='the document that is favorited'
     )
+    date_modified = models.DateTimeField(
+        auto_now=True,
+        editable=False,
+        db_index=True,
+        null=True
+    )
     name = models.CharField(
-        'a name for the alert', max_length=100
+        'a name for the alert',
+        max_length=100
     )
     notes = models.TextField(
         'notes about the favorite',

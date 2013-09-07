@@ -101,5 +101,13 @@ def flat_sitemap_maker(request):
                'priority': priority(page)}
         urls.append(url)
 
+    # Add a few non-flat pages
+    urls.append([{'location': 'https://www.courtlistener.com/dump-info/',
+                  'changefreq': 'monthly',
+                  'priority': '0.7'},
+                 {'location': 'https://www.courtlistener.com/api/jurisdictions/',
+                  'changefreq': 'monthly',
+                  'priority': '0.5'}])
+
     xml = smart_str(loader.render_to_string('sitemap.xml', {'urlset': urls}))
     return HttpResponse(xml, mimetype='application/xml')

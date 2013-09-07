@@ -17,7 +17,7 @@ class ViewDocumentTest(TestCase):
         cite = Citation(case_name=site.case_names[0],
                         docket_number=site.docket_numbers[0],
                         neutral_cite=site.neutral_citations[0],
-                        west_cite=site.west_citations[0])
+                        federal_cite_one=site.west_citations[0])
         cite.save(index=False)
         self.doc = Document(date_filed=site.case_dates[0],
                             court=self.court,

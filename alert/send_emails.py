@@ -21,7 +21,7 @@ class InvalidDateError(Exception):
 
 def send_alert(userProfile, hits, verbose, simulate):
     EMAIL_SUBJECT = 'New hits for your CourtListener alerts'
-    EMAIL_SENDER = 'alerts@courtlistener.com'
+    EMAIL_SENDER = 'CourtListener Alerts <alerts@courtlistener.com>'
 
     if userProfile.plaintext_preferred:
         txt_template = loader.get_template('emails/email.txt')
