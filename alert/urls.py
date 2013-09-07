@@ -1,5 +1,6 @@
 # imports of local settings and views
 from alert import settings
+from alert.api.views import court_index
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
 from alert.casepage.views import view_case, view_case_citations, \
                                  serve_static_file
@@ -118,6 +119,9 @@ urlpatterns = patterns('',
     (r'^alert/delete/(\d{1,6})/$', delete_alert),
     (r'^alert/delete/confirm/(\d{1,6})/$', delete_alert_confirm),
     (r'^tools/$', tools_page),
+
+    # The API
+    (r'^api/jurisdictions/$', court_index),
 
     # Dump index and generation pages
     (r'^dump-info/$', dump_index),

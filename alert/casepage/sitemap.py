@@ -87,19 +87,24 @@ def flat_sitemap_maker(request):
             return 0.7
         elif 'contribute' in str(page.get_absolute_url).lower():
             return 0.7
-        elif 'dump' in str(page.get_absolute_url).lower():
-            return 0.7
         else:
             return 0.2
 
-    protocol = request.is_secure() and 'https' or 'http'
     flat_pages = FlatPage.objects.all()
     urls = []
     for page in flat_pages:
-        url = {'location': '%s://www.courtlistener.com%s' % (protocol, page.get_absolute_url()),
+        url = {'location': 'https://www.courtlistener.com%s' % page.get_absolute_url(),
                'changefreq': 'monthly',
                'priority': priority(page)}
         urls.append(url)
+
+    # Add a few non-flat pages
+    urls.append([{'location': 'https://www.courtlistener.com/dump-info/',
+                  'changefreq': 'monthly',
+                  'priority': '0.7'},
+                 {'location': 'https://www.courtlistener.com/api/jurisdictions/',
+                  'changefreq': 'monthly',
+                  'priority': '0.5'}])
 
     xml = smart_str(loader.render_to_string('sitemap.xml', {'urlset': urls}))
     return HttpResponse(xml, mimetype='application/xml')

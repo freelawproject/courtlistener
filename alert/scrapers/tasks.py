@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import sys
-from lxml.etree import XMLSyntaxError
 
 sys.path.append('/var/www/court-listener/alert')
 
@@ -16,6 +15,7 @@ from celery.decorators import task
 from celery.task.sets import subtask
 from datetime import date
 from lxml.html.clean import Cleaner
+from lxml.etree import XMLSyntaxError
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
 from citations.tasks import update_document_by_id

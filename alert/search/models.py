@@ -12,7 +12,14 @@ import os
 # Note that spaces cannot be used in the keys, or else the SearchForm won't work
 JURISDICTIONS = (
     ('F', 'Federal'),
-    ('S', 'State'),
+    ('FB', 'Federal Bankruptcy'),
+    ('FD', 'Federal District'),
+    ('FS', 'Federal Special'),
+    ('S', 'State Supreme'),
+    ('SA', 'State Appellate'),
+    ('SS', 'State Special'),
+    ('C', 'Committee'),
+    ('T', 'Testing'),
 )
 
 DOCUMENT_STATUSES = (
@@ -33,7 +40,8 @@ DOCUMENT_SOURCES = (
     ('R', 'resource.org'),
     ('CR', 'court website merged with resource.org'),
     ('LB', 'lawbox'),
-    ('LBM', 'lawbox merged with previous document'),
+    ('LBM', 'lawbox merged with court'),
+    ('LBRM', 'lawbox merged with resource.org'),
     ('M', 'manual input'),
     ('A', 'internet archive'),
 )
@@ -85,10 +93,15 @@ class Court(models.Model):
         'a unique ID for each court as used in URLs',
         max_length=15,
         primary_key=True)
-    in_use = models.BooleanField('this court is in use in CourtListener',
-                                 default=False)
+    date_modified = models.DateTimeField(
+        auto_now=True,
+        editable=False,
+        db_index=True,
+        null=True)
+    in_use = models.BooleanField(
+        'this court is in use in CourtListener',
+        default=False)
     position = models.FloatField(
-        'a float that can be used to order the courts',
         null=True,
         db_index=True,
         unique=True)
@@ -105,9 +118,10 @@ class Court(models.Model):
         max_length='200',
         blank=False)
     URL = models.URLField('the homepage for each court')
-    start_date = models.DateField("the date the court was established",
-                                  blank=True,
-                                  null=True)
+    start_date = models.DateField(
+        "the date the court was established",
+        blank=True,
+        null=True)
     end_date = models.DateField(
         "the date the court was abolished",
         blank=True,
@@ -237,8 +251,24 @@ class Document(models.Model):
 
     This must go last, since it references the above classes
     """
-    documentUUID = models.AutoField("a unique ID for each document",
-                                    primary_key=True)
+    documentUUID = models.AutoField(
+        "a unique ID for each document",
+        primary_key=True)
+    time_retrieved = models.DateTimeField(
+        "the original creation date for the item",
+        auto_now_add=True,
+        editable=False,
+        db_index=True)
+    date_modified = models.DateTimeField(
+        auto_now=True,
+        editable=False,
+        db_index=True,
+        null=True)
+    date_filed = models.DateField(
+        "the date filed by the court",
+        blank=True,
+        null=True,
+        db_index=True)
     source = models.CharField(
         "the source of the document",
         max_length=3,
@@ -248,11 +278,6 @@ class Document(models.Model):
         "unique ID for the document, as generated via SHA1 of "
         "the binary file",
         max_length=40,
-        db_index=True)
-    date_filed = models.DateField(
-        "the date filed by the court",
-        blank=True,
-        null=True,
         db_index=True)
     court = models.ForeignKey(
         Court,
@@ -267,12 +292,6 @@ class Document(models.Model):
         "the URL on the court website where the document was "
         "originally scraped",
         verify_exists=False,
-        db_index=True)
-    time_retrieved = models.DateTimeField(
-        "the exact date and time stamp that the document was "
-        "placed into our database",
-        auto_now_add=True,
-        editable=False,
         db_index=True)
     local_path = models.FileField(
         "the location, relative to MEDIA_ROOT, where the files are stored",

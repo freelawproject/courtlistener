@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'debug_toolbar',
     'south',
     'alerts',
+    'api',
     'casepage',
     'citations',
     'corpus_importer',
@@ -166,7 +167,7 @@ if DEVELOPMENT:
     CSRF_COOKIE_SECURE = False
     # For debug_toolbar
     INTERNAL_IPS = ('127.0.0.1',)
-    DEBUG_TOOLBAR_CONFIG = {'INTERCEPT_REDIRECTS': True}
+    DEBUG_TOOLBAR_CONFIG = {'INTERCEPT_REDIRECTS': False}
     # For tests
     SOUTH_TESTS_MIGRATE = False
     if 'test' in sys.argv:
