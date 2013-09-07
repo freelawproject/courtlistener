@@ -13,7 +13,8 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 2013-07-09:
  - TODO: Does the fact that lawbox cases lack a URL cause an issue in the UI or can they be treated like the Resource.org cases?
- - TODO: If we do case merging, the source field should be LBM ("LawBox Merged.")
+ - TODO: If we do case merging, the source field should be LBM ("LawBox Merged") or even LBRM ("Lawbox, Resource.org
+         Merged.")
  - TODO: Investigate whether it's worth reworking the citation finder so that it better understands neutral citations.
          For example, right now a citation like 2012 NM 3 will get 3 as citation.page, and will get 2012 as
          citation.volume
@@ -29,22 +30,29 @@ We welcome a conversion of these notes to a better process using Fabric.
             + Update Solr and investigate how to swap in a better index.
             + Update the advanced search page notes
    TODO: Check that the contact form looks right, has no typos, etc.
+   TODO: manage.py dumpdata search.court --indent=2 | tee search/fixtures/initial_data.json
+   TODO: Update anything that says we have 150 courts...it's at least 200 now.
+   TODO: Wrap up the migration to using $CL_INSTALL_ROOT, and document how to do the upgrade for that.
+   TODO: Sort out the new court picking interface.
 
 2013-07-25:
  - A new dependency has been added. Install it with:
 
    $ sudo aptitude install curl
 
- - The database has been updated to support the lawbox use case and to support much greater citation granularity.
-   Migrate your database with:
+ - The database has been updated to include date_modified fields, support the lawbox use case, and to support much
+   greater citation granularity. Migrate your database with:
 
     manage.py migrate search
+    manage.py migrate favorites
 
  - Our data dumps have been expanded to continue mirroring our database. They now contain many additional fields for
    citations: federal_cite_one, federal_cite_two, federal_cite_three, state_cite_one, state_cite_two, state_cite_three,
    state_regional_cite, specialty_cite_one, scotus_early_cite and westlaw_cite. The goal of this change is to provide
    much greater granularity to those that are importing this data, splitting out parallel citations into more
    understandable fields.
+
+   Be sure to delete old copies of the dumps so they are no longer cached.
 
  - The Solr backend has been updated to deprecate the westCite field and rename it as simply "citation". The old field
    will continue working for at least one year, though alerts and documentation have been updated.
@@ -79,6 +87,8 @@ We welcome a conversion of these notes to a better process using Fabric.
  - The variables SERVER_EMAIL and DEFAULT_FROM_EMAIL have been changed from 'noreply@courtlistener.com' to
    'CourtListener <noreply@courtlistener.com>' to provide a proper name to email readers. This is changed in the default
    variable file, but can be overridden in your 05-private.py file, if desired.
+
+ - A new page has been added at /api/jurisdictions/ if you wish to include it in your sitemaps.
 
 
 2013-07-07:
