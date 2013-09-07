@@ -42,7 +42,7 @@ LAWBOX PROJECT
             + Update the advanced search page notes
    TODO: Check that the contact form looks right, has no typos, etc.
    TODO: manage.py dumpdata search.court --indent=2 | tee search/fixtures/initial_data.json
-   TODO: Update anything that says we have 150 courts...it's at least 200 now.
+   TODO: Update anything that says we have 150 courts.
    TODO: Wrap up the migration to using $CL_INSTALL_ROOT, and document how to do the upgrade for that.
    TODO: Sort out the new court picking interface.
 
