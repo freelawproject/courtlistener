@@ -333,7 +333,7 @@ def get_court_object(html, case_path=None):
 
         # State Special
         elif 'Tax Court of Arizona' in str:
-            return 'ariztc'
+            return 'ariztaxct'
         elif 'Tax Court of Indiana' in str or \
                         'Indiana Tax Court' in str:
             return 'indtc'
@@ -384,238 +384,251 @@ def get_court_object(html, case_path=None):
         # Federal district
         elif re.search('Distr?in?ct\.? Court', str, re.I):
             if re.search('D(\.|(istrict))?,? (of )?Columbia', str):
-                return 'distctdc'
+                return 'dcd'
             elif re.search('M\. ?D\. Alabama', str):
-                return 'distctmdala'
+                return 'almd'
             elif re.search('N\. ?D\. Alabama', str):
-                return 'distctndala'
+                return 'alnd'
             elif re.search('S\. ?D\. Alabama', str):
-                return 'distctsdala'
+                return 'alsd'
             elif 'Alaska' in str:
-                return 'distctdalaska'
+                return 'akd'
             elif re.search('D\.? ?Arizona', str):
-                return 'distctdariz'
+                return 'azd'
             elif re.search('E\. ?D(\.|:)? Arkansas', str):
-                return 'distctedark'
+                return 'ared'
             elif re.search('W\. ?D\. Arkansas', str):
-                return 'distctwdark'
+                return 'arwd'
             elif re.search('C\. ?D\. ?California', str):
-                return 'distctcdcal'
+                return 'cacd'
             elif re.search('N\. ?D\. California', str):
-                return 'distctndcal'
+                return 'cand'
             elif re.search('S\. ?D\. California', str):
-                return 'distctsdcal'
+                return 'casd'
+            # No longer exists. Existed 1866-07-27 to 1886-08-05
             elif 'D. California' in str:  # Must go last for Cal.
-                return 'distctdcal'
+                return 'californiad'
             elif 'D. Colorado' in str:
-                return 'distctdcolo'
+                return 'cod'
             elif 'D. Conn' in str:
-                return 'distctdconn'
+                return 'ctd'
             elif re.search('D\. ?Delaware', str):
-                return 'distctddel'
+                return 'ded'
             elif re.search('M\. ?D\. Florida', str):
-                return 'distctmdfla'
+                return 'flmd'
             elif re.search('N\. ?D\. Florida', str):
-                return 'distctndfla'
+                return 'flnd'
             elif re.search('S\. ?D\. Florida', str):
-                return 'distctsdfla'
+                return 'flsd'
             elif re.search('M\. ?D\. Georgia', str):
-                return 'distctmdga'
+                return 'gamd'
             elif re.search('N\. ?D\. (of )?Georgia', str):
-                return 'distctndga'
+                return 'gand'
             elif re.search('S\. ?D\. Georgia', str):
-                return 'distctsdga'
+                return 'gasd'
             elif 'D. Hawai' in str:
-                return 'distctdhaw'
+                return 'hid'
             elif 'D. Idaho' in str:
-                return 'distctdidaho'
+                return 'idd'
             elif re.search('C\.? ?D\.? (of )?Illinois', str):
-                return 'distctcdill'
-            elif re.search('E\. ?D\. ?Illinois', str):
-                return 'distctedill'
+                return 'ilcd'
             elif re.search('N\. ?D\.?,? ?(of )?Illinois', str):
-                return 'distctndill'
+                return 'ilnd'
             elif re.search('S\. ?D\. ?Illinois', str):
-                return 'distctsdill'
+                return 'ilsd'
+            # Abolished. 1905-03-03 to 1978-10-02
+            elif re.search('E\. ?D\. ?Illinois', str):
+                return 'illinoised'
+            # Abolished. 1819-03-03 to 1855-02-13
+            elif 'D. Illinois' in str:  # Must go last
+                return 'illinoisd'
             elif re.search('N\.? ?D\.? ?(of )?Indiana', str):
-                return 'distctndind'
+                return 'innd'
             elif re.search('S\.? ?D\.? ?(of )?Indiana', str):
-                return 'distctsdind'
+                return 'insd'
+            # Abolished. 1817-03-03 to 1928-04-21
             elif 'D. Indiana' in str:  # Must go last
-                return 'distctdind'
+                return 'indianad'
             elif re.search('N\. ?D\. ?(of )?Iowa', str):
-                return 'distctndiowa'
+                return 'iand'
             elif re.search('S\.? ?D\.? ?Iowa', str):
-                return 'distctsdiowa'
+                return 'iasd'
             elif 'Kansas' in str:
-                return 'distctdkan'
+                return 'ksd'
             elif re.search('E\. ?D\. ?Kentucky', str):
-                return 'distctedky'
+                return 'kyed'
             elif re.search('W\. ?D\. Kentucky', str):
-                return 'distctwdky'
+                return 'kywd'
             elif re.search('E\. ?D\. Louisiana', str) or \
                     'Eastern District, Louisiana' in str:
-                return 'distctedla'
+                return 'laed'
             elif re.search('M\. ?D\. Louisiana', str):
-                return 'distctmdla'
+                return 'lamd'
             elif re.search('W\. ?D\. Louisiana', str):
-                return 'distctwdla'
+                return 'lawd'
             elif 'D. Maine' in str:
-                return 'distctdme'
+                return 'med'
             elif re.search('D(\.|(istrict))? (of )?Maryland', str) or \
                             ', Maryland' in str:
-                return 'distctdmd'
+                return 'mdd'
             elif re.search('D\. ?(of )?Mass(achusetts)?', str):
-                return 'distctdmass'
+                return 'mad'
             elif re.search('E\.? ?D\.? (of )?Michigan', str):
-                return 'distctedmich'
+                return 'mied'
             elif re.search('W\. ?D\. ?Michigan', str):
-                return 'distctwdmich'
+                return 'miwd'
             elif re.search('D\.? Minnesota', str):
-                return 'distctdminn'
+                return 'mnd'
             elif re.search('N\. ?D\. Mississippi', str):
-                return 'distctndmiss'
+                return 'msnd'
             elif re.search('S\. ?D\. Mississippi', str):
-                return 'distctsdmiss'
+                return 'mssd'
             elif re.search('C\. ?D\. Missouri', str):
-                return 'distctcdmo'
+                return 'mocd'
             elif re.search('E\.? ?D(\.|(istrict))? ?(of )?Missouri', str):
-                return 'distctedmo'
+                return 'moed'
             elif re.search('W\. ?D\. Missouri', str):
-                return 'distctwdmo'
+                return 'mowd'
             elif 'D. Montana' in str:
-                return 'distctdmont'
+                return 'mtd'
             elif 'D. Nebraska' in str:
-                return 'distctdneb'
+                return 'ned'
             elif 'D. Nevada' in str:
-                return 'distctdnev'
+                return 'nvd'
             elif 'D. New Hampshire' in str:
-                return 'distctdnh'
+                return 'nhd'
             elif 'New Jersey' in str:
-                return 'distctdnj'
+                return 'njd'
             elif 'D. New Mexico' in str:
-                return 'distctdnm'
+                return 'nmd'
             elif re.search('E\. ?D\. New\.? York', str):
-                return 'distctedny'
+                return 'nyed'
             elif re.search('N\. ?D\. New York', str):
-                return 'distctndny'
+                return 'nynd'
             elif re.search('S\. ?D(\.|(istrict))? ?(of )?New York', str) or \
                     'S.D.N.Y' in str:
-                return 'distctsdny'
+                return 'nysd'
             elif re.search('W\. ?D\. New York', str):
-                return 'distctwdny'
+                return 'nywd'
             elif re.search('E\. ?D\. North Carolina', str):
-                return 'distctednc'
+                return 'nced'
             elif re.search('M\. ?D\. North Carolina', str) or \
                     'Greensboro Division' in str:
-                return 'distctmdnc'
+                return 'ncmd'
             elif re.search('W\. ?D\. North Carolina', str):
-                return 'distctwdnc'
+                return 'ncwd'
             elif 'North Dakota' in str:
-                return 'distctdnd'
+                return 'ndd'
             elif re.search('N\. ?D\. Ohio', str):
-                return 'distctndohio'
+                return 'ohnd'
             elif re.search('S\. ?D\.,? (of )?Ohio', str):
-                return 'distctsdohio'
+                return 'ohsd'
+            # Abolished. 1803-02-19 to 1855-02-10
             elif 'D. Ohio' in str:  # Must be the last court!
-                return 'distctdohio'
+                return 'ohiod'
             elif re.search('E\. ?D\. Oklahoma', str):
-                return 'distctedokla'
+                return 'oked'
             elif re.search('N\. ?D\. Oklahoma', str):
-                return 'distctndokla'
+                return 'oknd'
             elif re.search('W\. ?D\. Oklahoma', str):
-                return 'distctwdokla'
+                return 'okwd'
             elif 'D. Oregon' in str:
-                return 'distctdor'
+                return 'ord'
             elif re.search('E\.? ?D\. ?Pennsylvania', str):
-                return 'distctedpa'
+                return 'paed'
             elif re.search('M(\.|(iddle))? ?D(\.|(ist\.))? ?P((ennsylvania)|(a\.))', str):
-                return 'distctmdpenn'
+                return 'pamd'
             elif re.search('W\.? ?D\. Pennsylvania', str):
-                return 'distctwdpa'
-            elif re.search('D\. Pennsylvania', str):
-                return 'distctdpa'
+                return 'pawd'
+            # Abolished. 1789-09-24 to 1818-04-20
+            elif re.search('D\. Pennsylvania', str):  # Must go last
+                return 'pennsylvaniad'
             elif 'D. Rhode Island' in str:
-                return 'distctdri'
+                return 'rid'
+            # Abolished. 1823-02-21 to 1965-10-07
             elif re.search('E\. ?D\. South Carolina', str):
-                return 'distctedsc'
+                return 'southcarolinaed'
+            # Abolished. 1823-02-21 to 1965-10-07
             elif re.search('W\. ?D\. South Carolina', str):
-                return 'distctwdsc'
+                return 'southcarolinawd'
             elif 'D. South Carolina' in str:  # Must go last!
-                return 'distctdsc'
+                return 'scd'
             elif 'D. South Dakota' in str:
-                return 'distctdsd'
+                return 'sdd'
             elif re.search('E\. ?D\. Tennessee', str):
-                return 'distctedtenn'
+                return 'tned'
             elif re.search('M(\.|(iddle))? ?D(\.|(istrict))? (of )?Tennessee', str):
-                return 'distctmdtenn'
+                return 'tnmd'
             elif re.search('W\. ?D\. Tennessee', str):
-                return 'distctwdtenn'
+                return 'tnwd'
+            # Abolished. 1797-01-31 to 1839-06-18
             elif 'D. Tennessee' in str:  # Must be the last court!
                 return 'distctdtenn'
             elif re.search('E\. ?D\. Texas', str):
-                return 'distctedtex'
+                return 'txed'
             elif re.search('N\. ?D\.,? (of )?Texas', str):
-                return 'distctndtex'
+                return 'txnd'
             elif re.search('S(\.|(outhern)) ?D(\.|(istrict)) (of )?Texas', str):
-                return 'distctsdtex'
+                return 'txsd'
             elif re.search('W\.? ?D\.? Texas', str):
-                return 'distctwdtex'
+                return 'txwd'
             elif 'Utah' in str:
-                return 'distctdutah'
+                return 'utd'
             elif 'D. Vermont' in str:
-                return 'distctdvt'
+                return 'vtd'
             elif re.search('E\.? ?D\.? ?(of )?Virginia', str):
-                return 'distctedva'
+                return 'vaed'
             elif re.search('W\. ?D\. Virginia', str):
-                return 'distctwdva'
+                return 'vawd'
             elif re.search('E\. ?D\. Washington', str):
-                return 'distctedwash'
+                return 'waed'
             elif re.search('W\. ?D\. Washington', str):
-                return 'distctwdwash'
+                return 'wawd'
             elif re.search('N\. ?D\. West Virginia', str):
-                return 'distctndwva'
+                return 'wvnd'
             elif re.search('S\. ?D\. (of )?West Virginia', str) or \
                     'West Virginia, at Charleston' in str:
-                return 'distctsdwva'
+                return 'wvsd'
             elif re.search('E\. ?D\. Wisconsin', str):
-                return 'distctedwis'
+                return 'wied'
             elif re.search('W\. ?D\. Wisconsin', str):
-                return 'distctwdwis'
+                return 'wiwd'
             elif 'Wyoming' in str:
-                return 'distctdwyo'
+                return 'wyd'
+            # Abolished. 1937-07-26 to 1982-03-31
             elif 'Canal Zone' in str:
-                return 'distctcz'
+                return 'canalzoned'
             elif 'Guam' in str:
-                return 'distctdguam'
+                return 'gud'
             elif 'Northern Mariana' in str:
-                return 'distctdnmari'
+                return 'nmid'
             elif re.search('Puerto Rico', str):
-                return 'distctdpr'
+                return 'prd'
             elif 'Virgin Islands' in str:
-                return 'distctvi'
+                return 'vid'
 
         # Federal special
         elif 'United States Judicial Conference Committee' in str or \
                 'U.S. Judicial Conference Committee' in str:
-            return 'usjcc'
+            return 'usjc'
         elif re.search('Judicial Panel on Multidistrict Litigation', str, re.I):
             return 'jpml'
         elif 'Court of Customs and Patent Appeals' in str:
             return 'ccpa'
         elif 'Court of Claims' in str:
-            return 'cc'
+            return 'cc'  # Cannot change
         elif 'United States Foreign Intelligence Surveillance Court' in str:
-            return 'fiscr'
+            return 'fiscr'  # Cannot change
         elif re.search('Court,? of,? International ?Trade', str):
             return 'cit'
         elif 'United States Customs Court' in str:
-            return 'cusc'
+            return 'cusc'  # Cannot change?
         elif 'Special Court Regional Rail Reorganization Act' in str:
-            return 'rrra'
+            return 'reglrailreorgct'
 
         # Bankruptcy Courts
         elif re.search('bankrup?tcy', str, re.I):
+            # Bankruptcy Appellate Panels
             if re.search('Appellan?te Panel', str, re.I):
                 if 'First Circuit' in str:
                     return 'bap1'
@@ -630,240 +643,227 @@ def get_court_object(html, case_path=None):
                 elif 'Tenth Circuit' in str:
                     return 'bap10'
                 elif 'Maine' in str:
-                    return 'bapdme'
+                    return 'bapmed'  # Double check
                 elif 'Massachusetts' in str:
-                    return 'bapmass'
+                    return 'bapmass'  # Double check
+
+            # Bankruptcy District Courts
             else:
                 if 'District of Columbia' in str or \
                         'D. Columbia' in str:
-                    return 'bankrdc'
+                    return 'dcb'
                 elif re.search('M\.? ?D(\.|(istrict))? (of )?Alabama', str):
-                    return 'bankrmdala'
+                    return 'almb'
                 elif re.search('N\.? ?D(\.|(istrict))? (of )?Alabama', str):
-                    return 'bankrndala'
+                    return 'alnb'
                 elif re.search('S\.? ?D(\.|(istrict))? (of )?Alabama', str):
-                    return 'bankrsdala'
+                    return 'alsb'
                 elif 'D. Alaska' in str:
-                    return 'bankrdalaska'
+                    return 'akb'
                 elif re.search('D(\.|(istrict))? ?Arizona', str):
-                    return 'bankrdariz'
+                    return 'arb'
                 elif re.search('E\.? ?D(\.|(istrict))? ?(of )?Arkansas', str):
-                    return 'bankredark'
+                    return 'areb'
                 elif re.search('W\.? ?D(\.|(istrict))? ?(of )?Arkansas', str):
-                    return 'bankrwdark'
+                    return 'arwb'
                 elif re.search('C\.? ?D(\.|(istrict))? ?(of )?Cal(ifornia)?', str):
-                    return 'bankrcdcal'
+                    return 'cacb'
                 elif re.search('E\.? ?D(\.|(istrict))? ?(of )?Cal(ifornia)?', str):
-                    return 'bankredcal'
+                    return 'caeb'
                 elif re.search('N\.? ?D(\.|(istrict))? ?(of )?Cal(ifornia)?', str):
-                    return 'bankrndcal'
+                    return 'canb'
                 elif re.search('S\.? ?D(\.|(istrict))? ?(of )?Cal(ifornia)?', str):
-                    return 'bankrsdcal'
-                # elif 'D. California' in str:  # Must go last for Cal.
-                #     return 'bankrdcal'
+                    return 'casb'
                 elif re.search('D(\.|(istrict)) ?(of )?Colorado', str):
-                    return 'bankrdcolo'
+                    return 'cob'
                 elif 'Connecticut' in str:
-                    return 'bankrdconn'
+                    return 'ctb'
                 elif re.search('D(\.|(istrict))? (of )?Delaware', str):
-                    return 'bankrddel'
+                    return 'deb'
                 elif re.search('M\.? ?D(\.|(istrict))? ?(of )?Florida', str) or \
                         re.search('Middle District (of )?Florida', str) or \
                         'M .D. Florida' in str or \
                         'Florida, Tampa Division' in str or \
                         'Florida, Jacksonville Division' in str:
-                    return 'bankrmdfla'
+                    return 'flmb'
                 elif re.search('N\.? ?D(\.|(istrict))? (of )?Florida', str):
-                    return 'bankrndfla'
+                    return 'flnb'
                 elif re.search('S\. ?D(\.|(istrict))? (of )?Florida', str):
-                    return 'bankrsdfla'
+                    return 'flsb'
                 elif re.search('M\.? ?D(\.|(istrict))? (of )?Georgia', str):
-                    return 'bankrmdga'
+                    return 'gamb'
                 elif re.search('N\.? ?D(\.|(istrict))? (of )?Georgia', str) or \
                         'Atlanta Division' in str:
-                    return 'bankrndga'
+                    return 'ganb'
                 elif re.search('S\. ?D(\.|(istrict))? Georgia', str):
-                    return 'bankrsdga'
+                    return 'gasb'
                 elif re.search('D(\.|(istrict))? ?Hawai', str):
-                    return 'bankrdhaw'
+                    return 'hib'
                 elif 'D. Idaho' in str:
-                    return 'bankrdidaho'
+                    return 'idb'
                 elif re.search('C\.? ?D(\.|(istrict))? ?(of )?Ill(inois)?', str):
-                    return 'bankrcdill'
-                # elif re.search('E\.? ?D(\.|(istrict))? (of )?Illinois', str):
-                #     return 'bankredill'
+                    return 'ilcb'
                 elif re.search('N\.? ?D(\.|(istrict))? ?(of )?Ill(inois)?', str):
-                    return 'bankrndill'
+                    return 'ilnb'
                 elif re.search('S\.? ?D(\.|(istrict))? ?(of )?Ill(inois)?', str):
-                    return 'bankrsdill'
+                    return 'ilsb'
                 elif re.search('N\.? ?D(\.|(istrict))? ?(of )?Indiana', str):
-                    return 'bankrndind'
+                    return 'innb'
                 elif re.search('S.D. (of )?Indiana', str):
-                    return 'bankrsdind'
-                # elif 'D. Indiana' in str:  # Must be last
-                #     return 'bankrdind'
+                    return 'insb'
                 elif re.search('N\. ?D(\.|(istrict))? Iowa', str):
-                    return 'bankrndiowa'
+                    return 'ianb'
                 elif re.search('S\. ?D(\.|(istrict))? (of )?Iowa', str):
-                    return 'bankrsdiowa'
+                    return 'iasb'
                 elif 'D. Kansas' in str or \
                         'M. Kansas' in str or \
                         'District of Kansas' in str or \
                         'D. Kan' in str:
-                    return 'bankrdkan'
+                    return 'ksb'
                 elif re.search('E\.? ?D(\.|(istrict))? (of )?Kentucky', str):
-                    return 'bankredky'
+                    return 'kyeb'
                 elif re.search('W\.? ?D(\.|(istrict))? (of )?Kentucky', str):
-                    return 'bankrwdky'
+                    return 'kywb'
                 elif re.search('E\.? ?D(\.|(istrict))? (of )?Loui?siana', str) or \
                         'Eastern District, Louisiana' in str:
-                    return 'bankredla'
+                    return 'laeb'
                 elif re.search('M\.? ?D(\.|(istrict))? (of )?Loui?siana', str):
-                    return 'bankrmdla'
+                    return 'lamb'
                 elif re.search('W\.? ?D(\.|(istrict))? (of )?Loui?siana', str):
-                    return 'bankrwdla'
+                    return 'lawb'
                 elif 'D. Maine' in str:
-                    return 'bankrdme'
+                    return 'meb'
                 elif 'Maryland' in str:
-                    return 'bankrdmd'
+                    return 'mdb'
                 elif re.search('D(\.|(istrict))? ?(of )?Mass', str) or \
                         ', Massachusetts' in str:
-                    return 'bankrdmass'
+                    return 'mab'
                 elif re.search('E\.? ?D(\.|(istrict))? (of )?Michigan', str):
-                    return 'bankredmich'
+                    return 'mieb'
                 elif re.search('W\.D(\.|(istrict))? (of )?Michigan', str):
-                    return 'bankrwdmich'
+                    return 'miwb'
                 elif re.search('D(\.|(istrict))? ?Minnesota', str):
-                    return 'bankrdminn'
+                    return 'mnb'
                 elif re.search('N\.? ?D(\.|(istrict))? (of )?Mississippi', str):
-                    return 'bankrndmiss'
+                    return 'msnb'
                 elif re.search('S\.? ?D(\.|(istrict))? (of )?Mississippi', str):
-                    return 'bankrsdmiss'
-                # elif re.search('C\.? ?D(\.|(istrict))? (of )?Missouri', str):
-                #     return 'bankrcdmo'
+                    return 'mssb'
                 elif re.search('E\.? ?D(\.|(istrict))? ?(of )?Missouri', str):
-                    return 'bankredmo'
+                    return 'moeb'
                 elif re.search('W\.? ?D(\.|(istrict))? ?(of )?Missouri', str):
-                    return 'bankrwdmo'
+                    return 'mowb'
                 elif 'D. Montana' in str:
-                    return 'bankrdmont'
+                    return 'mtb'
+                # Here we avoid a conflict with state abbreviations
                 elif re.search('D(\.|(istrict))? (of )?Neb(raska)?', str):
-                    return 'bankrdneb'
+                    return 'nebraskab'
                 elif 'Nevada' in str:
-                    return 'bankrdnev'
+                    return 'nvb'
                 elif 'New Hampshire' in str or \
                         'D.N.H' in str:
-                    return 'bankrdnh'
+                    return 'nhb'
                 elif re.search('D(\.|(istrict))? ?New Jersey', str) or \
                         ', New Jersey' in str:
-                    return 'bankrdnj'
+                    return 'njb'
                 elif 'New Mexico' in str or \
                         'State of New Mexico' in str:
-                    return 'bankrdnm'
+                    return 'nmb'
                 elif re.search('E\.? ?D(\.|(istrict))? (of )?New York', str) or \
                         'E.D.N.Y' in str:
-                    return 'bankredny'
+                    return 'nyeb'
                 elif re.search('N\.? ?D(\.|(istrict))? (of )?New York', str):
-                    return 'bankrndny'
+                    return 'nynb'
                 elif re.search('S\. ?D(\.|(istrict))? (of )?New York', str) or \
                         'Southern District of New York' in str or \
                         'S.D.N.Y' in str:
-                    return 'bankrsdny'
+                    return 'nysb'
                 elif re.search('W\.? ?D(\.|(istrict))? (of )?New York', str):
-                    return 'bankrwdny'
+                    return 'nywb'
                 elif re.search('E\.? ?D(\.|(istrict))? (of )?North Carolina', str):
-                    return 'bankrednc'
+                    return 'nceb'
                 elif re.search('M\.? ?D(\.|(istrict))? (of )?North Carolina', str):
-                    return 'bankrmdnc'
+                    return 'ncmb'
                 elif re.search('W\.? ?D(\.|(istrict))? (of )?North Carolina', str):
-                    return 'bankrwdnc'
+                    return 'ncwb'
                 elif 'North Dakota' in str:
-                    return 'bankrdnd'
+                    return 'ndb'
                 elif re.search('N\.? ?D(\.|(istrict))? (of )?Ohio', str) or \
                         'Northern District of Ohio' in str:
-                    return 'bankrndohio'
+                    return 'ohnb'
                 elif re.search('S\. ?D(\.|(istrict))? (of )?Ohio', str):
-                    return 'bankrsdohio'
-                # elif 'D. Ohio' in str:  # Must be the last court!
-                #     return 'bankrdohio'
+                    return 'ohsb'
                 elif re.search('E\.? ?D(\.|(istrict))? (of )?Oklahoma', str):
-                    return 'bankredokla'
+                    return 'okeb'
                 elif re.search('N\.? ?D(\.|(istrict))? (of )?Oklahoma', str):
-                    return 'bankrndokla'
+                    return 'oknb'
                 elif re.search('W\.? ?D(\.|(istrict))? (of )?Oklahoma', str):
-                    return 'bankrwdokla'
+                    return 'okwb'
                 elif 'Oregon' in str:
-                    return 'bankrdor'
+                    return 'orb'
                 elif re.search('E\.? ?D(\.|(istrict))? (of )?Pennsylvania', str):
-                    return 'bankredpa'
+                    return 'paeb'
                 elif re.search('M\.? ?D(\.|(istrict))? (of )?Pennsylvania', str):
-                    return 'bankrmdpenn'
+                    return 'pamb'
                 elif re.search('W\.? ?D(\.|(istrict))? (of )?Pennsylvania', str):
-                    return 'bankrwdpa'
+                    return 'pawb'
                 elif ', Rhode Island' in str or \
                         re.search('D(\.|(istrict))? ?Rhode Island', str) or \
                         ', D.R.I' in str:
-                    return 'bankrdri'
-                # elif re.search('E\.? ?D(\.|(istrict))? (of )?South Carolina', str):
-                #     return 'bankredsc'
-                # elif re.search('W\.? ?D(\.|(istrict))? (of )?South Carolina', str):
-                #     return 'bankrwdsc'
+                    return 'rib'
                 elif 'D.S.C' in str or \
                         re.search('D(\.|(istrict))? ?(of )?South Carolina', str):
-                    return 'bankrdsc'
+                    return 'scb'
                 elif 'D. South Dakota' in str or \
                         ', South Dakota' in str:
-                    return 'bankrdsd'
+                    return 'sdb'
                 elif re.search('E\.? ?D(\.|(istrict))? (of )?Tenn(essee)?', str):
-                    return 'bankredtenn'
+                    return 'tneb'
                 elif re.search('M\.? ?D(\.|(istrict))? (of )?Tenn(essee)?', str) or \
                         'Middle District of Tennessee' in str or \
                         'M.D.S. Tennessee' in str or \
                         'Nashville' in str:
-                    return 'bankrmdtenn'
+                    return 'tnmb'
                 elif re.search('W\.? ?D(\.|(istrict))? (of )?Tennessee', str):
-                    return 'bankrwdtenn'
-                elif 'D. Tennessee' in str:  # Must be the last court!
-                    return 'bankrdtenn'
+                    return 'tnwb'
                 elif re.search('E\.? ?D(\.|(istrict))? (of )?Texas', str):
-                    return 'bankredtex'
+                    return 'txeb'
                 elif re.search('N\.? ?D(\.|(istrict))? (of )?Texas', str):
-                    return 'bankrndtex'
+                    return 'txnb'
                 elif re.search('S\.? ?D(\.|(istrict))? (of )?Texas', str):
-                    return 'bankrsdtex'
+                    return 'txsb'
                 elif re.search('W\.? ?D(\.|(istrict))? (of )?Texas', str):
-                    return 'bankrwdtex'
+                    return 'txwb'
                 elif 'Utah' in str:
-                    return 'bankrdutah'
+                    return 'utb'
                 elif re.search('D(\.|(istrict))? ?(of )?Vermont', str):
-                    return 'bankrdvt'
+                    return 'vtb'
                 elif re.search('E\.? ?D(\.|(istrict))? ?(of )?Virginia', str):
-                    return 'bankredva'
+                    return 'vaeb'
                 elif re.search('W\.? ?D(\.|(istrict))? ?(of )?Virginia', str):
-                    return 'bankrwdva'
-                elif 'D. Virginia' in str:  # Must go last
-                    return 'bankrdva'
+                    return 'vawb'
                 elif re.search('E\.? ?D(\.|(istrict))? (of )?Washington', str):
-                    return 'bankredwash'
+                    return 'waeb'
                 elif re.search('W\.? ?D(\.|(istrict))? (of )?Washington', str):
-                    return 'bankrwdwash'
+                    return 'wawb'
                 elif re.search('N\.? ?D(\.|(istrict))? (of )?W(\.|(est)) Virginia', str):
-                    return 'bankrndwva'
+                    return 'wvnb'
                 elif re.search('S\.? ?D(\.|(istrict))? (of )?W(\.|(est)) Virginia', str):
-                    return 'bankrsdwva'
+                    return 'wvsb'
                 elif re.search('E\.? ?D(\.|(istrict))? (of )?Wis(consin)?', str):
-                    return 'bankredwis'
+                    return 'wieb'
                 elif re.search('W\.? ?D(\.|(istrict))? (of )?Wis(consin)?', str) or \
                         'Western District of Wisconsin' in str:
-                    return 'bankrwdwis'
+                    return 'wiwb'
                 elif 'D. Wyoming' in str:
-                    return 'bankrdwyo'
+                    return 'wyb'
                 elif 'Guam' in str:
-                    return 'bankrdguam'
+                    return 'gub'
+                elif 'Northern Mariana' in str:
+                    return 'nmib'
                 elif 'Puerto Rico' in str:
-                    return 'bankrdpr'
+                    return 'prb'
                 elif 'Virgin Islands' in str:
-                    return 'bankrdvi'
+                    return 'vib'
         else:
             return False
 
