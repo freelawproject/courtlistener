@@ -2,6 +2,7 @@ from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 from juriscraper.lib import parse_dates
 import os
 import pickle
+import random
 import re
 import subprocess
 import traceback
@@ -9,6 +10,8 @@ from lxml import html
 from alert.citations.constants import EDITIONS, REPORTERS
 from alert.citations.find_citations import get_citations
 from datetime import date, timedelta
+from alert.corpus_importer.court_regexes import fd_pairs
+from alert.corpus_importer.judge_extractor import get_judge_from_str
 from alert.lib.import_lib import map_citations_to_models
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
@@ -136,24 +139,6 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
                 dates.append(date.today())
                 with open('missing_dates.txt', 'a') as out:
                     out.write('%s\n' % case_path)
-
-        '''
-        # Special cases...sigh.
-        for e in clean_html_tree.xpath(path):
-            text = tostring(e, method='text', encoding='unicode')
-            if 'December, 1924' in text:
-                dates.append(date(1924, 12, 1))
-            elif '38 Cal.App.2d 215 (1040)' in text:
-                dates.append(date(1940, 3, 29))
-            elif 'September 28, 1336' in text:
-                dates.append(date(1936, 9, 28))
-            elif 'June 21, 1944.8' in text:
-                dates.append(date(1944, 6, 21))
-            elif 'Nov. 16, 1567' in text:
-                dates.append(date(1967, 11, 16))
-            if dates:
-                break
-        '''
 
     if DEBUG >= 3:
         print "  Using date: %s of dates found: %s" % (max(dates), dates)
@@ -368,7 +353,7 @@ def get_court_object(html, case_path=None):
                 return 'ca7'
             elif 'Eighth' in str:  # Aka, apparently, "Eighth Court"
                 return 'ca8'
-            elif 'Ninth Circuit' in str:
+            elif re.search('Ninth (Judicial )?Circuit', str):
                 return 'ca9'
             elif 'Tenth Circuit' in str:
                 return 'ca10'
@@ -382,240 +367,15 @@ def get_court_object(html, case_path=None):
                 return 'eca'
             elif 'Court of Appeals of Columbia' in str:
                 return 'cadc'
-        elif 'Judicial Council of the Ninth Circuit' in str:
+        elif 'Judicial Council of the Ninth Circuit' in str or \
+                re.search('Ninth (Judicial )?Circuit', str):
             return 'ca9'
 
-
         # Federal district
-        elif re.search('Distr?in?ct\.? Court', str, re.I):
-            fd_pairs = (
-                ('D(\.|(istrict))?,? (of )?Colu(m|(in))bia', 'dcd'),
-            )
-            if re.search('D(\.|(istrict))?,? (of )?Colu(m|(in))bia', str):
-                return 'dcd'
-            elif re.search('M\. ?D\. Alabama', str):
-                return 'almd'
-            elif re.search('N\. ?D\. Alabama', str):
-                return 'alnd'
-            elif re.search('S\. ?D\. Alabama', str):
-                return 'alsd'
-            elif 'Alaska' in str:
-                return 'akd'
-            elif re.search('D\.? ?Arizona', str):
-                return 'azd'
-            elif re.search('E\. ?D(\.|:)? Arkansas', str):
-                return 'ared'
-            elif re.search('W\. ?D\. Arkansas', str):
-                return 'arwd'
-            elif re.search('C\. ?D\. ?(of )?Cal(ifornia)?', str):
-                return 'cacd'
-            elif re.search('N\. ?D\. ?(of )?Cal(ifornia)?', str):
-                return 'cand'
-            elif re.search('S\. ?D\. ?(of )?Cal(ifornia)?', str):
-                return 'casd'
-            # No longer exists. Existed 1866-07-27 to 1886-08-05
-            elif 'D. California' in str:  # Must go last for Cal.
-                return 'californiad'
-            elif re.search('D\. ?Colo(rado)?', str):
-                return 'cod'
-            elif 'D. Conn' in str:
-                return 'ctd'
-            elif re.search('D\. ?Delaware', str):
-                return 'ded'
-            elif re.search('M\. ?D\. ?Florida', str):
-                return 'flmd'
-            elif re.search('N\. ?D\. ?Florida', str):
-                return 'flnd'
-            elif re.search('S\. ?D\. ?Florida', str):
-                return 'flsd'
-            elif re.search('M\. ?D\. ?Georgia', str):
-                return 'gamd'
-            elif re.search('N\. ?D\. ?(of )?Georgia', str):
-                return 'gand'
-            elif re.search('S\. ?D\. ?Georgia', str):
-                return 'gasd'
-            elif 'Hawai' in str:
-                return 'hid'
-            elif 'D. Idaho' in str:
-                return 'idd'
-            elif re.search('C\.? ?D\.? (of )?Ill(inois)?', str):
-                return 'ilcd'
-            elif re.search('N\. ?D\.?,? ?(of )?Ill(inois)?', str):
-                return 'ilnd'
-            elif re.search('S\. ?D\. ?Illinois', str):
-                return 'ilsd'
-            # Abolished. 1905-03-03 to 1978-10-02
-            elif re.search('E\. ?D\. ?Illinois', str):
-                return 'illinoised'
-            # Abolished. 1819-03-03 to 1855-02-13
-            elif 'D. Illinois' in str:  # Must go last
-                return 'illinoisd'
-            elif re.search('N\.? ?D\.? ?(of )?Indiana', str):
-                return 'innd'
-            elif re.search('S\.? ?D\.? ?(of )?Indiana', str):
-                return 'insd'
-            # Abolished. 1817-03-03 to 1928-04-21
-            elif 'D. Indiana' in str:  # Must go last
-                return 'indianad'
-            elif re.search('N\. ?D\. ?(of )?Iowa', str):
-                return 'iand'
-            elif re.search('S\.? ?D\.? ?Iowa', str):
-                return 'iasd'
-            elif 'Kansas' in str:
-                return 'ksd'
-            elif re.search('E\. ?D\. ?Kentucky', str):
-                return 'kyed'
-            elif re.search('W\. ?D\. Kentucky', str):
-                return 'kywd'
-            elif re.search('E\. ?D\. Louisiana', str) or \
-                    'Eastern District, Louisiana' in str:
-                return 'laed'
-            elif re.search('M\. ?D\. Louisiana', str):
-                return 'lamd'
-            elif re.search('W\. ?D\. Louisiana', str):
-                return 'lawd'
-            elif 'D. Maine' in str:
-                return 'med'
-            elif re.search('D(\.|(istrict))? ?(of )?Maryland', str) or \
-                            ', Maryland' in str or \
-                            'Maryland Admiralty' in str:
-                return 'mdd'
-            elif re.search('D?\.? ?(of )?Mass(achusetts)?', str):
-                return 'mad'
-            elif re.search('E\.? ?D\.? ?(of )?Michigan', str):
-                return 'mied'
-            elif re.search('W\. ?D\. ?Michigan', str):
-                return 'miwd'
-            elif re.search('D\.? Minnesota', str):
-                return 'mnd'
-            elif re.search('N\. ?D\. Mississippi', str):
-                return 'msnd'
-            elif re.search('S\. ?D\. Mississippi', str):
-                return 'mssd'
-            elif re.search('C\. ?D\. Missouri', str):
-                return 'mocd'
-            elif re.search('E\.? ?D(\.|(istrict))? ?(of )?(the )?Missouri', str):
-                return 'moed'
-            elif re.search('W\. ?D\. Missouri', str):
-                return 'mowd'
-            elif 'D. Montana' in str:
-                return 'mtd'
-            elif re.search('D(\.|(istrict))? ?(of )?Nebraska', str):
-                return 'ned'
-            elif 'D. Nevada' in str:
-                return 'nvd'
-            elif re.search('D\. ?New Hampshire', str):
-                return 'nhd'
-            elif 'New Jersey' in str:
-                return 'njd'
-            elif 'D. New Mexico' in str:
-                return 'nmd'
-            elif re.search('E(\.|(astern)) ?D(\.|(istrict)) (of )?New\.? York', str):
-                return 'nyed'
-            elif re.search('N\. ?D\. New York', str):
-                return 'nynd'
-            elif re.search('S(\.|(outhern)) ?D(\.|(istrict))? ?(of )?New York', str) or \
-                    re.search('S\. ?D\. ?N\. ?Y', str):
-                return 'nysd'
-            elif re.search('W\. ?D\. New York', str) or \
-                    re.search('W\. ?D\. ?N\. ?Y', str):
-                return 'nywd'
-            elif re.search('E\. ?D\. North Carolina', str):
-                return 'nced'
-            elif re.search('M\. ?D\. North Carolina', str) or \
-                    'Greensboro Division' in str:
-                return 'ncmd'
-            elif re.search('W\. ?D\. North Carolina', str):
-                return 'ncwd'
-            elif 'North Dakota' in str:
-                return 'ndd'
-            elif re.search('N\. ?D\. Ohio', str):
-                return 'ohnd'
-            elif re.search('S\. ?D\.,? (of )?Ohio', str):
-                return 'ohsd'
-            # Abolished. 1803-02-19 to 1855-02-10
-            elif 'D. Ohio' in str:  # Must be the last court!
-                return 'ohiod'
-            elif re.search('E\. ?D\. Oklahoma', str):
-                return 'oked'
-            elif re.search('N\. ?D\. Oklahoma', str):
-                return 'oknd'
-            elif re.search('W\. ?D\. Oklahoma', str):
-                return 'okwd'
-            elif 'D. Oregon' in str:
-                return 'ord'
-            elif re.search('E\.? ?D\. ?P(a|(ennsylvania))', str):
-                return 'paed'
-            elif re.search('M(\.|(iddle))? ?D(\.|(ist\.))? ?P(a|(ennsylvania))', str):
-                return 'pamd'
-            elif re.search('W\.? ?D\. P(a|(ennsylvania))', str):
-                return 'pawd'
-            # Abolished. 1789-09-24 to 1818-04-20
-            elif re.search('D\. P(a|(ennsylvania))', str):  # Must go last
-                return 'pennsylvaniad'
-            elif 'D. Rhode Island' in str:
-                return 'rid'
-            # Abolished. 1823-02-21 to 1965-10-07
-            elif re.search('E\. ?D\. South Carolina', str):
-                return 'southcarolinaed'
-            # Abolished. 1823-02-21 to 1965-10-07
-            elif re.search('W\. ?D\. South Carolina', str):
-                return 'southcarolinawd'
-            elif 'D. South Carolina' in str:  # Must go last!
-                return 'scd'
-            elif 'D. South Dakota' in str:
-                return 'sdd'
-            elif re.search('E\. ?D\. Tennessee', str):
-                return 'tned'
-            elif re.search('M(\.|(iddle))? ?D(\.|(istrict))? (of )?Tennessee', str):
-                return 'tnmd'
-            elif re.search('W\. ?D\. Tennessee', str):
-                return 'tnwd'
-            # Abolished. 1797-01-31 to 1839-06-18
-            elif 'D. Tennessee' in str:  # Must be the last court!
-                return 'tennessed'
-            elif re.search('E\. ?D\. Texas', str):
-                return 'txed'
-            elif re.search('N\. ?D\.,? (of )?Texas', str):
-                return 'txnd'
-            elif re.search('S(\.|(outhern)) ?D(\.|(istrict)) ?(of )?Texas', str):
-                return 'txsd'
-            elif re.search('W\.? ?D\.? Texas', str):
-                return 'txwd'
-            elif 'Utah' in str:
-                return 'utd'
-            elif 'D. Vermont' in str:
-                return 'vtd'
-            elif re.search('E\.? ?D\.? ?(of )?Virginia', str, re.I):
-                return 'vaed'
-            elif re.search('W\. ?D\. Virginia', str):
-                return 'vawd'
-            elif re.search('E\. ?D\. Washington', str):
-                return 'waed'
-            elif re.search('W\. ?D\. Washington', str):
-                return 'wawd'
-            elif re.search('N\. ?D\. West Virginia', str):
-                return 'wvnd'
-            elif re.search('S\. ?D\. (of )?West Virginia', str) or \
-                    'West Virginia, at Charleston' in str:
-                return 'wvsd'
-            elif re.search('E\. ?D\. Wisconsin', str):
-                return 'wied'
-            elif re.search('W\. ?D\. Wisconsin', str):
-                return 'wiwd'
-            elif 'Wyoming' in str:
-                return 'wyd'
-            # Abolished. 1937-07-26 to 1982-03-31
-            elif 'Canal Zone' in str:
-                return 'canalzoned'
-            elif 'Guam' in str:
-                return 'gud'
-            elif 'Northern Mariana' in str:
-                return 'nmid'
-            elif re.search('Puerto Rico', str):
-                return 'prd'
-            elif 'Virgin Islands' in str:
-                return 'vid'
+        elif re.search('Distr?in?ct', str, re.I):
+            for regex, value in fd_pairs:
+                if re.search(regex, str, re.I):
+                    return value
         elif 'D. Virgin Islands' in str:
             return 'vid'
 
@@ -664,7 +424,7 @@ def get_court_object(html, case_path=None):
                 if 'District of Columbia' in str or \
                         'D. Columbia' in str:
                     return 'dcb'
-                elif re.search('M\.? ?D(\.|(istrict))? (of )?Alabama', str):
+                elif re.search('M(\.|(iddle))? ?D(\.|(istrict))? (of )?Alabama', str):
                     return 'almb'
                 elif re.search('N\.? ?D(\.|(istrict))? (of )?Alabama', str):
                     return 'alnb'
@@ -698,7 +458,7 @@ def get_court_object(html, case_path=None):
                         'Florida, Tampa Division' in str or \
                         'Florida, Jacksonville Division' in str:
                     return 'flmb'
-                elif re.search('N\.? ?D(\.|(istrict))? (of )?Florida', str):
+                elif re.search('N(\.|(orthern))? ?D(\.|(istrict))? (of )?Florida', str):
                     return 'flnb'
                 elif re.search('S\. ?D(\.|(istrict))? (of )?Florida', str):
                     return 'flsb'
@@ -853,7 +613,8 @@ def get_court_object(html, case_path=None):
                     return 'vtb'
                 elif re.search('E\.? ?D(\.|(istrict))? ?(of )?Virginia', str):
                     return 'vaeb'
-                elif re.search('W\.? ?D(\.|(istrict))? ?(of )?Virginia', str):
+                elif re.search('W\.? ?D(\.|(istrict))? ?(of )?Virginia', str) or \
+                        re.search('Big Stone Gap', str):
                     return 'vawb'
                 elif re.search('E\.? ?D(\.|(istrict))? (of )?Washington', str):
                     return 'waeb'
@@ -912,6 +673,37 @@ def get_court_object(html, case_path=None):
     return court
 
 
+def get_judge(html, case_path=None):
+    path = '//p[position() <= 43]//text()[not(parent::span)][not(ancestor::center)]'
+    text_elements = html.xpath(path)
+
+    # Get the first paragraph that starts with two uppercase letters after we've stripped out any star pagination.
+    judge = None
+    for t in text_elements:
+        t = clean_string(t).strip('.')
+        judge = get_judge_from_str(t)
+        if judge:
+            break
+
+    if not judge:
+        # Try a second round, but look for judges with a one-word-long name
+        for t in text_elements:
+            t = clean_string(t).strip('.')
+            judge = get_judge_from_str(t, forward_test=1)
+            if judge:
+                break
+
+    if not judge:
+        if DEBUG >= 3:
+            subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
+            input_judge = raw_input("No judge identified! What should be here? ")
+
+    if DEBUG >= 2:
+        print '  Judge: %s' % judge
+
+    return judge
+
+
 def get_html_from_raw_text(raw_text):
     """Using the raw_text, creates four useful variables:
         1. complete_html_tree: A tree of the complete HTML from the file, including <head> tags and whatever else.
@@ -950,7 +742,8 @@ def import_law_box_case(case_path):
         court_id=court,
         html=clean_html_str,
         date_filed=get_date_filed(clean_html_tree, citations=citations, case_path=case_path, court=court),
-        precedential_status=get_precedential_status(clean_html_tree)
+        precedential_status=get_precedential_status(clean_html_tree),
+        judges=get_judge(clean_html_tree, case_path)
     )
 
     cite = Citation(
@@ -989,10 +782,14 @@ def main():
                         help='Run the code in simulate mode, making no permanent changes.')
     parser.add_argument('-d', '--dir', type=readable_dir,
                         help='The directory where the lawbox dump can be found.')
+    parser.add_argument('-f', '--file', type=str, default="index.txt", required=False, dest="file_name",
+                        help="The file that has all the URLs to import, one per line.")
     parser.add_argument('-l', '--line', type=int, default=1, required=False,
                         help='If provided, this will be the line number in the index file where we resume processing.')
     parser.add_argument('-r', '--resume', default=False, required=False, action='store_true',
                         help='Use the saved marker to resume operation where it last failed.')
+    parser.add_argument('-x', '--random', default=False, required=False, action='store_true',
+                        help='Pick cases randomly rather than serially.')
     args = parser.parse_args()
 
     if args.dir:
@@ -1005,15 +802,26 @@ def main():
         cases = case_generator(args.root)
         i = 0
     else:
+        def generate_random_line(file_name):
+            while True:
+                total_bytes = os.stat(file_name).st_size
+                random_point = random.randint( 0, total_bytes )
+                f = open(file_name)
+                f.seek(random_point)
+                f.readline()  # skip this line to clear the partial line
+                yield f.readline().strip()
+
         def case_generator(line_number):
             """Yield cases from the index file."""
-            #index_file = open('index.txt')
-            index_file = open('missing_courts.txt')
+            index_file = open(args.file_name)
             for i, line in enumerate(index_file):
                 if i > line_number:
                     yield line.strip()
 
-        if args.resume:
+        if args.random:
+            cases = generate_random_line(args.file_name)
+            i = 0
+        elif args.resume:
             with open('lawbox_progress_marker.txt') as marker:
                 resume_point = int(marker.read().strip())
             cases = case_generator(resume_point)
