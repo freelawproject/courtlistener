@@ -39,6 +39,16 @@ def create_cited_html(document, citations):
     return new_html.encode('utf-8')
 
 
+def create_stub(citation):
+    stub_doc = Document(
+        is_stub_document = True,
+        sha1 = None,
+        court = None,
+        citation = citation
+    )
+    stub_doc.save(index=False)
+
+
 @task
 def update_document(document):
     DEBUG = 0
@@ -81,6 +91,9 @@ def update_document(document):
                     print "Multiple database matches found for document id %s" % match_id
                 continue
         else:
+            # if len(matches) != 1, create a stub document for the citation
+            create_stub(citation)
+
             if DEBUG >= 2:
                 # TODO: Don't print 1 line per citation.  Save them in a list
                 # and print in a single line at the end.
