@@ -1,0 +1,89 @@
+{% load text_filters %}
+
+<!DOCTYPE html>
+<html style="font-size: 100.01%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">
+    <head>
+        <meta charset="utf-8">
+        <style type="text/css">
+            a:visited { text-decoration: none !important; }
+            a:hover { text-decoration: none !important; }
+            a:focus { text-decoration: none !important; }
+        </style>
+    </head>
+    <body style="font-size: 75%; font-weight: inherit; line-height: 1.5; font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif; color: #222; border: 0; vertical-align: baseline; font-style: inherit; background: #fff; margin: 0; padding: 0;">
+        <h1 class="bottom"  style="font-size: 3em; font-weight: normal; line-height: 1; font-family: inherit; color: #111; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">
+            <a href="http://courtlistener.com" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #111; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
+                CourtListener
+            </a>
+        </h1>
+
+        <hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 60%; height: .1em; margin: 0 0 1.45em; border: none;">
+
+        {% for alert, docs in hits %}
+            {% for doc in docs %}
+                {% if forloop.first %}
+                    <h2 style="font-size: 2em; font-weight: normal; font-family: inherit; color: #111; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;" class="alt bottom">
+                        Your {{alert.get_alertFrequency_display|lower}} alert &mdash; {{alert.alertName}} &mdash; had {{docs|length}} hit{{docs|pluralize}}:
+                    </h2>
+                    <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
+                        <a href="http://courtlistener.com/alert/edit/{{ alert.alertUUID }}/">
+                            Edit/delete this alert
+                        </a>
+                    </p>
+                {% endif %}
+
+                <h3 class="alt bottom" style="font-size: 1.5em; font-weight: normal; line-height: 1; font-family: 'Warnock Pro', 'Goudy Old Style','Palatino','Book Antiqua', Georgia, serif; color: #666; border: 0; vertical-align: baseline; font-style: italic; margin: 0; padding: 0;">
+                    <a href="http://courtlistener.com{{doc.absolute_url}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
+                        {{ forloop.counter }}. {{doc.solr_highlights.caseName.0|safe}},
+                        {% if doc.solr_highlights.westCite.0 != '' and doc.solr_highlights.westCite.0 != None %}
+                            {{ doc.solr_highlights.westCite.0|safe }}
+                        {% else %}
+                            {{ doc.solr_highlights.docketNumber.0|safe }}
+                        {% endif %}
+                        ({% if doc.court_id != 'scotus' %}{{doc.solr_highlights.court_citation_string.0|nbsp|safe}}&nbsp;{% endif %}{{doc.dateFiled|date:"Y"}})
+                    </a>
+                </h3>
+                <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">
+                    <strong style="font-weight: bold;">
+                        Status:
+                    </strong>
+                        {{doc.status}}<br>
+                    <strong style="font-weight: bold;">
+                        View original:
+                    </strong>
+                    {% if doc.download_url %}
+                        <a href="{{doc.download_url}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
+                            From the court
+                        </a>
+                    {% endif %}
+                    {% if doc.download_url and doc.local_path %}
+                        &nbsp;&nbsp;|&nbsp;&nbsp;
+                    {% endif %}
+                    {% if doc.local_path %}
+                        <a href="http://courtlistener.com/{{doc.local_path}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
+                            Our backup
+                        </a>
+                    {% endif %}
+                </p>
+                <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
+                    &hellip;{% for frag in doc.solr_highlights.text %}
+                       {{ frag|safe|underscore_to_space }}&hellip;
+                    {% endfor %}
+                </p>
+                <br>
+
+            {% empty %}
+                {% if alert.sendNegativeAlert %}
+                    {# it's a negative alert with no hits. #}
+                    <h2 style="font-size: 2em; font-weight: normal; font-family: inherit; color: #111; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">
+                        Your {{ alert.get_alertFrequency_display|lower}} alert &mdash; {{alert.alertName}} &mdash; had 0 hits.
+                    </h2>
+                {% endif %}
+            {% endfor %}
+            <br>
+        {% endfor %}
+        <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
+            <strong>&mdash;CourtListener.com</strong>
+        </p>
+    </body>
+</html>
