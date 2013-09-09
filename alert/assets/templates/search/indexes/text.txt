@@ -1,3 +1,4 @@
+{# The body of the item #}
 {% if object.html %}
     {# if the HTML exists we do it, but not the plaintext #}
     {{ object.html|striptags|default_if_none:"" }}
@@ -5,6 +6,7 @@
     {{ object.plain_text|default_if_none:"" }}
 {% endif %}
 
+{# The document itself #}
 {{ object.citation.case_name|default_if_none:"" }}
 {{ object.precedential_status|default_if_none:"" }}
 {{ object.sha1|default_if_none:"" }}
@@ -13,10 +15,3 @@
 {{ object.court.courtUUID|default_if_none:"" }}
 {{ object.judges|default_if_none:"" }}
 {{ object.nature_of_suit|default_if_none:"" }}
-
-{# This code must match the code in document_caseNumber.txt #}
-{{ object.citation.docket_number|default_if_none:"" }}
-{{ object.citation.west_cite|default_if_none:"" }}
-{{ object.citation.west_state_cite|default_if_none:""}}
-{{ object.citation.lexis_cite|default_if_none:"" }}
-{{ object.citation.neutral_cite|default_if_none:"" }}

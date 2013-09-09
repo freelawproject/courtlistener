@@ -4,7 +4,7 @@
 # 1. Solr needs to be installed at /usr/local/solr/example
 # 2. daemon needs to be installed
 # 3. Script needs to be executed by root
-# 4. CL_INSTALL_ROOT needs to be set up in /etc/environment
+# 4. $CL_INSTALL_ROOT must be set.
 
 # This script will launch Solr in a mode that will automatically respawn if it
 # crashes. Output will be sent to /var/log/solr/solr.log. A pid file will be
@@ -16,7 +16,7 @@ start () {
     # Use python to determine if this is a dev machine
     . /etc/environment
     if [ -z $CL_INSTALL_ROOT ]; then
-      echo "CL_INSTALL_ROOT not set. Please set it in /etc/environment."
+      echo "CL_INSTALL_ROOT is not set. Please set it in /etc/environment."
       exit 1
     fi
     cd $CL_INSTALL_ROOT/alert

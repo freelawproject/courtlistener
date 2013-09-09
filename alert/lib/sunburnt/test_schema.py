@@ -103,7 +103,7 @@ class TestReadingSchema(object):
         that we get the right set of fields, the right
         default field, and the right unique key"""
         assert set(self.s.fields.keys()) \
-            == set(['boolean_field', 'int_field', 'text_field'])
+            == {'boolean_field', 'int_field', 'text_field'}
         assert self.s.default_field_name == 'text_field'
         assert self.s.unique_key == 'int_field'
 
@@ -118,10 +118,10 @@ class TestReadingSchema(object):
 
     def test_missing_fields(self):
         assert set(self.s.missing_fields([])) \
-            == set(['int_field', 'text_field'])
+            == {'int_field', 'text_field'}
         assert set(self.s.missing_fields(['boolean_field'])) \
-            == set(['int_field', 'text_field'])
-        assert set(self.s.missing_fields(['int_field'])) == set(['text_field'])
+            == {'int_field', 'text_field'}
+        assert set(self.s.missing_fields(['int_field'])) == {'text_field'}
 
     def test_serialize_value_list_fails_with_bad_field_name(self):
         try:

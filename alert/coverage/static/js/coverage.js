@@ -23,23 +23,23 @@ function addNavigation() {
 		    nav_link.toggleClass('selected');
 		}
 		nav_link.appendTo('#nav ul');
-		
+
 		// Make a totals dict (necessary, because otherwise courts are in a list
 		// where we can't look things up by court name.
 		court_data[court.pk] = {'pk': court.pk,
 							    'total': court.total_docs,
 				                'short_name': court.short_name};
     });
-    
+
     $(window).hashchange(function() {
 		$('#nav li.selected').toggleClass('selected');
 		$('#court_' + window.location.hash.substr(1)).parent().toggleClass('selected');
-		
+
 		// Clean things up
 		canvas.clear();
     	$('#graph svg').attr('height', '0');
 		$('#graph table, #graph p').remove();
-		
+
 		// Update the drawing area
 		var court_name = court_data[location.hash.substr(1)].pk;
 		updateHeader(court_name);
@@ -66,10 +66,10 @@ function drawGraph(court_id) {
     });
     if (keys.length < 5) {
     	// Make a table
-    	var not_enough_data = "<p>We do not have enough data to show this court as a graph. We require at least five year's data.</p>"
+    	var not_enough_data = "<p>We do not have enough data to show this court as a graph. We require at least five year's data.</p>";
 		$('#graph').append(not_enough_data);
-    	var table_stub = "<table><thead><tr><th>Year</th><th>Count</th></tr></thead><tbody></tbody></table>"
-    	$('#graph').append(table_stub)
+    	var table_stub = "<table><thead><tr><th>Year</th><th>Count</th></tr></thead><tbody></tbody></table>";
+    	$('#graph').append(table_stub);
     	for(var i = 0; i < x.length; i++){
     		$('#graph tbody').append('<tr><td>' + x[i] + '</td><td>' + y[i] + '</td></tr>');
     	}
@@ -80,7 +80,7 @@ function drawGraph(court_id) {
     		var color = this.symbol.attr("fill");
     		var label = this.axis + ": " + this.value;
     	    this.popup = canvas.popup(this.x, this.y, label).insertBefore(this).attr([{stroke: color, fill: "#fff"}, { fill: "#000" }]);
-        }, 
+        },
         function () {
             this.popup.remove();
         });
@@ -88,7 +88,7 @@ function drawGraph(court_id) {
 	    // X axis label
 	    var label_attrs = {'font-size': 14, 'font-weight': 'bold'};
 	    canvas.text(385, 385, court_data[court_id].short_name).attr(label_attrs);
-	
+
 	    // Y axis label
 	    var y_label = canvas.text(15, 200, "Number of opinions").attr(label_attrs);
 	    y_label.transform('r-90');

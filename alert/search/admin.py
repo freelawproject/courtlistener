@@ -7,8 +7,8 @@ from django.contrib import admin
 
 class CitationAdmin(admin.ModelAdmin):
     # This needs to be disabled for performance reasons.
-    #list_display = ('docket_number', 'west_cite', 'case_name', )
-    search_fields = ['case_name', 'docket_number', 'west_cite']
+    #list_display = ('docket_number', 'federal_cite', 'case_name', )
+    search_fields = ['case_name', 'docket_number', 'federal_cite_one']
 
 
 class DocumentAdmin(admin.ModelAdmin):
@@ -23,8 +23,17 @@ class DocumentAdmin(admin.ModelAdmin):
 
 
 class CourtAdmin(admin.ModelAdmin):
-    list_display = ('full_name', 'short_name', 'position', 'in_use',
-                    'courtUUID',)
+    list_display = (
+        'full_name',
+        'short_name',
+        'position',
+        'in_use',
+        'courtUUID'
+    )
+    list_filter = (
+        'jurisdiction',
+        'in_use',
+    )
 
 admin.site.register(Document, DocumentAdmin)
 admin.site.register(Court, CourtAdmin)
