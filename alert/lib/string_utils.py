@@ -2,16 +2,16 @@
 
 import re
 
-# three digits dash two digits dash four digits, not proceeded or followed 
-# by digits. Proceeding start of line (^) or following end of line ($) OK.   
+# three digits dash two digits dash four digits, not proceeded or followed
+# by digits. Proceeding start of line (^) or following end of line ($) OK.
 SSN_AND_ITIN = re.compile('([^0-9A-Za-z-]|^)(\d{3}-\d{2}-\d{4})([^0-9A-Za-z-]|$)')
 EIN = re.compile('([^0-9A-Za-z-]|^)(\d{2}-\d{7})([^0-9A-Za-z-]|$)')
 def anonymize(string):
-    '''Anonymizes private information.
+    """Anonymizes private information.
 
     Converts SSNs, EIN and alienIDs to X's. Reports whether a modification was
     made, as a boolean.
-    '''
+    """
     string, ssn_replacements = re.subn(SSN_AND_ITIN, r"\1XXX-XX-XXXX\3", string)
     string, ien_replacements = re.subn(EIN, r"\1XX-XXXXXXX\3", string)
     modified = bool(ssn_replacements + ien_replacements)
@@ -19,11 +19,11 @@ def anonymize(string):
 
 
 def trunc(s, length):
-    '''Truncates a string at a good length.
+    """Truncates a string at a good length.
 
     Finds the rightmost space in a string, and truncates there. Lacking such
     a space, truncates at length.
-    '''
+    """
     if len(s) <= length:
         return s
     else:
@@ -36,13 +36,13 @@ def trunc(s, length):
 
 
 def removeLeftMargin(s):
-    '''Gets rid of left hand margin.
+    """Gets rid of left hand margin.
 
     Given a block of text, calculates the mode of the number of spaces before
     text in the doc, and then removes that number of spaces from the text. This
     should not be used in the general case, but can be used in cases where a
     left-hand margin is known to exist.
-    '''
+    """
     lines = s.split('\n')
     marginSizes = []
     for line in lines:
@@ -72,7 +72,7 @@ def removeLeftMargin(s):
 
 
 def removeDuplicateLines(s):
-    '''Remove duplicate lines next to each other.'''
+    """Remove duplicate lines next to each other."""
     lines = s.split('\n')
     lines_out = []
     previous_line = ''

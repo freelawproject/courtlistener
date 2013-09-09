@@ -18,8 +18,8 @@
         <meta name="msapplication-navbutton-color" content="#6683B7"/>
 
         <link rel="stylesheet" href="{{ STATIC_URL }}css/style.css" type="text/css" media="screen, projection">
-        <link rel="stylesheet" href="{{ STATIC_URL }}css/override.css" type="text/css" media="screen, projection">
         <link rel="stylesheet" href="{{ STATIC_URL }}css/jquery-ui-1.10.3.custom.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="{{ STATIC_URL }}css/override.css" type="text/css" media="screen, projection">
         <script src="{{ STATIC_URL }}js/modernizr-2.0.6.min.js"></script>
         {% block privacy %}
             {% if private %}
@@ -111,6 +111,11 @@
                     <span class="footer-item">
                         <a href="/about/">About</a>
                     </span>
+                    {% comment %}
+                    <span class="footer-item">
+                        <a href="/donate/?referrer=footer">Donate</a>
+                    </span>
+                    {% endcomment %}
                     <span class="footer-item">
                         <a href="/dump-info/">Data Dumps</a>
                     </span>

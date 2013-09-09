@@ -39,7 +39,7 @@ class Site(GenericSite):
         return list(self.html.xpath(path))
 
     def _get_west_citations(self):
-        path = '//opinion/west_cite/text()'
+        path = '//opinion/federal_cite/text()'
         return list(self.html.xpath(path))
 
     def _get_nature_of_suit(self):

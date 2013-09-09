@@ -1,6 +1,7 @@
 import socket
 import sys
-sys.path.append('/var/www/court-listener/alert')
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 from alert import settings
 from django.core.management import setup_environ

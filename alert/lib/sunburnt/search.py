@@ -505,7 +505,7 @@ class BaseSearch(object):
 
     _count = None
     def count(self):
-        # get the total count for the current query without retrieving any results 
+        # get the total count for the current query without retrieving any results
         # cache it, since it may be needed multiple times when used with django paginator
         if self._count is None:
             # are we already paginated? then we'll behave as if that's
@@ -614,7 +614,7 @@ class SolrSearch(BaseSearch):
 
 
 class RawSolrSearch(BaseSearch):
-    '''Provides an interface for querying Solr directly.'''
+    """Provides an interface for querying Solr directly."""
     def __init__(self, interface, original=None):
         self.interface = interface
         self.schema = interface.schema

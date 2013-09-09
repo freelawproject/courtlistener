@@ -31,13 +31,13 @@ def num_to_ascii(num, alphabet=ALPHABET):
 
     `num`: The number to encode
     """
-    if (num <= 0):
+    if num <= 0:
         return alphabet[0]
     arr = []
     base = len(alphabet)
     while num:
         rem = num % base
-        num = num // base
+        num //= base
         arr.append(alphabet[rem])
     arr.reverse()
     return ''.join(arr)

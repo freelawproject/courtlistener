@@ -105,7 +105,7 @@ class Command(BaseCommand):
         return counts, totals, critical_history
 
     def _tally_errors(self):
-        '''Look at the error db and gather the latest errors from it'''
+        """Look at the error db and gather the latest errors from it"""
         yesterday = date.today() - timedelta(days=1)
         cts_critical = Court.objects \
             .filter(errorlog__log_time__gt=yesterday,
@@ -141,9 +141,9 @@ class Command(BaseCommand):
         return errors, critical_today
 
     def generate_report(self):
-        '''Look at the counts and errors, generate and return a report.
+        """Look at the counts and errors, generate and return a report.
 
-        '''
+        """
         averages, totals, critical_history = self._calculate_counts()
         errors, critical_today = self._tally_errors()
 
@@ -163,7 +163,7 @@ class Command(BaseCommand):
         return report, subject
 
     def send_report(self, report, subject, debug=True):
-        '''Send the report to the admins'''
+        """Send the report to the admins"""
         if debug:
             BACKEND = 'django.core.mail.backends.console.EmailBackend'
         else:
@@ -180,7 +180,7 @@ class Command(BaseCommand):
         connection.close()
 
     def truncate_database_logs(self):
-        '''Truncate the database so that it doesn't grow forever.'''
+        """Truncate the database so that it doesn't grow forever."""
         thirty_days_ago = date.today() - timedelta(days=30)
         ErrorLog.objects.filter(log_time__lt=thirty_days_ago).delete()
 

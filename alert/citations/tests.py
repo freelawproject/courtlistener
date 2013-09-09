@@ -1,5 +1,5 @@
 from alert.citations.constants import REPORTERS
-from alert.citations.find_citations import get_citations, Citation, disambiguate_reporters, is_date_in_reporter
+from alert.citations.find_citations import get_citations, Citation, is_date_in_reporter
 from alert.citations.reporter_tokenizer import tokenize
 from django.test import TestCase
 

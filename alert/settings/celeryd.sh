@@ -2,12 +2,12 @@
 CELERYD_NODES="w1"
 
 ENV_PYTHON="python"
-# If you are using a virtual environment, comment out the line above and uncomment 
+# If you are using a virtual environment, comment out the line above and uncomment
 # the folling line, substituting in the path to your virtual environment.
 #ENV_PYTHON="/path/to/my/virtualenv/bin/python"
 
 # How to call "manage.py celeryd_multi"
-CELERYD_MULTI="$ENV_PYTHON /var/www/court-listener/alert/manage.py celeryd_multi"
+CELERYD_MULTI="$ENV_PYTHON $CL_INSTALL_ROOT/alert/manage.py celeryd_multi"
 
 # Name of the celery config module.
 CELERY_CONFIG_MODULE="celeryconfig"

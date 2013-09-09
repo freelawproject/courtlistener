@@ -52,5 +52,5 @@ def set_data(field, data):
 
 @register.filter
 def behave(field, names):
-    ''' https://github.com/anutron/behavior support '''
+    """ https://github.com/anutron/behavior support """
     return set_data(field, 'filters:'+names)

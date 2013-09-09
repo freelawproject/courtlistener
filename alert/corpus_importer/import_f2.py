@@ -5,7 +5,8 @@ os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 
 import sys
 # append these to the path to make the dev machines and the server happy (respectively)
-sys.path.append("/var/www/court-listener")
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 from django import db
 from django.conf import settings
@@ -148,7 +149,7 @@ def scrape_and_parse():
     vol_file = open('../logs/vol_file.txt', 'r+')
     case_file = open('../logs/case_file.txt', 'r+')
 
-    url = "file:///var/www/court-listener/Resource.org/F2/index.html"
+    url = "file://%s/Resource.org/F2/index.html" % INSTALL_ROOT
     openedURL = urllib2.urlopen(url)
     content = openedURL.read()
     openedURL.close()
@@ -341,7 +342,7 @@ def scrape_and_parse():
             # http://pleac.sourceforge.net/pleac_python/datesandtimes.html
             rawDate = caseDates[j].find('a')
             try:
-                if rawDate != None:
+                if rawDate is not None:
                     # Special cases
                     if sha1Hash == 'f0da421f117ef16223d7e61d1e4e5526036776e6':
                         date_text = 'August 28, 1980'

@@ -3,12 +3,14 @@
     "pk": "scotus",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "SCOTUS",
       "short_name": "Supreme Court",
       "in_use": true,
       "URL": "http://supremecourt.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Supreme Court of the United States",
       "position": 1.0,
       "start_date": "1789-09-24"
@@ -18,12 +20,14 @@
     "pk": "ca1",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "1st Cir.",
       "short_name": "First Circuit",
       "in_use": true,
       "URL": "http://www.ca1.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Court of Appeals for the First Circuit",
       "position": 101.0,
       "start_date": "1891-03-03"
@@ -33,12 +37,14 @@
     "pk": "ca2",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "2d Cir.",
       "short_name": "Second Circuit",
       "in_use": true,
       "URL": "http://www.ca2.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Court of Appeals for the Second Circuit",
       "position": 102.0,
       "start_date": "1891-03-03"
@@ -48,12 +54,14 @@
     "pk": "ca3",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "3rd Cir.",
       "short_name": "Third Circuit",
       "in_use": true,
       "URL": "http://www.ca3.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Court of Appeals for the Third Circuit",
       "position": 103.0,
       "start_date": "1891-03-03"
@@ -63,12 +71,14 @@
     "pk": "ca4",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "4th Cir.",
       "short_name": "Fourth Circuit",
       "in_use": true,
       "URL": "http://www.ca4.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Court of Appeals for the Fourth Circuit",
       "position": 104.0,
       "start_date": "1891-03-03"
@@ -78,12 +88,14 @@
     "pk": "ca5",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "5th Cir.",
       "short_name": "Fifth Circuit",
       "in_use": true,
       "URL": "http://www.ca5.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Court of Appeals for the Fifth Circuit",
       "position": 105.0,
       "start_date": "1891-03-03"
@@ -93,12 +105,14 @@
     "pk": "ca6",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "6th Cir.",
       "short_name": "Sixth Circuit",
       "in_use": true,
       "URL": "http://www.ca6.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Court of Appeals for the Sixth Circuit",
       "position": 106.0,
       "start_date": "1891-03-03"
@@ -108,12 +122,14 @@
     "pk": "ca7",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "7th Cir.",
       "short_name": "Seventh Circuit",
       "in_use": true,
       "URL": "http://www.ca7.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Court of Appeals for the Seventh Circuit",
       "position": 107.0,
       "start_date": "1891-03-03"
@@ -123,12 +139,14 @@
     "pk": "ca8",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "8th Cir.",
       "short_name": "Eighth Circuit",
       "in_use": true,
       "URL": "http://www.ca8.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Court of Appeals for the Eighth Circuit",
       "position": 108.0,
       "start_date": "1891-03-03"
@@ -138,12 +156,14 @@
     "pk": "ca9",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "9th Cir.",
       "short_name": "Ninth Circuit",
       "in_use": true,
       "URL": "http://www.ca9.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Court of Appeals for the Ninth Circuit",
       "position": 109.0,
       "start_date": "1891-03-03"
@@ -153,12 +173,14 @@
     "pk": "ca10",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "10th Cir.",
       "short_name": "Tenth Circuit",
       "in_use": true,
       "URL": "http://www.ca10.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Court of Appeals for the Tenth Circuit",
       "position": 110.0,
       "start_date": "1929-02-28"
@@ -168,12 +190,14 @@
     "pk": "ca11",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "11th Cir.",
       "short_name": "Eleventh Circuit",
       "in_use": true,
       "URL": "http://www.ca11.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Court of Appeals for the Eleventh Circuit",
       "position": 111.0,
       "start_date": "1980-10-14"
@@ -183,12 +207,14 @@
     "pk": "cadc",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "D.C. Cir.",
       "short_name": "District of Columbia",
       "in_use": true,
       "URL": "http://www.cadc.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Court of Appeals for the D.C. Circuit",
       "position": 112.0,
       "start_date": "1893-02-09"
@@ -198,12 +224,14 @@
     "pk": "cafc",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "Fed. Cir.",
       "short_name": "Federal Circuit",
       "in_use": true,
       "URL": "http://www.cafc.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Court of Appeals for the Federal Circuit",
       "position": 113.0,
       "start_date": "1982-04-02"
@@ -213,12 +241,14 @@
     "pk": "armfor",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "C.A.A.F.",
       "short_name": "Court of Appeals for the Armed Forces",
       "in_use": true,
       "URL": "http://www.armfor.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Court of Appeals for the Armed Forces",
       "position": 113.2,
       "start_date": "1951-05-31"
@@ -228,12 +258,14 @@
     "pk": "cc",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": "1992-10-29",
       "citation_string": "Ct. Cl.",
       "short_name": "Court of Claims",
       "in_use": false,
       "URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_coc.html",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "United States Court of Claims",
       "position": 113.5,
       "start_date": "1855-02-24"
@@ -243,12 +275,14 @@
     "pk": "uscfc",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "Fed. Cl.",
       "short_name": "Federal Claims",
       "in_use": true,
       "URL": "http://www.uscfc.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "United States Court of Federal Claims",
       "position": 113.6,
       "start_date": "1982-04-02"
@@ -258,12 +292,14 @@
     "pk": "com",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": "1913-01-01",
       "citation_string": "Comm. Ct.",
       "short_name": "Commerce Court",
       "in_use": false,
       "URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_com.html",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Commerce Court",
       "position": 113.9,
       "start_date": "1910-01-01"
@@ -273,12 +309,14 @@
     "pk": "ccpa",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": "1982-04-02",
       "citation_string": "C.C.P.A.",
       "short_name": "Customs and Patent Appeals",
       "in_use": true,
       "URL": "http://www.cafc.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Court of Customs and Patent Appeals",
       "position": 114.0,
       "start_date": "1909-08-05"
@@ -288,12 +326,14 @@
     "pk": "cusc",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": "1980-01-01",
       "citation_string": "Cust. Ct.",
       "short_name": "U.S. Customs Court",
       "in_use": false,
       "URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_cc_bib.html",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "United States Customs Court",
       "position": 114.1,
       "start_date": "1926-01-01"
@@ -303,12 +343,14 @@
     "pk": "tax",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "Tax Ct.",
       "short_name": "U.S. Tax Court",
       "in_use": true,
       "URL": "http://www.ustaxcourt.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "United States Tax Court",
       "position": 114.2,
       "start_date": null
@@ -318,12 +360,14 @@
     "pk": "cavc",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "Vet. App.",
       "short_name": "Veterans Claims",
       "in_use": true,
       "URL": "http://www.uscourts.cavc.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "United States Court of Appeals for Veterans Claims",
       "position": 115.0,
       "start_date": null
@@ -333,12 +377,14 @@
     "pk": "eca",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": "1962-04-18",
       "citation_string": "Emer. Ct. App.",
       "short_name": "Emergency Court of Appeals",
       "in_use": true,
       "URL": "https://secure.wikimedia.org/wikipedia/en/wiki/Emergency_Court_of_Appeals",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Emergency Court of Appeals",
       "position": 116.0,
       "start_date": "1942-01-30"
@@ -348,12 +394,14 @@
     "pk": "tecoa",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": "1992-10-29",
       "citation_string": "Temp. Emerg. Ct. App.",
       "short_name": "Temporary Emergency Court of Appeals",
       "in_use": false,
       "URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_tecoa.html",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Temporary Emergency Court of Appeals",
       "position": 116.1,
       "start_date": "1971-12-01"
@@ -363,12 +411,14 @@
     "pk": "fiscr",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "FISA Ct. Rev.",
       "short_name": "Foreign Intelligence Surveillance Court of Review",
       "in_use": true,
       "URL": "http://www.fjc.gov/history/home.nsf/page/courts_special_fisc.html",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Foreign Intelligence Surveillance Court of Review",
       "position": 140.0,
       "start_date": "1978-10-25"
@@ -378,12 +428,14 @@
     "pk": "cit",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "Ct. Intl. Trade",
       "short_name": "Court of International Trade",
       "in_use": true,
       "URL": "http://www.cit.uscourts.gov/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "United States Court of International Trade",
       "position": 141.0,
       "start_date": null
@@ -393,14 +445,1393 @@
     "pk": "bap9",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "F",
       "end_date": null,
       "citation_string": "9th Cir. BAP",
       "short_name": "Bankruptcy Appellate Panel for the Ninth Circuit",
       "in_use": true,
       "URL": "http://www.ca9.uscourts.gov/bap/",
-      "jurisdiction": "F",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "United States Bankruptcy Appellate Panel for the Ninth Circuit",
       "position": 200.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctmdala",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "M.D. Ala.",
+      "short_name": "District Court, M.D. Alabama",
+      "in_use": true,
+      "URL": "http://www.almd.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, M.D. Alabama",
+      "position": 201.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctsdala",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "S.D. Ala.",
+      "short_name": "District Court, S. D. Alabama",
+      "in_use": true,
+      "URL": "http://www.als.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, S. D. Alabama",
+      "position": 202.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdariz",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Ariz.",
+      "short_name": "District Court, D. Arizona",
+      "in_use": true,
+      "URL": "http://www.azd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Arizona",
+      "position": 203.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctedark",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "E.D. Ark.",
+      "short_name": "District Court, E.D. Arkansas",
+      "in_use": true,
+      "URL": "http://www.are.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, E.D. Arkansas",
+      "position": 204.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctwdark",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "W.D. Ark.",
+      "short_name": "District Court, W. D. Arkansas",
+      "in_use": true,
+      "URL": "http://www.arwd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, W. D. Arkansas",
+      "position": 204.2,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdcal",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Cal.",
+      "short_name": "District Court, D. California",
+      "in_use": true,
+      "URL": "http://www.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. California",
+      "position": 205.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctndcal",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "N.D. Cal.",
+      "short_name": "District Court, N.D. California",
+      "in_use": true,
+      "URL": "http://www.cand.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, N.D. California",
+      "position": 205.1,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctsdcal",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. California",
+      "short_name": "District Court, S.D. California",
+      "in_use": true,
+      "URL": "http://www.casd.uscourts.gov/",
+      "notes": "",
+      "date_modified": null,
+      "full_name": "District Court, S.D. California",
+      "position": 205.2,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdcolo",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Colo.",
+      "short_name": "District Court, D. Colorado",
+      "in_use": true,
+      "URL": "http://www.cod.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Colorado",
+      "position": 206.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdconn",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Conn.",
+      "short_name": "District Court, D. Connecticut",
+      "in_use": true,
+      "URL": "http://www.ctd.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Connecticut",
+      "position": 207.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctddel",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Del.",
+      "short_name": "District Court, D. Delaware",
+      "in_use": true,
+      "URL": "http://www.ded.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Delaware",
+      "position": 208.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdidaho",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Idaho",
+      "short_name": "District Court, D. Idaho",
+      "in_use": true,
+      "URL": "http://www.id.uscourts.gov/\u200e",
+      "notes": "lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Idaho",
+      "position": 209.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctedill",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "E.D. Ill.",
+      "short_name": "District Court, E. D. Illinois",
+      "in_use": true,
+      "URL": "https://en.wikipedia.org/wiki/United_States_District_Court_for_the_Eastern_District_of_Illinois",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, E. D. Illinois",
+      "position": 209.9,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctndill",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "N.D. Ill.",
+      "short_name": "District Court, N.D. Illinois",
+      "in_use": true,
+      "URL": "http://www.ilnd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, N.D. Illinois",
+      "position": 210.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctsdill",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "S.D. Ill.",
+      "short_name": "District Court, S.D. Illinois",
+      "in_use": true,
+      "URL": "http://www.ilsd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, S.D. Illinois",
+      "position": 210.1,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdind",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Ind.",
+      "short_name": "District Court, D. Indiana",
+      "in_use": true,
+      "URL": "http://www.insd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Indiana",
+      "position": 214.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctndiowa",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "N.D. Iowa",
+      "short_name": "District Court, N.D. Iowa",
+      "in_use": true,
+      "URL": "http://www.iand.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, N.D. Iowa",
+      "position": 215.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctsdiowa",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "S.D. Iowa",
+      "short_name": "District Court, S. D. Iowa",
+      "in_use": true,
+      "URL": "http://www.iasd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, S. D. Iowa",
+      "position": 216.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctsdfla",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "S.D. Fla.",
+      "short_name": "District Court, S.D. Florida",
+      "in_use": true,
+      "URL": "http://www.flsd.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, S.D. Florida",
+      "position": 220.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctmdga",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "",
+      "short_name": "District Court, M.D. Georgia",
+      "in_use": true,
+      "URL": "http://www.gamd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, M.D. Georgia",
+      "position": 224.9,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctndga",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "N.D. Ga.",
+      "short_name": "District Court, N.D. Georgia",
+      "in_use": true,
+      "URL": "http://www.gand.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, N.D. Georgia",
+      "position": 225.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctsdga",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "S.D. Ga.",
+      "short_name": "District Court, S. D. Georgia",
+      "in_use": true,
+      "URL": "http://www.gasd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, S. D. Georgia",
+      "position": 226.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdkan",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "",
+      "short_name": "District Court, D. Kansas",
+      "in_use": true,
+      "URL": "http://www.ksd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Kansas",
+      "position": 228.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctedky",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "E.D. Ky.",
+      "short_name": "District Court, E. D. Kentucky",
+      "in_use": true,
+      "URL": "http://www.kyed.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, E. D. Kentucky",
+      "position": 229.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctwdky",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "W.D. Ky.",
+      "short_name": "District Court, W.D. Kentucky",
+      "in_use": true,
+      "URL": "http://www.kywd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, W.D. Kentucky",
+      "position": 230.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctedla",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "E.D. La.",
+      "short_name": "District Court, E.D. Louisiana.",
+      "in_use": true,
+      "URL": "http://www.laed.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, E.D. Louisiana.",
+      "position": 231.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctwdla",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "W.D. La.",
+      "short_name": "District Court, W.D. Louisiana",
+      "in_use": true,
+      "URL": "http://www.lawd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, W.D. Louisiana",
+      "position": 231.2,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdme",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Me.",
+      "short_name": "District Court, D. Maine",
+      "in_use": true,
+      "URL": "http://www.med.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Maine",
+      "position": 239.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdmd",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Maryland",
+      "short_name": "District Court, D. Maryland",
+      "in_use": true,
+      "URL": "https://www.mdd.uscourts.gov/\u200e",
+      "notes": "",
+      "date_modified": null,
+      "full_name": "District Court, D. Maryland",
+      "position": 240.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdmass",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Mass.",
+      "short_name": "District Court, D. Massachusetts",
+      "in_use": true,
+      "URL": "http://www.mad.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Massachusetts",
+      "position": 240.5,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctedmich",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "E.D. Mich.",
+      "short_name": "District Court, E.D. Michigan",
+      "in_use": true,
+      "URL": "http://www.mied.uscourts.gov/\u200e",
+      "notes": "",
+      "date_modified": null,
+      "full_name": "District Court, E.D. Michigan",
+      "position": 240.6,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctwdmich",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "",
+      "short_name": "District Court, W. D. Michigan",
+      "in_use": true,
+      "URL": "http://www.miwd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, W. D. Michigan",
+      "position": 240.7,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdminn",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Minnesota",
+      "short_name": "District Court, D. Minnesota",
+      "in_use": true,
+      "URL": "http://www.mnd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Minnesota",
+      "position": 241.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctcdmo",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "C.D. Mo.",
+      "short_name": "District Court, C. D. Missouri",
+      "in_use": true,
+      "URL": "http://www.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, C. D. Missouri",
+      "position": 241.5,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctedmo",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "E.D. Mo.",
+      "short_name": "District Court, E. D. Missouri",
+      "in_use": true,
+      "URL": "http://www.moed.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, E. D. Missouri",
+      "position": 242.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctwdmo",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "W.D. Mo.",
+      "short_name": "District Court, W.D. Missouri",
+      "in_use": true,
+      "URL": "http://www.mow.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, W.D. Missouri",
+      "position": 242.1,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctndmiss",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "N.D. Miss.",
+      "short_name": "District Court, N.D. Mississippi",
+      "in_use": true,
+      "URL": "http://www.msnd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, N.D. Mississippi",
+      "position": 242.12,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctsdmiss",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "S.D. Miss.",
+      "short_name": "District Court, S. D. Mississippi",
+      "in_use": true,
+      "URL": "http://www.mssd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, S. D. Mississippi",
+      "position": 242.15,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdmont",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Mont.",
+      "short_name": "District Court, D. Montana",
+      "in_use": true,
+      "URL": "http://www.mtd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Montana",
+      "position": 242.19,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdneb",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Neb.",
+      "short_name": "District Court, D. Nebraska",
+      "in_use": true,
+      "URL": "http://www.ned.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Nebraska",
+      "position": 242.2,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdnev",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Nev.",
+      "short_name": "District Court, D. Nevada",
+      "in_use": true,
+      "URL": "http://www.nvd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Nevada",
+      "position": 242.5,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdnh",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D.N.H.",
+      "short_name": "District Court, D. New Hampshire",
+      "in_use": true,
+      "URL": "http://www.nhd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. New Hampshire",
+      "position": 243.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdnj",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D.N.J.",
+      "short_name": "District Court, D. New Jersey",
+      "in_use": true,
+      "URL": "http://www.njd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. New Jersey",
+      "position": 243.5,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdnm",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D.N.M.",
+      "short_name": "District Court, D. New Mexico",
+      "in_use": true,
+      "URL": "http://www.nmcourt.fed.us/web/DCDOCS/dcindex.html\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. New Mexico",
+      "position": 243.7,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctedny",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "E.D.N.Y",
+      "short_name": "District Court, E.D. New York",
+      "in_use": true,
+      "URL": "http://www.nyed.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, E.D. New York",
+      "position": 244.8,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctndny",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "",
+      "short_name": "District Court, N. D. New York",
+      "in_use": true,
+      "URL": "http://www.nynd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, N. D. New York",
+      "position": 244.9,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctsdny",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "S.D.N.Y.",
+      "short_name": "District Court, S. D. New York",
+      "in_use": true,
+      "URL": "http://www.nysd.uscourts.gov/\u200e",
+      "notes": "",
+      "date_modified": null,
+      "full_name": "District Court, S. D. New York",
+      "position": 245.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctwdny",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "W.D.N.Y.",
+      "short_name": "District Court, W.D. New York",
+      "in_use": true,
+      "URL": "http://www.nywd.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, W.D. New York",
+      "position": 245.05,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctednc",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "E.D.N.C.",
+      "short_name": "District Court, E.D. North Carolina",
+      "in_use": true,
+      "URL": "http://www.nced.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, E.D. North Carolina",
+      "position": 245.1,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctwdnc",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "W.D.N.C.",
+      "short_name": "District Court, W. D. North Carolina",
+      "in_use": true,
+      "URL": "http://www.ncwd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, W. D. North Carolina",
+      "position": 245.2,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdohio",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Ohio",
+      "short_name": "District Court, D. Ohio",
+      "in_use": true,
+      "URL": "http://www.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Ohio",
+      "position": 245.7,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctndohio",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "N.D. Ohio",
+      "short_name": "District Court, N.D. Ohio",
+      "in_use": true,
+      "URL": "http://www.ohnd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, N.D. Ohio",
+      "position": 245.8,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctsdohio",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "S.D. Ohio",
+      "short_name": "District Court, S.D. Ohio",
+      "in_use": true,
+      "URL": "http://www.ohsd.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, S.D. Ohio",
+      "position": 245.91,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctedokla",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "E.D. Okla.",
+      "short_name": "District Court, E. D. Oklahoma",
+      "in_use": true,
+      "URL": "http://www.oked.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, E. D. Oklahoma",
+      "position": 245.95,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctndokla",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "N.D. Okla.",
+      "short_name": "District Court, N.D. Oklahoma",
+      "in_use": true,
+      "URL": "http://www.oknd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, N.D. Oklahoma",
+      "position": 245.99,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctwdokla",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "W.D. Okla.",
+      "short_name": "District Court, W.D. Oklahoma",
+      "in_use": true,
+      "URL": "http://www.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, W.D. Oklahoma",
+      "position": 246.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdor",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Or.",
+      "short_name": "District Court, D. Oregon",
+      "in_use": true,
+      "URL": "http://www.ord.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Oregon",
+      "position": 247.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctedpa",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "E.D. Pa.",
+      "short_name": "District Court, E.D. Pennsylvania",
+      "in_use": true,
+      "URL": "http://www.paed.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, E.D. Pennsylvania",
+      "position": 247.9,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctmdpenn",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "M.D. Penn.",
+      "short_name": "District Court, M. D. Pennsylvania",
+      "in_use": true,
+      "URL": "http://www.pamd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, M. D. Pennsylvania",
+      "position": 247.95,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctwdpa",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "W.D. Pa.",
+      "short_name": "District Court, W.D. Pennsylvania",
+      "in_use": true,
+      "URL": "http://www.pawd.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, W.D. Pennsylvania",
+      "position": 248.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdri",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D.R.I.",
+      "short_name": "District Court, D. Rhode Island",
+      "in_use": true,
+      "URL": "http://www.rid.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Rhode Island",
+      "position": 248.5,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctedsc",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "E.D.S.C.",
+      "short_name": "District Court, E.D. South Carolina",
+      "in_use": true,
+      "URL": "http://www.scd.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, E.D. South Carolina",
+      "position": 249.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctwdsc",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "W.D.S.C.",
+      "short_name": "District Court, W. D. South Carolina",
+      "in_use": true,
+      "URL": "http://www.ncwd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, W. D. South Carolina",
+      "position": 249.1,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdsd",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D.S.D.",
+      "short_name": "District Court, D. South Dakota",
+      "in_use": true,
+      "URL": "http://www.sdd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. South Dakota",
+      "position": 249.5,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdtenn",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Tenn.",
+      "short_name": "District Court, D. Tennessee",
+      "in_use": true,
+      "URL": "http://www.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Tennessee",
+      "position": 249.59,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctedtenn",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "E.D. Tenn.",
+      "short_name": "District Court, E. D. Tennessee",
+      "in_use": true,
+      "URL": "http://www.tned.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, E. D. Tennessee",
+      "position": 249.6,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctmdtenn",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "M.D. Tenn.",
+      "short_name": "District Court, M. D. Tennessee",
+      "in_use": true,
+      "URL": "http://www.tnmd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, M. D. Tennessee",
+      "position": 249.7,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctwdtenn",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "W.D. Tenn.",
+      "short_name": "District Court, W. D. Tennessee",
+      "in_use": true,
+      "URL": "http://www.tnwd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, W. D. Tennessee",
+      "position": 249.8,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctedtex",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "E.D. Tex.",
+      "short_name": "District Court, E.D. Texas",
+      "in_use": true,
+      "URL": "http://www.txed.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, E.D. Texas",
+      "position": 250.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctndtex",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "N.D. Tex.",
+      "short_name": "District Court, N.D. Texas",
+      "in_use": true,
+      "URL": "http://www.txnd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, N.D. Texas",
+      "position": 250.1,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctsdtex",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "S.D. Tex.",
+      "short_name": "District Court, S. D. Texas",
+      "in_use": true,
+      "URL": "http://www.txs.uscourts.gov/\u200e",
+      "notes": "",
+      "date_modified": null,
+      "full_name": "District Court, S. D. Texas",
+      "position": 250.5,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctwdtex",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "W.D. Tex.",
+      "short_name": "District Court, W. D. Texas",
+      "in_use": true,
+      "URL": "http://www.txwd.uscourts.gov/\u200e",
+      "notes": "",
+      "date_modified": null,
+      "full_name": "District Court, W. D. Texas",
+      "position": 251.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctedva",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "E.D. Va.",
+      "short_name": "District Court, E.D. Virginia",
+      "in_use": true,
+      "URL": "http://www.vaed.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, E.D. Virginia",
+      "position": 279.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctwdva",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "W.D. Va.",
+      "short_name": "District Court, W.D. Virginia",
+      "in_use": true,
+      "URL": "http://www.vawd.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, W.D. Virginia",
+      "position": 280.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctedwash",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "E.D. Wash.",
+      "short_name": "District Court, E. D. Washington",
+      "in_use": true,
+      "URL": "http://www.waed.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, E. D. Washington",
+      "position": 289.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctwdwash",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "W.D. Wash.",
+      "short_name": "District Court, W. D. Washington",
+      "in_use": true,
+      "URL": "http://www.wawd.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, W. D. Washington",
+      "position": 290.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctndwva",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "N.D.W. Va.",
+      "short_name": "District Court, N. D. West Virginia",
+      "in_use": true,
+      "URL": "http://www.wvnd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, N. D. West Virginia",
+      "position": 294.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctsdwva",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "S.D.W. Va",
+      "short_name": "District Court, S. D. West Virginia.",
+      "in_use": true,
+      "URL": "http://www.wvsd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, S. D. West Virginia.",
+      "position": 295.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctedwis",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Wis.",
+      "short_name": "District Court, E. D. Wisconsin",
+      "in_use": true,
+      "URL": "http://www.wied.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, E. D. Wisconsin",
+      "position": 297.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctwdwis",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "W.D. Wis.",
+      "short_name": "District Court, W. D. Wisconsin",
+      "in_use": true,
+      "URL": "http://www.wiwd.uscourts.gov/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, W. D. Wisconsin",
+      "position": 298.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "distctdwyo",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "D. Wyo.",
+      "short_name": "District Court, D. Wyoming",
+      "in_use": true,
+      "URL": "http://www.wyd.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "District Court, D. Wyoming",
+      "position": 299.0,
       "start_date": null
     }
   },
@@ -408,14 +1839,33 @@
     "pk": "alaska",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Alaska",
       "short_name": "Alaska Supreme Court",
       "in_use": true,
       "URL": "http://courts.alaska.gov/sp.htm",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Alaska Supreme Court",
       "position": 320.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "alaskactapp",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Alaska Ct. App.",
+      "short_name": "Court of Appeals of Alaska",
+      "in_use": true,
+      "URL": "http://courts.alaska.gov/appcts.htm\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "Court of Appeals of Alaska",
+      "position": 321.0,
       "start_date": null
     }
   },
@@ -423,14 +1873,33 @@
     "pk": "ariz",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Ariz.",
       "short_name": "Arizona Supreme Court",
       "in_use": true,
       "URL": "http://www.azcourts.gov/azsupremecourt.aspx",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Arizona Supreme Court",
       "position": 322.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "arizctapp",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Ariz. Ct. App.",
+      "short_name": "Court of Appeals of Arizona",
+      "in_use": true,
+      "URL": "http://www.azcourts.gov/AZCourts/CourtofAppeals.aspx\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "Court of Appeals of Arizona",
+      "position": 323.0,
       "start_date": null
     }
   },
@@ -438,14 +1907,50 @@
     "pk": "cal",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Cal.",
       "short_name": "California Supreme Court",
       "in_use": true,
       "URL": "http://www.courts.ca.gov/supremecourt.htm",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "California Supreme Court",
       "position": 350.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "colo",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Colo.",
+      "short_name": "Supreme Court of Colorado",
+      "in_use": true,
+      "URL": "http://www.coloradosupremecourt.com/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "Supreme Court of Colorado",
+      "position": 350.9,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "coloctapp",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Colo. Ct. App.",
+      "short_name": "Colorado Court of Appeals",
+      "in_use": true,
+      "URL": "http://www.courts.state.co.us/Courts/Court_Of_Appeals/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "Colorado Court of Appeals",
+      "position": 351.0,
       "start_date": null
     }
   },
@@ -453,12 +1958,14 @@
     "pk": "haw",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Haw.",
       "short_name": "Hawaii Supreme Court",
       "in_use": true,
       "URL": "http://www.courts.state.hi.us/",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Hawaii Supreme Court",
       "position": 359.0,
       "start_date": null
@@ -468,12 +1975,14 @@
     "pk": "hawapp",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Haw. App.",
       "short_name": "Hawaii Intermediate Court of Appeals",
       "in_use": true,
       "URL": "http://www.courts.state.hi.us/",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Hawaii Intermediate Court of Appeals",
       "position": 359.1,
       "start_date": null
@@ -483,12 +1992,14 @@
     "pk": "idaho",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Idaho",
       "short_name": "Idaho Supreme Court",
       "in_use": true,
       "URL": "http://www.isc.idaho.gov/",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Idaho Supreme Court",
       "position": 359.2,
       "start_date": null
@@ -498,14 +2009,50 @@
     "pk": "idahoctapp",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Idaho Ct. App.",
       "short_name": "Idaho Court of Appeals",
       "in_use": true,
       "URL": "http://www.isc.idaho.gov/",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Idaho Court of Appeals",
       "position": 359.25,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "ill",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Ill.",
+      "short_name": "Illinois Supreme Court",
+      "in_use": true,
+      "URL": "http://www.state.il.us/court/",
+      "notes": "All coverage from Lawbox.",
+      "date_modified": null,
+      "full_name": "Illinois Supreme Court",
+      "position": 359.5,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "illappct",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Ill. App. Ct.",
+      "short_name": "Appellate Court of Illinois",
+      "in_use": true,
+      "URL": "http://www.state.il.us/court/appellatecourt/\u200e",
+      "notes": "",
+      "date_modified": null,
+      "full_name": "Appellate Court of Illinois",
+      "position": 359.6,
       "start_date": null
     }
   },
@@ -513,14 +2060,118 @@
     "pk": "ind",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Ind.",
       "short_name": "Indiana Supreme Court",
       "in_use": true,
       "URL": "http://www.in.gov/judiciary/supreme/",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Indiana Supreme Court",
       "position": 360.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "indctapp",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Ind. Ct. App.",
+      "short_name": "Court of Appeals of Indiana",
+      "in_use": true,
+      "URL": "http://www.in.gov/judiciary/appeals/\u200e",
+      "notes": "",
+      "date_modified": null,
+      "full_name": "Court of Appeals of Indiana",
+      "position": 361.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "indtc",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Ind. T.C.",
+      "short_name": "Indiana Tax Court",
+      "in_use": true,
+      "URL": "http://www.in.gov/judiciary/tax/\u200e",
+      "notes": "",
+      "date_modified": null,
+      "full_name": "Indiana Tax Court",
+      "position": 362.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "kan",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Kan.",
+      "short_name": "Supreme Court of Kansas",
+      "in_use": true,
+      "URL": "http://www.kscourts.org/kansas-courts/supreme-court/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "Supreme Court of Kansas",
+      "position": 362.1,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "kanctapp",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Kan. Ct. App.",
+      "short_name": "Court of Appeals of Kansas",
+      "in_use": true,
+      "URL": "http://www.kscourts.org/kansas-courts/court-of-appeals/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "Court of Appeals of Kansas",
+      "position": 362.2,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "mass",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Mass.",
+      "short_name": "Massachusetts Supreme Judicial Court",
+      "in_use": true,
+      "URL": "http://www.mass.gov/courts/sjc/\u200e",
+      "notes": "",
+      "date_modified": null,
+      "full_name": "Massachusetts Supreme Judicial Court",
+      "position": 362.99,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "massappct",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Mass. App. Ct.",
+      "short_name": "Massachusetts Appeals Court",
+      "in_use": true,
+      "URL": "http://www.mass.gov/courts/appealscourt/\u200e",
+      "notes": "",
+      "date_modified": null,
+      "full_name": "Massachusetts Appeals Court",
+      "position": 363.0,
       "start_date": null
     }
   },
@@ -528,12 +2179,14 @@
     "pk": "mich",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Mich.",
       "short_name": "Michigan Supreme Court",
       "in_use": true,
       "URL": "http://courts.mi.gov/",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Michigan Supreme Court",
       "position": 365.0,
       "start_date": null
@@ -543,12 +2196,14 @@
     "pk": "miss",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Miss.",
       "short_name": "Mississippi Supreme Court",
       "in_use": true,
       "URL": "http://courts.ms.gov/appellate_courts/sc/sc.html",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Mississippi Supreme Court",
       "position": 366.0,
       "start_date": null
@@ -558,12 +2213,14 @@
     "pk": "mont",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Mont.",
       "short_name": "Montana Supreme Court",
       "in_use": true,
       "URL": "http://courts.mt.gov/supreme/default.mcpx",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Montana Supreme Court",
       "position": 366.1,
       "start_date": null
@@ -573,12 +2230,14 @@
     "pk": "neb",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Neb.",
       "short_name": "Nebraska Supreme Court",
       "in_use": true,
       "URL": "http://supremecourt.ne.gov/",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Nebraska Supreme Court",
       "position": 366.2,
       "start_date": null
@@ -588,12 +2247,14 @@
     "pk": "nebctapp",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Neb. Ct. App.",
       "short_name": "Nebraska Court of Appeals",
       "in_use": true,
       "URL": "http://supremecourt.ne.gov/",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Nebraska Court of Appeals",
       "position": 366.25,
       "start_date": null
@@ -603,12 +2264,14 @@
     "pk": "nev",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Nev.",
       "short_name": "Nevada Supreme Court",
       "in_use": true,
       "URL": "http://www.nevadajudiciary.us/index.php/supremecourt",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Nevada Supreme Court",
       "position": 366.5,
       "start_date": null
@@ -618,12 +2281,14 @@
     "pk": "nm",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "N.M.",
       "short_name": "New Mexico Supreme Court",
       "in_use": true,
       "URL": "https://nmsupremecourt.nmcourts.gov/index.php",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "New Mexico Supreme Court",
       "position": 366.9,
       "start_date": null
@@ -633,14 +2298,33 @@
     "pk": "nmctapp",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "N.M. Ct. App.",
       "short_name": "New Mexico Court of Appeals",
       "in_use": true,
       "URL": "https://coa.nmcourts.gov/index.php",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "New Mexico Court of Appeals",
       "position": 366.95,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "ny",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "",
+      "short_name": "New York Court of Appeals",
+      "in_use": true,
+      "URL": "http://www.nycourts.gov/ctapps/\u200e",
+      "notes": "",
+      "date_modified": null,
+      "full_name": "New York Court of Appeals",
+      "position": 366.96,
       "start_date": null
     }
   },
@@ -648,12 +2332,14 @@
     "pk": "nd",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "N.D.",
       "short_name": "North Dakota Supreme Court",
       "in_use": true,
       "URL": "http://www.ndcourts.gov/default.htm",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "North Dakota Supreme Court",
       "position": 366.99,
       "start_date": null
@@ -663,14 +2349,67 @@
     "pk": "ndctapp",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "N.D. Ct. App.",
       "short_name": "North Dakota Court of Appeals",
       "in_use": true,
       "URL": "http://www.ndcourts.gov/default.htm",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "North Dakota Court of Appeals",
       "position": 366.991,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "okla",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Okla.",
+      "short_name": "Supreme Court of Oklahoma",
+      "in_use": true,
+      "URL": "http://www.oscn.net/oscn/schome/start.htm\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "Supreme Court of Oklahoma",
+      "position": 366.999,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "oklacivapp",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Okla. Civ. App.",
+      "short_name": "Court of Civil Appeals of Oklahoma",
+      "in_use": true,
+      "URL": "http://www.oscn.net/oscn/schome/civilappeals.htm\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "Court of Civil Appeals of Oklahoma",
+      "position": 366.9995,
+      "start_date": "1908-01-01"
+    }
+  },
+  {
+    "pk": "oklavrimapp",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Okla. Crim. App.",
+      "short_name": "Court of Criminal Appeals of Oklahoma",
+      "in_use": true,
+      "URL": "http://www.okcca.net/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "Court of Criminal Appeals of Oklahoma",
+      "position": 366.9996,
       "start_date": null
     }
   },
@@ -678,14 +2417,33 @@
     "pk": "or",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Or.",
       "short_name": "Oregon Supreme Court",
       "in_use": true,
       "URL": "http://www.publications.ojd.state.or.us/Pages/OpinionsSC.aspx",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Oregon Supreme Court",
       "position": 367.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "orctapp",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Or. Ct. App.",
+      "short_name": "Court of Appeals of Oregon",
+      "in_use": true,
+      "URL": "http://courts.oregon.gov/COA/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "Court of Appeals of Oregon",
+      "position": 367.1,
       "start_date": null
     }
   },
@@ -693,12 +2451,14 @@
     "pk": "sd",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "S.D.",
       "short_name": "South Dakota Supreme Court",
       "in_use": true,
       "URL": "http://www.sdjudicial.com/",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "South Dakota Supreme Court",
       "position": 367.5,
       "start_date": null
@@ -708,12 +2468,14 @@
     "pk": "tex",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Tex.",
       "short_name": "Texas Supreme Court",
       "in_use": true,
       "URL": "http://www.supreme.courts.state.tx.us/",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Texas Supreme Court",
       "position": 368.0,
       "start_date": null
@@ -723,14 +2485,33 @@
     "pk": "utah",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Utah",
       "short_name": "Utah Supreme Court",
       "in_use": true,
       "URL": "http://www.utcourts.gov/opinions/supopin/index.htm",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Utah Supreme Court",
       "position": 369.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "utahctapp",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Utah Ct. App.",
+      "short_name": "Court of Appeals of Utah",
+      "in_use": true,
+      "URL": "http://www.utcourts.gov/courts/appell/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "Court of Appeals of Utah",
+      "position": 369.1,
       "start_date": null
     }
   },
@@ -738,12 +2519,14 @@
     "pk": "wash",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Wash.",
       "short_name": "Washington Supreme Court",
       "in_use": true,
       "URL": "https://www.courts.wa.gov/appellate_trial_courts/SupremeCourt/",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Washington Supreme Court",
       "position": 370.0,
       "start_date": null
@@ -753,14 +2536,33 @@
     "pk": "wva",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "W. Va.",
       "short_name": "West Virginia Supreme Court",
       "in_use": true,
       "URL": "http://www.courtswv.gov/supreme-court/",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "West Virginia Supreme Court",
       "position": 385.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "washctapp",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "S",
+      "end_date": null,
+      "citation_string": "Wash. Ct. App.",
+      "short_name": "Court of Appeals of Washington",
+      "in_use": true,
+      "URL": "https://www.courts.wa.gov/appellate_trial_courts/\u200e",
+      "notes": "Lawbox",
+      "date_modified": null,
+      "full_name": "Court of Appeals of Washington",
+      "position": 385.1,
       "start_date": null
     }
   },
@@ -768,12 +2570,14 @@
     "pk": "wis",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Wis.",
       "short_name": "Wisconsin Supreme Court",
       "in_use": true,
       "URL": "http://www.wicourts.gov/courts/supreme/index.htm",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Wisconsin Supreme Court",
       "position": 386.0,
       "start_date": null
@@ -783,14 +2587,50 @@
     "pk": "wyo",
     "model": "search.court",
     "fields": {
+      "jurisdiction": "S",
       "end_date": null,
       "citation_string": "Wyo.",
       "short_name": "Wyoming Supreme Court",
       "in_use": true,
       "URL": "http://www.courts.state.wy.us/",
-      "jurisdiction": "S",
+      "notes": "",
+      "date_modified": "2013-08-14 09:46:30",
       "full_name": "Wyoming Supreme Court",
       "position": 390.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "usjcc",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "U.S.J.C.C",
+      "short_name": "United States Judicial Conference Committee",
+      "in_use": true,
+      "URL": "http://www.uscourts.gov/FederalCourts/JudicialConference/Committees.aspx",
+      "notes": "",
+      "date_modified": null,
+      "full_name": "United States Judicial Conference Committee",
+      "position": 450.0,
+      "start_date": null
+    }
+  },
+  {
+    "pk": "test",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "",
+      "end_date": null,
+      "citation_string": "",
+      "short_name": "",
+      "in_use": false,
+      "URL": "",
+      "notes": "",
+      "date_modified": null,
+      "full_name": "",
+      "position": null,
       "start_date": null
     }
   }

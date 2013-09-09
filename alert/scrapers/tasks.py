@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 
+import os
 import sys
-from lxml.etree import XMLSyntaxError
 
-sys.path.append('/var/www/court-listener/alert')
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 from alert import settings
 from django.core.management import setup_environ
@@ -16,12 +17,12 @@ from celery.decorators import task
 from celery.task.sets import subtask
 from datetime import date
 from lxml.html.clean import Cleaner
+from lxml.etree import XMLSyntaxError
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
 from citations.tasks import update_document_by_id
 
 import glob
-import os
 import subprocess
 import time
 import traceback
@@ -267,7 +268,7 @@ def extract_by_ocr(path):
             success = True
         except IOError:
             print ("OCR was unable to finish due to not having a txt file created. "
-                   "This usually happens when Tesseract cannot ingest the tiff file at: %" % path)
+                   "This usually happens when Tesseract cannot ingest the tiff file at: %s" % path)
             content = fail_msg
             success = False
 

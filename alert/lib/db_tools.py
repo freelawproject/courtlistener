@@ -4,7 +4,7 @@ from alert.settings import *
 
 
 def queryset_generator(queryset, chunksize=1000):
-    '''
+    """
     from: http://djangosnippets.org/snippets/1949/
     Iterate over a Django Queryset ordered by the primary key
 
@@ -15,7 +15,7 @@ def queryset_generator(queryset, chunksize=1000):
 
     Note that the implementation of the iterator does not support ordered query
     sets.
-    '''
+    """
     if queryset.count() == 0:
         return
     if DEVELOPMENT:
@@ -34,7 +34,7 @@ def queryset_generator(queryset, chunksize=1000):
 
 
 def queryset_generator_by_date(queryset, date_field, start_date, end_date, chunksize=7):
-    '''
+    """
     Takes a queryset and chunks it by date. Useful if sorting by pk isn't
     needed. For large querysets, such sorting can be very expensive.
 
@@ -43,7 +43,7 @@ def queryset_generator_by_date(queryset, date_field, start_date, end_date, chunk
 
     Chunksize should be given in days, and start and end dates should be provided
     as dates.
-    '''
+    """
     chunksize = timedelta(chunksize)
     bottom_date = start_date
     top_date = bottom_date + chunksize - timedelta(1)
