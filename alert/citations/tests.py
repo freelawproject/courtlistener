@@ -54,10 +54,10 @@ class CiteTest(TestCase):
             ('171 Wn.2d 1016 (1982)',
              Citation(volume=171, reporter='Wash. 2d', page=1016, canonical_reporter='Wash.', lookup_index=1, year=1982)),
         )
-        for pair in test_pairs:
-            cite_found = get_citations(pair[0])[0]
-            self.assertEqual(cite_found, pair[1],
-                             msg='%s\n%s != \n%s' % (pair[0], cite_found.__dict__, pair[1].__dict__))
+        for q, a in test_pairs:
+            cite_found = get_citations(q)[0]
+            self.assertEqual(cite_found, a,
+                             msg='%s\n%s != \n%s' % (q, cite_found.__dict__, a.__dict__))
 
     def test_date_in_editions(self):
         test_pairs = [
@@ -103,12 +103,15 @@ class CiteTest(TestCase):
             ('1 Cr. 1',
              [Citation(volume=1, reporter='Cranch', page=1, canonical_reporter='Cranch', lookup_index=0)]),
             # 7. Cranch. --> Not a variant, but could refer to either Cranch's Supreme Court cases or his DC ones.
-            #                In this case, we disambiguate based on parallel citations because years won't provide
-            #                enough information.
-            #('1 Cranch. 1 1 U.S. 23',
-            # [Citation(volume=1, reporter='Cranch', page=1, canonical_reporter='Cranch', lookup_index=0),
-            #  Citation(volume=1, reporter='U.S.', page=1, canonical_reporter='U.S.', lookup_index=0)]),
-            # 8. Rob. --> Either:
+            #                In this case, we cannot disambiguate. Years are not known, and we have no further clues.
+            #                We must simply return what we've been given.
+            ('1 Cranch 1 1 U.S. 23',
+             [Citation(volume=1, reporter='U.S.', page=23, canonical_reporter='U.S.', lookup_index=0),
+              Citation(volume=1, reporter='Cranch', page=1, canonical_reporter='Cranch')]),
+            # 8. Unsolved problem. In theory, we could use parallel citations to resolve this, because Rob is getting
+            # cited next to La., but we don't currently know the proximity of citations to each other, so can't use
+            # this.
+            #  - Rob. --> Either:
             #                8.1: A variant of Robards (1862-1865) or
             #                8.2: Robinson's Louisiana Reports (1841-1846) or
             #                8.3: Robinson's Virgina Reports (1842-1865)
