@@ -10,7 +10,7 @@ from lxml import html
 from alert.citations.constants import EDITIONS, REPORTERS
 from alert.citations.find_citations import get_citations
 from datetime import date, timedelta
-from alert.corpus_importer.court_regexes import fd_pairs
+from alert.corpus_importer.court_regexes import fd_pairs, state_pairs
 from alert.corpus_importer.judge_extractor import get_judge_from_str
 from alert.lib.import_lib import map_citations_to_models
 
@@ -26,13 +26,42 @@ from lxml.html import tostring
 from alert.search.models import Document, Citation, Court
 
 
-DEBUG = 3
+DEBUG = 'out'
 
 try:
     with open('lawbox_fix_file.pkl', 'rb') as fix_file:
         fixes = pickle.load(fix_file)
 except (IOError, EOFError):
     fixes = {}
+
+try:
+    # Load up SCOTUS dates
+    scotus_dates = {}
+    with open('../../cleaning_scripts/SupremeCourtCleanup/date_of_decisions.csv') as scotus_date_file:
+        for line in scotus_date_file:
+            line_parts = [line.strip() for line in line.split('|')]
+            if line_parts[-1]:
+                scotus_dates[line_parts[0]] = datetime.datetime.strptime(line_parts[-1].strip(), '%Y-%m-%d').date()
+except IOError:
+    pass
+
+
+##########################################
+# This variable is used to do statistical work on Opinions whose jurisdiction is unclear. The problem is that
+# many Opinions, probably thousands of them, have a court like, "D. Wisconsin." Well, Wisconsin has an east and
+# west district, but no generic district, so this has to be resolved. When we hit such a case, we set it aside
+# for later processing, once we've processed all the easy cases. At that point, we will have the variable below,
+# judge stats, which will have all of the judges along with a count of their jurisdictions:
+# judge_stats = {
+#     'McKensey': {
+#         'wied': 998,
+#         'wis': 2
+#     }
+# }
+# So in this case, you can see quite clearly that McKensey is a judge at wied, and we can classify the case as
+# such.
+##########################################
+judge_stats = {}
 
 all_courts = Court.objects.all()
 
@@ -80,6 +109,8 @@ def get_case_name(complete_html_tree):
 
 
 def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
+    if not scotus_dates:
+        print "Failed to load scotus dates."
     path = '//center[descendant::text()[not(starts-with(normalize-space(.), "No.") or starts-with(normalize-space(.), "Case No.") or starts-with(normalize-space(.), "Record No."))]]'
 
     reporter_keys = [citation.reporter for citation in citations]
@@ -114,10 +145,13 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
             # If it has unicode is crashes dateutil's parser, but is unlikely to be the date.
             pass
 
-    # Additional approaches to getting the date(s)
-    if not dates and court == 'SCOTUS':
-        pass
-
+    # Get the date from our SCOTUS date table
+    if not dates and court == 'scotus':
+        for citation in citations:
+            try:
+                dates.append(scotus_dates["%s %s %s" % (citation.volume, citation.reporter, citation.page)])
+            except KeyError:
+                pass
 
     if not dates:
         # Try to grab the year from the citations, if it's the same in all of them.
@@ -223,7 +257,7 @@ def get_docket_number(html, case_path=None, court=None):
     return docket_number
 
 
-def get_court_object(html, case_path=None):
+def get_court_object(html, citations=None, case_path=None):
     """
        Parse out the court string, somehow, and then map it back to our internal ids
     """
@@ -233,107 +267,17 @@ def get_court_object(html, case_path=None):
     def string_to_key(str):
         """Given a string, tries to map it to a court key."""
         # State
-        if 'Supreme Court of Alaska' in str:
-            return 'alaska'
-        elif 'Court of Appeals of Alaska' in str:
-            return 'alaskactapp'
-        elif 'Supreme Court of Arizona' in str:
-            return 'ariz'
-        elif re.search('Court of Appeals,? of Arizona', str):
-            return 'arizctapp'
-        elif 'Supreme Court of California' in str:
-            return 'cal'
-        elif 'California Court of Appeals' in str or \
-                'Court of Appeals of California' in str:
-            return 'calctapp'
-        elif 'Supreme Court of Colorado' in str:
-            return 'colo'
-        elif 'Colorado Court of Appeals' in str or \
-                'Court of Appeals of Colorado' in str:
-            return 'coloctapp'
-        elif 'Supreme Court of Hawai' in str:
-            return 'haw'
-        elif re.search('Intermediate Court of Appeals .*Hawai', str, re.I) or \
-                        'Court of Appeals of Hawai' in str:
-            return 'hawapp'
-        elif re.search('Supreme Court of (the state of )?Idaho', str, re.I):
-            return 'idaho'
-        elif 'Court of Appeals of Idaho' in str or \
-                'Idaho Court of Appeals' in str:
-            return 'idahoctapp'
-        elif 'Supreme Court of Illinois' in str:
-            return 'ill'
-        elif 'Appellate Court of Illinois' in str or \
-                'Illinois Appellate Court' in str:
-            return 'illappct'
-        elif 'Supreme Court of Indiana' in str:
-            return 'ind'
-        elif re.search('Court of Appeals ((of)|(in)) Indiana', str) or \
-                re.search('Appe((llate)|(als)) Court of Indiana', str) or \
-                'Indiana Court of Appeals' in str:
-            return 'indctapp'
-        elif 'Supreme Court of Kansas' in str:
-            return 'kan'
-        elif 'Court of Appeals of Kansas' in str:
-            return 'kanctapp'
-        elif re.search('Supreme (Judicial )?Court of Massachusetts', str):
-            return 'mass'
-        elif 'Appeals Court of Massachusetts' in str:
-            return 'massappct'
-        elif re.search('Supreme Court of Montana', str, re.I):
-            return 'mont'
-        elif 'Supreme Court of Nevada' in str:
-            return 'nev'
-        elif 'Supreme Court of New Mexico' in str:
-            return 'nm'
-        elif 'Court of Appeals of New Mexico' in str or \
-                'New Mexico Court of Appeals' in str:
-            return 'nmctapp'
-        elif re.search('Court of Appeals of (the State of )?New York', str):
-            return 'ny'
-        elif 'Supreme Court of Ohio' in str:
-            return 'ohio'
-        elif re.search('Supreme Court (of )?Oklahoma', str):
-            return 'okla'
-        elif re.search('Court of Criminal Appeals (of )?Oklahoma', str, re.I) or \
-                re.search('Criminal Courts of Appeals of Oklahoma', str):
-            return 'oklacrimapp'
-        elif re.search('Court of Civils? Appeals of Oklahoma', str) or \
-                re.search('Court of Appeals?,? (civil )?(of )?(State )?(of )?Oklahoma', str, re.I):
-            # Researched this with the court. When they refer to simply the "Court of Appeals" they mean the the civil
-            # court.
-            return 'oklacivapp'
-        elif re.search('Supreme Court (((for)|(of)) the State )?of (the )?Oregon', str, re.I) or \
-                re.search('Oregon Supreme Court', str, re.I):
-            return 'or'
-        elif re.search('Court of Appeals of (the )?(state of )?Oregon', str, re.I) or \
-                'oregon court of appeals' in str.lower():
-            return 'orctapp'
-        elif re.search('Supreme Court of (the )?(state of )?Utah', str, re.I):
-            return 'utah'
-        elif re.search('Court of Appeals (of )?Utah', str) or \
-                'Utah Court of Appeals' in str:
-            return 'utahctapp'
-        elif 'Supreme Court of Washington' in str:
-            return 'wash'
-        elif 'Court of Appeals of Washington' in str:
-            return 'washctapp'
-        elif re.search('Supreme Court (of )?Wyoming', str):
-            return 'wyo'
+        for regex, value in state_pairs:
+            if re.search(regex, str):
+                return value
 
-        # State Special
-        elif 'Tax Court of Arizona' in str:
-            return 'ariztaxct'
-        elif 'Tax Court of Indiana' in str or \
-                        'Indiana Tax Court' in str:
-            return 'indtc'
-        elif 'Oklahoma Judicial Ethics Advisory Panel' in str:
-            return 'oklajeap'
-        elif 'Court on the Judiciary of Oklahoma' in str:
-            return 'oklacoj'
+        # Supreme Court
+        if re.search('Supreme Court of (the )?United States', str) or \
+            re.search('United States Supreme Court', str):
+            return 'scotus'
 
         # Federal appeals
-        elif re.search('Court,? of Appeal', str) or \
+        if re.search('Court,? of Appeal', str) or \
                 'Circuit of Appeals' in str:
             if 'First Circuit' in str or \
                     'First District' in str:
@@ -372,9 +316,9 @@ def get_court_object(html, case_path=None):
             return 'ca9'
 
         # Federal district
-        elif re.search('Distr?in?ct', str, re.I):
+        elif re.search('(^| )Distr?in?ct', str, re.I):
             for regex, value in fd_pairs:
-                if re.search(regex, str, re.I):
+                if re.search(regex, str):
                     return value
         elif 'D. Virgin Islands' in str:
             return 'vid'
@@ -653,52 +597,57 @@ def get_court_object(html, case_path=None):
     t = clean_string(' '.join(text_elements)).strip('.')
     court = string_to_key(t)
 
+    if citations:
+        # Round three: try using the citations as a clue
+        reporter_keys = [citation.canonical_reporter for citation in citations]
+        if 'Cal. Rptr.' in reporter_keys:
+            # It's a california court.
+            for t in text_elements:
+                t = clean_string(t).strip('.')
+                if re.search('court of appeal', t, re.I):
+                    court = 'calctapp'
+
     if not court:
         try:
             court = fixes[case_path]['court']
         except KeyError:
-            if DEBUG >= 3:
+            if DEBUG == 'firefox':
                 subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
                 input_court = raw_input("No court identified! What should be here? ")
                 add_fix(case_path, {'court': input_court})
-            elif DEBUG == 2:
+            elif DEBUG == 'out':
                 # Write the failed case out to file.
                 court = 'test'
-                with open('missing_courts.txt', 'a') as out:
+                with open('missing_courts_judge_generator.txt', 'a') as out:
                     out.write('%s\n' % case_path)
 
-    if DEBUG >= 2:
+    if 'print' in DEBUG:
         print '  Court: %s' % court
 
     return court
 
 
 def get_judge(html, case_path=None):
-    path = '//p[position() <= 43]//text()[not(parent::span)][not(ancestor::center)]'
+    path = '//p[position() <= 60]//text()[not(parent::span)][not(ancestor::center)][not(ancestor::i)]'
     text_elements = html.xpath(path)
 
     # Get the first paragraph that starts with two uppercase letters after we've stripped out any star pagination.
     judge = None
     for t in text_elements:
-        t = clean_string(t).strip('.')
-        judge = get_judge_from_str(t)
+        t = clean_string(t)
+        judge, reason = get_judge_from_str(t)
         if judge:
+            break
+        if reason == 'TOO_LONG':
+            # We've begun doing paragraphs...
             break
 
     if not judge:
-        # Try a second round, but look for judges with a one-word-long name
-        for t in text_elements:
-            t = clean_string(t).strip('.')
-            judge = get_judge_from_str(t, forward_test=1)
-            if judge:
-                break
-
-    if not judge:
-        if DEBUG >= 3:
+        if DEBUG == 'firefox':
             subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
             input_judge = raw_input("No judge identified! What should be here? ")
 
-    if DEBUG >= 2:
+    if 'print' in DEBUG:
         print '  Judge: %s' % judge
 
     return judge
@@ -734,7 +683,8 @@ def import_law_box_case(case_path):
 
     sha1 = hashlib.sha1(clean_html_str).hexdigest()
     citations = get_citations_from_tree(complete_html_tree)
-    court = get_court_object(clean_html_tree, case_path)
+    judges = get_judge(clean_html_tree, case_path)
+    court = get_court_object(clean_html_tree, citations, case_path)
 
     doc = Document(
         source='LB',
@@ -743,7 +693,7 @@ def import_law_box_case(case_path):
         html=clean_html_str,
         date_filed=get_date_filed(clean_html_tree, citations=citations, case_path=case_path, court=court),
         precedential_status=get_precedential_status(clean_html_tree),
-        judges=get_judge(clean_html_tree, case_path)
+        judges=judges,
     )
 
     cite = Citation(
@@ -842,6 +792,7 @@ def main():
                 marker.write(str(i))
             with open('lawbox_fix_file.pkl', 'wb') as fix_file:
                 pickle.dump(fixes, fix_file)
+
 
         save_it = check_duplicate(doc)  # Need to write this method?
         if save_it and not args.simulate:
