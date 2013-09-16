@@ -39,7 +39,7 @@ def get_judge_from_str(t):
     bad_starting_words = ('amended ', 'decision ', 'memorandum ', 'trial ', '"', '\(', '[0-9]', ':', '>', '\[', 'a ',
                           '\{', '\}', 'any ', 'that ', 'there ', 'this ', 'u\.s\.', 'us ', 'we ', 'an ', 'and ', 'tex',
                           'krs', 'his ', 'her ', 'I ', 'II ', 'III ', 'IV ', 'V ', 'in ', 'it ', 'llp', 'llc', 'on ',
-                          'present')
+                          'present', 'argued')
     # Beginning of line followed by any of the stuff above, case insensitive
     bad_starting_words_regex = re.compile('^(%s)' % '|'.join(bad_starting_words), re.I)
 
@@ -141,11 +141,11 @@ def get_judge_from_str(t):
                 judge = titlecase(judge.upper())
                 reason = REASONS[7]
 
-    # Late abortion opportunities. Uses early abortion of conditionals to bail if judge == False.
+    # Late abortion opportunities. Uses early termination of conditionals to bail if judge == False.
     if judge and ord(judge[0]) > 127:
         # Unicode madness
         return False, REASONS[2]
-    if t.startswith('the '):
+    if judge and (t.startswith('the ') or judge.startswith('the ')):
         return False, REASONS[18]
     if judge and re.search(bad_starting_words_regex, judge):
         # Bad first word/characters
@@ -156,6 +156,8 @@ def get_judge_from_str(t):
             pass
         else:
             return False, REASONS[4]
+    if judge and len(judge) == 0:
+        return False, REASONS[0]
 
     if judge:
         # Cleanup

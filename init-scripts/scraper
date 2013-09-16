@@ -2,9 +2,15 @@
 
 # Debug daemon using the -f flag to run it in the foreground.
 
+. /etc/courtlistener
+if [ -z $INSTALL_ROOT ]; then
+    echo "INSTALL_ROOT is not set. Please set it in /etc/courtlistener."
+    exit 1
+fi
+
 start () {
     echo -n "Starting the scraper..."
-    daemon --command="/usr/bin/python $CL_INSTALL_ROOT/alert/manage.py cl_scrape_and_extract -d -c juriscraper.opinions.united_states" --respawn --name=scraper --user=www-data --verbose
+    daemon --command="/usr/bin/python $INSTALL_ROOT/alert/manage.py cl_scrape_and_extract -d -c juriscraper.opinions.united_states" --respawn --name=scraper --user=www-data --verbose
 
     RETVAL=$?
 

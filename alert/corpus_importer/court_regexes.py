@@ -193,7 +193,7 @@ state_pairs = (
     (re.compile('Supreme Court of Nevada', re.I), 'nev'),
     (re.compile('Supreme Court of New Hampshire', re.I), 'nh'),
     (re.compile('Supreme Court of New Jersey', re.I), 'nj'),
-    (re.compile('Superior Court of New Jersey', re.I), 'njsuperctapp'),
+    (re.compile('Superior Court of New Jersey', re.I), 'njsuperctappdiv'),
     (re.compile('Supreme Court of New Mexico', re.I), 'nm'),
     (re.compile('Court of Appeals of New Mexico', re.I), 'nmctapp'),
         (re.compile('New Mexico Court of Appeals', re.I), 'nmctapp'),
