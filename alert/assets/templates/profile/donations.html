@@ -1,0 +1,58 @@
+{% extends "profile/nav.html" %}
+
+{% block title %}Donations - CourtListener.com{% endblock %}
+
+{% block search-form %}{% endblock %}
+
+{% block nav-donations %}active{% endblock %}
+
+{% block content %}
+    <div class="span-24 last" id="content">
+        <div class="span-24 last content">
+            {% if messages %}
+                <div class="span-17 last">
+                    <div class="span-10">
+                        {% for message in messages %}
+                            <p class="bottom {{message.tags}}">{{message|safe}}</p>
+                        {% endfor %}
+                    </div>
+                    <div class="span-6 last">&nbsp;</div>
+                </div>
+            {% endif %}
+        </div>
+        {% if user.get_profile.donation.all %}
+            <div class="span-24 last content">
+                <table class="settings-table">
+                    <thead>
+                        <tr>
+                            <th>Amount</th>
+                            <th>Date</th>
+                            <th>Via</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for donation in user.get_profile.donation.all %}
+                        <tr>
+                            <td>${{ donation.amount }}</td>
+                            <td>{{ donation.date_created|date:"D, n/j/Y" }}</td>
+                            <td>{{ donation.get_payment_provider_display }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <hr class="space"/>
+                <h3>Thanks for your support!</h3>
+                <p>Your support <em>truly</em> makes a difference. If you would like to change a donation or if you
+                    have questions please get in touch with us at <a href="mailto:donate@freelawproject.org">donate@freelawproject.org</a>.
+                    We'd be happy to hear from you.</p>
+            </div>
+        {% else %}
+            <h3>Make a Donation to Support the Free Law Project</h3>
+            <p>CourtListener is a part of the <a href="http://freelawproject.org">Free Law Project</a> and is supported
+                in part by people like you. We run a very lean budget and your donations go towards paying our full time
+                developers, server costs and fund raising efforts.</p>
+            <p>To learn more or support our cause, visit <a href="/donate?referrer=profile">our donations page</a>.</p>
+        {% endif %}
+    </div>
+{% endblock %}

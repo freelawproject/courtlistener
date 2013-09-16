@@ -7,6 +7,7 @@ import sys
 
 from juriscraper.lib.html_utils import get_visible_text
 from alert.citations.constants import EDITIONS, REPORTERS, VARIATIONS_ONLY
+from alert.search.models import Court
 import reporter_tokenizer
 
 FORWARD_SEEK = 20
@@ -15,6 +16,9 @@ BACKWARD_SEEK = 70  # Average case name length in the db is 67
 
 STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed",
                "remanded", "see", "granted", "dismissed"]
+
+# Store court values to avoid repeated DB queries
+ALL_COURTS = Court.objects.all().values('citation_string', 'courtUUID')
 
 
 class Citation(object):
@@ -108,15 +112,48 @@ def strip_punct(text):
     return text.strip()
 
 
-def get_court(paren_string, year):
-    if year is None:
-        court = strip_punct(paren_string)
+def is_scotus_reporter(citation):
+    try:
+        reporter = REPORTERS[citation.canonical_reporter][citation.lookup_index]
+    except TypeError:
+        # Occurs when citation.lookup_index is None
+        return False
+
+    if reporter:
+        truisms = [
+            reporter['cite_type'] == 'federal' and 'supreme' in reporter['name'].lower(),
+            'scotus' in reporter['cite_type'].lower()
+        ]
+        if any(truisms):
+            return True
     else:
-        year_index = paren_string.find(str(year))
-        court = strip_punct(paren_string[:year_index])
-    if court == u'':
-        court = None
-    return court
+        return False
+
+
+def get_court_by_paren(paren_string, citation):
+    """Takes the citation string, usually something like "2d Cir", and maps that back to the court code.
+
+    Does not work on SCOTUS, since that court lacks parentheticals, and needs to be handled after disambiguation has
+    been completed.
+    """
+    if citation.year is None:
+        court_str = strip_punct(paren_string)
+    else:
+        year_index = paren_string.find(str(citation.year))
+        court_str = strip_punct(paren_string[:year_index])
+
+    court_code = None
+    if court_str == u'':
+        court_code = None
+    else:
+        # Map the string to a court, if possible.
+        for court in ALL_COURTS:
+            # Use startswith because citations are often missing final period, e.g. "2d Cir"
+            if court['citation_string'].startswith(court_str):
+                court_code = court['courtUUID']
+                break
+
+    return court_code
 
 
 def get_year(token):
@@ -132,7 +169,7 @@ def get_year(token):
     if len(token) != 4:
         return None
     year = int(token)
-    if year < 1754: # Earliest case in the database
+    if year < 1754:  # Earliest case in the database
         return None
     return year
 
@@ -150,7 +187,7 @@ def add_post_citation(citation, words, reporter_index):
     """
     end_position = reporter_index + 2
     # Start looking 2 tokens after the reporter (1 after page)
-    for start in xrange(reporter_index + 2, min(reporter_index + FORWARD_SEEK, len(words))):
+    for start in xrange(reporter_index + 2, min((reporter_index + FORWARD_SEEK), len(words))):
         if words[start].startswith('('):
             for end in xrange(start, start + FORWARD_SEEK):
                 try:
@@ -164,13 +201,14 @@ def add_post_citation(citation, words, reporter_index):
                         citation.year = get_year(words[end - 1])
                     else:
                         citation.year = get_year(words[end])
-                    citation.court = get_court(u' '.join(words[start:end + 1]), citation.year)
+                    citation.court = get_court_by_paren(u' '.join(words[start:end + 1]), citation)
                     end_position = end
                     break
             if start > reporter_index + 2:
                 # Then there's content between page and (), starting with a comma, which we skip
                 citation.extra = u' '.join(words[reporter_index + 2:start])
             break
+
     return end_position
 
 
@@ -236,7 +274,7 @@ def is_date_in_reporter(editions, year):
 
 
 def disambiguate_reporters(citations):
-    """A second, from scratch, approach to converting a list of citations to a list of unambiguous ones.
+    """Convert a list of citations to a list of unambiguous ones.
 
     Goal is to figure out:
      - citation.canonical_reporter
@@ -259,9 +297,9 @@ def disambiguate_reporters(citations):
     for citation in citations:
         # Non-variant items (P.R.R., A.2d, Wash., etc.)
         if REPORTERS.get(EDITIONS.get(citation.reporter)) is not None:
+            citation.canonical_reporter = EDITIONS[citation.reporter]
             if len(REPORTERS[EDITIONS[citation.reporter]]) == 1:
                 # Single reporter, easy-peasy.
-                citation.canonical_reporter = EDITIONS[citation.reporter]
                 citation.lookup_index = 0
                 unambiguous_citations.append(citation)
                 continue
@@ -275,7 +313,6 @@ def disambiguate_reporters(citations):
                             possible_citations.append((citation.reporter, i,))
                     if len(possible_citations) == 1:
                         # We were able to identify only one hit after filtering by year.
-                        citation.canonical_reporter = EDITIONS[possible_citations[0][0]]
                         citation.reporter = possible_citations[0][0]
                         citation.lookup_index = possible_citations[0][1]
                         unambiguous_citations.append(citation)
@@ -285,10 +322,11 @@ def disambiguate_reporters(citations):
         elif VARIATIONS_ONLY.get(citation.reporter) is not None:
             if len(VARIATIONS_ONLY[citation.reporter]) == 1:
                 # Only one variation -- great, use it.
-                if len(REPORTERS[EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]]) == 1:
+                citation.canonical_reporter = EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]
+                cached_variation = citation.reporter
+                citation.reporter = VARIATIONS_ONLY[citation.reporter][0]
+                if len(REPORTERS[citation.canonical_reporter]) == 1:
                     # It's a single reporter under a misspelled key.
-                    citation.canonical_reporter = EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]
-                    citation.reporter = VARIATIONS_ONLY[citation.reporter][0]
                     citation.lookup_index = 0
                     unambiguous_citations.append(citation)
                     continue
@@ -298,27 +336,23 @@ def disambiguate_reporters(citations):
                     if citation.year:
                         # attempt resolution by date
                         possible_citations = []
-                        for i in range(0, len(REPORTERS[EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]])):
-                            if is_date_in_reporter(REPORTERS[EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]][i]['editions'],
+                        for i in range(0, len(REPORTERS[citation.canonical_reporter])):
+                            if is_date_in_reporter(REPORTERS[citation.canonical_reporter][i]['editions'],
                                                    citation.year):
                                 possible_citations.append((citation.reporter, i,))
                         if len(possible_citations) == 1:
                             # We were able to identify only one hit after filtering by year.
-                            citation.canonical_reporter = EDITIONS[VARIATIONS_ONLY[possible_citations[0][0]][0]]
-                            citation.reporter = VARIATIONS_ONLY[possible_citations[0][0]][0]
                             citation.lookup_index = possible_citations[0][1]
                             unambiguous_citations.append(citation)
                             continue
                     # Attempt resolution by unique variation (e.g. Cr. can only be Cranch[0])
                     possible_citations = []
-                    for i in range(0, len(REPORTERS[EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]])):
-                        for variation in REPORTERS[EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]][i]['variations'].items():
-                            if variation[0] == citation.reporter:
+                    for i in range(0, len(REPORTERS[citation.canonical_reporter])):
+                        for variation in REPORTERS[citation.canonical_reporter][i]['variations'].items():
+                            if variation[0] == cached_variation:
                                 possible_citations.append((variation[1], i))
                     if len(possible_citations) == 1:
                         # We were able to find a single match after filtering by variation.
-                        citation.canonical_reporter = EDITIONS[possible_citations[0][0]]
-                        citation.reporter = possible_citations[0][0]
                         citation.lookup_index = possible_citations[0][1]
                         unambiguous_citations.append(citation)
                         continue
@@ -338,122 +372,13 @@ def disambiguate_reporters(citations):
                     unambiguous_citations.append(citation)
                     continue
 
-    # At this point, unambiguous_citations is populated with the easy cases, and we need to work out the hard ones.
-    for citation in citations:
-        if citation not in unambiguous_citations:
-            # Try matching by year.
-            if True:
-                # It's a matter of figuring out which
-                pass
-
-            else:
-                # Unable to disambiguate, just add it anyway so we can return it.
-                unambiguous_citations.append(citation)
-
-    return unambiguous_citations
-
-
-
-def disambiguate_reporters_orig(citations):
-    """Using a list of citations from an opinion, disambiguate any that are not clear.
-
-    See test cases for examples of each code path, as this is a fairly complex bit of code.
-    """
-    unambiguous_citations = []
-    # Are any of the citations already unambiguous?
-    for citation in citations:
-        # Case 1: The correct abbreviation for a reporter (P.R.R)
-        if REPORTERS.get(citation.reporter) is not None and \
-                        len(REPORTERS[citation.reporter]) == 1:
-            citation.canonical_reporter = citation.reporter
-            citation.lookup_index = 0
-            unambiguous_citations.append(citation)
-            continue
-
-        # Case 2: A simple variant to resolve (U. S.)
-        if VARIATIONS_ONLY.get(citation.reporter) is not None and \
-                        len(VARIATIONS_ONLY.get(citation.reporter)) == 1 and \
-                        REPORTERS.get(VARIATIONS_ONLY[citation.reporter][0]) is not None and \
-                        len(REPORTERS.get(VARIATIONS_ONLY[citation.reporter][0])) == 1:
-            # The reporter appears in the VARIATIONS_ONLY variable, resolves to only one possible variant, and
-            # that reporter is unambiguous.
-            citation.canonical_reporter = VARIATIONS_ONLY.get(citation.reporter)[0]
-            citation.reporter = VARIATIONS_ONLY.get(citation.reporter)[0]
-            citation.lookup_index = 0
-            unambiguous_citations.append(citation)
-            continue
-
-        # Case 3: An edition to resolve, but not a variant (A.2d)
-        if VARIATIONS_ONLY.get(citation.reporter) is None and \
-                        len(REPORTERS.get(EDITIONS.get(citation.reporter))) == 1:
-            citation.canonical_reporter = EDITIONS[citation.reporter]
-            citation.lookup_index = 0
-            unambiguous_citations.append(citation)
-            continue
-
-        # Case 4: An simple variant of an edition (A. 2d)
-        if VARIATIONS_ONLY.get(citation.reporter) is not None and \
-                        len(VARIATIONS_ONLY[citation.reporter]) == 1 and \
-                        len(REPORTERS[EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]]) == 1:
-            citation.canonical_reporter = EDITIONS[VARIATIONS_ONLY[citation.reporter][0]]
-            citation.reporter = VARIATIONS_ONLY[citation.reporter][0]
-            citation.lookup_index = 0
-            unambiguous_citations.append(citation)
-            continue
-
-        # Case 5: A variant that's resolvable by year alone (what about a variant of an edition?)
-        if VARIATIONS_ONLY.get(citation.reporter) is not None and \
-                        len(VARIATIONS_ONLY[citation.reporter]) > 1 and \
-                        citation.year is not None:
-            possible_citations = []
-            for reporter_key in VARIATIONS_ONLY[citation.reporter]:
-                for i in range(0, len(REPORTERS[EDITIONS[reporter_key]])):
-                    if is_date_in_reporter(REPORTERS[EDITIONS[reporter_key]][i]['editions'], citation.year):
-                        possible_citations.append((reporter_key, i,))
-            if len(possible_citations) == 1:
-                # We were able to identify only one hit after filtering by year.
-                citation.canonical_reporter = EDITIONS[possible_citations[0][0]]
-                citation.reporter = possible_citations[0][0]
-                citation.lookup_index = possible_citations[0][1]
-                unambiguous_citations.append(citation)
-                continue
-
-
-        # Case 6: A unique variant of an otherwise ambiguous reporter
-        try:
-            an_unambiguous_variant_of_an_edition = (len(VARIATIONS_ONLY.get(citation.reporter)) == 1)
-        except TypeError:
-            # Happens when None is returned to len() -- indicating that the item has no variations
-            an_unambiguous_variant_of_an_edition = False
-        if an_unambiguous_variant_of_an_edition:
-            # Test the variations for each of the items to see if more than one matches.
-            matches_count = 0
-            for i in range(0, len(REPORTERS[EDITIONS[VARIATIONS_ONLY.get(citation.reporter)[0]]])):
-                if citation.reporter in REPORTERS[EDITIONS[VARIATIONS_ONLY.get(citation.reporter)[0]]][i]['variations']:
-                    matches_count += 1
-                    citation.reporter = VARIATIONS_ONLY.get(citation.reporter)[0]
-                    citation.canonical_reporter = VARIATIONS_ONLY.get(citation.reporter)[0]
-                    citation.lookup_index = i
-            if matches_count == 1:
-                # Only one hit. Use it and continue.
-                unambiguous_citations.append(citation)
-                continue
-            else:
-                # More than one hit. Try another approach
-                citation.canonical_reporter = None
-                citation.lookup_index = None
-
-    # At this point, unambiguous_citations is populated with the easy cases, and we need to work out
-    # the hard cases.
-    for citation in citations:
-        if citation not in unambiguous_citations:
-            # Try matching by year.
-            if True:
-                # It's a matter of figuring out which
-                pass
-
-            else:
-                # Unable to disambiguate, just add it anyway so we can return it.
+    # At this point, unambiguous_citations is as populated with resolved citations as it can be. Add in any missing
+    # ambiguous citations and that's that. There was a possibility that we could disambiguate based on parallel
+    # citation, but that will never work because often the citations we're working with are from vastly different
+    # courts.
+    if len(citations) != len(unambiguous_citations):
+        for citation in citations:
+            if citation not in unambiguous_citations:
                 unambiguous_citations.append(citation)
 
     return unambiguous_citations
@@ -481,6 +406,10 @@ def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
 
     # Disambiguate all the reporters
     citations = disambiguate_reporters(citations)
+
+    for citation in citations:
+        if not citation.court and is_scotus_reporter(citation):
+            citation.court = 'scotus'
 
     return citations
 

@@ -1,12 +1,9 @@
-import sys
-
-from django.core.management import setup_environ, BaseCommand, CommandError
+from django.core.management import BaseCommand, CommandError
 from alert.scrapers.management.commands.cl_scrape_and_extract import scrape_court
 
 from juriscraper.GenericSite import logger
 from juriscraper.lib.importer import build_module_list
 
-import signal
 import traceback
 from datetime import date
 from dateutil.rrule import rrule

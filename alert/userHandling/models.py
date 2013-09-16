@@ -1,31 +1,19 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-
 from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.localflavor.us.models import USStateField
 from alert.alerts.models import Alert
+from alert.donate.models import Donation
 from alert.favorites.models import Favorite
 
-# a class where bar memberships are held and handled.
+
 class BarMembership(models.Model):
-    barMembershipUUID = models.AutoField('a unique ID for each bar membership',
-        primary_key=True)
-    barMembership = USStateField('the two letter state abbreviation of a bar membership')
+    barMembershipUUID = models.AutoField(
+        'a unique ID for each bar membership',
+        primary_key=True
+    )
+    barMembership = USStateField(
+        'the two letter state abbreviation of a bar membership'
+    )
 
     def __unicode__(self):
         return self.get_barMembership_display()
@@ -36,45 +24,100 @@ class BarMembership(models.Model):
         ordering = ['barMembership']
 
 
-# a class to extend the User class with the fields we need.
 class UserProfile(models.Model):
-    userProfileUUID = models.AutoField('a unique ID for each user profile',
-        primary_key=True)
-    user = models.ForeignKey(User,
+    userProfileUUID = models.AutoField(
+        'a unique ID for each user profile',
+        primary_key=True
+    )
+    user = models.ForeignKey(
+        User,
         verbose_name='the user this model extends',
-        unique=True)
-    location = models.CharField('the location of the user',
+        unique=True
+    )
+    stub_account = models.BooleanField(
+        default=False,
+    )
+    employer = models.CharField(
+        'the user\'s employer',
         max_length=100,
-        blank=True)
-    employer = models.CharField('the user\'s employer',
+        blank=True,
+        null=True,
+    )
+    address1 = models.CharField(
         max_length=100,
-        blank=True)
-    avatar = models.ImageField('the user\'s avatar',
+        blank=True,
+        null=True,
+    )
+    address2 = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+    )
+    city = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+    )
+    state = models.CharField(
+        max_length=2,
+        blank=True,
+        null=True,
+    )
+    zip_code = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+    )
+    avatar = models.ImageField(
+        'the user\'s avatar',
         upload_to='avatars/%Y/%m/%d',
-        blank=True)
-    wantsNewsletter = models.BooleanField('does the user want newsletters',
-        default=False)
-    barmembership = models.ManyToManyField(BarMembership,
+        blank=True
+    )
+    wants_newsletter = models.BooleanField(
+        'This user wants newsletters',
+        default=False
+    )
+    barmembership = models.ManyToManyField(
+        BarMembership,
         verbose_name='the bar memberships held by the user',
         blank=True,
-        null=True)
-    alert = models.ManyToManyField(Alert,
+        null=True
+    )
+    alert = models.ManyToManyField(
+        Alert,
         verbose_name='the alerts created by the user',
         blank=True,
-        null=True)
-    favorite = models.ManyToManyField(Favorite,
+        null=True
+    )
+    donation = models.ManyToManyField(
+        Donation,
+        verbose_name='the donations made by the user',
+        blank=True,
+        null=True
+    )
+    favorite = models.ManyToManyField(
+        Favorite,
         verbose_name='the favorites created by the user',
         related_name='users',
         blank=True,
-        null=True)
-    plaintextPreferred = models.BooleanField('should the alert should be sent in plaintext',
-        default=False)
-    activationKey = models.CharField(max_length=40)
-    key_expires = models.DateTimeField('The time and date when the user\'s activationKey expires',
+        null=True
+    )
+    plaintext_preferred = models.BooleanField(
+        'should the alert should be sent in plaintext',
+        default=False
+    )
+    activation_key = models.CharField(
+        max_length=40
+    )
+    key_expires = models.DateTimeField(
+        'The time and date when the user\'s activation_key expires',
         blank=True,
-        null=True)
-    emailConfirmed = models.BooleanField('The user has confirmed their email address',
-        default=False)
+        null=True
+    )
+    email_confirmed = models.BooleanField(
+        'The user has confirmed their email address',
+        default=False
+    )
 
     def __unicode__(self):
         return self.user.username

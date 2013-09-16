@@ -1,6 +1,8 @@
 import sys
+from alert.casepage.views import make_citation_string
 
-sys.path.append('/var/www/court-listener/alert')
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 from alert import settings
 from django.core.management import setup_environ
@@ -14,7 +16,7 @@ import re
 
 
 def get_document_citations(document):
-    '''Identify and return citations from the html or plain text of the document.'''
+    """Identify and return citations from the html or plain text of the document."""
     if document.html:
         citations = find_citations.get_citations(document.html)
     elif document.plain_text:
@@ -52,7 +54,7 @@ def update_document(document):
     for citation in citations:
         # Resource.org docs contain their own citation in the html text, which
         # we don't want to include
-        if citation.base_citation() == document.citation.west_cite:
+        if citation.base_citation() in make_citation_string(document):
             continue
         matches, is_citation_match = match_citations.match_citation(citation, document)
 
@@ -66,7 +68,8 @@ def update_document(document):
                 # already been cited by this document.
                 if not matched_doc.citation in document.cases_cited.all():
                     matched_doc.citation_count += 1
-                    matched_doc.save(index=False)
+                    matched_doc.save(index=True)
+
                 # Add citation match to the citing document's list of cases it cites.
                 # cases_cited is a set so duplicates aren't an issue
                 document.cases_cited.add(matched_doc.citation)
