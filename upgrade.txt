@@ -46,6 +46,7 @@ LAWBOX PROJECT
 
    INSTALL_ROOT='/home/mlissner/Programming/intellij/courtlistener'
 
+
    This variable will be used by both bash scripts and all Django scripts henceforth for determining where CourtListener
    is installed. If you are a developer with multiple installations, this will make your life considerably easier, as
    you can simply change this variable to automatically update all of your Django settings.
