@@ -8,6 +8,7 @@ class FavoriteForm(ModelForm):
         model = Favorite
         fields = (
             'id',
+            'doc_id',
             'name',
             'notes'
         )

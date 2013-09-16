@@ -5,9 +5,6 @@ from south.v2 import SchemaMigration
 
 
 class Migration(SchemaMigration):
-    depends_on = (
-        ('search', '0001_initial'),
-    )
 
     def forwards(self, orm):
         # Adding model 'Favorite'
