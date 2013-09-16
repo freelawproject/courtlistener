@@ -84,11 +84,14 @@ def match_citation(citation, citing_doc):
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     main_params = {'fq': []}
     # Set up filter parameters
+    start_year = 1750
+    end_year = date.today().year
     if citation.year:
         start_year = end_year = citation.year
     else:
-        print citation.__dict__
-        start_year, end_year = [d.year for d in REPORTERS[citation.canonical_reporter][citation.lookup_index]['editions'][citation.reporter]]
+        if citation.lookup_index:
+            # Some cases can't be disambiguated.
+            start_year, end_year = [d.year for d in REPORTERS[citation.canonical_reporter][citation.lookup_index]['editions'][citation.reporter]]
         if citing_doc.date_filed:
             end_year = min(end_year, citing_doc.date_filed.year)
     date_param = 'dateFiled:%s' % build_date_range(start_year, end_year)
