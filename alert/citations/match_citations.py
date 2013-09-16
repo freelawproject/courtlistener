@@ -10,7 +10,6 @@ execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 
 from django.conf import settings
-from alert.search.models import Court
 from alert.citations.constants import REPORTERS
 from alert.citations.find_citations import strip_punct
 from alert.lib import sunburnt
@@ -88,6 +87,7 @@ def match_citation(citation, citing_doc):
     if citation.year:
         start_year = end_year = citation.year
     else:
+        print citation.__dict__
         start_year, end_year = [d.year for d in REPORTERS[citation.canonical_reporter][citation.lookup_index]['editions'][citation.reporter]]
         if citing_doc.date_filed:
             end_year = min(end_year, citing_doc.date_filed.year)

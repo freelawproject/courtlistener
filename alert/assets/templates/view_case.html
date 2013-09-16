@@ -154,9 +154,9 @@
             {% if user.is_authenticated %}
             <div id="modal-save-favorite" class="hidden span-10">
                 {% if favorite_form.instance.doc_id %}
-                    <h2>Edit/delete this favorite</h2>
+                    <h2>Edit This Favorite</h2>
                 {% else %}
-                    <h2 id='save-favorite-title'>Save a favorite</h2>
+                    <h2 id='save-favorite-title'>Save a Favorite</h2>
                 {% endif %}
                 <form action="" method="POST">{% csrf_token %}
                     {{ favorite_form.doc_id }}
