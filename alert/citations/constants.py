@@ -8,9 +8,12 @@ import datetime
      - The 'variations' key consists of data from local rules, found through organic usage in our corpus and from the
        list at http://www.legalabbrevs.cardiff.ac.uk/. We have used a dict for these values due to the fact that there
        can be variations for each series.
-     - mlz_jurisdiction corresponds to the work that is being done for reference software such as Zotero.
-     - In reporters with multiple series, if multiple volumes have the same dates, this indicates that the point where
-       one series ends and the other begins is unknown. These are good areas for research.
+     - mlz_jurisdiction corresponds to the work that is being done for Multi-Lingual Zotero.
+     - Regarding dates of the editions, there are a few things to know. In reporters with multiple series, if multiple
+       volumes have the same dates, this indicates that the point where one series ends and the other begins is unknown.
+       If an edition has 1750 as its start date, this indicates that the actual start date is unknown. Likewise, if an
+       edition has today() as its end date, that indicates the actual end date is either unknown, or it's known that the
+       series has not completed. These areas need research before we can release version 1.1 of this database.
 
     Past Versions:
      - 1.0 - Has all common Blue Book reporters, with their variations from the Cardiff database.
@@ -26,10 +29,9 @@ import datetime
              research beyond what Blue Book provides).
      - 1.2 - All dates are dialed into the correct day for every edition of every reporter.
      - 1.x - International Reporters added?
-           - Other features?
+           - Other features (suggestions welcome)?
 
-    Pull requests welcome. Online editing in BitBucket is possible (and easy!)
-
+    Pull and feature requests welcome. Online editing in BitBucket is possible (and easy!)
 '''
 
 REPORTERS = {'A.': [{'cite_type': 'state_regional',

@@ -4,7 +4,7 @@
 # 1. Solr needs to be installed at /usr/local/solr/example
 # 2. daemon needs to be installed
 # 3. Script needs to be executed by root
-# 4. $CL_INSTALL_ROOT must be set.
+# 4. $INSTALL_ROOT must be set.
 
 # This script will launch Solr in a mode that will automatically respawn if it
 # crashes. Output will be sent to /var/log/solr/solr.log. A pid file will be
@@ -14,12 +14,12 @@ start () {
     echo -n "Starting solr..."
 
     # Use python to determine if this is a dev machine
-    . /etc/environment
-    if [ -z $CL_INSTALL_ROOT ]; then
-      echo "CL_INSTALL_ROOT is not set. Please set it in /etc/environment."
+    . /etc/courtlistener
+    if [ -z $INSTALL_ROOT ]; then
+      echo "INSTALL_ROOT is not set. Please set it in /etc/courtlistener."
       exit 1
     fi
-    cd $CL_INSTALL_ROOT/alert
+    cd $INSTALL_ROOT/alert
     DEV=`python -c 'import settings;
 from django.core.management import setup_environ;
 setup_environ(settings);
@@ -33,7 +33,7 @@ print settings.DEVELOPMENT;'`
     fi
 
     # start daemon
-    daemon --chdir='/usr/local/solr/example' --command "java -jar -server -Xmx$xmx start.jar -DCL_INSTALL_ROOT=$CL_INSTALL_ROOT" --respawn --output=/var/log/solr/solr.log --name=solr --verbose
+    daemon --chdir='/usr/local/solr/example' --command "java -jar -server -Xmx$xmx start.jar -DINSTALL_ROOT=$INSTALL_ROOT" --respawn --output=/var/log/solr/solr.log --name=solr --verbose
 
     RETVAL=$?
     if [ $RETVAL = 0 ]

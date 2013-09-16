@@ -124,6 +124,9 @@ class JudgeExtractionTest(TestCase):
             ('THERESA CRAFT, J.', (u'Theresa Craft', REASONS[7])),
             # Nothing with utf-8 as first char is good.
             (u'\xe2\xa7\xe2\xa7 19-1-102(1), JUDGE', (False, REASONS[2])),
+            # Argued Before is ok, but Argued is not.
+            ('Argued before Lissner', (u'Lissner', REASONS[17])),
+            ('ARGUED: amy louise howe, before so-and-so, Justice', (False, REASONS[3])),
         )
 
         for q, a in pairs:

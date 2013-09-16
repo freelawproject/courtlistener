@@ -7,6 +7,7 @@ import sys
 
 from juriscraper.lib.html_utils import get_visible_text
 from alert.citations.constants import EDITIONS, REPORTERS, VARIATIONS_ONLY
+from alert.search.models import Court
 import reporter_tokenizer
 
 FORWARD_SEEK = 20
@@ -15,6 +16,9 @@ BACKWARD_SEEK = 70  # Average case name length in the db is 67
 
 STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed",
                "remanded", "see", "granted", "dismissed"]
+
+# Store court values to avoid repeated DB queries
+ALL_COURTS = Court.objects.all().values('citation_string', 'courtUUID')
 
 
 class Citation(object):
@@ -108,15 +112,48 @@ def strip_punct(text):
     return text.strip()
 
 
-def get_court(paren_string, year):
-    if year is None:
-        court = strip_punct(paren_string)
+def is_scotus_reporter(citation):
+    try:
+        reporter = REPORTERS[citation.canonical_reporter][citation.lookup_index]
+    except TypeError:
+        # Occurs when citation.lookup_index is None
+        return False
+
+    if reporter:
+        truisms = [
+            reporter['cite_type'] == 'federal' and 'supreme' in reporter['name'].lower(),
+            'scotus' in reporter['cite_type'].lower()
+        ]
+        if any(truisms):
+            return True
     else:
-        year_index = paren_string.find(str(year))
-        court = strip_punct(paren_string[:year_index])
-    if court == u'':
-        court = None
-    return court
+        return False
+
+
+def get_court_by_paren(paren_string, citation):
+    """Takes the citation string, usually something like "2d Cir", and maps that back to the court code.
+
+    Does not work on SCOTUS, since that court lacks parentheticals, and needs to be handled after disambiguation has
+    been completed.
+    """
+    if citation.year is None:
+        court_str = strip_punct(paren_string)
+    else:
+        year_index = paren_string.find(str(citation.year))
+        court_str = strip_punct(paren_string[:year_index])
+
+    court_code = None
+    if court_str == u'':
+        court_code = None
+    else:
+        # Map the string to a court, if possible.
+        for court in ALL_COURTS:
+            # Use startswith because citations are often missing final period, e.g. "2d Cir"
+            if court['citation_string'].startswith(court_str):
+                court_code = court['courtUUID']
+                break
+
+    return court_code
 
 
 def get_year(token):
@@ -132,7 +169,7 @@ def get_year(token):
     if len(token) != 4:
         return None
     year = int(token)
-    if year < 1754: # Earliest case in the database
+    if year < 1754:  # Earliest case in the database
         return None
     return year
 
@@ -150,7 +187,7 @@ def add_post_citation(citation, words, reporter_index):
     """
     end_position = reporter_index + 2
     # Start looking 2 tokens after the reporter (1 after page)
-    for start in xrange(reporter_index + 2, min(reporter_index + FORWARD_SEEK, len(words))):
+    for start in xrange(reporter_index + 2, min((reporter_index + FORWARD_SEEK), len(words))):
         if words[start].startswith('('):
             for end in xrange(start, start + FORWARD_SEEK):
                 try:
@@ -164,13 +201,14 @@ def add_post_citation(citation, words, reporter_index):
                         citation.year = get_year(words[end - 1])
                     else:
                         citation.year = get_year(words[end])
-                    citation.court = get_court(u' '.join(words[start:end + 1]), citation.year)
+                    citation.court = get_court_by_paren(u' '.join(words[start:end + 1]), citation)
                     end_position = end
                     break
             if start > reporter_index + 2:
                 # Then there's content between page and (), starting with a comma, which we skip
                 citation.extra = u' '.join(words[reporter_index + 2:start])
             break
+
     return end_position
 
 
@@ -368,6 +406,10 @@ def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
 
     # Disambiguate all the reporters
     citations = disambiguate_reporters(citations)
+
+    for citation in citations:
+        if not citation.court and is_scotus_reporter(citation):
+            citation.court = 'scotus'
 
     return citations
 
