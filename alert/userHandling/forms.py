@@ -1,54 +1,92 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from django.contrib.localflavor.us.forms import USStateField, USZipCodeField
+from django.contrib.localflavor.us.us_states import STATE_CHOICES
 from django.forms import ModelForm
 from alert.userHandling.models import UserProfile
 
 
 class ProfileForm(ModelForm):
+    STATE_CHOICES = list(STATE_CHOICES)
+    STATE_CHOICES.insert(0, ('', '---------'))
+    state = USStateField(
+        widget=forms.Select(
+            choices=STATE_CHOICES,
+            attrs={'class': 'span-5'}
+        ),
+        required=False,
+    )
+    zip_code = USZipCodeField(
+        widget=forms.TextInput(
+            attrs={'class': 'span-4'}
+        ),
+        required=False,
+    )
+
     class Meta:
         model = UserProfile
-        # things MUST be excluded, or they get deleted. Creates confusing
-        # deletions.
-        exclude = ('user', 'alert', 'avatar', 'activationKey', 'key_expires',
-            'emailConfirmed')
+        fields = (
+            'employer',
+            'address1',
+            'address2',
+            'city',
+            'state',
+            'zip_code',
+            'wants_newsletter',
+            'barmembership',
+            'plaintext_preferred',
+        )
+        widgets = {
+            'employer': forms.TextInput(
+                attrs={'class': 'span-9'}
+            ),
+            'barmembership': forms.SelectMultiple(
+                attrs={'class': 'span-9',
+                       'size': '8'}
+            ),
+            'address1': forms.TextInput(
+                attrs={'class': 'span-9'}
+            ),
+            'address2': forms.TextInput(
+                attrs={'class': 'span-9'}
+            ),
+            'city': forms.TextInput(
+                attrs={'class': 'span-9'}
+            ),
+        }
 
 
 class UserForm(ModelForm):
-    email = forms.EmailField(required=True)
+    email = forms.EmailField(
+        required=True,
+        widget=forms.TextInput(
+            attrs={'class': 'span-9'}
+        )
+    )
 
-    # ensure that emails are always unique.
     def clean_email(self):
+        """ensures unique email addresses"""
         email = self.cleaned_data.get('email')
-
-        if email and (User.objects.filter(email=email).count() > 1):
-            raise forms.ValidationError(
-                u'This email address is already in use.')
+        if email and User.objects.filter(email=email).count():
+            raise forms.ValidationError(u'This email address is already in use.')
         return email
 
     class Meta:
         model = User
-        # If these aren't excluded, they throw errors or get deleted.
-        # Either is BAD, BAD, BAD
-        exclude = ('password', 'last_login', 'date_joined', 'is_staff',
-            'username', 'is_active', 'is_superuser', 'groups',
-            'user_permissions',)
+        fields = (
+            'first_name',
+            'last_name',
+            'email',
+        )
+        widgets = {
+            'first_name': forms.TextInput(
+                attrs={'class': 'span-4'}
+            ),
+            'last_name': forms.TextInput(
+                attrs={'class': 'span-5'}
+            ),
+        }
 
 
 class UserCreationFormExtended(UserCreationForm):
@@ -56,18 +94,21 @@ class UserCreationFormExtended(UserCreationForm):
         super(UserCreationFormExtended, self).__init__(*args, **kwargs)
         self.fields['email'].required = True
 
-    # ensure that emails are always unique. Not sure why this is duplicated
-    # from above. mlissner, 2010-07-20.
     def clean_email(self):
+        """ensures unique email addresses, discounting stub accounts"""
         email = self.cleaned_data.get('email')
-        if email and User.objects.filter(email=email).count():
-            raise forms.ValidationError(
-                u'This email address is already in use.')
+        if email and User.objects.filter(email=email).filter(userprofile__stub_account=False).count():
+            raise forms.ValidationError(u'This email address is already in use.')
         return email
 
     class Meta:
         model = User
-        fields = ('username', 'email', 'first_name', 'last_name')
+        fields = (
+            'username',
+            'email',
+            'first_name',
+            'last_name'
+        )
 
 
 class EmailConfirmationForm(forms.Form):

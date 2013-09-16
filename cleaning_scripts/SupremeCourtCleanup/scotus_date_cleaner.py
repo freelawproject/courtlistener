@@ -1,29 +1,4 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-#  Under Sections 7(a) and 7(b) of version 3 of the GNU Affero General Public
-#  License, that license is supplemented by the following terms:
-#
-#  a) You are required to preserve this legal notice and all author
-#  attributions in this program and its accompanying documentation.
-#
-#  b) You are prohibited from misrepresenting the origin of any material
-#  within this covered work and you are required to mark in reasonable
-#  ways how any modified versions differ from the original version.
-'''
+"""
 Process is as follows:
     For each row in the CSV:
         extract the case number from the row (caseNum = line.split("|")[0]
@@ -47,10 +22,11 @@ Spec/features:
       detail to revert a change.
     - simulate mode allows the user to generate the messages and logs without
       editing the DB
-'''
+"""
 
 import sys
-sys.path.append('/var/www/court-listener/alert')
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
 from django.core.management import setup_environ
@@ -85,11 +61,11 @@ def remove_words(phrase):
 
 
 def gen_diff_ratio(case_name_left, case_name_right):
-    '''
+    """
     Genrates a difference between two strings, in this case case_names.
     Returns a value between 0 and 1. 0 means the strings are totally diffferent.
     1 means they are identical.
-    '''
+    """
     # Remove common strings from all case names /before/ comparison.
     # Doing so lowers the opportunity for false positives.
     case_name_left = remove_words(case_name_left)
@@ -240,7 +216,6 @@ def main():
         print "*******************************************"
 
     return cleaner(simulate, verbose)
-    exit(0)
 
 
 if __name__ == '__main__':

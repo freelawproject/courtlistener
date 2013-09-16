@@ -1,32 +1,6 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-#  Under Sections 7(a) and 7(b) of version 3 of the GNU Affero General Public
-#  License, that license is supplemented by the following terms:
-#
-#  a) You are required to preserve this legal notice and all author
-#  attributions in this program and its accompanying documentation.
-#
-#  b) You are prohibited from misrepresenting the origin of any material
-#  within this covered work and you are required to mark in reasonable
-#  ways how any modified versions differ from the original version.
-
-
 import sys
-sys.path.append('/var/www/court-listener/alert')
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
 from django.core.management import setup_environ
@@ -45,9 +19,9 @@ from optparse import OptionParser
 
 
 def delete_data_by_time_and_court(courtID, SIMULATE, delTime=None, VERBOSITY=0):
-    '''
+    """
     Deletes data for a court. If a time is given, uses that time as a constraint.
-    '''
+    """
     if delTime is not None:
         if VERBOSITY >= 1:
             print "Deleting data newer than %s for court %s" % (delTime, courtID)
@@ -63,16 +37,16 @@ def delete_data_by_time_and_court(courtID, SIMULATE, delTime=None, VERBOSITY=0):
             docs = queryset_generator(Document.objects.filter(court=courtID))
 
     if VERBOSITY >= 1:
-        print "Deleting %s documents from the database." % (count)
+        print "Deleting %s documents from the database." % count
     if (not SIMULATE) and (count != 0):
         for doc in docs:
             doc.delete()
 
 
 def delete_all_citations(SIMULATE, VERBOSITY=0):
-    '''
+    """
     Deletes all citations and their associated documents.
-    '''
+    """
     if VERBOSITY >= 1:
         print "Deleting all citations and associated documents."
     cites = Citation.objects.all()
@@ -88,12 +62,12 @@ def delete_all_citations(SIMULATE, VERBOSITY=0):
 
 
 def delete_orphaned_citations(SIMULATE, VERBOSITY=0):
-    '''
+    """
     Deletes all citations that don't have a document associated with them.
 
     This is brutally inefficient, iterating over ALL citations in the DB, and
     performing one query per citation.
-    '''
+    """
     if VERBOSITY >= 1:
         print "Deleting all citations that are not associated with a document."
     cites = Citation.objects.all()
@@ -112,14 +86,14 @@ def delete_orphaned_citations(SIMULATE, VERBOSITY=0):
 
 
 def main():
-    '''Manipulates the database in convenient ways.
+    """Manipulates the database in convenient ways.
 
     This script has some basic commands that allow manipulations of the database
     in somewhat more convenient ways than provided through other utilities.
 
     Yes, it's possible to get into MySQL, and to delete things, but it's easier
     and cleaner to delete things this way.
-    '''
+    """
 
     usage = "usage: %prog -c COURT  (-d | -o | --allcites) [-t time] [-v VERBOSITY] [-s]"
     parser = OptionParser(usage)

@@ -10,7 +10,7 @@ import json
 
 
 def calculate_grand_totals(data):
-    '''Iterates over the data and puts the totals together'''
+    """Iterates over the data and puts the totals together"""
     summed_court_data = {}
     for year_count_dict in data.values():
         for year, count in year_count_dict['years'].iteritems():
@@ -24,12 +24,12 @@ def calculate_grand_totals(data):
 
 
 def strip_trailing_zeroes(data):
-    '''Removes zeroes from the end of the court data
+    """Removes zeroes from the end of the court data
 
     Some courts only have values through to a certain date, but we don't
     check for that in our queries. Instead, we truncate any zero-values that
     occur at the end of their stats.
-    '''
+    """
     i = len(data) - 1
     while i > 0:
         if data[i][1] == 0:
@@ -41,8 +41,8 @@ def strip_trailing_zeroes(data):
 
 
 def build_court_dicts(grand_total, courts):
-    '''Takes the court objects, and manipulates them into a list of more useful
-    dictionaries'''
+    """Takes the court objects, and manipulates them into a list of more useful
+    dictionaries"""
     court_dicts = [{'pk': 'all',
                     'short_name': u'All Courts'}]
     court_dicts.extend([{'pk': court.pk,

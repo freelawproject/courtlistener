@@ -3,6 +3,7 @@ from datetime import time
 from django.core.urlresolvers import NoReverseMatch
 from django.template import Context
 from django.template import loader
+from alert.casepage.views import make_caption, make_citation_string
 
 
 class InvalidDocumentError(Exception):
@@ -30,7 +31,7 @@ class SearchDocument(object):
         except AttributeError:
             raise InvalidDocumentError("Unable to save to index due to missing Citation object.")
         except NoReverseMatch:
-            raise InvalidDocumentError("Unable to save to index due to missing absolute url.")
+            raise InvalidDocumentError("Unable to save to index due to missing absolute_url.")
         self.judge = doc.judges
         self.suitNature = doc.nature_of_suit
         self.docketNumber = doc.citation.docket_number
@@ -40,21 +41,19 @@ class SearchDocument(object):
         self.source = doc.source
         self.download_url = doc.download_URL
         self.local_path = unicode(doc.local_path)
-
-        # Load the westCite field using a template to make a concatenation
-        west_cite_template = loader.get_template('search/indexes/westCite.txt')
-        c = Context({'object': doc})
-        self.westCite = west_cite_template._render(c)
-
-        # Load the case_name field using a template to make it a concatenation
-        case_name_template = loader.get_template('search/indexes/caseNumber.txt')
-        c = Context({'object': doc})
-        self.caseNumber = case_name_template.render(c)
+        self.citation = make_citation_string(doc)
+        # Assign the docket number and/or the citation to the caseNumber field
+        if doc.citation and doc.citation.docket_number:
+            self.caseNumber = '%s, %s' % (self.citation, doc.citation.docket_number)
+        elif doc.citation:
+            self.caseNumber = self.citation
+        elif doc.citation.docket_number:
+            self.caseNumber = self.citation.docket_number
 
         # Load the document text using a template for cleanup and concatenation
         text_template = loader.get_template('search/indexes/text.txt')
         c = Context({'object': doc})
-        self.text = text_template.render(c).translate(null_map)
+        self.text = '%s %s' % (text_template.render(c).translate(null_map), self.caseNumber)
 
         # Faceting fields
         self.status_exact = doc.get_precedential_status_display()

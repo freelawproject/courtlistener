@@ -18,15 +18,6 @@
                     </div>
                     <div class="span-6 last">&nbsp;</div>
                 </div>
-            {% else %}
-                {% if not request.user.get_profile.emailConfirmed %}
-                    <div class="span-17 last">
-                        <div class="span-10">
-                            <p class="bottom notice">Your email address has not been confirmed. To receive alerts, you must <a href="/email-confirmation/request/">confirm your email address</a>.</p>
-                        </div>
-                        <div class="span-6 last">&nbsp;</div>
-                    </div>
-                {% endif %}
             {% endif %}
         </div>
         {% if user.get_profile.alert.all %}
@@ -61,12 +52,14 @@
                     </tbody>
                 </table>
                 <form action="/" method="post">{% csrf_token %}
-                <button type="submit" class="button">Make new alert</button>
+                    <button type="submit" class="button">Make new alert</button>
+                </form>
             </div>
         {% else %}
             <h3>You have not made any alerts.</h3>
             <form action="/" method="get">
-            <button type="submit" class="button">Make new alert</button>
+                <button type="submit" class="button">Make new alert</button>
+            </form>
         {% endif %}
     </div>
 {% endblock %}

@@ -37,10 +37,10 @@ from alert.settings import DUMP_DIR
 
 
 def dump_all_cases():
-    '''
+    """
     A simple function that dumps all cases to a single dump file. Rotates out
     the old file before deleting it.
-    '''
+    """
     today = date.today()
     start_date = date(1754, 9, 1)  # First American case
     end_date = date(today.year, today.month, today.day)
@@ -59,10 +59,10 @@ def dump_all_cases():
 
 
 def main():
-    '''Runs the script.
+    """Runs the script.
 
     Returns 0 if successful, else returns 1.
-    '''
+    """
     return dump_all_cases()
 
 if __name__ == '__main__':

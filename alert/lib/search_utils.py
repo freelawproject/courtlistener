@@ -17,7 +17,7 @@ def make_get_string(request):
         pass
     get_string = urlencode(get_dict, True)
     if len(get_string) > 0:
-        get_string = get_string + '&'
+        get_string += '&'
     return get_string
 
 
@@ -135,11 +135,11 @@ def build_main_query(cd, highlight=True):
 
         # Highlighting for the main query.
         main_params['hl'] = 'true'
-        main_params['hl.fl'] = 'text,caseName,judge,suitNature,westCite,neutralCite,docketNumber,lexisCite,court_citation_string'
+        main_params['hl.fl'] = 'text,caseName,judge,suitNature,citation,neutralCite,docketNumber,lexisCite,court_citation_string'
         main_params['f.caseName.hl.fragListBuilder'] = 'single'
         main_params['f.judge.hl.fragListBuilder'] = 'single'
         main_params['f.suitNature.hl.fragListBuilder'] = 'single'
-        main_params['f.westCite.hl.fragListBuilder'] = 'single'
+        main_params['f.citation.hl.fragListBuilder'] = 'single'
         main_params['f.neutralCite.hl.fragListBuilder'] = 'single'
         main_params['f.docketNumber.hl.fragListBuilder'] = 'single'
         main_params['f.lexisCite.hl.fragListBuilder'] = 'single'
@@ -151,7 +151,7 @@ def build_main_query(cd, highlight=True):
         main_params['f.caseName.hl.alternateField'] = 'caseName'
         main_params['f.judge.hl.alternateField'] = 'judge'
         main_params['f.suitNature.hl.alternateField'] = 'suitNature'
-        main_params['f.westCite.hl.alternateField'] = 'westCite'
+        main_params['f.citation.hl.alternateField'] = 'citation'
         main_params['f.neutralCite.hl.alternateField'] = 'neutralCite'
         main_params['f.docketNumber.hl.alternateField'] = 'docketNumber'
         main_params['f.lexisCite.hl.alternateField'] = 'lexisCite'
@@ -170,8 +170,8 @@ def build_main_query(cd, highlight=True):
         main_fq.append('judge:(%s)' % ' AND '.join(cd['judge'].split()))
 
     # Citations
-    if cd['west_cite']:
-        main_fq.append('westCite:' + cd['west_cite'])
+    if cd['citation']:
+        main_fq.append('citation:' + cd['citation'])
     if cd['docket_number']:
         main_fq.append('docketNumber:' + cd['docket_number'])
     if cd['neutral_cite']:
@@ -229,11 +229,11 @@ def place_facet_queries(cd):
         shared_fq.append('judge:(%s)' % ' AND '.join(cd['judge'].split()))
 
     # Citations
-    if cd['west_cite'] != '' and cd['west_cite'] is not None:
-        shared_fq.append('westCite:%s' % cd['west_cite'])
-    if cd['docket_number'] != '' and cd['docket_number'] is not None:
+    if cd['citation']:
+        shared_fq.append('citation:%s' % cd['citation'])
+    if cd['docket_number']:
         shared_fq.append('docketNumber:%s' % cd['docket_number'])
-    if cd['neutral_cite'] != '' and cd['neutral_cite'] is not None:
+    if cd['neutral_cite']:
         shared_fq.append('neutralCite:%s' % cd['neutral_cite'])
 
     # Dates
@@ -286,10 +286,7 @@ def get_court_start_year(conn, court):
     """Get the start year for a court by placing a Solr query. If a court is
     active, but does not yet have any results, return the current year.
     """
-    params = {}
-    params['fq'] = ['court_exact:%s' % court.courtUUID]
-    params['sort'] = 'dateFiled asc'
-    params['rows'] = 1
+    params = {'fq': ['court_exact:%s' % court.courtUUID], 'sort': 'dateFiled asc', 'rows': 1}
     response = conn.raw_query(**params).execute()
     try:
         year = response.result.docs[0]['dateFiled'].year
@@ -301,13 +298,7 @@ def get_court_start_year(conn, court):
 
 
 def build_coverage_query(court, start_year):
-    params = {}
-    params['facet'] = 'true'
-    params['facet.range'] = 'dateFiled'
-    params['facet.range.end'] = 'NOW/DAY'
-    params['facet.range.gap'] = '+1YEAR'
-    params['rows'] = 0
-    params['facet.range.start'] = '%d-01-01T00:00:00Z' % start_year
-    params['fq'] = ['court_exact:%s' % court.courtUUID]
-    params['q'] = '*:*'
+    params = {'facet': 'true', 'facet.range': 'dateFiled', 'facet.range.end': 'NOW/DAY', 'facet.range.gap': '+1YEAR',
+              'rows': 0, 'facet.range.start': '%d-01-01T00:00:00Z' % start_year,
+              'fq': ['court_exact:%s' % court.courtUUID], 'q': '*:*'}
     return params

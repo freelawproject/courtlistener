@@ -129,12 +129,7 @@
                 <article>
                     <h3 class="bottom serif">
                         <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}" class="visitable">
-                            {{result.solr_highlights.caseName.0|safe}},
-                            {% if result.solr_highlights.westCite.0 %}
-                                {{ result.solr_highlights.westCite.0|safe }}
-                            {% else %}
-                                {{ result.solr_highlights.docketNumber.0|safe }}
-                            {% endif %}
+                            {{result.solr_highlights.caseName.0|safe}}
                             ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
                         </a>
                     </h3>
@@ -150,11 +145,11 @@
                         </time>
                         <span class="meta-data-header">Status:</span>
                         <span class="meta-data-value">{{ result.status }}</span>
-                        {% if result.solr_highlights.neutralCite.0 != '' and result.solr_highlights.neutralCite.0 != None %}
-                            <span class="meta-data-header">Neutral Citation:</span>
-                            <span class="meta-data-value">{{ result.solr_highlights.neutralCite.0|safe }}</span>
+                        {% if result.solr_highlights.citation.0 %}
+                            <span class="meta-data-header">Citations: </span>
+                            <span class="meta-data-value">{{ result.solr_highlights.citation.0|safe }}</span>
                         {% endif %}
-                        {% if result.solr_highlights.westCite.0 and result.solr_highlights.docketNumber.0 %}
+                        {% if result.solr_highlights.docketNumber.0 %}
                             <span class="meta-data-header">Docket Number:</span>
                             <span class="meta-data-value">{{ result.solr_highlights.docketNumber.0|safe }}</span>
                         {% endif %}
@@ -177,7 +172,7 @@
                         <p class="bottom">
                             <span class="meta-data-value">
                                 <a href="{{ result.absolute_url }}cited-by/?{{ request.META.QUERY_STRING }}">
-                                    Cited {{ result.citeCount|intcomma }} times
+                                    Cited ~{{ result.citeCount|intcomma }} time{{ result.citeCount|pluralize }}
                                 </a>
                             </span>
                         </p>

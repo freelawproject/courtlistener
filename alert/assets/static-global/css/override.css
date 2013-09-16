@@ -96,6 +96,13 @@ mark {
     background-color: #ffffbf;
 }
 
+.radio-list ul {
+    /* Django creates radio items as a list, but they need to be wrapped in a div with class "radio-list" then this
+       style will make them look normal */
+    list-style-type: none;
+    padding-left: 0;
+}
+
 .serif{ font-family: "Warnock Pro","Palatino","Book Antiqua",Georgia,serif; }
 .meta-data-header{ font-weight: bold; }
 .meta-data-value{ margin-right: 2em; }
@@ -203,12 +210,23 @@ div.shown ul {
 }
 
 /* Button formatting */
-a.button, button {
+a.button, button, .ui-button-text {
     border-color: #a6a6a6;
     background-color: #6683B7;
     color: white;
     letter-spacing: 0.5px;
 }
+.ui-state-active .ui-button-text,
+.ui-state-hover .ui-button-text,
+.ui-state-focus .ui-button-text {
+    background-color: #7896D0;
+    color: #eeeeee;
+}
+
+.ui-state-active, .ui-state-hover, .ui-state-focus {
+    border-color: transparent;
+}
+
 button:hover, a.button:hover {
   background-color: #7896D0;
   border:1px solid gray;
@@ -249,13 +267,18 @@ div.sidebar-checkbox input {
 }
 
 input.court-checkbox, input.status-checkbox {
-    top: 0px;
+    top: 0;
 }
 #citation-count {
     float: right;
 }
 #slider-range {
     margin: 0.5em;
+}
+
+#payment-provider-radio input[type="radio"] {
+    position: absolute;
+    top: auto;
 }
 
 /* Results page */
@@ -295,6 +318,28 @@ input.court-checkbox, input.status-checkbox {
 	float: right;
 	width: 200px;
 	text-align: right;
+}
+
+/* Donations page */
+#id_amount_other {
+    float: none;
+    margin-top: 0;
+}
+
+#how-much-donate-choices {
+    padding-left: 2em;
+}
+
+#cc-month-field {
+    width: 29px;
+}
+#cc-year-field {
+    width: 67px;
+}
+
+#unconfirmed-email-warning{
+    margin-top: 9px;
+    margin-left: 5px;
 }
 
 

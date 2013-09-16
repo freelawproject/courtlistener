@@ -1,26 +1,17 @@
-from alert.lib import sunburnt
-from alert.search.models import Citation, Court, Document
-from alert.scrapers.test_assets import test_scraper
 from django.test import TestCase
 from django.test.client import Client
+import time
 
+from alert.lib import sunburnt
+from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core
+from alert.search.models import Citation, Court, Document
+from alert.scrapers.test_assets import test_scraper
 from alert import settings
 
 
 class SetupException(Exception):
     def __init__(self, message):
         Exception.__init__(self, message)
-
-
-def clear_solr(si):
-    # Clear the Solr index
-    response = si.raw_query(**{'q': '*:*'}).execute()
-    count = response.result.numFound
-    if 0 < count <= 10000:
-        si.delete_all()
-        si.commit()
-    elif count > 10000:
-        raise SetupException('Solr has more than 10000 items. Will not empty as part of a test.')
 
 
 class SearchTest(TestCase):
@@ -30,10 +21,12 @@ class SearchTest(TestCase):
         # Set up some handy variables
         self.court = Court.objects.get(pk='test')
         self.client = Client()
-        self.si = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
 
-        # Clear Solr
-        clear_solr(self.si)
+        # Set up a testing core in Solr and swap it in
+        self.core_name = '%s.test-%s' % (self.__module__, time.time())
+        create_solr_core(self.core_name)
+        swap_solr_core('collection1', self.core_name)
+        self.si = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
 
         # Add two documents to the index, but don't extract their contents
         self.site = test_scraper.Site().parse()
@@ -42,7 +35,7 @@ class SearchTest(TestCase):
             cite = Citation(case_name=self.site.case_names[i],
                             docket_number=self.site.docket_numbers[i],
                             neutral_cite=self.site.neutral_citations[i],
-                            west_cite=self.site.west_citations[i])
+                            federal_cite_one=self.site.west_citations[i])
             cite.save(index=False)
             self.doc = Document(date_filed=self.site.case_dates[i],
                                 court=self.court,
@@ -51,13 +44,12 @@ class SearchTest(TestCase):
                                 citation_count=cite_counts[i],
                                 nature_of_suit=self.site.nature_of_suit[i],
                                 judges=self.site.judges[i])
-
             self.doc.save()
 
     def tearDown(self):
         self.doc.delete()
-
-        clear_solr(self.si)
+        swap_solr_core(self.core_name, 'collection1')
+        delete_solr_core(self.core_name)
 
     def test_a_simple_text_query(self):
         """Does typing into the main query box work?"""
@@ -90,9 +82,9 @@ class SearchTest(TestCase):
 
     def test_a_west_citation_query(self):
         """Can we query by citation number?"""
-        get_dicts = [{'q': '*:*', 'west_cite': '44'},
-                     {'q': 'westCite:44'},
-                     {'q': 'westcite:44'}]  # Tests query field lower-casing
+        get_dicts = [{'q': '*:*', 'citation': '44'},
+                     {'q': 'citation:44'},
+                     {'q': 'westcite:44'}]  # Tests query field lower-casing, and the deprecated field.
         for get_dict in get_dicts:
             response = self.client.get('/', get_dict)
             self.assertIn('Tarrant', response.content)
