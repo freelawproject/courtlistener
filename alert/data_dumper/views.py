@@ -17,7 +17,7 @@ from datetime import date
 
 def dump_index(request):
     """Shows an index page for the dumps."""
-    court_count = Court.objects.exclude(jurisdiction='T').filter(in_use=True).count()  # Non-testing courts
+    court_count = Court.objects.exclude(jurisdiction='T').count()  # Non-testing courts
     try:
         dump_size = size(os.path.getsize(os.path.join(DUMP_DIR, 'all.xml.gz')))
     except os.error:
