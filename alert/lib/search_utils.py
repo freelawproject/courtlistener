@@ -310,6 +310,7 @@ def build_coverage_query(court, start_year):
     }
     return params
 
+
 def build_court_count_query():
     """Build a query that returns the count of cases for all courts"""
     params = {
