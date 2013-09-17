@@ -1,17 +1,14 @@
 import calendar
 import gzip
-import shutil
 import time
 import os
-
-from django.http import HttpResponseBadRequest
 
 from datetime import date
 from lxml import etree
 
 
 class myGzipFile(gzip.GzipFile):
-    '''Backports Python 2.7 functionality into 2.6.
+    """Backports Python 2.7 functionality into 2.6.
 
     In order to use the 'with syntax' below, I need to subclass the gzip
     library here. Once all of the machines are running Python 2.7, this class
@@ -20,7 +17,7 @@ class myGzipFile(gzip.GzipFile):
 
     This line of code worked in 2.7:
     with gzip.open(filename, mode='wb') as z_file:
-    '''
+    """
     def __enter__(self):
         if self.fileobj is None:
             raise ValueError("I/O operation on closed GzipFile object")
@@ -78,11 +75,47 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 except:
                     pass
                 try:
-                    row.set('west_cite', doc.citation.west_cite)
+                    row.set('federal_cite_one', doc.citation.federal_cite_one)
+                except:
+                    pass
+                try:
+                    row.set('federal_cite_two', doc.citation.federal_cite_two)
+                except:
+                    pass
+                try:
+                    row.set('federal_cite_three', doc.citation.federal_cite_three)
+                except:
+                    pass
+                try:
+                    row.set('state_cite_one', doc.citation.state_cite_one)
+                except:
+                    pass
+                try:
+                    row.set('state_cite_two', doc.citation.state_cite_two)
+                except:
+                    pass
+                try:
+                    row.set('state_cite_three', doc.citation.state_cite_three)
+                except:
+                    pass
+                try:
+                    row.set('state_cite_regional', doc.citation.state_cite_regional)
+                except:
+                    pass
+                try:
+                    row.set('specialty_cite_one', doc.citation.specialty_cite_one)
+                except:
+                    pass
+                try:
+                    row.set('scotus_early_cite', doc.citation.scotus_early_cite)
                 except:
                     pass
                 try:
                     row.set('lexis_cite', doc.citation.lexis_cite)
+                except:
+                    pass
+                try:
+                    row.set('westlaw_cite', doc.citation.westlaw_cite)
                 except:
                     pass
                 try:
@@ -159,19 +192,19 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
 
 
 def get_date_range(year, month, day):
-    ''' Create a date range to be queried.
+    """ Create a date range to be queried.
 
     Given a year and optionally a month or day, return a date range. If only a
     year is given, return start date of January 1, and end date of December
     31st. Do similarly if a year and month are supplied or if all three values
     are provided.
-    '''
+    """
     # Sort out the start dates
-    if month == None:
+    if month is None:
         start_month = 1
     else:
         start_month = int(month)
-    if day == None:
+    if day is None:
         start_day = 1
     else:
         start_day = int(day)
@@ -183,12 +216,12 @@ def get_date_range(year, month, day):
     monthly = False
     daily = False
     # Sort out the end dates
-    if day == None and month == None:
+    if day is None and month is None:
         # it's an annual query
         annual = True
         end_month = 12
         end_day = 31
-    elif day == None:
+    elif day is None:
         # it's a month query
         monthly = True
         end_month = int(month)

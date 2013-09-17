@@ -9,7 +9,17 @@
                 <span class="{% block nav-alerts %}inactive{% endblock %} settings-nav-item"><a href="/profile/alerts/">Alerts</a></span>
                 <span class="favorite-off sprites"></span>
                 <span class="{% block nav-favorites %}inactive{% endblock %} settings-nav-item"><a href="/profile/favorites/">Favorites</a></span>
-                <span class="{% block nav-account %}inactive{% endblock %} settings-nav-item"><a href="/profile/settings/">Account</a></span></span>
+                <span class="{% block nav-donations %}inactive{% endblock %} settings-nav-item"><a href="/profile/donations/">Donations</a></span>
+                <span class="{% block nav-account %}inactive{% endblock %} settings-nav-item">
+                    <a href="/profile/settings/">Account
+                        {% if not request.user.get_profile.email_confirmed %}
+                            <img src="/static/png/exclamation.png"
+                                 width="16"
+                                 height="16"
+                                 alt="Your email address is not confirmed."
+                                 id="unconfirmed-email-warning-nav"/>
+                        {% endif %}
+                    </a></span></span>
                 <span class="{% block nav-password %}inactive{% endblock %} settings-nav-item"><a href="/profile/password/change">Password</a></span>
             </h3>
         </div>

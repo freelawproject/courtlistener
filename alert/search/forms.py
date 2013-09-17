@@ -88,7 +88,7 @@ class SearchForm(forms.Form):
                    'autocomplete': 'off'}
         )
     )
-    west_cite = forms.CharField(
+    citation = forms.CharField(
         required=False,
         widget=forms.TextInput(
             attrs={'class': 'span-5 external-input',
@@ -168,7 +168,7 @@ class SearchForm(forms.Form):
         # Fix fields to work in all lowercase
         q = re.sub('casename', 'caseName', q)
         q = re.sub('lexiscite', 'lexisCite', q)
-        q = re.sub('westcite', 'westCite', q)
+        q = re.sub('westcite', 'westCite', q)  # Purge after 2014-08-06
         q = re.sub('casenumber', 'caseNumber', q)
         q = re.sub('docketnumber', 'docketNumber', q)
         q = re.sub('neutralcite', 'neutralCite', q)

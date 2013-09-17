@@ -7,6 +7,9 @@ import os
 import sys
 sys.path.append(os.getcwd())
 
+# Loads the variable INSTALL_ROOT
+execfile('/etc/courtlistener')
+
 SITE_ID = 1
 
 # If you set this to False, Django will make some optimizations so as not
@@ -58,11 +61,14 @@ INSTALLED_APPS = [
     'debug_toolbar',
     'south',
     'alerts',
+    'api',
     'casepage',
     'citations',
+    'corpus_importer',
     'contact',
     'coverage',
     'custom_filters',
+    'donate',
     'favorites',
     'honeypot',
     'lib',
@@ -94,7 +100,8 @@ MESSAGE_TAGS = {
 ########
 # Solr #
 ########
-SOLR_URL = 'http://127.0.0.1:8983/solr'
+SOLR_URL = 'http://127.0.0.1:8983/solr/collection1'
+#SOLR_URL = 'http://127.0.0.1:8983/solr/swap_core'
 
 
 ##########
@@ -122,8 +129,8 @@ CELERY_SEND_TASK_ERROR_EMAILS = True
 if DEVELOPMENT:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
-SERVER_EMAIL = 'noreply@courtlistener.com'
-DEFAULT_FROM_EMAIL = 'noreply@courtlistener.com'
+SERVER_EMAIL = 'CourtListener <noreply@courtlistener.com>'
+DEFAULT_FROM_EMAIL = 'CourtListener <noreply@courtlistener.com>'
 
 
 #######
@@ -144,7 +151,7 @@ MEDIA_ROOT = os.path.join(INSTALL_ROOT, 'alert/assets/media/')
 # Static files configuration...
 STATIC_URL = '/static/'
 STATICFILES_DIRS = (os.path.join(INSTALL_ROOT, 'alert/assets/static-global/'),)
-STATIC_ROOT = os.path.join(INSTALL_ROOT, 'alert/assets/static/')
+STATIC_ROOT = os.path.join(INSTALL_ROOT, 'alert/assets/static/')  # This is where things get collected to
 
 # Where should the data dumps be stored?
 DUMP_DIR = os.path.join(INSTALL_ROOT, 'alert/assets/media/dumps/')
@@ -153,6 +160,20 @@ TEMPLATE_DIRS = (
     # Don't forget to use absolute paths, not relative paths.
     os.path.join(INSTALL_ROOT, 'alert/assets/templates/'),
 )
+
+
+############
+# Payments #
+############
+PAYMENT_REDIRECT = 'https://www.courtlistener.com/donate/thanks/'
+PAYMENT_CANCELLATION = 'https://www.courtlistener.com/donate/cancel/'
+DWOLLA_CALLBACK = 'https://www.courtlistener.com/donate/callbacks/dwolla/'
+PAYPAL_CALLBACK = 'https://www.courtlistener.com/donate/callbacks/paypal/'
+DWOLLA_REDIRECT = 'https://www.courtlistener.com/donate/dwolla/complete/'
+if DEVELOPMENT:
+    PAYMENT_TESTING_MODE = True
+else:
+    PAYMENT_TESTING_MODE = False
 
 
 ######################
@@ -164,7 +185,7 @@ if DEVELOPMENT:
     CSRF_COOKIE_SECURE = False
     # For debug_toolbar
     INTERNAL_IPS = ('127.0.0.1',)
-    DEBUG_TOOLBAR_CONFIG = {'INTERCEPT_REDIRECTS': True}
+    DEBUG_TOOLBAR_CONFIG = {'INTERCEPT_REDIRECTS': False}
     # For tests
     SOUTH_TESTS_MIGRATE = False
     if 'test' in sys.argv:

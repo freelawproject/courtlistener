@@ -47,7 +47,7 @@ class search_feed(Feed):
     author_email = "feeds@courtlistener.com"
 
     def items(self, obj):
-        '''Do a Solr query here. Return the first 20 results'''
+        """Do a Solr query here. Return the first 20 results"""
         search_form = SearchForm(obj.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
@@ -95,14 +95,9 @@ class court_feed(Feed):
     author_email = "feeds@courtlistener.com"
 
     def items(self, obj):
-        '''Do a Solr query here. Return the first 20 results'''
+        """Do a Solr query here. Return the first 20 results"""
         conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
-        params = {}
-        params['q'] = '*:*'
-        params['court_exact'] = obj.courtUUID
-        params['sort'] = 'dateFiled desc'
-        params['rows'] = '20'
-        params['start'] = '0'
+        params = {'q': '*:*', 'court_exact': obj.courtUUID, 'sort': 'dateFiled desc', 'rows': '20', 'start': '0'}
         results_si = conn.raw_query(**params).execute()
         return results_si
 
@@ -138,13 +133,9 @@ class all_courts_feed(Feed):
     author_email = "feeds@courtlistener.com"
 
     def items(self, obj):
-        '''Do a Solr query here. Return the first 20 results'''
+        """Do a Solr query here. Return the first 20 results"""
         conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
-        params = {}
-        params['q'] = '*:*'
-        params['sort'] = 'dateFiled desc'
-        params['rows'] = '20'
-        params['start'] = '0'
+        params = {'q': '*:*', 'sort': 'dateFiled desc', 'rows': '20', 'start': '0'}
         results_si = conn.raw_query(**params).execute()
         return results_si
 
@@ -167,7 +158,7 @@ class all_courts_feed(Feed):
 
 
 class cited_by_feed(Feed):
-    '''Creates a feed of cases that cite a case, ordered by date filed.'''
+    """Creates a feed of cases that cite a case, ordered by date filed."""
     feed_type = Atom1Feed
 
     # get the court info from the URL
@@ -184,7 +175,7 @@ class cited_by_feed(Feed):
     author_email = "feeds@courtlistener.com"
 
     def items(self, obj):
-        '''Return the latest 20 cases citing this one.'''
+        """Return the latest 20 cases citing this one."""
         return obj.citation.citing_cases.all().order_by('-date_filed')[:20]
 
     def item_link(self, item):
