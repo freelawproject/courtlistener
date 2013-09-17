@@ -41,11 +41,19 @@ LAWBOX PROJECT
    TODO: Sort out the new court picking interface.
 
 2013-09-16:
+ - OVERVIEW: This update contains a number of large fixes, which will alter your database in a number of ways. It lands
+   the beginning work for the Lawbox corpus import (including > 300 new courts), and lands the initial work for a
+   donation page. Between these two changes, hundreds of changes have been made to the codebase, which will take a bit
+   of work to upgrade. Before we begin, turn off the scrapers with:
+
+     sudo service scrapers stop
+
+   Once that's complete, proceed through the steps below.
+
  - CourtListener has been modified to support multiple installations on a single computer. For this to work, a new file
    must be created at /etc/courtlistener, with contents like the following:
 
-   INSTALL_ROOT='/home/mlissner/Programming/intellij/courtlistener'
-
+     INSTALL_ROOT='/home/mlissner/Programming/intellij/courtlistener'
 
    This variable will be used by both bash scripts and all Django scripts henceforth for determining where CourtListener
    is installed. If you are a developer with multiple installations, this will make your life considerably easier, as
@@ -55,12 +63,37 @@ LAWBOX PROJECT
    oddly, environment variables cannot be changed on the fly without restarting the computer. Please see this
    stackoverflow question and my answer for more details:
 
-    http://stackoverflow.com/questions/8677504/setting-environment-variable-globally-without-restarting-ubuntu/18388854#18388854
+     http://stackoverflow.com/questions/8677504/setting-environment-variable-globally-without-restarting-ubuntu/18388854#18388854
+
+ - Hundreds of new courts have been added to initial_data.json and will be installed automatically, but there are some
+   conflicts with the current courts that need to be fixed first. To do that, in a Python shell run:
+
+        from search.models import Court
+        c = Court.objects.get(pk="calctapp")
+        c.position = 350.1
+        c.save()
+        c = Court.objects.get(pk="wva")
+        c.position = 385.1
+        c.save()
+        c = Court.objects.get(pk="ark")
+        c.position = 330.0
+        c.save()
+        c = Court.objects.get(pk="ri")
+        c.position = 367.3
+        c.save()
+        c = Court.objects.get(pk="nj")
+        c.position = 366.55
+        c.save()
+
+   The remainder of the courts will get updated automatically when you perform the next steps.
 
  - the user profiles have been updated to support donations. Update your database with:
 
     manage.py migrate donate
     manage.py migrate userHandling
+
+   A new fixture has also been added that will automatically populate your database with 56 bar membership
+   jurisdictions.
 
  - we've added payment support, which introduces a new dependency. Install it with:
 
@@ -82,7 +115,8 @@ LAWBOX PROJECT
    much greater granularity to those that are importing this data, splitting out parallel citations into more
    understandable fields.
 
-   Be sure to delete old copies of the dumps so they are no longer cached.
+   Be sure to delete old copies of the dumps so they are no longer cached, and at the end we will create the monthly
+   dump so it is cached.
 
  - The Solr backend has been updated to deprecate the westCite field and rename it as simply "citation". The old field
    will continue working for at least one year, though alerts and documentation have been updated to begin phasing it
@@ -94,11 +128,14 @@ LAWBOX PROJECT
      % screen
 
    Halt the scrapers and restart Solr to bring in the new schema
-     % sudo service scrapers stop
      % sudo service solr restart
 
-   Create a new Solr core named "swap_core", using the normal core's settings:
-     % curl 'http://localhost:8983/solr/admin/cores?wt=json&action=CREATE&name=swap_core&instanceDir=%2Fusr%2Flocal%2Fsolr%2Fexample%2Fsolr%2Fcollection1&dataDir=data&config=solrconfig.xml&schema=schema.xml'
+   Create a new Solr core named "swap_core", using the normal core's settings, and in a Python shell:
+
+     % manage.py shell
+     >>> from alert.lib.solr_core_admin import *
+     >>> from alert import settings
+     >>> create_solr_core("swap_core", data_dir='%s/Solr/data/2/' % settings.INSTALL_ROOT)
 
    The cl_update_index command has been updated with a new argument, --solr-url, that allows users to override the
    default SOLR_URL value that is normally pulled from the site-wide settings. Use the new argument to reindex all
@@ -106,22 +143,32 @@ LAWBOX PROJECT
    space and memory your Solr index currently uses:
      % manage.py cl_update_index --everything --update --optimize --solr-url='http://127.0.0.1:8983/solr/swap_core'
 
-   Once complete, swap the indexes with:
-     % curl 'http://localhost:8983/solr/admin/cores?wt=json&action=SWAP&core=collection1&other=swap_core'
+   Once complete, swap the indexes in your Python shell with:
+
+     >>> swap_solr_core('collection1', 'swap_core')
+
+   Note that the core named "swap_core" is now your old core (the one from before we began the upgrade). This can be
+   confusing -- you've been warned!
 
    Test your system at this point to ensure that the new citation field is working.
 
    Delete the old core and index:
-     % curl 'http://localhost:8983/solr/admin/cores?wt=json&action=UNLOAD&core=swap_core&deleteIndex=true'
 
-   And finally, restart the scrapers:
-     % sudo service scrapers start
+     >>> delete_solr_core('swap_core', delete_index=True)
 
  - The variables SERVER_EMAIL and DEFAULT_FROM_EMAIL have been changed from 'noreply@courtlistener.com' to
    'CourtListener <noreply@courtlistener.com>' to provide a proper name to email readers. This is changed in the default
    variable file, but can be overridden in your 05-private.py file, if desired.
 
  - A new page has been added at /api/jurisdictions/ if you wish to include it in your sitemaps.
+
+ - And finally, restart the scrapers:
+
+    % sudo service scrapers start
+
+   And if this is a production system, regenerate the monthly dump that we deleted.
+
+    % sudo -u www-data /usr/bin/python /var/www/court-listener/alert/dump_all_cases.py
 
 
 2013-07-07:

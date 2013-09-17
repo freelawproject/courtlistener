@@ -16,7 +16,7 @@ from celery.decorators import task
 
 
 @task
-def add_or_update_doc_object(doc):
+def add_or_update_doc_object(doc, solr_url=settings.SOLR_URL):
     """Adds a document object to the solr index.
 
     This function is for use with the update_index command. It's slightly
@@ -26,7 +26,7 @@ def add_or_update_doc_object(doc):
     this is only used by the update_index command, and we want to query and
     build the SearchDocument objects in the task, not in its caller.
     """
-    si = sunburnt.SolrInterface(settings.SOLR_URL, mode='w')
+    si = sunburnt.SolrInterface(solr_url, mode='w')
     try:
         search_doc = SearchDocument(doc)
         si.add(search_doc)
