@@ -1,32 +1,6 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-#  Under Sections 7(a) and 7(b) of version 3 of the GNU Affero General Public
-#  License, that license is supplemented by the following terms:
-#
-#  a) You are required to preserve this legal notice and all author
-#  attributions in this program and its accompanying documentation.
-#
-#  b) You are prohibited from misrepresenting the origin of any material
-#  within this covered work and you are required to mark in reasonable
-#  ways how any modified versions differ from the original version.
-
-
 import sys
-sys.path.append('/var/www/court-listener/alert')
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
 from django.core.management import setup_environ
@@ -38,15 +12,14 @@ from lib.string_utils import clean_string
 from lib.string_utils import harmonize
 from lib.string_utils import titlecase
 from optparse import OptionParser
-import re
 
 
 def link_fixer(link):
-    '''Fixes the errors in a link
+    """Fixes the errors in a link
 
     Orig:  http://bulk.resource.org/courts.gov/c/US/819/996.F2d.311.html
     Fixed: http://bulk.resource.org/courts.gov/c/F2/996/996.F2d.311.html
-    '''
+    """
     # Very crude and lazy replacement of US with F2
     link_parts = link.split('US')
     fixed = 'F2'.join(link_parts)
@@ -90,7 +63,6 @@ def main():
         print "*******************************************"
 
     return cleaner(simulate, verbose)
-    exit(0)
 
 
 if __name__ == '__main__':

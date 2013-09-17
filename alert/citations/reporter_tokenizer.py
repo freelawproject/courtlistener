@@ -5,19 +5,40 @@
 # URL: <http://nltk.sourceforge.net>
 
 import re
+from alert.citations.constants import EDITIONS, VARIATIONS_ONLY
 
-# List of Federal Reporters
-REPORTERS = ["U.S.", "U. S.", "S. Ct.", "L. Ed. 2d", "L. Ed.", "F.3d",
-             "F.2d", "F. Supp. 2d", "F. Supp.", "F.", "F.R.D.", "B.R.",
-             "Vet. App.", "M.J.", "Fed. Cl.", "Ct. Int'l Trade", "T.C."]
+# We need to build a REGEX that has all the variations and the reporters in order from longest to shortest.
+REGEX_LIST = EDITIONS.keys() + VARIATIONS_ONLY.keys()
+REGEX_LIST.sort(key=len, reverse=True)
+REGEX_STR = '|'.join(map(re.escape, REGEX_LIST))
+REPORTER_RE = re.compile("(%s)" % REGEX_STR)
 
-REGEX = "|".join(map(re.escape, REPORTERS))
 
-REPORTER_RE = re.compile("(%s)" % REGEX)
+def normalize_variation(string):
+    """Gets the best possible canonicalization of a variant spelling of a reporter.
+
+    Variations map to lists of one or more result, and we need to figure out which is best. Usually, this can be
+    accomplished using the year of the item.
+    """
+    if string in VARIATIONS_ONLY.keys():
+        if len(VARIATIONS_ONLY[string]) == 1:
+            # Simple case
+            return VARIATIONS_ONLY[string][0]
+        else:
+            # Hard case, resolve the variation or return as is.
+            # TODO: This must be fixed or else all resolutionsn are resolved the same way --> BAD!
+            #       Once fixed, it will probably need to be removed from the tokenizer, and moved
+            #       down the pipeline.
+            return VARIATIONS_ONLY[string][0]
+    else:
+        # Not a variant
+        return string
+
+
 
 
 def tokenize(text):
-    '''Tokenize text using regular expressions in the following steps:
+    """Tokenize text using regular expressions in the following steps:
          -Split the text by the occurrences of patterns which match a federal
           reporter, including the reporter strings as part of the resulting list.
          -Perform simple tokenization (whitespace split) on each of the non-reporter
@@ -25,14 +46,15 @@ def tokenize(text):
 
        Example:
        >>>tokenize('See Roe v. Wade, 410 U. S. 113 (1973)')
-       ['See', 'Roe', 'v.', 'Wade,', '410', 'U. S.', '113', '(1973)']
-    '''
+       ['See', 'Roe', 'v.', 'Wade,', '410', 'U.S.', '113', '(1973)']
+    """
     strings = REPORTER_RE.split(text)
     words = []
     for string in strings:
-        if string in REPORTERS:
+        if string in EDITIONS.keys() + VARIATIONS_ONLY.keys():
             words.append(string)
         else:
+            # Normalize spaces
             words.extend(_tokenize(string))
     return words
 

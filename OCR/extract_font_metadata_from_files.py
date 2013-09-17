@@ -32,11 +32,11 @@ import subprocess
 
 DEVNULL = open('/dev/null', 'w')
 def inspect(dir_name):
-    '''Get font information from PDFs.
-    
-    Recursively iterate over all the pdfs in a directory. For each found, 
-    extract the font information and throw it in a dictionary with a count. Sort 
-    the dict; print it out.'''
+    """Get font information from PDFs.
+
+    Recursively iterate over all the pdfs in a directory. For each found,
+    extract the font information and throw it in a dictionary with a count. Sort
+    the dict; print it out."""
 
     pdfs = []
     for r, d, f in os.walk(dir_name):

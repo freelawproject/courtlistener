@@ -1,8 +1,8 @@
 import os
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 import sys
-sys.path.append("/var/www/court-listener")
-sys.path.append('/var/www/court-listener/alert')
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 from juriscraper.lib.parse_dates import parse_dates
 from alert.lib.string_utils import anonymize
@@ -22,9 +22,9 @@ from urlparse import urljoin
 BROWSER = 'firefox'
 
 def add_case(case):
-    '''Add the case to the database.
+    """Add the case to the database.
 
-    '''
+    """
     simulate = False
     # Get the court
     court = Court.objects.get(courtUUID=case.court)
@@ -54,7 +54,7 @@ def add_case(case):
         doc.save()
 
 def merge_cases_simple(case, target_id):
-    '''Add `case` to the database, merging with target_id
+    """Add `case` to the database, merging with target_id
 
      Merging is done along the following algorithm:
      - SHA1 is preserved from CL
@@ -63,7 +63,7 @@ def merge_cases_simple(case, target_id):
      - The source field for the document is changed to CR (court and PRO)
      - The west citation is added to CL's DB from PRO
      - Block status is determined according to the indexing pipeline
-    '''
+    """
     simulate = False
     print "Target_id: %s" % target_id
     doc = Document.objects.get(documentUUID=target_id)
@@ -82,11 +82,11 @@ def merge_cases_simple(case, target_id):
         doc.save()
 
 def merge_cases_complex(case, target_ids):
-    '''Merge data from PRO with multiple cases that seem to be a match.
+    """Merge data from PRO with multiple cases that seem to be a match.
 
     The process here is a conservative one. We take *only* the information
     from PRO that is not already in CL in any form, and add only that.
-    '''
+    """
     for target_id in target_ids:
         simulate = False
         doc = Document.objects.get(documentUUID=target_id)
@@ -102,9 +102,9 @@ def merge_cases_complex(case, target_ids):
 
 
 def find_same_docket_numbers(case, candidates):
-    '''Identify the candidates that have the same docket numbers as the case.
+    """Identify the candidates that have the same docket numbers as the case.
 
-    '''
+    """
     new_docket_number = case.docket_number
     same_docket_numbers = []
     for candidate in candidates:
@@ -114,9 +114,9 @@ def find_same_docket_numbers(case, candidates):
 
 
 def filter_by_stats(candidates, stats):
-    '''Looks at the candidates and their stats, and filters out obviously
+    """Looks at the candidates and their stats, and filters out obviously
     different candidates.
-    '''
+    """
     filtered_stats = stats[0:2]
     filtered_stats.append([])
     filtered_stats.append([])
@@ -142,7 +142,7 @@ def filter_by_stats(candidates, stats):
 
 
 def need_dup_check_for_date_and_court(case):
-    '''Checks whether a case needs duplicate checking.
+    """Checks whether a case needs duplicate checking.
 
     Performs a simple check for whether we have scraped any documents for the
     date and court specified, using known dates of when scraping started at a
@@ -178,7 +178,7 @@ def need_dup_check_for_date_and_court(case):
     We'll use these values to filter out cases that can't possibly have a dup.
 
     Returns True if a duplicate check should be run. Else: False.
-    '''
+    """
 
     earliest_dates = {
         'ca1': datetime.datetime(1993, 1, 5),
@@ -210,19 +210,19 @@ def need_dup_check_for_date_and_court(case):
 
 
 class Case(object):
-    '''Represents a case within Resource.org'''
+    """Represents a case within Resource.org"""
     def __init__(self, base_url, url_element, case_date, sha1_hash):
         print "Making a case object"
         super(Case, self).__init__()
         # Non-core data attributes
         self.url_element = url_element
         self.tree = fromstring(urllib2.urlopen(urljoin(base_url, url_element.get('href'))).read())
-        self.court_fix_dict = self._load_fix_file('/var/www/court-listener/Resource.org/logs/f3_court_fix_file.txt')
-        self.date_fix_dict = self._load_fix_file('/var/www/court-listener/Resource.org/logs/f3_date_fix_file.txt')
-        self.case_name_dict = self._load_fix_file('/var/www/court-listener/Resource.org/logs/f3_short_case_name_fix_file.txt')
-        self.court_fix_file = open('/var/www/court-listener/Resource.org/logs/f3_court_fix_file.txt', 'a')
-        self.date_fix_file = open('/var/www/court-listener/Resource.org/logs/f3_date_fix_file.txt', 'a')
-        self.case_name_fix_file = open('/var/www/court-listener/Resource.org/logs/f3_short_case_name_fix_file.txt', 'a')
+        self.court_fix_dict = self._load_fix_file('%s/Resource.org/logs/f3_court_fix_file.txt' % INSTALL_ROOT)
+        self.date_fix_dict = self._load_fix_file('%s/Resource.org/logs/f3_date_fix_file.txt' % INSTALL_ROOT)
+        self.case_name_dict = self._load_fix_file('%s/Resource.org/logs/f3_short_case_name_fix_file.txt' % INSTALL_ROOT)
+        self.court_fix_file = open('%s/Resource.org/logs/f3_court_fix_file.txt' % INSTALL_ROOT, 'a')
+        self.date_fix_file = open('%s/Resource.org/logs/f3_date_fix_file.txt' % INSTALL_ROOT, 'a')
+        self.case_name_fix_file = open('%s/Resource.org/logs/f3_short_case_name_fix_file.txt' % INSTALL_ROOT, 'a')
         self.saved_court = ''
 
         # Core data attributes
@@ -251,7 +251,7 @@ class Case(object):
         return '\n'.join(out) + '\n'
 
     def _load_fix_file(self, location):
-        '''Loads a fix file into memory so it can be accessed efficiently.'''
+        """Loads a fix file into memory so it can be accessed efficiently."""
         fix_file = open(location, 'r')
         fix_dict = {}
         for line in fix_file:
@@ -262,12 +262,12 @@ class Case(object):
         return fix_dict
 
     def _check_fix_list(self, sha1, fix_dict):
-        '''Given a sha1, return the correction for a case. Return false if no values.
+        """Given a sha1, return the correction for a case. Return false if no values.
 
         Corrections are strings that the parser can interpret as needed. Items are
         written to this file the first time the cases are imported, and this file
         can be used to import F3 into later systems.
-        '''
+        """
         try:
             return fix_dict[sha1].strip()
         except KeyError:
@@ -376,7 +376,7 @@ class Case(object):
     def _get_case_date(self, case_date):
         raw_date = case_date.find('a')
         try:
-            if raw_date != None:
+            if raw_date is not None:
                 date_text = raw_date.text
                 try:
                     case_date = datetime.datetime(*time.strptime(date_text, "%B, %Y")[0:5])
@@ -519,7 +519,7 @@ class Case(object):
 
 
 class Volume(object):
-    '''Represents a volume within Resource.org'''
+    """Represents a volume within Resource.org"""
     def __init__(self, url):
         super(Volume, self).__init__()
         self.url = url
@@ -557,7 +557,7 @@ class Volume(object):
 
 
 class Corpus(object):
-    '''Contains a collection of Volumes'''
+    """Contains a collection of Volumes"""
     def __init__(self, url):
         super(Corpus, self).__init__()
         self.url = url

@@ -1,32 +1,6 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-#  Under Sections 7(a) and 7(b) of version 3 of the GNU Affero General Public
-#  License, that license is supplemented by the following terms:
-#
-#  a) You are required to preserve this legal notice and all author
-#  attributions in this program and its accompanying documentation.
-#
-#  b) You are prohibited from misrepresenting the origin of any material
-#  within this covered work and you are required to mark in reasonable
-#  ways how any modified versions differ from the original version.
-
-
 import sys
-sys.path.append('/var/www/court-listener/alert')
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
 from django.core.management import setup_environ
@@ -37,13 +11,13 @@ from optparse import OptionParser
 
 
 def fixer(simulate=False, verbose=False):
-    '''If an alert is set up to query ALL courts with them individually listed,
-    simply strip out all the court values.'''
+    """If an alert is set up to query ALL courts with them individually listed,
+    simply strip out all the court values."""
     alerts = Alert.objects.filter(alertText__contains='court_all')
 
     for alert in alerts:
         if verbose:
-            print "Fixing alert %s" % (alert)
+            print "Fixing alert %s" % alert
             print "  Old query: %s" % alert.alertText
         q = alert.alertText
         q_parts = q.split('&')
@@ -74,7 +48,6 @@ def main():
         print "*******************************************"
 
     return fixer(simulate, verbose)
-    exit(0)
 
 if __name__ == '__main__':
     main()

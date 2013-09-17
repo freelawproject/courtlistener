@@ -276,7 +276,7 @@ class SolrInterface(object):
 
 
 def grouper(iterable, n):
-    "grouper('ABCDEFG', 3) --> [['ABC'], ['DEF'], ['G']]"
+    """grouper('ABCDEFG', 3) --> [['ABC'], ['DEF'], ['G']]"""
     i = iter(iterable)
     g = list(islice(i, 0, n))
     while g:

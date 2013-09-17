@@ -9,54 +9,64 @@
     <script src="{{ STATIC_URL }}js/g.line.js"></script>
     <script src="{{ STATIC_URL }}js/jquery.ba-hashchange.min.js"></script>
     <script type="text/javascript">
-      var sorted_courts = {{ sorted_courts|safe}};
-      var data = {{ coverage_data|safe }};
+        var sorted_courts = {{ sorted_courts|safe}};
+        var data = {{ coverage_data|safe }};
     </script>
     <script src="{{ STATIC_URL }}js/coverage.js"></script>
 {% endblock %}
 
 {% block head %}
-    <link rel="stylesheet" href="{{ STATIC_URL }}css/coverage.css" type="text/css" media="screen, projection" />
+    <link rel="stylesheet" href="{{ STATIC_URL }}css/coverage.css" type="text/css" media="screen, projection"/>
 {% endblock %}
 
 {% block sidebar %}
     <div id="nav" class="span-5 append-1">
-      <ul>
-      </ul>
+        <ul>
+        </ul>
     </div>
 {% endblock %}
 
 {% block content %}
     <div class="span-18 last">
         <h3 class="bottom" id="graph-header"></h3>
+
         <div id="graph"></div>
 
         <div>
             <hr class="space">
             <h4 class="bottom">General Notes</h4>
+
             <p>Charts indicate the number of cases that we have in our database for
-            a given year. These numbers include both precedential and non-precedential
-            opinions for any given court.
+                a given year. These numbers include both precedential and non-precedential
+                opinions for any given court.
             </p>
+
             <p>We have sourced our data from <a href="bulk.resource.org/courts.gov/">
-            Resource.org</a> and directly from the court websites, with the following
-            notes:</p>
+                Resource.org</a>, a donation from Lawbox LLC. and directly from the
+                court websites, with the following notes:</p>
             <ul>
                 <li>Our coverage includes the majority of the Supreme Court record.
-                We sourced this from Resource.org, which most people consider
-                complete for 1754 to 2004. Unfortunately, we have identified some
-                small gaps, especially around the very beginning of this corpus.</li>
-                <li>F3 and F2 from Resource.org are included with no known gaps for
-                for the years 1950-2007.</li>
+                    We sourced this from Resource.org and Lawbox LLC., which most people
+                    consider complete for 1754 to 2004. Unfortunately, we have identified some
+                    small gaps, especially around the very beginning of this corpus.
+                </li>
+                <li>F.3d and F.2d from Resource.org and Lawbox LLC. are included with no known gaps for
+                    for the years 1950-2007.
+                </li>
                 <li>Starting in 2010 we have scraped opinions from many Federal
-                Court websites.</li>
+                    Court websites.
+                </li>
                 <li>We have scraped the historical content off many court
-                websites, merging it with F3 where appropriate.</li>
+                    websites, merging it with F3 where appropriate.
+                </li>
             </ul>
             <p>We believe that our coverage of the Supreme Court and F3 is the best
-            available on the open Web, but we admit we have some gaps in several of
-            our other courts. If you have questions or would like more detail,
-            please let us know.</p>
+                available on the open Web, but we admit we have some gaps in several of
+                our other courts. If you have questions or would like more detail,
+                please let us know.</p>
+
+            <p>For more information about our jurisdictions, see <a href="/api/jurisdictions/">our jurisdiction page</a>.
+            </p>
         </div>
     </div>
 {% endblock %}

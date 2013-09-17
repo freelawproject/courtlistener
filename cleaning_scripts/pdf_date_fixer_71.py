@@ -1,31 +1,7 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-#  Under Sections 7(a) and 7(b) of version 3 of the GNU Affero General Public
-#  License, that license is supplemented by the following terms:
-#
-#  a) You are required to preserve this legal notice and all author
-#  attributions in this program and its accompanying documentation.
-#
-#  b) You are prohibited from misrepresenting the origin of any material
-#  within this covered work and you are required to mark in reasonable
-#  ways how any modified versions differ from the original version.
-
+import os
 import sys
-sys.path.append('/var/www/court-listener/alert')
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 import settings
 from django.core.management import setup_environ
@@ -33,10 +9,10 @@ setup_environ(settings)
 
 from alert.search.models import Document
 from optparse import OptionParser
-import gc, errno, os, os.path, string, time
+import gc, errno, string, time
 
 def queryset_generator(queryset, chunksize=100):
-    '''
+    """
     from: http://djangosnippets.org/snippets/1949/
     Iterate over a Django Queryset ordered by the primary key
 
@@ -46,7 +22,7 @@ def queryset_generator(queryset, chunksize=100):
     classes.
 
     Note that the implementation of the iterator does not support ordered query sets.
-    '''
+    """
     documentUUID = 0
     last_pk = queryset.order_by('-documentUUID')[0].documentUUID
     queryset = queryset.order_by('documentUUID')
@@ -72,17 +48,17 @@ def update_date(doc, simulate):
     time.sleep(1)
     # take the doc, check its date_filed field, make a hardlink to the PDF
     # location, and update the database
-    if doc.date_filed != None:
+    if doc.date_filed is not None:
         date_filed = doc.date_filed
     else:
         # break from this function.
         print "\n***No date_filed value for doc: " + str(doc.documentUUID) + ". Punting.***\n"
-        return(1)
+        return 1
     if doc.local_path != "":
         local_path = doc.local_path
     else:
         print "\n***No local_path value for doc: " + str(doc.documentUUID) + ". Punting.***\n"
-        return(2)
+        return 2
     root = settings.MEDIA_ROOT
 
     # old link

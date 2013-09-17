@@ -22,7 +22,9 @@
                 {% block h2 %}<h2>Sign in</h2>{% endblock %}
                 {% if form.errors %}
                     <div class="span-4 error">
-                        <p class="bottom">Sorry, that is not a valid username or password.</p>
+                        {%  for error in form.non_field_errors %}
+                        <p class="bottom">{{ error|safe }}</p>
+                        {% endfor %}
                     </div>
                 {% endif %}
 
@@ -38,7 +40,7 @@
 
                     </p>
                     <input type="hidden" name="next" value="{{ next|escape }}">
-                    <button type="submit" class="button last">Sign in</button>
+                    <button type="submit" class="button last">Sign In</button>
                 </form>
                 <p class="bottom"><a href="/reset-password/">Forgot username/password?</a></p>
                 <p><a href="/register/">Need to register?</a></p>

@@ -37,7 +37,7 @@ def delete_old_accounts(verbose, simulate):
     two_months_ago = (datetime.date.today() - datetime.timedelta(60))
 
     # get the accounts
-    unconfirmed_ups = UserProfile.objects.filter(emailConfirmed=False,
+    unconfirmed_ups = UserProfile.objects.filter(email_confirmed=False,
         user__date_joined__lte=two_months_ago.isoformat())
 
     # some redundant code here, but emphasis is on getting it right.
@@ -90,7 +90,7 @@ def notify_unconfirmed(verbose, simulate):
     a_week_ago = (datetime.date.today() - datetime.timedelta(7))
 
     # get the accounts
-    unconfirmed_ups = UserProfile.objects.filter(emailConfirmed=False,
+    unconfirmed_ups = UserProfile.objects.filter(email_confirmed=False,
         key_expires__lte=a_week_ago)
 
     for up in unconfirmed_ups:
@@ -112,10 +112,10 @@ def notify_unconfirmed(verbose, simulate):
             user = up.user
             # Build and save a new activation key for the account.
             salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-            activationKey = hashlib.sha1(salt + user.username).hexdigest()
+            activation_key = hashlib.sha1(salt + user.username).hexdigest()
             key_expires = datetime.datetime.today() + datetime\
                     .timedelta(5)
-            up.activationKey = activationKey
+            up.activation_key = activation_key
             up.key_expires = key_expires
             up.save()
 
@@ -133,7 +133,7 @@ Thanks for using our site,\n\nThe CourtListener team\n\n\n\
 -------------------\nFor questions or comments, please see our contact page, \
 http://courtlistener.com/contact/." % (
                 user.username,
-                up.activationKey)
+                up.activation_key)
             send_mail(email_subject,
                       email_body,
                       'no-reply@courtlistener.com',
@@ -157,13 +157,13 @@ def generate_keys_expiration_dates():
 def find_legit():
     # find accounts that have alerts, and mark them as confirmed.
     # this is a one-off script used to grandfather-in old accounts
-    real_users = UserProfile.objects.filter(emailConfirmed=False)
+    real_users = UserProfile.objects.filter(email_confirmed=False)
 
     for user in real_users:
         if user.alert.count() > 0:
             print "User \"" + user.user.username + \
                 "\" is toggled to confirmed."
-            user.emailConfirmed = True
+            user.email_confirmed = True
             user.save()
 
     return 0

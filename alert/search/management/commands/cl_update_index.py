@@ -44,11 +44,14 @@ class Command(BaseCommand):
                     default=False,
                     help='Take action on everything in the database'),
         make_option('--query',
-                    action='store_true',
                     dest='query',
-                    default=False,
                     help=('Take action on documents fulfilling a query. Queries should be'
                           ' formatted as Python dicts such as: "{\'court_id\':\'haw\'}"')),
+        make_option('--solr-url',
+                    dest='solr_url',
+                    default=settings.SOLR_URL,
+                    help=('When swapping cores, it can be valuable to use a temporary Solr URL, overriding the default '
+                          'value that\'s in the settings, e.g., http://127.0.0.1:8983/solr/swap_core')),
         make_option('--datetime',
                     action='store_true',
                     dest='datetime',
@@ -104,8 +107,8 @@ class Command(BaseCommand):
             # Make a search doc, and add it to the index
             if self.verbosity >= 2:
                 self.stdout.write('Indexing document %s' % doc.pk)
-            if doc.court.in_use == True:
-                subtasks.append(add_or_update_doc_object.subtask((doc,)))
+            if doc.court.in_use:
+                subtasks.append(add_or_update_doc_object.subtask((doc, self.solr_url)))
                 processed_count += 1
             else:
                 # The document is in an unused court
@@ -122,9 +125,10 @@ class Command(BaseCommand):
                 # The jobs finished - clean things up for the next round
                 subtasks = []
 
-                if (processed_count % 50000 == 0) or last_document:
-                    # Do a commit every 50000 items, for good measure.
-                    self.si.commit()
+            if (processed_count % 50000 == 0) or last_document:
+                # Do a commit every 50000 items, for good measure.
+                self.stdout.write("...running commit command...")
+                self.si.commit()
 
             self.stdout.write("\rProcessed %d of %d.   Not in use: %d" %
                               (processed_count, count, not_in_use))
@@ -143,7 +147,7 @@ class Command(BaseCommand):
         """
         Deletes all documents from the database.
         """
-        count = self.si.raw_query({'q': '*:*'}).count()
+        count = self.si.raw_query(**{'q': '*:*'}).count()
 
         if self._proceed_with_deletion(count):
             self.stdout.write('Removing all documents from your index because '
@@ -200,7 +204,7 @@ class Command(BaseCommand):
         qs = Document.objects.filter(time_retrieved__gt=dt)
         docs = queryset_generator(qs)
         count = qs.count()
-        self._chunk_queryset_into_tasks(docs, count, chunksize=1000)
+        self._chunk_queryset_into_tasks(docs, count)
 
     @print_timing
     def add_or_update_all(self):
@@ -212,7 +216,7 @@ class Command(BaseCommand):
         self.stdout.write("Adding or updating all documents...\n")
         docs = queryset_generator(Document.objects.all())
         count = Document.objects.all().count()
-        self._chunk_queryset_into_tasks(docs, count, chunksize=1000)
+        self._chunk_queryset_into_tasks(docs, count)
 
     @print_timing
     def optimize(self):
@@ -227,7 +231,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.verbosity = int(options.get('verbosity', 1))
-        self.si = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
+        self.solr_url = options.get('solr_url')
+        self.si = sunburnt.SolrInterface(options.get('solr_url'), mode='rw')
 
         if options.get('datetime'):
             try:
@@ -251,7 +256,7 @@ class Command(BaseCommand):
                 self.add_or_update_all()
             elif options.get('datetime'):
                 self.add_or_update_by_datetime(dt)
-            elif option.get('query'):
+            elif options.get('query'):
                 self.stderr.write("Updating by query not yet implemented.")
                 sys.exit(1)
             elif options.get('document'):

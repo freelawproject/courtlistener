@@ -2,7 +2,8 @@ import os
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 
 import sys
-sys.path.append("/var/www/court-listener")
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
 
 from django import db
 from django.conf import settings
@@ -35,7 +36,7 @@ def load_stopwords():
     an array.
     """
     #  /usr/local/sphinx/bin/indexer -c sphinx-scraped-only.conf scraped-document --buildstops word_freq.txt 5000 --buildfreqs
-    stopwords_file = open('/var/www/court-listener/alert/resource_org/word_freq.5000.txt', 'r')
+    stopwords_file = open('%s/alert/resource_org/word_freq.5000.txt' % INSTALL_ROOT, 'r')
     stopwords = []
     for word in stopwords_file:
         try:
@@ -56,10 +57,9 @@ def make_solr_query(content, caseName, court, date_filed, num_q_words=5, DEBUG=F
     eliminated. After elimination, if no words are left, a query is made from
     the case name rather than the content.
     """
-    main_params = {}
-    main_params['fq'] = ['court_exact:%s' % court,
-                         'dateFiled:%s' % build_date_range(date_filed)]
-    main_params['rows'] = 100
+    main_params = {'fq': ['court_exact:%s' % court,
+                          'dateFiled:%s' % build_date_range(date_filed)],
+                   'rows': 100}
     stopwords = load_stopwords()
     words = content.split()
     length = len(words)
@@ -228,7 +228,7 @@ def write_dups(source, dups, DEBUG=False):
     This function receives a queryset and then writes out the values to a log.
     """
     log = open('dup_log.txt', 'a')
-    if dups[0] != None:
+    if dups[0] is not None:
         log.write(str(source.pk))
         print "  Logging match: " + str(source.pk),
         for dup in dups:

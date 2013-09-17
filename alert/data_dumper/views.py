@@ -16,22 +16,22 @@ from datetime import date
 
 
 def dump_index(request):
-    '''Shows an index page for the dumps.'''
-    courts = Court.objects.filter(in_use=True).order_by('start_date')
+    """Shows an index page for the dumps."""
+    court_count = Court.objects.exclude(jurisdiction='T').count()  # Non-testing courts
     try:
         dump_size = size(os.path.getsize(os.path.join(DUMP_DIR, 'all.xml.gz')))
     except os.error:
         # Happens when the file is unaccessible or doesn't exist. An estimate.
         dump_size = '3.2GB'
     return render_to_response('dumps/dumps.html',
-                              {'courts': courts,
+                              {'court_count': court_count,
                                'dump_size': dump_size,
                                'private': False},
                               RequestContext(request))
 
 
 def serve_or_gen_dump(request, court, year=None, month=None, day=None):
-    '''Serves the dump file to the user, generating it if needed.'''
+    """Serves the dump file to the user, generating it if needed."""
     if year is None:
         if court != 'all':
             # Sanity check
