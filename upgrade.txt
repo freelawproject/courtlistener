@@ -3,6 +3,7 @@ This file contains notes for upgrades when special instructions are necessary. I
 hg pull -u
 sudo -u www-data $INSTALL_ROOT/alert/manage.py collectstatic
 manage.py migrate
+sudo service celeryd restart
 
 is all that's necessary. In the case that special instructions are needed, we will attempt to put them here, with the
 most recent at the top.
@@ -39,6 +40,14 @@ LAWBOX PROJECT
    TODO: manage.py dumpdata search.court --indent=2 | tee search/fixtures/initial_data.json (and merge any live changes
          back into this data structure)
    TODO: Sort out the new court picking interface.
+
+
+2013-09-17:
+ - The donation system has been fully deployed. To make the donation system work, you need to set up the following keys
+   after getting them from the various payment providers. These need to go in your 05-private.py file:
+
+
+
 
 2013-09-16:
  - OVERVIEW: This update contains a number of large fixes, which will alter your database in a number of ways. It lands
