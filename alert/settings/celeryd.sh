@@ -6,8 +6,15 @@ ENV_PYTHON="python"
 # the folling line, substituting in the path to your virtual environment.
 #ENV_PYTHON="/path/to/my/virtualenv/bin/python"
 
+# Get the INSTALL_ROOT
+. /etc/courtlistener
+if [ -z $INSTALL_ROOT ]; then
+  echo "INSTALL_ROOT is not set. Please set it in /etc/courtlistener."
+  exit 1
+fi
+
 # How to call "manage.py celeryd_multi"
-CELERYD_MULTI="$ENV_PYTHON $CL_INSTALL_ROOT/alert/manage.py celeryd_multi"
+CELERYD_MULTI="$ENV_PYTHON $INSTALL_ROOT/alert/manage.py celeryd_multi"
 
 # Name of the celery config module.
 CELERY_CONFIG_MODULE="celeryconfig"

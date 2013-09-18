@@ -108,7 +108,7 @@ class Command(BaseCommand):
             if self.verbosity >= 2:
                 self.stdout.write('Indexing document %s' % doc.pk)
             if doc.court.in_use:
-                subtasks.append(add_or_update_doc_object.subtask((doc,)))
+                subtasks.append(add_or_update_doc_object.subtask((doc, self.solr_url)))
                 processed_count += 1
             else:
                 # The document is in an unused court
@@ -204,7 +204,7 @@ class Command(BaseCommand):
         qs = Document.objects.filter(time_retrieved__gt=dt)
         docs = queryset_generator(qs)
         count = qs.count()
-        self._chunk_queryset_into_tasks(docs, count, chunksize=1000)
+        self._chunk_queryset_into_tasks(docs, count)
 
     @print_timing
     def add_or_update_all(self):
@@ -216,7 +216,7 @@ class Command(BaseCommand):
         self.stdout.write("Adding or updating all documents...\n")
         docs = queryset_generator(Document.objects.all())
         count = Document.objects.all().count()
-        self._chunk_queryset_into_tasks(docs, count, chunksize=1000)
+        self._chunk_queryset_into_tasks(docs, count)
 
     @print_timing
     def optimize(self):
@@ -231,6 +231,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.verbosity = int(options.get('verbosity', 1))
+        self.solr_url = options.get('solr_url')
         self.si = sunburnt.SolrInterface(options.get('solr_url'), mode='rw')
 
         if options.get('datetime'):
@@ -255,7 +256,7 @@ class Command(BaseCommand):
                 self.add_or_update_all()
             elif options.get('datetime'):
                 self.add_or_update_by_datetime(dt)
-            elif option.get('query'):
+            elif options.get('query'):
                 self.stderr.write("Updating by query not yet implemented.")
                 sys.exit(1)
             elif options.get('document'):

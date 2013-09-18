@@ -104,7 +104,7 @@
   <!--mlr
   <dataDir>${solr.data.dir:}</dataDir>
   mlr-->
-  <dataDir>${CL_INSTALL_ROOT}/Solr/data/</dataDir>
+  <dataDir>${INSTALL_ROOT}/Solr/data/</dataDir>
 
 
   <!-- The DirectoryFactory to use for indexes.

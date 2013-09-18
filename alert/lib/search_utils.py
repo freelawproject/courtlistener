@@ -298,7 +298,25 @@ def get_court_start_year(conn, court):
 
 
 def build_coverage_query(court, start_year):
-    params = {'facet': 'true', 'facet.range': 'dateFiled', 'facet.range.end': 'NOW/DAY', 'facet.range.gap': '+1YEAR',
-              'rows': 0, 'facet.range.start': '%d-01-01T00:00:00Z' % start_year,
-              'fq': ['court_exact:%s' % court.courtUUID], 'q': '*:*'}
+    params = {
+        'facet': 'true',
+        'facet.range': 'dateFiled',
+        'facet.range.start': '%d-01-01T00:00:00Z' % start_year,
+        'facet.range.end': 'NOW/DAY',
+        'facet.range.gap': '+1YEAR',
+        'rows': 0,
+        'fq': ['court_exact:%s' % court.courtUUID],
+        'q': '*:*'
+    }
+    return params
+
+
+def build_court_count_query():
+    """Build a query that returns the count of cases for all courts"""
+    params = {
+        'facet': 'true',
+        'facet.field': 'court_exact',
+        'rows': 0,
+        'q': '*:*',
+    }
     return params

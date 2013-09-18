@@ -31,7 +31,7 @@ class SearchDocument(object):
         except AttributeError:
             raise InvalidDocumentError("Unable to save to index due to missing Citation object.")
         except NoReverseMatch:
-            raise InvalidDocumentError("Unable to save to index due to missing absolute url.")
+            raise InvalidDocumentError("Unable to save to index due to missing absolute_url.")
         self.judge = doc.judges
         self.suitNature = doc.nature_of_suit
         self.docketNumber = doc.citation.docket_number
@@ -42,7 +42,13 @@ class SearchDocument(object):
         self.download_url = doc.download_URL
         self.local_path = unicode(doc.local_path)
         self.citation = make_citation_string(doc)
-        self.caseNumber = '%s, %s' % (self.citation, doc.citation.docket_number)
+        # Assign the docket number and/or the citation to the caseNumber field
+        if doc.citation and doc.citation.docket_number:
+            self.caseNumber = '%s, %s' % (self.citation, doc.citation.docket_number)
+        elif doc.citation:
+            self.caseNumber = self.citation
+        elif doc.citation.docket_number:
+            self.caseNumber = self.citation.docket_number
 
         # Load the document text using a template for cleanup and concatenation
         text_template = loader.get_template('search/indexes/text.txt')

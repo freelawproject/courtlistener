@@ -1,3 +1,6 @@
+2013-09-17:
+Re-index to add citation field. 905403 docs, 170 minutes.
+
 2013-06-27:
 Re-index to add citation counts, judges and suitNature. 894,000 docs, about
 2-3 hours.

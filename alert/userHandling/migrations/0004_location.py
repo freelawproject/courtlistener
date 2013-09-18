@@ -9,6 +9,7 @@ class Migration(DataMigration):
     def forwards(self, orm):
         """Split the location field into city/State pairs"""
         for up in orm.UserProfile.objects.filter(location__isnull=False).exclude(location=''):
+            print 'location is: %s' %  up.location
             up.city, up.state = up.location.split(',')
             up.state = up.state.upper().strip()
             up.city = up.city.title().strip()

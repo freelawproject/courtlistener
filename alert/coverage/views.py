@@ -57,6 +57,7 @@ def coverage_graph(request):
     courts = Court.objects.filter(in_use=True)
     data = {}
     grand_total = 0
+    non_empty_courts = []  # To make sure a court with no items doesn't appear in the list
     for court in courts:
         start_year = search_utils.get_court_start_year(conn, court)
         years = {}
@@ -68,14 +69,16 @@ def coverage_graph(request):
         for date_string, count in counts:
             years[date_string[:7]] = count
             total_docs += count
-        data[court.pk] = {'years': years,
-                          'total_docs': total_docs }
-        grand_total += total_docs
+        if total_docs > 0:
+            non_empty_courts.append(court)
+            data[court.pk] = {'years': years,
+                              'total_docs': total_docs}
+            grand_total += total_docs
     data[u'all'] = {'years': calculate_grand_totals(data),
                     'total_docs': grand_total}
     coverage_data = json.dumps(data)
 
-    court_dicts = build_court_dicts(grand_total, courts)
+    court_dicts = build_court_dicts(grand_total, non_empty_courts)
     courts_json = json.dumps(court_dicts)
     return render_to_response(
         'coverage/coverage_graph.html',

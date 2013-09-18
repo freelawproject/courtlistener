@@ -10,7 +10,6 @@ execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 
 from django.conf import settings
-from alert.search.models import Court
 from alert.citations.constants import REPORTERS
 from alert.citations.find_citations import strip_punct
 from alert.lib import sunburnt
@@ -20,9 +19,6 @@ from datetime import date, datetime
 DEBUG = True
 
 QUERY_LENGTH = 10
-
-# Store court values to avoid repeated DB queries
-courts = Court.objects.all().values('citation_string', 'courtUUID')
 
 
 def build_date_range(start_year, end_year):
@@ -87,25 +83,22 @@ def match_citation(citation, citing_doc):
     # TODO: Create shared solr connection to use across multiple citations/documents
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     main_params = {'fq': []}
-    # Set up filter paramters
+    # Set up filter parameters
+    start_year = 1750
+    end_year = date.today().year
     if citation.year:
         start_year = end_year = citation.year
     else:
-        start_year = 1754  # Earliest case in the db
-        end_year = date.today().year
-        start_year, end_year = REPORTER_DATES[citation.reporter]
+        if citation.lookup_index:
+            # Some cases can't be disambiguated.
+            start_year, end_year = [d.year for d in REPORTERS[citation.canonical_reporter][citation.lookup_index]['editions'][citation.reporter]]
         if citing_doc.date_filed:
             end_year = min(end_year, citing_doc.date_filed.year)
     date_param = 'dateFiled:%s' % build_date_range(start_year, end_year)
     main_params['fq'].append(date_param)
-    if not citation.court and citation.reporter in ["U.S.", "U. S."]:
-        citation.court = "SCOTUS"
     if citation.court:
-        for court in courts:
-            # Use startswith because citations are often missing final period, e.g. "2d Cir"
-            if court['citation_string'].startswith(citation.court):
-                court_param = 'court_exact:%s' % court['courtUUID']
-                main_params['fq'].append(court_param)
+        court_param = 'court_exact:%s' % citation.court
+        main_params['fq'].append(court_param)
 
     # Non-precedential documents shouldn't be cited
     main_params['fq'].append('status:Precedential')
@@ -117,7 +110,7 @@ def match_citation(citation, citing_doc):
     if len(results) == 1:
         return results, True
     if len(results) > 1:
-        if citation.defendant: # Refine using defendant, if there is one
+        if citation.defendant:  # Refine using defendant, if there is one
             results = case_name_query(conn, main_params, citation, citing_doc)
         return results, True
 

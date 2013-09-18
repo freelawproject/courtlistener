@@ -34,7 +34,7 @@ def make_caption(doc):
     elif doc.citation.state_cite_regional:
         caption += ", %s" % doc.citation.state_cite_regional
     elif doc.citation.state_cite_one:
-        caption += ", %s" % doc.citataion.state_cite_one
+        caption += ", %s" % doc.citation.state_cite_one
     elif doc.citation.westlaw_cite and doc.citation.lexis_cite:
         # If both WL and LEXIS
         caption += ", %s, %s" % (doc.citation.westlaw_cite, doc.citation.lexis_cite)
@@ -50,7 +50,7 @@ def make_caption(doc):
     if doc.court.citation_string != 'SCOTUS':
         caption += re.sub(' ', '&nbsp;', doc.court.citation_string)
         caption += '&nbsp;'
-    caption += '%s)' % datetime.strftime(doc.date_filed, '%Y')
+    caption += '%s)' % doc.date_filed.isoformat().split('-')[0]  # b/c strftime f's up before 1900.
     return caption
 
 

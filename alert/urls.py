@@ -142,7 +142,7 @@ urlpatterns = patterns('',
     (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
 
     # Feeds
-    (r'^feed/(search)/$', search_feed()),  #lacks URL capturing b/c it will use GET queries.
+    (r'^feed/(search)/$', search_feed()),  # lacks URL capturing b/c it will use GET queries.
     (r'^feed/court/all/$', all_courts_feed()),
     (r'^feed/court/(?P<court>' + '|'.join(pacer_codes) + ')/$', court_feed()),
     (r'^feed/(?P<doc_id>.*)/cited-by/$', cited_by_feed()),

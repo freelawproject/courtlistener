@@ -3,7 +3,7 @@ from alert.lib import search_utils
 from alert.lib import sunburnt
 from alert.search.forms import SearchForm
 
-from django.conf import settings
+from alert import settings
 from django.contrib import messages
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.shortcuts import render_to_response
