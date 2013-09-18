@@ -55,7 +55,7 @@ def process_dwolla_transaction_status_callback(request):
                                       'are allowed.</h1>')
 
 
-def process_dwolla_payment(cd_donation_form, cd_profile_form, cd_user_form, test=True):
+def process_dwolla_payment(cd_donation_form, cd_profile_form, cd_user_form, test=settings.PAYMENT_TESTING_MODE):
     """Generate a redirect URL for the user, and shuttle them off"""
     data = {
         'key': settings.DWOLLA_APPLICATION_KEY,
