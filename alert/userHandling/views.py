@@ -80,7 +80,7 @@ http://courtlistener.com/contact/." % (
                 up.activation_key)
             send_mail(email_subject,
                       email_body,
-                      'no-reply@courtlistener.com',
+                      'CourtListener <noreply@courtlistener.com>',
                       [new_email])
 
             messages.add_message(request, messages.SUCCESS,
@@ -215,7 +215,11 @@ CourtListener.com. To activate your account, click this link within five days:\
 -------------------\n\
 For questions or comments, please see our contact page, \
 https://www.courtlistener.com/contact/." % (user.username, up.activation_key)
-                send_mail(email_subject, email_body, 'no-reply@courtlistener.com', [user.email])
+                send_mail(
+                    email_subject,
+                    email_body, 'CourtListener <noreply@courtlistener.com>',
+                    [user.email]
+                )
                 return HttpResponseRedirect('/register/success/?next=%s' % redirect_to)
         else:
             form = UserCreationFormExtended()
@@ -276,7 +280,7 @@ def confirmEmail(request, activation_key):
                                              user_profile.user.email))
     send_mail(email_subject,
               email_body,
-              'no-reply@courtlistener.com',
+              'CourtListener <noreply@courtlistener.com>',
               [a[1] for a in settings.ADMINS])
 
     return render_to_response('registration/confirm.html',
@@ -324,7 +328,7 @@ def request_email_confirmation(request):
                           "We're always happy to hear from you." % (user.username, up.activation_key))
             send_mail(email_subject,
                       email_body,
-                      'no-reply@courtlistener.com',
+                      'CourtListener <noreply@courtlistener.com>'
                       [user.email])
             return HttpResponseRedirect('/email-confirmation/success/')
     else:

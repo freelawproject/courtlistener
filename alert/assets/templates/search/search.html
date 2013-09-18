@@ -172,7 +172,7 @@
                         <p class="bottom">
                             <span class="meta-data-value">
                                 <a href="{{ result.absolute_url }}cited-by/?{{ request.META.QUERY_STRING }}">
-                                    Cited ~{{ result.citeCount|intcomma }} time{{ result.citeCount|pluralize }}
+                                    Cited {{ result.citeCount|intcomma }} time{{ result.citeCount|pluralize }}
                                 </a>
                             </span>
                         </p>
