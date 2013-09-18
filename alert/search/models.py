@@ -254,7 +254,7 @@ class Citation(models.Model):
 
     def __unicode__(self):
         if self.case_name:
-            return smart_unicode(self.case_name)
+            return smart_unicode('%s: %s' % (self.citationUUID, self.case_name))
         else:
             return str(self.citationUUID)
 
@@ -357,7 +357,7 @@ class Document(models.Model):
 
     def __unicode__(self):
         if self.citation:
-            return self.citation.case_name
+            return '%s: %s' % (self.documentUUID, self.citation.case_name)
         else:
             return str(self.documentUUID)
 
