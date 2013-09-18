@@ -1,0 +1,86 @@
+#!/bin/bash
+
+# Debug daemon using the -f flag to run it in the foreground.
+
+. /etc/courtlistener
+if [ -z $INSTALL_ROOT ]; then
+    echo "INSTALL_ROOT is not set. Please set it in /etc/courtlistener."
+    exit 1
+fi
+
+start () {
+    echo -n "Starting the scraper..."
+    daemon --command="/usr/bin/python $INSTALL_ROOT/alert/manage.py cl_scrape_and_extract -d -c juriscraper.opinions.united_states" --respawn --name=scraper --user=www-data --verbose
+
+    RETVAL=$?
+
+    if [ $RETVAL = 0 ]
+    then
+        echo "done."
+    else
+        echo "failed. See error code for more information."
+    fi
+    return $RETVAL
+}
+
+stop () {
+    echo -n "Stopping the scraper..."
+    daemon --stop --name=scraper --user=www-data
+    RETVAL=$?
+
+    if [ $RETVAL = 0 ]
+    then
+        echo "done."
+    else
+        echo "failed. See error code for more information."
+    fi
+    return $RETVAL
+}
+
+restart () {
+    echo -n "Stopping the scraper..."
+    daemon --stop --name=scraper --user=www-data
+    sleep 1
+
+    while true
+    do
+        # Check if it's still running...
+        daemon --running --name=scraper --user=www-data
+        RETVAL=$?
+        if [ $RETVAL != '0' ]
+        then
+            echo "done."
+            start
+            break
+        else
+            echo -n '.'
+            sleep 1
+        fi
+    done
+
+}
+
+status () {
+    # report on the status of the daemon
+    daemon --running --verbose --name=scraper --user=www-data
+    return $?
+}
+
+case "${1:-''}" in
+    'start')
+        start
+    ;;
+    'stop')
+        stop
+    ;;
+    'restart')
+        restart
+    ;;
+    'status')
+        status
+    ;;
+    *)
+        echo "Usage: $SELF start|stop|restart|status"
+        exit 1
+    ;;
+esac

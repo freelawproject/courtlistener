@@ -1,0 +1,92 @@
+{% extends "profile/nav.html" %}
+{% load text_filters %}
+
+{% block title %}Edit Alerts - CourtListener.com{% endblock %}
+{% block search-form %}{% endblock %}
+
+{% block footer-scripts %}
+    <script defer type="text/javascript" src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+    <script defer type="text/javascript" src="{{ STATIC_URL }}js/save-favorites-profile.js"></script>
+{% endblock %}
+
+{% block nav-favorites %}active{% endblock %}
+
+{% block content %}
+    <div class="span-17 last" id="content">
+        {% if form.errors %}
+            <div class="span-10 error">
+                <p class="bottom">There were errors with your submission.</p>
+            </div>
+            <div class="span-7 last">&nbsp;</div>
+        {% endif %}
+
+        <div class="span-10">
+            <h3 class="bottom alt">
+                    <a href="{{doc.get_absolute_url}}">
+                        {{ caption|safe|v_wrapper }}
+                    </a>
+                </h3>
+                <p class="bottom">
+                    <strong>Date Filed:</strong>
+                    {% if doc.date_filed %}
+                        {{doc.date_filed|date:"l, F jS, Y"}}
+                    {% else %}
+                        Unknown date
+                    {% endif %}
+                </p>
+                <p class="bottom">
+                    <strong>Status: </strong>
+                    {% if doc.precedential_status %}
+                        {{doc.get_precedential_status_display}}
+                    {% else %}
+                        Unknown
+                    {% endif %}
+                </p>
+                <p class="bottom">
+                    {% if citation_string %}
+                        <span class="meta-data-header">Citations: </span>
+                        <span class="meta-data-value">{{ citation_string }}</span>
+                    {% endif %}
+                </p>
+                <p>
+                    {% if doc.citation.docket_number %}
+                        <span class="meta-data-header">Docket Number: </span>
+                        <span class="meta-data-value">{{ doc.citation.docket_number }}</span>
+                    {% endif %}
+                </p>
+            <form action="" method="POST">{% csrf_token %}
+                {{ favorite_form.doc_id }}
+                <p class="bottom">
+                    <label for="id_name">Name</label>
+                    {% if favorite_form.name.errors %}
+                        <br><span class="errortext">
+                            {% for error in favorite_form.name.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                    {{ favorite_form.name }}
+                </p>
+                <p class="bottom">
+                    <label for="id_favorite_notes">Notes</label>
+                    {% if favorite_form.notes.errors %}
+                        <br><span class="errortext">
+                            {% for error in favorite_form.notes.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                    {{ favorite_form.notes }}
+                    <p class="top right"><span id="characters-remaining"></span> characters remaining</p>
+                </p>
+
+                <button type="submit" class="button title save-favorite-button" name="saveFavorite" id="saveFavorite" tabindex='3'>
+                    Save favorite
+                </button>
+                <p id="save-favorite-delete" class="bottom fake-link inline" tabindex="4">Delete this favorite</a>
+                </p>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+

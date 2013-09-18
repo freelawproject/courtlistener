@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Email confirmation - CourtListener.com{% endblock %}
+
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div class="span-17 last">
+        {% if invalid %}
+            <h2>Invalid confirmation link</h2>
+            <p>The link you have used to confirm your account is invalid. Please try
+            again or you may request a <a href="/email-confirmation/request/">new confirmation link</a>.</p>
+        {% endif %}
+
+        {% if expired %}
+            <h2>Expired confirmation link</h2>
+            <p>Your confirmation link has expired. Please try again or you may
+            request a <a href="/email-confirmation/request/">new confirmation link</a>.</p>
+        {% endif %}
+
+        {% if success or alreadyConfirmed %}
+            <h2>Your email address has been confirmed.</h2>
+            <p>Thank you for successfully confirming your email address.</p>
+            <p><a href="/sign-in/">Sign into your account</a></p>
+        {% endif %}
+    </div>
+{% endblock %}
