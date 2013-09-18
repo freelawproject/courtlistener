@@ -10,12 +10,12 @@
         <h2>Available Jurisdictions</h2>
 
         <p>
-            We have more than 150 jurisdictions available on CourtListener. These jurisdictions are available via
+            We currently have <span id="jurisdiction-count">{{ courts.count }}</span> jurisdictions available on CourtListener. These jurisdictions are available via
             our API or can be used in our bulk data queries.
         </p>
 
         <p>
-            Some of the data below is incomplete; missing dates or other information. If you are a legal researcher
+            Some of the data below is incomplete, missing dates or other information. If you are a legal researcher
             interested in helping us research this or other data, please get in touch via our <a href="/contact/">contact
             form</a>. We welcome your contribution.
         </p>
@@ -24,6 +24,7 @@
             <thead>
             <tr>
                 <th>Name</th>
+                <th title="The number of cases in this court on CourtListener">Count</th>
                 <th>Jurisdiction</th>
                 <th>Homepage</th>
                 <th title="The value used in our URLs, bulk data, etc.">
@@ -50,6 +51,7 @@
             {% for court in courts %}
                 <tr>
                     <td>{{ court.full_name }}</td>
+                    <td>{{ court.count }}</td>
                     <td>{{ court.get_jurisdiction_display|nbsp }}</td>
                     <td title="{{ court.URL }}">
                         <a href="{{ court.URL }}" target="_blank">

@@ -1,4 +1,3 @@
-import os
 import sys
 from alert.casepage.views import make_citation_string
 
@@ -79,7 +78,8 @@ def update_document(document):
                 # already been cited by this document.
                 if not matched_doc.citation in document.cases_cited.all():
                     matched_doc.citation_count += 1
-                    matched_doc.save(index=False)
+                    matched_doc.save(index=True)
+
                 # Add citation match to the citing document's list of cases it cites.
                 # cases_cited is a set so duplicates aren't an issue
                 document.cases_cited.add(matched_doc.citation)

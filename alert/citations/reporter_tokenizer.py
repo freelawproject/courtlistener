@@ -5,7 +5,7 @@
 # URL: <http://nltk.sourceforge.net>
 
 import re
-from alert.citations.constants import EDITIONS, REPORTERS, VARIATIONS_ONLY
+from alert.citations.constants import EDITIONS, VARIATIONS_ONLY
 
 # We need to build a REGEX that has all the variations and the reporters in order from longest to shortest.
 REGEX_LIST = EDITIONS.keys() + VARIATIONS_ONLY.keys()

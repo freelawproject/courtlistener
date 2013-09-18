@@ -31,7 +31,24 @@ if not DEVELOPMENT:
     CELERY_PASSWORD = 'your-celery-password'
 
 # Payment secrets
+DWOLLA_APPLICATION_KEY = ''
 DWOLLA_SECRET_KEY = ''
+DWOLLA_ACCOUNT_ID = ''
+if DEVELOPMENT:
+    PAYPAL_ENDPOINT = 'https://api.sandbox.paypal.com'
+    PAYPAL_ACCOUNT = 'donate-facilitator@freelawproject.org'
+    PAYPAL_CLIENT_ID = ''
+    PAYPAL_SECRET_KEY = ''
+    STRIPE_SECRET_KEY = ''
+    STRIPE_PUBLIC_KEY = ''
+else:
+    PAYPAL_ENDPOINT = 'https://api.paypal.com'
+    PAYPAL_ACCOUNT = 'donate@freelawproject.org'
+    PAYPAL_CLIENT_ID = ''
+    PAYPAL_SECRET_KEY = ''
+    STRIPE_SECRET_KEY = ''
+    STRIPE_PUBLIC_KEY = ''
+
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name

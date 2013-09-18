@@ -1,41 +1,17 @@
-import requests
-from alert.lib import sunburnt
-from alert.search.models import Citation, Court, Document
-from alert.scrapers.test_assets import test_scraper
 from django.test import TestCase
 from django.test.client import Client
+import time
 
+from alert.lib import sunburnt
+from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core
+from alert.search.models import Citation, Court, Document
+from alert.scrapers.test_assets import test_scraper
 from alert import settings
 
 
 class SetupException(Exception):
     def __init__(self, message):
         Exception.__init__(self, message)
-
-
-def create_solr_core(core_name):
-    """ Create a new core for use in testing."""
-    params = {
-        'wt': 'json',
-        'action': 'CREATE',
-        'name': core_name,
-        'instanceDir': '/usr/local/solr/example/solr/collection1',
-        'dataDir': 'data',
-        'config': 'solrconfig.xml',
-        'schema': 'schema.xml',
-    }
-    return requests.get('http://localhost:8983/solr/admin/cores', params=params)
-
-
-def delete_solr_core(core_name):
-    """ Delete a solr core by name."""
-    params = {
-        'wt': 'json',
-        'action': 'UNLOAD',
-        'core': core_name,
-        'deleteIndex': 'true',
-    }
-    return requests.get('http://localhost:8983/solr/admin/cores', params=params)
 
 
 class SearchTest(TestCase):
@@ -45,11 +21,12 @@ class SearchTest(TestCase):
         # Set up some handy variables
         self.court = Court.objects.get(pk='test')
         self.client = Client()
-        settings.SOLR_URL = 'http://127.0.0.1:8983/solr/test_core'
-        self.si = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
 
-        # Set up a testing core in Solr
-        create_solr_core('test_core')
+        # Set up a testing core in Solr and swap it in
+        self.core_name = '%s.test-%s' % (self.__module__, time.time())
+        create_solr_core(self.core_name)
+        swap_solr_core('collection1', self.core_name)
+        self.si = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
 
         # Add two documents to the index, but don't extract their contents
         self.site = test_scraper.Site().parse()
@@ -71,8 +48,8 @@ class SearchTest(TestCase):
 
     def tearDown(self):
         self.doc.delete()
-
-        delete_solr_core('test_core')
+        swap_solr_core(self.core_name, 'collection1')
+        delete_solr_core(self.core_name)
 
     def test_a_simple_text_query(self):
         """Does typing into the main query box work?"""

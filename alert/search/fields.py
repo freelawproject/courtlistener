@@ -34,6 +34,7 @@ class FloorDateField(DateField):
             return value
         for format in self.input_formats or formats.get_format('DATE_INPUT_FORMATS'):
             try:
+                value = value.strip()
                 return datetime.date(*time.strptime(value, format)[:3])
             except ValueError:
                 continue
@@ -73,6 +74,7 @@ class CeilingDateField(Field):
             return value
         for format in self.input_formats or formats.get_format('DATETIME_INPUT_FORMATS'):
             try:
+                value = value.strip()
                 valid_date = datetime.date(*time.strptime(value, format)[:3])
             except ValueError:
                 continue
