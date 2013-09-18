@@ -354,6 +354,9 @@ class Document(models.Model):
     extracted_by_ocr = models.BooleanField(
         'OCR was used to get this document content',
         default=False)
+    pagerank = models.FloatField(
+        'PageRank value based on the citing relation among documents',
+        default=0)
 
     def __unicode__(self):
         if self.citation:
