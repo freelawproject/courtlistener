@@ -33,11 +33,8 @@ def sitemap_maker(request, size=250):
             if int(result['citeCount']) > 0:
                 # Only include this page if there are citations.
                 url_strs.append('https://www.courtlistener.com%scited-by/' % result['absolute_url'])
-            try:
+            if result.get('local_path') and result.get('local_path') != '':
                 url_strs.append('https://www.courtlistener.com/%s' % result['local_path'])
-            except KeyError:
-                # No local_path key.
-                pass
 
             for url_str in url_strs:
                 url['location'] = url_str
