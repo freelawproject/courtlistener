@@ -1,7 +1,7 @@
 This file contains notes for upgrades when special instructions are necessary. In general, simply doing:
 
 hg pull -u
-sudo -u www-data $INSTALL_ROOT/alert/manage.py collectstatic
+manage.py collectstatic
 manage.py migrate
 sudo service celeryd restart
 

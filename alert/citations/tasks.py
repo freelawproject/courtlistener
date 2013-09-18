@@ -20,8 +20,7 @@ def get_document_citations(document):
     if document.html:
         citations = find_citations.get_citations(document.html)
     elif document.plain_text:
-        citations = find_citations.get_citations(document.plain_text,
-                                                 html=False)
+        citations = find_citations.get_citations(document.plain_text, html=False)
     else:
         citations = []
     return citations
