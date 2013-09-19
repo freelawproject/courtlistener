@@ -24,7 +24,7 @@ def process_dwolla_callback(request):
     if request.method == 'POST':
         data = simplejson.loads(request.raw_post_data)  # Update for Django 1.4 to request.body
         logger.info('data is: %s' % data)
-        if check_dwolla_signature(data['Signature'], '%s&%s' % (data['CheckoutId'], data['Amount'])):
+        if check_dwolla_signature(data['Signature'], '%s&%0.2f' % (data['CheckoutId'], data['Amount'])):
             d = Donation.objects.get(payment_id=data['CheckoutId'])
             if data['Status'].lower() == 'completed':
                 d.amount = data['amount']
@@ -37,6 +37,7 @@ def process_dwolla_callback(request):
             d.save()
             return HttpResponse('<h1>200: OK</h1>')
         else:
+            logger.info('Dwolla signature check failed.')
             return HttpResponseForbidden('<h1>403: Did not pass signature check.</h1>')
     else:
         return HttpResponseNotAllowed('<h1>405: This is a callback endpoint for a payment provider. Only POST methods '
