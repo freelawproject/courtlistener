@@ -218,7 +218,6 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'simple'
         },
-        # I always add this handler to facilitate separating loggings
         'log_file': {
             'level': 'DEBUG',
             'class': 'logging.handlers.RotatingFileHandler',
