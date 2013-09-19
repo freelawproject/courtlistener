@@ -16,6 +16,18 @@
                 <button type="submit" class="button">Try Donating Again</button>
                 &nbsp;&nbsp;<a href="/">Go to the homepage</a>
             </form>
+        {% elif error == 'Insufficient Funds' %}
+            <h2>Insufficient Funds in Your Dwolla Account!</h2>
+            <p>Dwolla has reported to us that you have insufficient funds in your account to make this donation.</p>
+            <p>This usually happens if your bank account is not configured on an existing account or if you have not
+                yet verified it.</p>
+            <p>Your donation means the world to us and keeps us going. We'd really appreciate it if you tried again.
+                possibly via PayPal, Check or Credit Card?</p>
+            <p>Would you like to try again?</p>
+            <form action="/donate/" method="get" class="inline">
+                <button type="submit" class="button">Try Donating Again</button>
+                &nbsp;&nbsp;<a href="/">I give up, take me to the homepage</a>
+            </form>
         {% else %}
             <h2>Thanks for Your Donation</h2>
             <p>Thanks for your donation to the Free Law Project and for supporting CourtListener. Your contribution
