@@ -1,6 +1,4 @@
 from datetime import datetime
-from django.shortcuts import render_to_response
-from django.template import RequestContext
 import hashlib
 import hmac
 import logging
@@ -9,6 +7,9 @@ import requests
 from alert.donate.models import Donation
 from django.conf import settings
 from django.http import HttpResponseNotAllowed
+from django.shortcuts import render_to_response
+from django.template import RequestContext
+from django.views.decorators.csrf import csrf_exempt
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ def check_dwolla_signature(proposed_signature, raw):
     return True if (signature == proposed_signature) else False
 
 
+@csrf_exempt
 def process_dwolla_callback(request):
     logger.info('Dwolla callback processing triggered with method: %s' % request.method)
     if request.method == 'POST':
@@ -38,6 +40,7 @@ def process_dwolla_callback(request):
                                       'are allowed.</h1>')
 
 
+@csrf_exempt
 def process_dwolla_transaction_status_callback(request):
     if request.method == 'POST':
         data = simplejson.loads(request.raw_post_data)  # Update for django 1.4 to request.body
