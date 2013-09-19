@@ -37,7 +37,7 @@ def send_thank_you_email(donation):
 
 
 def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form):
-    """Routes the donation to the correct payment provider, then normalizes its resopnse.
+    """Routes the donation to the correct payment provider, then normalizes its response.
 
     Returns a dict with:
      - message: Any error messages that apply
@@ -186,9 +186,15 @@ def donate(request):
                     'email': request.user.email,
                 }
             )
+            up = request.user.get_profile()
             profile_form = ProfileForm(
                 initial={
-                    'wants_newsletter': request.user.get_profile().wants_newsletter
+                    'address1': up.address1,
+                    'address2': up.address2,
+                    'city': up.city,
+                    'state': up.state,
+                    'zip_code': up.zip_code,
+                    'wants_newsletter': up.wants_newsletter
                 }
             )
         except AttributeError:
