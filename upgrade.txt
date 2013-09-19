@@ -14,6 +14,8 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 DONATION PROJECT
     - PRE DEPLOY:
+        - TODO: Users cannot change any profile information if they don't update their email address ("This email
+                address already in use")
         - TODO: Make the annual reminder
         - TODO: Why don't the mailing address, city, state and zip fields auto-populate when the info is known?
 

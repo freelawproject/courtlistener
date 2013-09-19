@@ -1,3 +1,4 @@
+import traceback
 import settings
 from django.core.management import setup_environ
 setup_environ(settings)
@@ -120,6 +121,7 @@ def emailer(rate, verbose, simulate):
                     print "Errors from the SearchForm: %s" % search_form.errors
                     continue
             except:
+                traceback.print_exc()
                 print "Search for this alert failed: %s" % alert.alertText
                 continue
 
