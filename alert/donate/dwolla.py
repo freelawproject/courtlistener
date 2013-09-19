@@ -25,7 +25,7 @@ def process_dwolla_callback(request):
     if request.method == 'POST':
         data = simplejson.loads(request.raw_post_data)  # Update for Django 1.4 to request.body
         logger.info('data is: %s' % data)
-        if check_dwolla_signature(data['Signature'], '%s&%s' % (data['CheckoutId'], data['amount'])):
+        if check_dwolla_signature(data['Signature'], '%s&%s' % (data['CheckoutId'], data['Amount'])):
             d = Donation.objects.get(payment_id=data['CheckoutId'])
             if data['Status'].lower() == 'completed':
                 d.amount = data['amount']
