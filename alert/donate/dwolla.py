@@ -109,6 +109,7 @@ def process_dwolla_payment(cd_donation_form, cd_profile_form, cd_user_form, test
 
 
 def donate_dwolla_complete(request):
+    logger.info('Dwolla complete.')
     if len(request.GET) > 0:
         # We've gotten some information from the payment provider
         if request.GET.get('error') == 'failure' and request.GET.get('error_description') == 'User Cancelled':
