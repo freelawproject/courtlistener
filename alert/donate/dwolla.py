@@ -6,7 +6,7 @@ import simplejson
 import requests
 from alert.donate.models import Donation
 from django.conf import settings
-from django.http import HttpResponseNotAllowed
+from django.http import HttpResponseNotAllowed, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.views.decorators.csrf import csrf_exempt
@@ -21,7 +21,6 @@ def check_dwolla_signature(proposed_signature, raw):
 
 @csrf_exempt
 def process_dwolla_callback(request):
-    logger.info('Dwolla callback processing triggered with method: %s' % request.method)
     if request.method == 'POST':
         data = simplejson.loads(request.raw_post_data)  # Update for Django 1.4 to request.body
         logger.info('data is: %s' % data)
@@ -35,6 +34,9 @@ def process_dwolla_callback(request):
             elif data['Status'].lower() == 'failed':
                 d.status = 1
             d.save()
+            return HttpResponse('<h1>200: OK</h1>')
+        else:
+            return HttpResponseForbidden('<h1>403: Did not pass signature check.</h1>')
     else:
         return HttpResponseNotAllowed('<h1>405: This is a callback endpoint for a payment provider. Only POST methods '
                                       'are allowed.</h1>')
@@ -58,6 +60,9 @@ def process_dwolla_transaction_status_callback(request):
             elif data['Value'].lower() == 'reclaimed':
                 d.status = 7
             d.save()
+            return HttpResponse('<h1>200: OK</h1>')
+        else:
+            return HttpResponseForbidden('<h1>403: Did not pass signature check.</h1>')
     else:
         return HttpResponseNotAllowed('<h1>405: This is a callback endpoint for a payment provider. Only POST methods '
                                       'are allowed.</h1>')
