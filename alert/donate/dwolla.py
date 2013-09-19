@@ -32,6 +32,7 @@ def process_dwolla_callback(request):
                 from alert.donate.views import send_thank_you_email
                 send_thank_you_email(d)
             elif data['Status'].lower() == 'failed':
+                logger.info('Failed to process payment: %s' % data['Error'])
                 d.status = 1
             d.save()
             return HttpResponse('<h1>200: OK</h1>')
