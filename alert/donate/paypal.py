@@ -1,5 +1,6 @@
 from datetime import datetime
 from django.http import HttpResponseRedirect
+from django.views.decorators.csrf import csrf_exempt
 import json
 from urlparse import urlparse, parse_qs
 import requests
@@ -28,6 +29,7 @@ def get_paypal_access_token():
     return json.loads(r.content).get('access_token')
 
 
+@csrf_exempt
 def process_paypal_callback(request):
     """Process the GET request that PayPal uses.
 
