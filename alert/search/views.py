@@ -1,3 +1,4 @@
+import logging
 from alert.alerts.forms import CreateAlertForm
 from alert.lib import search_utils
 from alert.lib import sunburnt
@@ -10,6 +11,8 @@ from django.shortcuts import render_to_response
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
 from django.views.decorators.cache import never_cache
+
+logger = logging.getLogger(__name__)
 
 
 def _clean_form(request, cd):
@@ -40,7 +43,6 @@ def show_results(request):
 
     Implements a parallel faceted search interface with Solr as the backend.
     """
-
     # Create a search string that does not contain the page numbers
     get_string = search_utils.make_get_string(request)
 
@@ -88,18 +90,23 @@ def show_results(request):
                 status_facets = search_utils.make_facets_variable(
                     stat_facet_fields, search_form, 'status_exact', 'stat_')
             except Exception, e:
-                return render_to_response('search/search.html',
-                                          {'error': True, 'private': False},
-                                          RequestContext(request))
+                logger.warning("Error loading search page with request: %s" % request.GET)
+                return render_to_response(
+                    'search/search.html',
+                    {'error': True, 'private': True},
+                    RequestContext(request)
+                )
 
             search_form = _clean_form(request, cd)
 
         else:
             # Invalid form, send it back
+            logger.warning("Invalid form when loading search page with request: %s" % request.GET)
             return render_to_response(
                 'search/search.html',
-                {'error': True, 'private': False},
-                RequestContext(request))
+                {'error': True, 'private': True},
+                RequestContext(request)
+            )
 
     else:
         # No search placed. Show default page after placing the needed queries.
@@ -135,6 +142,7 @@ def show_results(request):
             paged_results = paginator.page(paginator.num_pages)
     except:
         # Catches any Solr errors, and simply aborts.
+        logger.warning("Error loading pagination on search page with request: %s" % request.GET)
         return render_to_response('search/search.html',
                                   {'error': True, 'private': True},
                                   RequestContext(request))
