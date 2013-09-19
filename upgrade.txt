@@ -1,0 +1,271 @@
+This file contains notes for upgrades when special instructions are necessary. In general, simply doing:
+
+hg pull -u
+manage.py collectstatic
+manage.py migrate
+sudo service celeryd restart
+
+is all that's necessary. In the case that special instructions are needed, we will attempt to put them here, with the
+most recent at the top.
+
+We welcome a conversion of these notes to a better process using Fabric.
+
+----------------------------
+
+DONATION PROJECT
+    - PRE DEPLOY:
+        - TODO: Users cannot change any profile information if they don't update their email address ("This email
+                address already in use")
+        - TODO: Make the annual reminder
+        - TODO: Why don't the mailing address, city, state and zip fields auto-populate when the info is known?
+
+    - POST DEPLOY:
+        - TODO: Test the "Try Donating Again" button that comes up when you cancel a Dwolla payment.
+        - TODO: Make sure that the location field gets mapped into city/state properly
+
+LAWBOX PROJECT
+ - TODO: Does the fact that lawbox cases lack a URL cause an issue in the UI or can they be treated like the Resource.org cases?
+ - TODO: If we do case merging, the source field should be LBM ("LawBox Merged") or even LBRM ("Lawbox, Resource.org
+         Merged.")
+ - TODO: Investigate whether it's worth reworking the citation finder so that it better understands neutral citations.
+         For example, right now a citation like 2012 NM 3 will get 3 as citation.page, and will get 2012 as
+         citation.volume
+   TODO: Note that citations aren't always unique! For example, you can have a Dal. Citation that is either from Dallas'
+         Supreme Court Reports or from Dallas' Pennsylvania Reports. Make sure that date filtering can handle this. This
+         can even happen within the same court. So, Fed.R. can refer to either F. or F.2d.
+   TODO: Change the DB to support better granularity of citations:
+            + Add the new fields to the model and migrate it.
+            - Update the crawler and other code to properly map to the new fields
+            + Remove West Cite from the front end (make it say simply citation)
+            + Update Solr and investigate how to swap in a better index.
+            + Update the advanced search page notes
+   TODO: manage.py dumpdata search.court --indent=2 | tee search/fixtures/initial_data.json (and merge any live changes
+         back into this data structure)
+   TODO: Sort out the new court picking interface.
+
+
+2013-09-17:
+ - BEFORE PULL: We've finally (*finally*) dealt with Python's painful logging system and deployed logging. To make
+   this work, you'll need a directory at /var/log/courtlistener/ that the server can write to. Create it with:
+
+     sudo mkdir /var/log/courtlistener/
+     sudo chmod 777 courtlistener/
+
+ - BEFORE PULL: The donation system has been fully deployed. To make the donation system work, you need to set up the
+   payment related section of 05-private.example in your 05-private.py file. To get these keys, you'll need to set up
+   accounts with PayPal, Dwolla and Stripe.
+ -
+
+
+
+
+2013-09-16:
+ - OVERVIEW: This update contains a number of large fixes, which will alter your database in a number of ways. It lands
+   the beginning work for the Lawbox corpus import (including > 300 new courts), and lands the initial work for a
+   donation page. Between these two changes, hundreds of changes have been made to the codebase, which will take a bit
+   of work to upgrade. Before we begin, turn off the scrapers with:
+
+     sudo service scrapers stop
+
+   Once that's complete, proceed through the steps below.
+
+ - CourtListener has been modified to support multiple installations on a single computer. For this to work, a new file
+   must be created at /etc/courtlistener, with contents like the following:
+
+     INSTALL_ROOT='/home/mlissner/Programming/intellij/courtlistener'
+
+   This variable will be used by both bash scripts and all Django scripts henceforth for determining where CourtListener
+   is installed. If you are a developer with multiple installations, this will make your life considerably easier, as
+   you can simply change this variable to automatically update all of your Django settings.
+
+   If you are wondering why an environmental variable cannot be used instead of a configuration file, the reason is that
+   oddly, environment variables cannot be changed on the fly without restarting the computer. Please see this
+   stackoverflow question and my answer for more details:
+
+     http://stackoverflow.com/questions/8677504/setting-environment-variable-globally-without-restarting-ubuntu/18388854#18388854
+
+ - Hundreds of new courts have been added to initial_data.json and will be installed automatically, but there are some
+   conflicts with the current courts that need to be fixed first. To do that, in a Python shell run:
+
+        from search.models import Court
+        c = Court.objects.get(pk="calctapp")
+        c.position = 350.1
+        c.save()
+        c = Court.objects.get(pk="wva")
+        c.position = 385.1
+        c.save()
+        c = Court.objects.get(pk="ark")
+        c.position = 330.0
+        c.save()
+        c = Court.objects.get(pk="ri")
+        c.position = 367.3
+        c.save()
+        c = Court.objects.get(pk="nj")
+        c.position = 366.55
+        c.save()
+
+   The remainder of the courts will get updated automatically when you perform the next steps.
+
+ - the user profiles have been updated to support donations. Update your database with:
+
+    manage.py migrate donate
+    manage.py migrate userHandling
+
+   A new fixture has also been added that will automatically populate your database with 56 bar membership
+   jurisdictions.
+
+ - we've added payment support, which introduces a new dependency. Install it with:
+
+    sudo pip install --index-url https://code.stripe.com --upgrade stripe
+
+ - A new dependency has been added. Install it with:
+
+   $ sudo aptitude install curl
+
+ - The database has been updated to include date_modified fields, support the lawbox use case, and to support much
+   greater citation granularity. Migrate your database with:
+
+    manage.py migrate search
+    manage.py migrate favorites
+
+ - Our data dumps have been expanded to continue mirroring our database. They now contain many additional fields for
+   citations: federal_cite_one, federal_cite_two, federal_cite_three, state_cite_one, state_cite_two, state_cite_three,
+   state_regional_cite, specialty_cite_one, scotus_early_cite and westlaw_cite. The goal of this change is to provide
+   much greater granularity to those that are importing this data, splitting out parallel citations into more
+   understandable fields.
+
+   Be sure to delete old copies of the dumps so they are no longer cached, and at the end we will create the monthly
+   dump so it is cached.
+
+ - The Solr backend has been updated to deprecate the westCite field and rename it as simply "citation". The old field
+   will continue working for at least one year, though alerts and documentation have been updated to begin phasing it
+   out.
+
+   To create a new Solr core and smoothly swap it in takes a few incantations:
+
+   First, set up a session that supports (dis/re)connection:
+     % screen
+
+   Halt the scrapers and restart Solr to bring in the new schema
+     % sudo service solr restart
+
+   Create a new Solr core named "swap_core", using the normal core's settings, and in a Python shell:
+
+     % manage.py shell
+     >>> from alert.lib.solr_core_admin import *
+     >>> from alert import settings
+     >>> create_solr_core("swap_core", data_dir='%s/Solr/data/2/' % settings.INSTALL_ROOT)
+
+   The cl_update_index command has been updated with a new argument, --solr-url, that allows users to override the
+   default SOLR_URL value that is normally pulled from the site-wide settings. Use the new argument to reindex all
+   content to the new core we just created. This will take several hours on a large index and require twice the disk
+   space and memory your Solr index currently uses:
+     % manage.py cl_update_index --everything --update --optimize --solr-url='http://127.0.0.1:8983/solr/swap_core'
+
+   Once complete, swap the indexes in your Python shell with:
+
+     >>> swap_solr_core('collection1', 'swap_core')
+
+   Note that the core named "swap_core" is now your old core (the one from before we began the upgrade). This can be
+   confusing -- you've been warned!
+
+   Test your system at this point to ensure that the new citation field is working.
+
+   Delete the old core and index:
+
+     >>> delete_solr_core('swap_core', delete_index=True)
+
+ - The variables SERVER_EMAIL and DEFAULT_FROM_EMAIL have been changed from 'noreply@courtlistener.com' to
+   'CourtListener <noreply@courtlistener.com>' to provide a proper name to email readers. This is changed in the default
+   variable file, but can be overridden in your 05-private.py file, if desired.
+
+ - A new page has been added at /api/jurisdictions/ if you wish to include it in your sitemaps.
+
+ - And finally, restart the scrapers:
+
+    % sudo service scrapers start
+
+   And if this is a production system, regenerate the monthly dump that we deleted.
+
+    % sudo -u www-data /usr/bin/python /var/www/court-listener/alert/dump_all_cases.py
+
+
+2013-07-07:
+ - The piwik configuration has been merged into the virtual host for the main site. If you are using piwik, you will
+   need to restart your apache server to enable this configuration. After this change, piwik will be located at
+   /piwik rather than as a subdomain.
+
+
+2013-07-03:
+ - Adds a notes field to the Courts model. Migrate your database with:
+
+    manage.py migrate search
+
+   And you'll be good to go.
+
+2013-06-27:
+ - This release will require downtime and will put your site into management mode upon pulling it.
+ - judge, suitNature and citeCount have been added to the Solr configuration. judges and nature_of_suit have been added
+   to the Document model.Unfortunately, these require a recrawl of the database into the Solr index and a migration of
+   the database. To realize these changes:
+
+     sudo -u www-data pull -u
+     sudo service apache2 restart # Welcome to management mode.
+     sudo servce scraper stop
+     manage.py migrate search
+     manage.py cl_update_index --delete --everything
+     sudo service solr restart
+     sudo service celeryd restart
+     manage.py cl_update_index --update --everything
+     sudo servce scraper start
+
+   There have also been changes to the settings to enable staticfiles as indicated below, and settings have been
+   overhauled to make them much simpler.
+
+   To effect the changes to settings, copy 05-private.example to 05-private.py, and edit it as needed. Once complete,
+   delete 20-private.py or rename it with a different extension, if you need a backup.
+
+   At this point your system should be upgraded, and you can disable the management mode in urls.py, then restart apache
+   again.
+
+ - We've moved to using django.contrib.staticfiles[1]. This introduces better management of static files and moves CL
+   towards standard Django practices in versions >= 1.3, but presents several changes for the project:
+    - When deploying, there are new commands that must be run if there are any new static files:
+       manage.py collectstatic
+    - The locations of static files have been distributed to either the app they correspond with or to a new directory,
+      "alert/assets/static-global", that contains static items that have a global scope across apps. Within each app
+      there is a /static/ directory where their own static files should go. Files are not served from these locations,
+      but are instead collected into the "alert/assets/static/" directory upon deploying the app.
+    - Changes have been made to the apache configuration which will make it serve files from the new location. These
+      changes require that Apache be restarted after pulling from hg.
+    - urls.py has been simplified, since django.contrib.staticfiles serves static files automatically when
+      DEBUG == True.
+    - Nearly all templates have been altered to use this app, introducing the possibility of missing images, css or JS.
+
+ [1]: https://docs.djangoproject.com/en/1.3/howto/static-files/#staticfiles-in-templates
+
+
+2013-06-20:
+ - The add_citations script has been converted to a management command. Any previous usages of it will need to be
+   updated to use manage.py cl_add_citations_to_docs. It remains mostly API compatible, but management commands do
+   not support variable numbers of arguments so the doc_ids parameter is now doc_id. It takes an int instead of an
+   iterable.
+
+2013-06-19:
+ - Numerous changes to the models have been made to rename variables. Please update your database after pulling the
+   code. This should be an instant migration in PostGres.
+
+     manage.py migrate search
+
+ - The dependency on the requests library has been updated to version 1.2.3:
+
+   sudo pip uninstall requests
+   sudo apt-get purge python-requests
+   sudo pip install requests==1.2.3
+
+ - The scrape_and_extract.py script has been converted to the cl_scrape_and_extract management command. It is API
+   compatible in terms of args, but any jobs calling the script will need to be updated.
+
+
+
+
