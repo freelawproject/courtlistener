@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+{% load static %}{% get_static_prefix as STATIC_PREFIX %}<!DOCTYPE html>
 <!--[if lt IE 7]> <html class="no-js ie6 lt8 lt7 oldie" lang="en"> <![endif]-->
 <!--[if IE 7]>    <html class="no-js ie7 lt8 oldie" lang="en"> <![endif]-->
 <!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en"> <![endif]-->
@@ -11,16 +11,16 @@
         <link rel="author" href="/humans.txt" type="text/plain"/>
 
         <meta name="viewport" content="width=device-width,initial-scale=1"/>
-        <link rel="search" type="application/opensearchdescription+xml" title="CourtListener" href="{{ STATIC_URL }}xml/opensearch.xml" />
+        <link rel="search" type="application/opensearchdescription+xml" title="CourtListener" href="{{ STATIC_PREFIX }}xml/opensearch.xml" />
         <meta name="application-name" content="CourtListener"/>
         <meta name="msapplication-tooltip" content="Create alerts, search for and browse the latest court opinions."/>
         <meta name="msapplication-starturl" content="https://www.courtlistener.com"/>
         <meta name="msapplication-navbutton-color" content="#6683B7"/>
 
-        <link rel="stylesheet" href="{{ STATIC_URL }}css/style.css" type="text/css" media="screen, projection">
-        <link rel="stylesheet" href="{{ STATIC_URL }}css/jquery-ui-1.10.3.custom.css" type="text/css" media="screen, projection">
-        <link rel="stylesheet" href="{{ STATIC_URL }}css/override.css" type="text/css" media="screen, projection">
-        <script src="{{ STATIC_URL }}js/modernizr-2.0.6.min.js"></script>
+        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/style.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/jquery-ui-1.10.3.custom.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/override.css" type="text/css" media="screen, projection">
+        <script src="{{ STATIC_PREFIX }}js/modernizr-2.0.6.min.js"></script>
         {% block privacy %}
             {% if private %}
                 <meta name="robots" content="noindex, noodp, noarchive, noimageindex" />
@@ -42,7 +42,7 @@
                     <div class="span-7 header" id="header">
                         <a href="/" tabindex="1">
                             {% block logo %}
-                                <img src="{{ STATIC_URL }}png/logo.png"
+                                <img src="{{ STATIC_PREFIX }}png/logo.png"
                                      alt="CourtListener logo"
                                      width="252"
                                      height="28"/>
@@ -146,8 +146,8 @@
 
         {# Set up jquery to be on every page. Doesn't hurt thanks to caching #}
         <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
-        <script>window.jQuery || document.write('<script src="{{ STATIC_URL }}js/jquery-1.6.2.min.js"><\/script>')</script>
-        <script type="text/javascript" src="{{ STATIC_URL }}js/jquery-ui-1.10.3.custom.min.js"></script>
+        <script>window.jQuery || document.write('<script src="{{ STATIC_PREFIX }}js/jquery-1.6.2.min.js"><\/script>')</script>
+        <script type="text/javascript" src="{{ STATIC_PREFIX }}js/jquery-ui-1.10.3.custom.min.js"></script>
 
         {# Allows your own scripts in the footer. #}
         {% block footer-scripts %}{% endblock %}
@@ -155,16 +155,17 @@
         {% if not user.is_superuser  %}
             <!-- Piwik -->
             <script type="text/javascript">
-            Modernizr.load({
-            	load: 'https://www.courtlistener.com/piwik/piwik.js',
-            	complete: function() {
-            		try {
-            			var piwikTracker = Piwik.getTracker('https://www.courtlistener.com/piwik/piwik.php', 1);
-            			piwikTracker.trackPageView();
-                        piwikTracker.enableLinkTracking();
-            		} catch(err) {}
-            	}
-            });
+                Modernizr.load({
+                    load: 'https://www.courtlistener.com/piwik/piwik.js',
+                    complete: function () {
+                        try {
+                            var piwikTracker = Piwik.getTracker('https://www.courtlistener.com/piwik/piwik.php', 1);
+                            piwikTracker.trackPageView();
+                            piwikTracker.enableLinkTracking();
+                        } catch (err) {
+                        }
+                    }
+                });
             </script><noscript><p><img src="https://www.courtlistener.com/piwik/piwik.php?idsite=1" style="border:0" alt=""/></p></noscript>
             <!-- End Piwik Tag -->
         {% endif %}
