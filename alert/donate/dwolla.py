@@ -122,12 +122,15 @@ def donate_dwolla_complete(request):
     logger.info('Dwolla complete.')
     if len(request.GET) > 0:
         # We've gotten some information from the payment provider
-        if request.GET.get('error') == 'failure' and request.GET.get('error_description') == 'User Cancelled':
-            # Cancelled order.
+        if request.GET.get('error') == 'failure':
+            if request.GET.get('error_description') == 'User Cancelled':
+                error = 'User Cancelled'
+            elif 'insufficient funds' in request.GET.get('error_description').lower():
+                error = 'Insufficient Funds'
             return render_to_response(
                 'donate/donate_complete.html',
                 {
-                    'error': 'User Cancelled',
+                    'error': error,
                     'private': True,
                 },
                 RequestContext(request),
