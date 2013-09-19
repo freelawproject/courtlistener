@@ -121,6 +121,10 @@ def show_results(request):
     try:
         paginator = Paginator(results_si, 20)
         page = request.GET.get('page', 1)
+        private = True
+        if page == 1:
+            # It's the homepage -- not private.
+            private = False
         try:
             paged_results = paginator.page(page)
         except PageNotAnInteger:
@@ -132,7 +136,7 @@ def show_results(request):
     except:
         # Catches any Solr errors, and simply aborts.
         return render_to_response('search/search.html',
-                                  {'error': True, 'private': False},
+                                  {'error': True, 'private': True},
                                   RequestContext(request))
     return render_to_response(
         'search/search.html',
@@ -143,7 +147,7 @@ def show_results(request):
          'status_facets': status_facets,
          'get_string': get_string,
          'count': count,
-         'private': False},
+         'private': private},
         RequestContext(request)
     )
 
