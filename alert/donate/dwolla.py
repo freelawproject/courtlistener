@@ -3,11 +3,14 @@ from django.shortcuts import render_to_response
 from django.template import RequestContext
 import hashlib
 import hmac
+import logging
 import simplejson
 import requests
 from alert.donate.models import Donation
 from django.conf import settings
 from django.http import HttpResponseNotAllowed
+
+logger = logging.getLogger(__name__)
 
 
 def check_dwolla_signature(proposed_signature, raw):
@@ -16,8 +19,10 @@ def check_dwolla_signature(proposed_signature, raw):
 
 
 def process_dwolla_callback(request):
+    logger.debug('Dwolla callback processing triggered with method: %s' % request.method)
     if request.method == 'POST':
         data = simplejson.loads(request.raw_post_data)  # Update for Django 1.4 to request.body
+        logger.debug('data is: %s' % data)
         if check_dwolla_signature(data['Signature'], '%s&%s' % (data['CheckoutId'], data['amount'])):
             d = Donation.objects.get(payment_id=data['CheckoutId'])
             if data['Status'].lower() == 'completed':

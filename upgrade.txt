@@ -45,9 +45,15 @@ LAWBOX PROJECT
 
 
 2013-09-17:
- - The donation system has been fully deployed. To make the donation system work, you need to set up the payment related
-   section of 05-private.example in your 05-private.py file. To get these keys, you'll need to set up accounts with
-   PayPal, Dwolla and Stripe.
+ - BEFORE PULL: We've finally (*finally*) dealt with Python's painful logging system and deployed logging. To make
+   this work, you'll need a directory at /var/log/courtlistener/ that the server can write to. Create it with:
+
+     sudo mkdir /var/log/courtlistener/
+     sudo chmod 777 courtlistener/
+
+ - BEFORE PULL: The donation system has been fully deployed. To make the donation system work, you need to set up the
+   payment related section of 05-private.example in your 05-private.py file. To get these keys, you'll need to set up
+   accounts with PayPal, Dwolla and Stripe.
  -
 
 

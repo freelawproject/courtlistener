@@ -31,7 +31,10 @@ if not DEVELOPMENT:
     CELERY_PASSWORD = 'your-celery-password'
 
 # Payment secrets
-PAYMENT_TESTING_MODE = True
+if DEVELOPMENT:
+    PAYMENT_TESTING_MODE = True
+else:
+    PAYMENT_TESTING_MODE = False
 DWOLLA_APPLICATION_KEY = ''
 DWOLLA_SECRET_KEY = ''
 DWOLLA_ACCOUNT_ID = ''

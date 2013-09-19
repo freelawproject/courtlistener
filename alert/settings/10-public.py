@@ -170,10 +170,6 @@ PAYMENT_CANCELLATION = 'https://www.courtlistener.com/donate/cancel/'
 DWOLLA_CALLBACK = 'https://www.courtlistener.com/donate/callbacks/dwolla/'
 PAYPAL_CALLBACK = 'https://www.courtlistener.com/donate/callbacks/paypal/'
 DWOLLA_REDIRECT = 'https://www.courtlistener.com/donate/dwolla/complete/'
-if DEVELOPMENT:
-    PAYMENT_TESTING_MODE = True
-else:
-    PAYMENT_TESTING_MODE = False
 
 
 ######################
@@ -195,5 +191,60 @@ else:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     DEBUG_TOOLBAR_CONFIG = {'INTERCEPT_REDIRECTS': False}
+
+
+########################
+# Logging Machinations #
+########################
+# From: http://stackoverflow.com/questions/1598823/elegant-setup-of-python-logging-in-django
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '%(levelname)s %(asctime)s (%(pathname)s %(funcName)s): "%(message)s"'
+        },
+        'simple': {
+            'format': '%(levelname)s %(message)s'
+        },
+    },
+    'handlers': {
+        'null': {
+            'level': 'DEBUG',
+            'class': 'django.utils.log.NullHandler',
+        },
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple'
+        },
+        # I always add this handler to facilitate separating loggings
+        'log_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': '/var/log/courtlistener/django.log',
+            'maxBytes': '16777216',  # 16 megabytes
+            'formatter': 'verbose'
+        },
+        'mail_admins': {
+            'level': 'ERROR',
+            'class': 'django.utils.log.AdminEmailHandler',
+            'include_html': True,
+        }
+    },
+    'loggers': {
+        'django.request': {
+            'handlers': ['mail_admins'],
+            'level': 'ERROR',
+            'propagate': True,
+        },
+        # This is the one that's used practically everywhere in the code.
+        'alert': {
+            'handlers': ['log_file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
 
 
