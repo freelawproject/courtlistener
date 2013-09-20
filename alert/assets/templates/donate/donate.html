@@ -105,6 +105,11 @@
 {% block content %}
     <div class="span-13 append-2">
         <h2>Support the Free Law Project</h2>
+        {% if message %}
+            <div class="span-13 append-2 last">
+                <p class="bottom">{{ message }}</p>
+            </div>
+        {% endif %}
         <form action="/donate/" method="post" id="donate-form">{% csrf_token %}
             {% if donation_form.non_field_errors or user_form.non_field_errors or profile_form.non_field_errors %}
                 <span class="errortext">

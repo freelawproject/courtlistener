@@ -1,11 +1,14 @@
-from datetime import datetime
-from django.http import HttpResponseRedirect
-from django.views.decorators.csrf import csrf_exempt
 import json
-from urlparse import urlparse, parse_qs
+import logging
 import requests
 from alert.donate.models import Donation
+from datetime import datetime
 from django.conf import settings
+from django.http import HttpResponseRedirect
+from django.views.decorators.csrf import csrf_exempt
+from urlparse import urlparse, parse_qs
+
+logger = logging.getLogger(__name__)
 
 
 def get_paypal_access_token():
@@ -14,8 +17,9 @@ def get_paypal_access_token():
     Query the PayPal API to get an access token. This could be improved by
     caching the token and detecting when it is expired.
     """
+    logger.info("Got paypal token with value: ")
     r = requests.post(
-        'https://api.sandbox.paypal.com/v1/oauth2/token',
+        '%s/v1/oauth2/token' % settings.PAYPAL_ENDPOINT,
         headers={
             'Accept': 'application/json',
             'Accept-Language': 'en_US'
@@ -26,6 +30,10 @@ def get_paypal_access_token():
         ),
         data={'grant_type': 'client_credentials'}
     )
+    if r.status_code == 200:
+        logger.info("Got paypal token successfully.")
+    else:
+        logger.warning("Problem getting paypal token status_code was: %s" % r.status_code)
     return json.loads(r.content).get('access_token')
 
 
@@ -42,7 +50,7 @@ def process_paypal_callback(request):
     access_token = get_paypal_access_token()
     d = Donation.objects.get(transaction_id=request.GET['token'])
     r = request.post(
-        'https://api.sandbox.paypal.com/v1/payments/payment/%s/execute/' % d.payment_id,
+        '%s/v1/payments/payment/%s/execute/' % (settings.PAYPAL_ENDPOINT, d.payment_id),
         headers={
             'Content-Type': 'application/json',
             'Authorization': 'Bearer %s' % access_token
@@ -62,7 +70,7 @@ def process_paypal_callback(request):
     return HttpResponseRedirect('/donate/thanks/')
 
 
-def process_paypal_payment(cd_donation_form, cd_profile_form, cd_user_form, test=True):
+def process_paypal_payment(cd_donation_form):
     # https://developer.paypal.com/webapps/developer/docs/integration/web/accept-paypal-payment/
     access_token = get_paypal_access_token()
     if access_token:
@@ -85,7 +93,7 @@ def process_paypal_payment(cd_donation_form, cd_profile_form, cd_user_form, test
             ]
         }
         r = requests.post(
-            'https://api.sandbox.paypal.com/v1/payments/payment',
+            '%s/v1/payments/payment' % settings.PAYPAL_ENDPOINT,
             headers={
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer %s' % access_token
