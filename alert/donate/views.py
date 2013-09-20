@@ -9,7 +9,7 @@ import logging
 from alert.donate.dwolla import process_dwolla_payment
 from alert.donate.paypal import process_paypal_payment
 from alert.donate.forms import DonationForm, UserForm, ProfileForm
-from alert.donate.stripe import process_stripe_payment
+from alert.donate.stripe_helpers import process_stripe_payment
 from alert.userHandling.models import UserProfile
 from django.conf import settings
 
