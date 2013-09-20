@@ -118,7 +118,7 @@ def process_paypal_payment(cd_donation_form):
             redirect = [link for link in json.loads(r.content)['links'] if
                         link['rel'].lower() == 'approval_url'][0]['href']
             parsed_redirect = urlparse(redirect)
-            token = parse_qs(parsed_redirect.query)['token']
+            token = parse_qs(parsed_redirect.query)['token'][0]
             response = {
                 'result': r_content_as_dict['state'],
                 'status_code': r.status_code,
