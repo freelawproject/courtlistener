@@ -138,6 +138,10 @@ def process_paypal_payment(cd_donation_form):
 
 
 def donate_paypal_cancel(request):
+    d = Donation.objects.get(transaction_id=request.GET['token'])
+    d.status = 3  # Cancelled, bummer
+    d.save()
+
     return render_to_response(
         'donate/donate_complete.html',
         {
