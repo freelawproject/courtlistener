@@ -8,7 +8,7 @@ import time
 from alert.donate.models import Donation
 from django.conf import settings
 from django.http import HttpResponseNotAllowed, HttpResponse, HttpResponseForbidden
-from django.shortcuts import render_to_response
+from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
 from django.views.decorators.csrf import csrf_exempt
 
@@ -56,7 +56,7 @@ def process_dwolla_transaction_status_callback(request):
                 # Wait, because Dwolla issues this faster than they issue their application callback. If we don't wait
                 # for a second here, we'll have no ID to lookup, and we'll get a DoesNotExist exception.
                 time.sleep(1)
-            d = Donation.objects.get_object_or_404(transaction_id=data['Id'])
+            d = get_object_or_404(Donation, transaction_id=data['Id'])
 
             if data['Value'].lower() == 'processed':
                 d.clearing_date = datetime.strptime(data['Triggered'], '%m/%d/%Y %I:%M:%S %p')
