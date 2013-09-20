@@ -72,12 +72,7 @@ def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form):
                 'redirect': None,
             }
     elif cd_donation_form['payment_provider'] == 'paypal':
-        response = process_paypal_payment(
-            cd_donation_form,
-            cd_profile_form,
-            cd_user_form,
-            test=settings.PAYMENT_TESTING_MODE
-        )
+        response = process_paypal_payment(cd_donation_form)
         if response['result'] == 'created':
             response = {
                 'message': None,
@@ -87,7 +82,7 @@ def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form):
             }
         else:
             response = {
-                'message': 'Error creating payment. Please try another payment method.',
+                'message': 'Error working with PayPal. Please try another payment method.',
                 'status': 1,  # ERROR
                 'payment_id': None,
                 'redirect': None,
@@ -104,6 +99,7 @@ def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form):
 
 
 def donate(request):
+    message = None
     if request.method == 'POST':
         donation_form = DonationForm(request.POST)
 
@@ -136,6 +132,7 @@ def donate(request):
 
             # Route the payment to a payment provider
             response = route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form)
+            logger.info("Payment routed with response: %s" % response)
 
             if response['status'] == 0:
                 d = donation_form.save(commit=False)
@@ -174,8 +171,9 @@ def donate(request):
                 return HttpResponseRedirect(response['redirect'])
 
             else:
-                logger.warn("Got back status of %s when making initial request of API." % response['status'])
-
+                logger.critical("Got back status of %s when making initial request of API. Message was:\n%s" %
+                                (response['status'], response['message']))
+                message = response['message']
     else:
         try:
             donation_form = DonationForm(
@@ -213,6 +211,7 @@ def donate(request):
             'user_form': user_form,
             'profile_form': profile_form,
             'private': False,
+            'message': message,
             'stripe_public_key': settings.STRIPE_PUBLIC_KEY
         },
         RequestContext(request)
