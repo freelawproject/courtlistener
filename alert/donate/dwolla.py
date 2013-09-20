@@ -27,7 +27,7 @@ def process_dwolla_callback(request):
         if check_dwolla_signature(data['Signature'], '%s&%0.2f' % (data['CheckoutId'], data['Amount'])):
             d = Donation.objects.get(payment_id=data['CheckoutId'])
             if data['Status'].lower() == 'completed':
-                d.amount = data['amount']
+                d.amount = data['Amount']
                 d.transaction_id = data['TransactionId']
                 d.clearing_date = datetime.strptime(data['ClearingDate'], '%m/%d/%Y %I:%M:%S %p')
                 d.status = 2
@@ -51,7 +51,7 @@ def process_dwolla_transaction_status_callback(request):
         data = simplejson.loads(request.raw_post_data)  # Update for django 1.4 to request.body
         logger.info('data is: %s' % data)
         if check_dwolla_signature(request.META['HTTP_X_DWOLLA_SIGNATURE'], request.raw_post_data):
-            d = Donation.objects.get(payment_id=data['Id'])
+            d = Donation.objects.get(transaction_id=data['Id'])
             if data['Value'].lower() == 'processed':
                 d.clearing_date = datetime.strptime(data['Triggered'], '%m/%d/%Y %I:%M:%S %p')
                 d.status = 4
@@ -111,6 +111,7 @@ def process_dwolla_payment(cd_donation_form, cd_profile_form, cd_user_form, test
         headers={'Content-Type': 'application/json'}
     )
     r_content_as_dict = simplejson.loads(r.content)
+    logger.info("Sent the payment to Dwolla, got back this data: %s" % r_content_as_dict)
     response = {
         'result': r_content_as_dict.get('Result'),
         'status_code': r.status_code,

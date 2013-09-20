@@ -5,12 +5,15 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.views.decorators.cache import never_cache
+import logging
 from alert.donate.dwolla import process_dwolla_payment
 from alert.donate.paypal import process_paypal_payment
 from alert.donate.forms import DonationForm, UserForm, ProfileForm
 from alert.donate.stripe import process_stripe_payment
 from alert.userHandling.models import UserProfile
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -170,7 +173,7 @@ def donate(request):
                 return HttpResponseRedirect(response['redirect'])
 
             else:
-                print response
+                logger.warn("Got back status of %s when making initial request of API." % response['status'])
 
     else:
         try:
