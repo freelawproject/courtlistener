@@ -9,9 +9,10 @@ from alert.contact.views import contact, thanks
 from alert.coverage.views import coverage_graph
 from alert.data_dumper.views import dump_index, serve_or_gen_dump
 from alert.donate.sitemap import donate_sitemap_maker
+from alert.donate.stripe import donate_stripe_complete
 from alert.donate.views import view_donations, donate
 from alert.donate.dwolla import process_dwolla_callback, donate_dwolla_complete, process_dwolla_transaction_status_callback
-from alert.donate.paypal import process_paypal_callback
+from alert.donate.paypal import process_paypal_callback, donate_paypal_complete, donate_paypal_cancel
 from alert.favorites.views import delete_favorite, edit_favorite, \
                                   save_or_update_favorite
 from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, \
@@ -42,6 +43,7 @@ admin.autodiscover()
 # creates a list of the first element of the choices variable for the courts field
 pacer_codes = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
 mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html')
+
 
 urlpatterns = patterns('',
     # Admin docs and site
@@ -168,6 +170,9 @@ urlpatterns = patterns('',
     (r'^donate/callbacks/dwolla/$', process_dwolla_callback),
     (r'^donate/callbacks/dwolla/transaction-status/$', process_dwolla_transaction_status_callback),
     (r'^donate/callbacks/paypal/$', process_paypal_callback),
+    (r'^donate/paypal/complete/$', donate_paypal_complete),
+    (r'^donate/paypal/cancel/$', donate_paypal_cancel),
+    (r'^donate/stripe/complete/$', donate_stripe_complete),
 )
 
 # redirects

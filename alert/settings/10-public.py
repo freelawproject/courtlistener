@@ -165,11 +165,12 @@ TEMPLATE_DIRS = (
 ############
 # Payments #
 ############
-PAYMENT_REDIRECT = 'https://www.courtlistener.com/donate/thanks/'
-PAYMENT_CANCELLATION = 'https://www.courtlistener.com/donate/cancel/'
 DWOLLA_CALLBACK = 'https://www.courtlistener.com/donate/callbacks/dwolla/'
-PAYPAL_CALLBACK = 'https://www.courtlistener.com/donate/callbacks/paypal/'
 DWOLLA_REDIRECT = 'https://www.courtlistener.com/donate/dwolla/complete/'
+PAYPAL_CALLBACK = 'https://www.courtlistener.com/donate/callbacks/paypal/'
+PAYPAL_REDIRECT = 'https://www.courtlistener.com/donate/paypal/complete/'
+PAYPAL_CANCELLATION = 'https://www.courtlistener.com/donate/paypal/cancel/'
+STRIPE_REDIRECT = 'https://www.courtlistener.com/donate/stripe/complete/'
 
 
 ######################
