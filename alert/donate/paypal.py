@@ -2,6 +2,7 @@ from django.shortcuts import render_to_response
 from django.template import RequestContext
 import json
 import logging
+import simplejson
 import requests
 from alert.donate.models import Donation
 from datetime import datetime
@@ -56,7 +57,7 @@ def process_paypal_callback(request):
             'Content-Type': 'application/json',
             'Authorization': 'Bearer %s' % access_token
         },
-        data={'payer_id': request.GET['PayerID']}
+        data=simplejson.dumps({'payer_id': request.GET['PayerID']}),
     )
     if r.status_code == 200:
         d.clearing_date = datetime.now()
