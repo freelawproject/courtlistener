@@ -60,12 +60,13 @@ def process_paypal_callback(request):
     )
     if r.status_code == 200:
         d.clearing_date = datetime.now()
-        d.status = 'SUCCESSFUL_COMPLETION'
+        d.status = 2
         d.save()
         from alert.donate.views import send_thank_you_email
         send_thank_you_email(d)
     else:
-        d.status = 'ERROR'
+        logger.warn("Unable to execute PayPal transaction. Status code %s with data: %s" % (r.status_code, r.content))
+        d.status = 1
         d.save()
     # Finally, show them the thank you page
     return HttpResponseRedirect('/donate/thanks/')
