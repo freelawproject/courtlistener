@@ -52,7 +52,8 @@ def process_dwolla_transaction_status_callback(request):
         data = simplejson.loads(request.raw_post_data)  # Update for django 1.4 to request.body
         logger.info('data is: %s' % data)
         if check_dwolla_signature(request.META['HTTP_X_DWOLLA_SIGNATURE'], request.raw_post_data):
-            if data['Value'].lower() == 'processed':
+            # Statuses can be found at: https://developers.dwolla.com/dev/pages/statuses
+            if data['Value'].lower() == 'pending':
                 # Wait, because Dwolla issues this faster than they issue their application callback. If we don't wait
                 # for a second here, we'll have no ID to lookup, and we'll get a DoesNotExist exception.
                 time.sleep(1)
@@ -62,6 +63,7 @@ def process_dwolla_transaction_status_callback(request):
                 d.clearing_date = datetime.strptime(data['Triggered'], '%m/%d/%Y %I:%M:%S %p')
                 d.status = 4
             elif data['Value'].lower() == 'pending':
+                d.clearing_date = datetime.strptime(data['Triggered'], '%m/%d/%Y %I:%M:%S %p')
                 d.status = 5
             elif data['Value'].lower() == 'cancelled':
                 d.status = 3
