@@ -17,7 +17,6 @@ def get_paypal_access_token():
     Query the PayPal API to get an access token. This could be improved by
     caching the token and detecting when it is expired.
     """
-    logger.info("Got paypal token with value: ")
     r = requests.post(
         '%s/v1/oauth2/token' % settings.PAYPAL_ENDPOINT,
         headers={
@@ -126,6 +125,7 @@ def process_paypal_payment(cd_donation_form):
                 'payment_id': r_content_as_dict.get('id'),
                 'transaction_id': token
             }
+            logger.info("Created payment in paypal with response: %s" % response)
             return response
         else:
             return {'result': 'UNABLE_TO_MAKE_PAYMENT'}
