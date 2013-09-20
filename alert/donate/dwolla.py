@@ -1,4 +1,3 @@
-from datetime import datetime
 import hashlib
 import hmac
 import logging
@@ -6,10 +5,10 @@ import simplejson
 import requests
 import time
 from alert.donate.models import Donation
+from datetime import datetime
 from django.conf import settings
 from django.http import HttpResponseNotAllowed, HttpResponse, HttpResponseForbidden
-from django.shortcuts import render_to_response, get_object_or_404
-from django.template import RequestContext
+from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 
 logger = logging.getLogger(__name__)
@@ -50,7 +49,7 @@ def process_dwolla_callback(request):
 def process_dwolla_transaction_status_callback(request):
     if request.method == 'POST':
         data = simplejson.loads(request.raw_post_data)  # Update for django 1.4 to request.body
-        logger.info('data is: %s' % data)
+        logger.info('Dwolla transaction status callback triggered with data: %s' % data)
         if check_dwolla_signature(request.META['HTTP_X_DWOLLA_SIGNATURE'], request.raw_post_data):
             # Statuses can be found at: https://developers.dwolla.com/dev/pages/statuses
             if data['Value'].lower() == 'pending':
@@ -128,30 +127,3 @@ def process_dwolla_payment(cd_donation_form, cd_profile_form, cd_user_form, test
         'payment_id': r_content_as_dict.get('CheckoutId')
     }
     return response
-
-
-def donate_dwolla_complete(request):
-    if len(request.GET) > 0:
-        # We've gotten some information from the payment provider
-        if request.GET.get('error') == 'failure':
-            if request.GET.get('error_description') == 'User Cancelled':
-                error = 'User Cancelled'
-            elif 'insufficient funds' in request.GET.get('error_description').lower():
-                error = 'Insufficient Funds'
-            return render_to_response(
-                'donate/donate_complete.html',
-                {
-                    'error': error,
-                    'private': True,
-                },
-                RequestContext(request),
-            )
-
-    return render_to_response(
-        'donate/donate_complete.html',
-        {
-            'error': "None",
-            'private': True,
-        },
-        RequestContext(request)
-    )

@@ -83,19 +83,27 @@ def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form):
             }
         else:
             response = {
-                'message': 'Error working with PayPal. Please try another payment method.',
+                'message': 'We had an error working with PayPal. Please try another payment method.',
                 'status': 1,  # ERROR
                 'payment_id': None,
                 'redirect': None,
             }
     elif cd_donation_form['payment_provider'] == 'cc':
-        response = process_stripe_payment(
-            cd_donation_form,
-            cd_profile_form,
-            cd_user_form,
-            test=settings.PAYMENT_TESTING_MODE,
-        )
-
+        response = process_stripe_payment(cd_donation_form, cd_user_form)
+        if response['result'] == 'success':
+            response = {
+                'message': None,
+                'status': 0,  # Awaiting payment
+                'payment_id': response['payment_id'],
+                'redirect': '/donate/stripe/complete'
+            }
+        else:
+            response = {
+                'message': 'We had an error processing your credit card. Please try another payment method.',
+                'status': 1,  #ERROR
+                'payment_id': None,
+                'redirect': None,
+            }
     return response
 
 
@@ -219,3 +227,29 @@ def donate(request):
         RequestContext(request)
     )
 
+
+def donate_complete(request):
+    if len(request.GET) > 0:
+        # We've gotten some information from the payment provider
+        if request.GET.get('error') == 'failure':
+            if request.GET.get('error_description') == 'User Cancelled':
+                error = 'User Cancelled'
+            elif 'insufficient funds' in request.GET.get('error_description').lower():
+                error = 'Insufficient Funds'
+            return render_to_response(
+                'donate/donate_complete.html',
+                {
+                    'error': error,
+                    'private': True,
+                },
+                RequestContext(request),
+            )
+
+    return render_to_response(
+        'donate/donate_complete.html',
+        {
+            'error': "None",
+            'private': True,
+        },
+        RequestContext(request)
+    )
