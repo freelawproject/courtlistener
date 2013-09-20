@@ -28,16 +28,17 @@ def process_dwolla_callback(request):
             d = Donation.objects.get(payment_id=data['CheckoutId'])
             if data['Status'].lower() == 'completed':
                 d.amount = data['amount']
+                d.transaction_id = data['TransactionId']
+                d.clearing_date = datetime.strptime(data['ClearingDate'], '%m/%d/%Y %I:%M:%S %p')
                 d.status = 2
                 from alert.donate.views import send_thank_you_email
                 send_thank_you_email(d)
             elif data['Status'].lower() == 'failed':
-                logger.info('Failed to process payment: %s' % data['Error'])
                 d.status = 1
             d.save()
             return HttpResponse('<h1>200: OK</h1>')
         else:
-            logger.info('Dwolla signature check failed.')
+            logger.warn('Dwolla signature check failed.')
             return HttpResponseForbidden('<h1>403: Did not pass signature check.</h1>')
     else:
         return HttpResponseNotAllowed('<h1>405: This is a callback endpoint for a payment provider. Only POST methods '
@@ -48,7 +49,8 @@ def process_dwolla_callback(request):
 def process_dwolla_transaction_status_callback(request):
     if request.method == 'POST':
         data = simplejson.loads(request.raw_post_data)  # Update for django 1.4 to request.body
-        if check_dwolla_signature(request.META['X-Dwolla-Signature'], request.raw_post_data):
+        logger.info('data is: %s' % data)
+        if check_dwolla_signature(request.META['HTTP_X_DWOLLA_SIGNATURE'], request.raw_post_data):
             d = Donation.objects.get(payment_id=data['Id'])
             if data['Value'].lower() == 'processed':
                 d.clearing_date = datetime.strptime(data['Triggered'], '%m/%d/%Y %I:%M:%S %p')
@@ -64,6 +66,7 @@ def process_dwolla_transaction_status_callback(request):
             d.save()
             return HttpResponse('<h1>200: OK</h1>')
         else:
+            logger.warn('Dwolla signature check failed.')
             return HttpResponseForbidden('<h1>403: Did not pass signature check.</h1>')
     else:
         return HttpResponseNotAllowed('<h1>405: This is a callback endpoint for a payment provider. Only POST methods '
@@ -119,7 +122,6 @@ def process_dwolla_payment(cd_donation_form, cd_profile_form, cd_user_form, test
 
 
 def donate_dwolla_complete(request):
-    logger.info('Dwolla complete.')
     if len(request.GET) > 0:
         # We've gotten some information from the payment provider
         if request.GET.get('error') == 'failure':
