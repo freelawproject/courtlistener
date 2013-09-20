@@ -50,7 +50,7 @@ def process_paypal_callback(request):
     """
     access_token = get_paypal_access_token()
     d = Donation.objects.get(transaction_id=request.GET['token'])
-    r = request.post(
+    r = requests.post(
         '%s/v1/payments/payment/%s/execute/' % (settings.PAYPAL_ENDPOINT, d.payment_id),
         headers={
             'Content-Type': 'application/json',
