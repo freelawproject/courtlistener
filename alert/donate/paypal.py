@@ -1,3 +1,5 @@
+from django.shortcuts import render_to_response
+from django.template import RequestContext
 import json
 import logging
 import requests
@@ -78,7 +80,7 @@ def process_paypal_payment(cd_donation_form):
             'intent': 'sale',
             'redirect_urls': {
                 'return_url': settings.PAYPAL_CALLBACK,
-                'cancel_url': settings.PAYMENT_CANCELLATION,
+                'cancel_url': settings.PAYPAL_CANCELLATION,
             },
             'payer': {'payment_method': 'paypal'},
             'transactions': [
@@ -131,3 +133,41 @@ def process_paypal_payment(cd_donation_form):
             return {'result': 'UNABLE_TO_MAKE_PAYMENT'}
     else:
         return {'result': 'NO_ACCESS_TOKEN', }
+
+
+def donate_paypal_complete(request):
+    if len(request.GET) > 0:
+        # We've gotten some information from the payment provider
+        if request.GET.get('error') == 'failure':
+            if request.GET.get('error_description') == 'User Cancelled':
+                error = 'User Cancelled'
+            elif 'insufficient funds' in request.GET.get('error_description').lower():
+                error = 'Insufficient Funds'
+            return render_to_response(
+                'donate/donate_complete.html',
+                {
+                    'error': error,
+                    'private': True,
+                },
+                RequestContext(request),
+            )
+
+    return render_to_response(
+        'donate/donate_complete.html',
+        {
+            'error': "None",
+            'private': True,
+        },
+        RequestContext(request)
+    )
+
+
+def donate_paypal_cancel(request):
+    return render_to_response(
+        'donate/donate_complete.html',
+        {
+            'error': 'None',
+            'private': False,
+        },
+        RequestContext(request)
+    )

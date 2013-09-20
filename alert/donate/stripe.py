@@ -1,4 +1,6 @@
 from datetime import datetime
+from django.shortcuts import render_to_response
+from django.template import RequestContext
 import hashlib
 import hmac
 import json
@@ -41,7 +43,7 @@ def process_stripe_payment(cd_donation_form, cd_profile_form, cd_user_form, test
         'key': settings.DWOLLA_APPLICATION_KEY,
         'secret': settings.DWOLLA_SECRET_KEY,
         'callback': settings.DWOLLA_CALLLBACK,
-        'redirect': settings.PAYMENT_REDIRECT,
+        'redirect': settings.STRIPE_REDIRECT,
         'allowFundingSources': True,
         'test': test,
         'purchaseOrder': {
@@ -81,3 +83,30 @@ def process_stripe_payment(cd_donation_form, cd_profile_form, cd_user_form, test
         'payment_id': r_content_as_dict.get('CheckoutId')
     }
     return response
+
+
+def donate_stripe_complete(request):
+    if len(request.GET) > 0:
+        # We've gotten some information from the payment provider
+        if request.GET.get('error') == 'failure':
+            if request.GET.get('error_description') == 'User Cancelled':
+                error = 'User Cancelled'
+            elif 'insufficient funds' in request.GET.get('error_description').lower():
+                error = 'Insufficient Funds'
+            return render_to_response(
+                'donate/donate_complete.html',
+                {
+                    'error': error,
+                    'private': True,
+                },
+                RequestContext(request),
+            )
+
+    return render_to_response(
+        'donate/donate_complete.html',
+        {
+            'error': "None",
+            'private': True,
+        },
+        RequestContext(request)
+    )
