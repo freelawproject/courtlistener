@@ -12,7 +12,7 @@ from alert.donate.sitemap import donate_sitemap_maker
 from alert.donate.stripe import donate_stripe_complete
 from alert.donate.views import view_donations, donate
 from alert.donate.dwolla import process_dwolla_callback, donate_dwolla_complete, process_dwolla_transaction_status_callback
-from alert.donate.paypal import process_paypal_callback, donate_paypal_complete, donate_paypal_cancel
+from alert.donate.paypal import process_paypal_callback, donate_paypal_cancel
 from alert.favorites.views import delete_favorite, edit_favorite, \
                                   save_or_update_favorite
 from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, \
