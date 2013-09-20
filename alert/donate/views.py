@@ -78,6 +78,7 @@ def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form):
                 'message': None,
                 'status': 0,  # AWAITING_PAYMENT
                 'payment_id': response['payment_id'],
+                'transaction_id': response['transaction_id'],
                 'redirect': response['redirect'],
             }
         else:
@@ -138,6 +139,7 @@ def donate(request):
                 d = donation_form.save(commit=False)
                 d.status = response['status']
                 d.payment_id = response['payment_id']
+                d.transaction_id = response.get('transaction_id')  # Will onlyl work for Paypal.
                 d.save()
 
                 if request.user.is_anonymous() and not stub_account:
