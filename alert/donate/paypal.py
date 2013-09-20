@@ -1,6 +1,5 @@
 from django.shortcuts import render_to_response
 from django.template import RequestContext
-import json
 import logging
 import simplejson
 import requests
@@ -35,8 +34,8 @@ def get_paypal_access_token():
     if r.status_code == 200:
         logger.info("Got paypal token successfully.")
     else:
-        logger.warning("Problem getting paypal token status_code was: %s" % r.status_code)
-    return json.loads(r.content).get('access_token')
+        logger.critical("Problem getting paypal token status_code was: %s, with content: %s" % (r.status_code, r.content))
+    return simplejson.loads(r.content).get('access_token')
 
 
 @csrf_exempt
@@ -66,11 +65,12 @@ def process_paypal_callback(request):
         from alert.donate.views import send_thank_you_email
         send_thank_you_email(d)
     else:
-        logger.warn("Unable to execute PayPal transaction. Status code %s with data: %s" % (r.status_code, r.content))
+        logger.critical("Unable to execute PayPal transaction. Status code %s with data: %s" %
+                        (r.status_code, r.content))
         d.status = 1
         d.save()
     # Finally, show them the thank you page
-    return HttpResponseRedirect('/donate/thanks/')
+    return HttpResponseRedirect('/donate/paypal/complete/')
 
 
 def process_paypal_payment(cd_donation_form):
@@ -101,11 +101,11 @@ def process_paypal_payment(cd_donation_form):
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer %s' % access_token
             },
-            data=json.dumps(data)
+            data=simplejson.dumps(data)
         )
 
         if r.status_code == 201:  # "Created"
-            r_content_as_dict = json.loads(r.content)
+            r_content_as_dict = simplejson.loads(r.content)
             # Get the redirect value from the 'links' attribute. Links look like:
             #   [{u'href': u'https://api.sandbox.paypal.com/v1/payments/payment/PAY-8BC403022U6413151KIQPC2I',
             #     u'method': u'GET',
@@ -117,7 +117,7 @@ def process_paypal_payment(cd_donation_form):
             #     u'method': u'POST',
             #     u'rel': u'execute'}
             #   ]
-            redirect = [link for link in json.loads(r.content)['links'] if
+            redirect = [link for link in simplejson.loads(r.content)['links'] if
                         link['rel'].lower() == 'approval_url'][0]['href']
             parsed_redirect = urlparse(redirect)
             token = parse_qs(parsed_redirect.query)['token'][0]
@@ -137,38 +137,11 @@ def process_paypal_payment(cd_donation_form):
         return {'result': 'NO_ACCESS_TOKEN', }
 
 
-def donate_paypal_complete(request):
-    if len(request.GET) > 0:
-        # We've gotten some information from the payment provider
-        if request.GET.get('error') == 'failure':
-            if request.GET.get('error_description') == 'User Cancelled':
-                error = 'User Cancelled'
-            elif 'insufficient funds' in request.GET.get('error_description').lower():
-                error = 'Insufficient Funds'
-            return render_to_response(
-                'donate/donate_complete.html',
-                {
-                    'error': error,
-                    'private': True,
-                },
-                RequestContext(request),
-            )
-
-    return render_to_response(
-        'donate/donate_complete.html',
-        {
-            'error': "None",
-            'private': True,
-        },
-        RequestContext(request)
-    )
-
-
 def donate_paypal_cancel(request):
     return render_to_response(
         'donate/donate_complete.html',
         {
-            'error': 'None',
+            'error': 'User Cancelled',
             'private': False,
         },
         RequestContext(request)

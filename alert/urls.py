@@ -170,7 +170,7 @@ urlpatterns = patterns('',
     (r'^donate/callbacks/dwolla/$', process_dwolla_callback),
     (r'^donate/callbacks/dwolla/transaction-status/$', process_dwolla_transaction_status_callback),
     (r'^donate/callbacks/paypal/$', process_paypal_callback),
-    (r'^donate/paypal/complete/$', donate_paypal_complete),
+    (r'^donate/paypal/complete/$', donate_dwolla_complete),
     (r'^donate/paypal/cancel/$', donate_paypal_cancel),
     (r'^donate/stripe/complete/$', donate_stripe_complete),
 )
