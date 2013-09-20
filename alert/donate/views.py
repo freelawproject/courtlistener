@@ -78,7 +78,7 @@ def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form):
                 'message': None,
                 'status': 0,  # AWAITING_PAYMENT
                 'payment_id': response['payment_id'],
-                'redirect': 'Unknown',
+                'redirect': response['redirect'],
             }
         else:
             response = {
