@@ -4,6 +4,7 @@ import hmac
 import logging
 import simplejson
 import requests
+import time
 from alert.donate.models import Donation
 from django.conf import settings
 from django.http import HttpResponseNotAllowed, HttpResponse, HttpResponseForbidden
@@ -51,7 +52,12 @@ def process_dwolla_transaction_status_callback(request):
         data = simplejson.loads(request.raw_post_data)  # Update for django 1.4 to request.body
         logger.info('data is: %s' % data)
         if check_dwolla_signature(request.META['HTTP_X_DWOLLA_SIGNATURE'], request.raw_post_data):
-            d = Donation.objects.get(transaction_id=data['Id'])
+            if data['Value'].lower() == 'processed':
+                # Wait, because Dwolla issues this faster than they issue their application callback. If we don't wait
+                # for a second here, we'll have no ID to lookup, and we'll get a DoesNotExist exception.
+                time.sleep(1)
+            d = Donation.objects.get_object_or_404(transaction_id=data['Id'])
+
             if data['Value'].lower() == 'processed':
                 d.clearing_date = datetime.strptime(data['Triggered'], '%m/%d/%Y %I:%M:%S %p')
                 d.status = 4
@@ -115,7 +121,7 @@ def process_dwolla_payment(cd_donation_form, cd_profile_form, cd_user_form, test
     response = {
         'result': r_content_as_dict.get('Result'),
         'status_code': r.status_code,
-        'message': r_content_as_dict.get('Message'),
+        'message': r_content_as_dict.get('Message'),  # None if no errors.
         'redirect': 'https://www.dwolla.com/payment/checkout/%s' % r_content_as_dict.get('CheckoutId'),
         'payment_id': r_content_as_dict.get('CheckoutId')
     }

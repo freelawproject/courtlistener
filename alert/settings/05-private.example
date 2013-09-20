@@ -31,6 +31,7 @@ if not DEVELOPMENT:
     CELERY_PASSWORD = 'your-celery-password'
 
 # Payment secrets
+EIN = ''  # The business tax ID.
 if DEVELOPMENT:
     PAYMENT_TESTING_MODE = True
 else:
