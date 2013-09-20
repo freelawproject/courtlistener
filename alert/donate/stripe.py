@@ -1,112 +1,73 @@
-from datetime import datetime
-from django.shortcuts import render_to_response
-from django.template import RequestContext
-import hashlib
-import hmac
-import json
-import requests
+from django.shortcuts import get_object_or_404
+import logging
+import simplejson
+import stripe
 from alert.donate.models import Donation
+from datetime import datetime
 from django.conf import settings
-from django.http import HttpResponseNotAllowed
+from django.http import HttpResponseNotAllowed, HttpResponse
+
+logger = logging.getLogger(__name__)
 
 
-def check_dwolla_signature(proposed_signature, checkout_id, amount):
-    # From Dwolla documentation
-    raw = '%s&%s' % (checkout_id, amount)
-    signature = hmac.new(settings.DWOLLA_SECRET_KEY, raw, hashlib.sha1).hexdigest()
-    return True if (signature == proposed_signature) else False
-
-
-def process_dwolla_callback(request):
+def process_stripe_callback(request):
     if request.method == 'POST':
-        data = json.loads(request.raw_post_data)  # Update for Django 1.4 to request.body
-        if check_dwolla_signature(data['Signature'], data['CheckoutId'], data['amount']):
-            d = Donation.objects.get(payment_id=data['CheckoutId'])
-            if data['Status'] == 'Completed':
-                d.amount = data['amount']
-                d.clearing_date = datetime.strptime(data['ClearingDate'], '%m/%d/%Y %I:%M:%S %p')
-                d.status = 'SUCCESSFUL_COMPLETION'
-                d.save()
-                from alert.donate.views import send_thank_you_email
-                send_thank_you_email(d)
-            elif data['Status'] == 'Failed':
-                d.status = 'ERROR'
-                d.save()
+        # Stripe hits us with a callback, and their security model is for us to use the ID from that to hit their API.
+        # It's analogous to when you get a random call and you call them back to make sure it's legit.
+        event_id = simplejson.loads(request.raw_post_data)['id']
+        # Now use the API to call back.
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        event = simplejson.loads(stripe.Event.retrieve(event_id))
+        logger.info('Stripe callback triggered with data: %s' % event)
+        if event['type'].startswith('charge') and event['livemode'] == settings.PAYMENT_TESTING_MODE:
+            charge = event['data']['object']
+            d = get_object_or_404(Donation, transaction_id=charge['id'])
+            # See: https://stripe.com/docs/api#event_types
+            if event['type'].endswith('succeeded'):
+                d.clearing_date = datetime.utcfromtimestamp(charge['created'])
+                d.status = 4
+            elif event['type'].endswith('failed'):
+                d.clearing_date = datetime.utcfromtimestamp(charge['created'])
+                d.status = 1
+            elif event['type'].endswith('refunded'):
+                d.clearing_date = datetime.utcfromtimestamp(charge['created'])
+                d.status = 7
+            elif event['type'].endswith('captured'):
+                d.clearing_date = datetime.utcfromtimestamp(charge['created'])
+                d.status = 8
+            elif event['type'].endswith('dispute.created'):
+                logger.critical("Somebody has created a dispute in Stripe: %s" % charge['id'])
+            elif event['type'].endswith('dispute.updated'):
+                logger.critical("The Stripe dispute on charge %s has been updated." % charge['id'])
+            elif event['type'].endswith('dispute.closed'):
+                logger.critical("The Stripe dispute on charge %s has been closed." % charge['id'])
+            d.save()
+        return HttpResponse('<h1>200: OK</h1>')
     else:
         return HttpResponseNotAllowed('<h1>405: This is a callback endpoint for a payment provider. Only POST methods '
                                       'are allowed.</h1>')
 
 
-def process_stripe_payment(cd_donation_form, cd_profile_form, cd_user_form, test=True):
-    """Generate a redirect URL for the user, and shuttle them off"""
-    data = {
-        'key': settings.DWOLLA_APPLICATION_KEY,
-        'secret': settings.DWOLLA_SECRET_KEY,
-        'callback': settings.DWOLLA_CALLLBACK,
-        'redirect': settings.STRIPE_REDIRECT,
-        'allowFundingSources': True,
-        'test': test,
-        'purchaseOrder': {
-            'customerInfo': {
-                'firstName': cd_user_form['first'],
-                'lastName': cd_user_form['last'],
-                'email': cd_user_form['email'],
-                'city': cd_profile_form['city'],
-                'state': cd_profile_form['state'],
-                'zip': cd_profile_form['zip_code'],
-            },
-            'DestinationID': settings.DWOLLA_ACCOUNT_ID,
-            'shipping': '0',
-            'tax': '0',
-            'total': cd_donation_form['amount'],
-            'OrderItems': [
-                {
-                    'Name': 'Donation to the Free Law Project',
-                    'Description': 'Your donation makes our work possible.',
-                    'Price': cd_donation_form['amount'],
-                    'Quantity': '1',
-                },
-            ]
-        }
-    }
-    r = requests.POST(
-        'https://www.dwolla.com/payment/request',
-        data=json.dumps(data),
-        headers={'Content-Type': 'application/json'}
-    )
-    r_content_as_dict = json.loads(r.content)
+def process_stripe_payment(cd_donation_form, cd_user_form):
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    token = cd_donation_form['stripeToken']
+
+    # Create the charge on Stripe's servers
+    try:
+        charge = stripe.Charge.create(
+            amount=cd_donation_form['amount'] * 100,  # amount in cents, watch yourself
+            currency="usd",
+            card=token,
+            description=cd_user_form['email'],
+        )
+        result = "success"
+    except stripe.CardError, e:
+        logger.warn("Stripe was unable to process the payment: %s" % e)
+        result = "failure"
+        charge = None
+
     response = {
-        'result': r_content_as_dict.get('Result'),
-        'status_code': r.status_code,
-        'message': r_content_as_dict.get('Message'),
-        'redirect': 'https://www.dwolla.com/payment/checkout/%s' % r_content_as_dict.get('CheckoutId'),
-        'payment_id': r_content_as_dict.get('CheckoutId')
+        'result': result,
+        'payment_id': charge.id,
     }
     return response
-
-
-def donate_stripe_complete(request):
-    if len(request.GET) > 0:
-        # We've gotten some information from the payment provider
-        if request.GET.get('error') == 'failure':
-            if request.GET.get('error_description') == 'User Cancelled':
-                error = 'User Cancelled'
-            elif 'insufficient funds' in request.GET.get('error_description').lower():
-                error = 'Insufficient Funds'
-            return render_to_response(
-                'donate/donate_complete.html',
-                {
-                    'error': error,
-                    'private': True,
-                },
-                RequestContext(request),
-            )
-
-    return render_to_response(
-        'donate/donate_complete.html',
-        {
-            'error': "None",
-            'private': True,
-        },
-        RequestContext(request)
-    )

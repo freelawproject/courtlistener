@@ -16,7 +16,8 @@ PAYMENT_STATUSES = (
     (4, 'Processed'),
     (5, 'Pending'),
     (6, 'Failed'),
-    (7, 'Reclaimed'),
+    (7, 'Reclaimed/Refunded'),
+    (8, 'Captured'),
 )
 
 

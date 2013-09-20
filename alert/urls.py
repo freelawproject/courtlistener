@@ -3,23 +3,19 @@ from alert import settings
 from alert.api.views import court_index
 from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
-from alert.casepage.views import view_case, view_case_citations, \
-                                 serve_static_file
+from alert.casepage.views import view_case, view_case_citations, serve_static_file
 from alert.contact.views import contact, thanks
 from alert.coverage.views import coverage_graph
 from alert.data_dumper.views import dump_index, serve_or_gen_dump
-from alert.donate.sitemap import donate_sitemap_maker
-from alert.donate.stripe import donate_stripe_complete
-from alert.donate.views import view_donations, donate
-from alert.donate.dwolla import process_dwolla_callback, donate_dwolla_complete, process_dwolla_transaction_status_callback
+from alert.donate.dwolla import process_dwolla_callback, process_dwolla_transaction_status_callback
 from alert.donate.paypal import process_paypal_callback, donate_paypal_cancel
-from alert.favorites.views import delete_favorite, edit_favorite, \
-                                  save_or_update_favorite
-from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, \
-                              search_feed
+from alert.donate.sitemap import donate_sitemap_maker
+from alert.donate.stripe import process_stripe_callback
+from alert.donate.views import view_donations, donate, donate_complete
+from alert.favorites.views import delete_favorite, edit_favorite, save_or_update_favorite
+from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, search_feed
 from alert.maintenance_warning.views import show_maintenance_warning
-from alert.pinger.views import validate_for_bing, validate_for_bing2, \
-                               validate_for_google, validate_for_google2
+from alert.pinger.views import validate_for_bing, validate_for_bing2, validate_for_google, validate_for_google2
 from alert.robots.views import robots
 from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert
 from alert.search.models import Court
@@ -32,8 +28,7 @@ from django.conf.urls.defaults import *
 from django.views.generic import RedirectView
 
 # for the flatfiles in the sitemap
-from django.contrib.auth.views import login as signIn, logout as signOut, \
-                                      password_reset, password_reset_done, \
+from django.contrib.auth.views import login as signIn, logout as signOut, password_reset, password_reset_done, \
                                       password_reset_confirm
 
 # enables the admin:
@@ -166,13 +161,14 @@ urlpatterns = patterns('',
 
     # Donations
     (r'^donate/$', donate),
-    (r'^donate/dwolla/complete/$', donate_dwolla_complete),
+    (r'^donate/dwolla/complete/$', donate_complete),
+    (r'^donate/paypal/complete/$', donate_complete),
+    (r'^donate/stripe/complete/$', donate_complete),
     (r'^donate/callbacks/dwolla/$', process_dwolla_callback),
     (r'^donate/callbacks/dwolla/transaction-status/$', process_dwolla_transaction_status_callback),
     (r'^donate/callbacks/paypal/$', process_paypal_callback),
-    (r'^donate/paypal/complete/$', donate_dwolla_complete),
+    (r'^donate/callbacks/stripe/$', process_stripe_callback),
     (r'^donate/paypal/cancel/$', donate_paypal_cancel),
-    (r'^donate/stripe/complete/$', donate_stripe_complete),
 )
 
 # redirects

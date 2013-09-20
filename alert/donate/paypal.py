@@ -1,5 +1,3 @@
-from django.shortcuts import render_to_response
-from django.template import RequestContext
 import logging
 import simplejson
 import requests
@@ -7,6 +5,8 @@ from alert.donate.models import Donation
 from datetime import datetime
 from django.conf import settings
 from django.http import HttpResponseRedirect
+from django.shortcuts import render_to_response
+from django.template import RequestContext
 from django.views.decorators.csrf import csrf_exempt
 from urlparse import urlparse, parse_qs
 
