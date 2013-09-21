@@ -17,6 +17,7 @@ SITE_ID = 1
 USE_I18N = False
 DEFAULT_CHARSET = 'utf-8'
 LANGUAGE_CODE = 'en-us'
+USE_TZ = True
 
 # List of callables that know how to import templates from various sources.
 TEMPLATE_LOADERS = (
@@ -76,6 +77,7 @@ INSTALLED_APPS = [
     'pinger',
     'scrapers',
     'search',
+    'stats',
     'userHandling',
 ]
 
