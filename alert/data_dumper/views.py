@@ -13,6 +13,7 @@ from django.template import RequestContext
 
 import os
 from datetime import date
+from alert.stats import tally_stat
 
 
 def dump_index(request):
@@ -40,6 +41,7 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
                 'your court ID instead.</h2>')
         else:
             # Serve the dump for all cases.
+            tally_stat('bulk_data.served.all')
             return HttpResponseRedirect('/dumps/all.xml.gz')
 
     else:
@@ -70,6 +72,7 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
     # See if we already have it on disk.
     try:
         _ = open(os.path.join(path_from_root, filename + '.gz'), 'rb')
+        tally_stat('bulk_data.served.by_date')
         return HttpResponseRedirect(os.path.join('/dumps', filepath, filename + '.gz'))
     except IOError:
         # Time-based dump
@@ -92,7 +95,8 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
             make_dump_file(docs_to_dump, path_from_root, filename)
         else:
             print "Bad request!"
-            return HttpResponseBadRequest('<h2>Error 400: We do not have any '
-                'data for this time period.</h2>', status=404)
+            return HttpResponseBadRequest('<h2>Error 400: We do not have any data for this time period.</h2>',
+                                          status=404)
 
+        tally_stat('bulk_data.served.by_date')
         return HttpResponseRedirect('%s.gz' % os.path.join('/dumps', filepath, filename))

@@ -7,6 +7,7 @@ from alert.lib import search_utils
 from alert.lib import sunburnt
 from alerts.models import FREQUENCY
 from alert.search.forms import SearchForm
+from alert.stats import tally_stat
 from userHandling.models import UserProfile
 
 from django.template import loader, Context
@@ -83,6 +84,7 @@ def emailer(rate, verbose, simulate):
     userProfiles = UserProfile.objects.filter(alert__alertFrequency=rate).distinct()
 
     # for each user with a daily, weekly or monthly alert...
+    alerts_sent_count = 0
     for userProfile in userProfiles:
         #...get their alerts...
         alerts = userProfile.alert.filter(alertFrequency=rate)
@@ -147,10 +149,13 @@ def emailer(rate, verbose, simulate):
                 print e
 
         if len(hits) > 0:
+            alerts_sent_count += 1
             send_alert(userProfile, hits, verbose, simulate)
         elif verbose:
             print "No hits, thus not sending mail for this alert."
 
+    if not simulate:
+        tally_stat('alerts.sent', inc=alerts_sent_count)
     return "Done"
 
 

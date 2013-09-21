@@ -11,6 +11,7 @@ from django.shortcuts import render_to_response
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
 from django.views.decorators.cache import never_cache
+from alert.stats import tally_stat
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,7 @@ def show_results(request):
     '''
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     if len(request.GET) > 0:
-        # A query was performed. Bind the search form.
+        # Bind the search form.
         search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
@@ -89,6 +90,7 @@ def show_results(request):
                     court_facet_fields, search_form, 'court_exact', 'court_')
                 status_facets = search_utils.make_facets_variable(
                     stat_facet_fields, search_form, 'status_exact', 'stat_')
+                tally_stat('search.results')
             except Exception, e:
                 logger.warning("Error loading search page with request: %s" % request.GET)
                 return render_to_response(
