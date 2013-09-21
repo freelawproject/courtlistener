@@ -65,13 +65,6 @@ class UserForm(ModelForm):
         )
     )
 
-    def clean_email(self):
-        """ensures unique email addresses"""
-        email = self.cleaned_data.get('email')
-        if email and User.objects.filter(email=email).count():
-            raise forms.ValidationError(u'This email address is already in use.')
-        return email
-
     class Meta:
         model = User
         fields = (
@@ -93,13 +86,6 @@ class UserCreationFormExtended(UserCreationForm):
     def __init__(self, *args, **kwargs):
         super(UserCreationFormExtended, self).__init__(*args, **kwargs)
         self.fields['email'].required = True
-
-    def clean_email(self):
-        """ensures unique email addresses, discounting stub accounts"""
-        email = self.cleaned_data.get('email')
-        if email and User.objects.filter(email=email).filter(userprofile__stub_account=False).count():
-            raise forms.ValidationError(u'This email address is already in use.')
-        return email
 
     class Meta:
         model = User
