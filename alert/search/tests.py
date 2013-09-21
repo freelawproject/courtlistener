@@ -8,7 +8,7 @@ from alert.search.models import Citation, Court, Document
 from alert.scrapers.test_assets import test_scraper
 from alert import settings
 from alert.search import models
-from alert.search.tasks import do_pagerank
+from alert.search.management.commands.cl_calculate_pagerank import do_pagerank
 
 class SetupException(Exception):
     def __init__(self, message):
@@ -132,19 +132,6 @@ class SearchTest(TestCase):
 class PagerankTest(TestCase):
     fixtures = ['test_court.json']
 
-    def setUp(self):
-        # Set up a testing core in Solr and swap it in
-        self.core_name = '%s.test-%s' % (self.__module__, time.time())
-        create_solr_core(self.core_name)
-        swap_solr_core('collection1', self.core_name)
-
-        # Set up a handy court object
-        self.court = Court.objects.get(pk='test')
-
-    def tearDown(self):
-        swap_solr_core(self.core_name, 'collection1')
-        delete_solr_core(self.core_name)
-
     def test_pagerank_calculation(self):
         """Create a few Documents and fake citation relation among them, then run the pagerank
         algorithm. Check whether this simple case can get the correct result.
@@ -177,7 +164,6 @@ class PagerankTest(TestCase):
         do_pagerank()
 
         #verify that whether the answer is correct
-
         ANS_LIST=[1.16336, 0.64443, 1.19219]
         result = True
         for i in range(3):

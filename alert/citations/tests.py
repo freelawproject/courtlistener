@@ -8,7 +8,6 @@ from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_s
 from alert.search.models import Court
 from alert.search import models
 from django.test import TestCase
-from alert.search.management.commands import cl_calculate_pagerank
 
 from datetime import date
 
@@ -214,5 +213,3 @@ class ConstantsTest(TestCase):
             for variation in variations:
                 self.assertIn(EDITIONS[variation], REPORTERS.keys(),
                               msg="Could not map variation to a valid reporter: %s" % variation)
-
-
