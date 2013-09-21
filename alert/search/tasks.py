@@ -13,18 +13,8 @@ from alert.search.models import Document
 from alert.search.search_indexes import InvalidDocumentError
 from alert.search.search_indexes import SearchDocument
 from celery.decorators import task
-from alert.lib.db_tools import queryset_generator
 
-class LocalDocument(object):
-    """Convenience class which save the field from database temporarily.
-    After the iterations of pagerank calculation, it will upload the pagerank
-    to database. This will avoid frequent hit of database.
-    """
-    def __init__(self, id, cases_cited_count, citing_cases_id, pagerank=1):
-        self.id = id
-        self.cases_cited_count = cases_cited_count
-        self.citing_cases_id = citing_cases_id
-        self.pagerank = pagerank
+
 
 @task
 def add_or_update_doc_object(doc, solr_url=settings.SOLR_URL):
@@ -101,43 +91,3 @@ def update_cite(citation_id):
         search_doc = SearchDocument(doc)
         si.add(search_doc)
     si.commit()
-
-@task
-def do_pagerank():
-    DAMPING_FACTOR = 0.85
-    MAX_ITERATIONS = 100
-    MIN_DELTA = 0.00001
-
-    #graph_size = Document.objects.all().count()
-    min_value = (1.0 - DAMPING_FACTOR)
-    locdoc_dict = dict()
-    case_list = queryset_generator(Document.objects.all())
-    for case in case_list:
-        id = case.pk
-        cases_cited_count = len(case.cases_cited.all())
-        citing_cases_id = []
-        for citing_case in case.citation.citing_cases.all():
-            citing_cases_id.append(citing_case.pk)
-        locdoc = LocalDocument(id, cases_cited_count, citing_cases_id)
-        locdoc_dict[id] = locdoc
-
-    for i in range(MAX_ITERATIONS):
-        diff = 0
-        print("No.{:d} iteration...({:d} times at most)".format(i, MAX_ITERATIONS))
-        for key, locdoc in locdoc_dict.iteritems():
-            tmp_pagerank = min_value
-            for id in locdoc.citing_cases_id:
-                citing_case = locdoc_dict[id]
-                tmp_pagerank += DAMPING_FACTOR * citing_case.pagerank / citing_case.cases_cited_count
-            diff += abs(locdoc.pagerank - tmp_pagerank)
-            locdoc.pagerank = tmp_pagerank
-        if diff < MIN_DELTA:
-            break
-
-    print('Updating database...')
-    case_list = queryset_generator(Document.objects.all())
-    for case in case_list:
-        case.pagerank = locdoc_dict[case.pk].pagerank
-        case.save(index=False)
-        #print(str(case.pk)+":\t"+str(case.pagerank))
-    print('PageRank calculation finish!')
