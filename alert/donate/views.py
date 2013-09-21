@@ -40,7 +40,7 @@ def send_thank_you_email(donation):
     send_mail(email_subject, email_body, 'Free Law Project <donate@freelawproject.org>', [profile.user.email])
 
 
-def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form):
+def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form, stripe_token):
     """Routes the donation to the correct payment provider, then normalizes its response.
 
     Returns a dict with:
@@ -89,7 +89,7 @@ def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form):
                 'redirect': None,
             }
     elif cd_donation_form['payment_provider'] == 'cc':
-        response = process_stripe_payment(cd_donation_form, cd_user_form)
+        response = process_stripe_payment(cd_donation_form, cd_user_form, stripe_token)
         if response['result'] == 'success':
             response = {
                 'message': None,
@@ -100,10 +100,12 @@ def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form):
         else:
             response = {
                 'message': 'We had an error processing your credit card. Please try another payment method.',
-                'status': 1,  #ERROR
+                'status': 1,  # ERROR
                 'payment_id': None,
                 'redirect': None,
             }
+    else:
+        response = None
     return response
 
 
@@ -111,6 +113,7 @@ def donate(request):
     message = None
     if request.method == 'POST':
         donation_form = DonationForm(request.POST)
+        stub_account = False
 
         if request.user.is_anonymous():
             # Either this is a new account, a stubbed one, or a user that's simply not logged into their account
@@ -118,7 +121,7 @@ def donate(request):
                 stub_account = User.objects.filter(userprofile__stub_account=True). \
                                             get(email__iexact=request.POST.get('email'))
             except User.DoesNotExist:
-                stub_account = False
+                pass
 
             if not stub_account:
                 user_form = UserForm(request.POST)
@@ -138,9 +141,10 @@ def donate(request):
             cd_donation_form = donation_form.cleaned_data
             cd_user_form = user_form.cleaned_data
             cd_profile_form = profile_form.cleaned_data
+            stripe_token = request.POST.get('stripeToken')
 
             # Route the payment to a payment provider
-            response = route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form)
+            response = route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form, stripe_token)
             logger.info("Payment routed with response: %s" % response)
 
             if response['status'] == 0:
@@ -229,6 +233,7 @@ def donate(request):
 
 
 def donate_complete(request):
+    error = None
     if len(request.GET) > 0:
         # We've gotten some information from the payment provider
         if request.GET.get('error') == 'failure':
@@ -248,7 +253,7 @@ def donate_complete(request):
     return render_to_response(
         'donate/donate_complete.html',
         {
-            'error': "None",
+            'error': error,
             'private': True,
         },
         RequestContext(request)

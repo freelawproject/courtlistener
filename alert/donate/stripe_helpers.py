@@ -48,16 +48,15 @@ def process_stripe_callback(request):
                                       'are allowed.</h1>')
 
 
-def process_stripe_payment(cd_donation_form, cd_user_form):
+def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
     stripe.api_key = settings.STRIPE_SECRET_KEY
-    token = cd_donation_form['stripeToken']
 
     # Create the charge on Stripe's servers
     try:
         charge = stripe.Charge.create(
             amount=cd_donation_form['amount'] * 100,  # amount in cents, watch yourself
             currency="usd",
-            card=token,
+            card=stripe_token,
             description=cd_user_form['email'],
         )
         result = "success"
