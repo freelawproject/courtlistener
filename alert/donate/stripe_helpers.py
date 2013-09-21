@@ -25,7 +25,7 @@ def process_stripe_callback(request):
                         event['livemode'] != settings.PAYMENT_TESTING_MODE:  # Livemode is opposite of testing mode
             logger.info('1')
             charge = event['data']['object']
-            d = get_object_or_404(Donation, transaction_id=charge['id'])
+            d = get_object_or_404(Donation, payment_id=charge['id'])
             # See: https://stripe.com/docs/api#event_types
             if event['type'].endswith('succeeded'):
                 logger.info('2')
