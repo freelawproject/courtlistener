@@ -10,7 +10,7 @@ from alert.data_dumper.views import dump_index, serve_or_gen_dump
 from alert.donate.dwolla import process_dwolla_callback, process_dwolla_transaction_status_callback
 from alert.donate.paypal import process_paypal_callback, donate_paypal_cancel
 from alert.donate.sitemap import donate_sitemap_maker
-from alert.donate.stripe import process_stripe_callback
+from alert.donate.stripe_helpers import process_stripe_callback
 from alert.donate.views import view_donations, donate, donate_complete
 from alert.favorites.views import delete_favorite, edit_favorite, save_or_update_favorite
 from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, search_feed
