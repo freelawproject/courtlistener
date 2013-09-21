@@ -19,7 +19,7 @@ def process_stripe_callback(request):
         event_id = simplejson.loads(request.raw_post_data)['id']
         # Now use the API to call back.
         stripe.api_key = settings.STRIPE_SECRET_KEY
-        event = simplejson.loads(stripe.Event.retrieve(event_id))
+        event = stripe.Event.retrieve(event_id)
         logger.info('Stripe callback triggered with data: %s' % event)
         if event['type'].startswith('charge') and event['livemode'] == settings.PAYMENT_TESTING_MODE:
             charge = event['data']['object']
