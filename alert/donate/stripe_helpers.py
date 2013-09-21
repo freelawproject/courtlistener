@@ -22,19 +22,24 @@ def process_stripe_callback(request):
         event = simplejson.loads(str(stripe.Event.retrieve(event_id)))
         logger.info('Stripe callback triggered with data: %s' % event)
         if event['type'].startswith('charge') and event['livemode'] == settings.PAYMENT_TESTING_MODE:
+            logger.info('1')
             charge = event['data']['object']
             d = get_object_or_404(Donation, transaction_id=charge['id'])
             # See: https://stripe.com/docs/api#event_types
             if event['type'].endswith('succeeded'):
+                logger.info('2')
                 d.clearing_date = datetime.utcfromtimestamp(charge['created'])
                 d.status = 4
             elif event['type'].endswith('failed'):
+                logger.info('3')
                 d.clearing_date = datetime.utcfromtimestamp(charge['created'])
                 d.status = 1
             elif event['type'].endswith('refunded'):
+                logger.info('4')
                 d.clearing_date = datetime.utcfromtimestamp(charge['created'])
                 d.status = 7
             elif event['type'].endswith('captured'):
+                logger.info('5')
                 d.clearing_date = datetime.utcfromtimestamp(charge['created'])
                 d.status = 8
             elif event['type'].endswith('dispute.created'):
@@ -43,6 +48,7 @@ def process_stripe_callback(request):
                 logger.critical("The Stripe dispute on charge %s has been updated." % charge['id'])
             elif event['type'].endswith('dispute.closed'):
                 logger.critical("The Stripe dispute on charge %s has been closed." % charge['id'])
+            logger.info('6')
             d.save()
         return HttpResponse('<h1>200: OK</h1>')
     else:
