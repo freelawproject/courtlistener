@@ -54,7 +54,7 @@ def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
     # Create the charge on Stripe's servers
     try:
         charge = stripe.Charge.create(
-            amount=cd_donation_form['amount'] * 100,  # amount in cents, watch yourself
+            amount=int(cd_donation_form['amount']) * 100,  # amount in cents, watch yourself
             currency="usd",
             card=stripe_token,
             description=cd_user_form['email'],
