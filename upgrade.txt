@@ -24,8 +24,6 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 DONATION PROJECT
     - PRE DEPLOY:
-        - TODO: Users cannot change any profile information if they don't update their email address ("This email
-                address already in use")
         - TODO: Make the annual reminder
         - TODO: Why don't the mailing address, city, state and zip fields auto-populate when the info is known?
 
@@ -52,6 +50,15 @@ LAWBOX PROJECT
    TODO: manage.py dumpdata search.court --indent=2 | tee search/fixtures/initial_data.json (and merge any live changes
          back into this data structure)
    TODO: Sort out the new court picking interface.
+
+2013-09-21:
+ - I've added a new feature that allows us to log stats. It it has the signature of tally_stat('name_of_stat', inc=1,
+   date=date.today()), which, if not self explanatory should be pretty clear. As you might expect, it comes with a
+   database change, which you'll need to run:
+
+     manage.py migrate stats
+
+   With that complete, a number of the major CL features will begin logging their work.
 
 
 2013-09-17:
