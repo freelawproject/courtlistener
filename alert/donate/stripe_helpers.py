@@ -21,7 +21,8 @@ def process_stripe_callback(request):
         stripe.api_key = settings.STRIPE_SECRET_KEY
         event = simplejson.loads(str(stripe.Event.retrieve(event_id)))
         logger.info('Stripe callback triggered with data: %s' % event)
-        if event['type'].startswith('charge') and event['livemode'] == settings.PAYMENT_TESTING_MODE:
+        if event['type'].startswith('charge') and \
+                        event['livemode'] != settings.PAYMENT_TESTING_MODE:  # Livemode is opposite of testing mode
             logger.info('1')
             charge = event['data']['object']
             d = get_object_or_404(Donation, transaction_id=charge['id'])
