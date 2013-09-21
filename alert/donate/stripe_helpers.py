@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
 import logging
 import simplejson
 import stripe
@@ -10,6 +11,7 @@ from django.http import HttpResponseNotAllowed, HttpResponse
 logger = logging.getLogger(__name__)
 
 
+@csrf_exempt
 def process_stripe_callback(request):
     if request.method == 'POST':
         # Stripe hits us with a callback, and their security model is for us to use the ID from that to hit their API.
