@@ -2,6 +2,7 @@ import logging
 from alert.alerts.forms import CreateAlertForm
 from alert.lib import search_utils
 from alert.lib import sunburnt
+from alert.lib.bot_detector import is_bot
 from alert.search.forms import SearchForm
 
 from alert import settings
@@ -90,7 +91,8 @@ def show_results(request):
                     court_facet_fields, search_form, 'court_exact', 'court_')
                 status_facets = search_utils.make_facets_variable(
                     stat_facet_fields, search_form, 'status_exact', 'stat_')
-                tally_stat('search.results')
+                if not is_bot(request):
+                    tally_stat('search.results')
             except Exception, e:
                 logger.warning("Error loading search page with request: %s" % request.GET)
                 return render_to_response(

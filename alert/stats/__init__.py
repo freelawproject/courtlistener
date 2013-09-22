@@ -21,3 +21,28 @@ def tally_stat(name, inc=1, date_logged=date.today()):
         # s doesn't have the new value when it's updated with a F object, so we
         # fake the return value instead of looking it up again for the user.
         return count_cache + inc
+
+
+def clear_stats(name, clear_date=date.today()):
+    """Clears the stats for the name-date pair requested.
+
+    If clear_date is None, it will clear all dates for the name.
+    """
+    if clear_date is None:
+        Stat.objects.filter(name=name).delete()
+    else:
+        Stat.objects.filter(name=name, date_logged=clear_date).delete()
+
+
+def set_stat(name, value, set_date=date.today()):
+    """Sets the value for the name-date pair requested.
+
+    Returns the value if possible, or None if unable to complete.
+    """
+    try:
+        s = Stat.objects.get(name=name, date=set_date)
+        s.count = value
+        s.save()
+        return s.count
+    except Stat.DoesNotExist:
+        return None
