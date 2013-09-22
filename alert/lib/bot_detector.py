@@ -6,7 +6,7 @@ def is_bot(request):
     is_known_bot = False
     for bot in known_bots:
         if bot in user_agent.lower():
-            is_bot = True
+            is_known_bot = True
             break
 
     return is_known_bot
