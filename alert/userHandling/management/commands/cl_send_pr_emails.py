@@ -26,6 +26,8 @@ class Command(BaseCommand):
     option_list = BaseCommand.option_list + (
         make_option(
             '--subscribers',
+            default=False,
+            action='store_true',
             help='Lookup the subscribers in the database and send the email to them.'
         ),
         make_option(
