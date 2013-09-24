@@ -8,7 +8,7 @@ from alert.search.models import Citation, Court, Document
 from alert.scrapers.test_assets import test_scraper
 from alert import settings
 from alert.search import models
-from alert.search.management.commands.cl_calculate_pagerank import do_pagerank
+from alert.search.management.commands.cl_calculate_pagerank import Command
 
 class SetupException(Exception):
     def __init__(self, message):
@@ -161,7 +161,8 @@ class PagerankTest(TestCase):
         d3.save(index=False)
 
         #calculate pagerank of these 3 document
-        do_pagerank()
+        comm = Command()
+        comm.do_pagerank()
 
         #verify that whether the answer is correct
         ANS_LIST=[1.16336, 0.64443, 1.19219]
