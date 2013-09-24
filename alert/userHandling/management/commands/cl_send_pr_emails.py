@@ -112,6 +112,7 @@ class Command(BaseCommand):
                 sys.stdout.write("**********************************\n")
                 sys.stdout.write("* SIMULATE MODE - NO EMAILS SENT *\n")
                 sys.stdout.write("**********************************\n")
+            recipients = list(set(recipients))  # Dups gotta go.
             self.send_emails(recipients)
         else:
             sys.stderr.write("No recipients defined. Aborting.\n")
