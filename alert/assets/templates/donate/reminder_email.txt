@@ -1,0 +1,30 @@
+********************
+The Free Law Project
+********************
+
+{% if up.user.first_name %}Hello {{ up.user.first_name }},{% else %}Hello,{% endif %}
+
+About a year ago you donated ${{ amount|floatformat:"-2" }} to the Free Law Project to support our work on the CourtListener platform and other projects under our umbrella. We've had a fantastic year and we hope you'll donate again to help sustain our work. To do so, please click the link below:
+
+ - https://www.courtlistener.com/donate/
+
+With your support, we've made a lot of progress over the past year:
+
+ - We've added {{ new_doc_count|intcomma }} opinions to our collection.
+ - We now have {{ court_count|intcomma }} jurisdictions that can be queried or analyzed in our bulk data files.
+ - We've served our bulk data files {{ bulk_data_count|intcomma }} times.
+ - We've sent {{ alerts_sent_count|intcomma }} email alerts.
+ - We've added a bunch of new features too numerous to mention.
+
+We still have a lot to do, but every bit that you give helps to sustain our efforts to create a free and open legal ecosystem in America. If you're interested in what we have planned, you can always take a look at our planning board and even get involved, suggesting ideas or prioritization. For ideas about how to get involved, see our page at:
+
+ - https://www.courtlistener.com/contribute/
+
+Since it's been a year, we hope that you will consider donating to the Free Law Project again, and that you will consider telling your friends and colleagues about the work we do. If you have any questions, please don't hesitate to get in touch.
+
+Thanks again,
+
+Mike and Brian
+Creators
+Free Law Project
+donate@freelawproject.org

@@ -1,0 +1,78 @@
+{% load text_filters %}
+
+<!DOCTYPE html>
+<html style="font-size: 100.01%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+             font-style: inherit; margin: 0; padding: 0;">
+<head>
+    <meta charset="utf-8">
+    <style type="text/css">
+        a:visited { text-decoration: none !important; }
+        a:hover { text-decoration: none !important; }
+        a:focus { text-decoration: none !important; }
+    </style>
+</head>
+<body style="font-size: 75%; font-weight: inherit; line-height: 1.5;
+             font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif; color: #222; border: 0;
+             vertical-align: baseline; font-style: inherit; background: #fff; margin: 0; padding: 0;">
+<h1 class="bottom"  style="font-size: 3em; font-weight: normal; line-height: 1; font-family: inherit; color: #111;
+                           border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">
+    <a href="https://www.freelawproject.org" style="font-size: 100%; font-weight: inherit; font-family: inherit;
+                                                    color: #111; border: 0; font-style: inherit; padding: 0;
+                                                    text-decoration: none; vertical-align: baseline; margin: 0;">
+        Free Law Project
+    </a>
+</h1>
+
+<hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 60%; height: .1em; margin: 0 0 1.45em;
+           border: none;">
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0 0 1.5em; padding: 0;">
+    {% if up.user.first_name %}
+        Hello {{ up.user.first_name }},
+    {% else %}
+        Hello,
+    {% endif %}
+</p>
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0 0 1.5em; padding: 0;">About a year ago you donated ${{ amount|floatformat:"-2" }}
+    to the Free Law Project to support our work on the CourtListener platform and other projects under our umbrella.
+    We've had a fantastic year and we hope you'll donate again to help sustain our work. To do so,
+    <a href="https://www.courtlistener.com/donate/">please click here</a>.
+</p>
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0 0 1.5em; padding: 0;">With your support, we've made a lot of progress over the
+    past year.</p>
+<ul>
+    <li>We've added {{ new_doc_count|intcomma }} opinions to our collection</li>
+    <li>We now have {{ court_count|intcomma }} jurisdictions that can be queried or analyzed in our bulk data files.</li>
+    <li>We've served our bulk data files {{ bulk_data_count|intcomma }} times.</li>
+    <li>We've sent {{ alerts_sent_count|intcomma }} email alerts.</li>
+    <li>We've added a bunch of new features too numerous to mention.</li>
+</ul>
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0 0 1.5em; padding: 0;">We still have a lot to do, but every bit that you give
+    helps to sustain our efforts to create a free and open legal ecosystem in America. If you're interested in what we
+    have planned, you can always take a look at our planning board and even get involved, suggesting ideas or
+    prioritization. For ideas about how to get involved, see <a href="https://www.courtlistener.com/contribute/">
+        our page about getting involved.
+    </a>
+</p>
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0 0 1.5em; padding: 0;">Since it's been a year, we hope that you will consider
+    donating to the Free Law Project again, and that you will consider telling your friends and colleagues about the
+    work we do.
+</p>
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0 0 1.5em; padding: 0;">If you have any questions, please don't hesitate to get
+    in touch.
+</p>
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0; padding: 0;">Mike and Brian</p>
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0; padding: 0;">Creators<p>
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0; padding: 0;">Free Law Project</p>
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0; padding: 0;">donate@freelawproject.org</p>
+</body>
+</html>

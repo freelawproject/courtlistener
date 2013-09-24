@@ -59,7 +59,7 @@ def run_dup_check(case, simulate=True):
                 print "      Docket nums: %s" % case.docket_number
                 print "                   %s" % filtered_candidates[k]['docketNumber']
                 print "      Candidate URL: %s" % case.download_url
-                print "      Match URL: http://courtlistener.com%s" % \
+                print "      Match URL: https://www.courtlistener.com%s" % \
                                       (filtered_candidates[k]['absolute_url'])
 
                 choice = raw_input("Is this a duplicate? [Y/n]: ")

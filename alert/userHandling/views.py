@@ -69,24 +69,21 @@ def view_settings(request):
             current_site = Site.objects.get_current()
             email_subject = 'Email changed successfully on ' + \
                             str(current_site.name)
-            email_body = "Hello, %s,\n\nYou have successfully changed your \
-email address at %s. Please confirm this change by clicking the following \
-link within 5 days:\n\nhttp://courtlistener.com/email/confirm/%s\n\n\
-Thanks for using our site,\n\nThe CourtListener team\n\n\
--------------------\nFor questions or comments, please see our contact page, \
-http://courtlistener.com/contact/." % (
-                user.username,
-                current_site.name,
-                up.activation_key)
-            send_mail(email_subject,
-                      email_body,
-                      'CourtListener <noreply@courtlistener.com>',
-                      [new_email])
+            email_body = ("Hello, %s,\n\n"
+                          "You have successfully changed your email address at %s. Please confirm this change by "
+                          "clicking the following link within 5 days:\n\n"
+                          " - https://www.courtlistener.com/email/confirm/%s\n\n"
+                          "Thanks for using our site,\n\n"
+                          "The CourtListener team\n\n"
+                          "------------------\n"
+                          "For questions or comments, please see our contact page, "
+                          "https://www.courtlistener.com/contact/." % (user.username, current_site.name, up.activation_key))
+            send_mail(email_subject, email_body, 'CourtListener <noreply@courtlistener.com>', [new_email])
 
             messages.add_message(request, messages.SUCCESS,
-                                 'Your settings were saved successfully. To continue ' +
-                                 'receiving emails, please confirm your new email address ' +
-                                 'by checking your email within five days.')
+                                 ('Your settings were saved successfully. To continue '
+                                 'receiving emails, please confirm your new email address '
+                                 'by checking your email within five days.'))
         elif not up.email_confirmed:
             # they didn't just change their email, but it isn't confirmed.
             messages.add_message(request, messages.INFO,
