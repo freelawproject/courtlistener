@@ -1,3 +1,4 @@
+import logging
 import traceback
 import settings
 from django.core.management import setup_environ
@@ -17,6 +18,9 @@ import datetime
 from optparse import OptionParser
 
 
+logger = logging.getLogger(__name__)
+
+
 class InvalidDateError(Exception):
     pass
 
@@ -25,29 +29,16 @@ def send_alert(userProfile, hits, verbose, simulate):
     EMAIL_SUBJECT = 'New hits for your CourtListener alerts'
     EMAIL_SENDER = 'CourtListener Alerts <alerts@courtlistener.com>'
 
-    if userProfile.plaintext_preferred:
-        txt_template = loader.get_template('emails/email.txt')
-        c = Context({'hits': hits})
-        email_text = txt_template.render(c)
-        if verbose and simulate:
-            print "email_text: %s" % email_text
-        if not simulate:
-            send_mail(EMAIL_SUBJECT, email_text, EMAIL_SENDER,
-                      [userProfile.user.email], fail_silently=False)
-    else:
-        txt_template = loader.get_template('emails/email.txt')
-        html_template = loader.get_template('emails/email.html')
-        c = Context({'hits': hits})
-        email_text = txt_template.render(c)
-        html_text = html_template.render(c)
-        if verbose and simulate:
-            print "email_text: %s" % email_text
-            print "html_text: %s" % html_text
-        if not simulate:
-            msg = EmailMultiAlternatives(EMAIL_SUBJECT, email_text,
-                EMAIL_SENDER, [userProfile.user.email])
-            msg.attach_alternative(html_text, "text/html")
-            msg.send(fail_silently=False)
+    txt_template = loader.get_template('alerts/email.txt')
+    html_template = loader.get_template('alerts/email.html')
+    c = Context({'hits': hits})
+    txt = txt_template.render(c)
+    html = html_template.render(c)
+    msg = EmailMultiAlternatives(EMAIL_SUBJECT, txt,
+                                 EMAIL_SENDER, [userProfile.user.email])
+    msg.attach_alternative(html, "text/html")
+    if not simulate:
+        msg.send(fail_silently=False)
 
 
 def get_cut_off_date(rate):
@@ -156,6 +147,7 @@ def emailer(rate, verbose, simulate):
 
     if not simulate:
         tally_stat('alerts.sent', inc=alerts_sent_count)
+        logger.info("Sent %s email alerts." % alerts_sent_count)
     return "Done"
 
 
