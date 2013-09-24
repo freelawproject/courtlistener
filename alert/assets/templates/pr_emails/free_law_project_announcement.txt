@@ -2,20 +2,22 @@ Hi,
 
 I'm pleased to share today that after four years developing free and open legal technologies such as CourtListener and Juriscraper, Brian Carver and I are launching a non-profit umbrella organization for our work: Free Law Project. Free Law Project will serve to bring legal materials and research to the public for free, formalizing the work that we have been doing, and providing a long-term home for similar projects.
 
-Since the birth of this country, legal materials have been in the hands of the few, denying legal justice to the many. With this project, we hope to ease difficulty many have when engaging in a legal dispute, whether they are lawyers or pro se litigants.
+Since the birth of this country, legal materials have been in the hands of the few, denying legal justice to the many. It is appalling that the public does not have free online access to the entirety of United States case law, and we are working to change this situation. We also provide a platform for developing technologies that can make legal research easier for both professionals and the general public.
 
 The official goals for the non-profit are:
 
-  *  To provide free, public, and permanent access to primary legal materials on the Internet for educational, charitable, and scientific purposes,
-  *  To develop, implement, and provide public access to technologies useful for legal research,
-  *  To create an open ecosystem for legal research and materials, and
+  *  To provide free, public, and permanent access to primary legal materials on the Internet for educational, charitable, and scientific purposes;
+  *  To develop, implement, and provide public access to technologies useful for legal research;
+  *  To create an open ecosystem for legal research and materials; and
   *  To support academic research on related technologies, corpora, and legal systems.
 
-The CourtListener platform was started in 2009 as part of a masters project at UC Berkeley, and has matured over the years to be a powerful legal research platform. It has nearly a million legal opinions dating from 1754, and has more each day as it gets them directly from court websites. CourtListener currently serves thousands of people with free legal opinions each week, and has had a doubling of traffic just since July 2013. CourtListener sends out hundreds of alerts to its users each week, informing them of new legal cases in which they have expressed an interest. All of CourtListener's code is open source and all of its content is available for free bulk download. Numerous startups and researchers have used both the code and the documents as a basis for their work.
+In 2009, with Brian as my adviser, I started the CourtListener platform as part of my masters project at UC Berkeley, and since then it has matured to be a powerful legal research platform. It has nearly a million legal opinions dating from 1754, and has more each day as it gets them directly from court websites. CourtListener currently serves thousands of people with free legal opinions each week, and has had a doubling of traffic just since July 2013. CourtListener sends out hundreds of alerts to its users each week, informing them of new legal cases in which they have expressed an interest. All of CourtListener's code is open source and all of its content is available for free bulk download. Numerous startups and researchers have used both the code and the bulk data as a basis for their work.
 
 More information about our work is on the Free Law Project about page, where you can find a list of current activities and non-profit documents:
 
  - http://www.freelawproject.org/about
+
+Brian and I expect to pursue grant funding from foundations, but also hope that those who support the goals of improving public access to the law will donate directly so that the non-profit can put more developers to work on these efforts.
 
 We'll periodically email you updates like this one when we we're announcing new features or projects, and you can follow our work on:
 
