@@ -1,9 +1,19 @@
 This file contains notes for upgrades when special instructions are necessary. In general, simply doing:
 
+# Get the latest code
 hg pull -u
-sudo -u www-data $INSTALL_ROOT/alert/manage.py collectstatic
+
+# Gather any new static files
+manage.py collectstatic
+
+# Migrate the database
 manage.py migrate
+
+# Restart celery
 sudo service celeryd restart
+
+# Restart apache's code
+touch apache/django.wsgi
 
 is all that's necessary. In the case that special instructions are needed, we will attempt to put them here, with the
 most recent at the top.
@@ -14,8 +24,8 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 DONATION PROJECT
     - PRE DEPLOY:
-        - TODO: Make sure the scrapers are working properly again (see error logs in VM)
         - TODO: Make the annual reminder
+        - TODO: Why don't the mailing address, city, state and zip fields auto-populate when the info is known?
 
     - POST DEPLOY:
         - TODO: Test the "Try Donating Again" button that comes up when you cancel a Dwolla payment.
@@ -41,13 +51,26 @@ LAWBOX PROJECT
          back into this data structure)
    TODO: Sort out the new court picking interface.
 
+2013-09-21:
+ - I've added a new feature that allows us to log stats. It it has the signature of tally_stat('name_of_stat', inc=1,
+   date=date.today()), which, if not self explanatory should be pretty clear. As you might expect, it comes with a
+   database change, which you'll need to run:
+
+     manage.py migrate stats
+
+   With that complete, a number of the major CL features will begin logging their work.
+
 
 2013-09-17:
- - The donation system has been fully deployed. To make the donation system work, you need to set up the following keys
-   after getting them from the various payment providers. These need to go in your 05-private.py file:
+ - BEFORE PULL: We've finally (*finally*) dealt with Python's painful logging system and deployed logging. To make
+   this work, you'll need a directory at /var/log/courtlistener/ that the server can write to. Create it with:
 
+     sudo mkdir /var/log/courtlistener/
+     sudo chmod 777 /var/log/courtlistener/
 
-
+ - BEFORE PULL: The donation system has been fully deployed. To make the donation system work, you need to set up the
+   payment related section of 05-private.example in your 05-private.py file. To get these keys, you'll need to set up
+   accounts with PayPal, Dwolla and Stripe.
 
 2013-09-16:
  - OVERVIEW: This update contains a number of large fixes, which will alter your database in a number of ways. It lands

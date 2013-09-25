@@ -1,6 +1,6 @@
 # Google, AOL, Bing, Yahoo!
 # These support meta robots and x-robots-tag.
-# Crawl everything except a few explicit blocks 
+# Crawl everything except a few explicit blocks
 User-agent: Googlebot
 Disallow: /robots.txt
 Disallow: /x/
@@ -60,4 +60,4 @@ Disallow: /doc/
 User-agent: *
 Disallow: /
 
-Sitemap: http://courtlistener.com/sitemap.xml
+Sitemap: https://www.courtlistener.com/sitemap.xml

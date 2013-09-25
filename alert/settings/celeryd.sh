@@ -1,3 +1,4 @@
+#!/bin/sh
 # Name of nodes to start, here we have a single node
 CELERYD_NODES="w1"
 

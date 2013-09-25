@@ -1,6 +1,5 @@
-from datetime import datetime
-from datetime import timedelta
-from alert.settings import *
+from datetime import datetime, timedelta
+from alert import settings
 
 
 def queryset_generator(queryset, chunksize=1000):
@@ -18,7 +17,7 @@ def queryset_generator(queryset, chunksize=1000):
     """
     if queryset.count() == 0:
         return
-    if DEVELOPMENT:
+    if settings.DEVELOPMENT:
         chunksize = 5
 
     documentUUID = queryset.order_by('pk')[0].documentUUID
@@ -51,8 +50,8 @@ def queryset_generator_by_date(queryset, date_field, start_date, end_date, chunk
         if top_date > end_date:
             # Last iteration
             top_date = end_date
-        keywords = {'%s__gte' % date_field : bottom_date,
-                    '%s__lte' % date_field : top_date}
+        keywords = {'%s__gte' % date_field: bottom_date,
+                    '%s__lte' % date_field: top_date}
         bottom_date = bottom_date + chunksize
         top_date = top_date + chunksize
         for row in queryset.filter(**keywords):

@@ -20,8 +20,7 @@ def get_document_citations(document):
     if document.html:
         citations = find_citations.get_citations(document.html)
     elif document.plain_text:
-        citations = find_citations.get_citations(document.plain_text,
-                                                 html=False)
+        citations = find_citations.get_citations(document.plain_text, html=False)
     else:
         citations = []
     return citations
@@ -55,7 +54,7 @@ def create_stub(citation):
 def update_document(document):
     DEBUG = 0
     if DEBUG >= 1:
-        print "%s at http://courtlistener.com/admin/search/citation/%s/" % \
+        print "%s at https://www.courtlistener.com/admin/search/citation/%s/" % \
             (document.citation.case_name, document.citation.pk)
 
     citations = get_document_citations(document)
