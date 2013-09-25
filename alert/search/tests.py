@@ -136,10 +136,15 @@ class PagerankTest(TestCase):
         """Create a few Documents and fake citation relation among them, then run the pagerank
         algorithm. Check whether this simple case can get the correct result.
         """
+        # Set up some handy variables
+        self.court = Court.objects.get(pk='test')
 
         #create 3 documents with their citations
-        c1, c2, c3 = models.Citation(case_name="c1"), models.Citation(case_name="c2"), models.Citation(case_name="c3")
-        d1, d2, d3 = (models.Document(),) * 3
+        c1, c2, c3 = Citation(case_name="c1"), Citation(case_name="c2"), Citation(case_name="c3")
+        c1.save(index=False)
+        c2.save(index=False)
+        c3.save(index=False)
+        d1, d2, d3 = Document(), Document(), Document()
         d1.citation, d2.citation, d3.citation = c1, c2, c3
         doc_list = [d1, d2, d3]
         for d in doc_list:
@@ -163,6 +168,8 @@ class PagerankTest(TestCase):
         #calculate pagerank of these 3 document
         comm = Command()
         comm.do_pagerank()
+        d1, d2, d3 = Document.objects.get(pk=d1.pk), Document.objects.get(pk=d2.pk), Document.objects.get(pk=d3.pk)
+        doc_list = [d1, d2, d3]
 
         #verify that whether the answer is correct
         ANS_LIST=[1.16336, 0.64443, 1.19219]
