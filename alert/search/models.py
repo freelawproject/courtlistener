@@ -338,6 +338,9 @@ class Document(models.Model):
     citation_count = models.IntegerField(
         'the number of times this document is cited by other cases',
         default=0)
+    pagerank = models.FloatField(
+        'PageRank value based on the citing relation among documents',
+        default=0)
     precedential_status = models.CharField(
         'the precedential status of document',
         max_length=50,

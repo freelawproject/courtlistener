@@ -15,6 +15,7 @@ from alert.search.search_indexes import SearchDocument
 from celery.decorators import task
 
 
+
 @task
 def add_or_update_doc_object(doc, solr_url=settings.SOLR_URL):
     """Adds a document object to the solr index.

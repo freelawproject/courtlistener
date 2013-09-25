@@ -54,7 +54,7 @@ LAWBOX PROJECT
 2013-09-21:
  - I've added a new feature that allows us to log stats. It it has the signature of tally_stat('name_of_stat', inc=1,
    date=date.today()), which, if not self explanatory should be pretty clear. As you might expect, it comes with a
-   database change, which you'll need to run:
+   database change, which you'll need tohg s run:
 
      manage.py migrate stats
 

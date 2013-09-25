@@ -7,7 +7,8 @@ from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_s
 from alert.search.models import Citation, Court, Document
 from alert.scrapers.test_assets import test_scraper
 from alert import settings
-
+from alert.search import models
+from alert.search.management.commands.cl_calculate_pagerank import Command
 
 class SetupException(Exception):
     def __init__(self, message):
@@ -127,3 +128,59 @@ class SearchTest(TestCase):
         response = self.client.get('/', {'q': '*:*', 'sort': 'citeCount asc'})
         self.assertTrue(response.content.index('Disclosure') > response.content.index('Tarrant'),
                         msg="'Disclosure' should come AFTER 'Tarrant' when ordered by ascending citeCount.")
+
+class PagerankTest(TestCase):
+    fixtures = ['test_court.json']
+
+    def test_pagerank_calculation(self):
+        """Create a few Documents and fake citation relation among them, then run the pagerank
+        algorithm. Check whether this simple case can get the correct result.
+        """
+        # Set up some handy variables
+        self.court = Court.objects.get(pk='test')
+
+        #create 3 documents with their citations
+        c1, c2, c3 = Citation(case_name="c1"), Citation(case_name="c2"), Citation(case_name="c3")
+        c1.save(index=False)
+        c2.save(index=False)
+        c3.save(index=False)
+        d1, d2, d3 = Document(), Document(), Document()
+        d1.citation, d2.citation, d3.citation = c1, c2, c3
+        doc_list = [d1, d2, d3]
+        for d in doc_list:
+            d.court = self.court
+            d.citation.save(index=False)
+            d.save(index=False)
+
+        #create simple citing relation: 1 cites 2; 2 cites 3; 3 cites 1; 1 cites 3
+        d1.cases_cited.add(d2.citation)
+        d2.citation_count += 1
+        d2.cases_cited.add(d3.citation)
+        d3.citation_count += 1
+        d3.cases_cited.add(d1.citation)
+        d1.citation_count += 1
+        d1.cases_cited.add(d3.citation)
+        d3.citation_count += 1
+        d1.save(index=False)
+        d2.save(index=False)
+        d3.save(index=False)
+
+        #calculate pagerank of these 3 document
+        comm = Command()
+        comm.do_pagerank()
+        d1, d2, d3 = Document.objects.get(pk=d1.pk), Document.objects.get(pk=d2.pk), Document.objects.get(pk=d3.pk)
+        doc_list = [d1, d2, d3]
+
+        #verify that whether the answer is correct
+        ANS_LIST=[1.16336, 0.64443, 1.19219]
+        result = True
+        for i in range(3):
+            result *= abs(doc_list[i].pagerank - ANS_LIST[i]) / ANS_LIST[i] < 0.0001
+        self.assertEqual(
+            result,
+            1,
+            msg="The pagerank calculation is wrong.\n" +
+                "The answer 1 is {:f}\tYour answer 1 is {:f}\n".format(ANS_LIST[0], doc_list[0].pagerank) +
+                "The answer 2 is {:f}\tYour answer 2 is {:f}\n".format(ANS_LIST[1], doc_list[1].pagerank) +
+                "The answer 3 is {:f}\tYour answer 3 is {:f}\n".format(ANS_LIST[2], doc_list[2].pagerank)
+        )
