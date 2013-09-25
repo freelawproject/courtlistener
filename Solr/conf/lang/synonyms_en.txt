@@ -28,7 +28,7 @@ Television, Televisions, TV, TVs
 pixima => pixma
 
 # These are easy b/c we don't want to return documents containing the letter
-# u or the letter p. 
+# u or the letter p.
 u, unpublished, non-precedential
 p, precedential, published
 us, usa, united states
@@ -49,3 +49,4 @@ r, relating-to
 cir, circuit
 dist, district
 fed, federal
+vs, v

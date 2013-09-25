@@ -1,4 +1,4 @@
-********************
+{% load humanize %}********************
 The Free Law Project
 ********************
 
@@ -23,6 +23,7 @@ We still have a lot to do, but every bit that you give helps to sustain our effo
 Since it's been a year, we hope that you will consider donating to the Free Law Project again, and that you will consider telling your friends and colleagues about the work we do. If you have any questions, please don't hesitate to get in touch.
 
 Thanks again,
+
 
 Mike and Brian
 Creators
