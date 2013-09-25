@@ -25,7 +25,7 @@
 
         <h3 id="usage">Using the Dumps</h3>
         <p>Annual, monthly or daily dumps can be accessed at
-        http://courtlistener.com/dump-api/<strong>year/month/day/court</strong>.xml.gz.</p>
+        https://www.courtlistener.com/dump-api/<strong>year/month/day/court</strong>.xml.gz.</p>
         <p class="bottom">For example, let's look at ways to access the First Circuit of Appeals (<strong>ca1</strong>):</p>
         <ul>
             <li>All ca1 cases from 2009: <a href="/dump-api/2009/ca1.xml.gz">
@@ -39,13 +39,13 @@
         <p>If you would like <strong>all</strong> cases for a given time period,
         you can use <strong>all</strong> for the court name. For example,
         <a href="/dump-api/2009/06/09/all.xml.gz">
-        http://courtlistener.com/dump-api/2009/06/09/<strong>all</strong>.xml.gz</a>
+        https://www.courtlistener.com/dump-api/2009/06/09/<strong>all</strong>.xml.gz</a>
         returns all of the cases from June 9, 2009 (across all courts).</p>
 
         <p>We also provide a dump of all cases up through the last day
         of the previous month. To obtain this dump, simply omit the date
         in your query, and use <strong>all</strong> for the court name:
-        <a href="/dump-api/all.xml.gz">http://courtlistener.com/dump-api/all.xml.gz</a>.
+        <a href="/dump-api/all.xml.gz">https://www.courtlistener.com/dump-api/all.xml.gz</a>.
         This dump is currently very large ({{dump_size}}). It's currently not
         possible to obtain complete dumps for individual courts.</p>
 
@@ -108,7 +108,8 @@
         there is a field for each case, "<strong>blocked</strong>," which
         describes whether we have blocked search engines from indexing the case.
         The simple thing for you to do in your project is to continue blocking
-        such cases.</p>
+        such cases. This impacts real people with privacy issues such as stalkers
+        and rejected requests for asylum.</p>
 
         <p class="bottom">
             For our approach to blocking, please see our <a href="/removal/">removal

@@ -5,12 +5,15 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.views.decorators.cache import never_cache
+import logging
 from alert.donate.dwolla import process_dwolla_payment
 from alert.donate.paypal import process_paypal_payment
 from alert.donate.forms import DonationForm, UserForm, ProfileForm
-from alert.donate.stripe import process_stripe_payment
+from alert.donate.stripe_helpers import process_stripe_payment
 from alert.userHandling.models import UserProfile
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -24,20 +27,21 @@ def view_donations(request):
 def send_thank_you_email(donation):
     profile = donation.userprofile_set.all()[0]
     email_subject = 'Thanks for your donation to the Free Law Project!'
-    email_body = ('Hello %s,\n\nThanks for your donation of $%s to the Free Law Project. We are currently using '
+    email_body = ('Hello %s,\n\nThanks for your donation of $%0.2f to the Free Law Project. We are currently using '
                   'donations like yours for a variety of important projects that would never exist without your '
                   'help.\n\n'
                   'We are currently a California non-profit corporation, and we hope to soon receive recognition '
                   'as a federally recognized 501(c)(3) non-profit. Our EIN is %s.\n\n'
                   'If you have any questions about your donation, please don\'t hesitate to get in touch.\n\n'
+                  'Thanks again,\n\n'
                   'Michael Lissner and Brian Carver\n'
                   'Founders of Free Law Project\n'
                   'http://freelawproject.org/contact/') % (profile.user.first_name, donation.amount, settings.EIN, )
     send_mail(email_subject, email_body, 'Free Law Project <donate@freelawproject.org>', [profile.user.email])
 
 
-def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form):
-    """Routes the donation to the correct payment provider, then normalizes its resopnse.
+def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form, stripe_token):
+    """Routes the donation to the correct payment provider, then normalizes its response.
 
     Returns a dict with:
      - message: Any error messages that apply
@@ -68,40 +72,48 @@ def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form):
                 'redirect': None,
             }
     elif cd_donation_form['payment_provider'] == 'paypal':
-        response = process_paypal_payment(
-            cd_donation_form,
-            cd_profile_form,
-            cd_user_form,
-            test=settings.PAYMENT_TESTING_MODE
-        )
+        response = process_paypal_payment(cd_donation_form)
         if response['result'] == 'created':
             response = {
                 'message': None,
                 'status': 0,  # AWAITING_PAYMENT
                 'payment_id': response['payment_id'],
-                'redirect': 'Unknown',
+                'transaction_id': response['transaction_id'],
+                'redirect': response['redirect'],
             }
         else:
             response = {
-                'message': 'Error creating payment. Please try another payment method.',
+                'message': 'We had an error working with PayPal. Please try another payment method.',
                 'status': 1,  # ERROR
                 'payment_id': None,
                 'redirect': None,
             }
     elif cd_donation_form['payment_provider'] == 'cc':
-        response = process_stripe_payment(
-            cd_donation_form,
-            cd_profile_form,
-            cd_user_form,
-            test=settings.PAYMENT_TESTING_MODE,
-        )
-
+        response = process_stripe_payment(cd_donation_form, cd_user_form, stripe_token)
+        if response['result'] == 'success':
+            response = {
+                'message': None,
+                'status': 0,  # Awaiting payment
+                'payment_id': response['payment_id'],
+                'redirect': '/donate/stripe/complete'
+            }
+        else:
+            response = {
+                'message': 'We had an error processing your credit card. Please try another payment method.',
+                'status': 1,  # ERROR
+                'payment_id': None,
+                'redirect': None,
+            }
+    else:
+        response = None
     return response
 
 
 def donate(request):
+    message = None
     if request.method == 'POST':
         donation_form = DonationForm(request.POST)
+        stub_account = False
 
         if request.user.is_anonymous():
             # Either this is a new account, a stubbed one, or a user that's simply not logged into their account
@@ -109,7 +121,7 @@ def donate(request):
                 stub_account = User.objects.filter(userprofile__stub_account=True). \
                                             get(email__iexact=request.POST.get('email'))
             except User.DoesNotExist:
-                stub_account = False
+                pass
 
             if not stub_account:
                 user_form = UserForm(request.POST)
@@ -129,14 +141,17 @@ def donate(request):
             cd_donation_form = donation_form.cleaned_data
             cd_user_form = user_form.cleaned_data
             cd_profile_form = profile_form.cleaned_data
+            stripe_token = request.POST.get('stripeToken')
 
             # Route the payment to a payment provider
-            response = route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form)
+            response = route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form, stripe_token)
+            logger.info("Payment routed with response: %s" % response)
 
             if response['status'] == 0:
                 d = donation_form.save(commit=False)
                 d.status = response['status']
                 d.payment_id = response['payment_id']
+                d.transaction_id = response.get('transaction_id')  # Will onlyl work for Paypal.
                 d.save()
 
                 if request.user.is_anonymous() and not stub_account:
@@ -170,8 +185,9 @@ def donate(request):
                 return HttpResponseRedirect(response['redirect'])
 
             else:
-                print response
-
+                logger.critical("Got back status of %s when making initial request of API. Message was:\n%s" %
+                                (response['status'], response['message']))
+                message = response['message']
     else:
         try:
             donation_form = DonationForm(
@@ -186,9 +202,15 @@ def donate(request):
                     'email': request.user.email,
                 }
             )
+            up = request.user.get_profile()
             profile_form = ProfileForm(
                 initial={
-                    'wants_newsletter': request.user.get_profile().wants_newsletter
+                    'address1': up.address1,
+                    'address2': up.address2,
+                    'city': up.city,
+                    'state': up.state,
+                    'zip_code': up.zip_code,
+                    'wants_newsletter': up.wants_newsletter
                 }
             )
         except AttributeError:
@@ -203,8 +225,36 @@ def donate(request):
             'user_form': user_form,
             'profile_form': profile_form,
             'private': False,
+            'message': message,
             'stripe_public_key': settings.STRIPE_PUBLIC_KEY
         },
         RequestContext(request)
     )
 
+
+def donate_complete(request):
+    error = None
+    if len(request.GET) > 0:
+        # We've gotten some information from the payment provider
+        if request.GET.get('error') == 'failure':
+            if request.GET.get('error_description') == 'User Cancelled':
+                error = 'User Cancelled'
+            elif 'insufficient funds' in request.GET.get('error_description').lower():
+                error = 'Insufficient Funds'
+            return render_to_response(
+                'donate/donate_complete.html',
+                {
+                    'error': error,
+                    'private': True,
+                },
+                RequestContext(request),
+            )
+
+    return render_to_response(
+        'donate/donate_complete.html',
+        {
+            'error': error,
+            'private': True,
+        },
+        RequestContext(request)
+    )

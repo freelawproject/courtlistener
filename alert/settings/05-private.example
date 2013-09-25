@@ -31,10 +31,15 @@ if not DEVELOPMENT:
     CELERY_PASSWORD = 'your-celery-password'
 
 # Payment secrets
+EIN = ''  # The business tax ID.
+if DEVELOPMENT:
+    PAYMENT_TESTING_MODE = True
+else:
+    PAYMENT_TESTING_MODE = False
 DWOLLA_APPLICATION_KEY = ''
 DWOLLA_SECRET_KEY = ''
 DWOLLA_ACCOUNT_ID = ''
-if DEVELOPMENT:
+if PAYMENT_TESTING_MODE:
     PAYPAL_ENDPOINT = 'https://api.sandbox.paypal.com'
     PAYPAL_ACCOUNT = 'donate-facilitator@freelawproject.org'
     PAYPAL_CLIENT_ID = ''

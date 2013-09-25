@@ -7,15 +7,17 @@ PROVIDERS = (
     ('cc', 'Credit Card'),
     ('check', 'Check'),
 )
+# These statuses are shown on the profile page. Be warned.
 PAYMENT_STATUSES = (
-    (0, 'AWAITING_PAYMENT'),
-    (1, 'UNKNOWN_ERROR'),
-    (2, 'COMPLETED'),  # This does not mean we get the money, must await "PROCESSED" for that.
-    (3, 'CANCELLED'),
-    (4, 'PROCESSED'),
-    (5, 'PENDING'),
-    (6, 'FAILED'),
-    (7, 'RECLAIMED'),
+    (0, 'Awaiting Payment'),
+    (1, 'Unknown Error'),
+    (2, 'Completed, but awaiting processing'),  # This does not mean we get the money, must await "PROCESSED" for that.
+    (3, 'Cancelled'),
+    (4, 'Processed'),
+    (5, 'Pending'),
+    (6, 'Failed'),
+    (7, 'Reclaimed/Refunded'),
+    (8, 'Captured'),
 )
 
 
@@ -68,3 +70,6 @@ class Donation(models.Model):
 
     def __unicode__(self):
         return '%s: $%s, %s' % (self.get_payment_provider_display(), self.amount, self.get_status_display())
+
+    class Meta:
+        ordering = ['-date_created']

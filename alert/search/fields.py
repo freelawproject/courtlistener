@@ -26,8 +26,6 @@ class FloorDateField(DateField):
         """
         if value in validators.EMPTY_VALUES or value == 'YYYY-MM-DD':
             return None
-        else:
-            value = value.strip()
         if isinstance(value, datetime.datetime):
             return value.date()
         if isinstance(value, datetime.date):
@@ -66,8 +64,6 @@ class CeilingDateField(Field):
         """
         if value in validators.EMPTY_VALUES or value == "YYYY-MM-DD":
             return None
-        else:
-            value = value.strip()
         if isinstance(value, datetime.datetime):
             return value.date()
         if isinstance(value, datetime.date):
