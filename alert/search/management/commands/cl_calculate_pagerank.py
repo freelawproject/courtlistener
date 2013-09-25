@@ -3,7 +3,10 @@ __author__ = 'Krist Jin'
 from django.core.management.base import BaseCommand
 from alert.search.models import Document
 from alert.lib.db_tools import queryset_generator
+import logging
 import sys
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -15,27 +18,27 @@ class Command(BaseCommand):
         MAX_ITERATIONS = 100
         MIN_DELTA = 0.00001
 
-        print('Initializing...')
+        sys.stdout.write('Initializing...\n')
         graph_size = Document.objects.all().count()
         min_value = (1.0 - DAMPING_FACTOR)
-        doc_dict = dict()
-        case_list = queryset_generator(Document.objects.only("documentUUID", "cases_cited", "citation", "pagerank"))
-        # in case of calling the do_pagerank function in other function (like in the test.py)
-        try:
-            self.verbosity
-        except AttributeError:
-            self.verbosity = 1
-            sys.stdout.write('verbosity is set to 1 by default\n')
+        doc_dict = {}
+        case_list = queryset_generator(
+            Document.objects.only(
+                "documentUUID",
+                "cases_cited",
+                "citation",
+                "pagerank"
+            ).annotate(Count())
+        )
         if self.verbosity >= 1:
             sys.stdout.write('graph_size is {0:d}.\n'.format(graph_size))
-            log_file = open('pagerank.log', 'w')
 
         case_count = 0
         for case in case_list:
             case_count += 1
             sys.stdout.write("\rSaving data from database locally...{:.0%}".format(case_count * 1.0 / graph_size))
             sys.stdout.flush()
-            attr_dict = dict()
+            attr_dict = {}
             id = case.documentUUID
             attr_dict['cases_cited_count'] = case.cases_cited.all().count()
             attr_dict['citing_cases_id'] = case.citation.citing_cases.values_list("documentUUID")
@@ -43,7 +46,7 @@ class Command(BaseCommand):
             attr_dict['original_pagerank'] = case.pagerank
             doc_dict[id] = attr_dict
 
-        print('')
+        sys.stdout.write('\n')
         i_times = 0
         for i in range(MAX_ITERATIONS):
             diff = 0
@@ -75,7 +78,7 @@ class Command(BaseCommand):
             if attr_dict['original_pagerank'] != attr_dict['pagerank']:
                 Document.objects.filter(pk=key).update(pagerank=attr_dict['pagerank'])
                 update_count += 1
-        print('\nPageRank calculation finish! Updated {0:d} cases'.format(update_count))
+        sys.stdout.write('\nPageRank calculation finish! Updated {0:d} cases\n'.format(update_count))
         if self.verbosity >= 1:
             sys.stdout.write('See the log in pagerank.log\n')
             log_file.close()
