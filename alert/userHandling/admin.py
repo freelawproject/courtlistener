@@ -3,27 +3,23 @@ from django.contrib.auth.models import User
 from alert.userHandling.models import *
 
 
-def getEmailConfirmed(obj):
+def get_email_confirmed(obj):
     return obj.get_profile().email_confirmed
-getEmailConfirmed.short_description = "Email Confirmed?"
+get_email_confirmed.short_description = "Email Confirmed?"
+
+
+def get_stub_account(obj):
+    return obj.get_profile().stub_account
+get_stub_account.short_description = "Stub Account?"
 
 
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
 
+
 class UserAdmin(admin.ModelAdmin):
     inlines = [UserProfileInline, ]
-    list_display = ('username', getEmailConfirmed)
-
-class DocumentAdmin(admin.ModelAdmin):
-    # ordering is brutal on MySQL. Don't put it here. Sorry.
-    #list_display = ('citation',)
-    #list_filter = ('court',)
-    fields = ('source', 'sha1', 'date_filed', 'court',
-              'excerptSummary', 'download_URL',
-              'local_path', 'plain_text', 'html',
-              'precedential_status',)
-    search_fields = ['@plain_text']
+    list_display = ('username', get_email_confirmed, get_stub_account)
 
 
 class FavoriteAdmin(admin.ModelAdmin):
@@ -34,6 +30,6 @@ admin.site.register(Alert)
 admin.site.register(BarMembership)
 admin.site.register(Favorite, FavoriteAdmin)
 
-# Unregister the built in user admin and register the custom User admin with UserProfile
+# Un-register the built in user admin and register the custom User admin with UserProfile
 admin.site.unregister(User)
 admin.site.register(User, UserAdmin)

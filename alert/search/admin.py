@@ -12,7 +12,7 @@ class CitationAdmin(admin.ModelAdmin):
 
 
 class DocumentAdmin(admin.ModelAdmin):
-    # ordering is brutal on MySQL. Don't put it here. Sorry.
+    # ordering is brutal. Don't put it here. Sorry.
     #list_display = ('citation',)
     #list_filter = ('court',)
     fields = ('citation', 'source', 'sha1', 'date_filed', 'court', 'download_URL', 'local_path', 'plain_text', 'html',

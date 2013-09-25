@@ -45,7 +45,7 @@ class Command(BaseCommand):
                 i += 1
         target_doc.save(index=False)
         source_doc.save(index=False)
-        print('\nSuccessfully created %s edges in the citation graph\n' % edge_amount)
+        self.stdout.write('\nSuccessfully created %s edges in the citation graph\n' % edge_amount)
 
     def handle(self, *args, **options):
         try:

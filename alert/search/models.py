@@ -340,7 +340,8 @@ class Document(models.Model):
         default=0)
     pagerank = models.FloatField(
         'PageRank value based on the citing relation among documents',
-        default=0)
+        default=0,
+        db_index=True)
     precedential_status = models.CharField(
         'the precedential status of document',
         max_length=50,
@@ -360,9 +361,6 @@ class Document(models.Model):
     is_stub_document = models.BooleanField(
         'Whether this document is a stub or not',
         default=False)
-    pagerank_value = models.FloatField(
-        'PageRank value based on the citing relation among documents',
-        default=0)
 
     def __unicode__(self):
         if self.citation:
