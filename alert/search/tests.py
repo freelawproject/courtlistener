@@ -167,6 +167,7 @@ class PagerankTest(TestCase):
 
         #calculate pagerank of these 3 document
         comm = Command()
+        self.verbosity = 1
         comm.do_pagerank()
         d1, d2, d3 = Document.objects.get(pk=d1.pk), Document.objects.get(pk=d2.pk), Document.objects.get(pk=d3.pk)
         doc_list = [d1, d2, d3]
