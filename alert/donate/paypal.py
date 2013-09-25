@@ -1,10 +1,16 @@
-from datetime import datetime
-from django.http import HttpResponseRedirect
-import json
-from urlparse import urlparse, parse_qs
+import logging
+import simplejson
 import requests
 from alert.donate.models import Donation
+from datetime import datetime
 from django.conf import settings
+from django.http import HttpResponseRedirect
+from django.shortcuts import render_to_response
+from django.template import RequestContext
+from django.views.decorators.csrf import csrf_exempt
+from urlparse import urlparse, parse_qs
+
+logger = logging.getLogger(__name__)
 
 
 def get_paypal_access_token():
@@ -14,7 +20,7 @@ def get_paypal_access_token():
     caching the token and detecting when it is expired.
     """
     r = requests.post(
-        'https://api.sandbox.paypal.com/v1/oauth2/token',
+        '%s/v1/oauth2/token' % settings.PAYPAL_ENDPOINT,
         headers={
             'Accept': 'application/json',
             'Accept-Language': 'en_US'
@@ -25,9 +31,14 @@ def get_paypal_access_token():
         ),
         data={'grant_type': 'client_credentials'}
     )
-    return json.loads(r.content).get('access_token')
+    if r.status_code == 200:
+        logger.info("Got paypal token successfully.")
+    else:
+        logger.critical("Problem getting paypal token status_code was: %s, with content: %s" % (r.status_code, r.content))
+    return simplejson.loads(r.content).get('access_token')
 
 
+@csrf_exempt
 def process_paypal_callback(request):
     """Process the GET request that PayPal uses.
 
@@ -39,28 +50,30 @@ def process_paypal_callback(request):
     """
     access_token = get_paypal_access_token()
     d = Donation.objects.get(transaction_id=request.GET['token'])
-    r = request.post(
-        'https://api.sandbox.paypal.com/v1/payments/payment/%s/execute/' % d.payment_id,
+    r = requests.post(
+        '%s/v1/payments/payment/%s/execute/' % (settings.PAYPAL_ENDPOINT, d.payment_id),
         headers={
             'Content-Type': 'application/json',
             'Authorization': 'Bearer %s' % access_token
         },
-        data={'payer_id': request.GET['PayerID']}
+        data=simplejson.dumps({'payer_id': request.GET['PayerID']}),
     )
     if r.status_code == 200:
         d.clearing_date = datetime.now()
-        d.status = 'SUCCESSFUL_COMPLETION'
+        d.status = 2
         d.save()
         from alert.donate.views import send_thank_you_email
         send_thank_you_email(d)
     else:
-        d.status = 'ERROR'
+        logger.critical("Unable to execute PayPal transaction. Status code %s with data: %s" %
+                        (r.status_code, r.content))
+        d.status = 1
         d.save()
     # Finally, show them the thank you page
-    return HttpResponseRedirect('/donate/thanks/')
+    return HttpResponseRedirect('/donate/paypal/complete/')
 
 
-def process_paypal_payment(cd_donation_form, cd_profile_form, cd_user_form, test=True):
+def process_paypal_payment(cd_donation_form):
     # https://developer.paypal.com/webapps/developer/docs/integration/web/accept-paypal-payment/
     access_token = get_paypal_access_token()
     if access_token:
@@ -69,7 +82,7 @@ def process_paypal_payment(cd_donation_form, cd_profile_form, cd_user_form, test
             'intent': 'sale',
             'redirect_urls': {
                 'return_url': settings.PAYPAL_CALLBACK,
-                'cancel_url': settings.PAYMENT_CANCELLATION,
+                'cancel_url': settings.PAYPAL_CANCELLATION,
             },
             'payer': {'payment_method': 'paypal'},
             'transactions': [
@@ -83,16 +96,16 @@ def process_paypal_payment(cd_donation_form, cd_profile_form, cd_user_form, test
             ]
         }
         r = requests.post(
-            'https://api.sandbox.paypal.com/v1/payments/payment',
+            '%s/v1/payments/payment' % settings.PAYPAL_ENDPOINT,
             headers={
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer %s' % access_token
             },
-            data=json.dumps(data)
+            data=simplejson.dumps(data)
         )
 
         if r.status_code == 201:  # "Created"
-            r_content_as_dict = json.loads(r.content)
+            r_content_as_dict = simplejson.loads(r.content)
             # Get the redirect value from the 'links' attribute. Links look like:
             #   [{u'href': u'https://api.sandbox.paypal.com/v1/payments/payment/PAY-8BC403022U6413151KIQPC2I',
             #     u'method': u'GET',
@@ -104,10 +117,10 @@ def process_paypal_payment(cd_donation_form, cd_profile_form, cd_user_form, test
             #     u'method': u'POST',
             #     u'rel': u'execute'}
             #   ]
-            redirect = [link for link in json.loads(r.content)['links'] if
+            redirect = [link for link in simplejson.loads(r.content)['links'] if
                         link['rel'].lower() == 'approval_url'][0]['href']
             parsed_redirect = urlparse(redirect)
-            token = parse_qs(parsed_redirect.query)['token']
+            token = parse_qs(parsed_redirect.query)['token'][0]
             response = {
                 'result': r_content_as_dict['state'],
                 'status_code': r.status_code,
@@ -116,8 +129,24 @@ def process_paypal_payment(cd_donation_form, cd_profile_form, cd_user_form, test
                 'payment_id': r_content_as_dict.get('id'),
                 'transaction_id': token
             }
+            logger.info("Created payment in paypal with response: %s" % response)
             return response
         else:
             return {'result': 'UNABLE_TO_MAKE_PAYMENT'}
     else:
         return {'result': 'NO_ACCESS_TOKEN', }
+
+
+def donate_paypal_cancel(request):
+    d = Donation.objects.get(transaction_id=request.GET['token'])
+    d.status = 3  # Cancelled, bummer
+    d.save()
+
+    return render_to_response(
+        'donate/donate_complete.html',
+        {
+            'error': 'User Cancelled',
+            'private': False,
+        },
+        RequestContext(request)
+    )

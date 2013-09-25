@@ -1,9 +1,10 @@
 __author__ = 'Krist Jin'
 
-from django.core.management.base import BaseCommand, CommandError
-from alert.search.models import Citation, Document, Court
+from django.core.management.base import BaseCommand
+from alert.search.models import Document
 from alert.lib.db_tools import queryset_generator
 import sys
+
 
 class Command(BaseCommand):
     args = '<args>'

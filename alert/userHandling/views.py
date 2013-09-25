@@ -69,24 +69,21 @@ def view_settings(request):
             current_site = Site.objects.get_current()
             email_subject = 'Email changed successfully on ' + \
                             str(current_site.name)
-            email_body = "Hello, %s,\n\nYou have successfully changed your \
-email address at %s. Please confirm this change by clicking the following \
-link within 5 days:\n\nhttp://courtlistener.com/email/confirm/%s\n\n\
-Thanks for using our site,\n\nThe CourtListener team\n\n\
--------------------\nFor questions or comments, please see our contact page, \
-http://courtlistener.com/contact/." % (
-                user.username,
-                current_site.name,
-                up.activation_key)
-            send_mail(email_subject,
-                      email_body,
-                      'no-reply@courtlistener.com',
-                      [new_email])
+            email_body = ("Hello, %s,\n\n"
+                          "You have successfully changed your email address at %s. Please confirm this change by "
+                          "clicking the following link within 5 days:\n\n"
+                          " - https://www.courtlistener.com/email/confirm/%s\n\n"
+                          "Thanks for using our site,\n\n"
+                          "The CourtListener team\n\n"
+                          "------------------\n"
+                          "For questions or comments, please see our contact page, "
+                          "https://www.courtlistener.com/contact/." % (user.username, current_site.name, up.activation_key))
+            send_mail(email_subject, email_body, 'CourtListener <noreply@courtlistener.com>', [new_email])
 
             messages.add_message(request, messages.SUCCESS,
-                                 'Your settings were saved successfully. To continue ' +
-                                 'receiving emails, please confirm your new email address ' +
-                                 'by checking your email within five days.')
+                                 ('Your settings were saved successfully. To continue '
+                                 'receiving emails, please confirm your new email address '
+                                 'by checking your email within five days.'))
         elif not up.email_confirmed:
             # they didn't just change their email, but it isn't confirmed.
             messages.add_message(request, messages.INFO,
@@ -215,7 +212,11 @@ CourtListener.com. To activate your account, click this link within five days:\
 -------------------\n\
 For questions or comments, please see our contact page, \
 https://www.courtlistener.com/contact/." % (user.username, up.activation_key)
-                send_mail(email_subject, email_body, 'no-reply@courtlistener.com', [user.email])
+                send_mail(
+                    email_subject,
+                    email_body, 'CourtListener <noreply@courtlistener.com>',
+                    [user.email]
+                )
                 return HttpResponseRedirect('/register/success/?next=%s' % redirect_to)
         else:
             form = UserCreationFormExtended()
@@ -276,7 +277,7 @@ def confirmEmail(request, activation_key):
                                              user_profile.user.email))
     send_mail(email_subject,
               email_body,
-              'no-reply@courtlistener.com',
+              'CourtListener <noreply@courtlistener.com>',
               [a[1] for a in settings.ADMINS])
 
     return render_to_response('registration/confirm.html',
@@ -324,7 +325,7 @@ def request_email_confirmation(request):
                           "We're always happy to hear from you." % (user.username, up.activation_key))
             send_mail(email_subject,
                       email_body,
-                      'no-reply@courtlistener.com',
+                      'CourtListener <noreply@courtlistener.com>'
                       [user.email])
             return HttpResponseRedirect('/email-confirmation/success/')
     else:

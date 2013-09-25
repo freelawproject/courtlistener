@@ -18,7 +18,8 @@ STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed",
                "remanded", "see", "granted", "dismissed"]
 
 # Store court values to avoid repeated DB queries
-ALL_COURTS = Court.objects.all().values('citation_string', 'courtUUID')
+# list() forces early evaluation of the queryset so we don't have issues with closed cursors.
+ALL_COURTS = list(Court.objects.all().values('citation_string', 'courtUUID'))
 
 
 class Citation(object):

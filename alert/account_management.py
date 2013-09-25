@@ -123,21 +123,18 @@ def notify_unconfirmed(verbose, simulate):
             current_site = Site.objects.get_current()
             email_subject = 'Please confirm your account on ' + \
                 str(current_site.name)
-            email_body = "Hello, %s,\n\nDuring routine maintenance of our \
-site, we discovered that your email address has not yet been confirmed. \
-To confirm your email address and continue using our site, please click the \
-following link:\n\nhttp://courtlistener.com/email/confirm/%s\n\n\
-Unfortuantely, accounts that are not confirmed will stop receiving alerts, \
-and must eventually be deleted from our system.\n\n\
-Thanks for using our site,\n\nThe CourtListener team\n\n\n\
--------------------\nFor questions or comments, please see our contact page, \
-http://courtlistener.com/contact/." % (
-                user.username,
-                up.activation_key)
-            send_mail(email_subject,
-                      email_body,
-                      'no-reply@courtlistener.com',
-                      [user.email])
+            email_body = ("Hello, %s,\n\nDuring routine maintenance of our site, we discovered that your email address "
+                          "has not yet been confirmed. To confirm your email address and continue using our site, "
+                          "please click the following link:\n\n"
+                          " - https://www.courtlistener.com/email/confirm/%s\n\n"
+                          "Unfortuantely, accounts that are not confirmed will stop receiving alerts, and must "
+                          "eventually be deleted from our system.\n\n"
+                          "Thanks for using our site,\n\n"
+                          "The CourtListener team\n\n\n"
+                          "------------------\n"
+                          "For questions or comments, please see our contact page, "
+                          "https://www.courtlistener.com/contact/." % (user.username, up.activation_key))
+            send_mail(email_subject, email_body, 'CourtListener <no-reply@courtlistener.com>', [user.email])
     return 0
 
 

@@ -3,12 +3,12 @@
                        xmlns:moz="http://www.mozilla.org/2006/browser/search/">
   <ShortName>CourtListener</ShortName>
   <Description>Search CourtListener.com</Description>
-  <Url type="text/html" method="get" template="http://courtlistener.com/?q={searchTerms}"/>
-  <Image width="16" height="16">http://courtlistener.com/media/images/ico/favicon.ico</Image>
+  <Url type="text/html" method="get" template="https://www.courtlistener.com/?q={searchTerms}"/>
+  <Image width="16" height="16">https://www.courtlistener.com/media/images/ico/favicon.ico</Image>
   <Developer>CourtListener</Developer>
 
   <InputEncoding>UTF-8</InputEncoding>
-  <moz:SearchForm>http://courtlistener.com</moz:SearchForm>
-  <Url type="application/opensearchdescription+xml" rel="self" template="http://courtlistener.com/media/xml/opensearch.xml"/>
-  <moz:UpdateUrl>http://courtlistener.com/media/xml/opensearch.xml</moz:UpdateUrl>
+  <moz:SearchForm>https://www.courtlistener.com</moz:SearchForm>
+  <Url type="application/opensearchdescription+xml" rel="self" template="https://www.courtlistener.com/media/xml/opensearch.xml"/>
+  <moz:UpdateUrl>https://www.courtlistener.com/media/xml/opensearch.xml</moz:UpdateUrl>
 </OpenSearchDescription>

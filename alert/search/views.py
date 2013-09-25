@@ -1,6 +1,8 @@
+import logging
 from alert.alerts.forms import CreateAlertForm
 from alert.lib import search_utils
 from alert.lib import sunburnt
+from alert.lib.bot_detector import is_bot
 from alert.search.forms import SearchForm
 
 from alert import settings
@@ -10,6 +12,9 @@ from django.shortcuts import render_to_response
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
 from django.views.decorators.cache import never_cache
+from alert.stats import tally_stat
+
+logger = logging.getLogger(__name__)
 
 
 def _clean_form(request, cd):
@@ -40,7 +45,6 @@ def show_results(request):
 
     Implements a parallel faceted search interface with Solr as the backend.
     """
-
     # Create a search string that does not contain the page numbers
     get_string = search_utils.make_get_string(request)
 
@@ -75,7 +79,7 @@ def show_results(request):
     '''
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     if len(request.GET) > 0:
-        # A query was performed. Bind the search form.
+        # Bind the search form.
         search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
@@ -87,19 +91,26 @@ def show_results(request):
                     court_facet_fields, search_form, 'court_exact', 'court_')
                 status_facets = search_utils.make_facets_variable(
                     stat_facet_fields, search_form, 'status_exact', 'stat_')
+                if not is_bot(request):
+                    tally_stat('search.results')
             except Exception, e:
-                return render_to_response('search/search.html',
-                                          {'error': True, 'private': False},
-                                          RequestContext(request))
+                logger.warning("Error loading search page with request: %s" % request.GET)
+                return render_to_response(
+                    'search/search.html',
+                    {'error': True, 'private': True},
+                    RequestContext(request)
+                )
 
             search_form = _clean_form(request, cd)
 
         else:
             # Invalid form, send it back
+            logger.warning("Invalid form when loading search page with request: %s" % request.GET)
             return render_to_response(
                 'search/search.html',
-                {'error': True, 'private': False},
-                RequestContext(request))
+                {'error': True, 'private': True},
+                RequestContext(request)
+            )
 
     else:
         # No search placed. Show default page after placing the needed queries.
@@ -121,6 +132,10 @@ def show_results(request):
     try:
         paginator = Paginator(results_si, 20)
         page = request.GET.get('page', 1)
+        private = True
+        if page == 1:
+            # It's the homepage -- not private.
+            private = False
         try:
             paged_results = paginator.page(page)
         except PageNotAnInteger:
@@ -131,8 +146,9 @@ def show_results(request):
             paged_results = paginator.page(paginator.num_pages)
     except:
         # Catches any Solr errors, and simply aborts.
+        logger.warning("Error loading pagination on search page with request: %s" % request.GET)
         return render_to_response('search/search.html',
-                                  {'error': True, 'private': False},
+                                  {'error': True, 'private': True},
                                   RequestContext(request))
     return render_to_response(
         'search/search.html',
@@ -143,7 +159,7 @@ def show_results(request):
          'status_facets': status_facets,
          'get_string': get_string,
          'count': count,
-         'private': False},
+         'private': private},
         RequestContext(request)
     )
 
