@@ -20,7 +20,7 @@
                 </div>
             {% endif %}
         </div>
-        {% if user.get_profile.donation.all %}
+        {% if user.profile.donation.all %}
             <div class="span-24 last content">
                 <table class="settings-table">
                     <thead>
@@ -32,7 +32,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for donation in user.get_profile.donation.all %}
+                        {% for donation in user.profile.donation.all %}
                         <tr>
                             <td>${{ donation.amount }}</td>
                             <td>{{ donation.date_created|date:"D, n/j/Y" }}</td>

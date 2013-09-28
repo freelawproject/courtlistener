@@ -4,11 +4,11 @@ from alert.citations.constants import REPORTERS
 def map_citations_to_models(citations):
     """Takes a list of citations and converts it to a dict mapping those citations to the model itself.
 
-    For example, a citation mentioning U.S. and F.2d (impossible, I know) would get mapped to:
+    For example, an opinion mentioning 1 U.S. 1 and 1 F.2d 1 (impossible, I know) would get mapped to:
 
     {
-     'federal_cite_one': {'canonical_reporter': 'U.S.'},
-     'federal_cite_two': {'canonical_reporter': 'F.2d'},
+     'federal_cite_one': '1 U.S. 1',
+     'federal_cite_two': '1 F.2d 1',
     }
     """
     def add_mapping(mapping, key, value):

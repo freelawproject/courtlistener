@@ -1,16 +1,14 @@
+import os
 import sys
+
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
-import settings
-from django.core.management import setup_environ
-setup_environ(settings)
-
-from search.models import Document
+from alert.search.models import Document
+from alert.scrapers.tasks import extract_doc_content
 from optparse import OptionParser
 
-# adding alert to the front of this breaks celery. Ignore pylint error.
-from scrapers.tasks import extract_doc_content
 
 def fixer(simulate=False, verbose=False):
     """OCR documents that lack content"""

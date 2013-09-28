@@ -1,6 +1,6 @@
 from django.forms import ModelForm
-from alert.userHandling.models import Alert
 from django.forms.widgets import HiddenInput, TextInput
+from alert.userHandling.models import Alert
 
 
 class CreateAlertForm(ModelForm):

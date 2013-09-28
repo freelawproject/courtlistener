@@ -1,16 +1,17 @@
+import os
 import sys
+from django.utils.timezone import now
+
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
-import settings
-from django.core.management import setup_environ
-setup_environ(settings)
-
-from search.models import Document
+from alert.search.models import Document
 from alert.lib.db_tools import queryset_generator
 from alert.lib.string_utils import anonymize
 from optparse import OptionParser
 from datetime import date
+
 
 def cleaner(simulate=False, verbose=False):
     """Re-run the anonymize function across the whole corpus.
@@ -41,7 +42,7 @@ def cleaner(simulate=False, verbose=False):
         if not simulate and any(any_mods):
             doc.plain_text = '\n'.join(clean_lines)
             doc.blocked = True
-            doc.date_blocked = date.today()
+            doc.date_blocked = now()
             doc.save()
 
 

@@ -19,7 +19,7 @@
                 </div>
             {% endif %}
         </div>
-        {% if user.get_profile.favorite.all %}
+        {% if user.profile.favorite.all %}
             <div class="span-24 last content">
                 <table class="settings-table">
                     <thead>
@@ -30,10 +30,10 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for favorite in user.get_profile.favorite.all %}
+                        {% for favorite in user.profile.favorite.all %}
                             <tr>
                                 <td>
-                                    <a href="{{favorite.doc_id.get_absolute_url}}">
+                                    <a href="{{ favorite.doc_id.get_absolute_url }}">
                                         <img
                                             src="{{ STATIC_URL }}png/page_go.png"
                                             title="View the opinion"

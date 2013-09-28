@@ -1,10 +1,11 @@
-from django import forms
-from django.contrib.localflavor.us.forms import USStateField, USZipCodeField
-from django.contrib.localflavor.us.us_states import STATE_CHOICES
-from django.contrib.auth.models import User
-from django.forms import ModelForm
 from alert.donate.models import Donation
 from alert.userHandling.models import UserProfile
+from django import forms
+from django.contrib.auth.models import User
+from django.forms import ModelForm
+from localflavor.us.forms import USStateField, USZipCodeField
+from localflavor.us.us_states import STATE_CHOICES
+
 
 AMOUNTS = (
     ('5000', '$5,000'),
@@ -141,9 +142,3 @@ class DonationForm(ModelForm):
         if self.cleaned_data.get('amount') == 'other':
             self.cleaned_data['amount'] = self.cleaned_data.get('amount_other')
         return self.cleaned_data
-
-    '''
-    # Suggested here, that this is where we unroll the extra fields in this model: http://stackoverflow.com/a/13550897/64911
-    def save(self, commit=True):
-        super(DonationForm, self).save(commit=commit)
-    '''

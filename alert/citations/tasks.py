@@ -1,18 +1,16 @@
+import os
+import re
 import sys
-from alert.casepage.views import make_citation_string
+from alert.lib.import_lib import map_citations_to_models
 
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
-from alert import settings
-from django.core.management import setup_environ
-setup_environ(settings)
-
-from alert.citations import match_citations, find_citations
-from alert.search.models import Document
-from celery.decorators import task
-
-import re
+from alert.casepage.views import make_citation_string
+from alert.citations import find_citations, match_citations
+from alert.search.models import Document, Citation
+from celery import task
 
 
 def get_document_citations(document):
@@ -40,14 +38,23 @@ def create_cited_html(document, citations):
     return new_html.encode('utf-8')
 
 
-def create_stub(citation):
+def create_stub(citations):
+    """Creates a stub document with the bare minimum of meta data."""
+    cite = Citation()
+    # Add the dict of citations to the object as its attributes.
+    citations_as_dict = map_citations_to_models(citations)
+    for k, v in citations_as_dict.iteritems():
+        setattr(cite, k, v)
+    # TODO: We can use the court information in the citation here. Failure to do so will mean that our URLs will later
+    #       change -- something we wish to avoid.
     stub_doc = Document(
-        is_stub_document = True,
-        sha1 = None,
-        court = None,
-        citation = citation
+        is_stub_document=True,
+        sha1='!',
+        court=None,
+        citation=cite,
     )
     stub_doc.save(index=False)
+    return stub_doc
 
 
 @task
@@ -93,9 +100,7 @@ def update_document(document):
                     print "Multiple database matches found for document id %s" % match_id
                 continue
         else:
-            # if len(matches) != 1, create a stub document for the citation
-            create_stub(citation)
-
+            #create_stub([citation])
             if DEBUG >= 2:
                 # TODO: Don't print 1 line per citation.  Save them in a list
                 # and print in a single line at the end.

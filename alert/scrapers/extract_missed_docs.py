@@ -1,26 +1,22 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+import argparse
+import datetime
+import os
 import sys
+import time
+import traceback
+
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
-
-import settings
-from celery.task.sets import subtask
-from django.core.management import setup_environ
-from django.core.exceptions import ObjectDoesNotExist
-setup_environ(settings)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 from alert.search.models import Court
 from alert.search.models import Document
-
-# adding alert to the front of this breaks celery. Ignore pylint error.
-from scrapers.tasks import extract_doc_content, extract_by_ocr
-
-import datetime
-import time
-import traceback
-import argparse
+from alert.scrapers.tasks import extract_doc_content, extract_by_ocr
+from celery.task.sets import subtask
+from django.core.exceptions import ObjectDoesNotExist
 
 
 def extract_all_docs(docs):

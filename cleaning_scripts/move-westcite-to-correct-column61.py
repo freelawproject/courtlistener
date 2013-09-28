@@ -1,16 +1,16 @@
+import os
 import sys
+
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
-import settings
-from django.core.management import setup_environ
-setup_environ(settings)
-
-from search.models import Document, Citation
+from alert.search.models import Document
 from alert.lib.db_tools import *
 
 from optparse import OptionParser
 from lxml.html import fromstring
+
 
 def db_corrector(simulate, verbose):
     """Fixes invalid resource.org citations

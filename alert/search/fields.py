@@ -31,6 +31,7 @@ class FloorDateField(DateField):
         if isinstance(value, datetime.date):
             return value
         for format in self.input_formats or formats.get_format('DATE_INPUT_FORMATS'):
+            # If it's a str, try to convert it to a date object
             try:
                 value = value.strip()
                 return datetime.date(*time.strptime(value, format)[:3])

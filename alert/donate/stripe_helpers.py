@@ -16,7 +16,7 @@ def process_stripe_callback(request):
     if request.method == 'POST':
         # Stripe hits us with a callback, and their security model is for us to use the ID from that to hit their API.
         # It's analogous to when you get a random call and you call them back to make sure it's legit.
-        event_id = simplejson.loads(request.raw_post_data)['id']
+        event_id = simplejson.loads(request.body)['id']
         # Now use the API to call back.
         stripe.api_key = settings.STRIPE_SECRET_KEY
         event = simplejson.loads(str(stripe.Event.retrieve(event_id)))

@@ -9,9 +9,8 @@ execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 
 from django import db
-from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned
-from django.template.defaultfilters import slugify
+from django.utils.text import slugify
 from alert.search.models import Court, Document
 from alert.lib.parse_dates import parse_dates
 from juriscraper.lib.string_utils import trunc

@@ -1,9 +1,9 @@
-from django.db import models
-from django.contrib.auth.models import User
-from django.contrib.localflavor.us.models import USStateField
 from alert.alerts.models import Alert
 from alert.donate.models import Donation
 from alert.favorites.models import Favorite
+from django.db import models
+from django.contrib.auth.models import User
+from localflavor.us.models import USStateField
 
 
 class BarMembership(models.Model):
@@ -29,8 +29,9 @@ class UserProfile(models.Model):
         'a unique ID for each user profile',
         primary_key=True
     )
-    user = models.ForeignKey(
+    user = models.OneToOneField(
         User,
+        related_name='profile',
         verbose_name='the user this model extends',
         unique=True
     )

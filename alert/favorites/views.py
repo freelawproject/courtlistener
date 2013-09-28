@@ -38,7 +38,7 @@ def save_or_update_favorite(request):
         if f.is_valid():
             new_fave = f.save()
 
-            up = request.user.get_profile()
+            up = request.user.profile
             up.favorite.add(new_fave)
             up.save()
         else:

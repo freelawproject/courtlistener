@@ -1,14 +1,10 @@
 import datetime
 import pickle
 import pprint
-import simplejson
-from threading import Thread
-import traceback
 import argparse
 
 from datetime import date, timedelta
 import time
-import sys
 from alert.corpus_importer.import_law_box import get_html_from_raw_text, get_judge, get_court_object
 from alert.search.models import Court
 

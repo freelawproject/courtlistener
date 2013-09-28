@@ -1,6 +1,7 @@
 import datetime
 from urllib import urlencode
 from urlparse import parse_qs
+from django.utils.timezone import now
 
 from alert.lib import sunburnt
 from django.conf import settings
@@ -292,7 +293,7 @@ def get_court_start_year(conn, court):
         year = response.result.docs[0]['dateFiled'].year
     except IndexError:
         # Occurs when there are 0 results for an active court (rare but possible)
-        year = datetime.date.today().year
+        year = now().year
 
     return year
 

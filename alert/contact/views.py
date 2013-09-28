@@ -3,8 +3,8 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 
-from alert.contact.forms import ContactForm
 from alert import settings
+from alert.contact.forms import ContactForm
 from alert.honeypot.decorators import check_honeypot
 
 @check_honeypot(field_name='skip_me_if_alive')

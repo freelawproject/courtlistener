@@ -1,20 +1,3 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-
 from django.template import Library
 from django.template.defaultfilters import stringfilter
 from django.utils.html import conditional_escape
@@ -26,7 +9,7 @@ from alert.lib import encode_decode
 register = Library()
 
 
-@register.filter
+@register.filter(needs_autoescape=True)
 @stringfilter
 def nbsp(text, autoescape=None):
     """Converts white space to non-breaking spaces
@@ -42,10 +25,9 @@ def nbsp(text, autoescape=None):
         # value of x when x is given.
         esc = lambda x: x
     return mark_safe(re.sub('\s', '&nbsp;', esc(text.strip())))
-nbsp.needs_autoescape = True
 
 
-@register.filter
+@register.filter(needs_autoescape=True)
 @stringfilter
 def v_wrapper(text, autoescape=None):
     """Wraps every v. in a string with a class of alt"""
@@ -54,10 +36,9 @@ def v_wrapper(text, autoescape=None):
     else:
         esc = lambda x: x
     return mark_safe(re.sub(' v\. ', '<span class="alt bold"> v. </span>', esc(text)))
-v_wrapper.needs_autoescape = True
 
 
-@register.filter
+@register.filter(needs_autoescape=True)
 @stringfilter
 def underscore_to_space(text, autoescape=None):
     """Removed underscores from text."""
@@ -66,10 +47,9 @@ def underscore_to_space(text, autoescape=None):
     else:
         esc = lambda x: x
     return mark_safe(re.sub('_', ' ', esc(text)))
-underscore_to_space.needs_autoescape = True
 
 
-@register.filter
+@register.filter(needs_autoescape=True)
 @stringfilter
 def compress_whitespace(text, autoescape=None):
     """Compress whitespace in a string as a browser does with HTML
@@ -85,10 +65,9 @@ def compress_whitespace(text, autoescape=None):
     else:
         esc = lambda x: x
     return mark_safe(' '.join(text.split()))
-compress_whitespace.needs_autoescape = True
 
 
-@register.filter
+@register.filter(needs_autoescape=True)
 @stringfilter
 def num_to_ascii(pk, autoescape=None):
     """Convert a pk into a base 60 encoded string """
@@ -97,4 +76,3 @@ def num_to_ascii(pk, autoescape=None):
     else:
         esc = lambda x: x
     return mark_safe(encode_decode.num_to_ascii(int(pk)))
-num_to_ascii.needs_autoescape = True

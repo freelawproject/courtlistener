@@ -8,10 +8,21 @@
     Twitter: @brianwc
     Location: Berkeley, CA
 
-    Design and Development: Michael Lissner
+    Lead Developer: Mike Lissner
     Site: http://michaeljaylissner.com
     Twitter: @mlissner
     Location: Berkeley, CA
+
+    Citator development: Karen Rustad and Rowyn McDonald
+    Coverage graphs: Rowyn McDonald
+    PageRank development: Krist Jin
+
+    Graphic Design: Ryan Moon
+
+    Data Donations from:
+     - Resource.org, and the estimable Carl Malamud
+     - The Lawbox team, Nicholas Zeltzer and Paul Kerschen
+     - Anonymous donors
 
 
 /* SITE */

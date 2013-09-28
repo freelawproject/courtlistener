@@ -19,9 +19,9 @@ def edit_alert(request, alert_id):
 
     # check if the user can edit this, or if they are url hacking
     alert = get_object_or_404(Alert, pk=alert_id,
-                              userprofile=request.user.get_profile())
-
-    # If they've made it this far, they can edit the item, therefore, we load 
+                              userprofile=request.user.profile)
+    from django.contrib.auth.models import User
+    # If they've made it this far, they can edit the item, therefore, we load
     # the form.
     if request.method == 'POST':
         alert_form = CreateAlertForm(request.POST)
@@ -55,7 +55,7 @@ def delete_alert(request, alert_id):
 
     # check if the user can edit this, or if they are url hacking
     alert = get_object_or_404(Alert, pk=alert_id,
-                              userprofile=request.user.get_profile())
+                              userprofile=request.user.profile)
 
     # if they've made it this far, they have permission to edit the alert
     alert.delete()

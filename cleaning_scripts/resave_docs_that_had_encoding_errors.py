@@ -1,10 +1,9 @@
+import os
 import sys
+
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
-
-import settings
-from django.core.management import setup_environ
-setup_environ(settings)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 from alert.search.models import Document
 

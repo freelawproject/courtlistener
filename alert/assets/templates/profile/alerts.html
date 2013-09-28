@@ -20,7 +20,7 @@
                 </div>
             {% endif %}
         </div>
-        {% if user.get_profile.alert.all %}
+        {% if user.profile.alert.all %}
             <div class="span-24 last content">
                 <table class="settings-table">
                     <thead>
@@ -32,7 +32,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for alert in user.get_profile.alert.all %}
+                        {% for alert in user.profile.alert.all %}
                         <tr>
                             <td>
                                 <p class="bottom" title="{{alert.alertName}}">

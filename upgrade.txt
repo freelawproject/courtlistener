@@ -51,6 +51,62 @@ LAWBOX PROJECT
          back into this data structure)
    TODO: Sort out the new court picking interface.
 
+
+2013-09-25:
+ - Django has been upgraded to version 1.5.4, at last. This was long overdue, but Django finally forced our hand with
+   old bugs and new features (a one-two punch of awesome). To upgrade to the new version, you're going to have to do
+   some not fun work, alas.
+ - Some new features this comes with:
+    - Security:
+       - Click jacking is now prevented by setting the X-Frame-Options HTTP header to SAMEORIGIN.
+       - The hashing algorithm we use for user's passwords has been updated to PBKDF2
+       - Our Cross-Site Request Forgery cookies will now be sent over HTTPS.
+       - Sensitive variables will no longer be sent in our error emails
+       - Security measures to prevent cache poisoning have been put in place.
+       - A number of other minor security fixes
+    - UX:
+       - All elements on all pages are now timezone aware, and will be presented in the user's time zone.
+    - Developers:
+       - The wonderful {% elif %} tag is now available and implemented everywhere that makes sense.
+       - Documentation for the releases is at:
+          - https://docs.djangoproject.com/en/dev/releases/
+ - Upgrade process:
+    - Install Localflavor (it was spun out of the Django project itself):
+
+        sudo pip install django-localflavor==1.0
+
+    - Ensure pytz is installed with:
+
+        sudo pip install pytz --upgrade
+
+    - Upgrade django-debug-toolbar if you're on a development machine. Normally we would choose a specific version to
+      develop against, but the currently released version has a deprecation warning with Django 1.5 (fun!). Since we
+      only use this on development machines, it's OK to have a rolling dev version. We'll lock this down after their
+      next release, when the deprecation is fixed (as it is in dev).
+
+        sudo pip uninstall django-debug-toolbar
+        sudo pip install django-debug-toolbar==dev
+
+    - pull the latest code
+    - enable management mode if on a production system.
+    - upgrade django:
+        sudo pip install django==1.5.4 --upgrade
+
+
+ - TODO: Make sure that xpath-tester is 1.5 certified.
+
+POST-UPGRADE
+ - TODO: Test Celery imports
+ - TODO: Check that the static files in the admin interface still works
+ 1.5:
+ - TODO: Check if the other CL domains still work with the new ALLOWED_HOSTS setting in place.
+
+
+2013-09-24:
+ - We've added two new fields to the Document model that will need to be migrated with:
+
+    manage.py migrate search
+
 2013-09-21:
  - I've added a new feature that allows us to log stats. It it has the signature of tally_stat('name_of_stat', inc=1,
    date=date.today()), which, if not self explanatory should be pretty clear. As you might expect, it comes with a

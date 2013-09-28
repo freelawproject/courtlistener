@@ -20,9 +20,10 @@ start () {
       exit 1
     fi
     cd $INSTALL_ROOT/alert
-    DEV=`python -c 'import settings;
-from django.core.management import setup_environ;
-setup_environ(settings);
+    DEV=`python -c 'import os;
+import sys;
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings");
+from django.conf import settings;
 print settings.DEVELOPMENT;'`
 
     if [ $DEV = 'True' ]

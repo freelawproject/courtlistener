@@ -1,12 +1,11 @@
 import os
 import sys
+from django.utils.timezone import now
+
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
-
-from alert import settings
-from django.core.management import setup_environ
-
-setup_environ(settings)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
+from django.conf import settings
 
 from alert.search.models import Document
 from difflib import Differ
@@ -33,7 +32,7 @@ def toggle_blocked_status(url, block_or_unblock, simulate, verbose):
             if verbose:
                 print "Blocking: %s" % url
             doc.blocked = True
-            doc.date_blocked = datetime.date.today()
+            doc.date_blocked = now()
         elif block_or_unblock == "unblock":
             if verbose:
                 print "Unblocking: %s" % url
@@ -114,13 +113,12 @@ def main():
     usage = "usage: %prog [--verbose] [--simulate]"
     parser = OptionParser(usage)
     parser.add_option('-u', '--update', action='store_true',
-                      dest='update', default=False, help="Update the DB with any new " + \
-                                                         "entries at bulk.resource.org/robots.txt")
+                      dest='update', default=False, help="Update the DB with any new entries at "
+                                                         "bulk.resource.org/robots.txt")
     parser.add_option('-v', '--verbose', action="store_true", dest='verbose',
                       default=False, help="Display variable values during execution")
     parser.add_option('-s', '--simulate', action="store_true",
-                      dest='simulate', default=False, help="Simulate updating the " + \
-                                                           "database")
+                      dest='simulate', default=False, help="Simulate updating the database")
     (options, args) = parser.parse_args()
 
     verbose = options.verbose

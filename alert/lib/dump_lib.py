@@ -3,7 +3,8 @@ import gzip
 import time
 import os
 
-from datetime import date
+from datetime import datetime
+from django.utils.timezone import utc
 from lxml import etree
 
 
@@ -210,7 +211,7 @@ def get_date_range(year, month, day):
         start_day = int(day)
 
     start_year = int(year)
-    start_date = date(start_year, start_month, start_day)
+    start_date = datetime(start_year, start_month, start_day, tzinfo=utc)
 
     annual = False
     monthly = False
@@ -233,6 +234,6 @@ def get_date_range(year, month, day):
         end_day = int(day)
 
     end_year = int(year)
-    end_date = date(end_year, end_month, end_day)
+    end_date = datetime(end_year, end_month, end_day, tzinfo=utc)
 
     return start_date, end_date, annual, monthly, daily

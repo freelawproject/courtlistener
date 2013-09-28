@@ -1,4 +1,6 @@
 import os
+from django.utils.timezone import now
+
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 import sys
 execfile('/etc/courtlistener')
@@ -45,7 +47,7 @@ def add_case(case):
     doc.html, blocked = anonymize(case.body)
     if blocked:
         doc.blocked = True
-        doc.date_blocked = datetime.date.today()
+        doc.date_blocked = now()
 
     if not simulate:
         # Save everything together
@@ -75,7 +77,7 @@ def merge_cases_simple(case, target_id):
     doc.html, blocked = anonymize(case.body)
     if blocked:
         doc.blocked = True
-        doc.date_blocked = datetime.date.today()
+        doc.date_blocked = now()
 
     if not simulate:
         doc.citation.save()

@@ -1,16 +1,15 @@
+import os
 import sys
+
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
-import settings
-from django.core.management import setup_environ
-setup_environ(settings)
-
-from search.models import Document, Citation
-from lib.db_tools import queryset_generator
-from lib.string_utils import clean_string
-from lib.string_utils import harmonize
-from lib.string_utils import titlecase
+from alert.search.models import Document, Citation
+from alert.lib.db_tools import queryset_generator
+from alert.lib.string_utils import clean_string
+from alert.lib.string_utils import harmonize
+from alert.lib.string_utils import titlecase
 from optparse import OptionParser
 
 

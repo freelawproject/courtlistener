@@ -60,7 +60,7 @@ def show_results(request):
             alert = a.save()
 
             # associate the user with the alert
-            up = request.user.get_profile()
+            up = request.user.profile
             up.alert.add(alert)
             messages.add_message(request, messages.SUCCESS,
                                  'Your alert was created successfully.')

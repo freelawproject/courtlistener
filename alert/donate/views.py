@@ -131,10 +131,10 @@ def donate(request):
                 # don't care too much about the accuracy of this data. Later if/when this becomes a real account,
                 # anonymous users won't be able to update this information -- that's what matters.
                 user_form = UserForm(request.POST, instance=stub_account)
-                profile_form = ProfileForm(request.POST, instance=stub_account.get_profile())
+                profile_form = ProfileForm(request.POST, instance=stub_account.profile)
         else:
             user_form = UserForm(request.POST, instance=request.user)
-            profile_form = ProfileForm(request.POST, instance=request.user.get_profile())
+            profile_form = ProfileForm(request.POST, instance=request.user.profile)
 
         if all([donation_form.is_valid(), user_form.is_valid(), profile_form.is_valid()]):
             # Process the data in form.cleaned_data
@@ -202,7 +202,7 @@ def donate(request):
                     'email': request.user.email,
                 }
             )
-            up = request.user.get_profile()
+            up = request.user.profile
             profile_form = ProfileForm(
                 initial={
                     'address1': up.address1,

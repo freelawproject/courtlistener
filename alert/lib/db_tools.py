@@ -15,20 +15,22 @@ def queryset_generator(queryset, chunksize=1000):
     Note that the implementation of the iterator does not support ordered query
     sets.
     """
-    if queryset.count() == 0:
+    # Make a query that doesn't do related fetching for optimization
+    bare_qs = queryset.prefetch_related(None).select_related(None)
+    if bare_qs.count() == 0:
         return
     if settings.DEVELOPMENT:
         chunksize = 5
 
-    documentUUID = queryset.order_by('pk')[0].documentUUID
-    # Decrement document ID for use with 'greater than' filter
-    if documentUUID > 0:
-        documentUUID -= 1
-    last_pk = queryset.order_by('-pk')[0].documentUUID
-    queryset = queryset.order_by('pk')
-    while documentUUID < last_pk:
-        for row in queryset.filter(documentUUID__gt=documentUUID)[:chunksize]:
-            documentUUID = row.documentUUID
+    pk = bare_qs.order_by('pk')[0].pk
+    # Decrement pk for use with 'greater than' filter
+    if pk > 0:
+        pk -= 1
+    last_pk = bare_qs.order_by('-pk')[0].pk
+    queryset = bare_qs.order_by('pk')
+    while pk < last_pk:
+        for row in queryset.filter(pk__gt=pk)[:chunksize]:
+            pk = row.pk
             yield row
 
 
@@ -43,7 +45,7 @@ def queryset_generator_by_date(queryset, date_field, start_date, end_date, chunk
     Chunksize should be given in days, and start and end dates should be provided
     as dates.
     """
-    chunksize = timedelta(chunksize)
+    chunksize = timedelta(days=chunksize)
     bottom_date = start_date
     top_date = bottom_date + chunksize - timedelta(1)
     while bottom_date <= end_date:

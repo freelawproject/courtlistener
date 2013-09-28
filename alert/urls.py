@@ -20,16 +20,17 @@ from alert.robots.views import robots
 from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert
 from alert.search.models import Court
 from alert.search.views import browser_warning, show_results, tools_page
-from alert.userHandling.views import confirmEmail, deleteProfile, deleteProfileDone, emailConfirmSuccess, \
-    password_change, redirect_to_settings, register, register_success, request_email_confirmation, view_favorites, \
-    view_alerts, view_settings
+from alert.userHandling.views import (
+    confirmEmail, deleteProfile, deleteProfileDone, emailConfirmSuccess, password_change, redirect_to_settings,
+    register, register_success, request_email_confirmation, view_favorites, view_alerts, view_settings
+)
 
-from django.conf.urls.defaults import *
+from django.conf.urls import include, patterns, url
 from django.views.generic import RedirectView
 
 # for the flatfiles in the sitemap
 from django.contrib.auth.views import login as signIn, logout as signOut, password_reset, password_reset_done, \
-                                      password_reset_confirm
+        password_reset_confirm
 
 # enables the admin:
 from django.contrib import admin
@@ -46,18 +47,18 @@ urlpatterns = patterns('',
     (r'^admin/', include(admin.site.urls)),
 
     # favicon and apple touch icons (needed in urls.py because they have to be at the root)
-    (r'^favicon\.ico$', 'django.views.generic.simple.redirect_to',
-        {'url': '/static/ico/favicon.ico'}),
-    (r'^apple-touch-icon\.png$', 'django.views.generic.simple.redirect_to',
-        {'url': '/static/png/apple-touch-icon.png'}),
-    (r'^apple-touch-icon-57x57-precomposed\.png$', 'django.views.generic.simple.redirect_to',
-        {'url': '/static/png/apple-touch-icon-57x57-precomposed.png'}),
-    (r'^apple-touch-icon-72x72-precomposed\.png$', 'django.views.generic.simple.redirect_to',
-        {'url': '/static/png/apple-touch-icon-72x72-precomposed.png'}),
-    (r'^apple-touch-icon-114x114-precomposed\.png$', 'django.views.generic.simple.redirect_to',
-        {'url': '/static/png/apple-touch-icon-114x114-precomposed.png'}),
-    (r'^apple-touch-icon-precomposed\.png$', 'django.views.generic.simple.redirect_to',
-        {'url': '/static/png/apple-touch-icon-precomposed.png'}),
+    (r'^favicon\.ico$', 'django.shortcuts.redirect',
+        {'to': '/static/ico/favicon.ico'}),
+    (r'^apple-touch-icon\.png$', 'django.shortcuts.redirect',
+        {'to': '/static/png/apple-touch-icon.png'}),
+    (r'^apple-touch-icon-57x57-precomposed\.png$', 'django.shortcuts.redirect',
+        {'to': '/static/png/apple-touch-icon-57x57-precomposed.png'}),
+    (r'^apple-touch-icon-72x72-precomposed\.png$', 'django.shortcuts.redirect',
+        {'to': '/static/png/apple-touch-icon-72x72-precomposed.png'}),
+    (r'^apple-touch-icon-114x114-precomposed\.png$', 'django.shortcuts.redirect',
+        {'to': '/static/png/apple-touch-icon-114x114-precomposed.png'}),
+    (r'^apple-touch-icon-precomposed\.png$', 'django.shortcuts.redirect',
+        {'to': '/static/png/apple-touch-icon-precomposed.png'}),
     (r'^bad-browser/$', browser_warning),
 
     # Maintenance and protest mode!
@@ -69,8 +70,7 @@ urlpatterns = patterns('',
         name="view_case_citations"),
 
     # Display a case; a named URL because the get_absolute_url uses it.
-    url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case,
-        name="view_case"),
+    url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case, name="view_case"),
 
     # Serve a static file
     (r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$',

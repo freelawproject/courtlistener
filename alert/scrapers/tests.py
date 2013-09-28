@@ -1,6 +1,7 @@
 import hashlib
 import os
 import time
+from django.utils.timezone import now
 from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core
 from alert.lib.string_utils import trunc
 from alert.lib import sunburnt
@@ -9,6 +10,7 @@ from alert.scrapers.models import urlToHash
 from alert.scrapers.management.commands.cl_scrape_and_extract import get_extension
 from alert.scrapers.management.commands.cl_scrape_and_extract import scrape_court
 from alert.scrapers.tasks import extract_doc_content
+from alert.scrapers.tasks import extract_by_ocr
 from alert.scrapers.test_assets import test_scraper
 from alert.search.models import Citation, Court, Document
 from alert import settings
@@ -16,9 +18,6 @@ from celery.task.sets import subtask
 from datetime import date, timedelta
 from django.core.files.base import ContentFile
 from django.test import TestCase
-
-# Gotta have the bad import here for celery
-from scrapers.tasks import extract_by_ocr
 
 
 class IngestionTest(TestCase):
@@ -155,8 +154,8 @@ class DupcheckerTest(TestCase):
 
     def test_should_we_continue_break_or_carry_on_with_an_empty_database(self):
         for dup_checker in self.dup_checkers:
-            onwards = dup_checker.should_we_continue_break_or_carry_on(date.today(),
-                                                                       date.today() - timedelta(days=1),
+            onwards = dup_checker.should_we_continue_break_or_carry_on(now(),
+                                                                       now() - timedelta(days=1),
                                                                        lookup_value='content',
                                                                        lookup_by='sha1')
             if not dup_checker.full_crawl:
@@ -175,8 +174,8 @@ class DupcheckerTest(TestCase):
             # Create a document, then use the dup_cheker to see if it exists.
             doc = Document(sha1=content_hash, court=self.court)
             doc.save(index=False)
-            onwards = dup_checker.should_we_continue_break_or_carry_on(date.today(),
-                                                                       date.today(),
+            onwards = dup_checker.should_we_continue_break_or_carry_on(now(),
+                                                                       now(),
                                                                        lookup_value=content_hash,
                                                                        lookup_by='sha1')
             if dup_checker.full_crawl:
@@ -197,10 +196,8 @@ class DupcheckerTest(TestCase):
             doc = Document(sha1=content_hash, court=self.court)
             doc.save(index=False)
             # Note that the next case occurs prior to the current one
-            onwards = dup_checker.should_we_continue_break_or_carry_on(date.today(),
-                                                                       date.today() - timedelta(days=1),
-                                                                       lookup_value=content_hash,
-                                                                       lookup_by='sha1')
+            onwards = dup_checker.should_we_continue_break_or_carry_on(now(), now() - timedelta(days=1),
+                                                                       lookup_value=content_hash, lookup_by='sha1')
             if dup_checker.full_crawl:
                 self.assertEqual(onwards, 'CONTINUE',
                                  'DupChecker says to %s during a full crawl.' % onwards)

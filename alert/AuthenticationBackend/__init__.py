@@ -21,7 +21,7 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
                     _("Please enter a correct username and password. Note that both fields are case-sensitive."))
             elif not self.user_cache.is_active:
                 raise forms.ValidationError(_("This account is inactive."))
-            elif not self.user_cache.get_profile().email_confirmed:
+            elif not self.user_cache.profile.email_confirmed:
                 raise forms.ValidationError('Please <a href="/email-confirmation/request/">validate your email address</a> to log in.')
         self.check_for_test_cookie()
         return self.cleaned_data

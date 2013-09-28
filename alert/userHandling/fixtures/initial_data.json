@@ -1,394 +1,394 @@
 [
-    {
-        "pk": 2,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "AK"
-        }
-    },
-    {
-        "pk": 1,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "AL"
-        }
-    },
-    {
-        "pk": 6,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "AR"
-        }
-    },
-    {
-        "pk": 3,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "AS"
-        }
-    },
-    {
-        "pk": 5,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "AZ"
-        }
-    },
-    {
-        "pk": 7,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "CA"
-        }
-    },
-    {
-        "pk": 8,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "CO"
-        }
-    },
-    {
-        "pk": 9,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "CT"
-        }
-    },
-    {
-        "pk": 11,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "DC"
-        }
-    },
-    {
-        "pk": 10,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "DE"
-        }
-    },
-    {
-        "pk": 12,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "FL"
-        }
-    },
-    {
-        "pk": 13,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "GA"
-        }
-    },
-    {
-        "pk": 14,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "GU"
-        }
-    },
-    {
-        "pk": 15,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "HI"
-        }
-    },
-    {
-        "pk": 19,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "IA"
-        }
-    },
-    {
-        "pk": 16,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "ID"
-        }
-    },
-    {
-        "pk": 17,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "IL"
-        }
-    },
-    {
-        "pk": 18,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "IN"
-        }
-    },
-    {
-        "pk": 20,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "KS"
-        }
-    },
-    {
-        "pk": 21,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "KY"
-        }
-    },
-    {
-        "pk": 22,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "LA"
-        }
-    },
-    {
-        "pk": 25,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "MA"
-        }
-    },
-    {
-        "pk": 24,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "MD"
-        }
-    },
-    {
-        "pk": 23,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "ME"
-        }
-    },
-    {
-        "pk": 26,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "MI"
-        }
-    },
-    {
-        "pk": 27,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "MN"
-        }
-    },
-    {
-        "pk": 29,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "MO"
-        }
-    },
-    {
-        "pk": 39,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "MP"
-        }
-    },
-    {
-        "pk": 28,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "MS"
-        }
-    },
-    {
-        "pk": 30,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "MT"
-        }
-    },
-    {
-        "pk": 37,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "NC"
-        }
-    },
-    {
-        "pk": 38,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "ND"
-        }
-    },
-    {
-        "pk": 31,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "NE"
-        }
-    },
-    {
-        "pk": 33,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "NH"
-        }
-    },
-    {
-        "pk": 34,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "NJ"
-        }
-    },
-    {
-        "pk": 35,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "NM"
-        }
-    },
-    {
-        "pk": 32,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "NV"
-        }
-    },
-    {
-        "pk": 36,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "NY"
-        }
-    },
-    {
-        "pk": 40,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "OH"
-        }
-    },
-    {
-        "pk": 41,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "OK"
-        }
-    },
-    {
-        "pk": 42,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "OR"
-        }
-    },
-    {
-        "pk": 43,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "PA"
-        }
-    },
-    {
-        "pk": 44,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "PR"
-        }
-    },
-    {
-        "pk": 46,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "RI"
-        }
-    },
-    {
-        "pk": 47,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "SC"
-        }
-    },
-    {
-        "pk": 48,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "SD"
-        }
-    },
-    {
-        "pk": 49,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "TN"
-        }
-    },
-    {
-        "pk": 50,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "TX"
-        }
-    },
-    {
-        "pk": 51,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "UT"
-        }
-    },
-    {
-        "pk": 54,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "VA"
-        }
-    },
-    {
-        "pk": 53,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "VI"
-        }
-    },
-    {
-        "pk": 52,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "VT"
-        }
-    },
-    {
-        "pk": 55,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "WA"
-        }
-    },
-    {
-        "pk": 57,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "WI"
-        }
-    },
-    {
-        "pk": 56,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "WV"
-        }
-    },
-    {
-        "pk": 58,
-        "model": "userHandling.barmembership",
-        "fields": {
-            "barMembership": "WY"
-        }
+  {
+    "pk": 2,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "AK"
     }
+  },
+  {
+    "pk": 1,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "AL"
+    }
+  },
+  {
+    "pk": 6,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "AR"
+    }
+  },
+  {
+    "pk": 3,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "AS"
+    }
+  },
+  {
+    "pk": 5,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "AZ"
+    }
+  },
+  {
+    "pk": 7,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "CA"
+    }
+  },
+  {
+    "pk": 8,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "CO"
+    }
+  },
+  {
+    "pk": 9,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "CT"
+    }
+  },
+  {
+    "pk": 11,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "DC"
+    }
+  },
+  {
+    "pk": 10,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "DE"
+    }
+  },
+  {
+    "pk": 12,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "FL"
+    }
+  },
+  {
+    "pk": 13,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "GA"
+    }
+  },
+  {
+    "pk": 14,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "GU"
+    }
+  },
+  {
+    "pk": 15,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "HI"
+    }
+  },
+  {
+    "pk": 19,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "IA"
+    }
+  },
+  {
+    "pk": 16,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "ID"
+    }
+  },
+  {
+    "pk": 17,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "IL"
+    }
+  },
+  {
+    "pk": 18,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "IN"
+    }
+  },
+  {
+    "pk": 20,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "KS"
+    }
+  },
+  {
+    "pk": 21,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "KY"
+    }
+  },
+  {
+    "pk": 22,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "LA"
+    }
+  },
+  {
+    "pk": 25,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "MA"
+    }
+  },
+  {
+    "pk": 24,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "MD"
+    }
+  },
+  {
+    "pk": 23,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "ME"
+    }
+  },
+  {
+    "pk": 26,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "MI"
+    }
+  },
+  {
+    "pk": 27,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "MN"
+    }
+  },
+  {
+    "pk": 29,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "MO"
+    }
+  },
+  {
+    "pk": 39,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "MP"
+    }
+  },
+  {
+    "pk": 28,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "MS"
+    }
+  },
+  {
+    "pk": 30,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "MT"
+    }
+  },
+  {
+    "pk": 37,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "NC"
+    }
+  },
+  {
+    "pk": 38,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "ND"
+    }
+  },
+  {
+    "pk": 31,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "NE"
+    }
+  },
+  {
+    "pk": 33,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "NH"
+    }
+  },
+  {
+    "pk": 34,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "NJ"
+    }
+  },
+  {
+    "pk": 35,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "NM"
+    }
+  },
+  {
+    "pk": 32,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "NV"
+    }
+  },
+  {
+    "pk": 36,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "NY"
+    }
+  },
+  {
+    "pk": 40,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "OH"
+    }
+  },
+  {
+    "pk": 41,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "OK"
+    }
+  },
+  {
+    "pk": 42,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "OR"
+    }
+  },
+  {
+    "pk": 43,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "PA"
+    }
+  },
+  {
+    "pk": 44,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "PR"
+    }
+  },
+  {
+    "pk": 46,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "RI"
+    }
+  },
+  {
+    "pk": 47,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "SC"
+    }
+  },
+  {
+    "pk": 48,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "SD"
+    }
+  },
+  {
+    "pk": 49,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "TN"
+    }
+  },
+  {
+    "pk": 50,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "TX"
+    }
+  },
+  {
+    "pk": 51,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "UT"
+    }
+  },
+  {
+    "pk": 54,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "VA"
+    }
+  },
+  {
+    "pk": 53,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "VI"
+    }
+  },
+  {
+    "pk": 52,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "VT"
+    }
+  },
+  {
+    "pk": 55,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "WA"
+    }
+  },
+  {
+    "pk": 57,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "WI"
+    }
+  },
+  {
+    "pk": 56,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "WV"
+    }
+  },
+  {
+    "pk": 58,
+    "model": "userHandling.barmembership",
+    "fields": {
+      "barMembership": "WY"
+    }
+  }
 ]
