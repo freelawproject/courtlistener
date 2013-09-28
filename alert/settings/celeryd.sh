@@ -30,4 +30,4 @@ CELERYD_USER="celery"
 CELERYD_GROUP="celery"
 
 # Name of the projects settings module.
-export DJANGO_SETTINGS_MODULE="settings"
+export DJANGO_SETTINGS_MODULE="alert.settings"
