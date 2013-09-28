@@ -94,7 +94,7 @@ class Command(BaseCommand):
                                                                 case.pk, case.cached_pagerank, case.pagerank))
             if case.cached_pagerank != case.pagerank:
                 # Only save if we have changed the value
-                case.save(index=False)
+                case.save(index=False).update_fields('pagerank')
                 update_count += 1
 
         if verbosity >= 1:
