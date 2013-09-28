@@ -85,13 +85,18 @@ LAWBOX PROJECT
       only use this on development machines, it's OK to have a rolling dev version. We'll lock this down after their
       next release, when the deprecation is fixed (as it is in dev).
 
+      On all machines, run:
         sudo pip uninstall django-debug-toolbar
+
+      On dev machines only, run (our prod machines no longer have this dependency, a performance boost):
         sudo pip install django-debug-toolbar==dev
 
     - pull the latest code
     - enable management mode if on a production system.
     - upgrade django:
         sudo pip install django==1.5.4 --upgrade
+    - Migrate django
+        manage.py migrate
     - restart celery if on a production machine.
 
 
