@@ -1,12 +1,11 @@
-from django.utils.timezone import now
-
 __author__ = 'Krist Jin'
 
 from alert.search.models import Document
 from alert.lib.db_tools import queryset_generator, queryset_generator_by_date
-from datetime import date
+from datetime import datetime
 from django.core.management.base import BaseCommand
 from django.db.models import Count
+from django.utils.timezone import now, utc, make_aware
 import logging
 import sys
 
@@ -27,7 +26,8 @@ class Command(BaseCommand):
         min_value = (1.0 - DAMPING_FACTOR)
 
         # Chunk by date for best performance
-        start_date = Document.objects.all().order_by('date_filed')[0].date_filed
+        d = Document.objects.all().order_by('date_filed')[0].date_filed
+        start_date = make_aware(datetime.combine(d, datetime.min.time()), utc)
         end_date = now()
         qs = Document.objects.only(
             'documentUUID',
