@@ -128,7 +128,10 @@ POST-UPGRADE
 
  - BEFORE PULL: The donation system has been fully deployed. To make the donation system work, you need to set up the
    payment related section of 05-private.example in your 05-private.py file. To get these keys, you'll need to set up
-   accounts with PayPal, Dwolla and Stripe.
+   accounts with PayPal, Dwolla and Stripe. At a minimum, you need to set up these variables:
+
+   PAYMENT_TESTING_MODE = False
+
 
 2013-09-16:
  - OVERVIEW: This update contains a number of large fixes, which will alter your database in a number of ways. It lands
