@@ -47,21 +47,21 @@ urlpatterns = patterns('',
     (r'^admin/', include(admin.site.urls)),
 
     # favicon and apple touch icons (needed in urls.py because they have to be at the root)
-    (r'^favicon\.ico$', 'django.shortcuts.redirect',
-        {'to': '/static/ico/favicon.ico'}),
-    (r'^apple-touch-icon\.png$', 'django.shortcuts.redirect',
-        {'to': '/static/png/apple-touch-icon.png'}),
-    (r'^apple-touch-icon-57x57-precomposed\.png$', 'django.shortcuts.redirect',
-        {'to': '/static/png/apple-touch-icon-57x57-precomposed.png'}),
-    (r'^apple-touch-icon-72x72-precomposed\.png$', 'django.shortcuts.redirect',
-        {'to': '/static/png/apple-touch-icon-72x72-precomposed.png'}),
-    (r'^apple-touch-icon-114x114-precomposed\.png$', 'django.shortcuts.redirect',
-        {'to': '/static/png/apple-touch-icon-114x114-precomposed.png'}),
-    (r'^apple-touch-icon-precomposed\.png$', 'django.shortcuts.redirect',
-        {'to': '/static/png/apple-touch-icon-precomposed.png'}),
+    (r'^favicon\.ico$',
+     RedirectView.as_view(url='/static/ico/favicon.ico', permanent=True)),
+    (r'^apple-touch-icon\.png$',
+     RedirectView.as_view(url='/static/png/apple-touch-icon.png', permanent=True)),
+    (r'^apple-touch-icon-57x57-precomposed\.png$',
+     RedirectView.as_view(url='/static/png/apple-touch-icon-57x57-precomposed.png', permanent=True)),
+    (r'^apple-touch-icon-72x72-precomposed\.png$',
+     RedirectView.as_view(url='/static/png/apple-touch-icon-72x72-precomposed.png', permanent=True)),
+    (r'^apple-touch-icon-114x114-precomposed\.png$',
+     RedirectView.as_view(url='/static/png/apple-touch-icon-114x114-precomposed.png', permanent=True)),
+    (r'^apple-touch-icon-precomposed\.png$',
+     RedirectView.as_view(url='/static/png/apple-touch-icon-precomposed.png', permanent=True)),
     (r'^bad-browser/$', browser_warning),
 
-    # Maintenance and protest mode!
+    # Maintenance and SOPA/PIPA mode!
     #(r'/*', show_maintenance_warning),
 
     # Display a case's citations page
@@ -135,8 +135,10 @@ urlpatterns = patterns('',
     (r'^dump-info/$', dump_index),
     (r'^dump-api/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
     (r'^dump-api/(?P<year>\d{4})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
-    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
-    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
+    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$',
+     serve_or_gen_dump),
+    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$',
+     serve_or_gen_dump),
 
     # Feeds
     (r'^feed/(search)/$', search_feed()),  # lacks URL capturing b/c it will use GET queries.
