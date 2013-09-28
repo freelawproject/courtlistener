@@ -54,8 +54,8 @@ LAWBOX PROJECT
 
 2013-09-25:
  - Django has been upgraded to version 1.5.4, at last. This was long overdue, but Django finally forced our hand with
-   old bugs and new features (a one-two punch of awesome). To upgrade to the new version, you're going to have to do
-   some not fun work, alas.
+   old bugs and new features (a one-two punch of hate/awesome). To upgrade to the new version, you're going to have to
+   do some not fun work, alas.
  - Some new features this comes with:
     - Security:
        - Click jacking is now prevented by setting the X-Frame-Options HTTP header to SAMEORIGIN.
@@ -65,9 +65,10 @@ LAWBOX PROJECT
        - Security measures to prevent cache poisoning have been put in place.
        - A number of other minor security fixes
     - UX:
-       - All elements on all pages are now timezone aware, and will be presented in the user's time zone.
+       - All elements on all pages should now be timezone aware, and will be presented in the user's time zone.
     - Developers:
-       - The wonderful {% elif %} tag is now available and implemented everywhere that makes sense.
+       - The wonderful {% elif %} template tag is now available and implemented everywhere that makes sense. I've waited
+         years for this tag.
        - Documentation for the releases is at:
           - https://docs.djangoproject.com/en/dev/releases/
  - Upgrade process:
@@ -91,6 +92,7 @@ LAWBOX PROJECT
     - enable management mode if on a production system.
     - upgrade django:
         sudo pip install django==1.5.4 --upgrade
+    - restart celery if on a production machine.
 
 
  - TODO: Make sure that xpath-tester is 1.5 certified.
