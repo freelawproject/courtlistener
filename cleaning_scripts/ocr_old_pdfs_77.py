@@ -6,7 +6,7 @@ sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 from alert.search.models import Document
-from alert.scrapers.tasks import extract_doc_content
+from scrapers.tasks import extract_doc_content
 from optparse import OptionParser
 
 

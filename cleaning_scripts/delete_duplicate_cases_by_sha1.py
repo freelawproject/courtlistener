@@ -7,8 +7,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 from alert.search.models import Document, Court
 from optparse import OptionParser
-from alert.scrapers.tasks import extract_doc_content, extract_by_ocr
-from alert.search.tasks import delete_doc
+from search.tasks import delete_doc
 
 # A list of bad cases, found with the following query
 # select

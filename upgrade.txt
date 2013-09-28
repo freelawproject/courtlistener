@@ -103,8 +103,6 @@ LAWBOX PROJECT
  - TODO: Make sure that xpath-tester is 1.5 certified.
 
 POST-UPGRADE
- - TODO: Test Celery imports
- - TODO: Check that the static files in the admin interface still works
  1.5:
  - TODO: Check if the other CL domains still work with the new ALLOWED_HOSTS setting in place.
 

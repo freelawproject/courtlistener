@@ -1,9 +1,9 @@
 import time
 
-from alert.citations.tasks import update_document
 from alert.search.models import Document
 from alert.lib.db_tools import queryset_generator
 from celery.task.sets import TaskSet
+from citations.tasks import update_document
 from django.core.management import BaseCommand, CommandError
 from optparse import make_option
 
