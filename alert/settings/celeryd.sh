@@ -15,7 +15,7 @@ if [ -z $INSTALL_ROOT ]; then
 fi
 
 # How to call "manage.py celeryd_multi"
-CELERYD_MULTI="$ENV_PYTHON $INSTALL_ROOT/alert/manage.py celeryd_multi"
+CELERYD_MULTI="$ENV_PYTHON $INSTALL_ROOT/manage.py celeryd_multi"
 
 # Name of the celery config module.
 CELERY_CONFIG_MODULE="celeryconfig"
