@@ -10,7 +10,7 @@ from alert.search.models import Document
 from optparse import OptionParser
 
 # adding alert to the front of this breaks celery. Ignore pylint error.
-from alert.scrapers.tasks import extract_doc_content, extract_by_ocr
+from scrapers.tasks import extract_doc_content, extract_by_ocr
 
 
 def fixer(simulate=False, verbose=False):

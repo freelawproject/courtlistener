@@ -9,8 +9,6 @@ from alert.scrapers.DupChecker import DupChecker
 from alert.scrapers.models import urlToHash
 from alert.scrapers.management.commands.cl_scrape_and_extract import get_extension
 from alert.scrapers.management.commands.cl_scrape_and_extract import scrape_court
-from alert.scrapers.tasks import extract_doc_content
-from alert.scrapers.tasks import extract_by_ocr
 from alert.scrapers.test_assets import test_scraper
 from alert.search.models import Citation, Court, Document
 from alert import settings
@@ -18,6 +16,8 @@ from celery.task.sets import subtask
 from datetime import date, timedelta
 from django.core.files.base import ContentFile
 from django.test import TestCase
+from scrapers.tasks import extract_doc_content
+from scrapers.tasks import extract_by_ocr
 
 
 class IngestionTest(TestCase):

@@ -14,9 +14,9 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 from alert.search.models import Court
 from alert.search.models import Document
-from alert.scrapers.tasks import extract_doc_content, extract_by_ocr
 from celery.task.sets import subtask
 from django.core.exceptions import ObjectDoesNotExist
+from scrapers.tasks import extract_doc_content, extract_by_ocr
 
 
 def extract_all_docs(docs):

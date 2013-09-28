@@ -9,12 +9,13 @@ sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 from django.conf import settings
 
-from alert.citations.tasks import update_document_by_id
+
 from alert.search.models import Document
 from alert.lib.string_utils import anonymize
 from alert.lib.mojibake import fix_mojibake
 from celery import task
 from celery.task.sets import subtask
+from citations.tasks import update_document_by_id
 from datetime import date
 from lxml.html.clean import Cleaner
 from lxml.etree import XMLSyntaxError

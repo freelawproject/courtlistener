@@ -3,10 +3,10 @@ from alert.citations.constants import REPORTERS, VARIATIONS_ONLY, EDITIONS
 from alert.citations.find_citations import get_citations, is_date_in_reporter
 from alert.citations import find_citations
 from alert.citations.reporter_tokenizer import tokenize
-from alert.citations.tasks import create_stub, update_document
 from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core
 from alert.search.models import Court
 from alert.search import models
+from citations.tasks import create_stub, update_document
 from django.test import TestCase
 
 from datetime import date
