@@ -2,7 +2,7 @@ from alert import settings
 from alert.lib.string_utils import trunc
 from alert.lib.encode_decode import num_to_ascii
 
-from django.template.defaultfilters import slugify
+from django.utils.text import slugify
 from django.utils.text import get_valid_filename
 from django.utils.encoding import smart_unicode
 from django.db import models
@@ -249,7 +249,7 @@ class Citation(models.Model):
         # We only do this on update, not creation
         if index and not created:
             # Import is here to avoid looped import problem
-            from search.tasks import update_cite
+            from alert.search.tasks import update_cite
             update_cite.delay(self.pk)
 
     def __unicode__(self):
@@ -298,7 +298,8 @@ class Document(models.Model):
     court = models.ForeignKey(
         Court,
         verbose_name="the court where the document was filed",
-        db_index=True)
+        db_index=True,
+        null=True)
     citation = models.ForeignKey(
         Citation,
         verbose_name="the citation information for the document",
@@ -307,7 +308,6 @@ class Document(models.Model):
     download_URL = models.URLField(
         "the URL on the court website where the document was "
         "originally scraped",
-        verify_exists=False,
         db_index=True)
     local_path = models.FileField(
         "the location, relative to MEDIA_ROOT, where the files are stored",
@@ -386,7 +386,7 @@ class Document(models.Model):
         # Update the search index.
         if index:
             # Import is here to avoid looped import problem
-            from search.tasks import add_or_update_doc
+            from alert.search.tasks import add_or_update_doc
             add_or_update_doc.delay(self.pk)
 
         # Delete the cached sitemaps and dumps if the item is blocked.
@@ -407,7 +407,7 @@ class Document(models.Model):
 
         # Update the search index.
         # Import is here to avoid looped import problem
-        from search.tasks import delete_doc
+        from alert.search.tasks import delete_doc
         delete_doc.delay(doc_id_was)
 
         # Invalidate the sitemap and dump caches

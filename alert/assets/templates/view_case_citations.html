@@ -35,7 +35,7 @@
                         {# Changing the attributes on this li may break the js above. #}
                         <li class="citing-case">
                             <span class="citation-name">
-                                <a href="{{case.get_absolute_url}}">
+                                <a href="{{ case.get_absolute_url }}">
                                     {{ caption|v_wrapper }}
                                 </a>
                             </span>
@@ -43,7 +43,7 @@
                             {{ case.court }} |
                             {{ case.date_filed }} |
                             {% if case.citation_count != 0 %}
-                                <a href="{{case.get_absolute_url}}cited-by/">
+                                <a href="{{ case.get_absolute_url }}cited-by/">
                                     Cited {{ case.citation_count }} time{{ case.citation_count|pluralize }}
                                 </a>
                             {% else %}

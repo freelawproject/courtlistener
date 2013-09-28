@@ -1,11 +1,8 @@
 # Celery imports
 import djcelery
 djcelery.setup_loader()
-# Needed by Celery to avoid using relative path imports. See:
-# http://docs.celeryq.org/en/latest/userguide/tasks.html#automatic-naming-and-relative-imports
 import os
 import sys
-sys.path.append(os.getcwd())
 
 # Loads the variable INSTALL_ROOT
 execfile('/etc/courtlistener')
@@ -18,6 +15,12 @@ USE_I18N = False
 DEFAULT_CHARSET = 'utf-8'
 LANGUAGE_CODE = 'en-us'
 USE_TZ = True
+
+import warnings
+warnings.filterwarnings(
+        'error', r"DateTimeField received a naive datetime",
+        RuntimeWarning, r'django\.db\.models\.fields'
+)
 
 # List of callables that know how to import templates from various sources.
 TEMPLATE_LOADERS = (
@@ -32,17 +35,17 @@ TEMPLATE_CONTEXT_PROCESSORS = (
     'django.core.context_processors.static',
 )
 
-MIDDLEWARE_CLASSES = (
+MIDDLEWARE_CLASSES = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.middleware.cache.UpdateCacheMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.contrib.flatpages.middleware.FlatpageFallbackMiddleware',
     'django.middleware.cache.FetchFromCacheMiddleware',
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
-)
+]
 
 ROOT_URLCONF = 'alert.urls'
 
@@ -59,7 +62,6 @@ INSTALLED_APPS = [
     'django.contrib.sitemaps',
     'django.contrib.staticfiles',
     'djcelery',
-    'debug_toolbar',
     'south',
     'alerts',
     'api',
@@ -86,10 +88,6 @@ INSTALLED_APPS = [
 # Also where users are redirected after they login. Default: /account/profile
 LOGIN_URL = "/sign-in/"
 LOGIN_REDIRECT_URL = "/"
-
-# Per documentation, we need this to extend the User model
-# (http://docs.djangoproject.com/en/dev/topics/auth/#storing-additional-information-about-users)
-AUTH_PROFILE_MODULE = 'userHandling.UserProfile'
 
 # These remap some of the the messages constants to correspond with blueprint
 from django.contrib.messages import constants as message_constants
@@ -180,9 +178,11 @@ STRIPE_REDIRECT = 'https://www.courtlistener.com/donate/stripe/complete/'
 ######################
 if DEVELOPMENT:
     SESSION_COOKIE_SECURE = False
-    SESSION_COOKIE_DOMAIN = '127.0.0.1'
     CSRF_COOKIE_SECURE = False
+    SESSION_COOKIE_DOMAIN = '127.0.0.1'
     # For debug_toolbar
+    MIDDLEWARE_CLASSES.append('debug_toolbar.middleware.DebugToolbarMiddleware')
+    INSTALLED_APPS.append('debug_toolbar')
     INTERNAL_IPS = ('127.0.0.1',)
     DEBUG_TOOLBAR_CONFIG = {'INTERCEPT_REDIRECTS': False}
     # For tests
@@ -190,10 +190,11 @@ if DEVELOPMENT:
     if 'test' in sys.argv:
         # Does DB in memory during tests
         DATABASES['default'] = {'ENGINE': 'django.db.backends.sqlite3'}
+
 else:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    DEBUG_TOOLBAR_CONFIG = {'INTERCEPT_REDIRECTS': False}
+    ALLOWED_HOSTS = ['.courtlistener.com',]
 
 
 ########################
@@ -210,6 +211,11 @@ LOGGING = {
         'simple': {
             'format': '%(levelname)s %(message)s'
         },
+    },
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse'
+        }
     },
     'handlers': {
         'null': {
@@ -230,6 +236,7 @@ LOGGING = {
         },
         'mail_admins': {
             'level': 'ERROR',
+            'filters': ['require_debug_false'],
             'class': 'django.utils.log.AdminEmailHandler',
             'include_html': True,
         }

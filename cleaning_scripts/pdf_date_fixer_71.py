@@ -1,15 +1,15 @@
 import os
 import sys
+
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
-
-import settings
-from django.core.management import setup_environ
-setup_environ(settings)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
+from django.conf import settings
 
 from alert.search.models import Document
 from optparse import OptionParser
 import gc, errno, string, time
+
 
 def queryset_generator(queryset, chunksize=100):
     """

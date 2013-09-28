@@ -3,6 +3,7 @@ from django.test import TestCase
 from alert.corpus_importer.import_law_box import get_docket_number
 from alert.corpus_importer.judge_extractor import get_judge_from_str, REASONS
 
+
 class DocketNumberTest(TestCase):
     def test_extracting_docket_numbers(self):
         q_a_pairs = [
@@ -130,5 +131,4 @@ class JudgeExtractionTest(TestCase):
         )
 
         for q, a in pairs:
-            print q
             self.assertEqual(tuple(get_judge_from_str(q)), a)

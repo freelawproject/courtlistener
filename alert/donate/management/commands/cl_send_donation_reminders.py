@@ -3,6 +3,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Sum
 from django.template import loader, Context
 from optparse import make_option
+from django.utils.timezone import now
 from alert.search.models import Document, Court
 from alert.stats import Stat
 from alert.userHandling.models import UserProfile
@@ -54,7 +55,7 @@ class Command(BaseCommand):
             self.stdout.write("* SIMULATE MODE - NO EMAILS SENT *\n")
             self.stdout.write("**********************************\n")
 
-        about_a_year_ago = date.today() - timedelta(days=355)
+        about_a_year_ago = now() - timedelta(days=355)
 
         # Gather some stats to email
         self.new_doc_count = Document.objects.filter(time_retrieved__gte=about_a_year_ago).count()

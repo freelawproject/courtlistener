@@ -1,10 +1,13 @@
-import settings
-from django.core.management import setup_environ
-setup_environ(settings)
+import os
+import sys
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
-from userHandling.models import UserProfile
+from alert.userHandling.models import UserProfile
 from django.contrib.sites.models import Site
 from django.core.mail import send_mail
+from django.utils.timezone import now
 
 import datetime
 import hashlib
@@ -17,7 +20,7 @@ def delete_old_accounts(verbose, simulate):
     This script will find accounts older than roughly two months that have
     not been confirmed, and delete them. It can be run once a month, or so.
     """
-    two_months_ago = (datetime.date.today() - datetime.timedelta(60))
+    two_months_ago = now() - datetime.timedelta(60)
     unconfirmed_ups = UserProfile.objects.filter(
         email_confirmed=False,
         user__date_joined__lte=two_months_ago,
@@ -56,7 +59,7 @@ def notify_unconfirmed(verbose, simulate):
 
     # if your account is more than a week old, and you have not confirmed it,
     # we will send you a notification, requesting that you confirm it.
-    a_week_ago = (datetime.date.today() - datetime.timedelta(7))
+    a_week_ago = now() - datetime.timedelta(7)
 
     # get the accounts
     unconfirmed_ups = UserProfile.objects.filter(
@@ -73,7 +76,7 @@ def notify_unconfirmed(verbose, simulate):
             # Build and save a new activation key for the account.
             salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
             activation_key = hashlib.sha1(salt + up.user.username).hexdigest()
-            key_expires = datetime.datetime.today() + datetime.timedelta(5)
+            key_expires = now() + datetime.timedelta(5)
             up.activation_key = activation_key
             up.key_expires = key_expires
             up.save()

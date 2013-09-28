@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from django.utils.timezone import now
 
 from alert.scrapers.models import ErrorLog
 from alert.search.models import Court
@@ -24,13 +25,13 @@ class Command(BaseCommand):
     args = '[--debug]'
     help = 'Generates a report and sends it to the administrators.'
 
-    def _num_weekdays(self, start_date, end_date=date.today()):
+    def _num_weekdays(self, start_date, end_date=now()):
         """Calculates the number of weekdays between start_date and end_date
 
         From: http://stackoverflow.com/questions/3615375/
         """
         day_generator = (start_date + timedelta(x + 1) for x in
-                        xrange((end_date - start_date).days))
+                         xrange((end_date - start_date).days))
         return sum(1 for day in day_generator if day.weekday() < 5)
 
     def _make_query_dict(self, query_list):
@@ -53,9 +54,9 @@ class Command(BaseCommand):
          1: The count for the past 7 days.
          2: The count for today
         """
-        last_day = date.today() - timedelta(days=1)
-        seven_days_ago = date.today() - timedelta(days=7)
-        thirty_days_ago = date.today() - timedelta(days=30)
+        last_day = now() - timedelta(days=1)
+        seven_days_ago = now() - timedelta(days=7)
+        thirty_days_ago = now() - timedelta(days=30)
 
         # This makes a mess of queries, but gets everything we need.
         cts_last_day = Court.objects \
@@ -106,7 +107,7 @@ class Command(BaseCommand):
 
     def _tally_errors(self):
         """Look at the error db and gather the latest errors from it"""
-        yesterday = date.today() - timedelta(days=1)
+        yesterday = now() - timedelta(days=1)
         cts_critical = Court.objects \
             .filter(errorlog__log_time__gt=yesterday,
                     errorlog__log_level="CRITICAL") \
@@ -156,7 +157,7 @@ class Command(BaseCommand):
 
         # Sort out if the subject is critical and add a date to it
         subject = 'CourtListener status email for %s' % \
-                  date.strftime(date.today(), '%Y-%m-%d')
+                  date.strftime(now(), '%Y-%m-%d')
         if critical_history or critical_today:
             subject = 'CRITICAL - ' + subject
 
@@ -181,7 +182,7 @@ class Command(BaseCommand):
 
     def truncate_database_logs(self):
         """Truncate the database so that it doesn't grow forever."""
-        thirty_days_ago = date.today() - timedelta(days=30)
+        thirty_days_ago = now() - timedelta(days=30)
         ErrorLog.objects.filter(log_time__lt=thirty_days_ago).delete()
 
     def handle(self, *args, **options):

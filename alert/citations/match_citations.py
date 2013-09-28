@@ -8,13 +8,11 @@ import sys
 
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
-
-from django.conf import settings
 from alert.citations.constants import REPORTERS
 from alert.citations.find_citations import strip_punct
 from alert.lib import sunburnt
-
 from datetime import date, datetime
+from django.conf import settings
 
 DEBUG = True
 

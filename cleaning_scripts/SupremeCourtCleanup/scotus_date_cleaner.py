@@ -24,15 +24,14 @@ Spec/features:
       editing the DB
 """
 
+import os
 import sys
+
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
-import settings
-from django.core.management import setup_environ
-setup_environ(settings)
-
-from search.models import Document, Citation
+from alert.search.models import Document
 import datetime
 import difflib
 import string

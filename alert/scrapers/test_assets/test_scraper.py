@@ -23,7 +23,7 @@ class Site(GenericSite):
 
     def _get_case_dates(self):
         path = '//opinion/date/text()'
-        return [datetime.strptime(date_string, '%Y/%m/%d').date()
+        return [datetime.strptime(date_string, '%Y/%m/%d')
                 for date_string in self.html.xpath(path)]
 
     def _get_precedential_statuses(self):

@@ -66,7 +66,7 @@
                     </span>
                 {% endif %}<br>
                 {{ user_form.email }}
-                {% if not request.user.get_profile.email_confirmed %}
+                {% if not request.user.profile.email_confirmed %}
                     <a href="/email-confirmation/request/">
                         <img src="/static/png/exclamation.png"
                              width="16"

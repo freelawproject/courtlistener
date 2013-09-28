@@ -1,14 +1,13 @@
+import os
 import sys
+
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
-
-import settings
-from django.core.management import setup_environ
-from django.template.defaultfilters import slugify
-setup_environ(settings)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 from alert.lib.string_utils import trunc
 from alert.search.models import Citation
+from django.utils.text import slugify
 from optparse import OptionParser
 
 

@@ -6,6 +6,7 @@ import random
 import re
 import subprocess
 import traceback
+from django.utils.timezone import now
 from lxml import html
 from alert.citations.constants import EDITIONS, REPORTERS
 from alert.citations.find_citations import get_citations
@@ -124,9 +125,9 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
                 # queried. For example, Wash. 2d isn't in REPORTERS['Wash.']['editions'][0].
                 pass
     if range_dates:
-        start, end = min(range_dates) - timedelta(weeks=20 * 52), max(range_dates) + timedelta(weeks=20 * 52)
-        if end > date.today():
-            end = date.today()
+        start, end = min(range_dates) - timedelta(weeks=(20 * 52)), max(range_dates) + timedelta(weeks=20 * 52)
+        if end > now():
+            end = now()
 
     dates = []
     for e in clean_html_tree.xpath(path):
@@ -138,7 +139,7 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
             if range_dates:
                 found = parse_dates.parse_dates(text, sane_start=start, sane_end=end)
             else:
-                found = parse_dates.parse_dates(text, sane_end=date.today())
+                found = parse_dates.parse_dates(text, sane_end=now())
             if found:
                 dates.extend(found)
         except UnicodeEncodeError:
@@ -170,7 +171,7 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
                 dates = [input_date]
             elif DEBUG == 2:
                 # Write the failed case out to file.
-                dates.append(date.today())
+                dates.append(now())
                 with open('missing_dates.txt', 'a') as out:
                     out.write('%s\n' % case_path)
 

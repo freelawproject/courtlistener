@@ -1,3 +1,4 @@
+from django.utils.timezone import now
 from alert.search.models import Court
 from alert.search.models import Document
 from alert.lib.db_tools import queryset_generator_by_date
@@ -49,15 +50,13 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
         start_date, end_date, annual, monthly, daily = get_date_range(year, month, day)
 
         # Ensure that it's a valid request.
-        today = date.today()
-        if (today < end_date) and (today < start_date):
+        if (now() < end_date) and (now() < start_date):
             # It's the future. They fail.
-            return HttpResponseBadRequest('<h2>Error 400: Requested date is '
-                'in the future. Please try again then.</h2>')
-        elif today <= end_date:
+            return HttpResponseBadRequest('<h2>Error 400: Requested date is in the future. Please try again then.</h2>')
+        elif now() <= end_date:
             # Some of the data is in the past, some could be in the future.
-            return HttpResponseBadRequest('<h2>Error 400: Requested date is '
-                'partially in the future. Please try again then.</h2>')
+            return HttpResponseBadRequest('<h2>Error 400: Requested date is partially in the future. Please try again '
+                                          'then.</h2>')
 
     filename = court + '.xml'
     if daily:

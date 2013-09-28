@@ -1,19 +1,18 @@
+import os
 import socket
 import sys
+
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
-
-from alert import settings
-from django.core.management import setup_environ
-setup_environ(settings)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
+from django.conf import settings
 
 from alert.lib import sunburnt
 from alert.search.models import Citation
 from alert.search.models import Document
 from alert.search.search_indexes import InvalidDocumentError
 from alert.search.search_indexes import SearchDocument
-from celery.decorators import task
-
+from celery import task
 
 
 @task

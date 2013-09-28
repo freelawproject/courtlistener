@@ -6,9 +6,16 @@ This results in the following concept:
  - any overrides to public settings can go in 20-private.py (you'll need to create this)
 """
 
-import os.path
+import os
 import glob
-conffiles = glob.glob(os.path.join(os.path.dirname(__file__), 'settings', '*.py'))
-conffiles.sort()
-for f in conffiles:
+import sys
+
+# Needed for celery, non-standard. See:
+# http://docs.celeryq.org/en/latest/userguide/tasks.html#automatic-naming-and-relative-imports
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+
+# Load the conf files.
+conf_files = glob.glob(os.path.join(os.path.dirname(__file__), 'settings', '*.py'))
+conf_files.sort()
+for f in conf_files:
     execfile(os.path.abspath(f))

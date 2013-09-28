@@ -22,7 +22,7 @@ def check_dwolla_signature(proposed_signature, raw):
 @csrf_exempt
 def process_dwolla_callback(request):
     if request.method == 'POST':
-        data = simplejson.loads(request.raw_post_data)  # Update for Django 1.4 to request.body
+        data = simplejson.loads(request.body)
         logger.info('data is: %s' % data)
         if check_dwolla_signature(data['Signature'], '%s&%0.2f' % (data['CheckoutId'], data['Amount'])):
             d = Donation.objects.get(payment_id=data['CheckoutId'])
@@ -48,9 +48,9 @@ def process_dwolla_callback(request):
 @csrf_exempt
 def process_dwolla_transaction_status_callback(request):
     if request.method == 'POST':
-        data = simplejson.loads(request.raw_post_data)  # Update for django 1.4 to request.body
+        data = simplejson.loads(request.body)
         logger.info('Dwolla transaction status callback triggered with data: %s' % data)
-        if check_dwolla_signature(request.META['HTTP_X_DWOLLA_SIGNATURE'], request.raw_post_data):
+        if check_dwolla_signature(request.META['HTTP_X_DWOLLA_SIGNATURE'], request.body):
             # Statuses can be found at: https://developers.dwolla.com/dev/pages/statuses
             if data['Value'].lower() == 'pending':
                 # Wait, because Dwolla issues this faster than they issue their application callback. If we don't wait

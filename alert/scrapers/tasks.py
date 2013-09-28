@@ -2,25 +2,22 @@
 
 import os
 import sys
+from django.utils.timezone import now
 
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
+from django.conf import settings
 
-from alert import settings
-from django.core.management import setup_environ
-setup_environ(settings)
-
+from alert.citations.tasks import update_document_by_id
 from alert.search.models import Document
 from alert.lib.string_utils import anonymize
 from alert.lib.mojibake import fix_mojibake
-from celery.decorators import task
+from celery import task
 from celery.task.sets import subtask
 from datetime import date
 from lxml.html.clean import Cleaner
 from lxml.etree import XMLSyntaxError
-
-# adding alert to the front of this breaks celery. Ignore pylint error.
-from citations.tasks import update_document_by_id
 
 import glob
 import subprocess
@@ -161,7 +158,7 @@ def extract_doc_content(pk, callback=None):
 
     if blocked:
         doc.blocked = True
-        doc.date_blocked = date.today()
+        doc.date_blocked = now()
 
     if err:
         print "****Error extracting text from %s: %s****" % (extension, doc)

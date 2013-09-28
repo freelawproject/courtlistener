@@ -1,8 +1,8 @@
-from urlparse import urljoin
 from alert.lib import magic
 from alert.lib.string_utils import trunc
 from alert.scrapers.models import ErrorLog
 from alert.scrapers.DupChecker import DupChecker
+from alert.scrapers.tasks import extract_doc_content, extract_by_ocr
 from alert.search.models import Citation
 from alert.search.models import Court
 from alert.search.models import Document
@@ -13,9 +13,7 @@ from django.core.management.base import BaseCommand, CommandError
 from juriscraper.GenericSite import logger
 from juriscraper.lib.importer import build_module_list
 from requests.exceptions import SSLError
-
-# adding alert to the front of this breaks celery. Ignore pylint error.
-from scrapers.tasks import extract_doc_content, extract_by_ocr
+from urlparse import urljoin
 
 import hashlib
 import mimetypes

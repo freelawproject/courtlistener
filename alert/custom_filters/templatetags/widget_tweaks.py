@@ -1,8 +1,8 @@
 from django.template import Library
 register = Library()
 
-def _process_field_attributes(field, attr, process):
 
+def _process_field_attributes(field, attr, process):
     # split attribute name and value from 'attr:value' string
     params = attr.split(':', 1)
     attribute = params[0]

@@ -1,16 +1,13 @@
+import os
 import sys
+
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
-import settings
-from django.core.management import setup_environ
-setup_environ(settings)
-
-from django.template.defaultfilters import slugify
-
-from search.models import Document, Citation
-from lib.db_tools import queryset_generator
-from lib.string_utils import trunc
+from django.utils.text import slugify
+from alert.search.models import Document
+from alert.lib.string_utils import trunc
 from optparse import OptionParser
 
 
@@ -31,19 +28,19 @@ def cleaner(simulate=False, verbose=False):
 
     # Must slice here, or else only get top 20 results
     for doc in docs[0:docs.count()]:
-    if doc.citation.caseNameFull.lower() == "unpublished disposition":
-        # Only do each case once, since the index isn't updated until
-        # later, and I may run this script many times.
-        print doc.download_URL
-        casename = raw_input("Case name: ")
-        doc.citation.caseNameFull = casename
-        doc.citation.caseNameShort = trunc(casename, 100)
-        doc.citation.slug = trunc(slugify(casename), 50)
-        doc.precedential_status = "Unpublished"
-        if not simulate:
-            doc.citation.save()
-            doc.save()
-        print ""
+        if doc.citation.caseNameFull.lower() == "unpublished disposition":
+            # Only do each case once, since the index isn't updated until
+            # later, and I may run this script many times.
+            print doc.download_URL
+            casename = raw_input("Case name: ")
+            doc.citation.caseNameFull = casename
+            doc.citation.caseNameShort = trunc(casename, 100)
+            doc.citation.slug = trunc(slugify(casename), 50)
+            doc.precedential_status = "Unpublished"
+            if not simulate:
+                doc.citation.save()
+                doc.save()
+            print ""
 
 
 def main():

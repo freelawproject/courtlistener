@@ -70,7 +70,7 @@
                     <ul>
                         {% for case in cited_by_trunc %}
                             <li>
-                                <a href="{{case.get_absolute_url}}">{{ case.citation.case_name|truncatewords:10|v_wrapper }}</a>
+                                <a href="{{ case.get_absolute_url }}">{{ case.citation.case_name|truncatewords:10|v_wrapper }}</a>
                             </li>
                         {% endfor %}
                     </ul>
@@ -199,7 +199,7 @@
                 {# user is not authenticated #}
                 <div id="modal-logged-out" class="hidden pointer span-7">
                     <h3 class="center bottom">
-                        <a href="{%url sign-in %}?next={{request.path}}?{{get_string|urlencode}}">
+                        <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}">
                             Sign in or register to save a favorite.
                         </a>
                     </h3>
@@ -266,12 +266,10 @@
         <div id="text">
             {% if doc.html_with_citations %}
                 {{ doc.html_with_citations|safe }}
+            {% elif doc.html %}
+                {{doc.html|safe}}
             {% else %}
-                {% if doc.html %}
-                    {{doc.html|safe}}
-                {% else %}
-                    <pre>{{doc.plain_text}}</pre>
-                {% endif %}
+                <pre>{{doc.plain_text}}</pre>
             {% endif %}
         </div>
     </article>

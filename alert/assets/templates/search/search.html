@@ -90,8 +90,8 @@
                 {% endif %}
             {% else %}
                 {# User is not authenticated #}
-                <p>To get daily alerts for this search, <a href="{%url sign-in%}?next={{request.path}}?{{get_string|urlencode}}page={{results.number}}">sign in</a> or
-                <a href="{%url register%}?next={{request.path}}?next={{request.path}}?{{get_string|urlencode}}page={{results.number}}">register</a> as a new user.</p>
+                <p>To get daily alerts for this search, <a href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}page={{ results.number }}">sign in</a> or
+                <a href="{% url "register" %}?next={{ request.path }}?next={{ request.path }}?{{ get_string|urlencode }}page={{ results.number }}">register</a> as a new user.</p>
             {% endif %}
                 </div>
         </div>

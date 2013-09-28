@@ -1,18 +1,24 @@
+import os
+import sys
+
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
+from django.conf import settings
+
 import logging
 import traceback
-import settings
-from django.core.management import setup_environ
-setup_environ(settings)
 
 from alert.lib import search_utils
 from alert.lib import sunburnt
-from alerts.models import FREQUENCY
+from alert.alerts.models import FREQUENCY
 from alert.search.forms import SearchForm
 from alert.stats import tally_stat
-from userHandling.models import UserProfile
+from alert.userHandling.models import UserProfile
 
+from django.core.mail import EmailMultiAlternatives
 from django.template import loader, Context
-from django.core.mail import send_mail, EmailMultiAlternatives
+from django.utils.timezone import now, utc
 
 import datetime
 from optparse import OptionParser
@@ -42,16 +48,16 @@ def send_alert(userProfile, hits, verbose, simulate):
 
 
 def get_cut_off_date(rate):
-    today = datetime.date.today()
     if rate == 'dly':
-        cut_off_date = today
+        cut_off_date = now()
     elif rate == 'wly':
-        cut_off_date = today - datetime.timedelta(days=7)
+        cut_off_date = now() - datetime.timedelta(days=7)
     elif rate == 'mly':
-        if today.day > 28:
+        if now().day > 28:
             raise InvalidDateError, 'Monthly alerts cannot be run on the 29th, 30th or 31st.'
-        early_last_month = today - datetime.timedelta(days=28)
-        cut_off_date = datetime.date(early_last_month.year, early_last_month.month, 1)
+        # Get the first of the month of the previous month regardless of the current date
+        early_last_month = now() - datetime.timedelta(days=28)
+        cut_off_date = datetime.datetime(early_last_month.year, early_last_month.month, 1, tzinfo=utc)
     return cut_off_date
 
 
@@ -80,8 +86,7 @@ def emailer(rate, verbose, simulate):
         #...get their alerts...
         alerts = userProfile.alert.filter(alertFrequency=rate)
         if verbose:
-            print "\n\nAlerts for user %s: %s" % (userProfile.user.email,
-                                                  alerts)
+            print "\n\nAlerts for user %s: %s" % (userProfile.user.email, alerts)
 
         hits = []
         # ...and iterate over their alerts.
@@ -128,7 +133,7 @@ def emailer(rate, verbose, simulate):
             try:
                 if len(results) > 0:
                     hits.append([alert, results])
-                    alert.lastHitDate = datetime.date.today()
+                    alert.lastHitDate = now()
                     alert.save()
                 elif alert.sendNegativeAlert:
                     # if they want an alert even when no hits.

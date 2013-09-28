@@ -4,12 +4,12 @@ from alert.userHandling.models import *
 
 
 def get_email_confirmed(obj):
-    return obj.get_profile().email_confirmed
+    return obj.profile.email_confirmed
 get_email_confirmed.short_description = "Email Confirmed?"
 
 
 def get_stub_account(obj):
-    return obj.get_profile().stub_account
+    return obj.profile.stub_account
 get_stub_account.short_description = "Stub Account?"
 
 

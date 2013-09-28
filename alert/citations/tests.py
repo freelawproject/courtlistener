@@ -3,13 +3,17 @@ from alert.citations.constants import REPORTERS, VARIATIONS_ONLY, EDITIONS
 from alert.citations.find_citations import get_citations, is_date_in_reporter
 from alert.citations import find_citations
 from alert.citations.reporter_tokenizer import tokenize
-from alert.citations.tasks import update_document
+from alert.citations.tasks import create_stub, update_document
 from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core
 from alert.search.models import Court
 from alert.search import models
 from django.test import TestCase
 
 from datetime import date
+
+
+class CiteTestNew(TestCase):
+    pass
 
 
 class CiteTest(TestCase):
@@ -167,7 +171,7 @@ class MatchingTest(TestCase):
         This becomes a bit of an integration test, which is likely fine.
         """
         # Set up a document
-        c1 = models.Citation(case_name="Lissner v. Saad", federal_cite_one='1 Yeates 1 (test 1795)')
+        c1 = models.Citation(case_name=u"Lissner v. Saad", federal_cite_one=u'1 Yeates 1 (test 1795)')
         c1.save(index=False)
         d1 = models.Document(
             date_filed=date(1795, 6, 9),
@@ -177,13 +181,13 @@ class MatchingTest(TestCase):
         )
         d1.save(index=True)
         # Reference d1 from the text of another document
-        c2 = models.Citation(case_name="Reference to Lissner v. Saad")
+        c2 = models.Citation(case_name=u"Reference to Lissner v. Saad")
         c2.save(index=False)
         d2 = models.Document(
             date_filed=date(1982, 6, 9),
             court=self.court,
             citation=c2,
-            plain_text="1 Yeates 1"
+            plain_text=u"1 Yeates 1"
         )
         d2.save(index=False)
         update_document(d2)  # Updates d1's citation count in a Celery task
@@ -191,8 +195,30 @@ class MatchingTest(TestCase):
         self.assertEqual(
             d1.citation_count,
             1,
-            msg="d1 was not updated by a citation found in d2. Count was: %s" % d1.citation_count
+            msg=u"d1 was not updated by a citation found in d2. Count was: %s" % d1.citation_count
         )
+        d1.delete()
+        d2.delete()
+
+    def test_stub_document_creation(self):
+        """Creates a stub document, then ensures it has the right meta data."""
+        citations = [
+            find_citations.Citation(volume=1, page=1, reporter='U.S.', canonical_reporter='U.S.', lookup_index=0),
+            find_citations.Citation(volume=2, page=2, reporter='A.2d', canonical_reporter='A.', lookup_index=0),
+            find_citations.Citation(volume=3, page=3, reporter='F.2d', canonical_reporter='F.', lookup_index=0),
+            find_citations.Citation(volume=4, page=4, reporter='FL', canonical_reporter='FL', lookup_index=0),
+            find_citations.Citation(volume=5, page=5, reporter='F.R.D.', canonical_reporter='F.R.D.', lookup_index=0),
+            find_citations.Citation(volume=6, page=6, reporter='Fla.', canonical_reporter='Fla.', lookup_index=0),
+            find_citations.Citation(volume=7, page=7, reporter='Wall.', canonical_reporter='Wall.', lookup_index=0),
+        ]
+        stub = create_stub(citations)
+        self.assertIn('U.S.', stub.citation.federal_cite_one)
+        self.assertIn('F.2d', stub.citation.federal_cite_two)
+        self.assertIn('A.2d', stub.citation.state_cite_regional)
+        self.assertIn('F.R.D.', stub.citation.specialty_cite_one)
+        self.assertIn('FL', stub.citation.neutral_cite)
+        self.assertIn('Fla', stub.citation.state_cite_one)
+        self.assertIn('Wall.', stub.citation.scotus_early_cite)
 
 
 class ConstantsTest(TestCase):

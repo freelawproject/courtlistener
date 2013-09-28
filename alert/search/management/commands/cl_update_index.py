@@ -6,9 +6,9 @@ from alert.lib.db_tools import queryset_generator
 from alert.lib.timer import print_timing
 from alert.search.models import Document
 # Celery requires imports like this. Disregard syntax error.
-from search.tasks import delete_docs
-from search.tasks import add_or_update_docs
-from search.tasks import add_or_update_doc_object
+from alert.search.tasks import delete_docs
+from alert.search.tasks import add_or_update_docs
+from alert.search.tasks import add_or_update_doc_object
 
 from celery.task.sets import TaskSet
 from django.conf import settings

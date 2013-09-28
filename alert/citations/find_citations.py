@@ -4,11 +4,10 @@
 import os
 import re
 import sys
-
-from juriscraper.lib.html_utils import get_visible_text
 from alert.citations.constants import EDITIONS, REPORTERS, VARIATIONS_ONLY
+from alert.citations import reporter_tokenizer
 from alert.search.models import Court
-import reporter_tokenizer
+from juriscraper.lib.html_utils import get_visible_text
 
 FORWARD_SEEK = 20
 
@@ -18,8 +17,12 @@ STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed",
                "remanded", "see", "granted", "dismissed"]
 
 # Store court values to avoid repeated DB queries
-# list() forces early evaluation of the queryset so we don't have issues with closed cursors.
-ALL_COURTS = list(Court.objects.all().values('citation_string', 'courtUUID'))
+if 'test' in sys.argv:
+    # If it's a test, we can't count on the database being prepped, so we have to load lazily
+    ALL_COURTS = Court.objects.all().values('citation_string', 'courtUUID')
+else:
+    # list() forces early evaluation of the queryset so we don't have issues with closed cursors.
+    ALL_COURTS = list(Court.objects.all().values('citation_string', 'courtUUID'))
 
 
 class Citation(object):
@@ -263,10 +266,10 @@ def is_date_in_reporter(editions, year):
     """Checks whether a year falls within the range of 1 to n editions of a reporter
 
     Editions will look something like:
-        'editions': {'S.E.': (datetime.date(1887, 1, 1),
-                              datetime.date(1939, 12, 31)),
-                     'S.E.2d': (datetime.date(1939, 1, 1),
-                                datetime.date.today())},
+        'editions': {'S.E.': (datetime.datetime(1887, 1, 1, tzinfo=utc),
+                              datetime.datetime(1939, 12, 31, tzinfo=utc)),
+                     'S.E.2d': (datetime.datetime(1939, 1, 1, tzinfo=utc),
+                                now())},
     """
     for start, end in editions.values():
         if start.year <= year <= end.year:

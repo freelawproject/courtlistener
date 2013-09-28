@@ -1,10 +1,10 @@
+from alert.userHandling.models import UserProfile
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
-from django.contrib.localflavor.us.forms import USStateField, USZipCodeField
-from django.contrib.localflavor.us.us_states import STATE_CHOICES
 from django.forms import ModelForm
-from alert.userHandling.models import UserProfile
+from localflavor.us.forms import USStateField, USZipCodeField
+from localflavor.us.us_states import STATE_CHOICES
 
 
 class ProfileForm(ModelForm):

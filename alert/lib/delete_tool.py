@@ -1,15 +1,14 @@
+import os
 import sys
+
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
-
-import settings
-from django.core.management import setup_environ
-setup_environ(settings)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 from alert.search.models import Court
 from alert.search.models import Citation
 from alert.search.models import Document
-from lib.db_tools import queryset_generator
+from alert.lib.db_tools import queryset_generator
 
 import datetime
 import gc

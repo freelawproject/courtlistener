@@ -1,13 +1,12 @@
 from django.db import models
-# from search.models import Document
 
 
 # Flash is a jerk about only accepting these three rates.
 # If an mp3 has a different sample rate, we downgrade it as necessary.
 MP3_SAMPLE_RATES = (
-    ('low',    '11025'),
+    ('low', '11025'),
     ('medium', '22050'),
-    ('high',   '44100'),
+    ('high', '44100'),
 )
 
 class Audio(models.Model):
@@ -16,8 +15,7 @@ class Audio(models.Model):
     argued = models.DateField("the date the case was argued",
         blank=True,
         null=True)
-    download_URL = models.URLField("the URL on the court website where the audio was originally scraped",
-        verify_exists=False)
+    download_URL = models.URLField("the URL on the court website where the audio was originally scraped")
     time_retrieved = models.DateTimeField("the exact date and time stamp that the audio was placed into our database",
         auto_now_add=True,
         editable=False)

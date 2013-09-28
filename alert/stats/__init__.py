@@ -1,9 +1,10 @@
 from datetime import date
+from django.utils.timezone import now
 from alert.stats.models import Stat
 from django.db.models import F
 
 
-def tally_stat(name, inc=1, date_logged=date.today()):
+def tally_stat(name, inc=1, date_logged=now()):
     """Tally an event's occurrence to the database.
 
     Will assume the following overridable values:
@@ -23,7 +24,7 @@ def tally_stat(name, inc=1, date_logged=date.today()):
         return count_cache + inc
 
 
-def clear_stats(name, clear_date=date.today()):
+def clear_stats(name, clear_date=now()):
     """Clears the stats for the name-date pair requested.
 
     If clear_date is None, it will clear all dates for the name.
@@ -34,7 +35,7 @@ def clear_stats(name, clear_date=date.today()):
         Stat.objects.filter(name=name, date_logged=clear_date).delete()
 
 
-def set_stat(name, value, set_date=date.today()):
+def set_stat(name, value, set_date=now()):
     """Sets the value for the name-date pair requested.
 
     Returns the value if possible, or None if unable to complete.
