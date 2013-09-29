@@ -2,6 +2,7 @@ __author__ = 'Krist Jin'
 
 from alert.search.models import Document
 from alert.lib.db_tools import queryset_generator, queryset_generator_by_date
+from alert.lib.filesize import size
 from datetime import datetime
 from django.core.management.base import BaseCommand
 from django.db.models import Count
@@ -50,11 +51,18 @@ class Command(BaseCommand):
         for case in case_list:
             case_count += 1
             if verbosity >= 1:
-                sys.stdout.write("\rGenerating data in memory...{:.0%}".format(case_count * 1.0 / graph_size))
+                sys.stdout.write("\rGenerating data in memory...{:.0%}, {}".format(
+                    case_count * 1.0 / graph_size,
+                    size(sys.getsizeof(doc_dict)),
+                ))
                 sys.stdout.flush()
-            case.citing_cases_ids = case.citation.citing_cases.values_list("pk")
-            case.cached_pagerank = case.pagerank
-            doc_dict[case.pk] = case
+            doc_dict[case.pk] = {
+                'pk': case.pk,
+                'pagerank': case.pagerank,
+                'cached_pagerank': case.pagerank,
+                'citing_cases_ids': case.citation.citing_cases.values_list("pk"),
+                'cases_cited__count': case.cases_cited__count,
+            }
 
         if verbosity >= 1:
             sys.stdout.write('\n')
@@ -66,11 +74,11 @@ class Command(BaseCommand):
                 sys.stdout.flush()
             for key, case in doc_dict.iteritems():
                 tmp_pagerank = min_value
-                for id in case.citing_cases_ids:
+                for id in case['citing_cases_ids']:
                     citing_case = doc_dict[id[0]]
-                    tmp_pagerank += DAMPING_FACTOR * citing_case.pagerank / citing_case.cases_cited__count
-                diff += abs(case.pagerank - tmp_pagerank)
-                case.pagerank = tmp_pagerank
+                    tmp_pagerank += DAMPING_FACTOR * citing_case['pagerank'] / citing_case['cases_cited__count']
+                diff += abs(case['pagerank'] - tmp_pagerank)
+                case['pagerank'] = tmp_pagerank
             i_times += 1
             if diff < MIN_DELTA:
                 break
@@ -91,10 +99,10 @@ class Command(BaseCommand):
                 sys.stdout.write("\rUpdating database...{:.0%}".format(case_count * 1.0 / graph_size))
                 sys.stdout.flush()
             logger.info("ID: {0}\told pagerank is {1}\tnew pagerank is {2}\n".format(
-                                                                case.pk, case.cached_pagerank, case.pagerank))
-            if case.cached_pagerank != case.pagerank:
+                                                                case['pk'], case['cached_pagerank'], case['pagerank']))
+            if case['cached_pagerank'] != case['pagerank']:
                 # Only save if we have changed the value
-                case.save(index=False).update_fields('pagerank')
+                Document.objects.filter(pk=key).update(pagerank=case['pagerank'])
                 update_count += 1
 
         if verbosity >= 1:
