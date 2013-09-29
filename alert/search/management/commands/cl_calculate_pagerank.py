@@ -51,7 +51,7 @@ class Command(BaseCommand):
         for case in case_list:
             case_count += 1
             if verbosity >= 1:
-                sys.stdout.write("\rGenerating data in memory...{:.0%}, {}".format(
+                sys.stdout.write("\rGenerating data in memory...{:.0%}, {:<8}".format(
                     case_count * 1.0 / graph_size,
                     size(sys.getsizeof(doc_dict)),
                 ))

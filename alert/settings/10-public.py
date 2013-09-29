@@ -256,4 +256,11 @@ LOGGING = {
     },
 }
 
+if DEVELOPMENT:
+    LOGGING['loggers']['django.db.backends'] = {
+        'handlers': ['log_file'],
+        'level': 'DEBUG',
+        'propogate': True,
+    }
+
 
