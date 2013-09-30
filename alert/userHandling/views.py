@@ -167,7 +167,7 @@ def register(request):
     if request.user.is_anonymous():
         if request.method == 'POST':
             try:
-                stub_account = User.objects.filter(userprofile__stub_account=True).\
+                stub_account = User.objects.filter(profile__stub_account=True).\
                                             get(email__iexact=request.POST.get('email'))
             except User.DoesNotExist:
                 stub_account = False
