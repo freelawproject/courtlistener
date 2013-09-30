@@ -26,6 +26,10 @@ class Command(BaseCommand):
         graph_size = Document.objects.all().count()
         min_value = (1.0 - DAMPING_FACTOR)
 
+        ##########################
+        #        Stage I         #
+        # Build a Data Structure #
+        ##########################
         # Chunk by date for best performance
         d = Document.objects.all().order_by('date_filed')[0].date_filed
         start_date = make_aware(datetime.combine(d, datetime.min.time()), utc)
@@ -38,8 +42,6 @@ class Command(BaseCommand):
             'pagerank',
         ).prefetch_related(
             'citation__citing_cases'
-        ).annotate(
-            Count('cases_cited')
         )
         case_list = queryset_generator_by_date(qs, 'date_filed', start_date, end_date, chunksize=100)
 
@@ -61,9 +63,14 @@ class Command(BaseCommand):
                 'pagerank': case.pagerank,
                 'cached_pagerank': case.pagerank,
                 'citing_cases_ids': case.citation.citing_cases.values_list("pk"),
-                'cases_cited__count': case.cases_cited__count,
+                'cases_cited__count': case.cases_cited.all().count(),
             }
 
+
+        ######################
+        #      Stage II      #
+        # Calculate PageRank #
+        ######################
         if verbosity >= 1:
             sys.stdout.write('\n')
         i_times = 0
@@ -88,7 +95,7 @@ class Command(BaseCommand):
             sys.stdout.write('Iteration count was {0:d}.\n'.format(i_times))
 
         #####################
-        #     Stage II      #
+        #     Stage III     #
         # Update everything #
         #####################
         case_count = 0
