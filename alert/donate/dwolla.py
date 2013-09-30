@@ -5,7 +5,7 @@ import simplejson
 import requests
 import time
 from alert.donate.models import Donation
-from datetime import datetime
+from dateutil import parser
 from django.conf import settings
 from django.http import HttpResponseNotAllowed, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404
@@ -29,7 +29,7 @@ def process_dwolla_callback(request):
             if data['Status'].lower() == 'completed':
                 d.amount = data['Amount']
                 d.transaction_id = data['TransactionId']
-                d.clearing_date = datetime.strptime(data['ClearingDate'], '%m/%d/%Y %I:%M:%S %p')
+                d.clearing_date = parser.parse(data['ClearingDate'] + ' PST')
                 d.status = 2
                 from alert.donate.views import send_thank_you_email
                 send_thank_you_email(d)
@@ -59,10 +59,10 @@ def process_dwolla_transaction_status_callback(request):
             d = get_object_or_404(Donation, transaction_id=data['Id'])
 
             if data['Value'].lower() == 'processed':
-                d.clearing_date = datetime.strptime(data['Triggered'], '%m/%d/%Y %I:%M:%S %p')
+                d.clearing_date = parser.parse(data['Triggered'] + ' PST')
                 d.status = 4
             elif data['Value'].lower() == 'pending':
-                d.clearing_date = datetime.strptime(data['Triggered'], '%m/%d/%Y %I:%M:%S %p')
+                d.clearing_date = parser.parse(data['Triggered'] + ' PST')
                 d.status = 5
             elif data['Value'].lower() == 'cancelled':
                 d.status = 3
