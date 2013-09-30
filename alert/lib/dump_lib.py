@@ -3,7 +3,7 @@ import gzip
 import time
 import os
 
-from datetime import datetime
+from datetime import datetime, date
 from django.utils.timezone import utc
 from lxml import etree
 
