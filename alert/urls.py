@@ -21,8 +21,8 @@ from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert
 from alert.search.models import Court
 from alert.search.views import browser_warning, show_results, tools_page
 from alert.userHandling.views import (
-    confirmEmail, deleteProfile, deleteProfileDone, emailConfirmSuccess, password_change, redirect_to_settings,
-    register, register_success, request_email_confirmation, view_favorites, view_alerts, view_settings
+    confirmEmail, deleteProfile, deleteProfileDone, emailConfirmSuccess, password_change, register, register_success,
+    request_email_confirmation, view_favorites, view_alerts, view_settings
 )
 
 from django.conf.urls import include, patterns, url
@@ -90,8 +90,8 @@ urlpatterns = patterns('',
     (r'^sign-out/$', signOut, {'extra_context': {'private': False}}),
 
     # Settings pages
-    (r'^profile/$', redirect_to_settings),
     url(r'^profile/settings/$', view_settings, name='view_settings'),
+    (r'^profile/$', RedirectView.as_view(url='/profile/settings/', permanent=True)),
     (r'^profile/favorites/$', view_favorites),
     (r'^profile/alerts/$', view_alerts),
     (r'^profile/donations/$', view_donations),

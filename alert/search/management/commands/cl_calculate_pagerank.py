@@ -42,6 +42,8 @@ class Command(BaseCommand):
             'pagerank',
         ).prefetch_related(
             'citation__citing_cases'
+        ).annotate(
+            Count('cases_cited')
         )
         case_list = queryset_generator_by_date(qs, 'date_filed', start_date, end_date, chunksize=100)
 
@@ -63,7 +65,7 @@ class Command(BaseCommand):
                 'pagerank': case.pagerank,
                 'cached_pagerank': case.pagerank,
                 'citing_cases_ids': case.citation.citing_cases.values_list("pk"),
-                'cases_cited__count': case.cases_cited.all().count(),
+                'cases_cited__count': case.cases_cited__count,
             }
 
 

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
@@ -5,13 +6,13 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.views.decorators.cache import never_cache
-import logging
 from alert.donate.dwolla import process_dwolla_payment
 from alert.donate.paypal import process_paypal_payment
 from alert.donate.forms import DonationForm, UserForm, ProfileForm
 from alert.donate.stripe_helpers import process_stripe_payment
 from alert.userHandling.models import UserProfile
-from django.conf import settings
+
+import logging
 
 logger = logging.getLogger(__name__)
 

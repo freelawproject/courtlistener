@@ -10,7 +10,7 @@ fi
 
 start () {
     echo -n "Starting the scraper..."
-    daemon --command="/usr/bin/python $INSTALL_ROOT/alert/manage.py cl_scrape_and_extract -d -c juriscraper.opinions.united_states" --respawn --name=scraper --user=www-data --verbose
+    daemon --command="/usr/bin/python $INSTALL_ROOT/manage.py cl_scrape_and_extract -d -c juriscraper.opinions.united_states" --respawn --name=scraper --user=www-data --verbose
 
     RETVAL=$?
 

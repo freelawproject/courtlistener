@@ -1,23 +1,52 @@
-"""
-This file demonstrates two different styles of tests (one doctest and one
-unittest). These will both pass when you run "manage.py test".
-
-Replace these with more appropriate tests for your application.
-"""
-
+# coding=utf-8
+from datetime import timedelta
 from django.test import TestCase
+from django.utils.timezone import now
+from alert.userHandling.models import UserProfile
 
-class SimpleTest(TestCase):
-    def test_basic_addition(self):
-        """
-        Tests that 1 + 1 always equals 2.
-        """
-        self.failUnlessEqual(1 + 1, 2)
 
-__test__ = {"doctest": """
-Another way to test that 1 + 1 is equal to 2.
+class UserTest(TestCase):
+    fixtures = ['authtest_data.json']
 
->>> 1 + 1 == 2
-True
-"""}
+    def test_creating_a_new_user(self):
+        """Can we register a new user in the front end?"""
+        params = {
+            'username': 'pan',
+            'email': 'pan@courtlistener.com',
+            'password1': 'a',
+            'password2': 'a',
+            'first_name': 'dora',
+            'last_name': '☠☠☠☠☠☠☠☠☠☠☠',
+            'skip_me_if_alive': '',
+        }
+        response = self.client.post('/register/', params, follow=True)
+        self.assertRedirects(response, 'http://testserver/register/success/?next=/')
+
+    def test_signing_in(self):
+        """Can we create a user on the backend then sign them into the front end?"""
+        params = {
+            'username': 'pandora',
+            'password': 'password',
+        }
+        response = self.client.post('/sign-in/', params, follow=True)
+        self.assertRedirects(response, 'http://testserver/')
+
+    def test_confirming_an_email_address(self):
+        """Tests whether we can confirm the case where an email is associated with a single account."""
+        # Update the expiration since the fixture has one some time ago.
+        UserProfile.objects.filter(pk=2).update(key_expires=now() + timedelta(days=2))
+
+        response = self.client.get('/email/confirm/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/')
+        self.assertIn('has been confirmed', response.content,
+                      msg="Test string not found in response.content")
+
+    def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(self):
+        """Tests the trickier case when an email is associted with many accounts."""
+        UserProfile.objects.filter(pk__in=(3, 4,)).update(key_expires=now() + timedelta(days=2))
+        response = self.client.get('/email/confirm/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab/')
+        self.assertIn('has been confirmed', response.content,
+                      msg="Test string not found in response.content")
+        ups = UserProfile.objects.filter(pk__in=(3, 4,))
+        for up in ups:
+            self.assertTrue(up.email_confirmed)
 
