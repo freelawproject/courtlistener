@@ -1,0 +1,17 @@
+{# The body of the item #}
+{% if object.html %}
+    {# if the HTML exists we do it, but not the plaintext #}
+    {{ object.html|striptags|default_if_none:"" }}
+{% else %}
+    {{ object.plain_text|default_if_none:"" }}
+{% endif %}
+
+{# The document itself #}
+{{ object.citation.case_name|default_if_none:"" }}
+{{ object.precedential_status|default_if_none:"" }}
+{{ object.sha1|default_if_none:"" }}
+{{ object.court.full_name|default_if_none:"" }}
+{{ object.court.citation_string|default_if_none:"" }}
+{{ object.court.courtUUID|default_if_none:"" }}
+{{ object.judges|default_if_none:"" }}
+{{ object.nature_of_suit|default_if_none:"" }}

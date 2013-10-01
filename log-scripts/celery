@@ -1,0 +1,11 @@
+/var/log/celery/*.log {
+    rotate 36500
+    daily
+    dateext
+    notifempty
+    noolddir
+    sharedscripts
+    postrotate
+        /etc/init.d/celeryd restart 
+    endscript
+}

@@ -1,0 +1,64 @@
+These are ideas for making this project solvent. Current costs are low, but they
+will grow with every query and alert that is in the system. The goal here isn't 
+to make a fortune - It's to not lose money. This file exists to keep track of 
+ideas until they can be tried out, considered in more detail, etc.
+
+Order of ideas lacks relevancy.
+
+1. Service to send PDFs along with alerts as attachments or as part of the RSS feed
+   + nice feature
+   + easy to implement
+   + makes people's lives easier
+   + subscription model
+   - bandwidth cost (maybe)
+   - less traffic on site (maybe)
+   
+2. Curated alerts people can buy. For example, for a buck we could sell
+hand-crafted alerts for various areas of the law.
+    + useful feature
+    + helps attorneys that need to do due diligence staying up to date ("I used 
+        a special alert system to stay up to date!")
+    + could be cheap, like a buck or so per alert
+    + no added CPU/bandwidth costs
+    + could be subscription or one-off model
+    - work and expertise required to create/update/maintain alerts
+    - might be a better community-based thing
+    
+3. Sell our data to people that want it.
+    + almost effortless
+    + contributes to more data being in the world
+    + one off or subscription probably possible
+    - enables competition
+    - not nice to sell it, should probably give it away (as in resource.org)
+    
+4. Advertising
+    + very easy to implement
+    + powers much of the Internet
+    + could have high-value eyes
+    - lameness of site goes up...a lot.
+    
+5. More alert options, such as the day to run weekly or monthly alerts
+    + Not too hard to implement
+    - CPU intensive b/c requires running the weekly/monthly emailers every day.
+    - Requires changes to the alert models.
+
+6. Sponsorships
+    = That is, there are one or two pages where firms get to list their logos
+      as sponsors, maybe even at various levels Platinum, Gold, Silver, etc.
+    + Could generate significant revenue.
+    + Could be more discrete than ads on every page.
+    - Still sort of adds to the lameness of the site.
+    - Probably requires that at least those sponsors get some sort of guarantee
+      of reliability of the site.
+    - Requires at least annual outreach/fundraising efforts.
+    - Would be easier to get such support as a 501(c)(3) non-profit, but then
+      we have to go through the overhead of creating such an entity.
+      
+7. Extra security for premium users. Https could be rolled out on the login page 
+and change password page for all users, but for those users that are premium, 
+one of the benefits could be increased security of their traffic and activities.
+    + Certain people would definitely be willing to pay for this.
+    + Nice feature
+    - Would be nicer to give it to everybody.
+    - Might make promises about security that we'd be bound to
+    - Adds CPU and Certificate costs...
