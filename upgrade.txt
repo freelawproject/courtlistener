@@ -22,15 +22,6 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
-DONATION PROJECT
-    - PRE DEPLOY:
-        - TODO: Make the annual reminder
-        - TODO: Why don't the mailing address, city, state and zip fields auto-populate when the info is known?
-
-    - POST DEPLOY:
-        - TODO: Test the "Try Donating Again" button that comes up when you cancel a Dwolla payment.
-        - TODO: Make sure that the location field gets mapped into city/state properly
-
 LAWBOX PROJECT
  - TODO: Does the fact that lawbox cases lack a URL cause an issue in the UI or can they be treated like the Resource.org cases?
  - TODO: If we do case merging, the source field should be LBM ("LawBox Merged") or even LBRM ("Lawbox, Resource.org
@@ -98,14 +89,6 @@ LAWBOX PROJECT
     - Migrate django
         manage.py migrate
     - restart celery if on a production machine.
-
-
- - TODO: Make sure that xpath-tester is 1.5 certified.
-
-POST-UPGRADE
- 1.5:
- - TODO: Check if the other CL domains still work with the new ALLOWED_HOSTS setting in place.
-
 
 2013-09-24:
  - We've added two new fields to the Document model that will need to be migrated with:

@@ -1,16 +1,23 @@
-"""
-This file demonstrates writing tests using the unittest module. These will pass
-when you run "manage.py test".
-
-Replace this with more appropriate tests for your application.
-"""
-
+from datetime import timedelta
+from django.core import mail
 from django.test import TestCase
+from django.utils.timezone import now
+from alert.donate.management.commands.cl_send_donation_reminders import Command
+from alert.donate.models import Donation
 
 
-class SimpleTest(TestCase):
-    def test_basic_addition(self):
-        """
-        Tests that 1 + 1 always equals 2.
-        """
-        self.assertEqual(1 + 1, 2)
+class EmailCommandTest(TestCase):
+    fixtures = ['donate_test_data.json']
+
+    def test_sending_an_email(self):
+        """Do we send emails correctly?"""
+        # Set this value since the JSON will get stale and can't have dynamic dates.
+        about_a_year_ago = now() - timedelta(days=355)
+        Donation.objects.filter(pk=1).update(date_created=about_a_year_ago)
+
+        comm = Command()
+        comm.handle()
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('you donated $1', mail.outbox[0].body)
+        self.assertIn('you donated $1', mail.outbox[0].alternatives[0][0])
