@@ -1,6 +1,6 @@
-/*! jQuery UI - v1.10.3 - 2013-09-06
+/*! jQuery UI - v1.10.3 - 2013-10-01
 * http://jqueryui.com
-* Includes: jquery.ui.core.css, jquery.ui.button.css, jquery.ui.slider.css, jquery.ui.theme.css
+* Includes: jquery.ui.core.css, jquery.ui.button.css, jquery.ui.slider.css, jquery.ui.tabs.css, jquery.ui.theme.css
 * To view and modify this theme, visit http://jqueryui.com/themeroller/?ffDefault=Verdana%2CArial%2Csans-serif&fwDefault=normal&fsDefault=1.1em&cornerRadius=4px&bgColorHeader=cccccc&bgTextureHeader=highlight_soft&bgImgOpacityHeader=75&borderColorHeader=aaaaaa&fcHeader=222222&iconColorHeader=222222&bgColorContent=ffffff&bgTextureContent=flat&bgImgOpacityContent=75&borderColorContent=aaaaaa&fcContent=222222&iconColorContent=222222&bgColorDefault=e6e6e6&bgTextureDefault=glass&bgImgOpacityDefault=75&borderColorDefault=d3d3d3&fcDefault=555555&iconColorDefault=888888&bgColorHover=dadada&bgTextureHover=glass&bgImgOpacityHover=75&borderColorHover=999999&fcHover=212121&iconColorHover=454545&bgColorActive=ffffff&bgTextureActive=glass&bgImgOpacityActive=65&borderColorActive=aaaaaa&fcActive=212121&iconColorActive=454545&bgColorHighlight=fbf9ee&bgTextureHighlight=glass&bgImgOpacityHighlight=55&borderColorHighlight=fcefa1&fcHighlight=363636&iconColorHighlight=2e83ff&bgColorError=fef1ec&bgTextureError=glass&bgImgOpacityError=95&borderColorError=cd0a0a&fcError=cd0a0a&iconColorError=cd0a0a&bgColorOverlay=aaaaaa&bgTextureOverlay=flat&bgImgOpacityOverlay=0&opacityOverlay=30&bgColorShadow=aaaaaa&bgTextureShadow=flat&bgImgOpacityShadow=0&opacityShadow=30&thicknessShadow=8px&offsetTopShadow=-8px&offsetLeftShadow=-8px&cornerRadiusShadow=8px
 * Copyright 2013 jQuery Foundation and other contributors; Licensed MIT */
 
@@ -253,13 +253,54 @@ button.ui-button::-moz-focus-inner {
 .ui-slider-vertical .ui-slider-range-max {
 	top: 0;
 }
+.ui-tabs {
+	position: relative;/* position: relative prevents IE scroll bug (element with position: relative inside container with overflow: auto appear as "fixed") */
+	padding: .2em;
+}
+.ui-tabs .ui-tabs-nav {
+	margin: 0;
+	padding: .2em .2em 0;
+}
+.ui-tabs .ui-tabs-nav li {
+	list-style: none;
+	float: left;
+	position: relative;
+	top: 0;
+	margin: 1px .2em 0 0;
+	border-bottom-width: 0;
+	padding: 0;
+	white-space: nowrap;
+}
+.ui-tabs .ui-tabs-nav li a {
+	float: left;
+	padding: .5em 1em;
+	text-decoration: none;
+}
+.ui-tabs .ui-tabs-nav li.ui-tabs-active {
+	margin-bottom: -1px;
+	padding-bottom: 1px;
+}
+.ui-tabs .ui-tabs-nav li.ui-tabs-active a,
+.ui-tabs .ui-tabs-nav li.ui-state-disabled a,
+.ui-tabs .ui-tabs-nav li.ui-tabs-loading a {
+	cursor: text;
+}
+.ui-tabs .ui-tabs-nav li a, /* first selector in group seems obsolete, but required to overcome bug in Opera applying cursor: text overall if defined elsewhere... */
+.ui-tabs-collapsible .ui-tabs-nav li.ui-tabs-active a {
+	cursor: pointer;
+}
+.ui-tabs .ui-tabs-panel {
+	display: block;
+	border-width: 0;
+	padding: 1em 1.4em;
+	background: none;
+}
 
 /* Component containers
 ----------------------------------*/
 .ui-widget {
-    /* MLR: Both lines modified */
-	font-family: "Lucida Grande",Tahoma,Arial,Verdana,sans-serif;
-	font-size: 12px;
+	font-family: Verdana,Arial,sans-serif;
+	font-size: 1.1em;
 }
 .ui-widget .ui-widget {
 	font-size: 1em;
@@ -296,7 +337,7 @@ button.ui-button::-moz-focus-inner {
 .ui-widget-header .ui-state-default {
 	border: 1px solid #d3d3d3;
 	background: #e6e6e6 url(images/ui-bg_glass_75_e6e6e6_1x400.png) 50% 50% repeat-x;
-/*	font-weight: normal; */
+	font-weight: normal;
 	color: #555555;
 }
 .ui-state-default a,
@@ -313,7 +354,7 @@ button.ui-button::-moz-focus-inner {
 .ui-widget-header .ui-state-focus {
 	border: 1px solid #999999;
 	background: #dadada url(images/ui-bg_glass_75_dadada_1x400.png) 50% 50% repeat-x;
-/*	font-weight: normal;*/
+	font-weight: normal;
 	color: #212121;
 }
 .ui-state-hover a,
@@ -328,7 +369,7 @@ button.ui-button::-moz-focus-inner {
 .ui-widget-header .ui-state-active {
 	border: 1px solid #aaaaaa;
 	background: #ffffff url(images/ui-bg_glass_65_ffffff_1x400.png) 50% 50% repeat-x;
-/*	font-weight: normal;*/
+	font-weight: normal;
 	color: #212121;
 }
 .ui-state-active a,

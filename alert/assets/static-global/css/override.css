@@ -453,7 +453,9 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 #modal-rel {
     position: relative;
 }
-#modal-save-favorite, #modal-logged-out {
+#modal-save-favorite,
+#modal-logged-out,
+#modal-select-jurisdictions {
     z-index: 10;
     top: -10px;
     left: 10px;
