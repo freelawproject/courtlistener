@@ -1,3 +1,10 @@
+import os
+import sys
+
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alert.settings")
+
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 from juriscraper.lib import parse_dates
 import os
