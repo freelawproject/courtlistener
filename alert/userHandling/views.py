@@ -25,10 +25,6 @@ import re
 logger = logging.getLogger(__name__)
 
 
-def redirect_to_settings(request):
-    return redirect(view_settings, permanent=True)
-
-
 @login_required
 @never_cache
 def view_alerts(request):

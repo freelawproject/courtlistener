@@ -271,7 +271,7 @@ class Document(models.Model):
         "a unique ID for each document",
         primary_key=True)
     time_retrieved = models.DateTimeField(
-        "the original creation date for the item",
+        help_text="The original creation date for the item",
         auto_now_add=True,
         editable=False,
         db_index=True)
@@ -281,7 +281,7 @@ class Document(models.Model):
         db_index=True,
         null=True)
     date_filed = models.DateField(
-        "the date filed by the court",
+        help_text="The date filed by the court",
         blank=True,
         null=True,
         db_index=True)
@@ -291,72 +291,69 @@ class Document(models.Model):
         choices=DOCUMENT_SOURCES,
         blank=True)
     sha1 = models.CharField(
-        "unique ID for the document, as generated via SHA1 of "
-        "the binary file",
+        help_text="unique ID for the document, as generated via SHA1 of the binary data",
         max_length=40,
         db_index=True)
     court = models.ForeignKey(
         Court,
-        verbose_name="the court where the document was filed",
+        help_text="The court where the document was filed",
         db_index=True,
         null=True)
     citation = models.ForeignKey(
         Citation,
-        verbose_name="the citation information for the document",
+        verbose_name="The citation information for the document",
         blank=True,
         null=True)
     download_URL = models.URLField(
-        "the URL on the court website where the document was "
-        "originally scraped",
+        help_text="The URL on the court website where the document was originally scraped",
         db_index=True)
     local_path = models.FileField(
-        "the location, relative to MEDIA_ROOT, where the files are stored",
+        help_text="The location, relative to MEDIA_ROOT, where the files are stored",
         upload_to=make_upload_path,
         blank=True,
         db_index=True)
     judges = models.TextField(
-        "the judges that brought the opinion",
+        help_text="The judges that brought the opinion",
         blank=True)
     nature_of_suit = models.TextField(
-        "the nature of the suit, can be codes or laws or whatever",
+        help_text="The nature of the suit, can be codes or laws or whatever",
         blank=True)
     plain_text = models.TextField(
-        "plain text of the document after extraction",
+        help_text="Plain text of the document after extraction",
         blank=True)
     html = models.TextField(
-        "HTML of the document",
+        help_text="HTML of the document",
         blank=True)
     html_with_citations = models.TextField(
-        "HTML of the document with citation links",
+        help_text="HTML of the document with citation links",
         blank=True)
     cases_cited = models.ManyToManyField(
         Citation,
+        help_text="Cases cited (do not update!)",
         related_name="citing_cases",
-        verbose_name="Cases cited (do not update!)",
         null=True,
         blank=True)
     citation_count = models.IntegerField(
-        'the number of times this document is cited by other cases',
+        help_text='The number of times this document is cited by other cases',
         default=0)
     pagerank = models.FloatField(
-        'PageRank value based on the citing relation among documents',
+        help_text='PageRank score based on the citing relation among documents',
         default=0,
         db_index=True)
     precedential_status = models.CharField(
-        'the precedential status of document',
+        help_text='The precedential status of document',
         max_length=50,
         blank=True,
         choices=DOCUMENT_STATUSES)
     date_blocked = models.DateField(
-        'original block date',
         blank=True,
         null=True)
     blocked = models.BooleanField(
-        'block indexing of this document',
+        verbose_name='Block this item',
         db_index=True,
         default=False)
     extracted_by_ocr = models.BooleanField(
-        'OCR was used to get this document content',
+        verbose_name='OCR was used to get this document content',
         default=False)
     is_stub_document = models.BooleanField(
         'Whether this document is a stub or not',

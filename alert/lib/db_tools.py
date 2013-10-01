@@ -16,7 +16,7 @@ def queryset_generator(queryset, chunksize=1000):
     sets.
     """
     # Make a query that doesn't do related fetching for optimization
-    bare_qs = queryset.prefetch_related(None).select_related(None)
+    bare_qs = queryset.prefetch_related(None)
     if bare_qs.count() == 0:
         return
     if settings.DEVELOPMENT:
