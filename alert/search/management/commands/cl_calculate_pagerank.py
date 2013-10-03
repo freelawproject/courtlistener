@@ -1,14 +1,14 @@
 __author__ = 'Krist Jin'
 
 from alert.search.models import Document
-from alert.lib.db_tools import queryset_generator, queryset_generator_by_date
+from alert.lib.db_tools import queryset_generator
 from alert.lib.filesize import size
 from datetime import datetime
 from django.core.management.base import BaseCommand
-from django.db.models import Count
 from django.utils.timezone import now, utc, make_aware
 import logging
 import sys
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,6 @@ class Command(BaseCommand):
         #        Stage I         #
         # Build a Data Structure #
         ##########################
-        # Chunk by date for best performance
         d = Document.objects.all().order_by('date_filed')[0].date_filed
         start_date = make_aware(datetime.combine(d, datetime.min.time()), utc)
         end_date = now()
@@ -45,18 +44,29 @@ class Command(BaseCommand):
         ).annotate(
             Count('cases_cited')
         )
-        case_list = queryset_generator_by_date(qs, 'date_filed', start_date, end_date, chunksize=100)
+        case_list = queryset_generator(qs, chunksize=10000)
 
         if verbosity >= 1:
             sys.stdout.write('graph_size is {0:d} nodes.\n'.format(graph_size))
 
         case_count = 0
         doc_dict = {}
+        timings = []
+        average_per_s = 0
         for case in case_list:
             case_count += 1
             if verbosity >= 1:
-                sys.stdout.write("\rGenerating data in memory...{:.0%}, {:<8}".format(
+                if case_count % 100 == 1:
+                    t1 = time.time()
+                if case_count % 100 == 0:
+                    t2 = time.time()
+                    timings.append(t2 - t1)
+                    average_per_s = 100 / (sum(timings) / float(len(timings)))
+                sys.stdout.write("\rGenerating data in memory...{:.0%} ({}/{}, {:.1f}/s) at {:<9}".format(
                     case_count * 1.0 / graph_size,
+                    case_count,
+                    graph_size,
+                    average_per_s,
                     size(sys.getsizeof(doc_dict)),
                 ))
                 sys.stdout.flush()
