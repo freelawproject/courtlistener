@@ -31,8 +31,6 @@ class Command(BaseCommand):
         # Build a Data Structure #
         ##########################
         d = Document.objects.all().order_by('date_filed')[0].date_filed
-        start_date = make_aware(datetime.combine(d, datetime.min.time()), utc)
-        end_date = now()
         qs = Document.objects.only(
             'documentUUID',
             'date_filed',
@@ -41,8 +39,6 @@ class Command(BaseCommand):
             'pagerank',
         ).prefetch_related(
             'citation__citing_cases'
-        ).annotate(
-            Count('cases_cited')
         )
         case_list = queryset_generator(qs, chunksize=10000)
 
@@ -75,7 +71,7 @@ class Command(BaseCommand):
                 'pagerank': case.pagerank,
                 'cached_pagerank': case.pagerank,
                 'citing_cases_ids': case.citation.citing_cases.values_list("pk"),
-                'cases_cited__count': case.cases_cited__count,
+                'cases_cited__count': case.cases_cited.all().count(),
             }
 
 
