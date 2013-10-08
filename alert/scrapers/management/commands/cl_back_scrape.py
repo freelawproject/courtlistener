@@ -66,6 +66,12 @@ class Command(BaseCommand):
             return self.site_yielder(range(2009, 2013), mod)
         elif court_str == 'sd':
             return self.site_yielder(range(1996, 2013), mod)
+        elif court_str == 'tenn':
+            return self.site_yielder(range(0, 131), mod)
+        elif court_str == 'tenncrimapp':
+            return self.site_yielder(range(0, 1325), mod)
+        elif court_str == 'tennctapp':
+            return self.site_yielder(range(0, 987), mod)
         elif court_str == 'tex':
             start = date(1997, 10, 2)
             end = date(2013, 6, 5)
