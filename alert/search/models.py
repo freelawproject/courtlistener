@@ -158,7 +158,7 @@ class Citation(models.Model):
     )
     docket_number = models.CharField(
         "the docket number",
-        max_length=100, # sometimes these are consolidated, hence they need to be long.
+        max_length=1000,  # sometimes these are consolidated, hence they need to be long (was 50, 100, 300).
         blank=True,
         null=True
     )

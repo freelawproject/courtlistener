@@ -21,6 +21,9 @@ class DocumentAdmin(admin.ModelAdmin):
     raw_id_fields = ('citation', 'cases_cited')
     search_fields = ['plain_text']
     readonly_fields = ('pagerank', 'time_retrieved', 'date_modified', 'citation_count')
+    list_filter = (
+        'source',
+    )
 
 
 class CourtAdmin(admin.ModelAdmin):
