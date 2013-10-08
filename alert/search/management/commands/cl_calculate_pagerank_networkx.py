@@ -1,7 +1,6 @@
 __author__ = 'Krist Jin'
 
 from alert.search.models import Document
-from alert.lib.db_tools import queryset_generator
 from alert.lib.filesize import size
 from django.core.management.base import BaseCommand
 import logging
@@ -25,13 +24,12 @@ class Command(BaseCommand):
         #        Stage I         #
         # Build a Data Structure #
         ##########################
-        qs = Document.objects.only(
+        case_list = Document.objects.only(
             'documentUUID',
             'date_filed',
             'cases_cited',
             'pagerank',
-        )
-        case_list = queryset_generator(qs, chunksize=10000)
+        ).iterator()
 
         if verbosity >= 1:
             sys.stdout.write('graph_size is {0:d} nodes.\n'.format(graph_size))
