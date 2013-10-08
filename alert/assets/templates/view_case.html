@@ -210,13 +210,13 @@
 
 
 
-        <h3>{{court}}</h3>
+        <h3>{{ court }}</h3>
         <p class="bottom">
             <strong>Date Filed:</strong>
             {% if doc.date_filed %}
-                {{doc.date_filed|date:"l, F jS, Y"}}
+                {{doc.date_filed|date:"F jS, Y"}}
             {% else %}
-                Unknown date
+                Unknown Date
             {% endif %}
         </p>
         <p class="bottom">
@@ -252,25 +252,32 @@
             {% endif %}
         </p>
         <p>
-            <strong title="SHA1 Hash of the binary or text">Fingerprint:</strong> {{doc.sha1}}
+            <strong title="SHA1 Hash of the binary or text">Fingerprint:</strong> {{ doc.sha1 }}
         </p>
         <br>
         {% if doc.extracted_by_ocr %}
             <div class="notice span-17 last">
                 <p class="bottom">The text of this document was obtained by analyzing a scanned
-                document provided by the court. As a result it may have typos,
-                and you may prefer reading the original.</p>
+                document provided by the court. As a result it may have typos, and you may prefer
+                reading the original.</p>
             </div>
             <div class="clearfix"></div>
         {% endif %}
-        <div id="text">
-            {% if doc.html_with_citations %}
-                {{ doc.html_with_citations|safe }}
-            {% elif doc.html %}
-                {{doc.html|safe}}
-            {% else %}
-                <pre>{{doc.plain_text}}</pre>
-            {% endif %}
+
+        {% if doc.source == 'LB' or source == 'LBM' or source == 'LBRM' %}
+        <div id='lawbox-text'>
+        {% elif doc.source == 'R' or source == 'CR' %}
+        <div id='resource-org-text'>
+        {% else %}
+        <div id='default-text'>{{  source }}
+        {% endif %}
+        {% if doc.html_with_citations %}
+            {{ doc.html_with_citations|safe }}
+        {% elif doc.html %}
+            {{doc.html|safe}}
+        {% else %}
+            <pre>{{doc.plain_text}}</pre>
+        {% endif %}
         </div>
     </article>
 {% endblock %}

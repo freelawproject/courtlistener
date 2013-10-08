@@ -23,7 +23,6 @@ We welcome a conversion of these notes to a better process using Fabric.
 ----------------------------
 
 LAWBOX PROJECT
- - TODO: Does the fact that lawbox cases lack a URL cause an issue in the UI or can they be treated like the Resource.org cases?
  - TODO: If we do case merging, the source field should be LBM ("LawBox Merged") or even LBRM ("Lawbox, Resource.org
          Merged.")
  - TODO: Investigate whether it's worth reworking the citation finder so that it better understands neutral citations.

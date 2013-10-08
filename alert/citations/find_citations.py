@@ -119,7 +119,7 @@ def strip_punct(text):
 def is_scotus_reporter(citation):
     try:
         reporter = REPORTERS[citation.canonical_reporter][citation.lookup_index]
-    except TypeError:
+    except (TypeError, KeyError):
         # Occurs when citation.lookup_index is None
         return False
 
@@ -295,7 +295,9 @@ def disambiguate_reporters(citations):
         - More than one variation, which is an edition
         - ...
 
-    For variants, we just need to sort out the canonical_reporter
+    For variants, we just need to sort out the canonical_reporter.
+
+    If it's not possible to disambiguate the reporter, we simply have to drop it.
     """
     unambiguous_citations = []
     for citation in citations:
@@ -376,15 +378,6 @@ def disambiguate_reporters(citations):
                     unambiguous_citations.append(citation)
                     continue
 
-    # At this point, unambiguous_citations is as populated with resolved citations as it can be. Add in any missing
-    # ambiguous citations and that's that. There was a possibility that we could disambiguate based on parallel
-    # citation, but that will never work because often the citations we're working with are from vastly different
-    # courts.
-    if len(citations) != len(unambiguous_citations):
-        for citation in citations:
-            if citation not in unambiguous_citations:
-                unambiguous_citations.append(citation)
-
     return unambiguous_citations
 
 
@@ -408,7 +401,7 @@ def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
                 add_defendant(citation, words, i)
             citations.append(citation)
 
-    # Disambiguate all the reporters
+    # Disambiguate or drop all the reporters
     citations = disambiguate_reporters(citations)
 
     for citation in citations:
