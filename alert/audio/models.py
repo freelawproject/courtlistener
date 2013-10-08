@@ -15,7 +15,10 @@ class Audio(models.Model):
     argued = models.DateField("the date the case was argued",
         blank=True,
         null=True)
-    download_URL = models.URLField("the URL on the court website where the audio was originally scraped")
+    download_URL = models.URLField(
+        "the URL on the court website where the audio was originally scraped",
+        max_length=500,
+    )
     time_retrieved = models.DateTimeField("the exact date and time stamp that the audio was placed into our database",
         auto_now_add=True,
         editable=False)
