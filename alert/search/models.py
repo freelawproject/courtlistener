@@ -117,7 +117,10 @@ class Court(models.Model):
         'the full name of the court',
         max_length='200',
         blank=False)
-    URL = models.URLField('the homepage for each court')
+    URL = models.URLField(
+        'the homepage for each court',
+        max_length=500,
+    )
     start_date = models.DateField(
         "the date the court was established",
         blank=True,
@@ -158,7 +161,7 @@ class Citation(models.Model):
     )
     docket_number = models.CharField(
         "the docket number",
-        max_length=100, # sometimes these are consolidated, hence they need to be long.
+        max_length=1000,  # sometimes these are consolidated, hence they need to be long.
         blank=True,
         null=True
     )
@@ -269,95 +272,119 @@ class Document(models.Model):
     """
     documentUUID = models.AutoField(
         "a unique ID for each document",
-        primary_key=True)
+        primary_key=True
+    )
     time_retrieved = models.DateTimeField(
         help_text="The original creation date for the item",
         auto_now_add=True,
         editable=False,
-        db_index=True)
+        db_index=True
+    )
     date_modified = models.DateTimeField(
         auto_now=True,
         editable=False,
         db_index=True,
-        null=True)
+        null=True
+    )
     date_filed = models.DateField(
         help_text="The date filed by the court",
         blank=True,
         null=True,
-        db_index=True)
+        db_index=True
+    )
     source = models.CharField(
         "the source of the document",
         max_length=3,
         choices=DOCUMENT_SOURCES,
-        blank=True)
+        blank=True
+    )
     sha1 = models.CharField(
         help_text="unique ID for the document, as generated via SHA1 of the binary data",
         max_length=40,
-        db_index=True)
+        db_index=True
+    )
     court = models.ForeignKey(
         Court,
         help_text="The court where the document was filed",
         db_index=True,
-        null=True)
+        null=True
+    )
     citation = models.ForeignKey(
         Citation,
         verbose_name="The citation information for the document",
         blank=True,
-        null=True)
+        null=True
+    )
     download_URL = models.URLField(
         help_text="The URL on the court website where the document was originally scraped",
-        db_index=True)
+        max_length=500,
+        db_index=True
+    )
     local_path = models.FileField(
         help_text="The location, relative to MEDIA_ROOT, where the files are stored",
         upload_to=make_upload_path,
         blank=True,
-        db_index=True)
+        db_index=True
+    )
     judges = models.TextField(
         help_text="The judges that brought the opinion",
-        blank=True)
+        blank=True
+    )
     nature_of_suit = models.TextField(
         help_text="The nature of the suit, can be codes or laws or whatever",
-        blank=True)
+        blank=True
+    )
     plain_text = models.TextField(
         help_text="Plain text of the document after extraction",
-        blank=True)
+        blank=True
+    )
     html = models.TextField(
         help_text="HTML of the document",
-        blank=True)
+        blank=True
+    )
     html_with_citations = models.TextField(
         help_text="HTML of the document with citation links",
-        blank=True)
+        blank=True
+    )
     cases_cited = models.ManyToManyField(
         Citation,
         help_text="Cases cited (do not update!)",
         related_name="citing_cases",
         null=True,
-        blank=True)
+        blank=True
+    )
     citation_count = models.IntegerField(
         help_text='The number of times this document is cited by other cases',
-        default=0)
+        default=0
+    )
     pagerank = models.FloatField(
         help_text='PageRank score based on the citing relation among documents',
         default=0,
-        db_index=True)
+        db_index=True
+    )
     precedential_status = models.CharField(
         help_text='The precedential status of document',
         max_length=50,
         blank=True,
-        choices=DOCUMENT_STATUSES)
+        choices=DOCUMENT_STATUSES
+    )
     date_blocked = models.DateField(
         blank=True,
-        null=True)
+        null=True
+    )
     blocked = models.BooleanField(
         verbose_name='Block this item',
         db_index=True,
-        default=False)
+        default=False
+    )
     extracted_by_ocr = models.BooleanField(
         verbose_name='OCR was used to get this document content',
-        default=False)
+        default=False
+    )
     is_stub_document = models.BooleanField(
         'Whether this document is a stub or not',
-        default=False)
+        default=False
+    )
 
     def __unicode__(self):
         if self.citation:
