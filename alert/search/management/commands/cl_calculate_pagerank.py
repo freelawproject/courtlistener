@@ -5,7 +5,6 @@ from alert.lib.db_tools import queryset_generator
 from alert.lib.filesize import size
 from datetime import datetime
 from django.core.management.base import BaseCommand
-from django.utils.timezone import now, utc, make_aware
 import logging
 import sys
 import time
@@ -30,7 +29,6 @@ class Command(BaseCommand):
         #        Stage I         #
         # Build a Data Structure #
         ##########################
-        d = Document.objects.all().order_by('date_filed')[0].date_filed
         qs = Document.objects.only(
             'documentUUID',
             'date_filed',
@@ -73,14 +71,13 @@ class Command(BaseCommand):
                 'citing_cases_ids': case.citation.citing_cases.values_list("pk"),
                 'cases_cited__count': case.cases_cited.all().count(),
             }
-
+        if verbosity >= 1:
+            sys.stdout.write('\n')
 
         ######################
         #      Stage II      #
         # Calculate PageRank #
         ######################
-        if verbosity >= 1:
-            sys.stdout.write('\n')
         i_times = 0
         for i in range(MAX_ITERATIONS):
             diff = 0
@@ -114,7 +111,10 @@ class Command(BaseCommand):
                 sys.stdout.write("\rUpdating database...{:.0%}".format(case_count * 1.0 / graph_size))
                 sys.stdout.flush()
             logger.info("ID: {0}\told pagerank is {1}\tnew pagerank is {2}\n".format(
-                                                                case['pk'], case['cached_pagerank'], case['pagerank']))
+                case['pk'],
+                case['cached_pagerank'],
+                case['pagerank']
+            ))
             if case['cached_pagerank'] != case['pagerank']:
                 # Only save if we have changed the value
                 Document.objects.filter(pk=key).update(pagerank=case['pagerank'])

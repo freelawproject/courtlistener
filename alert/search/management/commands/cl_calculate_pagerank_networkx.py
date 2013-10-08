@@ -25,7 +25,6 @@ class Command(BaseCommand):
         #        Stage I         #
         # Build a Data Structure #
         ##########################
-        d = Document.objects.all().order_by('date_filed')[0].date_filed
         qs = Document.objects.only(
             'documentUUID',
             'date_filed',
@@ -64,6 +63,8 @@ class Command(BaseCommand):
                 'cached_pagerank': case.pagerank,
                 'cases_cited': case.cases_cited.values_list('document__pk'),
             }
+        if verbosity >= 1:
+            sys.stdout.write('\n')
 
         ######################
         #      Stage II      #
@@ -71,8 +72,6 @@ class Command(BaseCommand):
         ######################
         graph = nx.DiGraph()
         case_count = 0
-        if verbosity >= 1:
-            sys.stdout.write('\n')
         for key, case in doc_dict.iteritems():
             case_count += 1
             sys.stdout.write('\rImport citing relation into NetworkX graph...{:.0%}'.format(
@@ -103,7 +102,10 @@ class Command(BaseCommand):
                 sys.stdout.write("\rUpdating database...{:.0%}".format(case_count * 1.0 / graph_size))
                 sys.stdout.flush()
             logger.info("ID: {0}\told pagerank is {1}\tnew pagerank is {2}\n".format(
-                case['pk'], case['cached_pagerank'], case['pagerank']))
+                case['pk'],
+                case['cached_pagerank'],
+                case['pagerank']
+            ))
             result_file.write("{0}\t{1}\n".format(case['pk'], case['pagerank']))
             if case['cached_pagerank'] != case['pagerank']:
                 # Only save if we have changed the value
