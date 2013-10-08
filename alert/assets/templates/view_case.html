@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% load text_filters %}
+
+{# Shown on case pages. #}
+
+{% block title %}{{ title }} - CourtListener.com{% endblock %}
+{% block description %}{{ title }}{% endblock %}
+
+{% block head %}
+    {% if not error %}
+        {% if get_string %}
+            <link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?{{ get_string }}" />
+        {% endif %}
+        <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{doc|truncatewords:10}}" href="/feed/{{doc.pk|num_to_ascii}}/cited-by/">
+        <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">
+        {% for court in court_facets %}
+            <link rel="alternate" type="application/rss+xml" title="Atom feed for {{ court.0 }}" href="/feed/court/{{ court.4 }}/">
+        {% endfor %}
+
+    {% endif %}
+{% endblock %}
+
+{% block footer-scripts %}
+    <script defer type="text/javascript" src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+    <script defer type="text/javascript" src="{{ STATIC_URL }}js/save-favorites.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}js/search-form.js"></script>
+    <script type="text/javascript">
+        // Handles the clipboard action.
+        $(document).ready(function() {
+            $('#share-header').click(function() {
+                $('#copy-input').select();
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block sidebar %}
+    <div class="span-6 append-1" id="sidebar">
+        {# show the admin tools if applicable #}
+        {% if user.is_superuser and doc %}
+            <div class="sidebar-section">
+                <h3 class="bottom arrow-down-before pointer">Admin</h3>
+                <p class="shown">
+                    <a href="/admin/search/document/{{doc.pk}}/">Document</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+                    <a href="/admin/search/citation/{{doc.citation_id}}/">Citation</a>
+                </p>
+            </div>
+        {% endif %}
+
+
+        {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
+        <div class="{% if not favorite_form.instance.doc_id %}hidden{% endif %} sidebar-section" id="sidebar-notes">
+            <div>
+                <h3 class="bottom inline arrow-down-before pointer">Your Notes</h3>
+                <p class="inline" id="edit-favorite">(<a href="#favorite-editor">edit</a>)</p>
+                <div class="shown">
+                    <p id="sidebar-notes-text">
+                        {{ favorite_form.instance.notes|default:"(none)" }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+
+        {# Show cases that cite this case #}
+        <div id="cited-by" class="sidebar-section">
+            {% if doc.citation_count > 0 %}
+                <h3 class="bottom pointer arrow-down-before">Cited By ({{ doc.citation_count }})</h3>
+                <div class="shown">
+                    <ul>
+                        {% for case in cited_by_trunc %}
+                            <li>
+                                <a href="{{ case.get_absolute_url }}">{{ case.citation.case_name|truncatewords:10|v_wrapper }}</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <a class="more" href="{{ doc.get_absolute_url }}cited-by/?{{ request.META.QUERY_STRING }}">More detail&hellip;</a>
+                </div>
+            {% else %}
+                <h3 class="bottom pointer arrow-right-before">Cited By ({{ doc.citation_count }})</h3>
+                <div class="hidden">
+                    <p class="bottom">
+                        No citations found for this case.
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+
+
+        {# Download original? #}
+        <div class="sidebar-section">
+            <h3 class="bottom pointer arrow-down-before">View Original</h3>
+            <p class="shown">
+                {% if doc.download_URL or doc.local_path %}
+                    {% if doc.source != 'R' %}
+                        {% if doc.download_URL and result.source != 'R' %}
+                            <a href="{{doc.download_URL}}" class="visitable">From the court</a>
+                        {% endif %}
+                        {% if doc.download_URL and result.source != 'R' and doc.local_path %}
+                            &nbsp;&nbsp;|&nbsp;&nbsp;
+                        {% endif %}
+                        {% if doc.local_path %}
+                            <a href="/{{doc.local_path}}" class="visitable">Our backup</a>
+                        {% endif %}
+                    {% else %}
+                        No downloadable versions
+                    {% endif %}
+                {% else %}
+                    No downloadable versions
+                {% endif %}
+            </p>
+        </div>
+
+
+        {# Show the social links using sprites #}
+        <div class="sidebar-section">
+            <h3 class="bottom pointer arrow-right-before" id="share-header">Share</h3>
+            <div class="hidden">
+                <input type="text" readonly="readonly" id="copy-input" value="{{request.build_absolute_uri}}"/>
+                <a href="mailto:?subject={{title|urlencode}}%20at%20CourtListener.com&body={{request.build_absolute_uri}}" title="Email this link to a friend"class="sprites" id="email_link_png"></a>
+                <a href="http://www.facebook.com/share.php?u={{request.build_absolute_uri}}&t={{title}} at CourtListener.com" target="_blank" title="Facebook" class="sprites" id="facebook_png"></a>
+                <a href="http://twitter.com/home?status={{request.build_absolute_uri}}" target="_blank" title="Twitter" class="sprites" id="twitter_gif"></a>
+            </div>
+            <hr class="space">
+        </div>
+
+
+        {# Show the search refine section. This is populated with JS #}
+        <div class="sidebar-section">
+            <h3 class="pointer arrow-right-before">Refine your search</h3>
+            <div class="hidden">
+                <form action="/" method="get" id="sidebar-search-form">
+                    <div class="shown" id="sidebar-facet-placeholder"></div>
+                  <hr class="space">
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+
+{% block content %}
+    <article class="span-17 last">
+        {% if favorite_form.instance.doc_id %}
+            <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-on" title="Save/edit favorite"></a>
+        {% else %}
+            <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-off" title="Save/edit favorite"></a>
+        {% endif %}
+        <h2>
+            {{ caption|safe|v_wrapper }}
+        </h2>
+        <div id="modal-rel">
+            {# Modal box for saving the favorite #}
+            {% if user.is_authenticated %}
+            <div id="modal-save-favorite" class="hidden span-10">
+                {% if favorite_form.instance.doc_id %}
+                    <h2>Edit This Favorite</h2>
+                {% else %}
+                    <h2 id='save-favorite-title'>Save a Favorite</h2>
+                {% endif %}
+                <form action="" method="POST">{% csrf_token %}
+                    {{ favorite_form.doc_id }}
+                    <p class="bottom">
+                        <label for="id_name">Name</label>
+                        {% if favorite_form.name.errors %}
+                            <br><span class="errortext">
+                                {% for error in favorite_form.name.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </span>
+                        {% endif %}<br>
+                        {{ favorite_form.name }}
+                    </p>
+                    <p class="bottom">
+                        <label for="id_favorite_notes">Notes</label>
+                        {% if favorite_form.notes.errors %}
+                            <br><span class="errortext">
+                                {% for error in favorite_form.notes.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </span>
+                        {% endif %}<br>
+                        {{ favorite_form.notes }}
+                        <p class="top right"><span id="characters-remaining"></span> characters remaining</p>
+                    </p>
+
+                    <div id='favorites-bottom-section'>
+                        <p id="save-favorite-delete" class="bottom fake-link inline
+                            {% if not favorite_form.instance.doc_id %}hidden{%endif%}" tabindex="5">delete</p>
+                        <div id="favorites-buttons">
+                            <button type="submit" class="button title close-favorite-button" name="closeFavorite" id="closeFavorite" tabindex='4'>Close</button>
+                            <button type="submit" class="button title save-favorite-button" name="saveFavorite" id="saveFavorite" tabindex='3'>Save favorite</button>
+                        </div>
+                    </div>
+                </form>
+
+            </div>
+            {% else %}
+                {# user is not authenticated #}
+                <div id="modal-logged-out" class="hidden pointer span-7">
+                    <h3 class="center bottom">
+                        <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}">
+                            Sign in or register to save a favorite.
+                        </a>
+                    </h3>
+                    <p class="center bottom">(click to dismiss)</p>
+                </div>
+            {% endif %}
+        </div>
+
+
+
+        <h3>{{court}}</h3>
+        <p class="bottom">
+            <strong>Date Filed:</strong>
+            {% if doc.date_filed %}
+                {{doc.date_filed|date:"l, F jS, Y"}}
+            {% else %}
+                Unknown date
+            {% endif %}
+        </p>
+        <p class="bottom">
+            <strong>Status: </strong>
+            {% if doc.precedential_status %}
+                {{doc.get_precedential_status_display}}
+            {% else %}
+                Unknown
+            {% endif %}
+        </p>
+        <p class="bottom">
+            {% if citation_string %}
+                <span class="meta-data-header">Citations: </span>
+                <span class="meta-data-value">{{ citation_string }}</span>
+            {% endif %}
+        </p>
+        <p class="bottom">
+            {% if doc.citation.docket_number %}
+                <span class="meta-data-header">Docket Number: </span>
+                <span class="meta-data-value">{{ doc.citation.docket_number }}</span>
+            {% endif %}
+        </p>
+        <p class="bottom">
+            {%  if doc.judges %}
+                <span class="meta-data-header">Judges:</span>
+                <span class="meta-data-value">{{ doc.judges }}</span>
+            {% endif %}
+        </p>
+        <p class="bottom">
+            {%  if doc.nature_of_suit %}
+                <span class="meta-data-header">Nature of suit:</span>
+                <span class="meta-data-value">{{ doc.nature_of_suit }}</span>
+            {% endif %}
+        </p>
+        <p>
+            <strong title="SHA1 Hash of the binary or text">Fingerprint:</strong> {{doc.sha1}}
+        </p>
+        <br>
+        {% if doc.extracted_by_ocr %}
+            <div class="notice span-17 last">
+                <p class="bottom">The text of this document was obtained by analyzing a scanned
+                document provided by the court. As a result it may have typos,
+                and you may prefer reading the original.</p>
+            </div>
+            <div class="clearfix"></div>
+        {% endif %}
+        <div id="text">
+            {% if doc.html_with_citations %}
+                {{ doc.html_with_citations|safe }}
+            {% elif doc.html %}
+                {{doc.html|safe}}
+            {% else %}
+                <pre>{{doc.plain_text}}</pre>
+            {% endif %}
+        </div>
+    </article>
+{% endblock %}
