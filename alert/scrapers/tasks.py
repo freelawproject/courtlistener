@@ -2,13 +2,10 @@
 
 import os
 import sys
-from django.utils.timezone import now
-
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 from django.conf import settings
-
 
 from alert.search.models import Document
 from alert.lib.string_utils import anonymize
@@ -17,6 +14,8 @@ from celery import task
 from celery.task.sets import subtask
 from citations.tasks import update_document_by_id
 from datetime import date
+from django.utils.encoding import smart_text, DjangoUnicodeDecodeError
+from django.utils.timezone import now
 from lxml.html.clean import Cleaner
 from lxml.etree import XMLSyntaxError
 
@@ -90,15 +89,26 @@ def extract_from_pdf(doc, path, DEVNULL, callback=None):
 
 
 def extract_from_txt(path):
-    """Extract text from plain text files.
+    """Extract text from plain text files: A fool's errand.
 
-    This function is really here just for consistency.
+    Unfortunately, plain text files lack encoding information, so we have to guess. We could guess ascii, but we may as
+    well use a superset of ascii, cp1252, and failing that try utf-8, ignoring errors. Most txt files we encounter were
+    produced by converting wpd or doc files to txt on a Microsoft box, so assuming cp1252 as our first guess makes
+    sense.
+
+    May we hope for a better world.
     """
     try:
-        content = open(path).read()
         err = False
+        data = open(path).read()
+        try:
+            # Alas, cp1252 is probably still more popular than utf-8.
+            content = smart_text(data, encoding='cp1252')
+        except DjangoUnicodeDecodeError:
+            content = smart_text(data, encoding='utf-8', errors='ignore')
     except:
         err = True
+        content = ''
     return content, err
 
 
