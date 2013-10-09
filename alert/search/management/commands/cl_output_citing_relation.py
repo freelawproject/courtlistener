@@ -37,9 +37,9 @@ class Command(BaseCommand):
                 average_per_s,
             ))
             sys.stdout.flush()
-            for target_case in source_case.cases_cited.all():
+            for target_case in source_case.cases_cited.values_list('document__pk'):
                 out_file.write(str(source_case.documentUUID)
-                    + '\t' + str(target_case.document_set.all()[0].documentUUID) + '\n')
+                    + '\t' + str(target_case[0]) + '\n')
 
         out_file.close()
 
