@@ -119,7 +119,7 @@ def strip_punct(text):
 def is_scotus_reporter(citation):
     try:
         reporter = REPORTERS[citation.canonical_reporter][citation.lookup_index]
-    except TypeError:
+    except (TypeError, KeyError):
         # Occurs when citation.lookup_index is None
         return False
 
