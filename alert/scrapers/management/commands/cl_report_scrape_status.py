@@ -58,7 +58,6 @@ class Command(BaseCommand):
         seven_days_ago = now() - timedelta(days=7)
         thirty_days_ago = now() - timedelta(days=30)
 
-        # This makes a mess of queries, but gets everything we need.
         cts_last_day = Court.objects \
             .filter(document__date_filed__gt=last_day) \
             .annotate(count=Count('document__pk')) \
@@ -88,6 +87,9 @@ class Command(BaseCommand):
             thirty = cts_thirty_days.get(court['pk'], 0)
             seven = cts_seven_days.get(court['pk'], 0)
             last = cts_last_day.get(court['pk'], 0)
+            if thirty + seven + last == 0:
+                # Not a court we scrape. Move along.
+                continue
             totals[1] += thirty
             totals[2] += seven
             totals[3] += last
@@ -137,6 +139,9 @@ class Command(BaseCommand):
         for court in all_active_courts:
             critical_count = cts_critical.get(court['pk'], 0)
             warning_count = cts_warnings.get(court['pk'], 0)
+            if critical_count + warning_count == 0:
+                # No issues, move along.
+                continue
             errors[court['pk']] = [critical_count, warning_count]
 
         return errors, critical_today
