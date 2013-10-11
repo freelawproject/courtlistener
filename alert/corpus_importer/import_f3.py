@@ -1,9 +1,10 @@
 import dup_finder
-import f3_helpers
+import dup_helpers
 import re
 import sys
 
 import settings
+
 
 def run_dup_check(case, simulate=True):
     """Runs a series of duplicate checking code, generating and analyzing
@@ -23,7 +24,7 @@ def run_dup_check(case, simulate=True):
     if len(candidates) == 0:
         print "  No candidates found. Adding the opinion."
         if not simulate:
-            f3_helpers.add_case(case)
+            dup_helpers.add_case(case)
     elif (re.sub("(\D|0)", "", case.docket_number) ==
             re.sub("(\D|0)", "", candidates[0]['docketNumber'])) and \
             (len(candidates) == 1):
@@ -31,24 +32,24 @@ def run_dup_check(case, simulate=True):
         # one result
         print "  Match made on docket number of single candidate. Merging the opinions."
         if not simulate:
-            f3_helpers.merge_cases_simple(case, candidates[0]['id'])
-    elif len(f3_helpers.find_same_docket_numbers(case, candidates)) == 1:
+            dup_helpers.merge_cases_simple(case, candidates[0]['id'])
+    elif len(dup_helpers.find_same_docket_numbers(case, candidates)) == 1:
         print "  One of the %s candidates had an identical docket number. Merging the opinions." % len(candidates)
         if not simulate:
-            f3_helpers.merge_cases_simple(case, f3_helpers.find_same_docket_numbers(case, candidates)[0]['id'])
-    elif len(f3_helpers.find_same_docket_numbers(case, candidates)) > 0:
+            dup_helpers.merge_cases_simple(case, dup_helpers.find_same_docket_numbers(case, candidates)[0]['id'])
+    elif len(dup_helpers.find_same_docket_numbers(case, candidates)) > 0:
         print "  Several of the %s candidates had an identical docket number. Merging the opinions." % len(candidates)
         if not simulate:
-            target_ids = [can['id'] for can in f3_helpers.find_same_docket_numbers(case, candidates)]
-            f3_helpers.merge_cases_complex(case, target_ids)
+            target_ids = [can['id'] for can in dup_helpers.find_same_docket_numbers(case, candidates)]
+            dup_helpers.merge_cases_complex(case, target_ids)
     else:
         # Possible duplicate, filter out obviously bad cases, and
         # then pass forward for manual review if necessary.
-        filtered_candidates, stats = f3_helpers.filter_by_stats(candidates, stats)
+        filtered_candidates, stats = dup_helpers.filter_by_stats(candidates, stats)
         if len(filtered_candidates) == 0:
             print "After filtering, no candidates remain. Adding the opinion."
             if not simulate:
-                f3_helpers.add_case(case)
+                dup_helpers.add_case(case)
         else:
             print "FILTERED STATS: %s" % stats
             duplicates = []
@@ -70,15 +71,15 @@ def run_dup_check(case, simulate=True):
             if len(duplicates) == 0:
                 print "No duplicates found after manual determination. Adding the opinion."
                 if not simulate:
-                    f3_helpers.add_case(case)
+                    dup_helpers.add_case(case)
             elif len(duplicates) == 1:
                 print "Single duplicate found after manual determination. Merging the opinions."
                 if not simulate:
-                    f3_helpers.merge_cases_simple(case, duplicates[0])
+                    dup_helpers.merge_cases_simple(case, duplicates[0])
             elif len(duplicates) > 1:
                 print "Multiple duplicates found after manual determination. Merging the opinions."
                 if not simulate:
-                    f3_helpers.merge_cases_complex(case, duplicates)
+                    dup_helpers.merge_cases_complex(case, duplicates)
 
 
 def import_by_hand():
@@ -90,7 +91,7 @@ def import_by_hand():
     over it so that the documents can be imported manually.
     """
     simulate = False
-    corpus = f3_helpers.Corpus('file://%s/Resource.org/data/F3/' % settings.INSTALL_ROOT)
+    corpus = dup_helpers.Corpus('file://%s/Resource.org/data/F3/' % settings.INSTALL_ROOT)
     hand_file = open('%s/Resource.org/logs/hand_file.csv' % settings.INSTALL_ROOT, 'r')
     line_placeholder = open('%s/Resource.org/logs/line_placeholder.txt' % settings.INSTALL_ROOT, 'r+')
     try:
@@ -124,7 +125,7 @@ def import_f3():
      2. Merging duplicate documents. See their code in the f3_helpers module.
     """
     simulate = False
-    corpus = f3_helpers.Corpus('%s/Resource.org/data/F3/' % settings.INSTALL_ROOT)
+    corpus = dup_helpers.Corpus('%s/Resource.org/data/F3/' % settings.INSTALL_ROOT)
     vol_file = open('%s/Resource.org/logs/vol_file.txt' % settings.INSTALL_ROOT, 'r+')
     case_file = open('%s/Resource.org/logs/case_file.txt' % settings.INSTALL_ROOT, 'r+')
     stat_file = open('%s/Resource.org/logs/training_stats.csv' % settings.INSTALL_ROOT, 'a')
@@ -145,12 +146,12 @@ def import_f3():
             j = 0
         case_file.close()
         for case in volume[j:]:
-            if f3_helpers.need_dup_check_for_date_and_court(case):
+            if dup_helpers.need_dup_check_for_date_and_court(case):
                 run_dup_check(case, simulate)
             else:
                 print "Dup check not needed. Adding the opinion."
                 if not simulate:
-                    f3_helpers.add_case(case)
+                    dup_helpers.add_case(case)
 
             # save our location within the volume
             j += 1

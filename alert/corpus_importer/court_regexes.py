@@ -300,6 +300,10 @@ fb_pairs = (
 )
 
 state_pairs = (
+    (re.compile('D((istrict)|\.) (of )?C((olumbia)|\.) Court of Appeals', re.I), 'dc'),
+        (re.compile('D((istrict)|\.) (of )?C((olumbia)|\.) Municipal Court of Appeals', re.I), 'dc'),
+            (re.compile('Municipal Court of Appeals (for the )?D((istrict)|\.) (of )?C((olumbia)|\.)', re.I), 'dc'),
+        (re.compile('Supreme Court of the D((istrict)|\.) (of )?C((olumbia)|\.)', re.I), 'dc'),
     (re.compile('Supreme Court of Alabama', re.I), 'ala'),
     (re.compile('Court of Criminal Appeals? of Alabama', re.I), 'alacrimapp'),
         (re.compile('Alabama Court of Criminal Appeals?', re.I), 'alacrimapp'),

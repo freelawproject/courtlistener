@@ -1,0 +1,15 @@
+file:///sata/lawbox/dump/com.west.northwestern_reporter/2d/679/People_v._Boon,_679_NW_2d_319.html|0|Large docket number was falsely identified as a date.
+file:///sata/lawbox/dump/unsorted/29/CARBON_PROCESSING_v._VALERO_MARKETING_AND_SUPPLY,_823_F._Supp._2d_786.html|1|Weird date argued needed purging
+file:///sata/lawbox/dump/com.west.atlantic_reporter/2d/276/Mayfield_v._United_States,_276_A._2d_123.html|0|Was missing 'dc' court
+file:///sata/lawbox/dump/unsorted/25/BKR_GLOBAL,_LLC_v._FOURWINDS_CAPITAL_MANAGEMENT,_661_F._3d_1134.html|1|Worked despite the case names differing
+file:///sata/lawbox/dump/gov.ca.courts.california_appellate_reports/4th/37/Cedars-Sinai_Medical_Center_v._Shewry,_41_Cal._Rptr._3d_48.html|1|Court was previously identified as ca2 instead of calctapp
+file:///sata/lawbox/dump/com.west.northwestern_reporter/2d/762/People_v._Paige,_762_NW_2d_493.html|0|Got to filtering stage...what query did it use?
+file:///sata/lawbox/dump/com.west.pacific_reporter/2d/502/Stromberg_v._Seaton_Ranch_Company,_502_P._2d_41.html|1|Document was OCR'ed, so content SUCKS and doesn't currently match.
+file:///sata/lawbox/dump/com.west.atlantic_reporter/2d/983/ZUNIGA_&_GARNICA_v._US,_983_A._2d_1064.html|1|Has an errata and a real case, but neither was found
+file:///sata/lawbox/dump/com.west.federal_reporter/3d/548/US_v._Fox,_548_F._3d_523.html|0|No cases in ca7 for this year (currently works properly)
+file:///sata/lawbox/dump/unsorted/11/Montgomery_County_v._DRPT,_719_SE_2d_294.html|1|No candidates were found when there's one that should have been found
+file:///sata/lawbox/dump/com.west.federal_reporter/3d/584/Sutliffe_v._Epping_School_Dist.,_584_F._3d_314.html|1|There's a valid one and an errata, but how to handle it?
+file:///sata/lawbox/dump/com.west.bankruptcy_reporter/1st/24/In_re_Gauvin,_24_BR_578.html|0|Court should be BAP9, not ca9, cannot figure out the problem here.
+file:///sata/lawbox/dump/com.west.federal_supplement/1st/571/SSAB_NORTH_AMERICAN_v._US_BUREAU_OF_CUSTOMS,_571_F._Supp._2d_1347.html|1|Candidate found, but docket number was't close enough match (it should have been)
+file:///sata/lawbox/dump/gov.us.courts.united_states_reports/1st/87/Simpson_v._Greeley,_87_US_152.html|1|Crashed due to datetime vs date discrepancy
+

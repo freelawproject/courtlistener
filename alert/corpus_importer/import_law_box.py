@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from alert.corpus_importer import dup_finder, dup_helpers
 
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
@@ -66,7 +67,7 @@ try:
     with open('scotus_dates.csv') as scotus_date_file:
         for line in scotus_date_file:
             citation, date_filed = [line.strip() for line in line.split('|')]
-            date_filed = datetime.datetime.strptime(date_filed, '%Y-%m-%d').date()
+            date_filed = datetime.datetime.strptime(date_filed, '%Y-%m-%d')
             try:
                 # If we get fail to get a KeyError, we append to the list we got back, else, we create such a list.
                 scotus_dates[citation].append(date_filed)
@@ -136,6 +137,7 @@ def get_case_name(complete_html_tree):
 def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
     path = '//center[descendant::text()[not(starts-with(normalize-space(.), "No.") or starts-with(normalize-space(.), "Case No.") or starts-with(normalize-space(.), "Record No."))]]'
 
+    # Get a reasonable date range based on reporters in the citations.
     reporter_keys = [citation.reporter for citation in citations]
     range_dates = []
     for reporter_key in reporter_keys:
@@ -157,6 +159,16 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
         # Items like "February 4, 1991, at 9:05 A.M." stump the lexer in the date parser. Consequently, we purge
         # the word at, and anything after it.
         text = re.sub(' at .*', '', text)
+
+        # The parser recognizes numbers like 121118 as a date. This corpus does not have dates in that format.
+        text = re.sub('\d{5,}', '', text)
+
+        # The parser recognizes dates like December 3, 4, 1908 as 2004-12-3 19:08.
+        found = re.search('\d, \d, \d', text)
+        if found:
+            # These are always date argued, thus continue.
+            continue
+
         try:
             if range_dates:
                 found = parse_dates.parse_dates(text, sane_start=start, sane_end=end)
@@ -169,12 +181,18 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
             pass
 
     # Get the date from our SCOTUS date table
+    scotus_dates_found = []
     if not dates and court == 'scotus':
         for citation in citations:
             try:
-                dates.append(scotus_dates["%s %s %s" % (citation.volume, citation.reporter, citation.page)])
+                # Scotus dates are in the form of a list, since a single citation can refer to several dates.
+                found = scotus_dates["%s %s %s" % (citation.volume, citation.reporter, citation.page)]
+                if len(found) == 1:
+                    scotus_dates_found.extend(found)
             except KeyError:
                 pass
+        if len(scotus_dates_found) == 1:
+            dates = scotus_dates_found
 
     if not dates:
         # Try to grab the year from the citations, if it's the same in all of them.
@@ -289,9 +307,6 @@ def get_court_object(html, citations=None, case_path=None, judge=None):
     """
        Parse out the court string, somehow, and then map it back to our internal ids
     """
-    path = '//center/p/b/text()'
-    text_elements = html.xpath(path)
-
     def string_to_key(str):
         """Given a string, tries to map it to a court key."""
         # State
@@ -306,7 +321,7 @@ def get_court_object(html, citations=None, case_path=None, judge=None):
 
         # Federal appeals
         if re.search('Court,? of Appeal', str) or \
-                'Circuit of Appeals' in str:
+                                 'Circuit of Appeals' in str:
             if 'First Circuit' in str or \
                     'First District' in str:
                 return 'ca1'
@@ -337,7 +352,7 @@ def get_court_object(html, citations=None, case_path=None, judge=None):
                 return 'cafc'
             elif 'Emergency' in str:
                 return 'eca'
-            elif 'Court of Appeals of Columbia' in str:
+            elif 'Columbia' in str:
                 return 'cadc'
         elif 'Judicial Council of the Eighth Circuit' in str:
             return 'ca8'
@@ -407,35 +422,47 @@ def get_court_object(html, citations=None, case_path=None, judge=None):
         else:
             return False
 
+    path = '//center/p/b/text()'
+    text_elements = html.xpath(path)
     court = None
-    for t in text_elements:
-        t = clean_string(t).strip('.')
-        court = string_to_key(t)
-        if court:
-            break
 
-    # Round two: try the text elements joined together
-    t = clean_string(' '.join(text_elements)).strip('.')
-    court = string_to_key(t)
-
-    if not court and citations:
-        # Round three: try using the citations as a clue
+    # 1: try using the citations as a clue (necessary first because calctapp calls itself simply, "Court of Appeal,
+    # Second District")
+    if citations:
         reporter_keys = [citation.canonical_reporter for citation in citations]
-        if 'Cal. Rptr.' in reporter_keys:
-            # It's a california court.
-            for t in text_elements:
-                t = clean_string(t).strip('.')
-                if re.search('court of appeal', t, re.I):
+        if 'Cal. Rptr.' in reporter_keys or 'Cal.App.' in reporter_keys:
+            # It's a california court, but which?
+            for text_element in text_elements:
+                text_element = clean_string(text_element).strip('.')
+                if re.search('court of appeal', text_element, re.I):
                     court = 'calctapp'
+                else:
+                    court = 'cal'
+        elif 'U.S.' in reporter_keys:
+            court = 'scotus'
 
+    # 2: Try using a bunch of regular expressions (this catches 95% of items)
+    if not court:
+        for text_element in text_elements:
+            text_element = clean_string(text_element).strip('.')
+            court = string_to_key(text_element)
+            if court:
+                break
+
+    # 3: try the text elements joined together (works if there were line break problems)
+    if not court:
+        t = clean_string(' '.join(text_elements)).strip('.')
+        court = string_to_key(t)
+
+    # 4: Disambiguate by judge
     if not court and judge:
         court = disambiguate_by_judge(judge)
         if court and 'log_judge_disambiguations' in DEBUG:
             with open('disambiguated_by_judge.txt', 'a') as f:
                 f.write('%s\t%s\t%s\n' % (case_path, court, judge.encode('ISO-8859-1')))
 
+    # 5: give up.
     if not court:
-        # Fine, give up!
         try:
             court = fixes[case_path]['court']
         except KeyError:
@@ -537,6 +564,9 @@ def import_law_box_case(case_path):
         docket_number=get_docket_number(clean_html_tree, case_path=case_path, court=court)
     )
 
+    # Necessary for dup_finder.
+    doc.body_text = body_text
+
     # Add the dict of citations to the object as its attributes.
     citations_as_dict = map_citations_to_models(citations)
     for k, v in citations_as_dict.iteritems():
@@ -544,7 +574,7 @@ def import_law_box_case(case_path):
 
     doc.citation = cite
 
-    return doc, cite
+    return doc
 
 
 def readable_dir(prospective_dir):
@@ -556,9 +586,103 @@ def readable_dir(prospective_dir):
         raise argparse.ArgumentTypeError("readable_dir:{0} is not a readable dir".format(prospective_dir))
 
 
-def check_duplicate(doc):
-    """Return true if it should be saved, else False"""
-    return True
+def needs_dup_check(doc):
+    """Checks the document to see whether we need to run our duplicate checking code.
+
+    Based on minimum dates found in the CL database on 2013-10-10 using:
+    courtlistener=> select "court_id", min(date_filed) from "Document" group by court_id order by min(date_filed);
+    """
+    start_dates = {'scotus': '1754-09-01', 'ca5': '1901-07-15', 'ca2': '1904-06-22', 'ca1': '1940-01-23',
+                   'cafc': '1944-09-13', 'ca3': '1947-03-24', 'ca4': '1949-01-15', 'cadc': '1949-05-16',
+                   'ca9': '1949-06-30', 'ca10': '1949-10-31', 'ca8': '1949-11-16', 'ca7': '1949-11-17',
+                   'ca6': '1949-11-17', 'ccpa': '1949-12-12', 'eca': '1949-12-16', 'uscfc': '1960-01-20',
+                   'mont': '1972-01-03', 'ca11': '1981-10-20', 'miss': '1982-02-04', 'tenncrimapp': '1988-12-08',
+                   'tennctapp': '1993-01-28', 'vactapp': '1995-05-02', 'va': '1995-06-09', 'tenn': '1995-10-09',
+                   'sd': '1996-01-10', 'nd': '1996-09-03', 'ind': '1997-12-31', 'or': '1998-01-08',
+                   'ndctapp': '1998-07-07', 'cit': '1999-01-05', 'cavc': '2000-01-12', 'mich': '2000-12-18',
+                   'tex': '2001-10-02', 'ariz': '2002-01-09', 'fiscr': '2002-11-18', 'armfor': '2003-11-18',
+                   'idahoctapp': '2006-06-15', 'vt': '2006-08-04', 'idaho': '2006-11-28', 'nmctapp': '2007-08-31',
+                   'nm': '2008-12-01', 'hawapp': '2010-01-04', 'haw': '2010-01-07', 'cal': '2011-04-22',
+                   'washctapp': '2011-11-08', 'ri': '2012-10-05', 'bap9': '2012-10-10', 'wyo': '2012-12-28',
+                   'alaska': '2013-01-09', 'wva': '2013-01-14', 'utah': '2013-01-15', 'tax': '2013-01-30',
+                   'ill': '2013-02-04', 'wis': '2013-02-13', 'calctapp': '2013-02-25', 'wash': '2013-02-28',
+                   'nev': '2013-03-13', 'nebctapp': '2013-04-02', 'neb': '2013-04-05', 'njsuperctappdiv': '2013-07-30',
+                   'nj': '2013-07-30', 'ark': '2013-08-02', 'arkctapp': '2013-08-28', 'illappct': '2013-09-19', }
+    try:
+        if doc.date_filed >= datetime.datetime.strptime(start_dates[doc.court_id], '%Y-%m-%d'):
+            return True
+    except KeyError:
+        pass
+    return False
+
+
+def find_duplicates(doc, case_path):
+    """Return True if it should be saved, else False"""
+    print "Running duplicate checks..."
+
+    # 1. Is the item completely outside of the current corpus?
+    if not needs_dup_check(doc):
+        print "  - Not a duplicate: Outside of date range for selected court."
+        return []
+    else:
+        print "  - Could be a duplicate: Inside of date range for selected court."
+
+    # 2. Can we find any duplicates and information about them?
+    stats, candidates = dup_finder.get_dup_stats(doc)
+    if len(candidates) == 0:
+        print "  - Not a duplicate: No candidate matches found."
+        return []
+    elif len(candidates) == 1:
+        if (re.sub("(\D|0)", "", candidates[0]['docketNumber']) in
+                                  re.sub("(\D|0)", "", doc.citation.docket_number)):
+            print "  - Duplicate found: Only one candidate returned and docket number matches."
+            return [candidates[0]['id']]
+        else:
+            print "  - Could be a duplicate: Only one candidate, but docket number differs."
+    else:
+        # More than one candidate.
+        dups_by_docket_number = dup_helpers.find_same_docket_numbers(doc, candidates)
+        if len(dups_by_docket_number) > 1:
+            print "  - Duplicates found: %s candidates matched by docket number." % len(dups_by_docket_number)
+            return [can['id'] for can in dups_by_docket_number]
+        elif len(dups_by_docket_number) == 1:
+            print "  - Duplicate found: Multiple candidates returned, but one matched by docket number."
+            return [dups_by_docket_number[0]['id']]
+        else:
+            print "  - Could be a duplicate: Unable to find good match via docket number."
+
+    # 3. Filter out obviously bad cases and then pass remainder forward for manual review.
+    filtered_candidates, stats = dup_helpers.filter_by_stats(candidates, stats)
+    if len(filtered_candidates) == 0:
+        print "  - Not a duplicate: After filtering no good candidates remained."
+        return []
+    else:
+        print "Filtered stats: %s" % stats
+        duplicates = []
+        for k in range(0, len(filtered_candidates)):
+            # Have to determine by "hand"
+            print "  %s) Case name: %s" % (k + 1, doc.citation.case_name)
+            print "                %s" % filtered_candidates[k]['caseName']
+            print "      Docket nums: %s" % doc.citation.docket_number
+            print "                   %s" % filtered_candidates[k]['docketNumber']
+            print "      Candidate URL: %s" % case_path
+            print "      Match URL: https://www.courtlistener.com%s" % \
+                  (filtered_candidates[k]['absolute_url'])
+
+            choice = raw_input("Is this a duplicate? [Y/n]: ")
+            choice = choice or "y"
+            if choice == 'y':
+                duplicates.append(filtered_candidates[k]['id'])
+
+        if len(duplicates) == 0:
+            print "  - Not a duplicate: Manual determination found no matches."
+            return []
+        elif len(duplicates) == 1:
+            print "  - Duplicate found: Manual determination found one match."
+            return [duplicates[0]]
+        elif len(duplicates) > 1:
+            print "  - Duplicates found: Manual determination found %s matches." % len(duplicates)
+            return duplicates
 
 
 def main():
@@ -619,7 +743,7 @@ def main():
         if 'counter' in DEBUG:  #and i % 1000 == 0:
             print "\n%s: Doing case (%s): file://%s" % (datetime.datetime.now(), i, case_path)
         try:
-            doc, cite = import_law_box_case(case_path)
+            doc = import_law_box_case(case_path)
             with open('lawbox_progress_marker.txt', 'w') as marker:
                 marker.write(str(i))
             with open('lawbox_fix_file.pkl', 'wb') as fix_file:
@@ -629,13 +753,19 @@ def main():
             print traceback.format_exc()
             exit(1)
 
-        save_it = check_duplicate(doc)  # Need to write this method?
-        if save_it and not args.simulate:
-            # Not a dup, save to disk, Solr, etc.
-            cite.save()
-            doc.citation = cite
-            doc.save()  # Do we index it here, or does that happen automatically?
-            print 'Saved as: %s' % doc
+        duplicates = find_duplicates(doc, case_path)
+        if not args.simulate:
+            if len(duplicates) == 0:
+                # Not a dup, save to disk, Solr, etc.
+                doc.citation.save()
+                doc.save()  # Do we index it here, or does that happen automatically?
+                print 'Saved as: %s' % doc
+            if len(duplicates) == 1:
+                #simple_merge
+                pass
+            if len(duplicates) > 1:
+                #complex_merge
+                pass
 
 
 if __name__ == '__main__':

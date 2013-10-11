@@ -55,6 +55,7 @@ def add_case(case):
         doc.citation = cite
         doc.save()
 
+
 def merge_cases_simple(case, target_id):
     """Add `case` to the database, merging with target_id
 
@@ -103,21 +104,25 @@ def merge_cases_complex(case, target_ids):
             doc.save()
 
 
-def find_same_docket_numbers(case, candidates):
-    """Identify the candidates that have the same docket numbers as the case.
+def find_same_docket_numbers(doc, candidates):
+    """Identify the candidates that have the same docket numbers as doc after each has been cleaned.
 
     """
-    new_docket_number = case.docket_number
+    new_docket_number = re.sub('(\D|0)', '', doc.citation.docket_number)
     same_docket_numbers = []
     for candidate in candidates:
-        if candidate['docketNumber'] == new_docket_number:
-            same_docket_numbers.append(candidate)
+        old_docket_number = re.sub('(\D|0)', '', candidate['docketNumber'])
+        if all((len(new_docket_number) > 3, len(old_docket_number) > 3)):
+            if old_docket_number in new_docket_number:
+                same_docket_numbers.append(candidate)
     return same_docket_numbers
 
 
 def filter_by_stats(candidates, stats):
     """Looks at the candidates and their stats, and filters out obviously
     different candidates.
+
+    There is some clear hackery going on here.
     """
     filtered_stats = stats[0:2]
     filtered_stats.append([])
@@ -197,7 +202,7 @@ def need_dup_check_for_date_and_court(case):
         'cadc': datetime.datetime(1997, 9, 12),
         'cafc': datetime.datetime(2004, 11, 30),
         'scotus': datetime.datetime(1600, 1, 1),
-        }
+    }
     try:
         if case.case_date <= earliest_dates[case.court]:
             # Doc was filed before court was scraped. No need for check.
