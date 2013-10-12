@@ -1,0 +1,249 @@
+{% extends 'base.html' %}
+{% load text_filters %}
+{% load humanize %}
+
+{% block title %}
+    Search Results{% if request.GET.q %} for {{ request.GET.q }}{% endif %} - CourtListener.com
+{% endblock %}
+
+{% block head %}
+    {% if not error %}
+        {% if get_string %}
+            <link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?{{ get_string }}" />
+        {% endif %}
+        <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">
+        {% for court in court_facets %}
+            <link rel="alternate" type="application/rss+xml" title="Atom feed for {{ court.0 }}" href="/feed/court/{{ court.4 }}/">
+        {% endfor %}
+    {% endif %}
+{% endblock %}
+
+{% block footer-scripts %}
+    <script type="text/javascript" src="{{ STATIC_URL }}js/search-form.js"></script>
+    <script type="text/javascript">
+       $(document).ready(function() {
+           $('.auto-focus:first').focus();
+           $('#id_sort').change(function() {
+               // Makes the sort drop down work when changed.
+               $('#search-form').submit();
+           });
+           {% if count > 0 %}
+               $('#id_sort').appendTo('#result-order-chooser-placeholder');
+               $('#id_sort').show();
+           {% endif %}
+       });
+    </script>
+{% endblock %}
+
+
+{% block sidebar %}
+    <div class="span-6 append-1" id="sidebar">
+        {% if not error %}
+        <div class="sidebar-section">
+            {% if not alert_form.errors %}
+                <h3 class="pointer arrow-right-before" id="create-alert-header">Create alert</h3>
+                <div id="hidden-create-alert" class="hidden">
+            {% else %}
+                <h3 class="pointer arrow-down-before" id="create-alert-header">Create alert</h3>
+                <div id="hidden-create-alert" class="shown">
+            {% endif %}
+            {% if user.is_authenticated %}
+                {% if get_string %}
+                    {% if alert_form.errors %}
+                        <div class="span-4 error">
+                            <p class="bottom">Please fix the errors below.</p>
+                        </div>
+                    {% endif %}
+                    <form action="" method="post">{% csrf_token %}
+                        {{ alert_form.alertText }}
+                        <p class="span-6 append-1">
+                            <label for="id_alertName">Give the alert a name</label>
+                            {% if alert_form.alertName.errors %}
+                                <br><span class="errortext">
+                                    {% for error in alert_form.alertName.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}
+                            {{ alert_form.alertName }}
+                        </p>
+                        <p>
+                            <label for="id_alertFrequency">How often should we notify you?</label>
+                            {% if alert_form.alertFrequency.errors %}
+                                <br><span class="errortext">
+                                    {% for error in alert_form.alertFrequency.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </span>
+                            {% endif %}<br>
+                            {{ alert_form.alertFrequency }}
+                        </p>
+                        <p>
+                            {{ alert_form.sendNegativeAlert }}
+                            <label for="id_sendNegativeAlert">Send me an email even when there are no hits</label>
+                            <br>
+                        </p>
+                        <button type="submit" class="button title" name="alertSave">Create alert</button>
+                    </form>
+                {% else %}
+                    <p>To create an alert, first place a query.</p>
+                {% endif %}
+            {% else %}
+                {# User is not authenticated #}
+                <p>To get daily alerts for this search, <a href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}page={{ results.number }}">sign in</a> or
+                <a href="{% url "register" %}?next={{ request.path }}?next={{ request.path }}?{{ get_string|urlencode }}page={{ results.number }}">register</a> as a new user.</p>
+            {% endif %}
+                </div>
+        </div>
+
+        <div class="sidebar-section">
+            <h3 class="pointer arrow-down-before">Refine your search</h3>
+            <div class="shown">
+                <form action="/" method="get" id="sidebar-search-form">
+                    <div class="shown" id="sidebar-facet-placeholder"></div>
+                  <hr class="space">
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+{% endblock %}
+
+
+{% block content %}
+    <div class="span-17 last">
+        {% if messages %}
+            <div class="span-17 last">
+                {% for message in messages %}
+                    <p class="bottom {{message.tags}}">{{message|safe}}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% if results.paginator.count > 0 %}
+            <h2 id="result-count" class="bottom">{{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }}</h2>
+            <div id="result-order-chooser-placeholder"></div>
+            <span class="small gray span-17 last top">{{ results.object_list.QTime }}ms</span>
+            <hr class="space"/>
+            {% for result in results.object_list %}
+                <article>
+                    <h3 class="bottom serif">
+                        <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}" class="visitable">
+                            {{result.solr_highlights.caseName.0|safe}}
+                            ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
+                        </a>
+                    </h3>
+
+                    <p class="bottom">
+                        <span class="meta-data-header">Date Filed:</span>
+                        <time class="meta-data-value" datetime="{{ result.dateFiled|date:'Y-m-d'}}" pubdate>
+                            {% if result.dateFiled %}
+                                {{result.dateFiled|date:"F jS, Y"}}
+                            {% else %}
+                                Unknown date
+                            {% endif %}
+                        </time>
+                        <span class="meta-data-header">Status:</span>
+                        <span class="meta-data-value">{{ result.status }}</span>
+                        {% if result.solr_highlights.citation.0 %}
+                            <span class="meta-data-header">Citations: </span>
+                            <span class="meta-data-value">{{ result.solr_highlights.citation.0|safe }}</span>
+                        {% endif %}
+                        {% if result.solr_highlights.docketNumber.0 %}
+                            <span class="meta-data-header">Docket Number:</span>
+                            <span class="meta-data-value">{{ result.solr_highlights.docketNumber.0|safe }}</span>
+                        {% endif %}
+                    </p>
+                    <p class="bottom">
+                        {% if result.solr_highlights.judge.0 %}
+                            <span class="meta-data-header">Judge:</span>
+                            <span class="meta-data-value">{{ result.solr_highlights.judge.0|safe }}</span>
+                        {%  endif %}
+                        {% if result.solr_highlights.suitNature.0 %}
+                            <span class="meta-data-header">Nature of suit:</span>
+                            <span class="meta-data-value">
+                                <a href="?q=suitNature:{{ result.solr_highlights.suitNature.0|safe }}">
+                                    {{ result.solr_highlights.suitNature.0|safe }}
+                                </a>
+                            </span>
+                        {%  endif %}
+                    </p>
+                    {% if result.citeCount > 0 %}
+                        <p class="bottom">
+                            <span class="meta-data-value">
+                                <a href="{{ result.absolute_url }}cited-by/?{{ request.META.QUERY_STRING }}">
+                                    Cited {{ result.citeCount|intcomma }} time{{ result.citeCount|pluralize }}
+                                </a>
+                            </span>
+                        </p>
+                    {% endif %}
+                    <p>
+                        {% if request.GET.q %}&hellip;{% endif %}{% for frag in result.solr_highlights.text %}
+                           {{ frag|safe|underscore_to_space }}&hellip;
+                        {% endfor %}
+                    </p>
+                </article>
+            {% endfor %}
+        {% else %}
+            {% if not error %}
+                <h2 class="alt">Your search
+                    {% if request.GET.q != "" %}
+                        &mdash; <strong>{{ request.GET.q }}</strong> &mdash;
+                    {% endif %}
+                    had no results.</h2>
+                <p class="bottom">Search tips:</p>
+                <ul>
+                    <li>Check your spelling</li>
+                    <li>Try fewer filters</li>
+                    <li>Remove quotes if you used them</li>
+                </ul>
+                <p>Our <a href="/coverage/">coverage page</a> details which cases we
+                have. If you expected more results than this, <a href="/contact/">let us know</a>!
+                We value your feedback.</p>
+            {% else %}
+                <h2 class="alt">Your search
+                    {% if request.GET.q != "" %}
+                        &mdash; <strong>{{ request.GET.q }}</strong> &mdash;
+                    {% endif %}
+                    encountered a <strong>deadly</strong> error.</h2>
+                <p class="bottom">This could be because:</p>
+                <ul>
+                    <li>CourtListener couldn't make sense of your query</li>
+                    <li>Our system is down and can't respond</li>
+                    <li>Some other reason</li>
+                </ul>
+                <p>We log these errors and work to resolve them, but if you think we can benefit from your experience, don't hesitate to <a href="/contact/">let us know</a>! We value your feedback.</p>
+            {% endif %}
+        {% endif %}
+
+        {% if results.has_previous or results.has_next %}
+            <div class="box">
+                <div id="pagination-left">
+                    {% if results.has_previous %}
+                        <h3 class="bottom arrow-left-before">
+                            <a href="?{{ get_string }}page={{ results.previous_page_number }}" rel="prev">
+                                Previous
+                            </a>
+                        </h3>
+                    {% else %}
+                        &nbsp;
+                    {% endif %}
+                </div>
+                <div id="pagination-right">
+                    {% if results.has_next %}
+                        <h3 class="bottom arrow-right-after">
+                            <a href="?{{ get_string }}page={{ results.next_page_number }}" rel="next">Next</a>
+                        </h3>
+                    {% else %}
+                        &nbsp;
+                    {% endif %}
+                </div>
+                <div id="pagination-center">
+                    <h3 class="bottom">
+                        Page {{ results.number }} of {{ results.paginator.num_pages }}
+                    </h3>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
