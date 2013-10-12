@@ -1,4 +1,8 @@
+from collections import OrderedDict
+from lxml import html
 import os
+from lxml.html import tostring
+
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 
 import sys
@@ -42,76 +46,78 @@ def load_stopwords():
 stopwords = load_stopwords()  # Module-level.
 
 
-def make_solr_query(content, caseName, court, date_filed, num_q_words=5, encoding='utf-8', DEBUG=False):
+def get_good_words(word_list, stop_words_size=500):
+    """Cleans out stop words, abbreviations, etc. from a list of words"""
+    good_words = []
+    for word in word_list:
+        # Clean things up
+        word = re.sub(r"'s", '', word)
+        word = word.strip('*,();"')
+
+        # Boolean conditions
+        stop = word in stopwords[:stop_words_size]
+        bad_stuff = re.search('[0-9./()!:&\']', word)
+        too_short = True if len(word) <= 1 else False
+        if any([stop, bad_stuff, too_short]):
+            continue
+        else:
+            good_words.append(word)
+    # Eliminate dups, but keep order.
+    return list(OrderedDict.fromkeys(good_words))
+
+
+def make_solr_query(content, caseName, court, date_filed, num_q_words=0, encoding='utf-8', DEBUG=False):
     """Grab words from the content and returns them to the caller.
 
     This function attempts to choose words from the content that would return
-    the fewest cases if searched for. Words are selected from the content
-    variable. Any words containing punctuation or that are stopwords are
-    eliminated. After elimination, if no words are left, a query is made from
-    the case name rather than the content.
+    the fewest cases if queried. Words are selected from the case name and the
+    content.
     """
     main_params = {'fq': ['court_exact:%s' % court,
                           'dateFiled:%s' % build_date_range(date_filed)],
-                   'rows': 100}
-    words = content.split()
+                   'rows': 100,
+                   'q': ''}
 
-    # 1. Find some good query words, if possible.
-    content_length = len(words)
+    # 1. Create the case name query.
+    case_name_q_words = []
+    case_name_words = caseName.lower().split()
+    if ' v. ' in caseName.lower():
+        v_index = case_name_words.index('v.')
+        # The first word of the defendant and the last word in the plaintiff that's
+        # not a bad word.
+        plaintiff_a = get_good_words(case_name_words[:v_index])
+        defendant_a = get_good_words(case_name_words[v_index + 1:])
+        if plaintiff_a:
+            case_name_q_words.append(plaintiff_a[-1])
+        if defendant_a:
+            case_name_q_words.append(defendant_a[0])
+    elif 'in re ' in caseName.lower() or 'matter of ' in caseName.lower():
+        try:
+            subject = re.search('(?:(?:in Re)|(?:matter of)) (.*)', caseName, re.I).group(1)
+        except TypeError:
+            subject = ''
+        if subject:
+            case_name_q_words.append(subject.split()[0])
+    if case_name_q_words:
+        main_params['q'] = 'caseName:(%s) ' % ' '.join(case_name_q_words)
+
+    # 2. Add num_q_words to the query.
     i = 1
     query_words = []
-    while i <= num_q_words and i < content_length:
-        new_word = words[i].encode(encoding).lower()
-
-        # Clean the input a tad (remove 's, and a bunch of tailing/leading puncts)
-        cleaner = re.compile(r"'s")
-        new_word = cleaner.sub('', new_word)
-        new_word = new_word.strip('*,();"')
-
-        # Boolean conditions
-        stop = new_word in stopwords
-        dup = new_word in query_words
-        bad_stuff = re.search('[0-9./()!:&\']', new_word)
-        too_short = True if len(new_word) <= 1 else False
-        if stop or dup or bad_stuff or too_short:
-            # Try the next word
+    good_words = get_good_words(content.split(), stop_words_size=2500)  # Low tolerance for stopwords
+    while i <= num_q_words and i < len(good_words):
+        new_word = good_words[i].decode(encoding).encode('utf-8').lower()
+        if new_word in case_name_q_words:
             i += 1
             continue
         else:
-            if isinstance(new_word, unicode):
-                query_words.append(new_word)
-            else:
-                query_words.append(unicode(new_word))
-
-    if len(query_words) > 0:
-        # Add the words to our query
-        main_params['q'] = ' '.join(query_words)
-    else:
-        # Either it's a short case, or no good words within it...or both.
-        # 2. Try the casename instead.
-        for word in caseName.split():
-            # Clean up
-            cleaner = re.compile(r"'s")
-            word = cleaner.sub('', word)
-            word = word.strip('*,():"')
-
-            # Boolean conditions
-            stop = word in stopwords
-            dup = word in query_words
-            bad_stuff = re.search('[0-9./()!:&\']', word)
-            too_short = True if len(word) <= 1 else False
-            if dup or bad_stuff or too_short:
-                continue
-            else:
-                if isinstance(word, unicode):
-                    query_words.append(word)
-                else:
-                    query_words.append(unicode(word))
-
-        main_params['q'] = 'caseName:(%s)' % ' '.join(query_words[:num_q_words])
+            query_words.append(new_word)
+            i += 1
+    if query_words:
+        main_params['q'] += ' '.join(query_words)
 
     if DEBUG:
-        print "  main_params are: %s" % main_params
+        print "    - main_params are: %s" % main_params
 
     return main_params
 
@@ -139,16 +145,17 @@ def get_dup_stats(doc):
     ######################################
     num_q_words = 5
 
-    # Add one word to the query until either you run out of words or you get less than 50 results.
-    result_count = 51
+    # Add one word to the query until either you run out of words or you get less than 5 results.
+    result_count = 6
     word_count = len(doc.body_text.split())
-    while result_count > 50 and num_q_words <= word_count:
+    while result_count > 5 and num_q_words <= word_count:
         main_params = make_solr_query(
             doc.body_text,
             doc.citation.case_name,
             doc.court_id,
             doc.date_filed,
             num_q_words,
+            encoding='cp1252',
             DEBUG=DEBUG,
         )
         conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
@@ -172,15 +179,15 @@ def get_dup_stats(doc):
     # Second, if there were exact hits, we forward those onwards. If not, we
     # forward everything.
     remaining_candidates = []
-    new_docket_number = re.sub("\D", "", doc.citation.docket_number)
-    new_docket_number = re.sub("0", "", new_docket_number)
-    for candidate in candidates:
-        # Get rid of anything in the docket numbers that's not a digit
-        result_docket_number = re.sub("\D", "", candidate['docketNumber'])
-        # Get rid of zeroes too.
-        result_docket_number = re.sub('0', '', result_docket_number)
-        if new_docket_number == result_docket_number:
-            remaining_candidates.append(candidate)
+    if doc.citation.docket_number:
+        new_docket_number = re.sub("(\D|0)", "", doc.citation.docket_number)
+        for candidate in candidates:
+            if candidate.get('docketNumber'):
+                # Get rid of anything in the docket numbers that's not a digit
+                result_docket_number = re.sub("(\D|0)", "", candidate['docketNumber'])
+                # Get rid of zeroes too.
+                if new_docket_number == result_docket_number:
+                    remaining_candidates.append(candidate)
 
     if len(remaining_candidates) > 0:
         # We had one or more exact hits! Use those.

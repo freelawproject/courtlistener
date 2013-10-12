@@ -163,10 +163,17 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
         # The parser recognizes numbers like 121118 as a date. This corpus does not have dates in that format.
         text = re.sub('\d{5,}', '', text)
 
+        # The parser can't handle 'Sept.' so we tweak it.
+        text = text.replace('Sept.', 'Sep.')
+
         # The parser recognizes dates like December 3, 4, 1908 as 2004-12-3 19:08.
         found = re.search('\d, \d, \d', text)
         if found:
             # These are always date argued, thus continue.
+            continue
+
+        # Sometimes there's a string like: "Review Denied July 26, 2006. Skip this.
+        if 'review denied' in text:
             continue
 
         try:
@@ -565,7 +572,8 @@ def import_law_box_case(case_path):
     )
 
     # Necessary for dup_finder.
-    doc.body_text = body_text
+    path = '//p/text()'
+    doc.body_text = ' '.join(clean_html_tree.xpath(path))
 
     # Add the dict of citations to the object as its attributes.
     citations_as_dict = map_citations_to_models(citations)
@@ -633,23 +641,29 @@ def find_duplicates(doc, case_path):
         print "  - Not a duplicate: No candidate matches found."
         return []
     elif len(candidates) == 1:
-        if (re.sub("(\D|0)", "", candidates[0]['docketNumber']) in
-                                  re.sub("(\D|0)", "", doc.citation.docket_number)):
-            print "  - Duplicate found: Only one candidate returned and docket number matches."
-            return [candidates[0]['id']]
+        if doc.citation.docket_number and not candidates[0].get('docket_number'):
+            if (re.sub("(\D|0)", "", candidates[0]['docketNumber']) in
+                                         re.sub("(\D|0)", "", doc.citation.docket_number)):
+                print "  - Duplicate found: Only one candidate returned and docket number matches."
+                return [candidates[0]['id']]
+            else:
+                print "  - Could be a duplicate: Only one candidate, but docket number differs."
         else:
-            print "  - Could be a duplicate: Only one candidate, but docket number differs."
+            print "  - Skipping docket_number dup check."
     else:
         # More than one candidate.
-        dups_by_docket_number = dup_helpers.find_same_docket_numbers(doc, candidates)
-        if len(dups_by_docket_number) > 1:
-            print "  - Duplicates found: %s candidates matched by docket number." % len(dups_by_docket_number)
-            return [can['id'] for can in dups_by_docket_number]
-        elif len(dups_by_docket_number) == 1:
-            print "  - Duplicate found: Multiple candidates returned, but one matched by docket number."
-            return [dups_by_docket_number[0]['id']]
+        if doc.citation.docket_number:
+            dups_by_docket_number = dup_helpers.find_same_docket_numbers(doc, candidates)
+            if len(dups_by_docket_number) > 1:
+                print "  - Duplicates found: %s candidates matched by docket number." % len(dups_by_docket_number)
+                return [can['id'] for can in dups_by_docket_number]
+            elif len(dups_by_docket_number) == 1:
+                print "  - Duplicate found: Multiple candidates returned, but one matched by docket number."
+                return [dups_by_docket_number[0]['id']]
+            else:
+                print "  - Could be a duplicate: Unable to find good match via docket number."
         else:
-            print "  - Could be a duplicate: Unable to find good match via docket number."
+            print "  - Skipping docket_number dup check."
 
     # 3. Filter out obviously bad cases and then pass remainder forward for manual review.
     filtered_candidates, stats = dup_helpers.filter_by_stats(candidates, stats)
