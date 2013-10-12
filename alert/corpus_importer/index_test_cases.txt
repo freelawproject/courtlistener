@@ -12,4 +12,5 @@ file:///sata/lawbox/dump/com.west.federal_reporter/3d/584/Sutliffe_v._Epping_Sch
 file:///sata/lawbox/dump/com.west.bankruptcy_reporter/1st/24/In_re_Gauvin,_24_BR_578.html|0|Court should be BAP9, not ca9, cannot figure out the problem here.
 file:///sata/lawbox/dump/com.west.federal_supplement/1st/571/SSAB_NORTH_AMERICAN_v._US_BUREAU_OF_CUSTOMS,_571_F._Supp._2d_1347.html|1|Candidate found, but docket number was't close enough match (it should have been)
 file:///sata/lawbox/dump/gov.us.courts.united_states_reports/1st/87/Simpson_v._Greeley,_87_US_152.html|1|Crashed due to datetime vs date discrepancy
-
+file:///sata/lawbox/dump/com.west.pacific_reporter/3d/249/Rodriguez_v._Rodriguez,_249_P._3d_413.html|0|Unsure count is right, but this one crashed due to lacking a docket number.
+file:///sata/lawbox/dump/gov.us.courts.united_states_reports/1st/136/Norris_v._Haggin,_136_US_386.html|1|Didn't find duplicate because stupid words were in the query like "submitted" and "may".
