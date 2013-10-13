@@ -35,6 +35,7 @@ def _clean_form(request, cd):
         mutable_get['filed_after'] = '%s-%02d-%02d' % \
                                      (after.year, after.month, after.day)
     mutable_get['court_all'] = cd['court_all']
+    mutable_get['sort'] = cd['sort']
 
     return SearchForm(mutable_get)
 
@@ -95,6 +96,7 @@ def show_results(request):
                     tally_stat('search.results')
             except Exception, e:
                 logger.warning("Error loading search page with request: %s" % request.GET)
+                logger.warning("Error was %s" % e)
                 return render_to_response(
                     'search/search.html',
                     {'error': True, 'private': True},

@@ -1,3 +1,4 @@
+# coding=utf-8
 import hashlib
 import os
 import time
@@ -9,6 +10,7 @@ from alert.scrapers.DupChecker import DupChecker
 from alert.scrapers.models import urlToHash
 from alert.scrapers.management.commands.cl_scrape_and_extract import get_extension
 from alert.scrapers.management.commands.cl_scrape_and_extract import scrape_court
+from alert.scrapers.tasks import extract_from_txt
 from alert.scrapers.test_assets import test_scraper
 from alert.search.models import Citation, Court, Document
 from alert import settings
@@ -98,6 +100,16 @@ class IngestionTest(TestCase):
         response = self.si.raw_query(**{'q': 'supreme'}).execute()
         count = response.result.numFound
         self.assertEqual(count, 1, "There were %s items found when there should have been 1" % count)
+
+
+class ExtractionTest(TestCase):
+    def test_txt_extraction_with_bad_data(self):
+        """Verifies that we can extract text from nasty files lacking encodings."""
+        path = os.path.join(settings.INSTALL_ROOT, 'alert', 'scrapers', 'test_assets', 'txt_file_with_no_encoding.txt')
+        content, err = extract_from_txt(path)
+        self.assertFalse(err, "Error reported while extracting text from %s" % path)
+        self.assertIn(u'¶  1.  DOOLEY, J.   Plaintiffs', content,
+                      "Issue extracting/encoding text from file at: %s" % path)
 
 
 class DupcheckerTest(TestCase):
