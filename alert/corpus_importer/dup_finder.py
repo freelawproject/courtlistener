@@ -155,7 +155,6 @@ def get_dup_stats(doc):
             doc.court_id,
             doc.date_filed,
             num_q_words,
-            encoding='cp1252',
             DEBUG=DEBUG,
         )
         conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')

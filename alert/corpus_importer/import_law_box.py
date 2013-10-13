@@ -173,7 +173,7 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
             continue
 
         # Sometimes there's a string like: "Review Denied July 26, 2006. Skip this.
-        if 'review denied' in text:
+        if 'denied' in text.lower():
             continue
 
         try:
@@ -641,7 +641,7 @@ def find_duplicates(doc, case_path):
         print "  - Not a duplicate: No candidate matches found."
         return []
     elif len(candidates) == 1:
-        if doc.citation.docket_number and not candidates[0].get('docket_number'):
+        if doc.citation.docket_number and candidates[0].get('docketNumber') is not None:
             if (re.sub("(\D|0)", "", candidates[0]['docketNumber']) in
                                          re.sub("(\D|0)", "", doc.citation.docket_number)):
                 print "  - Duplicate found: Only one candidate returned and docket number matches."
