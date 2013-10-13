@@ -45,7 +45,7 @@ class Command(BaseCommand):
                 graph_size,
                 average_per_s,
                 size(sys.getsizeof(ngraph)),
-            ))
+                ))
             sys.stdout.flush()
             for target_case in source_case.cases_cited.values_list('document__pk'):
                 ngraph.add_edge(source_case.documentUUID, target_case[0])
