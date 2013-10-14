@@ -84,6 +84,7 @@ def merge_cases_simple(case, target_id):
         doc.citation.save()
         doc.save()
 
+
 def merge_cases_complex(case, target_ids):
     """Merge data from PRO with multiple cases that seem to be a match.
 
@@ -111,8 +112,8 @@ def find_same_docket_numbers(doc, candidates):
     new_docket_number = re.sub('(\D|0)', '', doc.citation.docket_number)
     same_docket_numbers = []
     for candidate in candidates:
-        old_docket_number = re.sub('(\D|0)', '', candidate['docketNumber'])
-        if all((len(new_docket_number) > 3, len(old_docket_number) > 3)):
+        old_docket_number = re.sub('(\D|0)', '', candidate.get('docketNumber', ''))
+        if all([len(new_docket_number) > 3, len(old_docket_number) > 3]):
             if old_docket_number in new_docket_number:
                 same_docket_numbers.append(candidate)
     return same_docket_numbers

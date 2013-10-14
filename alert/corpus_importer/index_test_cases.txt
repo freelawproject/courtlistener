@@ -14,3 +14,8 @@ file:///sata/lawbox/dump/com.west.federal_supplement/1st/571/SSAB_NORTH_AMERICAN
 file:///sata/lawbox/dump/gov.us.courts.united_states_reports/1st/87/Simpson_v._Greeley,_87_US_152.html|1|Crashed due to datetime vs date discrepancy
 file:///sata/lawbox/dump/com.west.pacific_reporter/3d/249/Rodriguez_v._Rodriguez,_249_P._3d_413.html|0|Unsure count is right, but this one crashed due to lacking a docket number.
 file:///sata/lawbox/dump/gov.us.courts.united_states_reports/1st/136/Norris_v._Haggin,_136_US_386.html|1|Didn't find duplicate because stupid words were in the query like "submitted" and "may".
+file:///sata/lawbox/dump/com.west.northwestern_reporter/2d/735/People_v._Fields,_735_NW_2d_280.html|1|Should find one result, but previously found 2 due to Solr's weird query parser.
+file:///sata/lawbox/dump/com.west.pacific_reporter/3d/94/PKP_ENTERPRISES,_INC._v._Brown,_94_P._3d_877.html|0|Crashed due to very short case text
+file:///sata/lawbox/dump/com.west.federal_reporter/3d/577/Bravo_v._US,_577_F._3d_1324.html|2|Has both an order and a decision that match. But computer cannot identify which is which, so it must prompt us.
+file:///sata/lawbox/dump/gov.us.courts.united_states_reports/1st/262/Hart_v._BF_Keith_Vaudeville_Exchange,_262_US_271.html|1|Failed because BF was found in the case name, but it was B.F. in CourtListener
+file:///sata/lawbox/dump/com.west.southern_reporter/2d/976/Cox_v._Cox,_976_So._2d_869.html|0|Mysterious crash with bad stacktrace. Need to sort it out on re-run.

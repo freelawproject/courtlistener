@@ -58,7 +58,8 @@ def get_good_words(word_list, stop_words_size=500):
         stop = word in stopwords[:stop_words_size]
         bad_stuff = re.search('[0-9./()!:&\']', word)
         too_short = True if len(word) <= 1 else False
-        if any([stop, bad_stuff, too_short]):
+        is_upper = word.isupper()
+        if any([stop, bad_stuff, too_short, is_upper]):
             continue
         else:
             good_words.append(word)
@@ -66,21 +67,23 @@ def get_good_words(word_list, stop_words_size=500):
     return list(OrderedDict.fromkeys(good_words))
 
 
-def make_solr_query(content, caseName, court, date_filed, num_q_words=0, encoding='utf-8', DEBUG=False):
+def make_solr_query(caseName, court, date_filed, DEBUG=False):
     """Grab words from the content and returns them to the caller.
 
     This function attempts to choose words from the content that would return
     the fewest cases if queried. Words are selected from the case name and the
     content.
     """
-    main_params = {'fq': ['court_exact:%s' % court,
-                          'dateFiled:%s' % build_date_range(date_filed)],
-                   'rows': 100,
-                   'q': ''}
+    main_params = {
+        'fq': [
+            'court_exact:%s' % court,
+            'dateFiled:%s' % build_date_range(date_filed, range=15)
+        ],
+        'rows': 100
+    }
 
-    # 1. Create the case name query.
     case_name_q_words = []
-    case_name_words = caseName.lower().split()
+    case_name_words = caseName.split()
     if ' v. ' in caseName.lower():
         v_index = case_name_words.index('v.')
         # The first word of the defendant and the last word in the plaintiff that's
@@ -90,31 +93,22 @@ def make_solr_query(content, caseName, court, date_filed, num_q_words=0, encodin
         if plaintiff_a:
             case_name_q_words.append(plaintiff_a[-1])
         if defendant_a:
-            case_name_q_words.append(defendant_a[0])
+            # append the first good word that's not already in the array
+            try:
+                case_name_q_words.append([word for word in defendant_a if word not in case_name_q_words][0])
+            except IndexError:
+                # When no good words left in defendant_a
+                pass
     elif 'in re ' in caseName.lower() or 'matter of ' in caseName.lower():
         try:
             subject = re.search('(?:(?:in Re)|(?:matter of)) (.*)', caseName, re.I).group(1)
         except TypeError:
             subject = ''
-        if subject:
-            case_name_q_words.append(subject.split()[0])
+        good_words = get_good_words(subject.split())
+        if good_words:
+            case_name_q_words.append(good_words[0])
     if case_name_q_words:
-        main_params['q'] = 'caseName:(%s) ' % ' '.join(case_name_q_words)
-
-    # 2. Add num_q_words to the query.
-    i = 1
-    query_words = []
-    good_words = get_good_words(content.split(), stop_words_size=2500)  # Low tolerance for stopwords
-    while i <= num_q_words and i < len(good_words):
-        new_word = good_words[i].decode(encoding).encode('utf-8').lower()
-        if new_word in case_name_q_words:
-            i += 1
-            continue
-        else:
-            query_words.append(new_word)
-            i += 1
-    if query_words:
-        main_params['q'] += ' '.join(query_words)
+        main_params['fq'].append('caseName:(%s)' % ' '.join(case_name_q_words))
 
     if DEBUG:
         print "    - main_params are: %s" % main_params
@@ -137,38 +131,38 @@ def get_dup_stats(doc):
             - Similarity of docket number
             - Comparison of content length
     """
+    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     stats = []
     DEBUG = True
 
-    ######################################
-    # 1: Refine by date, court and words #
-    ######################################
-    num_q_words = 5
+    ##########################################
+    # 1: Refine by date, court and case name #
+    ##########################################
+    main_params = make_solr_query(
+        doc.citation.case_name,
+        doc.court_id,
+        doc.date_filed,
+        DEBUG=DEBUG,
+    )
+    candidates = conn.raw_query(**main_params).execute()
 
-    # Add one word to the query until either you run out of words or you get less than 5 results.
-    result_count = 6
-    word_count = len(doc.body_text.split())
-    while result_count > 5 and num_q_words <= word_count:
-        main_params = make_solr_query(
-            doc.body_text,
-            doc.citation.case_name,
-            doc.court_id,
-            doc.date_filed,
-            num_q_words,
-            DEBUG=DEBUG,
-        )
-        conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+    if not len(candidates) and doc.citation.docket_number is not None:
+        # Try by docket number rather than case name
+        main_params = {
+            'fq': [
+                'court_exact:%s' % doc.court_id,
+                'dateFiled:%s' % build_date_range(doc.date_filed, range=15),
+                'docketNumber:%s' % ' OR '.join([w.strip('*,();"') for w in doc.citation.docket_number.split()
+                                                 if re.search('\d', w)])
+            ],
+            'rows': 100
+        }
+        if DEBUG:
+            print "    - main_params are: %s" % main_params
         candidates = conn.raw_query(**main_params).execute()
-        result_count = len(candidates)
-        if main_params['q'].startswith('caseName'):
-            # We've exhausted the possibilities for this case. Need to move on
-            # regardless of count.
-            break
-        else:
-            num_q_words += 1
 
-    stats.append(result_count)
-    if result_count == 0:
+    stats.append(len(candidates))
+    if not len(candidates):
         return stats, candidates
 
     #########################################
