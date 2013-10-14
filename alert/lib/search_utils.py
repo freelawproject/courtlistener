@@ -177,11 +177,11 @@ def build_main_query(cd, highlight=True):
 
     # Citations
     if cd['citation']:
-        main_fq.append('citation:' + cd['citation'])
+        main_fq.append('citation:(%s)' % ' AND '.join(cd['citation'].split()))
     if cd['docket_number']:
-        main_fq.append('docketNumber:' + cd['docket_number'])
+        main_fq.append('docketNumber:(%s)' % ' AND '.join(cd['docket_number'].split()))
     if cd['neutral_cite']:
-        main_fq.append('neutralCite:' + cd['neutral_cite'])
+        main_fq.append('neutralCite:(%s)' % ' AND '.join(cd['neutral_cite'].split()))
 
     # Dates
     date_query = make_date_query(cd)
