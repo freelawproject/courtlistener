@@ -167,8 +167,8 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
         text = text.replace('Sept.', 'Sep.')
 
         # The parser recognizes dates like December 3, 4, 1908 as 2004-12-3 19:08.
-        found = re.search('\d, \d, \d', text)
-        if found:
+        re_match = re.search('\d{1,2}, \d{1,2}, \d{4}', text)
+        if re_match:
             # These are always date argued, thus continue.
             continue
 
@@ -205,7 +205,7 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
         # Try to grab the year from the citations, if it's the same in all of them.
         years = set([citation.year for citation in citations if citation.year])
         if len(years) == 1:
-            dates.append(date(list(years)[0], 1, 1))
+            dates.append(datetime(list(years)[0], 1, 1))
 
     if not dates:
         try:
@@ -647,9 +647,14 @@ def find_duplicates(doc, case_path):
                 print "  - Duplicate found: Only one candidate returned and docket number matches."
                 return [candidates[0]['id']]
             else:
-                print "  - Could be a duplicate: Only one candidate, but docket number differs."
+                print "  - Not a duplicate: Only one candidate, and docket number differs."
+                return []
         else:
             print "  - Skipping docket_number dup check."
+
+        if doc.citation.case_name == candidates[0].get('caseName'):
+            print "  - Duplicate found: Only one candidate and case name matches."
+            return [candidates[0]['id']]
     else:
         # More than one candidate.
         if doc.citation.docket_number:
@@ -678,7 +683,7 @@ def find_duplicates(doc, case_path):
             print "  %s) Case name: %s" % (k + 1, doc.citation.case_name)
             print "                %s" % filtered_candidates[k]['caseName']
             print "      Docket nums: %s" % doc.citation.docket_number
-            print "                   %s" % filtered_candidates[k]['docketNumber']
+            print "                   %s" % filtered_candidates[k].get('docketNumber', 'No docket number')
             print "      Candidate URL: %s" % case_path
             print "      Match URL: https://www.courtlistener.com%s" % \
                   (filtered_candidates[k]['absolute_url'])
