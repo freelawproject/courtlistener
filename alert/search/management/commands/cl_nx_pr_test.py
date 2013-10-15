@@ -48,7 +48,7 @@ class Command(BaseCommand):
                 ))
             sys.stdout.flush()
             for target_case in source_case.cases_cited.values_list('document__pk'):
-                ngraph.add_edge(source_case.documentUUID, target_case[0])
+                ngraph.add_edge(str(source_case.documentUUID), str(target_case[0]))
 
         if verbosity >= 1:
             sys.stdout.write('\n')
