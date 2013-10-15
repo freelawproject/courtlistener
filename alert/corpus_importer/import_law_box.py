@@ -1,6 +1,6 @@
 import os
+import string
 import sys
-import time
 from alert.corpus_importer import dup_finder, dup_helpers
 
 execfile('/etc/courtlistener')
@@ -205,7 +205,7 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
         # Try to grab the year from the citations, if it's the same in all of them.
         years = set([citation.year for citation in citations if citation.year])
         if len(years) == 1:
-            dates.append(datetime(list(years)[0], 1, 1))
+            dates.append(datetime.datetime(list(years)[0], 1, 1))
 
     if not dates:
         try:
@@ -642,8 +642,11 @@ def find_duplicates(doc, case_path):
         return []
     elif len(candidates) == 1:
         if doc.citation.docket_number and candidates[0].get('docketNumber') is not None:
+            # One in the other or vice versa
             if (re.sub("(\D|0)", "", candidates[0]['docketNumber']) in
-                                         re.sub("(\D|0)", "", doc.citation.docket_number)):
+                                        re.sub("(\D|0)", "", doc.citation.docket_number)) or \
+               (re.sub("(\D|0)", "", doc.citation.docket_number) in
+                                        re.sub("(\D|0)", "", candidates[0]['docketNumber'])):
                 print "  - Duplicate found: Only one candidate returned and docket number matches."
                 return [candidates[0]['id']]
             else:
@@ -655,6 +658,11 @@ def find_duplicates(doc, case_path):
         if doc.citation.case_name == candidates[0].get('caseName'):
             print "  - Duplicate found: Only one candidate and case name matches."
             return [candidates[0]['id']]
+
+        if dup_helpers.case_name_in_candidate(doc.citation.case_name, candidates[0].get('caseName')):
+            print "  - Duplicate found: All words in new document's case name are in the candidate's case name (%s)" % candidates[0].get('caseName')
+            return [candidates[0]['id']]
+
     else:
         # More than one candidate.
         if doc.citation.docket_number:
