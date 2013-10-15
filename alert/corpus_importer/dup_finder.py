@@ -101,12 +101,14 @@ def make_solr_query(caseName, court, date_filed, DEBUG=False):
                 pass
     elif 'in re ' in caseName.lower() or 'matter of ' in caseName.lower():
         try:
-            subject = re.search('(?:(?:in Re)|(?:matter of)) (.*)', caseName, re.I).group(1)
+            subject = re.search('(?:(?:in re)|(?:matter of)|(?:ex parte)) (.*)', caseName, re.I).group(1)
         except TypeError:
             subject = ''
         good_words = get_good_words(subject.split())
         if good_words:
             case_name_q_words.append(good_words[0])
+    else:
+        case_name_q_words = get_good_words(caseName.split())
     if case_name_q_words:
         main_params['fq'].append('caseName:(%s)' % ' '.join(case_name_q_words))
 

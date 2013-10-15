@@ -1,4 +1,5 @@
 import os
+import string
 from django.utils.timezone import now
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
@@ -117,6 +118,27 @@ def find_same_docket_numbers(doc, candidates):
             if old_docket_number in new_docket_number:
                 same_docket_numbers.append(candidate)
     return same_docket_numbers
+
+
+def case_name_in_candidate(case_name_new, case_name_candidate):
+    """When there is one candidate match, this compares their case names to see if one is
+    contained in the other, in the right order.
+
+    Returns True if so, else False.
+    """
+    regex = re.compile('[%s]' % re.escape(string.punctuation))
+    case_name_new_words = regex.sub('', case_name_new.lower()).split()
+    case_name_candidate_words = regex.sub('', case_name_candidate.lower()).split()
+    index = 0
+    for word in case_name_new_words:
+        if len(word) <= 2:
+            continue
+        try:
+            index = case_name_candidate_words[index:].index(word)
+        except ValueError:
+            # The items were out of order or the item wasn't in the candidate.
+            return False
+    return True
 
 
 def filter_by_stats(candidates, stats):
