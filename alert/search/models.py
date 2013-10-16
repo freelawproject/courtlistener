@@ -39,9 +39,10 @@ DOCUMENT_SOURCES = (
     ('C', 'court website'),
     ('R', 'resource.org'),
     ('CR', 'court website merged with resource.org'),
-    ('LB', 'lawbox'),
-    ('LBM', 'lawbox merged with court'),
-    ('LBRM', 'lawbox merged with resource.org'),
+    ('L', 'lawbox'),
+    ('LC', 'lawbox merged with court'),
+    ('LR', 'lawbox merged with resource.org'),
+    ('LCR', 'lawbox merged with court and resource.org'),
     ('M', 'manual input'),
     ('A', 'internet archive'),
 )
@@ -323,6 +324,9 @@ class Document(models.Model):
         blank=True)
     html = models.TextField(
         help_text="HTML of the document",
+        blank=True)
+    html_lawbox = models.TextField(
+        help_text="HTML of lawbox documents",
         blank=True)
     html_with_citations = models.TextField(
         help_text="HTML of the document with citation links",

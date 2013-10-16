@@ -1,5 +1,6 @@
 # coding=utf-8
 from django.test import TestCase
+from alert.corpus_importer.dup_helpers import case_name_in_candidate
 from alert.corpus_importer.import_law_box import get_docket_number
 from alert.corpus_importer.judge_extractor import get_judge_from_str, REASONS
 
@@ -132,3 +133,14 @@ class JudgeExtractionTest(TestCase):
 
         for q, a in pairs:
             self.assertEqual(tuple(get_judge_from_str(q)), a)
+
+
+class CaseNameMatchTest(TestCase):
+    def test_pairs(self):
+        pairs = (
+            (('Testacular', 'Testacular'), True),
+            (("Ass'n Managers v. Lissner", 'Association Managers v. Lissner'), False),
+        )
+
+        for q, a in pairs:
+            self.assertEqual(case_name_in_candidate(*q), a)

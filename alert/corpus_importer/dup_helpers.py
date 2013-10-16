@@ -1,5 +1,6 @@
 import os
 import string
+from django.utils.text import slugify
 from django.utils.timezone import now
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
@@ -8,7 +9,7 @@ execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 
 from juriscraper.lib.parse_dates import parse_dates
-from alert.lib.string_utils import anonymize
+from alert.lib.string_utils import anonymize, trunc
 from alert.search.models import Citation, Court, Document
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 
@@ -24,40 +25,8 @@ from urlparse import urljoin
 
 BROWSER = 'firefox'
 
-def add_case(case):
-    """Add the case to the database.
 
-    """
-    simulate = False
-    # Get the court
-    court = Court.objects.get(courtUUID=case.court)
-
-    # Make a citation
-    cite = Citation(case_name=case.case_name,
-                    docket_number=case.docket_number,
-                    west_cite=case.west_cite)
-
-    # Make the document object
-    doc = Document(source='R',
-                   sha1=case.sha1_hash,
-                   date_filed=case.case_date,
-                   court=court,
-                   download_URL=case.download_url,
-                   precedential_status=case.precedential_status)
-
-    doc.html, blocked = anonymize(case.body)
-    if blocked:
-        doc.blocked = True
-        doc.date_blocked = now()
-
-    if not simulate:
-        # Save everything together
-        cite.save()
-        doc.citation = cite
-        doc.save()
-
-
-def merge_cases_simple(case, target_id):
+def merge_cases_simple(new, target_id):
     """Add `case` to the database, merging with target_id
 
      Merging is done along the following algorithm:
@@ -68,22 +37,50 @@ def merge_cases_simple(case, target_id):
      - The west citation is added to CL's DB from PRO
      - Block status is determined according to the indexing pipeline
     """
-    simulate = False
-    print "Target_id: %s" % target_id
-    doc = Document.objects.get(documentUUID=target_id)
-    print "Merging %s with" % case.case_name
-    print "        %s" % doc.citation.case_name
+    target = Document.objects.get(documentUUID=target_id)
+    print "Merging %s with" % new.citation.case_name
+    print "        %s" % target.citation.case_name
 
-    doc.source = 'CR'
-    doc.citation.west_cite = case.west_cite
-    doc.html, blocked = anonymize(case.body)
+    if target.source == 'C':
+        target.source = 'LC'
+    elif target.source == 'R':
+        target.source = 'LR'
+    elif target.source == 'CR':
+        target.source = 'LCR'
+
+    # Recreate the slug from the new case name (this changes the URL, but the old will continue working)
+    target.citation.slug = trunc(slugify(new.citation.case_name), 50)
+
+    # Take the case name from the new item; they tend to be pretty good
+    target.citation.case_name = new.citation.case_name
+
+    if not target.citation.docket_number:
+        target.citation.docket_number = new.citation.docket_number
+
+    # Get the citations from the new item (ditch the old).
+    target.citation.federal_cite_one = new.citation.federal_cite_one
+    target.citation.federal_cite_two = new.citation.federal_cite_two
+    target.citation.federal_cite_three = new.citation.federal_cite_three
+    target.citation.state_cite_one = new.citation.state_cite_one
+    target.citation.state_cite_two = new.citation.state_cite_two
+    target.citation.state_cite_three = new.citation.state_cite_three
+    target.citation.state_cite_regional = new.citation.state_cite_regional
+    target.citation.specialty_cite_one = new.citation.specialty_cite_one
+    target.citation.scotus_early_cite = new.citation.scotus_early_cite
+    target.citation.lexis_cite = new.citation.lexis_cite
+    target.citation.westlaw_cite = new.citation.westlaw_cite
+    target.citation.neutral_cite = new.citation.neutral_cite
+
+    if not target.judges:
+        target.judges = new.judges
+
+    target.html_lawbox, blocked = anonymize(new.html)
     if blocked:
-        doc.blocked = True
-        doc.date_blocked = now()
+        target.blocked = True
+        target.date_blocked = now()
 
-    if not simulate:
-        doc.citation.save()
-        doc.save()
+    target.citation.save()
+    target.save()
 
 
 def merge_cases_complex(case, target_ids):

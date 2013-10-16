@@ -21,12 +21,13 @@ import re
 
 DEBUG = True
 
+
 def build_date_range(date_filed, range=5):
     """Build a date range to be handed off to a solr query
 
     """
-    after = date_filed - datetime.timedelta(days=5)
-    before = date_filed + datetime.timedelta(days=6)
+    after = date_filed - datetime.timedelta(days=range)
+    before = date_filed + datetime.timedelta(days=range + 1)
     date_range = '[%sZ TO %sZ]' % (after.isoformat(),
                                    before.isoformat())
     return date_range
@@ -57,9 +58,9 @@ def get_good_words(word_list, stop_words_size=500):
         # Boolean conditions
         stop = word in stopwords[:stop_words_size]
         bad_stuff = re.search('[0-9./()!:&\']', word)
-        too_short = True if len(word) <= 1 else False
-        is_upper = word.isupper()
-        if any([stop, bad_stuff, too_short, is_upper]):
+        too_short = (len(word) <= 1)
+        is_acronym = (word.isupper() and len(word) <= 3)
+        if any([stop, bad_stuff, too_short, is_acronym]):
             continue
         else:
             good_words.append(word)
@@ -67,7 +68,7 @@ def get_good_words(word_list, stop_words_size=500):
     return list(OrderedDict.fromkeys(good_words))
 
 
-def make_solr_query(caseName, court, date_filed, DEBUG=False):
+def make_case_name_solr_query(caseName, court, date_filed, DEBUG=False):
     """Grab words from the content and returns them to the caller.
 
     This function attempts to choose words from the content that would return
@@ -99,7 +100,7 @@ def make_solr_query(caseName, court, date_filed, DEBUG=False):
             except IndexError:
                 # When no good words left in defendant_a
                 pass
-    elif 'in re ' in caseName.lower() or 'matter of ' in caseName.lower():
+    elif 'in re ' in caseName.lower() or 'matter of ' in caseName.lower() or 'ex parte' in caseName.lower():
         try:
             subject = re.search('(?:(?:in re)|(?:matter of)|(?:ex parte)) (.*)', caseName, re.I).group(1)
         except TypeError:
@@ -111,9 +112,6 @@ def make_solr_query(caseName, court, date_filed, DEBUG=False):
         case_name_q_words = get_good_words(caseName.split())
     if case_name_q_words:
         main_params['fq'].append('caseName:(%s)' % ' '.join(case_name_q_words))
-
-    if DEBUG:
-        print "    - main_params are: %s" % main_params
 
     return main_params
 
@@ -140,28 +138,47 @@ def get_dup_stats(doc):
     ##########################################
     # 1: Refine by date, court and case name #
     ##########################################
-    main_params = make_solr_query(
+    main_params = make_case_name_solr_query(
         doc.citation.case_name,
         doc.court_id,
         doc.date_filed,
         DEBUG=DEBUG,
     )
+    if DEBUG:
+        print "    - main_params are: %s" % main_params
     candidates = conn.raw_query(**main_params).execute()
 
     if not len(candidates) and doc.citation.docket_number is not None:
         # Try by docket number rather than case name
-        main_params = {
-            'fq': [
-                'court_exact:%s' % doc.court_id,
-                'dateFiled:%s' % build_date_range(doc.date_filed, range=15),
-                'docketNumber:%s' % ' OR '.join([w.strip('*,();"') for w in doc.citation.docket_number.split()
-                                                 if re.search('\d', w)])
-            ],
-            'rows': 100
-        }
-        if DEBUG:
-            print "    - main_params are: %s" % main_params
-        candidates = conn.raw_query(**main_params).execute()
+        docket_q = ' OR '.join([w.strip('*,();"') for w in doc.citation.docket_number.split()
+                                if re.search('\d', w)])
+        if docket_q:
+            main_params = {
+                'fq': [
+                    'court_exact:%s' % doc.court_id,
+                    'dateFiled:%s' % build_date_range(doc.date_filed, range=15),
+                    'docketNumber:(%s)' % docket_q
+                ],
+                'rows': 100
+            }
+            if DEBUG:
+                print "    - main_params are: %s" % main_params
+            candidates = conn.raw_query(**main_params).execute()
+
+    if not len(candidates) and doc.court_id == 'scotus':
+        if doc.citation.federal_cite_one:
+            # Scotus case, try by citation.
+            main_params = {
+                'fq': [
+                    'court_exact:%s' % doc.court_id,
+                    'dateFiled:%s' % build_date_range(doc.date_filed, range=90),  # Creates ~6 month span.
+                    'citation:(%s)' % ' '.join([re.sub(r"\D", '', w) for w in doc.citation.federal_cite_one.split()])
+                ],
+                'rows': 100,
+            }
+            if DEBUG:
+                print "    - main_params are: %s" % main_params
+            candidates = conn.raw_query(**main_params).execute()
 
     stats.append(len(candidates))
     if not len(candidates):

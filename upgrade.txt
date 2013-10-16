@@ -36,6 +36,7 @@ LAWBOX PROJECT
    TODO: Make sure our case name cleanup gets run.
    TODO: The get_judges function can return False when none are found. But what happens when False is given for the
          judges attribute of Document?
+   TODO: Ensure that the html_lawbox field is integrated everywhere properly.
 
 
 2013-09-25:

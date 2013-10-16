@@ -1,7 +1,7 @@
 import os
-import string
 import sys
 from alert.corpus_importer import dup_finder, dup_helpers
+from alert.lib.string_utils import anonymize
 
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
@@ -64,7 +64,7 @@ except (IOError, EOFError):
 try:
     # Load up SCOTUS dates
     scotus_dates = {}
-    with open('scotus_dates.csv') as scotus_date_file:
+    with open(os.path.join(INSTALL_ROOT, 'alert', 'corpus_importer', 'scotus_dates.csv'), 'r') as scotus_date_file:
         for line in scotus_date_file:
             citation, date_filed = [line.strip() for line in line.split('|')]
             date_filed = datetime.datetime.strptime(date_filed, '%Y-%m-%d')
@@ -284,7 +284,9 @@ def get_docket_number(html, case_path=None, court=None):
             docket_number = docket_number[1:-1]
 
     if docket_number and re.search('submitted|reversed', docket_number, re.I):
-        # False positive. Happens when there's no docket number and the date is incorrectly interpretted.
+        # False positive. Happens when there's no docket number and the date is incorrectly interpreted.
+        docket_number = None
+    elif docket_number == 'Not in Source':
         docket_number = None
 
     if not docket_number:
@@ -557,7 +559,7 @@ def import_law_box_case(case_path):
     court = get_court_object(clean_html_tree, citations, case_path, judges)
 
     doc = Document(
-        source='LB',
+        source='L',
         sha1=sha1,
         court_id=court,
         html=clean_html_str,
@@ -650,13 +652,13 @@ def find_duplicates(doc, case_path):
                 print "  - Duplicate found: Only one candidate returned and docket number matches."
                 return [candidates[0]['id']]
             else:
-                print "  - Not a duplicate: Only one candidate, and docket number differs."
+                print "  - Not a duplicate: Only one candidate but docket number differs."
                 return []
         else:
             print "  - Skipping docket_number dup check."
 
         if doc.citation.case_name == candidates[0].get('caseName'):
-            print "  - Duplicate found: Only one candidate and case name matches."
+            print "  - Duplicate found: Only one candidate and case name is a perfect match."
             return [candidates[0]['id']]
 
         if dup_helpers.case_name_in_candidate(doc.citation.case_name, candidates[0].get('caseName')):
@@ -783,16 +785,17 @@ def main():
         duplicates = find_duplicates(doc, case_path)
         if not args.simulate:
             if len(duplicates) == 0:
-                # Not a dup, save to disk, Solr, etc.
+                doc.html_lawbox, blocked = anonymize(doc.html)
+                if blocked:
+                    doc.blocked = True
+                    doc.date_blocked = now()
                 doc.citation.save()
-                doc.save()  # Do we index it here, or does that happen automatically?
-                print 'Saved as: %s' % doc
+                doc.save()
             if len(duplicates) == 1:
-                #simple_merge
-                pass
+                dup_helpers.merge_cases_simple(doc, duplicates[0])
             if len(duplicates) > 1:
                 #complex_merge
-                pass
+                raw_input("Got multimerge example! <enter to continue>")
 
 
 if __name__ == '__main__':
