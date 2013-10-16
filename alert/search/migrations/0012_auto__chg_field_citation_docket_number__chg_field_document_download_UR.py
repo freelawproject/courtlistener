@@ -8,16 +8,18 @@ from django.db import models
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        # Adding field 'Document.html_lawbox'
-        db.add_column('Document', 'html_lawbox',
-                      self.gf('django.db.models.fields.TextField')(default='', blank=True),
-                      keep_default=False)
+        # Changing field 'Document.download_URL'
+        db.alter_column('Document', 'download_URL', self.gf('django.db.models.fields.URLField')(max_length=500))
 
+        # Changing field 'Court.URL'
+        db.alter_column('Court', 'URL', self.gf('django.db.models.fields.URLField')(max_length=500))
 
     def backwards(self, orm):
-        # Deleting field 'Document.html_lawbox'
-        db.delete_column('Document', 'html_lawbox')
+        # Changing field 'Document.download_URL'
+        db.alter_column('Document', 'download_URL', self.gf('django.db.models.fields.URLField')(max_length=200))
 
+        # Changing field 'Court.URL'
+        db.alter_column('Court', 'URL', self.gf('django.db.models.fields.URLField')(max_length=200))
 
     models = {
         u'search.citation': {
@@ -41,7 +43,7 @@ class Migration(SchemaMigration):
         },
         u'search.court': {
             'Meta': {'ordering': "['position']", 'object_name': 'Court', 'db_table': "'Court'"},
-            'URL': ('django.db.models.fields.URLField', [], {'max_length': '200'}),
+            'URL': ('django.db.models.fields.URLField', [], {'max_length': '500'}),
             'citation_string': ('django.db.models.fields.CharField', [], {'max_length': '100', 'blank': 'True'}),
             'courtUUID': ('django.db.models.fields.CharField', [], {'max_length': '15', 'primary_key': 'True'}),
             'date_modified': ('django.db.models.fields.DateTimeField', [], {'auto_now': 'True', 'null': 'True', 'db_index': 'True', 'blank': 'True'}),
@@ -65,10 +67,9 @@ class Migration(SchemaMigration):
             'date_filed': ('django.db.models.fields.DateField', [], {'db_index': 'True', 'null': 'True', 'blank': 'True'}),
             'date_modified': ('django.db.models.fields.DateTimeField', [], {'auto_now': 'True', 'null': 'True', 'db_index': 'True', 'blank': 'True'}),
             'documentUUID': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'download_URL': ('django.db.models.fields.URLField', [], {'max_length': '200', 'db_index': 'True'}),
+            'download_URL': ('django.db.models.fields.URLField', [], {'max_length': '500', 'db_index': 'True'}),
             'extracted_by_ocr': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
             'html': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
-            'html_lawbox': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
             'html_with_citations': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
             'is_stub_document': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
             'judges': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
