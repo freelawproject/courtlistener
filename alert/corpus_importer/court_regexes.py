@@ -310,7 +310,7 @@ state_pairs = (
     (re.compile('Court of Criminal Appeals? of Alabama', re.I), 'alacrimapp'),
         (re.compile('Alabama Court of Criminal Appeals?', re.I), 'alacrimapp'),
     (re.compile('Court of Civil Appeals? of Alabama', re.I), 'alacivapp'),
-    (re.compile('Court of Appeals? of Alabama', re.I), 'alactapp'),
+    (re.compile('Court of Appeals? of Alabama', re.I), 'alactapp'),  # Abolished.
     (re.compile('Supreme Court of Alaska', re.I), 'alaska'),
     (re.compile('Court of Appeals? of Alaska', re.I), 'alaskactapp'),
     (re.compile('Supreme Court of Arizona', re.I), 'ariz'),

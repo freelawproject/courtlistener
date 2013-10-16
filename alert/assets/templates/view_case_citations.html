@@ -36,7 +36,7 @@
                         <li class="citing-case">
                             <span class="citation-name">
                                 <a href="{{ case.get_absolute_url }}">
-                                    {{ caption|v_wrapper }}
+                                    {{ caption|safe|v_wrapper }}
                                 </a>
                             </span>
                             <br/>

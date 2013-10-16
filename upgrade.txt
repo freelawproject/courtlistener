@@ -23,20 +23,13 @@ We welcome a conversion of these notes to a better process using Fabric.
 ----------------------------
 
 LAWBOX PROJECT
- - TODO: If we do case merging, the source field should be LBM ("LawBox Merged") or even LBRM ("Lawbox, Resource.org
-         Merged.")
- - TODO: Investigate whether it's worth reworking the citation finder so that it better understands neutral citations.
-         For example, right now a citation like 2012 NM 3 will get 3 as citation.page, and will get 2012 as
-         citation.volume
-   TODO: Note that citations aren't always unique! For example, you can have a Dal. Citation that is either from Dallas'
-         Supreme Court Reports or from Dallas' Pennsylvania Reports. Make sure that date filtering can handle this. This
-         can even happen within the same court. So, Fed.R. can refer to either F. or F.2d.
    TODO: Sort out the new court picking interface.
-   TODO: Make sure our anonymize/auto-blocking code gets run.
-   TODO: Make sure our case name cleanup gets run.
-   TODO: The get_judges function can return False when none are found. But what happens when False is given for the
-         judges attribute of Document?
+         - Coverage page
+         - Search page
+         - Remove search stuff from view_case sidebar?
    TODO: Ensure that the html_lawbox field is integrated everywhere properly.
+   TODO: Run through the file containing difficult to de-dup cases
+   TODO: Convert the fix file dates to datetimes
 
 
 2013-09-25:

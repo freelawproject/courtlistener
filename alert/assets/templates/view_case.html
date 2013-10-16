@@ -264,7 +264,7 @@
             <div class="clearfix"></div>
         {% endif %}
 
-        {% if doc.source == 'LB' or source == 'LBM' or source == 'LBRM' %}
+        {% if doc.source == 'L' or source == 'LC' or source == 'LR' or source == 'LCR' %}
         <div id='lawbox-text'>
         {% elif doc.source == 'R' or source == 'CR' %}
         <div id='resource-org-text'>
@@ -273,6 +273,8 @@
         {% endif %}
         {% if doc.html_with_citations %}
             {{ doc.html_with_citations|safe }}
+        {% elif doc.html_lawbox %}
+            {{ doc.html_lawbox|safe }}
         {% elif doc.html %}
             {{doc.html|safe}}
         {% else %}

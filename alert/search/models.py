@@ -315,7 +315,8 @@ class Document(models.Model):
         db_index=True)
     judges = models.TextField(
         help_text="The judges that brought the opinion",
-        blank=True)
+        blank=True,
+        null=True)
     nature_of_suit = models.TextField(
         help_text="The nature of the suit, can be codes or laws or whatever",
         blank=True)
@@ -324,7 +325,8 @@ class Document(models.Model):
         blank=True)
     html = models.TextField(
         help_text="HTML of the document",
-        blank=True)
+        blank=True,
+        null=True)
     html_lawbox = models.TextField(
         help_text="HTML of lawbox documents",
         blank=True)
@@ -417,3 +419,14 @@ class Document(models.Model):
 
     class Meta:
         db_table = "Document"
+
+
+def save_doc_and_cite(doc, index):
+    """Save a document and citation simultaneously.
+
+    Just a helper function to save everything neatly.
+    """
+    cite = doc.citation
+    cite.save(index=index)
+    doc.citation = cite
+    doc.save(index=index)
