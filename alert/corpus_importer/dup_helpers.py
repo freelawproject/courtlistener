@@ -79,8 +79,8 @@ def merge_cases_simple(new, target_id):
         target.blocked = True
         target.date_blocked = now()
 
-    target.citation.save()
-    target.save()
+    target.citation.save(index=False)
+    target.save(index=False)
 
 
 def merge_cases_complex(case, target_ids):

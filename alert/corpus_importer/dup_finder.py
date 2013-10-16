@@ -1,7 +1,6 @@
 from collections import OrderedDict
-from lxml import html
+import string
 import os
-from lxml.html import tostring
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 
@@ -9,11 +8,8 @@ import sys
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 
-from django import db
 from django.conf import settings
-from alert.search.models import Document
 from alert.lib import sunburnt
-from alert.lib.encode_decode import num_to_ascii
 from cleaning_scripts.lib.string_diff import find_confidences, gen_diff_ratio
 import datetime
 from datetime import date
@@ -150,8 +146,18 @@ def get_dup_stats(doc):
 
     if not len(candidates) and doc.citation.docket_number is not None:
         # Try by docket number rather than case name
-        docket_q = ' OR '.join([w.strip('*,();"') for w in doc.citation.docket_number.split()
-                                if re.search('\d', w)])
+        clean_docket_number_words = []
+        for word in doc.citation.docket_number.split():
+            if not re.search('\d', word):
+                # Must have numbers.
+                continue
+            word = word.strip(string.punctuation)
+            regex = re.compile('[%s]' % re.escape(string.punctuation))
+            if regex.search(re.sub('-', '', word)):
+                # Can only have hyphens after stripping
+                continue
+            clean_docket_number_words.append(word)
+        docket_q = ' OR '.join(clean_docket_number_words)
         if docket_q:
             main_params = {
                 'fq': [
@@ -233,78 +239,3 @@ def get_dup_stats(doc):
     stats.append(gestalt_diffs)
 
     return stats, candidates
-
-
-def write_dups(source, dups, DEBUG=False):
-    """Writes duplicates to a file so they are logged.
-
-    This function receives a queryset and then writes out the values to a log.
-    """
-    log = open('dup_log.txt', 'a')
-    if dups[0] is not None:
-        log.write(str(source.pk))
-        print "  Logging match: " + str(source.pk),
-        for dup in dups:
-            # write out each doc
-            log.write('|' + str(dup.pk) + " - " + num_to_ascii(dup.pk))
-            if DEBUG:
-                print '|' + str(dup.pk) + ' - ' + num_to_ascii(dup.pk),
-    else:
-        log.write("  No dups found for %s" % source.pk)
-        if DEBUG:
-            print "  No dups found for %s" % source.pk
-    print ''
-    log.write('\n')
-    log.close()
-
-
-def import_and_report_records():
-    """Traverses the first 500 records and find their dups.
-
-    This script is used to find dups within the database by comparing it to
-    the Sphinx index. This simulates the duplicate detection we will need to
-    do when importing from other sources, and allows us to test it.
-    """
-
-    docs = Document.objects.filter(court='ca1')[:5000]
-    #docs = Document.objects.filter(pk = 985184)
-
-    # do this 1000 times
-    for doc in docs:
-        court = doc.court_id
-        date = doc.date_filed
-        casename = doc.citation.caseNameFull
-        docket_number = doc.citation.docket_number
-        content = doc.plain_text
-        id = num_to_ascii(doc.pk)
-        if content == "":
-            # HTML content!
-            content = doc.html
-            br = re.compile(r'<br/?>')
-            content = br.sub(' ', content)
-            p = re.compile(r'<.*?>')
-            content = p.sub('', content)
-
-        dups = check_dup(court, date, casename, content, docket_number, id, True)
-
-        if len(dups) > 0:
-            # duplicate(s) were found, write them out to a log
-            write_dups(doc, dups, True)
-
-        if DEBUG:
-            print ''
-        # Clear query cache, as it presents a memory leak when in dev mode
-        db.reset_queries()
-
-    return
-
-
-def main():
-    print import_and_report_records()
-    print "Completed 500 records successfully. Exiting."
-    exit(0)
-
-
-if __name__ == '__main__':
-    main()
-

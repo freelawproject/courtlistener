@@ -7,6 +7,7 @@ execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alert.settings")
 
+from citations.tasks import update_document_by_id
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 from juriscraper.lib import parse_dates
 import pickle
@@ -32,7 +33,7 @@ import hashlib
 from lxml.html.clean import Cleaner
 from lxml.html import tostring
 
-from alert.search.models import Document, Citation, Court
+from alert.search.models import Document, Citation, Court, save_doc_and_cite
 
 
 DEBUG = [
@@ -786,11 +787,12 @@ def main():
         if not args.simulate:
             if len(duplicates) == 0:
                 doc.html_lawbox, blocked = anonymize(doc.html)
+                doc.html = ''
                 if blocked:
                     doc.blocked = True
                     doc.date_blocked = now()
-                doc.citation.save()
-                doc.save()
+                # Save nothing to the index for now (it'll get done when we find citations)
+                save_doc_and_cite(doc, index=False)
             if len(duplicates) == 1:
                 dup_helpers.merge_cases_simple(doc, duplicates[0])
             if len(duplicates) > 1:
