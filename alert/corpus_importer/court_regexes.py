@@ -1,4 +1,6 @@
+execfile('/etc/courtlistener')
 from math import ceil
+import os
 import pickle
 import re
 import sys
@@ -337,6 +339,7 @@ state_pairs = (
         (re.compile('Court of Oyer and Terminer of Delaware', re.I), 'delsuperct'),
     (re.compile('Family Court of Delaware', re.I), 'delfamct'),
     (re.compile('Supreme Court of Florida', re.I), 'fla'),
+        (re.compile('Supreme Court.*Nassau County', re.I), 'fla'),
     (re.compile('District Courts? of Appeal (of )?Florida', re.I), 'fladistctapp'),
     (re.compile('Supreme Court of Georgia', re.I), 'ga'),
     (re.compile('Court of Appeals? of Georgia', re.I), 'gactapp'),
@@ -469,7 +472,7 @@ state_pairs = (
 # such.
 ##########################################
 try:
-    with open('judge_stats.pkl', 'rb') as fix_file:
+    with open(os.path.join(INSTALL_ROOT, 'alert', 'corpus_importer', 'judge_stats.pkl'), 'rb') as fix_file:
         judge_stats = pickle.load(fix_file)
 except (IOError, EOFError):
     print "Unable to load judge_stats.pkl"
