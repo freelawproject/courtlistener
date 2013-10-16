@@ -70,11 +70,11 @@ class Command(BaseCommand):
         progress = 0
         update_count = 0
         min_value = min(pr_result.values())
-        UPDATE_TRESHOLD = min_value * 1.0e-05
+        UPDATE_THRESHOLD = min_value * 1.0e-05
         for id, old_pr in pr_db.iteritems():
             progress += 1
             try:
-                if abs(old_pr - pr_result[id]) > UPDATE_TRESHOLD:
+                if abs(old_pr - pr_result[id]) > UPDATE_THRESHOLD:
                     # Save only if the diff is larger enough
                     Document.objects.filter(pk=int(id)).update(pagerank=pr_result[id])
                     update_count += 1
@@ -91,7 +91,7 @@ class Command(BaseCommand):
                     ))
             #Because NetworkX removed the isolated nodes, these nodes will be updated below
             except KeyError:
-                if abs(old_pr - min_value) > UPDATE_TRESHOLD:
+                if abs(old_pr - min_value) > UPDATE_THRESHOLD:
                     Document.objects.filter(pk=int(id)).update(pagerank=min_value)
                     update_count += 1
                     logger.info("ID: {0}\told pagerank is {1}\tnew pagerank is {2}\n".format(
