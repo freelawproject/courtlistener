@@ -8,23 +8,20 @@ from django.db import models
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        # Adding field 'Document.html_lawbox'
-        db.add_column('Document', 'html_lawbox',
-                      self.gf('django.db.models.fields.TextField')(default='', blank=True),
-                      keep_default=False)
-
+        # Changing field 'Citation.docket_number'
+        db.alter_column('Citation', 'docket_number', self.gf('django.db.models.fields.CharField')(max_length=1000, null=True))
 
     def backwards(self, orm):
-        # Deleting field 'Document.html_lawbox'
-        db.delete_column('Document', 'html_lawbox')
 
+        # Changing field 'Citation.docket_number'
+        db.alter_column('Citation', 'docket_number', self.gf('django.db.models.fields.CharField')(max_length=100, null=True))
 
     models = {
         u'search.citation': {
             'Meta': {'object_name': 'Citation', 'db_table': "'Citation'"},
             'case_name': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
             'citationUUID': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'docket_number': ('django.db.models.fields.CharField', [], {'max_length': '1000', 'null': 'True', 'blank': 'True'}),
+            'docket_number': ('django.db.models.fields.CharField', [], {'max_length': '300', 'null': 'True', 'blank': 'True'}),
             'federal_cite_one': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
             'federal_cite_three': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
             'federal_cite_two': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
@@ -68,7 +65,6 @@ class Migration(SchemaMigration):
             'download_URL': ('django.db.models.fields.URLField', [], {'max_length': '200', 'db_index': 'True'}),
             'extracted_by_ocr': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
             'html': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
-            'html_lawbox': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
             'html_with_citations': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
             'is_stub_document': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
             'judges': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
