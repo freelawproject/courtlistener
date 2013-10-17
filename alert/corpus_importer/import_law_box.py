@@ -16,6 +16,7 @@ import re
 import subprocess
 import traceback
 from django.utils.timezone import now
+from django import db
 from lxml import html
 from alert.citations.constants import EDITIONS, REPORTERS
 from alert.citations.find_citations import get_citations
@@ -770,6 +771,9 @@ def main():
             i = args.line
 
     for case_path in cases:
+        if i % 1000 == 0:
+            db.reset_queries()  # Else we leak memory when DEBUG is True
+
         if 'counter' in DEBUG:  #and i % 1000 == 0:
             print "\n%s: Doing case (%s): file://%s" % (datetime.datetime.now(), i, case_path)
         try:
