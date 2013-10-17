@@ -27,9 +27,7 @@ LAWBOX PROJECT
          - Coverage page
          - Search page
          - Remove search stuff from view_case sidebar?
-   TODO: Ensure that the html_lawbox field is integrated everywhere properly.
    TODO: Run through the file containing difficult to de-dup cases
-   TODO: Convert the fix file dates to datetimes
 
 
 2013-09-25:
