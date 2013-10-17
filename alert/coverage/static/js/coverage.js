@@ -16,13 +16,13 @@ var court_data = new Array();
 function addNavigation() {
     $(sorted_courts).each(function(index, court) {
         // Build up the sidebar
-        var nav_link = $('<li></li>');
-        $('<a></a>').attr('href', '#' + court.pk).attr('id', "court_" + court.pk)
-            .text(court.short_name).appendTo(nav_link);
+        var select_elem = $('#nav select');
+        $('<option></option>').attr('value', court.pk).attr('id', 'court_' + court.pk)
+                                                            .text(court.short_name).appendTo(select_elem);
         if (index == 0) {
-            nav_link.toggleClass('selected');
+            select_elem.toggleClass('selected');
         }
-        nav_link.appendTo('#nav ul');
+        select_elem.appendTo('#nav');
 
         // Make a totals dict (necessary, because otherwise courts are in a list
         // where we can't look things up by court name).
@@ -32,7 +32,7 @@ function addNavigation() {
     });
 
     $(window).hashchange(function() {
-        $('#nav li.selected').toggleClass('selected');
+        $('#nav option.selected').toggleClass('selected');
         $('#court_' + window.location.hash.substr(1)).parent().toggleClass('selected');
 
         // Clean things up
