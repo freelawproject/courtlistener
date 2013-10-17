@@ -106,11 +106,11 @@ class Command(BaseCommand):
                         old_pr
                     ))
             if verbosity >= 1:
-                sys.stdout.write('\rRecording results...{:.0%}'.format(progress * 1.0 / len(pr_result)))
+                sys.stdout.write('\rUpdating Pagerank in database...{:.0%}'.format(progress * 1.0 / graph_size))
                 sys.stdout.flush()
 
         if verbosity >= 1:
-            sys.stdout.write('\nPageRank calculation finished! Updated {} ({:.0%}) cases\n'.format(
+            sys.stdout.write('\nPageRank calculation finish! Updated {} ({:.0%}) cases\n'.format(
                 update_count,
                 update_count * 1.0 / graph_size
             ))
