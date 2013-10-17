@@ -15,13 +15,13 @@ def queryset_generator(queryset, chunksize=1000):
     Note that the implementation of the iterator does not support ordered query
     sets.
     """
+    if settings.DEVELOPMENT:
+        chunksize = 5
+
     # Make a query that doesn't do related fetching for optimization
     bare_qs = queryset.prefetch_related(None)
     if bare_qs.count() == 0:
         return
-    if settings.DEVELOPMENT:
-        chunksize = 5
-
     pk = bare_qs.order_by('pk')[0].pk
     # Decrement pk for use with 'greater than' filter
     if pk > 0:
