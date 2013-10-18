@@ -67,6 +67,10 @@ span.bold {
     text-align: right;
 }
 
+.float-right {
+    float: right;
+}
+
 .hidden {
     display: none;
 }

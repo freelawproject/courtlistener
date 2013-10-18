@@ -292,7 +292,10 @@ def get_court_start_year(conn, court):
     """Get the start year for a court by placing a Solr query. If a court is
     active, but does not yet have any results, return the current year.
     """
-    params = {'fq': ['court_exact:%s' % court.courtUUID], 'sort': 'dateFiled asc', 'rows': 1}
+    if court.lower() == 'all':
+        params = {'sort': 'dateFiled asc', 'rows': 1, 'q': '*:*'}
+    else:
+        params = {'fq': ['court_exact:%s' % court], 'sort': 'dateFiled asc', 'rows': 1}
     response = conn.raw_query(**params).execute()
     try:
         year = response.result.docs[0]['dateFiled'].year
@@ -311,9 +314,9 @@ def build_coverage_query(court, start_year):
         'facet.range.end': 'NOW/DAY',
         'facet.range.gap': '+1YEAR',
         'rows': 0,
-        'fq': ['court_exact:%s' % court.courtUUID],
-        'q': '*:*'
     }
+    if court.lower() != 'all':
+        params['fq'] = ['court_exact:%s' % court]
     return params
 
 
