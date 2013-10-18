@@ -23,7 +23,7 @@ def contact(request):
 
             # send the email to the MANAGERS
             send_mail(
-                'Message from %s at CourtListener.com: %s' % (cd['name'], cd['subject']),
+                'CourtListener message from "%s": %s' % (cd['name'], cd['subject']),
                 cd['message'],
                 cd.get('email', 'noreply@example.com'),
                 email_addresses,)
