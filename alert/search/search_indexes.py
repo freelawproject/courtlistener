@@ -31,7 +31,9 @@ class SearchDocument(object):
         except AttributeError:
             raise InvalidDocumentError("Unable to save to index due to missing Citation object.")
         except NoReverseMatch:
-            raise InvalidDocumentError("Unable to save to index due to missing absolute_url.")
+            raise InvalidDocumentError("Unable to save to index due to missing absolute_url (court_id: %s, doc.pk: %s). "
+                                       "Might the court have in_use set to False?"
+                                       % (self.court_id, doc.pk))
         self.judge = doc.judges
         self.suitNature = doc.nature_of_suit
         self.docketNumber = doc.citation.docket_number
