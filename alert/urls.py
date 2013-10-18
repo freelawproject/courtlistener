@@ -5,6 +5,7 @@ from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
 from alert.casepage.views import view_case, view_case_citations, serve_static_file
 from alert.contact.views import contact, thanks
+from alert.coverage.api import coverage_data
 from alert.coverage.views import coverage_graph
 from alert.data_dumper.views import dump_index, serve_or_gen_dump
 from alert.donate.dwolla import process_dwolla_callback, process_dwolla_transaction_status_callback
@@ -130,14 +131,15 @@ urlpatterns = patterns('',
 
     # The API
     (r'^api/jurisdictions/$', court_index),
+    (r'^api/coverage/(all|%s)/' % '|'.join(pacer_codes), coverage_data),
 
     # Dump index and generation pages
     (r'^dump-info/$', dump_index),
-    (r'^dump-api/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
-    (r'^dump-api/(?P<year>\d{4})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$', serve_or_gen_dump),
-    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$',
+    (r'^dump-api/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes), serve_or_gen_dump),
+    (r'^dump-api/(?P<year>\d{4})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes), serve_or_gen_dump),
+    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
      serve_or_gen_dump),
-    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>' + "|".join(pacer_codes) + '|all)\.xml.gz$',
+    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
      serve_or_gen_dump),
 
     # Feeds
