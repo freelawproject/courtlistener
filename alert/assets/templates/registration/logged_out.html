@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Signed Out - CourtListener.com{% endblock %}
+{% block search-form %}{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div class="span-17 last">
+        <h2>You have successfully signed out</h2>
+        <p>Thank you for using CourtListener.com</p>
+
+        <form action="/" method="post" class="inline">{% csrf_token %}
+        <button type="submit" class="button">Return to Homepage</button></form>&nbsp;&nbsp;
+        <form action="/sign-in/" method="get" class="inline">{% csrf_token %}
+        <button type="submit" class="button">Sign In Again</button></form>
+    </div>
+{% endblock %}
