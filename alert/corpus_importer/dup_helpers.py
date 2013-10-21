@@ -10,7 +10,7 @@ sys.path.append(INSTALL_ROOT)
 
 from juriscraper.lib.parse_dates import parse_dates
 from alert.lib.string_utils import anonymize, trunc
-from alert.search.models import Citation, Court, Document
+from alert.search.models import Citation, Court, Document, save_doc_and_cite
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 
 import datetime
@@ -27,15 +27,9 @@ BROWSER = 'firefox'
 
 
 def merge_cases_simple(new, target_id):
-    """Add `case` to the database, merging with target_id
+    """Add `new` to the database, merging with target_id
 
-     Merging is done along the following algorithm:
-     - SHA1 is preserved from CL
-     - The HTML from PRO gets added to CL's DB.
-     - CL's title is preserved (it tends to be better)
-     - The source field for the document is changed to CR (court and PRO)
-     - The west citation is added to CL's DB from PRO
-     - Block status is determined according to the indexing pipeline
+     Merging is done by picking the best fields from each item.
     """
     target = Document.objects.get(documentUUID=target_id)
     print "Merging %s with" % new.citation.case_name
@@ -54,6 +48,7 @@ def merge_cases_simple(new, target_id):
     # Take the case name from the new item; they tend to be pretty good
     target.citation.case_name = new.citation.case_name
 
+    # Add the docket number if the old doesn't exist, but keep the old if one does.
     if not target.citation.docket_number:
         target.citation.docket_number = new.citation.docket_number
 
@@ -71,13 +66,19 @@ def merge_cases_simple(new, target_id):
     target.citation.westlaw_cite = new.citation.westlaw_cite
     target.citation.neutral_cite = new.citation.neutral_cite
 
+    # Add judge information if lacking. New is dirty, but better than none.
     if not target.judges:
         target.judges = new.judges
 
+    # Add the text.
     target.html_lawbox, blocked = anonymize(new.html)
     if blocked:
         target.blocked = True
         target.date_blocked = now()
+
+    target.extracted_by_ocr = False  # No longer true for any LB case.
+
+    save_doc_and_cite(target, index=False)
 
     target.citation.save(index=False)
     target.save(index=False)
@@ -141,31 +142,25 @@ def case_name_in_candidate(case_name_new, case_name_candidate):
 def filter_by_stats(candidates, stats):
     """Looks at the candidates and their stats, and filters out obviously
     different candidates.
-
-    There is some clear hackery going on here.
     """
-    filtered_stats = stats[0:2]
-    filtered_stats.append([])
-    filtered_stats.append([])
-    filtered_stats.append([])
     filtered_candidates = []
     for i in range(0, len(candidates)):
-        if stats[2][i] < 0.125:
+        if stats['case_name_similarities'][i] < 0.125:
             # The case name is wildly different
             continue
-        elif stats[3][i] > 400:
+        elif stats['length_diffs'][i] > 400:
             # The documents have wildly different lengths
             continue
-        elif stats[4][i] < 0.4:
+        elif stats['gestalt_diffs'][i] < 0.4:
             # The contents are wildly different
+            continue
+        elif stats['cos_sims'] < 0.01:
+            # Very different cosine similarities
             continue
         else:
             # It's a reasonably close match.
-            filtered_stats[2].append(stats[2][i])
-            filtered_stats[3].append(stats[3][i])
-            filtered_stats[4].append(stats[4][i])
             filtered_candidates.append(candidates[i])
-    return filtered_candidates, filtered_stats
+    return filtered_candidates
 
 
 def need_dup_check_for_date_and_court(case):

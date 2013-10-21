@@ -10,7 +10,7 @@ sys.path.append(INSTALL_ROOT)
 
 from django.conf import settings
 from alert.lib import sunburnt
-from cleaning_scripts.lib.string_diff import find_confidences, gen_diff_ratio
+from alert.lib.string_diff import find_confidences, gen_diff_ratio, get_cosine_similarity
 import datetime
 from datetime import date
 import re
@@ -76,7 +76,8 @@ def make_case_name_solr_query(caseName, court, date_filed, DEBUG=False):
             'court_exact:%s' % court,
             'dateFiled:%s' % build_date_range(date_filed, range=15)
         ],
-        'rows': 100
+        'rows': 100,
+        'caller': 'corpus_importer',
     }
 
     case_name_q_words = []
@@ -128,7 +129,6 @@ def get_dup_stats(doc):
             - Comparison of content length
     """
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
-    stats = []
     DEBUG = True
 
     ##########################################
@@ -165,7 +165,8 @@ def get_dup_stats(doc):
                     'dateFiled:%s' % build_date_range(doc.date_filed, range=15),
                     'docketNumber:(%s)' % docket_q
                 ],
-                'rows': 100
+                'rows': 100,
+                'caller': 'corpus_importer',
             }
             if DEBUG:
                 print "    - main_params are: %s" % main_params
@@ -181,12 +182,13 @@ def get_dup_stats(doc):
                     'citation:(%s)' % ' '.join([re.sub(r"\D", '', w) for w in doc.citation.federal_cite_one.split()])
                 ],
                 'rows': 100,
+                'caller': 'corpus_importer',
             }
             if DEBUG:
                 print "    - main_params are: %s" % main_params
             candidates = conn.raw_query(**main_params).execute()
 
-    stats.append(len(candidates))
+    stats = {'candidate_count': len(candidates)}
     if not len(candidates):
         return stats, candidates
 
@@ -213,18 +215,19 @@ def get_dup_stats(doc):
     else:
         # We just let candidates from step one get passed through by doing nothing.
         pass
-    stats.append(len(candidates))
+
+    stats['docket_match_count'] = len(candidates)
 
     ##############################
     # 3: Find the best case name #
     ##############################
     confidences = find_confidences(candidates, doc.citation.case_name)
-    stats.append(confidences)
+    stats['case_name_similarities'] = confidences
 
-    ###########################
-    # 4: Check content length #
-    ###########################
-    percent_diffs, gestalt_diffs = [], []
+    #####################################################################
+    # 4: Check content length, gestalt difference and cosine similarity #
+    #####################################################################
+    percent_diffs, gestalt_diffs, cos_sims = [], [], []
     new_stripped_content = re.sub('\W', '', doc.body_text).lower()
     for candidate in candidates:
         candidate_stripped_content = re.sub('\W', '', candidate['text']).lower()
@@ -232,10 +235,13 @@ def get_dup_stats(doc):
         # Calculate the difference in text length and their gestalt difference
         length_diff = abs(len(candidate_stripped_content) - len(new_stripped_content))
         percent_diff = float(length_diff) / len(new_stripped_content)
+        cos_sim = get_cosine_similarity(doc.body_text, candidate['text'])
         percent_diffs.append(percent_diff)
         gestalt_diffs.append(gen_diff_ratio(candidate_stripped_content, new_stripped_content))
+        cos_sims.append(cos_sim)
 
-    stats.append(percent_diffs)
-    stats.append(gestalt_diffs)
+    stats['length_diffs'] = percent_diffs
+    stats['gestalt_diffs'] = gestalt_diffs
+    stats['cos_sims'] = cos_sims
 
     return stats, candidates

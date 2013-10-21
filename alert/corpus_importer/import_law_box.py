@@ -54,6 +54,7 @@ DEBUG = [
     #'log_bad_dates',
     #'log_bad_docket_numbers',
     #'log_bad_judges',
+    'log_multimerge',
     'counter',
 ]
 
@@ -368,7 +369,7 @@ def get_court_object(html, citations=None, case_path=None, judge=None):
         elif 'Judicial Council of the Eighth Circuit' in str:
             return 'ca8'
         elif 'Judicial Council of the Ninth Circuit' in str or \
-                re.search('Ninth (Judicial )?Circuit', str):
+                re.search('Ninth Judicial Circuit', str):
             return 'ca9'
 
         # Federal district
@@ -683,12 +684,15 @@ def find_duplicates(doc, case_path):
             print "  - Skipping docket_number dup check."
 
     # 3. Filter out obviously bad cases and then pass remainder forward for manual review.
-    filtered_candidates, stats = dup_helpers.filter_by_stats(candidates, stats)
+    print "  - Using filtering stats: %s" % stats
+    filtered_candidates = dup_helpers.filter_by_stats(candidates, stats)
     if len(filtered_candidates) == 0:
         print "  - Not a duplicate: After filtering no good candidates remained."
         return []
+    elif len(filtered_candidates) == 1 and stats['cos_sims'][0] > 0.98:
+        print "  - Duplicate found: One candidate after filtering and cosine similarity is high (%s)" % stats['cos_sims'][0]
+        return [filtered_candidates[0]['id']]
     else:
-        print "Filtered stats: %s" % stats
         duplicates = []
         for k in range(0, len(filtered_candidates)):
             # Have to determine by "hand"
@@ -745,7 +749,7 @@ def main():
         def generate_random_line(file_name):
             while True:
                 total_bytes = os.stat(file_name).st_size
-                random_point = random.randint( 0, total_bytes )
+                random_point = random.randint(0, total_bytes)
                 f = open(file_name)
                 f.seek(random_point)
                 f.readline()  # skip this line to clear the partial line
@@ -753,9 +757,10 @@ def main():
 
         def case_generator(line_number):
             """Yield cases from the index file."""
+            enumerated_line_number = line_number - 1  # The enumeration is zero-index, but files are one-index.
             index_file = open(args.file_name)
             for i, line in enumerate(index_file):
-                if i > line_number:
+                if i >= enumerated_line_number:
                     yield line.strip()
 
         if args.random:
@@ -779,7 +784,7 @@ def main():
         try:
             doc = import_law_box_case(case_path)
             with open('lawbox_progress_marker.txt', 'w') as marker:
-                marker.write(str(i))
+                marker.write(str(i + 1))  # Files are one-index, not zero-index
             with open('lawbox_fix_file.pkl', 'wb') as fix_file:
                 pickle.dump(fixes, fix_file)
             i += 1
@@ -801,7 +806,9 @@ def main():
                 dup_helpers.merge_cases_simple(doc, duplicates[0])
             if len(duplicates) > 1:
                 #complex_merge
-                raw_input("Got multimerge example! <enter to continue>")
+                if 'log_multimerge' in DEBUG:
+                    with open('index_multimerge.txt', 'a') as log:
+                        log.write('%s\n' % case_path)
 
 
 if __name__ == '__main__':

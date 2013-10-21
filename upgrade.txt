@@ -24,9 +24,8 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 LAWBOX PROJECT
    TODO: Sort out the new court picking interface.
-         - Coverage page
          - Search page
-         - Remove search stuff from view_case sidebar?
+         - view_case sidebar?
    TODO: Run through the file containing difficult to de-dup cases
 
 
