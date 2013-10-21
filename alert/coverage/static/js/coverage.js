@@ -34,7 +34,11 @@ function addNavigation() {
 
     // Do this when the hash of the page changes (i.e. at page load or when a select is chosen.
     $(window).hashchange(function(){
-        var hash = window.location.hash.substr(1);
+        if (window.location.hash.substr(1) === "") {
+            var hash = 'all';
+        } else {
+            var hash = window.location.hash.substr(1);
+        }
         $.ajax({
             type: "GET",
             url: "/api/coverage/" + hash + "/",
@@ -114,9 +118,6 @@ function drawGraph(data) {
 $(document).ready(function() {
     addNavigation();
     canvas = Raphael("graph", 950, 400);
-    if (window.location.hash === ""){
-        window.location.hash = 'all';
-    }
     $(window).hashchange();
     $("#nav select").chosen();
 });
