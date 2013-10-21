@@ -3,19 +3,16 @@
 # Crawl everything except a few explicit blocks
 User-agent: Googlebot
 Disallow: /robots.txt
-Disallow: /x/
 Disallow: /dumps/
 Disallow: /assets/
 
 User-agent: bingbot
 Disallow: /robots.txt
-Disallow: /x/
 Disallow: /dumps/
 Disallow: /assets/
 
 User-agent: Slurp
 Disallow: /robots.txt
-Disallow: /x/
 Disallow: /dumps/
 Disallow: /assets/
 
@@ -25,7 +22,6 @@ Disallow: /assets/
 # Crawl everything except real files
 User-agent: YandexBot
 Disallow: /robots.txt
-Disallow: /x/
 Disallow: /dumps/
 Disallow: /assets/
 Disallow: /pdf/
@@ -35,7 +31,6 @@ Disallow: /doc/
 
 User-agent: teoma
 Disallow: /robots.txt
-Disallow: /x/
 Disallow: /dumps/
 Disallow: /assets/
 Disallow: /pdf/
@@ -45,7 +40,6 @@ Disallow: /doc/
 
 User-agent: ia_archiver
 Disallow: /robots.txt
-Disallow: /x/
 Disallow: /dumps/
 Disallow: /assets/
 Disallow: /pdf/
