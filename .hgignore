@@ -7,9 +7,6 @@ syntax: glob
 *~
 *.iml
 
-# no private files!
-*[P|p][R|r][I|i][V|v][A|a][T|t][E|e]*
-
 # Downloaded and generated assets
 alert/assets/media/html
 alert/assets/media/pdf
@@ -19,9 +16,6 @@ alert/assets/media/sitemaps
 alert/assets/media/doc
 alert/assets/media/dumps
 alert/assets/static
-
-# the cached robots.txt from Resource.org
-alert/robots/cached_file.txt
 
 # Solr
 Solr/data
