@@ -165,7 +165,7 @@ class SearchForm(forms.Form):
     #     the query being processed correctly (search results are all good), but the form on the UI won't be cleaned up
     #     for the user, making things rather confusing.
     #  3. We do some cleanup work in search_utils.make_facets_variable(). The work that's done there is used to check
-    #     or uncheck the boxes in the sidebar, so if you tweak how they work you'll need to tweak how this function.
+    #     or uncheck the boxes in the sidebar, so if you tweak how they work you'll need to tweak this function.
     # In short: This is a nasty area. Comments this long are a bad sign for the intrepid developer.
     def clean_q(self):
         """

@@ -47,7 +47,7 @@ def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
     facets = []
     solr_facet_values = dict(solr_facet_values[solr_field])
     # Are any of the checkboxes checked?
-    no_facets_selected = not any([field.value() is True for field in search_form
+    no_facets_selected = not any([field.value() for field in search_form
                                   if field.html_name.startswith(prefix)])
     for field in search_form:
         try:

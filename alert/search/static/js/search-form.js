@@ -22,7 +22,7 @@ $(document).ready(function() {
             // Add the court checkboxes that are selected
             gathered = gathered.add($('.court-checkbox:checked'));
         }
-        if ($('.status-checkbox:checked').length < $('.status-checkbox').length) {
+        if ($('.status-checkbox:checked').length <= $('.status-checkbox').length) {
             // Add the status checkboxes that are selected
             gathered = gathered.add($('.status-checkbox:checked'));
         }
