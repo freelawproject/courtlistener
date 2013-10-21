@@ -1,5 +1,6 @@
 import os
 import sys
+from django.core.management import BaseCommand
 
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
@@ -187,3 +188,7 @@ def main():
 if __name__ == '__main__':
     main()
 
+class Command(BaseCommand):
+    help = 'Sends the alert emails on a daily, weekly or monthly basis.'
+
+    def handle(self, *args, **options):
