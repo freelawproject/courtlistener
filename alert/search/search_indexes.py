@@ -3,7 +3,7 @@ from datetime import time
 from django.core.urlresolvers import NoReverseMatch
 from django.template import Context
 from django.template import loader
-from alert.casepage.views import make_caption, make_citation_string
+from alert.casepage.views import make_citation_string
 
 
 class InvalidDocumentError(Exception):
@@ -20,7 +20,7 @@ class SearchDocument(object):
         # Standard fields
         self.id = doc.pk
         if doc.date_filed is not None:
-            self.dateFiled = datetime.combine(doc.date_filed, time())
+            self.dateFiled = datetime.combine(doc.date_filed, time())  # Midnight, PST
         self.citeCount = doc.citation_count
         self.court = doc.court.short_name
         self.court_id = doc.court.courtUUID
