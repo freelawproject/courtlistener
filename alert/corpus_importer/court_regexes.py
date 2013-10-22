@@ -130,7 +130,7 @@ fd_pairs = (
     (re.compile('E(\.|(astern))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?South Carolina', re.I), 'southcarolinaed'),
     # Abolished. 1823-02-21 to 1965-10-07
     (re.compile('W(\.|(estern))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?S(\.|(outh))? C(\.|(arolina))?', re.I), 'southcarolinawd'),
-    (re.compile('D(\.|:|,|(ist(\.|(rict))))? ?(of )?S(\.|(outh))? C(\.|(arolina))?', re.I), 'scd'),  # Must go last!
+    (re.compile('D(\.|:|,|(ist(\.|(rict))))? (Court)?,? ?(of )?S(\.|(outh))? C(\.|(arolina))?', re.I), 'scd'),  # Must go last!
     (re.compile('South Dakota', re.I), 'sdd'),
     (re.compile('E(\.|(astern))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?Tenn(\.|(essee))', re.I), 'tned'),
     (re.compile('M(\.|(iddle))? ?D(\.|(istrict))?,? ?(of )?Tenn(\.|(essee))', re.I), 'tnmd'),

@@ -151,9 +151,10 @@ def filter_by_stats(candidates, stats):
         elif stats['length_diffs'][i] > 400:
             # The documents have wildly different lengths
             continue
-        elif stats['gestalt_diffs'][i] < 0.4:
-            # The contents are wildly different
-            continue
+        # Commented out because the headnotes sometimes included in Resource.org made this calculation vary too much.
+        #elif stats['gestalt_diffs'][i] < 0.4:
+        #    # The contents are wildly different
+        #    continue
         elif stats['cos_sims'] < 0.01:
             # Very different cosine similarities
             continue
