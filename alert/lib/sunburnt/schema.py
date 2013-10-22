@@ -449,10 +449,8 @@ class SolrSchema(object):
             name, class_name = field_type_node.attrib['name'], field_type_node.attrib['class']
         except KeyError, e:
             raise SolrError("Invalid schema.xml: missing %s attribute on fieldType" % e.args[0])
-        try:
-            field_class = self.solr_data_types[class_name]
-        except KeyError:
-            raise SolrError("Unknown field_class '%s'" % class_name)
+        # Sets the default to SolrField for any unknown field classes.
+        field_class = self.solr_data_types.get(class_name, SolrField)
         return name, SolrFieldTypeFactory(field_class,
             **self.translate_attributes(field_type_node.attrib))
 
