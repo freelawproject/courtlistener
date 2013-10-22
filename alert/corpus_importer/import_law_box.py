@@ -217,8 +217,8 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
             if 'input_dates' in DEBUG:
                 subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
                 input_date = raw_input('  No date found. What should be here (YYYY-MM-DD)? ')
-                add_fix(case_path, {'dates': [datetime.datetime.strptime(input_date, '%Y-%m-%d').date()]})
-                dates = [input_date]
+                add_fix(case_path, {'dates': [datetime.datetime.strptime(input_date, '%Y-%m-%d')]})
+                dates = [datetime.datetime.strptime(input_date, '%Y-%m-%d')]
             if 'log_bad_dates' in DEBUG:
                 # Write the failed case out to file.
                 with open('missing_dates.txt', 'a') as out:
