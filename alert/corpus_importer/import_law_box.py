@@ -48,6 +48,7 @@ DEBUG = [
     'input_dates',
     #'input_docket_number',
     'input_court',
+    'input_case_names',
     #'log_bad_citations',
     #'log_bad_courts',
     #'log_judge_disambiguations',
@@ -96,6 +97,12 @@ def add_fix(case_path, fix_dict):
         fixes[case_path] = fix_dict
 
 
+def log_print(msg):
+    print msg
+    with open('/sata/lawbox/import_log.txt', 'a') as log:
+        log.write(msg.encode('utf-8') + '\n')
+
+
 def get_citations_from_tree(complete_html_tree, case_path):
     path = '//center[descendant::text()[not(starts-with(normalize-space(.), "No.") or starts-with(normalize-space(.), "Case No.") or starts-with(normalize-space(.), "Record No."))]]'
     citations = []
@@ -120,21 +127,31 @@ def get_citations_from_tree(complete_html_tree, case_path):
 
     if 'citations' in DEBUG and len(citations):
         cite_strs = [str(cite.__dict__) for cite in citations]
-        print "  Citations found: %s" % ',\n                   '.join(cite_strs)
+        log_print("  Citations found: %s" % ',\n                   '.join(cite_strs))
     elif 'citations' in DEBUG:
-        print "  No citations found!"
+        log_print("  No citations found!")
     return citations
 
 
-def get_case_name(complete_html_tree):
+def get_case_name(complete_html_tree, case_path):
     path = '//head/title/text()'
     # Text looks like: 'In re 221A Holding Corp., Inc, 1 BR 506 - Dist. Court, ED Pennsylvania 1979'
     s = complete_html_tree.xpath(path)[0].rsplit('-', 1)[0].rsplit(',', 1)[0]
     # returns 'In re 221A Holding Corp., Inc.'
-    s = harmonize(clean_string(titlecase(s)))
+    case_name = harmonize(clean_string(titlecase(s)))
+    if not s:
+        try:
+            case_name = fixes[case_path]['case_name']
+        except KeyError:
+            if 'input_case_names' in DEBUG:
+                subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
+                input_case_name = raw_input('  No case name found. What should be here? ')
+                add_fix(case_path, input_case_name)
+                case_name = input_case_name
+
     if 'case_name' in DEBUG:
-        print "  Case name: %s" % s
-    return s
+        log_print("  Case name: %s" % case_name)
+    return case_name
 
 
 def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
@@ -226,11 +243,11 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
 
     if dates:
         if 'date' in DEBUG:
-            print "  Using date: %s of dates found: %s" % (max(dates), dates)
+            log_print("  Using date: %s of dates found: %s" % (max(dates), dates))
         return max(dates)
     else:
         if 'date' in DEBUG:
-            print "  No dates found"
+            log_print("  No dates found")
         return []
 
 
@@ -311,7 +328,7 @@ def get_docket_number(html, case_path=None, court=None):
                         out.write('%s\n' % case_path)
 
     if 'docket_number' in DEBUG:
-        print '  Docket Number: %s' % docket_number
+        log_print('  Docket Number: %s' % docket_number)
     return docket_number
 
 
@@ -489,7 +506,7 @@ def get_court_object(html, citations=None, case_path=None, judge=None):
                     out.write('%s\n' % case_path)
 
     if 'court' in DEBUG:
-        print '  Court: %s' % court
+        log_print('  Court: %s' % court)
 
     return court
 
@@ -522,7 +539,7 @@ def get_judge(html, case_path=None):
                     out.write('%s\n' % case_path)
 
     if 'judge' in DEBUG:
-        print '  Judge: %s' % judge
+        log_print('  Judge: %s' % judge)
 
     return judge
 
@@ -569,10 +586,11 @@ def import_law_box_case(case_path):
         date_filed=get_date_filed(clean_html_tree, citations=citations, case_path=case_path, court=court),
         precedential_status=get_precedential_status(),
         judges=judges,
+        download_URL=case_path,
     )
 
     cite = Citation(
-        case_name=get_case_name(complete_html_tree),
+        case_name=get_case_name(complete_html_tree, case_path),
         docket_number=get_docket_number(clean_html_tree, case_path=case_path, court=court)
     )
 
@@ -631,19 +649,19 @@ def needs_dup_check(doc):
 
 def find_duplicates(doc, case_path):
     """Return True if it should be saved, else False"""
-    print "Running duplicate checks..."
+    log_print("Running duplicate checks...")
 
     # 1. Is the item completely outside of the current corpus?
     if not needs_dup_check(doc):
-        print "  - Not a duplicate: Outside of date range for selected court."
+        log_print("  - Not a duplicate: Outside of date range for selected court.")
         return []
     else:
-        print "  - Could be a duplicate: Inside of date range for selected court."
+        log_print("  - Could be a duplicate: Inside of date range for selected court.")
 
     # 2. Can we find any duplicates and information about them?
     stats, candidates = dup_finder.get_dup_stats(doc)
     if len(candidates) == 0:
-        print "  - Not a duplicate: No candidate matches found."
+        log_print("  - Not a duplicate: No candidate matches found.")
         return []
     elif len(candidates) == 1:
         if doc.citation.docket_number and candidates[0].get('docketNumber') is not None:
@@ -652,20 +670,20 @@ def find_duplicates(doc, case_path):
                                         re.sub("(\D|0)", "", doc.citation.docket_number)) or \
                (re.sub("(\D|0)", "", doc.citation.docket_number) in
                                         re.sub("(\D|0)", "", candidates[0]['docketNumber'])):
-                print "  - Duplicate found: Only one candidate returned and docket number matches."
+                log_print("  - Duplicate found: Only one candidate returned and docket number matches.")
                 return [candidates[0]['id']]
             else:
-                print "  - Not a duplicate: Only one candidate but docket number differs."
+                log_print("  - Not a duplicate: Only one candidate but docket number differs.")
                 return []
         else:
-            print "  - Skipping docket_number dup check."
+            log_print("  - Skipping docket_number dup check.")
 
         if doc.citation.case_name == candidates[0].get('caseName'):
-            print "  - Duplicate found: Only one candidate and case name is a perfect match."
+            log_print("  - Duplicate found: Only one candidate and case name is a perfect match.")
             return [candidates[0]['id']]
 
         if dup_helpers.case_name_in_candidate(doc.citation.case_name, candidates[0].get('caseName')):
-            print "  - Duplicate found: All words in new document's case name are in the candidate's case name (%s)" % candidates[0].get('caseName')
+            log_print("  - Duplicate found: All words in new document's case name are in the candidate's case name (%s)" % candidates[0].get('caseName'))
             return [candidates[0]['id']]
 
     else:
@@ -673,36 +691,39 @@ def find_duplicates(doc, case_path):
         if doc.citation.docket_number:
             dups_by_docket_number = dup_helpers.find_same_docket_numbers(doc, candidates)
             if len(dups_by_docket_number) > 1:
-                print "  - Duplicates found: %s candidates matched by docket number." % len(dups_by_docket_number)
+                log_print("  - Duplicates found: %s candidates matched by docket number." % len(dups_by_docket_number))
                 return [can['id'] for can in dups_by_docket_number]
             elif len(dups_by_docket_number) == 1:
-                print "  - Duplicate found: Multiple candidates returned, but one matched by docket number."
+                log_print("  - Duplicate found: Multiple candidates returned, but one matched by docket number.")
                 return [dups_by_docket_number[0]['id']]
             else:
-                print "  - Could be a duplicate: Unable to find good match via docket number."
+                log_print("  - Could be a duplicate: Unable to find good match via docket number.")
         else:
-            print "  - Skipping docket_number dup check."
+            log_print("  - Skipping docket_number dup check.")
 
     # 3. Filter out obviously bad cases and then pass remainder forward for manual review.
-    print "  - Using filtering stats: %s" % stats
-    filtered_candidates = dup_helpers.filter_by_stats(candidates, stats)
+
+    filtered_candidates, filtered_stats = dup_helpers.filter_by_stats(candidates, stats)
+    log_print("  - %s candidates before filtering. With stats: %s" % (stats['candidate_count'], stats))
+    log_print("  - %s candidates after filtering. Using filtered stats: %s" % (filtered_stats['candidate_count'], filtered_stats))
     if len(filtered_candidates) == 0:
-        print "  - Not a duplicate: After filtering no good candidates remained."
+        log_print("  - Not a duplicate: After filtering no good candidates remained.")
         return []
-    elif len(filtered_candidates) == 1 and stats['cos_sims'][0] > 0.98:
-        print "  - Duplicate found: One candidate after filtering and cosine similarity is high (%s)" % stats['cos_sims'][0]
+    elif len(filtered_candidates) == 1 and filtered_stats['cos_sims'][0] > 0.93:
+        log_print("  - Duplicate found: One candidate after filtering and cosine similarity is high (%s)" % filtered_stats['cos_sims'][0])
         return [filtered_candidates[0]['id']]
     else:
         duplicates = []
         for k in range(0, len(filtered_candidates)):
             # Have to determine by "hand"
-            print "  %s) Case name: %s" % (k + 1, doc.citation.case_name)
-            print "                %s" % filtered_candidates[k]['caseName']
-            print "      Docket nums: %s" % doc.citation.docket_number
-            print "                   %s" % filtered_candidates[k].get('docketNumber', 'No docket number')
-            print "      Candidate URL: %s" % case_path
-            print "      Match URL: https://www.courtlistener.com%s" % \
-                  (filtered_candidates[k]['absolute_url'])
+            log_print("  %s) Case name: %s" % (k + 1, doc.citation.case_name))
+            log_print("                 %s" % filtered_candidates[k]['caseName'])
+            log_print("      Docket nums: %s" % doc.citation.docket_number)
+            log_print("                   %s" % filtered_candidates[k].get('docketNumber', 'None'))
+            log_print("      Cosine Similarity: %s" % filtered_stats['cos_sims'][k])
+            log_print("      Candidate URL: %s" % case_path)
+            log_print("      Match URL: https://www.courtlistener.com%s" %
+                                         (filtered_candidates[k]['absolute_url']))
 
             choice = raw_input("Is this a duplicate? [Y/n]: ")
             choice = choice or "y"
@@ -710,13 +731,13 @@ def find_duplicates(doc, case_path):
                 duplicates.append(filtered_candidates[k]['id'])
 
         if len(duplicates) == 0:
-            print "  - Not a duplicate: Manual determination found no matches."
+            log_print("  - Not a duplicate: Manual determination found no matches.")
             return []
         elif len(duplicates) == 1:
-            print "  - Duplicate found: Manual determination found one match."
+            log_print("  - Duplicate found: Manual determination found one match.")
             return [duplicates[0]]
         elif len(duplicates) > 1:
-            print "  - Duplicates found: Manual determination found %s matches." % len(duplicates)
+            log_print("  - Duplicates found: Manual determination found %s matches." % len(duplicates))
             return duplicates
 
 
@@ -780,36 +801,36 @@ def main():
             db.reset_queries()  # Else we leak memory when DEBUG is True
 
         if 'counter' in DEBUG:  #and i % 1000 == 0:
-            print "\n%s: Doing case (%s): file://%s" % (datetime.datetime.now(), i, case_path)
+            log_print("\n%s: Doing case (%s): file://%s" % (datetime.datetime.now(), i, case_path))
         try:
             doc = import_law_box_case(case_path)
-            with open('lawbox_progress_marker.txt', 'w') as marker:
-                marker.write(str(i + 1))  # Files are one-index, not zero-index
+            duplicates = find_duplicates(doc, case_path)
+            if not args.simulate:
+                if len(duplicates) == 0:
+                    doc.html_lawbox, blocked = anonymize(doc.html)
+                    doc.html = ''
+                    if blocked:
+                        doc.blocked = True
+                        doc.date_blocked = now()
+                        # Save nothing to the index for now (it'll get done when we find citations)
+                    save_doc_and_cite(doc, index=False)
+                if len(duplicates) == 1:
+                    dup_helpers.merge_cases_simple(doc, duplicates[0])
+                if len(duplicates) > 1:
+                    #complex_merge
+                    if 'log_multimerge' in DEBUG:
+                        with open('index_multimerge.txt', 'a') as log:
+                            log.write('%s\n' % case_path)
+            if args.resume:
+                # Don't change the progress marker unless you're in resume mode.
+                with open('lawbox_progress_marker.txt', 'w') as marker:
+                    marker.write(str(i + 1))  # Files are one-index, not zero-index
             with open('lawbox_fix_file.pkl', 'wb') as fix_file:
                 pickle.dump(fixes, fix_file)
             i += 1
         except Exception, err:
-            print traceback.format_exc()
+            log_print(traceback.format_exc())
             exit(1)
-
-        duplicates = find_duplicates(doc, case_path)
-        if not args.simulate:
-            if len(duplicates) == 0:
-                doc.html_lawbox, blocked = anonymize(doc.html)
-                doc.html = ''
-                if blocked:
-                    doc.blocked = True
-                    doc.date_blocked = now()
-                # Save nothing to the index for now (it'll get done when we find citations)
-                save_doc_and_cite(doc, index=False)
-            if len(duplicates) == 1:
-                dup_helpers.merge_cases_simple(doc, duplicates[0])
-            if len(duplicates) > 1:
-                #complex_merge
-                if 'log_multimerge' in DEBUG:
-                    with open('index_multimerge.txt', 'a') as log:
-                        log.write('%s\n' % case_path)
-
 
 if __name__ == '__main__':
     main()

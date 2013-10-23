@@ -216,7 +216,7 @@ def get_dup_stats(doc):
         # We just let candidates from step one get passed through by doing nothing.
         pass
 
-    stats['docket_match_count'] = len(candidates)
+    stats = {'candidate_count': len(candidates)}
 
     ##############################
     # 3: Find the best case name #
