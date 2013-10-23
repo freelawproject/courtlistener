@@ -26,8 +26,6 @@ LAWBOX PROJECT
    TODO: Sort out the new court picking interface.
          - Search page
          - view_case sidebar?
-   TODO: Check if indeed all documents are precedential or if there are any trouble-makers.
-   TODO: Work out the dup checker some more.
 
 
 2013-09-25:
