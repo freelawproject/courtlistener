@@ -3876,6 +3876,23 @@
   }
 },
 {
+  "pk": "nyfamct", 
+  "model": "search.court", 
+  "fields": {
+    "jurisdiction": "SS", 
+    "end_date": null, 
+    "citation_string": "N.Y. Fam. Ct.", 
+    "short_name": "New York Family Court", 
+    "in_use": true, 
+    "URL": "http://www.courts.state.ny.us/courts/cts-outside-nyc-FAMILY.shtml", 
+    "notes": "Lawbox", 
+    "date_modified": "2013-10-23T18:03:49.272Z", 
+    "full_name": "New York Family Court", 
+    "position": 366.966, 
+    "start_date": null
+  }
+},
+{
   "pk": "nynb", 
   "model": "search.court", 
   "fields": {

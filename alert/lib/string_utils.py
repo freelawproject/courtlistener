@@ -11,6 +11,8 @@ def anonymize(string):
 
     Converts SSNs, EIN and alienIDs to X's. Reports whether a modification was
     made, as a boolean.
+
+    TODO: Sometimes is over-eager when text like No. CV 12-4564456 comes along. Pull examples from DB and write tests.
     """
     string, ssn_replacements = re.subn(SSN_AND_ITIN, r"\1XXX-XX-XXXX\3", string)
     string, ien_replacements = re.subn(EIN, r"\1XX-XXXXXXX\3", string)
