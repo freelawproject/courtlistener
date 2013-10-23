@@ -8,20 +8,13 @@ import sys
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 
-from juriscraper.lib.parse_dates import parse_dates
 from alert.lib.string_utils import anonymize, trunc
-from alert.search.models import Citation, Court, Document, save_doc_and_cite
+from alert.search.models import Document, save_doc_and_cite
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 
 import datetime
 import re
 import subprocess
-import time
-import urllib2
-
-from lxml.html import fromstring, tostring
-from urlparse import urljoin
-
 
 BROWSER = 'firefox'
 

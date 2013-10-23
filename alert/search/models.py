@@ -442,3 +442,14 @@ class Document(models.Model):
 
     class Meta:
         db_table = "Document"
+
+
+def save_doc_and_cite(doc, index):
+    """Save a document and citation simultaneously.
+
+    Just a helper function to save everything neatly.
+    """
+    cite = doc.citation
+    cite.save(index=index)
+    doc.citation = cite
+    doc.save(index=index)
