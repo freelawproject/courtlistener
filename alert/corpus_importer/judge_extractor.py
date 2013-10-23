@@ -26,8 +26,8 @@ REASONS = {
 
 
 def get_judge_from_str(t):
-    """Returns the judge's name if the string looks like a judge. Else, returns False"""
-    judge = False
+    """Returns the judge's name if the string looks like a judge. Else, returns None"""
+    judge = None
 
     # From Blue Book, T11, plus a review of about 100,000 found "judges"
     judiciary_synonyms = ('curiam', 'judge', 'consultant', 'justice', 'referee', 'magistrate', 'j.', 'a.l.j.', 'arb.',
@@ -54,9 +54,9 @@ def get_judge_from_str(t):
     # Early abortion opportunities
     if len(words) > 100:
         # We're past the headnotes and into the paragraphs. Bail.
-        return False, REASONS[1]
+        return None, REASONS[1]
     if len(t) == 0:
-        return False, REASONS[0]
+        return None, REASONS[0]
 
     if t.lower().startswith('opinion by'):
         t = t.replace('OPINION BY ', '')
@@ -121,10 +121,10 @@ def get_judge_from_str(t):
                     # One last chance -- does it end with a judiciary_synonym?
                     pass
                 else:
-                    return False, REASONS[10]
+                    return None, REASONS[10]
         except IndexError:
             # The length of the string is too short.
-            return False, REASONS[0]
+            return None, REASONS[0]
 
         if [_ for _ in judiciary_synonyms if _ in t.lower()] and not re.search(bad_words_regex, t):
             if 'curiam' in t.lower():
@@ -141,23 +141,23 @@ def get_judge_from_str(t):
                 judge = titlecase(judge.upper())
                 reason = REASONS[7]
 
-    # Late abortion opportunities. Uses early termination of conditionals to bail if judge == False.
+    # Late abortion opportunities. Uses early termination of conditionals to bail if judge == None
     if judge and ord(judge[0]) > 127:
         # Unicode madness
-        return False, REASONS[2]
+        return None, REASONS[2]
     if judge and (t.startswith('the ') or judge.startswith('the ')):
-        return False, REASONS[18]
+        return None, REASONS[18]
     if judge and re.search(bad_starting_words_regex, judge):
         # Bad first word/characters
-        return False, REASONS[3]
+        return None, REASONS[3]
     if re.search(bad_words_regex, t):
         # Bad word found. Abort
         if 'the following is the order of judge' in t.lower():
             pass
         else:
-            return False, REASONS[4]
+            return None, REASONS[4]
     if judge and len(judge) == 0:
-        return False, REASONS[0]
+        return None, REASONS[0]
 
     if judge:
         # Cleanup
@@ -174,4 +174,4 @@ def get_judge_from_str(t):
 
         return judge, reason
     else:
-        return False, REASONS[9]
+        return None, REASONS[9]

@@ -87,7 +87,7 @@
             <h3 class="bottom pointer arrow-down-before">View Original</h3>
             <p class="shown">
                 {% if doc.download_URL or doc.local_path %}
-                    {% if doc.source != 'R' %}
+                    {% if doc.source != 'R' and doc.source != 'L' and doc.source != 'LR' %}
                         {% if doc.download_URL and result.source != 'R' %}
                             <a href="{{doc.download_URL}}" class="visitable">From the court</a>
                         {% endif %}
@@ -204,14 +204,13 @@
         </div>
 
 
-
-        <h3>{{court}}</h3>
+        <h3>{{ court }}</h3>
         <p class="bottom">
             <strong>Date Filed:</strong>
             {% if doc.date_filed %}
-                {{doc.date_filed|date:"l, F jS, Y"}}
+                {{doc.date_filed|date:"F jS, Y"}}
             {% else %}
-                Unknown date
+                Unknown Date
             {% endif %}
         </p>
         <p class="bottom">
@@ -247,25 +246,34 @@
             {% endif %}
         </p>
         <p>
-            <strong title="SHA1 Hash of the binary or text">Fingerprint:</strong> {{doc.sha1}}
+            <strong title="SHA1 Hash of the binary or text">Fingerprint:</strong> {{ doc.sha1 }}
         </p>
         <br>
         {% if doc.extracted_by_ocr %}
             <div class="notice span-17 last">
                 <p class="bottom">The text of this document was obtained by analyzing a scanned
-                document provided by the court. As a result it may have typos,
-                and you may prefer reading the original.</p>
+                document provided by the court. As a result it may have typos, and you may prefer
+                reading the original.</p>
             </div>
             <div class="clearfix"></div>
         {% endif %}
-        <div id="text">
-            {% if doc.html_with_citations %}
-                {{ doc.html_with_citations|safe }}
-            {% elif doc.html %}
-                {{doc.html|safe}}
-            {% else %}
-                <pre>{{doc.plain_text}}</pre>
-            {% endif %}
+
+        {% if doc.source == 'L' or doc.source == 'LC' or doc.source == 'LR' or doc.source == 'LCR' %}
+        <div id='lawbox-text'>
+        {% elif doc.source == 'R' or doc.source == 'CR' %}
+        <div id='resource-org-text'>
+        {% else %}
+        <div id='default-text'>
+        {% endif %}
+        {% if doc.html_with_citations %}
+            {{ doc.html_with_citations|safe }}
+        {% elif doc.html_lawbox %}
+            {{ doc.html_lawbox|safe }}
+        {% elif doc.html %}
+            {{doc.html|safe}}
+        {% else %}
+            <pre>{{doc.plain_text}}</pre>
+        {% endif %}
         </div>
     </article>
 {% endblock %}

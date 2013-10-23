@@ -39,9 +39,10 @@ DOCUMENT_SOURCES = (
     ('C', 'court website'),
     ('R', 'resource.org'),
     ('CR', 'court website merged with resource.org'),
-    ('LB', 'lawbox'),
-    ('LBM', 'lawbox merged with court'),
-    ('LBRM', 'lawbox merged with resource.org'),
+    ('L', 'lawbox'),
+    ('LC', 'lawbox merged with court'),
+    ('LR', 'lawbox merged with resource.org'),
+    ('LCR', 'lawbox merged with court and resource.org'),
     ('M', 'manual input'),
     ('A', 'internet archive'),
 )
@@ -160,8 +161,8 @@ class Citation(models.Model):
         blank=True
     )
     docket_number = models.CharField(
-        "the docket number",
-        max_length=1000,  # sometimes these are consolidated, hence they need to be long.
+        "the docket numbers",
+        max_length=5000,  # sometimes these are consolidated, hence they need to be long (was 50, 100, 300, 1000).
         blank=True,
         null=True
     )
@@ -328,7 +329,8 @@ class Document(models.Model):
     )
     judges = models.TextField(
         help_text="The judges that brought the opinion",
-        blank=True
+        blank=True,
+        null=True,
     )
     nature_of_suit = models.TextField(
         help_text="The nature of the suit, can be codes or laws or whatever",
