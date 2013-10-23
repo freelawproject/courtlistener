@@ -32,7 +32,7 @@ $(document).ready(function() {
             for (var i = 0; i < checked_courts.length; i++) {
                 values.push(checked_courts[i].name.split('_')[1]);
             }
-            var court_str = values.join("|");
+            var court_str = values.join(" ");
             var el = jQuery('<input/>', {
                 value: court_str,
                 name: 'court'
