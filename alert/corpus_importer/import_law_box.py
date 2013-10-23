@@ -664,6 +664,7 @@ def find_duplicates(doc, case_path):
         log_print("  - Not a duplicate: No candidate matches found.")
         return []
     elif len(candidates) == 1:
+
         if doc.citation.docket_number and candidates[0].get('docketNumber') is not None:
             # One in the other or vice versa
             if (re.sub("(\D|0)", "", candidates[0]['docketNumber']) in
@@ -673,7 +674,15 @@ def find_duplicates(doc, case_path):
                 log_print("  - Duplicate found: Only one candidate returned and docket number matches.")
                 return [candidates[0]['id']]
             else:
-                log_print("  - Not a duplicate: Only one candidate but docket number differs.")
+                if doc.court_id == 'cit':
+                    # CIT documents have neutral citations in the database. Look that up and compare against that.
+                    candidate_doc = Document.objects.get(pk=candidates[0]['id'])
+                    if doc.citation.neutral_cite and candidate_doc.citation.neutral_cite:
+                        if candidate_doc.citation.neutral_cite in doc.citation.docket_number:
+                            log_print('  - Duplicate found: One candidate from CIT and its neutral citation matches the new document\'s docket number.')
+                            return [candidates[0]['id']]
+                else:
+                    log_print("  - Not a duplicate: Only one candidate but docket number differs.")
                 return []
         else:
             log_print("  - Skipping docket_number dup check.")
