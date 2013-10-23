@@ -3,7 +3,7 @@ from alert.alerts.forms import CreateAlertForm
 from alert.lib import search_utils
 from alert.lib import sunburnt
 from alert.lib.bot_detector import is_bot
-from alert.search.forms import SearchForm
+from alert.search.forms import SearchForm, COURTS
 
 from alert import settings
 from django.contrib import messages
@@ -36,6 +36,9 @@ def _clean_form(request, cd):
                                      (after.year, after.month, after.day)
     mutable_get['court_all'] = cd['court_all']
     mutable_get['sort'] = cd['sort']
+
+    for court in COURTS:
+        mutable_get['court_%s' % court[0]] = cd['court_%s' % court[0]]
 
     return SearchForm(mutable_get)
 
@@ -84,6 +87,7 @@ def show_results(request):
         search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
+            search_form = _clean_form(request, cd)
             try:
                 results_si = conn.raw_query(**search_utils.build_main_query(cd))
                 court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(cd)
@@ -102,8 +106,6 @@ def show_results(request):
                     {'error': True, 'private': True},
                     RequestContext(request)
                 )
-
-            search_form = _clean_form(request, cd)
 
         else:
             # Invalid form, send it back
