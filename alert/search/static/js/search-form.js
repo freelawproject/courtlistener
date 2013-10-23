@@ -18,18 +18,32 @@ $(document).ready(function() {
 
         // Gather all form fields that are necessary
         var gathered = $();
+
+        // Add the input boxes that aren't empty
+        gathered = gathered.add($('.external-input:not([type=checkbox])').filter(function () {
+            return this.value != "";
+        }));
+
+        // Put these last, so they don't make the URL totally insane.
         if ($('#id_court_all:checked').length == 0) {
-            // Add the court checkboxes that are selected
-            gathered = gathered.add($('.court-checkbox:checked'));
+            // Add the court checkboxes that are selected as a single input element
+            var checked_courts = $('.court-checkbox:checked');
+            var values = [];
+            for (var i = 0; i < checked_courts.length; i++) {
+                values.push(checked_courts[i].name.split('_')[1]);
+            }
+            var court_str = values.join("|");
+            var el = jQuery('<input/>', {
+                value: court_str,
+                name: 'court'
+            });
+            gathered = gathered.add(el);
         }
         if ($('.status-checkbox:checked').length <= $('.status-checkbox').length) {
             // Add the status checkboxes that are selected
             gathered = gathered.add($('.status-checkbox:checked'));
         }
-        // Add the input boxes that aren't empty
-        gathered = gathered.add($('.external-input:not([type=checkbox])').filter(function () {
-            return this.value != "";
-        }));
+
         gathered.each(function () {
             // Make and submit a hidden input element for all gathered fields
             var el = $(this);

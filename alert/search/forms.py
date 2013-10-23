@@ -30,6 +30,9 @@ INPUT_FORMATS = [
     '%Y/%m',     # '2006/10'
 ]
 
+# Query the DB so we can build up check boxes for each court in use.
+COURTS = Court.objects.filter(in_use=True).values_list('courtUUID', 'short_name')
+
 
 class SearchForm(forms.Form):
     q = forms.CharField(
@@ -69,6 +72,10 @@ class SearchForm(forms.Form):
         widget=forms.CheckboxInput(
             attrs={'class': 'external-input court-checkbox left'}
         )
+    )
+    court = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput()
     )
     filed_after = FloorDateField(
         required=False,
@@ -130,10 +137,7 @@ class SearchForm(forms.Form):
         checkbox fields with dynamic names coming from the database, we need to interact directly with the fields dict.
         """
 
-        # Query the DB so we can build up check boxes for each court in use.
-        courts = Court.objects.filter(in_use=True).values_list('courtUUID', 'short_name')
-
-        for court in courts:
+        for court in COURTS:
             self.fields['court_' + court[0]] = forms.BooleanField(
                 label=court[1],
                 required=False,
@@ -212,7 +216,14 @@ class SearchForm(forms.Form):
                 cleaned_data['filed_before'] = after
                 cleaned_data['filed_after'] = before
 
-        # 2. Make sure that the user has selected at least one facet for each
+        # 2. Convert the value in the court field to the various court_* fields
+        court_str = cleaned_data.get('court')
+        if court_str:
+            court_ids = court_str.split('|')
+            for id in court_ids:
+                cleaned_data['court_%s' % id] = True
+
+        # 3. Make sure that the user has selected at least one facet for each
         #    taxonomy. Note that this logic must be paralleled in search_utils.make_facet_variable
         court_bools = [v for k, v in cleaned_data.iteritems()
                        if k.startswith('court_')]
