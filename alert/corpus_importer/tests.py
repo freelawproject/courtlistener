@@ -1,5 +1,6 @@
 # coding=utf-8
 from django.test import TestCase
+from alert.corpus_importer.dup_helpers import case_name_in_candidate
 from alert.corpus_importer.import_law_box import get_docket_number
 from alert.corpus_importer.judge_extractor import get_judge_from_str, REASONS
 
@@ -30,14 +31,14 @@ class JudgeExtractionTest(TestCase):
             ('Before INGRAHAM, Circuit Judge, and SEALS and COWAN, District Judges.',
              (u'Ingraham, Circuit Judge, and Seals and Cowan, District Judges', REASONS[14])),
             ('J. H. Reddy, Chattanooga, Tenn., James F. Neal, John J. Hooker, Sr., Special Atty., Nashville, Tenn., '
-             'Charles W. Shaffer, Jr., Dept. of Justice, Washington, D. C., for the United States.', (False, REASONS[10])),
+             'Charles W. Shaffer, Jr., Dept. of Justice, Washington, D. C., for the United States.', (None, REASONS[10])),
             ('MR. JUSTICE CLARK delivered the opinion of the Court.', (u'Clark', REASONS[5])),
             ('Justice THEIS delivered the judgment of the court, with opinion.',
              (u'Theis', REASONS[5])),
             ('Kennedy, J., announced the judgment of the Court and delivered the opinion of the Court, except...',
              (u'Kennedy', REASONS[5])),
             ('Kendy, J., announced the judgment of the Court ', (u'Kendy', REASONS[5])),
-            ('U.S.C. 22, JUSTICE Eats Apples', (False, REASONS[3])),  # Has a judiciary word, but not at the end.
+            ('U.S.C. 22, JUSTICE Eats Apples', (None, REASONS[3])),  # Has a judiciary word, but not at the end.
             ('PER CURIAM', (u'Per Curiam', REASONS[6])),
             ('Per Curiam', (u'Per Curiam', REASONS[6])),
             ('L. CHANDLER WATSON, Jr., Bankruptcy Judge.',
@@ -49,12 +50,12 @@ class JudgeExtractionTest(TestCase):
             ('SIMPSON, C.J.', (u'Simpson', REASONS[7])),
             ('LANSING, Judge.', (u'Lansing', REASONS[7])),
             ('BRAUN, PLAINTIFF, Kendrick, Finkbeiner, Schafer & Murphy (by Michael J. W. Horn), for defendants.',
-             (False, REASONS[4])),
+             (None, REASONS[4])),
             ('OPINION BY MR. JUSTICE JONES, May 25953', (u'Mr. Justice Jones', REASONS[8])),
             ('Opinion by Justice ROSS', (u'Ross', REASONS[8])),
             ('SPENCE, J.', (u'Spence', REASONS[7])),
             ('Spencer, J.,', (u'Spencer', REASONS[7])),
-            ('SPENCE', (False, REASONS[9])),
+            ('SPENCE', (None, REASONS[9])),
             ('Nourse, P. J.', (u'Nourse', REASONS[7])),
             ('A. SPENCE, J.', (u'A. Spence', REASONS[7])),
             ('Van SICKLE, District Judge.', (u'Van Sickle', REASONS[7])),
@@ -72,63 +73,74 @@ class JudgeExtractionTest(TestCase):
             ('FOTH, C.', (u'Foth', REASONS[7])),
             ('Robert L. KRECHEVSKY, Bankruptcy Judge.', (u'Robert L. Krechevsky', REASONS[7])),
             ('Ernstrom & Dreste, Rochester, NY (J. William Ernstrom, of counsel), for Northland Associates, Inc.',
-             (False, REASONS[10])),
+             (None, REASONS[10])),
 
             # memorandum looks like a bad_word, but it's not
             ('BREITEL and Judge JASEN, GABRIELLI, JONES, WACHTLER and COOKE Concur in Memorandum',
              (u'Breitel and Judge Jasen, Gabrielli, Jones, Wachtler and Cooke Concur in Memorandum',
               REASONS[16])),
             # but if it starts with Memorandum, it's no good.
-            ('Memorandum of Decision on R.C. Allen Instruments', (False, REASONS[10])),
+            ('Memorandum of Decision on R.C. Allen Instruments', (None, REASONS[10])),
             ('CONCLUDING That the Aggravating Circumstances Outweighed the Mitigating Circumstances.',
-             (False, REASONS[4])),
+             (None, REASONS[4])),
             ('Considering Factor (A), "The Ultimate and Decisive Test," We Examine Factors (E), (F) and (H)',
-             (False, REASONS[10])),
-            ('Decision Denying Application to Retain Rebecca J. Habbert', (False, REASONS[10])),
-            ("Accepting Appellant's Pleas of Guilty, the Record Reflects the Following Occurred:",(False, REASONS[10])),
-            ('ADDRESSING Ourselves to the Substance of These Questions We Think It Appropriate', (False, REASONS[4])),
+             (None, REASONS[10])),
+            ('Decision Denying Application to Retain Rebecca J. Habbert', (None, REASONS[10])),
+            ("Accepting Appellant's Pleas of Guilty, the Record Reflects the Following Occurred:",(None, REASONS[10])),
+            ('ADDRESSING Ourselves to the Substance of These Questions We Think It Appropriate', (None, REASONS[4])),
             ('ADMITTING a Statement as a Dying Declaration, the Trial Court Must Make a Preliminary',
-             (False, REASONS[4])),
-            ('AMENDED Findings of Fact', (False, REASONS[4])),
-            ('AMICUS Curiae Brief Was Filed by Bruce A. Olsen', (False, REASONS[4])),
-            ('LAWRENCE S. Robbins Argued the Cause for Appellants. With Him', (False, REASONS[4])),
-            ('DISCUSSING These Cases We Must Separate Them According to The', (False, REASONS[4])),
-            ('EXAMINING These and the Other Defenses Which Comdisco Has Raised, However', (False, REASONS[4])),
-            ('GOING Into the Question of the Public',(False, REASONS[4])),
+             (None, REASONS[4])),
+            ('AMENDED Findings of Fact', (None, REASONS[4])),
+            ('AMICUS Curiae Brief Was Filed by Bruce A. Olsen', (None, REASONS[4])),
+            ('LAWRENCE S. Robbins Argued the Cause for Appellants. With Him', (None, REASONS[4])),
+            ('DISCUSSING These Cases We Must Separate Them According to The', (None, REASONS[4])),
+            ('EXAMINING These and the Other Defenses Which Comdisco Has Raised, However', (None, REASONS[4])),
+            ('GOING Into the Question of the Public',(None, REASONS[4])),
             # Going is bad, but foregoing is good
             ('JUDGE BLATCHFORD After Stating the Facts in the Foregoing Language',
              (u'Judge Blatchford', REASONS[7])),
             ('DECISION Granting Judgment to the Trustee in Bankruptcy for Comprehensive Business Systems',
-             (False, REASONS[4])),
-            ('THESE Arguments That Both Sides Would Be Allowed Wide Latitude in Arguing', (False, REASONS[4])),
-            ('DECISION Denying Application to Retain Rebecca J. Habbert', (False, REASONS[4])),
-            ('TRIAL, Appellant Argued That It Was a Third-Party Benefic', (False, REASONS[4])),
-            ('FINDINGS of Fact and Conclusion of Law on Eastgroup', (False, REASONS[4])),
-            ('PROCEEDING Further a General Description of the Area Will Be Helpful', (False, REASONS[4])),
-            ('TURNING Them Over to His Counsel on the Morning of July 24', (False, REASONS[4])),
+             (None, REASONS[4])),
+            ('THESE Arguments That Both Sides Would Be Allowed Wide Latitude in Arguing', (None, REASONS[4])),
+            ('DECISION Denying Application to Retain Rebecca J. Habbert', (None, REASONS[4])),
+            ('TRIAL, Appellant Argued That It Was a Third-Party Benefic', (None, REASONS[4])),
+            ('FINDINGS of Fact and Conclusion of Law on Eastgroup', (None, REASONS[4])),
+            ('PROCEEDING Further a General Description of the Area Will Be Helpful', (None, REASONS[4])),
+            ('TURNING Them Over to His Counsel on the Morning of July 24', (None, REASONS[4])),
             # Starting with a number.
-            ('1975, SECTION 594 Did Not Describe What Kind judge ', (False, REASONS[3])),
+            ('1975, SECTION 594 Did Not Describe What Kind judge ', (None, REASONS[3])),
             # Starting with a regex special char
-            ('("DGCL") SEEKING judge Advancement of Reasonable Attorney\'s Fees', (False, REASONS[3])),
-            ('"DGCL") SEEKING judge Advancement of Reasonable Attorney\'s Fees', (False, REASONS[3])),
-            (':"DGCL") SEEKING judge Advancement of Reasonable Attorney\'s Fees', (False, REASONS[3])),
-            ('>"DGCL") SEEKING judge Advancement of Reasonable Attorney\'s Fees', (False, REASONS[3])),
-            ('["DGCL") SEEKING judge Advancement of Reasonable Attorney\'s Fees', (False, REASONS[3])),
-            ('{"DGCL") SEEKING judge Advancement of Reasonable Attorney\'s Fees', (False, REASONS[3])),
-            ('}"DGCL") SEEKING judge Advancement of Reasonable Attorney\'s Fees', (False, REASONS[3])),
+            ('("DGCL") SEEKING judge Advancement of Reasonable Attorney\'s Fees', (None, REASONS[3])),
+            ('"DGCL") SEEKING judge Advancement of Reasonable Attorney\'s Fees', (None, REASONS[3])),
+            (':"DGCL") SEEKING judge Advancement of Reasonable Attorney\'s Fees', (None, REASONS[3])),
+            ('>"DGCL") SEEKING judge Advancement of Reasonable Attorney\'s Fees', (None, REASONS[3])),
+            ('["DGCL") SEEKING judge Advancement of Reasonable Attorney\'s Fees', (None, REASONS[3])),
+            ('{"DGCL") SEEKING judge Advancement of Reasonable Attorney\'s Fees', (None, REASONS[3])),
+            ('}"DGCL") SEEKING judge Advancement of Reasonable Attorney\'s Fees', (None, REASONS[3])),
             # Starts with "The", but is a valid form
             ('The Cause Was Argued Before Anderson', (u'Anderson', REASONS[17])),
             # Lowercase 'the' is no good, however
-            ('the Water Heater Was Installed, the Slates, j.', (False, REASONS[18])),
+            ('the Water Heater Was Installed, the Slates, j.', (None, REASONS[18])),
             # Starting with "There " is no good, but "Theresa" is
-            ('THERE is No Merit in the Claim of Improper Comment of the Commonwealth, J.', (False, REASONS[3])),
+            ('THERE is No Merit in the Claim of Improper Comment of the Commonwealth, J.', (None, REASONS[3])),
             ('THERESA CRAFT, J.', (u'Theresa Craft', REASONS[7])),
             # Nothing with utf-8 as first char is good.
-            (u'\xe2\xa7\xe2\xa7 19-1-102(1), JUDGE', (False, REASONS[2])),
+            (u'\xe2\xa7\xe2\xa7 19-1-102(1), JUDGE', (None, REASONS[2])),
             # Argued Before is ok, but Argued is not.
             ('Argued before Lissner', (u'Lissner', REASONS[17])),
-            ('ARGUED: amy louise howe, before so-and-so, Justice', (False, REASONS[3])),
+            ('ARGUED: amy louise howe, before so-and-so, Justice', (None, REASONS[3])),
         )
 
         for q, a in pairs:
             self.assertEqual(tuple(get_judge_from_str(q)), a)
+
+
+class CaseNameMatchTest(TestCase):
+    def test_pairs(self):
+        pairs = (
+            (('Testacular', 'Testacular'), True),
+            (("Ass'n Managers v. Lissner", 'Association Managers v. Lissner'), False),
+        )
+
+        for q, a in pairs:
+            self.assertEqual(case_name_in_candidate(*q), a)

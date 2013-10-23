@@ -174,8 +174,7 @@ nav ul li {
 }
 
 /* New case view styling, including citations */
-#text pre, .citation {
-    font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+#default-text pre, .citation {
     white-space: pre;
 }
 
@@ -385,43 +384,45 @@ a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
 
 
 /* Display cases from Resources.org neatly */
-span.num {
+#resource-org-text span.num {
     position: absolute;
     color: #999999;
 }
-p.indent {
+#resource-org-text p.indent {
     position: relative;
     margin-left: 2em;
     margin-top: 1.5em;
 }
-div.footnotes {
+#resource-org-text div.footnotes {
     border-top: 1px dotted black;
     padding-top: 1em;
 }
-div.footnote > p {
+#resource-org-text div.footnote > p {
     margin-left: 2em;
 }
-div.prelims {
+#resource-org-text div.prelims {
     background: none repeat scroll 0 0 #eeeeee;
     border: 1px solid #dddddd;
     padding-top: 1.5em;
 }
-div.prelims p {
+#resource-org-text div.prelims p {
     position: relative;
     margin-left: 2em;
     margin-right: 2em;
     margin-top: 0em;
 }
-p.parties {
+#resource-org-text p.parties {
     text-align: center;
+    font-size: 1.25em;
+    font-weight: bold;
 }
 
-div.footnote a.footnote {
+#resource-org-text div.footnote a.footnote {
     /* Needs proper color use */
     color: #000099;
     position: absolute;
 }
-p a.footnote {
+#resource-org-text p a.footnote {
     /* make footnotes superscript */
     vertical-align: text-top;
     font-size: 70%;
@@ -429,6 +430,38 @@ p a.footnote {
 }
 /* End Resource.org display CSS */
 
+
+/* Start lawbox display CSS */
+#lawbox-text h1 {
+    font-size: 1.25em;
+    padding-top: 0.75em;
+    padding-bottom: 0.75em;
+    font-weight: bold;
+}
+#lawbox-text h2 {
+    font-size: 1.25em;
+    font-weight: bold;
+}
+span.star-pagination {
+    color: #999999;
+}
+span.star-pagination::after {
+    display: inline;
+    position: relative;
+    content: "•";
+    float: left;
+    left: -1em;
+    font-size: 1em;
+    color: #8a1f11;
+    width: 0px;
+}
+
+blockquote span.star-pagination::after {
+    left: -2.5em;
+}
+
+
+/* End lawbox display CSS */
 
 input.wide-title {
     width: 390px;

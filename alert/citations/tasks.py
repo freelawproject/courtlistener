@@ -15,7 +15,9 @@ from celery import task
 
 def get_document_citations(document):
     """Identify and return citations from the html or plain text of the document."""
-    if document.html:
+    if document.html_lawbox:
+        citations = find_citations.get_citations(document.html_lawbox)
+    elif document.html:
         citations = find_citations.get_citations(document.html)
     elif document.plain_text:
         citations = find_citations.get_citations(document.plain_text, html=False)
@@ -25,8 +27,8 @@ def get_document_citations(document):
 
 
 def create_cited_html(document, citations):
-    if document.html:
-        new_html = document.html
+    if document.html_lawbox or document.html:
+        new_html = document.html_lawbox or document.html
         for citation in citations:
             new_html = re.sub(citation.as_regex(), citation.as_html(), new_html)
     elif document.plain_text:
