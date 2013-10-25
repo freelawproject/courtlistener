@@ -31,7 +31,7 @@ INPUT_FORMATS = [
 ]
 
 # Query the DB so we can build up check boxes for each court in use.
-COURTS = Court.objects.filter(in_use=True).values_list('courtUUID', 'short_name')
+COURTS = Court.objects.filter(in_use=True).values('pk', 'short_name', 'jurisdiction')
 
 
 class SearchForm(forms.Form):
@@ -138,8 +138,8 @@ class SearchForm(forms.Form):
         """
 
         for court in COURTS:
-            self.fields['court_' + court[0]] = forms.BooleanField(
-                label=court[1],
+            self.fields['court_' + court['pk']] = forms.BooleanField(
+                label=court['short_name'],
                 required=False,
                 initial=True,
                 widget=forms.CheckboxInput(attrs={'checked': 'checked'})
@@ -168,7 +168,7 @@ class SearchForm(forms.Form):
     #     is that most changes made here will also need to be made in _clean_form(). Failure to do that will result in
     #     the query being processed correctly (search results are all good), but the form on the UI won't be cleaned up
     #     for the user, making things rather confusing.
-    #  3. We do some cleanup work in search_utils.make_facets_variable(). The work that's done there is used to check
+    #  3. We do some cleanup work in search_utils.make_stats_variable(). The work that's done there is used to check
     #     or uncheck the boxes in the sidebar, so if you tweak how they work you'll need to tweak this function.
     # In short: This is a nasty area. Comments this long are a bad sign for the intrepid developer.
     def clean_q(self):

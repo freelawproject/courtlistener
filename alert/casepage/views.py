@@ -4,7 +4,6 @@ from alert.lib.encode_decode import ascii_to_num
 from alert.lib import magic
 from alert.lib import search_utils
 from alert.lib.string_utils import trunc
-from alert.search.forms import SearchForm
 from alert.search.models import Court, Document
 from alert.favorites.forms import FavoriteForm
 from alert.favorites.models import Favorite
@@ -77,45 +76,17 @@ def view_case(request, court, pk, casename):
     it can populate the form on the page. If it is not a favorite, we send the
     unbound form.
     """
-    # Decode the id string back to an int
-    pk = ascii_to_num(pk)
-
     # Look up the court, document, title and favorite information
-    doc = get_object_or_404(Document, pk=pk)
+    doc = get_object_or_404(Document, pk=ascii_to_num(pk))
     ct = get_object_or_404(Court, pk=court)
     caption = make_caption(doc)
     citation_string = make_citation_string(doc)
     title = '%s, %s' % (trunc(doc.citation.case_name, 100), citation_string)
-    user = request.user
-
-    if request.GET:
-        search_form = SearchForm(request.GET)
-    else:
-        search_form = SearchForm()
     get_string = search_utils.make_get_string(request)
-
-    if search_form.is_bound and search_form.is_valid():
-        cd = search_form.cleaned_data
-        court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(cd)
-        # Create facet variables that can be used in our templates
-        court_facets = search_utils.make_facets_variable(
-                         court_facet_fields, search_form, 'court_exact', 'court_')
-        status_facets = search_utils.make_facets_variable(
-                         stat_facet_fields, search_form, 'status_exact', 'stat_')
-    else:
-        # Unbound or invalid search form
-        initial_values = {}
-        for k, v in dict(search_form.fields).iteritems():
-            initial_values[k] = v.initial
-        court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(initial_values)
-        court_facets = search_utils.make_facets_variable(
-                         court_facet_fields, search_form, 'court_exact', 'court_')
-        status_facets = search_utils.make_facets_variable(
-                         stat_facet_fields, search_form, 'status_exact', 'stat_')
 
     try:
         # Get the favorite, if possible
-        fave = Favorite.objects.get(doc_id=doc.documentUUID, users__user=user)
+        fave = Favorite.objects.get(doc_id=doc.documentUUID, users__user=request.user)
         favorite_form = FavoriteForm(instance=fave)
     except (ObjectDoesNotExist, TypeError):
         # Not favorited or anonymous user
@@ -127,21 +98,18 @@ def view_case(request, court, pk, casename):
           'citation').order_by('-citation_count', '-date_filed')[:5]
 
     return render_to_response(
-                  'view_case.html',
-                  {'title': title,
-                   'caption': caption,
-                   'citation_string': citation_string,
-                   'doc': doc,
-                   'court': ct,
-                   'count': count,
-                   'favorite_form': favorite_form,
-                   'search_form': search_form,
-                   'get_string': get_string,
-                   'court_facets': court_facets,
-                   'status_facets': status_facets,
-                   'private': doc.blocked,
-                   'cited_by_trunc': cited_by_trunc},
-                  RequestContext(request))
+        'view_case.html',
+        {'title': title,
+         'caption': caption,
+         'citation_string': citation_string,
+         'doc': doc,
+         'court': ct,
+         'favorite_form': favorite_form,
+         'get_string': get_string,
+         'private': doc.blocked,
+         'cited_by_trunc': cited_by_trunc},
+        RequestContext(request)
+    )
 
 
 def view_case_citations(request, pk, casename):

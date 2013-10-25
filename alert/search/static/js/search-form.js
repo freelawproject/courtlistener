@@ -99,14 +99,6 @@ $(document).ready(function() {
         }
     });
 
-    $('.sidebar-section h3').click(function() {
-        // Toggles the sidebar sections
-        $(this).siblings('.hidden').toggle('fast');
-        $(this).siblings('.shown').toggle('fast');
-        $(this).toggleClass('arrow-right-before');
-        $(this).toggleClass('arrow-down-before');
-    });
-
     $('#create-alert-header').click(function(){
         // Puts the cursor in the alertName box when the create alert section is expanded.
         $('#id_alertName').focus();
