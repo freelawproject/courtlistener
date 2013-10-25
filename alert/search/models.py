@@ -11,9 +11,9 @@ import os
 # changes here need to be mirrored in the coverage page view and Solr configs
 # Note that spaces cannot be used in the keys, or else the SearchForm won't work
 JURISDICTIONS = (
-    ('F', 'Federal'),
-    ('FB', 'Federal Bankruptcy'),
+    ('F', 'Federal Appellate'),
     ('FD', 'Federal District'),
+    ('FB', 'Federal Bankruptcy'),
     ('FS', 'Federal Special'),
     ('S', 'State Supreme'),
     ('SA', 'State Appellate'),
@@ -342,7 +342,13 @@ class Document(models.Model):
     )
     html = models.TextField(
         help_text="HTML of the document",
-        blank=True
+        blank=True,
+        null=True,
+    )
+    html_lawbox = models.TextField(
+        help_text='HTML of lawbox documents',
+        blank=True,
+        null=True,
     )
     html_with_citations = models.TextField(
         help_text="HTML of the document with citation links",

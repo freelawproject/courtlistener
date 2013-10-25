@@ -17,9 +17,7 @@
         <meta name="msapplication-starturl" content="https://www.courtlistener.com"/>
         <meta name="msapplication-navbutton-color" content="#6683B7"/>
 
-        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/style.css" type="text/css" media="screen, projection">
-        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/jquery-ui-1.10.3.custom.css" type="text/css" media="screen, projection">
-        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/override.css" type="text/css" media="screen, projection">
+        <link href="https://netdna.bootstrapcdn.com/font-awesome/4.0.0/css/font-awesome.css" rel="stylesheet">
         <script src="{{ STATIC_PREFIX }}js/modernizr-2.0.6.min.js"></script>
         {% block privacy %}
             {% if private %}
@@ -31,6 +29,10 @@
         {% endblock %}
         <title>{% block title %}CourtListener.com{% endblock %}</title>
         {% block head %}{% endblock %}
+        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/style.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/override.css" type="text/css" media="screen, projection">
+        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/jquery-ui-1.10.3.custom.css" type="text/css"
+              media="screen, projection">
     </head>
 
     <body>
@@ -84,6 +86,7 @@
                     {% endblock %}
                 </header>
                 <hr>
+                <hr class="space">
             {% endblock %}
 
             {% block sidebar %}
@@ -140,7 +143,7 @@
              {% endblock %}
         </div>
 
-        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
+        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
         <script>window.jQuery || document.write('<script src="{{ STATIC_PREFIX }}js/jquery-1.6.2.min.js"><\/script>')</script>
         <script type="text/javascript" src="{{ STATIC_PREFIX }}js/jquery-ui-1.10.3.custom.min.js"></script>
 

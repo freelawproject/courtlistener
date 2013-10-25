@@ -37,38 +37,19 @@
             <div id="extra-search-fields">
                 {{ search_form.sort }}
                 <div id="extra-sidebar-fields">
+                    {#  Modal is at bottom of results, so it loads last. #}
+                    <h4 id="jurisdiction-header"
+                        class="bottom pointer"
+                        data-toggle="modal"
+                        data-target="#court-picker">
+                            Jurisdictions <i class="gray fa fa-external-link"></i>
+                    </h4>
+                    <p class="bottom"><span id="jurisdiction-count">All</span> jurisdictions selected</p>
+                    <hr class="space">
                     <h4 class="bottom">Case name</h4>
                     <p class="bottom span-6">{{ search_form.case_name }}</p>
                     <h4 class="bottom">Judge</h4>
                     <p class="bottom span-6">{{ search_form.judge }}</p>
-                    <hr class="space">
-                    <h4 class="bottom">United States Courts</h4>
-
-                    <div class="sidebar-checkbox">
-                        {{ search_form.court_all }}
-                        <label
-                                for="id_court_all"
-                                class="pointer {% if count == 0 %}gray{% endif %}">
-                            {{ search_form.court_all.label }}&nbsp;<span
-                                class="gray small">({{ count|intcomma }})</span>
-                        </label>
-                    </div>
-                    {% for court in court_facets %}
-                        <div class="sidebar-checkbox">
-                            <input
-                                    id="id_{{ court.1 }}"
-                                    type="checkbox"
-                                    name="{{ court.1 }}"
-                                    class="external-input court-checkbox left"
-                                    {% if court.3 %}checked="checked"{% endif %}>
-                            <label
-                                    for="id_{{ court.1 }}"
-                                    class="pointer {% if court.2 == 0 %}gray{% endif %}">
-                                {{ court.0 }}&nbsp;<span class="gray small">({{ court.2|intcomma }})</span>
-                            </label>
-                        </div>
-                    {% endfor %}
-
                     <hr class="space">
                     <h4 class="bottom">Precedential Status</h4>
                     {% for status in status_facets %}

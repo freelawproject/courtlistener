@@ -38,7 +38,7 @@ def _clean_form(request, cd):
     mutable_get['sort'] = cd['sort']
 
     for court in COURTS:
-        mutable_get['court_%s' % court[0]] = cd['court_%s' % court[0]]
+        mutable_get['court_%s' % court['pk']] = cd['court_%s' % court['pk']]
 
     return SearchForm(mutable_get)
 
@@ -90,12 +90,9 @@ def show_results(request):
             search_form = _clean_form(request, cd)
             try:
                 results_si = conn.raw_query(**search_utils.build_main_query(cd))
-                court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(cd)
-                # Create facet variables that can be used in our templates
-                court_facets = search_utils.make_facets_variable(
-                    court_facet_fields, search_form, 'court_exact', 'court_')
-                status_facets = search_utils.make_facets_variable(
-                    stat_facet_fields, search_form, 'status_exact', 'stat_')
+                stat_facet_fields = search_utils.place_facet_queries(cd, conn)
+                status_facets = search_utils.make_stats_variable(stat_facet_fields, search_form)
+                courts = search_utils.merge_form_with_courts(COURTS, search_form)
                 if not is_bot(request):
                     tally_stat('search.results')
             except Exception, e:
@@ -126,11 +123,9 @@ def show_results(request):
             initial_values[k] = v.initial
         # Make the queries
         results_si = conn.raw_query(**search_utils.build_main_query(initial_values))
-        court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(initial_values)
-        court_facets = search_utils.make_facets_variable(
-            court_facet_fields, search_form, 'court_exact', 'court_')
-        status_facets = search_utils.make_facets_variable(
-            stat_facet_fields, search_form, 'status_exact', 'stat_')
+        stat_facet_fields = search_utils.place_facet_queries(initial_values, conn)
+        status_facets = search_utils.make_stats_variable(stat_facet_fields, search_form)
+        courts = search_utils.merge_form_with_courts(COURTS, search_form)
 
     # Set up pagination
     try:
@@ -159,10 +154,9 @@ def show_results(request):
         {'search_form': search_form,
          'alert_form': alert_form,
          'results': paged_results,
-         'court_facets': court_facets,
+         'courts': courts,
          'status_facets': status_facets,
          'get_string': get_string,
-         'count': count,
          'private': private},
         RequestContext(request)
     )

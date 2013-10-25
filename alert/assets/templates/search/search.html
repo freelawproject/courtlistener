@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load text_filters %}
+{% load partition_util %}
 {% load humanize %}
 
 {% block title %}
@@ -16,10 +17,13 @@
             <link rel="alternate" type="application/rss+xml" title="Atom feed for {{ court.0 }}" href="/feed/court/{{ court.4 }}/">
         {% endfor %}
     {% endif %}
+    <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/bootstrap.css" type="text/css"
+          media="screen, projection">
 {% endblock %}
 
 {% block footer-scripts %}
     <script type="text/javascript" src="{{ STATIC_URL }}js/search-form.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.min.js"></script>
     <script type="text/javascript">
        $(document).ready(function() {
            $('.auto-focus:first').focus();
@@ -27,11 +31,12 @@
                // Makes the sort drop down work when changed.
                $('#search-form').submit();
            });
-           {% if count > 0 %}
+           {% if results.paginator.count > 0 %}
                $('#id_sort').appendTo('#result-order-chooser-placeholder');
                $('#id_sort').show();
            {% endif %}
        });
+
     </script>
 {% endblock %}
 
@@ -40,13 +45,15 @@
     <div class="span-6 append-1" id="sidebar">
         {% if not error %}
         <div class="sidebar-section">
-            {% if not alert_form.errors %}
-                <h3 class="pointer arrow-right-before" id="create-alert-header">Create alert</h3>
-                <div id="hidden-create-alert" class="hidden">
-            {% else %}
-                <h3 class="pointer arrow-down-before" id="create-alert-header">Create alert</h3>
-                <div id="hidden-create-alert" class="shown">
-            {% endif %}
+            <h3><span>Refine Your Query</span></h3>
+            <form action="/" method="get" id="sidebar-search-form">
+                <div class="shown" id="sidebar-facet-placeholder"></div>
+              <hr class="space">
+            </form>
+        </div>
+
+        <div class="sidebar-section">
+            <h3 id="create-alert-header"><span>Create an Alert</span></h3>
             {% if user.is_authenticated %}
                 {% if get_string %}
                     {% if alert_form.errors %}
@@ -54,6 +61,7 @@
                             <p class="bottom">Please fix the errors below.</p>
                         </div>
                     {% endif %}
+                    <p>Create an alert to get regular notifications about this query whenever there are new results.</p>
                     <form action="" method="post">{% csrf_token %}
                         {{ alert_form.alertText }}
                         <p class="span-6 append-1">
@@ -80,30 +88,19 @@
                         </p>
                         <p>
                             {{ alert_form.sendNegativeAlert }}
-                            <label for="id_sendNegativeAlert">Send me an email even when there are no hits</label>
+                            <label for="id_sendNegativeAlert">Send me an email even if there are no new hits</label>
                             <br>
                         </p>
                         <button type="submit" class="button title" name="alertSave">Create alert</button>
                     </form>
                 {% else %}
-                    <p>To create an alert, first place a query.</p>
+                    <p>To create an alert, place a query.</p>
                 {% endif %}
             {% else %}
                 {# User is not authenticated #}
                 <p>To get daily alerts for this search, <a href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}page={{ results.number }}">sign in</a> or
                 <a href="{% url "register" %}?next={{ request.path }}?next={{ request.path }}?{{ get_string|urlencode }}page={{ results.number }}">register</a> as a new user.</p>
             {% endif %}
-                </div>
-        </div>
-
-        <div class="sidebar-section">
-            <h3 class="pointer arrow-down-before">Refine your search</h3>
-            <div class="shown">
-                <form action="/" method="get" id="sidebar-search-form">
-                    <div class="shown" id="sidebar-facet-placeholder"></div>
-                  <hr class="space">
-                </form>
-            </div>
         </div>
         {% endif %}
     </div>
@@ -245,5 +242,132 @@
                 </div>
             </div>
         {% endif %}
+    </div>
+
+    <div class="modal" id="court-picker" role="dialog" aria-hidden="true">
+        <div class="modal-dialog" id="modal-court-picker">
+            <div class="modal-content">
+                <h2>Select Jurisdictions</h2>
+                <input id="court-filter" class="left" type="text" placeholder="Filter Jurisdictions" autocomplete="off"/>
+                <ul class="nav nav-tabs" id="court-picker-tabs">
+                    <li class="active"><a href="#tab-federal-appellate" data-toggle="tab">Federal Appellate</a></li>
+                    <li><a href="#tab-federal-district" data-toggle="tab">Federal District</a></li>
+                    <li><a href="#tab-bankruptcy" data-toggle="tab">Bankruptcy</a></li>
+                    <li><a href="#tab-state" data-toggle="tab">State</a></li>
+                    <li><a href="#tab-special" data-toggle="tab">Special</a></li>
+                </ul>
+
+                <div class="tab-content">
+                    <div class="tab-pane active" id="tab-federal-appellate">
+                        {% for row in courts.federal|rows:4 %}
+                            <div class="span-5 {% if forloop.last %}last{% else %}append-1{% endif %}">
+                                {% for court in row %}
+                                    <div class="sidebar-checkbox">
+                                        <input
+                                                id="id_{{ court.pk }}"
+                                                name="{{ court.pk }}"
+                                                {% if court.checked %}checked="checked"{% endif %}
+                                                type="checkbox"
+                                                class="external-input court-checkbox left">
+                                        <label
+                                                for="id_{{ court.pk }}"
+                                                class="pointer">
+                                            {{ court.short_name }}
+                                        </label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="tab-pane" id="tab-federal-district">
+                        {% for row in courts.district|rows:4 %}
+                            <div class="span-5 {% if forloop.last %}last{% else %}append-1{% endif %}">
+                                {% for court in row %}
+                                    <div class="sidebar-checkbox">
+                                        <input
+                                                id="id_{{ court.pk }}"
+                                                name="{{ court.pk }}"
+                                                {% if court.checked %}checked="checked"{% endif %}
+                                                type="checkbox"
+                                                class="external-input court-checkbox left">
+                                        <label
+                                                for="id_{{ court.pk }}"
+                                                class="pointer">
+                                            {{ court.short_name }}
+                                        </label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="tab-pane" id="tab-bankruptcy">
+                        {% for row in courts.bankruptcy|rows:4 %}
+                            <div class="span-5 {% if forloop.last %}last{% else %}append-1{% endif %}">
+                                {%  for court in row %}
+                                    <div class="sidebar-checkbox">
+                                        <input
+                                                id="id_{{ court.pk }}"
+                                                name="{{ court.pk }}"
+                                                {% if court.checked %}checked="checked"{% endif %}
+                                                type="checkbox"
+                                                class="external-input court-checkbox left">
+                                        <label
+                                                for="id_{{ court.pk }}"
+                                                class="pointer">
+                                            {{ court.short_name }}
+                                        </label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="tab-pane" id="tab-state">
+                        {% for col_bundle in courts.state %}
+                            <div class="span-7 {% if forloop.last %}last{% else %}append-1{% endif %}">
+                                {% for court_bundle in col_bundle %}
+                                    {% for court in court_bundle %}
+                                        <div class="sidebar-checkbox {% if court.jurisdiction == 'SA' or court.jurisdiction == 'SS' %}appeals-court{% endif %}">
+                                            <input
+                                                    id="id_{{ court.pk }}"
+                                                    name="{{ court.pk }}"
+                                                    {% if court.checked %}checked="checked"{% endif %}
+                                                    type="checkbox"
+                                                    class="external-input court-checkbox left">
+                                            <label
+                                                    for="id_{{ court.pk }}"
+                                                    class="pointer">
+                                                {{ court.short_name }}
+                                            </label>
+                                        </div>
+                                    {% endfor %}
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="tab-pane" id="tab-special">
+                        {% for row in courts.special|rows:4 %}
+                            <div class="span-5 {% if forloop.last %}last{% else %}append-1{% endif %}">
+                                {% for court in row %}
+                                    <div class="sidebar-checkbox">
+                                        <input
+                                                id="id_{{ court.pk }}"
+                                                name="{{ court.pk }}"
+                                                {% if court.checked %}checked="checked"{% endif %}
+                                                type="checkbox"
+                                                class="external-input court-checkbox left">
+                                        <label
+                                                for="id_{{ court.pk }}"
+                                                class="pointer">
+                                            {{ court.short_name }}
+                                        </label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true" class="float-right">Apply</button>
+            </div>
+        </div>
     </div>
 {% endblock %}

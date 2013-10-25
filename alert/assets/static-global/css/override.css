@@ -76,14 +76,11 @@ span.bold {
 }
 
 .round {
-    -moz-border-radius: 6px 6px 6px 6px;
     -webkit-border-radius: 6px;
     border-radius: 6px;
 }
 
 .round-bottom {
-    -moz-border-radius-bottomright: 6px;
-    -moz-border-radius-bottomleft: 6px;
     -webkit-border-bottom-right-radius: 6px;
     -webkit-border-bottom-left-radius: 6px;
     border-bottom-right-radius: 6px;
@@ -245,7 +242,16 @@ a.button:active {
 }
 
 .sidebar-section {
-    margin-bottom: 2em;
+    margin-bottom: 3em;
+}
+
+.sidebar-section h3 {
+    margin-bottom: 0.6em;
+}
+
+.sidebar-section h3 > span {
+    padding: 0.5em 0em 0.1em;
+    border-bottom: 1px solid #ddd;
 }
 
 div.sidebar-checkbox {
@@ -266,7 +272,7 @@ div.sidebar-checkbox input {
     vertical-align: bottom;
     position: relative;
     top: 1px;
-    *overflow: hidden;
+    overflow: hidden;
 }
 
 input.court-checkbox, input.status-checkbox {
@@ -487,30 +493,75 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 }
 
 /* Save favorites and modal box configs */
-#modal-rel {
+.modal-rel {
     position: relative;
 }
+
+.modal-fixed {
+    position: fixed;
+    top: 20%;
+    width: 100%;
+    z-index: 11;
+}
+
+.modal {
+    box-shadow: 2px 2px 5px #000000;
+    border: 1px solid #dddddd;
+}
+
+.modal-content {
+    padding: 1em;
+}
+
+#modal-court-picker {
+    width: 934px;
+}
+
+#modal-court-picker label {
+    font-weight: normal;
+}
+
+#modal-court-picker #tab-state .appeals-court {
+    margin-left: 15px;
+}
+
+#court-picker-tabs {
+    text-align: right;
+}
+
+#modal-court-picker #court-picker-tabs li {
+    /* Has very specific selector to beat specific one in Bootstrap */
+    float: none;
+    text-align: right;
+    display: inline-block;
+}
+#court-picker-tabs > li a {
+    text-transform: uppercase;
+
+}
+
 #modal-save-favorite, #modal-logged-out {
     z-index: 10;
     top: -10px;
     left: 10px;
-    box-shadow: 2px 2px 5px #000000;
     position: absolute;
-    padding: 1em;
-    border: 1px solid #DDDDDD;
     background: white;
 }
+
 #modal-logged-out {
     top: -10px;
     left: 10px;
     padding: 2em;
 }
+
 #save-favorite-text-area {
     height: auto;
 }
+
 #modal-save-favorite .save-favorite-button {
     margin-right: 0px;
 }
+
 #favorites-bottom-section {
     margin-top: 4em;
 }
@@ -548,16 +599,6 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     background-repeat    : no-repeat;
     display: inline;
     float: left;
-}
-.arrow-down-before:before {
-    content: '';
-    display: inline-block;
-    border-color: #6683B7 transparent transparent transparent;
-    border-style: solid;
-    border-width: 8px 5px 5px 5px;
-    height: 0;
-    margin: 2px 5px 0 0;
-    width: 0;
 }
 .arrow-right-before:before {
     content: '';

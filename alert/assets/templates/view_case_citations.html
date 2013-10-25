@@ -3,7 +3,7 @@
 
 {# Shown on document citation pages. #}
 
-{% block title %}Cases citing {{ title }} - CourtListener.com{% endblock %}
+{% block title %}Cases Citing {{ title }} - CourtListener.com{% endblock %}
 {% block description %}{{ title }}{% endblock %}
 
 {% block head %}
@@ -14,7 +14,7 @@
     <div class="span-6 append-1" id="sidebar">
         <div class="sidebar-section">
             <h4 class="bottom">
-                <a href="{{ doc.get_absolute_url }}?{{ request.META.QUERY_STRING }}">&laquo; Back to Document</a>
+                <p>&larr; <a href="{{ doc.get_absolute_url }}?{{ request.META.QUERY_STRING }}">Back to Document</a></p>
             </h4>
         </div>
     </div>
