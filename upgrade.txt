@@ -21,11 +21,6 @@ most recent at the top.
 We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
-
-Court Picker
- - Update any locations where short_name was previously used, if it should instead now use full_name
-
-
 DEPLOYMENT
  - Check opinion count before beginning
  - Rebuild the bulk data file and delete the old ones
