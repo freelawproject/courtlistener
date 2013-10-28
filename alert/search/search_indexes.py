@@ -22,7 +22,7 @@ class SearchDocument(object):
         if doc.date_filed is not None:
             self.dateFiled = datetime.combine(doc.date_filed, time())  # Midnight, PST
         self.citeCount = doc.citation_count
-        self.court = doc.court.short_name
+        self.court = doc.court.full_name
         self.court_id = doc.court.courtUUID
         self.court_citation_string = doc.court.citation_string
         try:

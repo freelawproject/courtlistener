@@ -13,7 +13,7 @@ def build_court_dicts(courts):
     court_dicts = [{'pk': 'all',
                     'short_name': u'All Courts'}]
     court_dicts.extend([{'pk': court.pk,
-                         'short_name': court.short_name, }
+                         'short_name': court.full_name, }
                          #'notes': court.notes}
                         for court in courts])
     return court_dicts
