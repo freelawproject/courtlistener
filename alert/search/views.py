@@ -34,7 +34,6 @@ def _clean_form(request, cd):
         after = cd['filed_after']
         mutable_get['filed_after'] = '%s-%02d-%02d' % \
                                      (after.year, after.month, after.day)
-    mutable_get['court_all'] = cd['court_all']
     mutable_get['sort'] = cd['sort']
 
     for court in COURTS:
@@ -92,7 +91,7 @@ def show_results(request):
                 results_si = conn.raw_query(**search_utils.build_main_query(cd))
                 stat_facet_fields = search_utils.place_facet_queries(cd, conn)
                 status_facets = search_utils.make_stats_variable(stat_facet_fields, search_form)
-                courts = search_utils.merge_form_with_courts(COURTS, search_form)
+                courts, court_count = search_utils.merge_form_with_courts(COURTS, search_form)
                 if not is_bot(request):
                     tally_stat('search.results')
             except Exception, e:
@@ -125,7 +124,7 @@ def show_results(request):
         results_si = conn.raw_query(**search_utils.build_main_query(initial_values))
         stat_facet_fields = search_utils.place_facet_queries(initial_values, conn)
         status_facets = search_utils.make_stats_variable(stat_facet_fields, search_form)
-        courts = search_utils.merge_form_with_courts(COURTS, search_form)
+        courts, court_count = search_utils.merge_form_with_courts(COURTS, search_form)
 
     # Set up pagination
     try:
@@ -155,6 +154,7 @@ def show_results(request):
          'alert_form': alert_form,
          'results': paged_results,
          'courts': courts,
+         'court_count': court_count,
          'status_facets': status_facets,
          'get_string': get_string,
          'private': private},

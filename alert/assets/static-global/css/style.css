@@ -23,7 +23,7 @@ blockquote, q {quotes:"" "";}
 a img {border:none;}
 
 /* typography.css */
-html {font-size:100.01%; overflow-y: scroll; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+html {font-size:100.01%; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
 body {font-size:75%;color:#222;background:#fff;font-family:"Helvetica Neue", Arial, Helvetica, sans-serif;}
 h1, h2, h3, h4, h5, h6 {font-weight:normal;color:#111;}
 h1 {font-size:3em;line-height:1;margin-bottom:0.5em;}
@@ -300,7 +300,7 @@ html.lt8>body p code {*white-space:normal;}
 	.hide {display:none;}
 	a:link, a:visited {background:transparent;font-weight:700;text-decoration:underline;}
 	a:link:after, a:visited:after {content:" (" attr(href) ")";font-size:90%;}
-	abbr[title]:after { content: " (" attr(title) ")"; }	
+	abbr[title]:after { content: " (" attr(title) ")"; }
 }
 
 
@@ -323,11 +323,11 @@ html.lt8>body p code {*white-space:normal;}
 }
 
 
-/* -------------------------------------------------------------- 
-  
+/* --------------------------------------------------------------
+
    buttons.css
    * Gives you some great CSS-only buttons.
-   
+
    Created by Kevin Hale [particletree.com]
    * particletree.com/features/rediscovering-the-button-element
 
@@ -339,7 +339,7 @@ a.button, button {
   /*float:left;*/
   margin: 0.7em 0.5em 0.7em 0;
   padding:5px 10px 5px 7px;   /* Links */
-  
+
   border:1px solid #dedede;
   border-top:1px solid #eee;
   border-left:1px solid #eee;

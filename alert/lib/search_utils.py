@@ -100,17 +100,23 @@ def merge_form_with_courts(COURTS, search_form):
     """
 
     # Are any of the checkboxes checked?
-    no_facets_selected = not any([field.value() for field in search_form
-                                  if field.html_name.startswith('court_')])
+    checked_statuses = [field.value() for field in search_form
+                        if field.html_name.startswith('court_')]
+    no_facets_selected = not any(checked_statuses)
+    all_facets_selected = all(checked_statuses)
+    if no_facets_selected or all_facets_selected:
+        court_count = 'All'
+    else:
+        court_count = len([status for status in checked_statuses if status is True])
+
     for field in search_form:
         if no_facets_selected:
             for court in COURTS:
                 court['checked'] = True
         else:
             for court in COURTS:
-                # We're merging two lists, so we have to loop through the
-                # second one to find the right value. Luckily, this kind
-                # of thing is incredibly fast.
+                # We're merging two lists, so we have to do a nested loop
+                # to find the right value.
                 if 'court_%s' % court['pk'] == field.html_name:
                     court['checked'] = field.value()
 
@@ -122,40 +128,52 @@ def merge_form_with_courts(COURTS, search_form):
         'state': [],
         'special': [],
     }
-    bundle = []
+    bap_bundle = []
+    b_bundle = []
+    state_bundle = []
     state_bundles = []
     for court in COURTS:
         if court['jurisdiction'] == 'F':
             court['tab'] = 'federal'
         elif court['jurisdiction'] == 'FD':
             court['tab'] = 'district'
-        elif court['jurisdiction'] == 'FB':
+        elif court['jurisdiction'] in ['FB', 'FBP']:
             court['tab'] = 'bankruptcy'
         elif court['jurisdiction'].startswith('S'):
             court['tab'] = 'state'  # Merge all state courts.
         elif court['jurisdiction'] in ['FS', 'C']:
             court['tab'] = 'special'
 
-        if court['tab'] != 'state':
-            courts[court['tab']].append(court)
-        else:
+        if court['tab'] == 'bankruptcy':
+            # Bankruptcy gets bundled into BAPs and regular courts.
+            if court['jurisdiction'] == 'FBP':
+                bap_bundle.append(court)
+            else:
+                b_bundle.append(court)
+        elif court['tab'] == 'state':
             # State courts get bundled by supreme courts
             if court['jurisdiction'] == 'S':
-                if bundle:
-                    # Append the bundle of courts
-                    state_bundles.append(bundle)
-                bundle = [court]
+                # Whenever we hit a state supreme court, we append the previous bundle
+                # and start a new one.
+                if state_bundle:
+                    state_bundles.append(state_bundle)
+                state_bundle = [court]
             else:
-                bundle.append(court)
+                state_bundle.append(court)
+        else:
+            courts[court['tab']].append(court)
+    state_bundles.append(state_bundle)  # appends the final state bundle after the loop ends. Hack?
+
+    # Put the bankruptcy bundles in the courts dict
+    courts['bankruptcy'].append(bap_bundle)
+    courts['bankruptcy'].append(b_bundle)
 
     # Divide the state bundles into the correct partitions
-    state_col_breaks = [0, 15, 33, len(state_bundles)]
-    i = 0
-    while i < len(state_col_breaks) - 1:
-        courts['state'].append(state_bundles[state_col_breaks[i]:state_col_breaks[i + 1]])
-        i += 1
+    courts['state'].append(state_bundles[:15])
+    courts['state'].append(state_bundles[15:34])
+    courts['state'].append(state_bundles[34:])
 
-    return courts
+    return courts, court_count
 
 
 def make_date_query(cd):

@@ -38,13 +38,14 @@
                 {{ search_form.sort }}
                 <div id="extra-sidebar-fields">
                     {#  Modal is at bottom of results, so it loads last. #}
-                    <h4 id="jurisdiction-header"
-                        class="bottom pointer"
-                        data-toggle="modal"
-                        data-target="#court-picker">
-                            Jurisdictions <i class="gray fa fa-external-link"></i>
-                    </h4>
-                    <p class="bottom"><span id="jurisdiction-count">All</span> jurisdictions selected</p>
+                    <div class="pointer"
+                         data-toggle="modal"
+                         data-target="#court-picker">
+                        <h4 class="bottom">
+                            Select Jurisdictions <i class="gray fa fa-external-link"></i>
+                        </h4>
+                        <p class="bottom">{{ court_count }} jurisdictions selected</p>
+                    </div>
                     <hr class="space">
                     <h4 class="bottom">Case name</h4>
                     <p class="bottom span-6">{{ search_form.case_name }}</p>
