@@ -91,7 +91,7 @@ def invalidate_dumps_by_date_and_court(date, court):
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
     as needed."""
-    pk = models.CharField(
+    id = models.CharField(
         'a unique ID for each court as used in URLs',
         max_length=15,
         primary_key=True)
