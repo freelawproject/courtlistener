@@ -1,7 +1,10 @@
 import os
+import lxml
 import requests
+import StringIO
 import time
 from alert import settings
+from alert.lib.sunburnt import SolrError
 
 
 def create_solr_core(core_name, data_dir='/tmp/solr/data'):
@@ -52,3 +55,21 @@ def swap_solr_core(current_core, desired_core):
     r = requests.get('http://localhost:8983/solr/admin/cores', params=params)
     if r.status_code != 200:
         print "Problem swapping cores. Got status_code of %s. Check the Solr logs for details." % r.status_code
+
+
+def get_solr_core_status(core='all'):
+    """Get the status for the solr core as an XML document."""
+    if core == 'all':
+        core_query = ''
+    else:
+        core_query = '&core=%s' % core
+    r = requests.get('http://localhost:8983/solr/admin/cores?action=STATUS%s' % core_query)
+    if r.status_code != 200:
+        print "Problem getting the core status. Got status_code of %s. Check the Solr logs for details." % r.status_code
+
+    try:
+        solr_config = lxml.etree.parse(StringIO.StringIO(r.content))
+    except lxml.etree.XMLSyntaxError, e:
+        raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
+
+    return solr_config
