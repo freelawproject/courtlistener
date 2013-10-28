@@ -21,9 +21,15 @@ most recent at the top.
 We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
-DEPLOYMENT
- - Check opinion count before beginning
- - Rebuild the bulk data file and delete the old ones
+2013-10-28:
+ - The lawbox code is ready to go at long last. To make it live and to update all the needed resources on the site:
+   - Check opinion count before beginning
+   - Pull the latest code, migrate, static files, and touch it live.
+   - Import lawbox files using the script.
+        - They are now in the database, but not the index.
+   - Delete the old dump files and kick off the rebuild dump_all_cases.py
+   - Kick off cl_add_citations_to_docs to make the data go live in the index.
+   - Monitor disk space, htop, iotop.
 
 2013-10-21:
  - Removes resource.org polling. If you have used this, remove the cached file in the robots directory and any
