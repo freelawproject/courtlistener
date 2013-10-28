@@ -24,7 +24,6 @@
                 <table class="settings-table">
                     <thead>
                         <tr>
-                            <th></th>
                             <th>Name</th>
                             <th colspan="2">Notes</th>
                         </tr>
@@ -34,22 +33,15 @@
                             <tr>
                                 <td>
                                     <a href="{{ favorite.doc_id.get_absolute_url }}">
-                                        <img
-                                            src="{{ STATIC_URL }}png/page_go.png"
-                                            title="View the opinion"
-                                            height="16"
-                                            width="16"
-                                        />
+                                        {{favorite.name }}
                                     </a>
-                                </td>
-                                <td>
-                                    {{favorite.name }}
                                 </td>
                                 <td>
                                     {{ favorite.notes|default:"(none)"|truncatewords:"500" }}
                                 </td>
                                 <td>
                                     <a href="/favorite/edit/{{ favorite.id }}/">edit / delete</a>
+                                    <i class="fa fa-pencil gray"></i>
                                 </td>
                             </tr>
                         {% endfor %}

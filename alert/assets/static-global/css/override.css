@@ -26,7 +26,6 @@ Sets up all the overrides or additional CSS that the site uses.
 }
 
 .settings-nav-item {
-    float: left;
     margin-right: 1em;
 }
 

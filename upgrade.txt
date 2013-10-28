@@ -23,13 +23,12 @@ We welcome a conversion of these notes to a better process using Fabric.
 ----------------------------
 
 Court Picker
- - TODO: Does the favorites modal still work?
  - Update any locations where short_name was previously used, if it should instead now use full_name
- - Check favorites in the user's profile that they have the right image.
- - Rebuild the bulk data file and delete the old ones
+
 
 DEPLOYMENT
  - Check opinion count before beginning
+ - Rebuild the bulk data file and delete the old ones
 
 2013-10-21:
  - Removes resource.org polling. If you have used this, remove the cached file in the robots directory and any

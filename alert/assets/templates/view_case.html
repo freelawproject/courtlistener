@@ -25,7 +25,10 @@
     <div class="span-6 append-1" id="sidebar">
         {%  if get_string %}
             <div class="sidebar-section">
-                <h4><p>&larr; <a href="/?{{ request.META.QUERY_STRING }}">Back to Search Results</a></p></h4>
+                <h4>
+                    <i class="fa fa-arrow-circle-o-left gray"></i>
+                    <a href="/?{{ request.META.QUERY_STRING }}">Back to Search Results</a>
+                </h4>
             </div>
         {% endif %}
 
@@ -44,7 +47,10 @@
         <div class="{% if not favorite_form.instance.doc_id %}hidden{% endif %} sidebar-section" id="sidebar-notes">
             <div>
                 <h3 class="inline"><span>Your Notes</span></h3>
-                <p class="inline" data-toggle="modal" data-target="#modal-save-favorite">(<a href="#favorite-editor">edit</a>)</p>
+                <p class="inline" data-toggle="modal" data-target="#modal-save-favorite">
+                    (<a href="#favorite-editor">edit</a>)
+                     <i class="fa fa-pencil gray"></i>
+                </p>
                 <p id="sidebar-notes-text">
                     {{ favorite_form.instance.notes|default:"(none)" }}
                 </p>
