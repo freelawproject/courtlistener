@@ -23,13 +23,13 @@ We welcome a conversion of these notes to a better process using Fabric.
 ----------------------------
 
 Court Picker
- - TODO: Why does a second scroll bar appear when the modal pops up?
  - TODO: Does the favorites modal still work?
- - TODO: Change name from modalrific
- - TODO: Pull out the BAP courts
- - TODO: Add the check-all/none feature
+ - Update any locations where short_name was previously used, if it should instead now use full_name
+ - Check favorites in the user's profile that they have the right image.
+ - Rebuild the bulk data file and delete the old ones
 
-
+DEPLOYMENT
+ - Check opinion count before beginning
 
 2013-10-21:
  - Removes resource.org polling. If you have used this, remove the cached file in the robots directory and any

@@ -17,13 +17,12 @@ class FavoriteForm(ModelForm):
             'doc_id': forms.HiddenInput(),
             'name': forms.TextInput(
                 attrs={
-                    'class': 'span-10 last',
                     'id': 'save-favorite-name-field',
                     'tabindex': '1',
                     'maxlength': '100'}),
             'notes': forms.Textarea(
                 attrs={
-                    'class': 'span-10 last bottom',
+                    'class': 'bottom',
                     'id': 'save-favorite-notes-field',
                     'tabindex': '2',
                     'maxlength': '600'})

@@ -14,6 +14,7 @@ JURISDICTIONS = (
     ('F', 'Federal Appellate'),
     ('FD', 'Federal District'),
     ('FB', 'Federal Bankruptcy'),
+    ('FBP', 'Federal Bankruptcy Panel'),
     ('FS', 'Federal Special'),
     ('S', 'State Supreme'),
     ('SA', 'State Appellate'),

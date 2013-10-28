@@ -52,8 +52,11 @@ span.bold {
 	color: gray;
 }
 
-.gray {
+.gray, .grey {
     color: gray;
+}
+.gold {
+    color: gold;
 }
 
 .left {
@@ -493,17 +496,6 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 }
 
 /* Save favorites and modal box configs */
-.modal-rel {
-    position: relative;
-}
-
-.modal-fixed {
-    position: fixed;
-    top: 20%;
-    width: 100%;
-    z-index: 11;
-}
-
 .modal {
     box-shadow: 2px 2px 5px #000000;
     border: 1px solid #dddddd;
@@ -516,12 +508,23 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 #modal-court-picker {
     width: 934px;
 }
+#modal-court-picker p.inline {
+    margin-left: 10px;
+}
+#modal-court-picker span.close {
+    font-size: 2em;
+    position: relative;
+    top: -0.45em;
+    padding: 0.3em 0.7em 0.1em;
+    left: 0.4em;
+}
 
 #modal-court-picker label {
     font-weight: normal;
 }
 
 #modal-court-picker #tab-state .appeals-court {
+    /* Indent appeals courts in the state tab. */
     margin-left: 15px;
 }
 
@@ -532,14 +535,22 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 #modal-court-picker #court-picker-tabs li {
     /* Has very specific selector to beat specific one in Bootstrap */
     float: none;
-    text-align: right;
     display: inline-block;
 }
 #court-picker-tabs > li a {
     text-transform: uppercase;
-
+}
+#modal-save-favorite .modal-dialog {
+    width: 430px;
+}
+#modal-logged-out .modal-dialog {
+    width: 270px;
+}
+#modal-save-favorite textarea, #modal-save-favorite input {
+    width: 390px !important;
 }
 
+/*
 #modal-save-favorite, #modal-logged-out {
     z-index: 10;
     top: -10px;
@@ -553,13 +564,13 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     left: 10px;
     padding: 2em;
 }
-
+*/
 #save-favorite-text-area {
     height: auto;
 }
 
 #modal-save-favorite .save-favorite-button {
-    margin-right: 0px;
+    margin-right: 0;
 }
 
 #favorites-bottom-section {
@@ -687,20 +698,10 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 #twitter_gif:hover {
 	background-position  : -98px 0px;
 }
-#favorite-star-png {
-    margin: 8px 5px 0px 0px;
+#favorites-star {
+    font-size: 1.5em;
+    margin-right: 0.5em;
 }
-.favorite-on {
-    height               : 16px;
-	width                : 16px;
-	background-position  : -114px -16px;
-}
-.favorite-off {
-    height               : 16px;
-	width                : 16px;
-	background-position  : -114px 0px;
-}
-
 
 /* Highlights images that need height/width */
 img:not([width]):not([height]) {

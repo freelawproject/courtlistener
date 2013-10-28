@@ -65,14 +65,6 @@ class SearchForm(forms.Form):
                    'tabindex': '11'}
         )
     )
-    court_all = forms.BooleanField(
-        label='All Courts / Clear',
-        required=False,
-        initial=True,
-        widget=forms.CheckboxInput(
-            attrs={'class': 'external-input court-checkbox left'}
-        )
-    )
     court = forms.CharField(
         required=False,
         widget=forms.HiddenInput()

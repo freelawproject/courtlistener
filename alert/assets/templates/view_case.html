@@ -19,21 +19,15 @@
 {% block footer-scripts %}
     <script defer type="text/javascript" src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
     <script defer type="text/javascript" src="{{ STATIC_URL }}js/save-favorites.js"></script>
-    <script type="text/javascript">
-        // Handles the clipboard action.
-        $(document).ready(function() {
-            $('#share-header').click(function() {
-                $('#copy-input').select();
-            });
-        });
-    </script>
 {% endblock %}
 
 {% block sidebar %}
     <div class="span-6 append-1" id="sidebar">
-        <div class="sidebar-section">
-            <h4><p>&larr; <a href="/?{{ request.META.QUERY_STRING }}">Back to Search Results</a></p></h4>
-        </div>
+        {%  if get_string %}
+            <div class="sidebar-section">
+                <h4><p>&larr; <a href="/?{{ request.META.QUERY_STRING }}">Back to Search Results</a></p></h4>
+            </div>
+        {% endif %}
 
         {# show the admin tools if applicable #}
         {% if user.is_superuser and doc %}
@@ -46,22 +40,20 @@
             </div>
         {% endif %}
 
-
         {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
         <div class="{% if not favorite_form.instance.doc_id %}hidden{% endif %} sidebar-section" id="sidebar-notes">
             <div>
                 <h3 class="inline"><span>Your Notes</span></h3>
-                <p class="inline" id="edit-favorite">(<a href="#favorite-editor">edit</a>)</p>
+                <p class="inline" data-toggle="modal" data-target="#modal-save-favorite">(<a href="#favorite-editor">edit</a>)</p>
                 <p id="sidebar-notes-text">
                     {{ favorite_form.instance.notes|default:"(none)" }}
                 </p>
             </div>
         </div>
 
-
         {# Show cases that cite this case #}
-        <div id="cited-by" class="sidebar-section">
-            {% if doc.citation_count > 0 %}
+        {% if doc.citation_count > 0 %}
+            <div id="cited-by" class="sidebar-section">
                 <h3><span>Cited By ({{ doc.citation_count }})</span></h3>
                 <ul>
                     {% for case in cited_by_trunc %}
@@ -71,13 +63,12 @@
                     {% endfor %}
                 </ul>
                 <a class="more" href="{{ doc.get_absolute_url }}cited-by/?{{ request.META.QUERY_STRING }}">More detail&hellip;</a>
-            {% endif %}
-        </div>
-
+            </div>
+        {% endif %}
 
         {# Download original? #}
-        <div class="sidebar-section">
-            {% if doc.download_URL or doc.local_path %}
+        {% if doc.download_URL or doc.local_path %}
+            <div class="sidebar-section">
                 {% if doc.source != 'R' and doc.source != 'L' and doc.source != 'LR' %}
                     <h3"><span>View Original</span></h3>
                     <p>
@@ -92,9 +83,8 @@
                         {% endif %}
                     </p>
                 {% endif %}
-            {% endif %}
-        </div>
-
+            </div>
+        {% endif %}
 
         {# Show the social links using sprites #}
         <div class="sidebar-section">
@@ -112,72 +102,78 @@
 
 {% block content %}
     <article class="span-17 last">
-        {% if favorite_form.instance.doc_id %}
-            <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-on" title="Save/edit favorite"></a>
-        {% else %}
-            <a href="#favorite-editor" id="favorite-star-png" class="sprites favorite-off" title="Save/edit favorite"></a>
-        {% endif %}
-        <h2>
-            {{ caption|safe|v_wrapper }}
-        </h2>
-        <div class="modal-rel">
+        <i id="favorites-star"
+           class="{% if favorite_form.instance.doc_id %}gold{% else %}gray{% endif %} pointer fa fa-star inline"
+           data-toggle="modal"
+           data-target="#modal-save-favorite, #modal-logged-out"
+           title="Save this record as a favorite in your profile"></i>
+        <h2 class="inline">{{ caption|safe|v_wrapper }}</h2>
+        {% if user.is_authenticated %}
             {# Modal box for saving the favorite #}
-            {% if user.is_authenticated %}
-            <div id="modal-save-favorite" class="hidden span-10 modal">
-                {% if favorite_form.instance.doc_id %}
-                    <h2>Edit This Favorite</h2>
-                {% else %}
-                    <h2 id='save-favorite-title'>Save a Favorite</h2>
-                {% endif %}
-                <form action="" method="POST">{% csrf_token %}
-                    {{ favorite_form.doc_id }}
-                    <p class="bottom">
-                        <label for="id_name">Name</label>
-                        {% if favorite_form.name.errors %}
-                            <br><span class="errortext">
-                                {% for error in favorite_form.name.errors %}
-                                    {{ error|escape }}
-                                {% endfor %}
-                            </span>
-                        {% endif %}<br>
-                        {{ favorite_form.name }}
-                    </p>
-                    <p>
-                        <label for="id_favorite_notes">Notes</label>
-                        {% if favorite_form.notes.errors %}
-                            <br><span class="errortext">
-                                {% for error in favorite_form.notes.errors %}
-                                    {{ error|escape }}
-                                {% endfor %}
-                            </span>
-                        {% endif %}<br>
-                        {{ favorite_form.notes }}
-                        <p class="top right"><span id="characters-remaining"></span> characters remaining</p>
-                    </p>
+            <div id="modal-save-favorite" class="modal" role="dialog" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        {% if favorite_form.instance.doc_id %}
+                            <h2>Edit This Favorite</h2>
+                        {% else %}
+                            <h2 id='save-favorite-title'>Save a Favorite</h2>
+                        {% endif %}
+                        <form action="" method="POST">{% csrf_token %}
+                            {{ favorite_form.doc_id }}
+                            <p class="bottom">
+                                <label for="id_name">Name</label>
+                                {% if favorite_form.name.errors %}
+                                    <br><span class="errortext">
+                                        {% for error in favorite_form.name.errors %}
+                                            {{ error|escape }}
+                                        {% endfor %}
+                                    </span>
+                                {% endif %}<br>
+                                {{ favorite_form.name }}
+                            </p>
+                            <p class="bottom">
+                                <label for="id_favorite_notes">Notes</label>
+                                {% if favorite_form.notes.errors %}
+                                    <br><span class="errortext">
+                                        {% for error in favorite_form.notes.errors %}
+                                            {{ error|escape }}
+                                        {% endfor %}
+                                    </span>
+                                {% endif %}
+                            </p>
+                            {{ favorite_form.notes }}
+                            <p class="top right"><span id="characters-remaining"></span> characters remaining</p>
 
-                    <div id='favorites-bottom-section'>
-                        <p id="save-favorite-delete" class="bottom fake-link inline
-                            {% if not favorite_form.instance.doc_id %}hidden{%endif%}" tabindex="5">delete</p>
-                        <div id="favorites-buttons">
-                            <button type="submit" class="button title close-favorite-button" name="closeFavorite" id="closeFavorite" tabindex='4'>Close</button>
-                            <button type="submit" class="button title save-favorite-button" name="saveFavorite" id="saveFavorite" tabindex='3'>Save favorite</button>
-                        </div>
+                            <div id='favorites-bottom-section'>
+                                <p id="save-favorite-delete" class="bottom fake-link inline
+                                    {% if not favorite_form.instance.doc_id %}hidden{%endif%}" tabindex="5">delete</p>
+                                <div id="favorites-buttons">
+                                    <button type="submit" class="button title close-favorite-button" name="closeFavorite" id="closeFavorite" tabindex='4'>Close</button>
+                                    <button type="submit" class="button title save-favorite-button" name="saveFavorite" id="saveFavorite" tabindex='3'>Save favorite</button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
-                </form>
-
-            </div>
-            {% else %}
-                {# user is not authenticated #}
-                <div id="modal-logged-out" class="hidden pointer span-7 modal">
-                    <h3 class="center bottom">
-                        <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}">
-                            Sign in or register to save a favorite.
-                        </a>
-                    </h3>
-                    <p class="center bottom">(click to dismiss)</p>
                 </div>
-            {% endif %}
-        </div>
+            </div>
+        {% else %}
+            {# user is not authenticated #}
+            <div id="modal-logged-out"
+                 class="modal"
+                 role="dialog"
+                 aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <h3 class="center bottom">
+                            <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}">
+                                Sign in or register to save a favorite.
+                            </a>
+                        </h3>
+                        <p class="center bottom">(click to dismiss)</p>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
 
 
         <h3>{{ court }}</h3>

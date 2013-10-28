@@ -1,31 +1,13 @@
 $(document).ready(function() {
-    $("#favorite-star-png, #edit-favorite").click(function () {
-        $("#modal-save-favorite").toggle();
-        $("#save-favorite-name-field").focus();
-    });
-    $("#favorite-star-png").click(function () {
-        // This only works if the user is logged out
-        $('#modal-logged-out').fadeToggle('slow');
+    $("#closeFavorite").click(function (e) {
+        e.preventDefault();
+        $("#modal-save-favorite").modal('hide');
     });
     $("#modal-logged-out").click(function () {
-        $('#modal-logged-out').fadeToggle('fast');
-    });
-    $("#closeFavorite").click(function() {
-    	e.preventDefault();
-        $("#modal-save-favorite").hide();
-    });
-    // Close the modal box on blur
-    $('html').click(function() {
-        $('#modal-save-favorite').hide();
-        $('#modal-logged-out').hide();
-    });
-    $('#modal-save-favorite, #favorite-star-png, #edit-favorite').click(function(e) {
-        // Prevents the above from closing the modal when the modal is clicked.
-        e.stopPropagation();
+        $('#modal-logged-out').modal('hide');
     });
     $('#save-favorite-notes-field').NobleCount('#characters-remaining',{
         // set up the char counter
-        //on_negative: 'errortext',
         on_negative: function(t_obj, char_area, c_settings, char_rem){
             $('#characters-remaining').addClass("errortext");
             $('#saveFavorite').attr('disabled', 'disabled');
@@ -36,14 +18,6 @@ $(document).ready(function() {
         },
         max_chars: '500'
     });
-});
-
-// Close the modal box if ESC is pressed.
-$(document).keyup(function(e) {
-    if (e.keyCode == "27") {
-        $('#modal-save-favorite').hide();
-        $('#modal-logged-out').hide();
-    }
 });
 
 // Ajax functions for favorites form.
@@ -63,11 +37,11 @@ $(function() {
             data: dataString,
             success: function() {
                 // Hide the modal box
-                $("#modal-save-favorite").toggle();
+                $("#modal-save-favorite").modal('hide');
 
                 // Fill in the star and reset its title attr
-                $('#favorite-star-png').removeClass('favorite-off');
-                $('#favorite-star-png').addClass('favorite-on');
+                $('#favorites-star').removeClass('gray');
+                $('#favorites-star').addClass('gold');
 
                 // Add the new favorites info to the sidebar.
                 if (notes == ''){
@@ -85,8 +59,7 @@ $(function() {
 
     $("#save-favorite-delete").click(function() {
         // Send a post that deletes the favorite from the DB, and if successful
-        // remove the notes from the sidebar, and toggle the star icon
-        // to be blanked out.
+        // remove the notes from the sidebar; toggle the star icon.
         var csrf   = $("input[name=csrfmiddlewaretoken]").val();
         var doc_id = $("input#id_doc_id").val();
         var dataString = 'csrf=' + csrf + '&doc_id=' + doc_id;
@@ -96,10 +69,10 @@ $(function() {
             data: dataString,
             success: function() {
                 // Hide the modal box
-                $("#modal-save-favorite").toggle();
+                $("#modal-save-favorite").modal('hide');
                 // Empty the star and reset its titles
-                $('#favorite-star-png').removeClass('favorite-on');
-                $('#favorite-star-png').addClass('favorite-off');
+                $('#favorites-star').removeClass('gold');
+                $('#favorites-star').addClass('gray');
 
                 // Hide the sidebar
                 $('#sidebar-notes').hide();
