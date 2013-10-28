@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'djcelery',
     'south',
+    'tastypie',
     'alerts',
     'api',
     'casepage',
@@ -172,6 +173,10 @@ PAYPAL_REDIRECT = 'https://www.courtlistener.com/donate/paypal/complete/'
 PAYPAL_CANCELLATION = 'https://www.courtlistener.com/donate/paypal/cancel/'
 STRIPE_REDIRECT = 'https://www.courtlistener.com/donate/stripe/complete/'
 
+#######
+# API #
+#######
+TASTYPIE_DEFAULT_FORMATS = ['json', 'jsonp', 'xml']
 
 ######################
 # Various and Sundry #

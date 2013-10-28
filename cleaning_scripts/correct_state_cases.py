@@ -61,19 +61,19 @@ def fixer(simulate=False, verbose=False):
 
     # Round one! Fix plaintiffs.
     print "!!! ROUND ONE !!!"
-    court = Court.objects.get(courtUUID='cal')
+    court = Court.objects.get(pk='cal')
     docs = queryset_generator(Document.objects.filter(source="C", court=court, citation__case_name__contains='P. v.'))
     fix_plaintiffs(docs, True, simulate, verbose)
 
     # Round three! Fix the Mi cases.
     print "!!! ROUND THREE !!!"
-    court = Court.objects.get(courtUUID='mich')
+    court = Court.objects.get(pk='mich')
     docs = queryset_generator(Document.objects.filter(source="C", court=court, citation__case_name__startswith='People of Mi '))
     fix_michigan(docs, True, simulate, verbose)
 
     # Round four! Fix the statuses.
     print "!!! ROUND FOUR !!!"
-    court = Court.objects.get(courtUUID='wva')
+    court = Court.objects.get(pk='wva')
     docs = queryset_generator(Document.objects.filter(precedential_status__in=['Memorandum Decision', 'Per Curiam Opinion', 'Signed Opinion'],
                                                       court=court))
     fix_wva(docs, simulate, verbose)

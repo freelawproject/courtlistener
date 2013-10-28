@@ -91,7 +91,7 @@ def invalidate_dumps_by_date_and_court(date, court):
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
     as needed."""
-    courtUUID = models.CharField(
+    pk = models.CharField(
         'a unique ID for each court as used in URLs',
         max_length=15,
         primary_key=True)
@@ -404,7 +404,7 @@ class Document(models.Model):
     @models.permalink
     def get_absolute_url(self):
         return ('view_case',
-                [str(self.court.courtUUID),
+                [str(self.court.pk),
                  num_to_ascii(self.documentUUID),
                  self.citation.slug])
 

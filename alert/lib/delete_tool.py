@@ -143,7 +143,7 @@ def main():
         # All options are go. Proceed!
         if courtID == 'all':
             # All courts shall be done!
-            courts = Court.objects.filter(in_use=True).values_list('courtUUID', flat=True)
+            courts = Court.objects.filter(in_use=True).values_list('pk', flat=True)
             for courtID in courts:
                 delete_data_by_time_and_court(courtID, SIMULATE, delTime, VERBOSITY)
                 gc.collect()

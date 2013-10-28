@@ -23,7 +23,7 @@ class SearchDocument(object):
             self.dateFiled = datetime.combine(doc.date_filed, time())  # Midnight, PST
         self.citeCount = doc.citation_count
         self.court = doc.court.full_name
-        self.court_id = doc.court.courtUUID
+        self.court_id = doc.court.pk
         self.court_citation_string = doc.court.citation_string
         try:
             self.caseName = doc.citation.case_name
@@ -59,4 +59,4 @@ class SearchDocument(object):
 
         # Faceting fields
         self.status_exact = doc.get_precedential_status_display()
-        self.court_exact = doc.court.courtUUID
+        self.court_exact = doc.court.pk

@@ -33,7 +33,7 @@ class CourtAdmin(admin.ModelAdmin):
         'short_name',
         'position',
         'in_use',
-        'courtUUID'
+        'pk'
     )
     list_filter = (
         'jurisdiction',

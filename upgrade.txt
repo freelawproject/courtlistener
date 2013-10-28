@@ -21,6 +21,19 @@ most recent at the top.
 We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
+
+2013-10-31:
+ - This initiates the work on the API. To roll this out, simply:
+   - install django-tastypie: sudo pip install django-tastypie==0.10.0
+   - install python-mimeparse: sudo pip install python-mimeparse==0.1.4
+ - Documentation notes:
+   - Accept headers are recommended, but can be overridden with the format GET parameter.
+   - Allowed formats are json, jsonp and xml
+   - Remember to mention the coverage API
+ - TODO
+   - Can we make a faceting API? Do we want to?
+   - Rename all fields to id or pk
+
 2013-10-28:
  - The lawbox code is ready to go at long last. To make it live and to update all the needed resources on the site:
    - Check opinion count before beginning

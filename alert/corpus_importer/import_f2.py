@@ -298,7 +298,7 @@ def scrape_and_parse():
                     court_fix_file.write("%s|%s\n" % (sha1Hash, court))
 
             saved_court = court
-            court = Court.objects.get(courtUUID=court)
+            court = Court.objects.get(pk=court)
             if DEBUG >= 4:
                 print "Court is: %s" % court
 

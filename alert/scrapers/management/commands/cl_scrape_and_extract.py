@@ -132,7 +132,7 @@ def scrape_court(site, full_crawl=False):
     # Get the court object early for logging
     # opinions.united_states.federal.ca9_u --> ca9
     court_str = site.court_id.split('.')[-1].split('_')[0]
-    court = Court.objects.get(courtUUID=court_str)
+    court = Court.objects.get(pk=court_str)
 
     dup_checker = DupChecker(court, full_crawl=full_crawl)
     abort = dup_checker.abort_by_url_hash(site.url, site.hash)
@@ -322,7 +322,7 @@ class Command(BaseCommand):
 
                         # opinions.united_states.federal.ca9_u --> ca9
                         court_str = mod.Site.__module__.split('.')[-1].split('_')[0]
-                        court = Court.objects.get(courtUUID=court_str)
+                        court = Court.objects.get(pk=court_str)
                         ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
                     except Exception, e:
                         # This is very important. Without this, an exception above will crash the caller.

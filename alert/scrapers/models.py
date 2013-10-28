@@ -52,5 +52,5 @@ class ErrorLog(models.Model):
     def __unicode__(self):
         return "%s - %s@%s %s" % (self.log_time,
                                   self.log_level,
-                                  self.court.courtUUID,
+                                  self.court.pk,
                                   self.message)

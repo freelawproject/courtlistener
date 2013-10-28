@@ -19,10 +19,10 @@ STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed",
 # Store court values to avoid repeated DB queries
 if 'test' in sys.argv:
     # If it's a test, we can't count on the database being prepped, so we have to load lazily
-    ALL_COURTS = Court.objects.all().values('citation_string', 'courtUUID')
+    ALL_COURTS = Court.objects.all().values('citation_string', 'pk')
 else:
     # list() forces early evaluation of the queryset so we don't have issues with closed cursors.
-    ALL_COURTS = list(Court.objects.all().values('citation_string', 'courtUUID'))
+    ALL_COURTS = list(Court.objects.all().values('citation_string', 'pk'))
 
 
 class Citation(object):
@@ -154,7 +154,7 @@ def get_court_by_paren(paren_string, citation):
         for court in ALL_COURTS:
             # Use startswith because citations are often missing final period, e.g. "2d Cir"
             if court['citation_string'].startswith(court_str):
-                court_code = court['courtUUID']
+                court_code = court['pk']
                 break
 
     return court_code
