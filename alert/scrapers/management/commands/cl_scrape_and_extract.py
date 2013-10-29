@@ -332,6 +332,7 @@ class Command(BaseCommand):
                     last_court_in_list = (i == (num_courts - 1))
                     if last_court_in_list and daemon_mode:
                         # Start over...
+                        logger.info("All jurisdictions done. Looping back to the beginning.")
                         i = 0
                     else:
                         i += 1
