@@ -23,12 +23,12 @@ def queryset_generator(queryset, chunksize=100):
 
     Note that the implementation of the iterator does not support ordered query sets.
     """
-    documentUUID = 0
-    last_pk = queryset.order_by('-documentUUID')[0].documentUUID
-    queryset = queryset.order_by('documentUUID')
-    while documentUUID < last_pk:
-        for row in queryset.filter(documentUUID__gt=documentUUID)[:chunksize]:
-            documentUUID = row.documentUUID
+    pk = 0
+    last_pk = queryset.order_by('-pk')[0].pk
+    queryset = queryset.order_by('pk')
+    while pk < last_pk:
+        for row in queryset.filter(pk__gt=pk)[:chunksize]:
+            pk = row.pk
             yield row
         gc.collect()
 
@@ -52,12 +52,12 @@ def update_date(doc, simulate):
         date_filed = doc.date_filed
     else:
         # break from this function.
-        print "\n***No date_filed value for doc: " + str(doc.documentUUID) + ". Punting.***\n"
+        print "\n***No date_filed value for doc: " + str(doc.pk) + ". Punting.***\n"
         return 1
     if doc.local_path != "":
         local_path = doc.local_path
     else:
-        print "\n***No local_path value for doc: " + str(doc.documentUUID) + ". Punting.***\n"
+        print "\n***No local_path value for doc: " + str(doc.pk) + ". Punting.***\n"
         return 2
     root = settings.MEDIA_ROOT
 
@@ -94,9 +94,9 @@ def update_date(doc, simulate):
 
             doc.local_path = os.path.join("pdf", year, month, day, filename)
             doc.save()
-        print "***Created new hard link to " + new + " for doc: " + str(doc.documentUUID) + " ***"
+        print "***Created new hard link to " + new + " for doc: " + str(doc.pk) + " ***"
     else:
-        print 'Same. Not updating link for ' + str(doc.documentUUID)
+        print 'Same. Not updating link for ' + str(doc.pk)
 
 
 def main():
@@ -136,7 +136,7 @@ def main():
         exit(0)
     else:
         # run the script for the start and end points
-        queryset = queryset_generator(Document.objects.filter(documentUUID__gte=begin, documentUUID__lte=end))
+        queryset = queryset_generator(Document.objects.filter(pk__gte=begin, pk__lte=end))
         for doc in queryset:
             update_date(doc, simulate)
         exit(0)

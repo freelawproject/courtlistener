@@ -28,7 +28,7 @@ def cleaner(simulate=False, verbose=False):
         for line in text.split('\n'):
             clean_line, modified = anonymize(line)
             if modified:
-                print "Fixing text in document: %s" % doc.documentUUID
+                print "Fixing text in document: %s" % doc.pk
                 print "Line reads: %s" % line
                 fix = raw_input("Fix the line? [Y/n]: ") or 'y'
                 if fix.lower() == 'y':

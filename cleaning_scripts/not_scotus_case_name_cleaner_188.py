@@ -25,7 +25,7 @@ def cleaner(simulate=False, verbose=False):
         doc.citation.caseNameFull = caseNameFull
         if verbose:
             if (caseNameShortOrig != caseNameShort) or (caseNameFullOrig != caseNameFull):
-                print "Document: %s" % doc.documentUUID
+                print "Document: %s" % doc.pk
             if caseNameShortOrig != caseNameShort:
                 print "Short name, replacing: '%s'" % caseNameShortOrig
                 print "                 with: '%s'" % caseNameShort

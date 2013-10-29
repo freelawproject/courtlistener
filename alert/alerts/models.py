@@ -9,7 +9,6 @@ FREQUENCY = (
 
 
 class Alert(models.Model):
-    alertUUID = models.AutoField('a unique ID for each alert', primary_key=True)
     alertName = models.CharField('a name for the alert', max_length=75)
     alertText = models.CharField('the text of an alert created by a user',
         max_length=2500)
@@ -23,7 +22,7 @@ class Alert(models.Model):
         null=True)
 
     def __unicode__(self):
-        return 'Alert ' + str(self.alertUUID) + ': ' + self.alertName
+        return 'Alert ' + str(self.pk) + ': ' + self.alertName
 
     class Meta:
         verbose_name = 'alert'

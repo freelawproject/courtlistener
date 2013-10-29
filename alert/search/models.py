@@ -148,10 +148,6 @@ class Court(models.Model):
 
 
 class Citation(models.Model):
-    citationUUID = models.AutoField(
-        "a unique ID for each citation",
-        primary_key=True
-    )
     slug = models.SlugField(
         "URL that the document should map to (the slug)",
         max_length=50,
@@ -259,9 +255,9 @@ class Citation(models.Model):
 
     def __unicode__(self):
         if self.case_name:
-            return smart_unicode('%s: %s' % (self.citationUUID, self.case_name))
+            return smart_unicode('%s: %s' % (self.pk, self.case_name))
         else:
-            return str(self.citationUUID)
+            return str(self.pk)
 
     class Meta:
         db_table = "Citation"
@@ -272,10 +268,6 @@ class Document(models.Model):
 
     This must go last, since it references the above classes
     """
-    documentUUID = models.AutoField(
-        "a unique ID for each document",
-        primary_key=True
-    )
     time_retrieved = models.DateTimeField(
         help_text="The original creation date for the item",
         auto_now_add=True,
@@ -397,15 +389,15 @@ class Document(models.Model):
 
     def __unicode__(self):
         if self.citation:
-            return '%s: %s' % (self.documentUUID, self.citation.case_name)
+            return '%s: %s' % (self.pk, self.citation.case_name)
         else:
-            return str(self.documentUUID)
+            return str(self.pk)
 
     @models.permalink
     def get_absolute_url(self):
         return ('view_case',
                 [str(self.court.pk),
-                 num_to_ascii(self.documentUUID),
+                 num_to_ascii(self.pk),
                  self.citation.slug])
 
     def save(self, index=True, *args, **kwargs):

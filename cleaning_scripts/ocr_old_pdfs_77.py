@@ -13,7 +13,7 @@ from optparse import OptionParser
 def fixer(simulate=False, verbose=False):
     """OCR documents that lack content"""
     #docs = queryset_generator(Document.objects.filter(source='C', plain_text=''))
-    docs = Document.objects.raw('''select documentUUID
+    docs = Document.objects.raw('''select pk
                                    from Document
                                    where source='C' and
                                        plain_text REGEXP "^[[:space:]]*$"''')

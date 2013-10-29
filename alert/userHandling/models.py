@@ -4,13 +4,10 @@ from alert.favorites.models import Favorite
 from django.db import models
 from django.contrib.auth.models import User
 from localflavor.us.models import USStateField
+from south.modelsinspector import add_introspection_rules
 
 
 class BarMembership(models.Model):
-    barMembershipUUID = models.AutoField(
-        'a unique ID for each bar membership',
-        primary_key=True
-    )
     barMembership = USStateField(
         'the two letter state abbreviation of a bar membership'
     )
@@ -23,12 +20,10 @@ class BarMembership(models.Model):
         db_table = 'BarMembership'
         ordering = ['barMembership']
 
+add_introspection_rules([], ["^localflavor\.us\.models\.USStateField"])
+
 
 class UserProfile(models.Model):
-    userProfileUUID = models.AutoField(
-        'a unique ID for each user profile',
-        primary_key=True
-    )
     user = models.OneToOneField(
         User,
         related_name='profile',
