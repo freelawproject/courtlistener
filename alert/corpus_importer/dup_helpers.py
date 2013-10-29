@@ -24,7 +24,7 @@ def merge_cases_simple(new, target_id):
 
      Merging is done by picking the best fields from each item.
     """
-    target = Document.objects.get(documentUUID=target_id)
+    target = Document.objects.get(pk=target_id)
     print "Merging %s with" % new.citation.case_name
     print "        %s" % target.citation.case_name
 
@@ -86,7 +86,7 @@ def merge_cases_complex(case, target_ids):
     """
     for target_id in target_ids:
         simulate = False
-        doc = Document.objects.get(documentUUID=target_id)
+        doc = Document.objects.get(pk=target_id)
         print "Merging %s with" % case.case_name
         print "        %s" % doc.citation.case_name
 

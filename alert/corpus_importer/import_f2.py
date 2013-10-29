@@ -449,7 +449,7 @@ def scrape_and_parse():
                 # something is afoot. Throw a big error.
                 print "Duplicate found at volume " + str(i + 1) + \
                     " and row " + str(j + 1) + "!!!!"
-                print "Found document %s in the database with doc id of %d!" % (doc, doc.documentUUID)
+                print "Found document %s in the database with doc id of %d!" % (doc, doc.pk)
                 exit(1)
 
             # save our location within the volume.

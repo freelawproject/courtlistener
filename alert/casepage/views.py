@@ -86,11 +86,11 @@ def view_case(request, court, pk, casename):
 
     try:
         # Get the favorite, if possible
-        fave = Favorite.objects.get(doc_id=doc.documentUUID, users__user=request.user)
+        fave = Favorite.objects.get(doc_id=doc.pk, users__user=request.user)
         favorite_form = FavoriteForm(instance=fave)
     except (ObjectDoesNotExist, TypeError):
         # Not favorited or anonymous user
-        favorite_form = FavoriteForm(initial={'doc_id': doc.documentUUID,
+        favorite_form = FavoriteForm(initial={'doc_id': doc.pk,
             'name': doc.citation.case_name})
 
     # get most influential cases that cite this case
@@ -117,7 +117,7 @@ def view_case_citations(request, pk, casename):
     pk = ascii_to_num(pk)
 
     # Look up the document, title
-    doc = get_object_or_404(Document, documentUUID=pk)
+    doc = get_object_or_404(Document, pk=pk)
     caption = make_caption(doc)
     title = '%s, %s' % (trunc(doc.citation.case_name, 100), make_citation_string(doc))
 

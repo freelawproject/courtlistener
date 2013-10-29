@@ -12,7 +12,7 @@ We have news regarding your alerts at CourtListener.com
 
 {% for alert, docs in hits %}{% for doc in docs %}{% if forloop.first %}Your {{alert.get_alertFrequency_display|lower}} alert -- {{alert.alertName}} -- had {{docs|length}} hit{{docs|pluralize}}:
 -------------------------------------------------------
-Edit/delete this alert: https://www.courtlistener.com/alert/edit/{{ alert.alertUUID }}/{% endif %}
+Edit/delete this alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }}/{% endif %}
 {{forloop.counter}}. {{ doc.solr_highlights.caseName.0|safe|striptags }} ({% if doc.court_id != 'scotus' %}{{doc.solr_highlights.court_citation_string.0|safe|striptags}} {% endif %}{{doc.dateFiled|date:"Y"}})
 Precedential Status: {{doc.status}}
  - View on our site: https://www.courtlistener.com{{doc.absolute_url}}

@@ -32,7 +32,7 @@ We welcome a conversion of these notes to a better process using Fabric.
    - Remember to mention the coverage API
  - TODO
    - Can we make a faceting API? Do we want to?
-   - Rename all fields to id or pk (check answers on SO)
+   - Include the URL information
 
 2013-10-28:
  - The lawbox code is ready to go at long last. To make it live and to update all the needed resources on the site:

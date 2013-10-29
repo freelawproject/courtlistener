@@ -23,7 +23,7 @@ def cleaner(simulate=False, verbose=True):
     results_si = conn.raw_query(**{'q': u'ÚÑÎ'})
     for result in results_si:
         # For each document
-        doc = Document.objects.get(documentUUID=result['id'])
+        doc = Document.objects.get(pk=result['id'])
         if verbose:
             print "https://www.courtlistener.com" + doc.get_absolute_url()
         # Correct the text

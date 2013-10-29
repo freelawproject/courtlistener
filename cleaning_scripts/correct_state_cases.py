@@ -13,8 +13,8 @@ from optparse import OptionParser
 def fixer(simulate=False, verbose=False):
     """Fix a few issues discovered."""
     #docs = queryset_generator(Document.objects.filter(source='C', plain_text=''))
-    #docs = Document.objects.raw('''select "documentUUID"  from "Document" where "source" = 'C' and "plain_text" ~ '^[[:space:]]*$' ''')
-    #docs = Document.objects.raw('''select "documentUUID" from "Document" where "source" = 'C' and "plain_text" = 'Unable to extract document content.' ''')
+    #docs = Document.objects.raw('''select "pk"  from "Document" where "source" = 'C' and "plain_text" ~ '^[[:space:]]*$' ''')
+    #docs = Document.objects.raw('''select "pk" from "Document" where "source" = 'C' and "plain_text" = 'Unable to extract document content.' ''')
 
     def fix_plaintiffs(docs, left, simulate, verbose):
         for doc in docs:

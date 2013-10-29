@@ -118,9 +118,9 @@ def cleaner(simulate=False, verbose=False):
 
                 # Log as appropriate
                 if verbose: print "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s" % \
-                    (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip())
+                    (results.count(), line_num, diff, results[0].pk, results[0], line.strip())
                 updated_file.write("Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s\n" % \
-                    (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip()))
+                    (results.count(), line_num, diff, results[0].pk, results[0], line.strip()))
 
             elif (diff >= LOW_THRESHOLD) and (diff <= HIGH_THRESHOLD):
                 # Ask the user if the change should be made.
@@ -135,24 +135,24 @@ def cleaner(simulate=False, verbose=False):
 
                     # Log as appropriate
                     if verbose: print "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s" % \
-                        (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip())
+                        (results.count(), line_num, diff, results[0].pk, results[0], line.strip())
                     updated_file.write("Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s\n" % \
-                        (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip()))
+                        (results.count(), line_num, diff, results[0].pk, results[0], line.strip()))
                 else:
                     # Human says punt; therefore punt.
                     if verbose:
                         print "Results: %d. Line number %d punted by human. Diff_ratio: %f found on %d: %s; Line contents: %s" % \
-                            (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip())
+                            (results.count(), line_num, diff, results[0].pk, results[0], line.strip())
                     punt_file.write("Results: %d. Line number %d punted by human. Diff_ratio: %f found on %d: %s; Line contents: %s\n" % \
-                        (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip()))
+                        (results.count(), line_num, diff, results[0].pk, results[0], line.strip()))
 
             else:
                 # Below the threshold. Punt!
                 if verbose:
                     print "Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s" % \
-                        (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip())
+                        (results.count(), line_num, diff, results[0].pk, results[0], line.strip())
                 punt_file.write("Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s\n" % \
-                    (results.count(), line_num, diff, results[0].documentUUID, results[0], line.strip()))
+                    (results.count(), line_num, diff, results[0].pk, results[0], line.strip()))
 
         elif results.count() > 1:
             # More than one hit. Find the best one using diff_lib
@@ -179,17 +179,17 @@ def cleaner(simulate=False, verbose=False):
                 # Log as appropriate
                 if verbose:
                     print "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s" % \
-                        (results.count(), line_num, max_ratio, results[i].documentUUID, results[i], line.strip())
+                        (results.count(), line_num, max_ratio, results[i].pk, results[i], line.strip())
                 updated_file.write("Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s\n" % \
-                    (results.count(), line_num, max_ratio, results[i].documentUUID, results[i], line.strip()))
+                    (results.count(), line_num, max_ratio, results[i].pk, results[i], line.strip()))
 
             else:
                 # Below the threshold. Punt!
                 if verbose:
                     print "Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s" % \
-                        (results.count(), line_num, max_ratio, results[i].documentUUID, results[i], line.strip())
+                        (results.count(), line_num, max_ratio, results[i].pk, results[i], line.strip())
                 punt_file.write("Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s\n" % \
-                    (results.count(), line_num, max_ratio, results[i].documentUUID, results[i], line.strip()))
+                    (results.count(), line_num, max_ratio, results[i].pk, results[i], line.strip()))
 
         # increment the line number counter
         line_num += 1
