@@ -182,7 +182,6 @@ class Command(BaseCommand):
         if not self.options['simulate']:
             tally_stat('alerts.sent.%s' % self.options['rate'], inc=alerts_sent_count)
             logger.info("Sent %s %s email alerts." % (alerts_sent_count, self.options['rate']))
-        return "Done"
 
     def handle(self, *args, **options):
         self.verbosity = int(options.get('verbosity', 1))
