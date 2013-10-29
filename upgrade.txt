@@ -30,9 +30,18 @@ We welcome a conversion of these notes to a better process using Fabric.
    - Accept headers are recommended, but can be overridden with the format GET parameter.
    - Allowed formats are json, jsonp and xml
    - Remember to mention the coverage API
+   - Throttle limits
+   - Authentication (basic and session)
+   - Notes from here: http://django-tastypie.readthedocs.org/en/latest/interacting.html
+   - Filtering
+   - Date formats
+   - Fields
+   - Citation has no filters -- use search instead.
  - TODO
-   - Can we make a faceting API? Do we want to?
-   - Include the URL information
+   - Attempt to convert the coverage API to tastypie
+   - Set up the 'fields' get param: https://github.com/toastdriven/django-tastypie/issues/1056
+   - Make sure filtering can be done on cases_cited/cited_by
+
 
 2013-10-28:
  - The lawbox code is ready to go at long last. To make it live and to update all the needed resources on the site:
