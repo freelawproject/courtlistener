@@ -44,7 +44,7 @@ DEBUG = [
     'docket_number',
     'court',
     #'input_citations',
-    #'input_dates',
+    'input_dates',
     #'input_docket_number',
     'input_court',
     'input_case_names',
@@ -228,11 +228,12 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
 
     if not dates:
         try:
-            dates = fixes[case_path]['dates']
+            dates = fixes[case_path]['dates'][0]
         except KeyError:
             if 'input_dates' in DEBUG:
-                subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
-                input_date = raw_input('  No date found. What should be here (YYYY-MM-DD)? ')
+                #subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
+                print '  No date found for: file://%s' % case_path
+                input_date = raw_input('  What should be here (YYYY-MM-DD)? ')
                 add_fix(case_path, {'dates': [datetime.datetime.strptime(input_date, '%Y-%m-%d')]})
                 dates = [datetime.datetime.strptime(input_date, '%Y-%m-%d')]
             if 'log_bad_dates' in DEBUG:
