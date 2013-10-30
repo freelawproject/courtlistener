@@ -71,7 +71,7 @@ urlpatterns = patterns('',
     (r'^bad-browser/$', browser_warning),
 
     # Maintenance and SOPA/PIPA mode!
-    #(r'/*', show_maintenance_warning),
+    (r'/*', show_maintenance_warning),
 
     # Display a case's citations page
     url(r'^(?:.*)/(.*)/(.*)/cited-by/$',
