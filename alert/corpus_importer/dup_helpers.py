@@ -158,7 +158,7 @@ def filter_by_stats(candidates, stats):
         #elif stats['gestalt_diffs'][i] < 0.4:
         #    # The contents are wildly different
         #    continue
-        elif stats['cos_sims'][i] < 0.85:
+        elif stats['cos_sims'][i] < 0.90:
             # Very different cosine similarities
             continue
         else:
