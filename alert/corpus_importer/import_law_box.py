@@ -1,7 +1,5 @@
 import os
 import sys
-from alert.corpus_importer import dup_finder, dup_helpers
-from alert.lib.string_utils import anonymize
 
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
@@ -23,6 +21,8 @@ from alert.citations.find_citations import get_citations
 from datetime import date, timedelta
 from alert.corpus_importer.court_regexes import fd_pairs, state_pairs, disambiguate_by_judge, fb_pairs
 from alert.corpus_importer.judge_extractor import get_judge_from_str
+from alert.corpus_importer import dup_finder, dup_helpers
+from alert.lib.string_utils import anonymize
 from alert.lib.import_lib import map_citations_to_models
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
