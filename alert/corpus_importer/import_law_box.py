@@ -713,8 +713,9 @@ def find_duplicates(doc, case_path):
     # 3. Filter out obviously bad cases and then pass remainder forward for manual review.
 
     filtered_candidates, filtered_stats = dup_helpers.filter_by_stats(candidates, stats)
-    log_print("  - %s candidates before filtering. With stats: %s" % (stats['candidate_count'], stats))
-    log_print("  - %s candidates after filtering. Using filtered stats: %s" % (filtered_stats['candidate_count'], filtered_stats))
+    log_print("  - %s candidates before filtering. With stats: %s" % (stats['candidate_count'], stats['cos_sims']))
+    log_print("  - %s candidates after filtering. Using filtered stats: %s" % (filtered_stats['candidate_count'],
+                                                                               filtered_stats['cos_sims']))
     if len(filtered_candidates) == 0:
         log_print("  - Not a duplicate: After filtering no good candidates remained.")
         return []
@@ -764,6 +765,8 @@ def main():
                         help='Use the saved marker to resume operation where it last failed.')
     parser.add_argument('-x', '--random', default=False, required=False, action='store_true',
                         help='Pick cases randomly rather than serially.')
+    parser.add_argument('-m', '--marker', type=str, default='lawbox_progress_marker.txt', required=False,
+                        help="The name of the file that tracks the progress (useful if multiple versions run at same time)")
     args = parser.parse_args()
 
     if args.dir:
@@ -797,7 +800,7 @@ def main():
             cases = generate_random_line(args.file_name)
             i = 0
         elif args.resume:
-            with open('lawbox_progress_marker.txt') as marker:
+            with open(args.marker) as marker:
                 resume_point = int(marker.read().strip())
             cases = case_generator(resume_point)
             i = resume_point
@@ -832,7 +835,7 @@ def main():
                             log.write('%s\n' % case_path)
             if args.resume:
                 # Don't change the progress marker unless you're in resume mode.
-                with open('lawbox_progress_marker.txt', 'w') as marker:
+                with open(args.marker, 'w') as marker:
                     marker.write(str(i + 1))  # Files are one-index, not zero-index
             with open('lawbox_fix_file.pkl', 'wb') as fix_file:
                 pickle.dump(fixes, fix_file)
