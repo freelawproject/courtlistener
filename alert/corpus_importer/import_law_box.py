@@ -228,7 +228,7 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
 
     if not dates:
         try:
-            dates = fixes[case_path]['dates'][0]
+            dates = fixes[case_path]['dates']
         except KeyError:
             if 'input_dates' in DEBUG:
                 #subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
