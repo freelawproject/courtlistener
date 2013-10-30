@@ -44,7 +44,7 @@ We welcome a conversion of these notes to a better process using Fabric.
    - Make sure filtering can be done on cases_cited/cited_by
    - Add stat logging to the API
    - Add the API to robots.txt
-   - Resolve unicode issue.
+   - Resolve unicode issue in main site.
 
 
 2013-10-28:
@@ -58,6 +58,7 @@ We welcome a conversion of these notes to a better process using Fabric.
    - Monitor disk space, htop, iotop.
    - Run the alerts manually.
    - Make sure that that the case from 2103 is fixed in Solr
+   - https://www.courtlistener.com/scotus/rmu/the-united-states-v-klintock/ has been falsely merged. Unmerge it. (2013-10-29 20:31:03.770218)
 
 2013-10-21:
  - Removes resource.org polling. If you have used this, remove the cached file in the robots directory and any
