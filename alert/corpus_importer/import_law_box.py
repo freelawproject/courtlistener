@@ -778,7 +778,7 @@ def main():
     parser.add_argument('-m', '--marker', type=str, default='lawbox_progress_marker.txt', required=False,
                         help="The name of the file that tracks the progress (useful if multiple versions run at same time)")
     parser.add_argument('-e', '--end', type=int, required=False, default=2000000,
-                        htlp="An optional endpoint for an importer.")
+                        help="An optional endpoint for an importer.")
     args = parser.parse_args()
 
     if args.dir:
