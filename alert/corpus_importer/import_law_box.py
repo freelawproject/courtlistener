@@ -724,21 +724,31 @@ def find_duplicates(doc, case_path):
         return [filtered_candidates[0]['id']]
     else:
         duplicates = []
+        high_sims_count = len([sim for sim in filtered_stats['cos_sims'] if sim > 0.98])
+        low_sims_count = len([sim for sim in filtered_stats['cos_sims'] if sim < 0.95])
         for k in range(0, len(filtered_candidates)):
-            # Have to determine by "hand"
-            log_print("  %s) Case name: %s" % (k + 1, doc.citation.case_name))
-            log_print("                 %s" % filtered_candidates[k]['caseName'])
-            log_print("      Docket nums: %s" % doc.citation.docket_number)
-            log_print("                   %s" % filtered_candidates[k].get('docketNumber', 'None'))
-            log_print("      Cosine Similarity: %s" % filtered_stats['cos_sims'][k])
-            log_print("      Candidate URL: %s" % case_path)
-            log_print("      Match URL: https://www.courtlistener.com%s" %
-                                         (filtered_candidates[k]['absolute_url']))
-
-            choice = raw_input("Is this a duplicate? [Y/n]: ")
-            choice = choice or "y"
-            if choice == 'y':
+            if all([(filtered_stats['cos_sims'][k] > 0.98),
+                    (high_sims_count == 1),  # Only one high score
+                    (low_sims_count == filtered_stats['candidate_count'] - 1)  # All but one have low scores
+            ]):
+                # If only one of the items is very high, then we can assume it's right.
                 duplicates.append(filtered_candidates[k]['id'])
+                break
+            else:
+                # Have to determine by "hand"
+                log_print("  %s) Case name: %s" % (k + 1, doc.citation.case_name))
+                log_print("                 %s" % filtered_candidates[k]['caseName'])
+                log_print("      Docket nums: %s" % doc.citation.docket_number)
+                log_print("                   %s" % filtered_candidates[k].get('docketNumber', 'None'))
+                log_print("      Cosine Similarity: %s" % filtered_stats['cos_sims'][k])
+                log_print("      Candidate URL: %s" % case_path)
+                log_print("      Match URL: https://www.courtlistener.com%s" %
+                                             (filtered_candidates[k]['absolute_url']))
+
+                choice = raw_input("Is this a duplicate? [Y/n]: ")
+                choice = choice or "y"
+                if choice == 'y':
+                    duplicates.append(filtered_candidates[k]['id'])
 
         if len(duplicates) == 0:
             log_print("  - Not a duplicate: Manual determination found no matches.")
@@ -767,6 +777,8 @@ def main():
                         help='Pick cases randomly rather than serially.')
     parser.add_argument('-m', '--marker', type=str, default='lawbox_progress_marker.txt', required=False,
                         help="The name of the file that tracks the progress (useful if multiple versions run at same time)")
+    parser.add_argument('-e', '--end', type=int, required=False, default=2000000,
+                        htlp="An optional endpoint for an importer.")
     args = parser.parse_args()
 
     if args.dir:
@@ -840,6 +852,9 @@ def main():
             with open('lawbox_fix_file.pkl', 'wb') as fix_file:
                 pickle.dump(fixes, fix_file)
             i += 1
+            if i == args.end:
+                log_print("Hit the endpoint after importing number %s. Breaking." % i)
+                break
         except Exception, err:
             log_print(traceback.format_exc())
             exit(1)
