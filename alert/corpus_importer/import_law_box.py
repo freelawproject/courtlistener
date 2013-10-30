@@ -51,7 +51,7 @@ DEBUG = [
     #'log_bad_citations',
     #'log_bad_courts',
     #'log_judge_disambiguations',
-    'log_bad_dates',
+    #'log_bad_dates',
     #'log_bad_docket_numbers',
     #'log_bad_judges',
     'log_multimerge',
@@ -498,8 +498,8 @@ def get_court_object(html, citations=None, case_path=None, judge=None):
             if 'input_court' in DEBUG:
                 if 'firefox' in DEBUG:
                     subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
-                input_court = raw_input("No court identified! What should be here? ")
-                add_fix(case_path, {'court': input_court})
+                court = raw_input("No court identified! What should be here? ")
+                add_fix(case_path, {'court': input})
             if 'log_bad_courts' in DEBUG:
                 # Write the failed case out to file.
                 court = 'test'
