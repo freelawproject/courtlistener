@@ -1,9 +1,19 @@
+import logging
 from tastypie import fields
 from tastypie.authentication import BasicAuthentication, SessionAuthentication, MultiAuthentication
+from tastypie.bundle import Bundle
 from tastypie.constants import ALL
+from tastypie.exceptions import BadRequest
 from tastypie.resources import ModelResource
 from tastypie.throttle import CacheThrottle
+from alert import settings
+from alert.lib import search_utils
+from alert.lib.sunburnt import sunburnt
+from alert.search.forms import SearchForm
 from alert.search.models import Citation, Court, Document
+from alert.stats import tally_stat
+
+logger = logging.getLogger(__name__)
 
 good_time_filters = ('exact', 'gte', 'gt', 'lte', 'lt', 'range',
                      'year', 'month', 'day', 'hour', 'minute', 'second',)
@@ -23,6 +33,7 @@ class ModelResourceWithFieldsFilter(ModelResource):
                     new_data[k] = bundle.data[k]
             bundle.data = new_data
         return bundle
+
 
 class CourtResource(ModelResourceWithFieldsFilter):
     class Meta:
@@ -87,6 +98,63 @@ class DocumentResource(ModelResourceWithFieldsFilter):
             'extracted_by_ocr': ALL,
         }
         ordering = ['time_retrieved', 'date_modified', 'date_filed', 'pagerank', 'date_blocked']
+
+
+class SearchResource(ModelResourceWithFieldsFilter):
+    class Meta:
+        authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
+        throttle = CacheThrottle(throttle_at=1000)
+        resource_name = 'search'
+        max_limit = 20
+
+    def _make_obj_from_solr_result(self, solr_result):
+        pass
+
+    def build_filters(self, filters=None):
+        """Given a dictionary of filters, create Solr filters.
+        """
+        pass
+
+    def apply_sorting(self, obj_list, options=None):
+        pass
+
+    def apply_filters(self, request, applicable_filters):
+        pass
+
+    def get_resource_uri(self, bundle_or_obj):
+        return 'Foo'
+        '''
+        kwargs = {}
+        if isinstance(bundle_or_obj, Bundle):
+            kwargs['pk'] = bundle_or_obj.obj.uuid
+        else:
+            kwargs['pk'] = bundle_or_obj.uuid
+        return kwargs
+        '''
+
+    def get_obj_list(self, request=None):
+        """Performs the Solr work."""
+        conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+        results_si = conn.raw_query(**search_utils.build_main_query(cd))
+        tally_stat('api.search')
+
+    def obj_get_list(self, bundle, **kwargs):
+
+        search_form = SearchForm(bundle.request.GET)
+        if search_form.is_valid():
+            cd = search_form.cleaned_data
+            try:
+                return self.authorized_read_list(cd, bundle)
+            except Exception, e:
+                logger.warning('Error loading api search results with request: %s' % bundle.request)
+                logger.warning('Error was %s' % e)
+                BadRequest("Invalid resource lookup data provided. Unable to complete your query.")
+        else:
+            BadRequest("Invalid resource lookup data provided. Unable to complete your query.")
+
+
+
+
 
 
 

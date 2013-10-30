@@ -300,7 +300,6 @@ def build_main_query(cd, highlight=True):
     if len(main_fq) > 0:
         main_params['fq'] = main_fq
 
-    # For debugging:
     #print "Params sent to search are: %s" % '&'.join(['%s=%s' % (k, v) for k, v in main_params.items()])
     #print results_si.execute()
     return main_params

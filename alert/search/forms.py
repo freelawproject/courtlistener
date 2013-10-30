@@ -34,6 +34,31 @@ INPUT_FORMATS = [
 COURTS = Court.objects.filter(in_use=True).values('pk', 'short_name', 'jurisdiction')
 
 
+def _clean_form(request, cd):
+    """Returns cleaned up values as a Form object.
+    """
+    # Make a copy of request.GET so it is mutable
+    mutable_get = request.GET.copy()
+
+    # Send the user the cleaned up query
+    mutable_get['q'] = cd['q']
+    if mutable_get.get('filed_before') and cd.get('filed_before') is not None:
+        # Don't use strftime since it won't work prior to 1900.
+        before = cd['filed_before']
+        mutable_get['filed_before'] = '%s-%02d-%02d' % \
+                                      (before.year, before.month, before.day)
+    if mutable_get.get('filed_after') and cd.get('filed_before') is not None:
+        after = cd['filed_after']
+        mutable_get['filed_after'] = '%s-%02d-%02d' % \
+                                     (after.year, after.month, after.day)
+    mutable_get['sort'] = cd['sort']
+
+    for court in COURTS:
+        mutable_get['court_%s' % court['pk']] = cd['court_%s' % court['pk']]
+
+    return SearchForm(mutable_get)
+
+
 class SearchForm(forms.Form):
     q = forms.CharField(
         required=False
@@ -155,7 +180,7 @@ class SearchForm(forms.Form):
     #     part of a cleanup routine. This way a user can do a query for page=2, and still have all the correct
     #     defaults.
     #  2. In our search form, part of what we do is clean up the GET requests that the user sent. This is completed in
-    #     views._clean_form(). This allows a user to be taught what better queries look like. To do this, we have to
+    #     _clean_form(). This allows a user to be taught what better queries look like. To do this, we have to
     #     make a temporary variable in _clean_form() and assign it the values of the cleaned_data. The upshot of this
     #     is that most changes made here will also need to be made in _clean_form(). Failure to do that will result in
     #     the query being processed correctly (search results are all good), but the form on the UI won't be cleaned up

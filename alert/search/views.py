@@ -3,7 +3,7 @@ from alert.alerts.forms import CreateAlertForm
 from alert.lib import search_utils
 from alert.lib import sunburnt
 from alert.lib.bot_detector import is_bot
-from alert.search.forms import SearchForm, COURTS
+from alert.search.forms import SearchForm, COURTS, _clean_form
 
 from alert import settings
 from django.contrib import messages
@@ -15,31 +15,6 @@ from django.views.decorators.cache import never_cache
 from alert.stats import tally_stat
 
 logger = logging.getLogger(__name__)
-
-
-def _clean_form(request, cd):
-    """Returns cleaned up values as a Form object.
-    """
-    # Make a copy of request.GET so it is mutable
-    mutable_get = request.GET.copy()
-
-    # Send the user the cleaned up query
-    mutable_get['q'] = cd['q']
-    if mutable_get.get('filed_before') and cd.get('filed_before') is not None:
-        # Don't use strftime since it won't work prior to 1900.
-        before = cd['filed_before']
-        mutable_get['filed_before'] = '%s-%02d-%02d' % \
-                                      (before.year, before.month, before.day)
-    if mutable_get.get('filed_after') and cd.get('filed_before') is not None:
-        after = cd['filed_after']
-        mutable_get['filed_after'] = '%s-%02d-%02d' % \
-                                     (after.year, after.month, after.day)
-    mutable_get['sort'] = cd['sort']
-
-    for court in COURTS:
-        mutable_get['court_%s' % court['pk']] = cd['court_%s' % court['pk']]
-
-    return SearchForm(mutable_get)
 
 
 @never_cache

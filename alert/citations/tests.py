@@ -12,10 +12,6 @@ from django.test import TestCase
 from datetime import date
 
 
-class CiteTestNew(TestCase):
-    pass
-
-
 class CiteTest(TestCase):
     def test_reporter_tokenizer(self):
         """Do we tokenize correctly?"""
@@ -126,11 +122,10 @@ class CiteTest(TestCase):
                                        court='scotus')]),
             # 7. Cranch. --> Not a variant, but could refer to either Cranch's Supreme Court cases or his DC ones.
             #                In this case, we cannot disambiguate. Years are not known, and we have no further clues.
-            #                We must simply return what we've been given.
+            #                We must simply drop Cranch from the results.
             ('1 Cranch 1 1 U.S. 23',
              [find_citations.Citation(volume=1, reporter='U.S.', page=23, canonical_reporter='U.S.', lookup_index=0,
-                                       court='scotus'),
-              find_citations.Citation(volume=1, reporter='Cranch', page=1, canonical_reporter='Cranch')]),
+                                       court='scotus')]),
             # 8. Unsolved problem. In theory, we could use parallel citations to resolve this, because Rob is getting
             # cited next to La., but we don't currently know the proximity of citations to each other, so can't use
             # this.
