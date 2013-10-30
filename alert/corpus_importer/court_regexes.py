@@ -407,7 +407,7 @@ state_pairs = (
         (re.compile('Supreme Court.*Albany County', re.I), 'nyappdiv'),
         (re.compile('Supreme Court.*New York County', re.I), 'nyappdiv'),
         (re.compile('Supreme Court.*Kings County', re.I), 'nyappdiv'),
-        (re.compile('Supreme Court.*Oneida County.', re.I), 'nyappdiv'),
+        (re.compile('Supreme Court.*Oneida County', re.I), 'nyappdiv'),
         (re.compile('Supreme Court.*Queens County', re.I), 'nyappdiv'),
         (re.compile('Supreme Court.*Schenectady County', re.I), 'nyappdiv'),
         (re.compile('Supreme Court.*Westchester County', re.I), 'nyappdiv'),
