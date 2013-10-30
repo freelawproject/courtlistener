@@ -408,7 +408,7 @@ state_pairs = (
         (re.compile('Supreme Court.*New York County', re.I), 'nyappdiv'),
         (re.compile('Supreme Court.*Kings County', re.I), 'nyappdiv'),
     (re.compile('Family Court.*New York', re.I), 'nyfamct'),
-    (re.compile('Surrogate\'s Court', re.I), 'surct'),
+    (re.compile('Surrogate\'s Court', re.I), 'nysurct'),
     (re.compile('Supreme Court of North Carolina', re.I), 'nc'),
     (re.compile('Court of Appeals? (of )?North Carolina', re.I), 'ncctapp'),
         (re.compile('North Carolina Court of Appeals', re.I), 'ncctapp'),
