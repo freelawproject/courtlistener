@@ -200,6 +200,8 @@
 
    <field name="timestamp" type="date" indexed="true" stored="true" default="NOW" multiValued="false"/>
 
+   <field name="pagerank" type="pagerank" indexed="true"  stored="true"/>
+
    <!-- Dynamic field definitions allow using convention over configuration
        for fields via the specification of patterns to match field names.
        EXAMPLE:  name="*_i" will match any field ending in _i (like myid_i, z_i)
@@ -1176,6 +1178,13 @@
         <filter class="solr.SnowballPorterFilterFactory" language="Turkish"/>
       </analyzer>
     </fieldType>
+
+    <!-- Pagerank External File Field Type-->
+    <fieldType name="pagerank"
+               keyField="id"
+               stored="false" indexed="true"
+               class="solr.ExternalFileField"
+               valType="float"/>
 
  </types>
 

@@ -7,7 +7,7 @@ from django import forms
 import re
 
 SORT_CHOICES = (
-    ('score desc', 'Keyword relevance'),
+    ('score desc', 'Relevance'),
     ('dateFiled desc', 'Newest first'),
     ('dateFiled asc', 'Oldest first'),
     ('citeCount desc', 'Most cited first'),

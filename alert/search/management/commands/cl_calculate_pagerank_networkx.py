@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     args = '<args>'
     help = 'Calculate pagerank value for every case'
+    RESULT_FILE_PATH = './Solr/data/2/external_pagerank'
+    result_file = open(RESULT_FILE_PATH, 'w')
 
     def do_pagerank(self, verbosity=1):
         #####################
@@ -83,13 +85,15 @@ class Command(BaseCommand):
                         old_pr,
                         pr_result[id]
                     ))
+                    self.result_file.write('{}={}\n'.format(id, pr_result[id]))
                 else:
                     logger.info("ID: {0}\told pagerank is {1}\tnew pagerank is {2}\n".format(
                         id,
                         old_pr,
                         old_pr
                     ))
-            #Because NetworkX removed the isolated nodes, these nodes will be updated below
+                    self.result_file.write('{}={}\n'.format(id, old_pr))
+            #Because NetworkX removed the isolated nodes, which will be updated below
             except KeyError:
                 if abs(old_pr - min_value) > UPDATE_THRESHOLD:
                     Document.objects.filter(pk=int(id)).update(pagerank=min_value)
@@ -99,14 +103,18 @@ class Command(BaseCommand):
                         old_pr,
                         min_value
                     ))
+                    self.result_file.write('{}={}\n'.format(id, min_value))
                 else:
                     logger.info("ID: {0}\told pagerank is {1}\tnew pagerank is {2}\n".format(
                         id,
                         old_pr,
                         old_pr
                     ))
+                    self.result_file.write('{}={}\n'.format(id, old_pr))
             if verbosity >= 1:
-                sys.stdout.write('\rUpdating Pagerank in database...{:.0%}'.format(progress * 1.0 / graph_size))
+                sys.stdout.write('\rUpdating Pagerank in database and external file...{:.0%}'.format(
+                    progress * 1.0 / graph_size
+                ))
                 sys.stdout.flush()
 
         if verbosity >= 1:
@@ -115,6 +123,8 @@ class Command(BaseCommand):
                 update_count * 1.0 / graph_size
             ))
             sys.stdout.write('See the django log for more details.\n')
+
+        self.result_file.close()
 
     def handle(self, *args, **options):
         self.do_pagerank(verbosity=int(options.get('verbosity', 1)))

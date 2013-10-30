@@ -228,6 +228,9 @@ def build_main_query(cd, highlight=True):
 
     # Sorting for the main query
     main_params['sort'] = cd.get('sort', '')
+    
+    if str(main_params['sort']).startswith('score'):
+        main_params['boost'] = 'pagerank'
 
     if highlight:
         # Requested fields for the main query. We only need the fields here that
