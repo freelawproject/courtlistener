@@ -250,6 +250,7 @@ fb_pairs = (
         (re.compile('S.D.N.Y', re.I), 'nysb'),
     (re.compile('W\.? ?D(\.|(istrict))? (of )?New York', re.I), 'nywb'),
     (re.compile('E\.? ?D(\.|(istrict))? (of )?North Carolina', re.I), 'nceb'),
+        (re.compile('North Carolina,? Raleigh Division', re.I), 'nceb'),
     (re.compile('M\.? ?D(\.|(istrict))? (of )?North Carolina', re.I), 'ncmb'),
     (re.compile('W\.? ?D(\.|(istrict))? (of )?North Carolina', re.I), 'ncwb'),
     (re.compile('North Dakota', re.I), 'ndb'),
