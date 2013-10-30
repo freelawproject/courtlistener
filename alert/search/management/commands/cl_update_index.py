@@ -218,17 +218,9 @@ class Command(BaseCommand):
         existing documents will be updated.
         """
         self.stdout.write("Adding or updating all documents...\n")
-        docs = queryset_generator(Document.objects.all())
-        count = Document.objects.all().count()
-        self._chunk_queryset_into_tasks(docs, count)
-
-    @print_timing
-    def add_or_update_all_fast(self):
-        """Iterates over the entire corpus, adding items to the index in batches of 200.
-        """
         docs = queryset_generator(Document.objects.all(), chunksize=5000)
         count = Document.objects.all().count()
-        self._chunk_queryset_into_tasks_fast(docs, count)
+        self._chunk_queryset_into_tasks(docs, count)
 
     @print_timing
     def optimize(self):
