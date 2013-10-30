@@ -1,17 +1,15 @@
 Install instructions for the courtlistener project
 --------------------------------------------------
 
-Previous to 2013-01-25, CL had an install script that attempted to install 
-everything on your computer for you. It was hundreds of lines long, poorly 
-maintained and when it broke (which it often did), people were usually stumped
-how to proceed. You can still find it in the repository, if you're so inclined.
+You have two options for installing the CourtListener project. You may either
+follow the instructions on our wiki:
+ - https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/wiki/HowTo
 
-Going forward, it's a hands-on approach, where you install and configure 
-everything manually. That's the bad news, because it means more work for you, 
-humble coder. The good news is that we have copious notes about how to do this, 
-and they're even in a wiki, so you can edit them if needed. 
+Or you may simply use the Free Law Virtual Machine, discussed here:
+ - http://freelawproject.org/2013/10/15/free-law-virtual-machine-available-for-academics-and-developers/
 
-Here they are: https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/wiki/HowTo
+And available here:
+ - https://www.courtlistener.com/tools/free-law-machine/
 
 Please don't hesitate to get in touch in the forum if you have questions.
 
