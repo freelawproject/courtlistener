@@ -461,7 +461,7 @@ def get_court_object(html, citations=None, case_path=None, judge=None):
     # Second District")
     if citations:
         reporter_keys = [citation.canonical_reporter for citation in citations]
-        if 'Cal. Rptr.' in reporter_keys or 'Cal.App.' in reporter_keys:
+        if 'Cal. Rptr.' in reporter_keys or 'Cal. App.' in reporter_keys:
             # It's a california court, but which?
             for text_element in text_elements:
                 text_element = clean_string(text_element).strip('.')
