@@ -59,6 +59,7 @@ We welcome a conversion of these notes to a better process using Fabric.
    - Run the alerts manually.
    - Make sure that that the case from 2103 is fixed in Solr
    - https://www.courtlistener.com/scotus/rmu/the-united-states-v-klintock/ has been falsely merged. Unmerge it. (2013-10-29 20:31:03.770218)
+   - There are ~56 duplicates in bad_log.txt
 
 2013-10-21:
  - Removes resource.org polling. If you have used this, remove the cached file in the robots directory and any
