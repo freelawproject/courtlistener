@@ -2,6 +2,7 @@ __author__ = 'Krist Jin'
 
 from alert.search.models import Document
 from alert.lib.db_tools import queryset_generator
+from alert.lib.solr_core_admin import get_solr_core_status
 from django.core.management.base import BaseCommand
 import logging
 import sys
@@ -14,7 +15,8 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     args = '<args>'
     help = 'Calculate pagerank value for every case'
-    RESULT_FILE_PATH = './Solr/data/2/external_pagerank'
+    status_doc = get_solr_core_status()
+    RESULT_FILE_PATH = status_doc.xpath('//*[@name= "dataDir"][../*[@name="name" = "collection1"]]/text()')[0]
     result_file = open(RESULT_FILE_PATH, 'w')
 
     def do_pagerank(self, verbosity=1):
