@@ -1182,8 +1182,7 @@
     <!-- Pagerank External File Field Type-->
     <fieldType name="pagerank"
                keyField="id"
-               defVal="0"
-               stored="true" indexed="true"
+               stored="false" indexed="true"
                class="solr.ExternalFileField"
                valType="float"/>
 

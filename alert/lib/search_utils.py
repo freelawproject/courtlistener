@@ -132,10 +132,7 @@ def build_main_query(cd, highlight=True):
     # Sorting for the main query
     main_params['sort'] = cd.get('sort', '')
     
-    # if user choose "Relevance"(the sort param will start with 'score'), then
-    # "&defType=edismax&boost=pagerank" will be added to the URL, which means boosting with pagerank.
     if str(main_params['sort']).startswith('score'):
-        main_params['defType'] = 'edismax'
         main_params['boost'] = 'pagerank'
 
     if highlight:
