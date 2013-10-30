@@ -338,7 +338,7 @@ state_pairs = (
         (re.compile('Court of General Sessions', re.I), 'delsuperct'),
         (re.compile('Court of Oyer and Terminer of Delaware', re.I), 'delsuperct'),
     (re.compile('Family Court of Delaware', re.I), 'delfamct'),
-    (re.compile('Court on the Judiciary of Delaware', 'deljudct')),
+    (re.compile('Court on the Judiciary of Delaware', re.I), 'deljudct'),
     (re.compile('Supreme Court of Florida', re.I), 'fla'),
         (re.compile('Supreme Court.*Nassau County', re.I), 'fla'),
     (re.compile('District Courts? of Appeal (of )?Florida', re.I), 'fladistctapp'),
