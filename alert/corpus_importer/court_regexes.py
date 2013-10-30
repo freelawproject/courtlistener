@@ -404,7 +404,7 @@ state_pairs = (
         (re.compile('New Mexico Court of Appeals', re.I), 'nmctapp'),
     (re.compile('Court of Appeals? of (the State of )?New York', re.I), 'ny'),
     (re.compile('Appellate Division of the Supreme Court of the State of New York', re.I), 'nyappdiv'),
-        (re.compile('Supreme Court, Albany County', re.I), 'nyappdiv'),
+        (re.compile('Supreme Court.*Albany County', re.I), 'nyappdiv'),
         (re.compile('Supreme Court.*New York County', re.I), 'nyappdiv'),
         (re.compile('Supreme Court.*Kings County', re.I), 'nyappdiv'),
         (re.compile('Supreme Court.*Queens County', re.I), 'nyappdiv'),

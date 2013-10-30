@@ -66,6 +66,10 @@ We welcome a conversion of these notes to a better process using Fabric.
         - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/1st/303/Goldberg_Holding_Corp._v._Blier,_60_Misc._2d_374.html (NY Civil Court)
         - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/1st/300/Teska_v._ATL._NAT._INS._CO.,_59_Misc._2d_615.html
         - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/1st/304/McConaghley_v._City_of_NY,_60_Misc._2d_825.html
+        - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/1st/302/Garfinkel_v._LEHMAN_FLOOR_COVERING,_60_Misc._2d_72.html
+        - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/2d/59/People_v._Colon,_110_Misc._2d_917.html
+        - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/2d/18/People_v._Clute,_47_Misc._2d_1005.html
+        - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/2d/34/People_v._Beltrand,_63_Misc._2d_1041.html
    - Multi-merges.
    - Update the fixtures.
 
