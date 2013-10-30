@@ -237,7 +237,10 @@ def get_dup_stats(doc):
             length_diff = abs(len(candidate_stripped_content) - len(new_stripped_content))
         except ZeroDivisionError:
             length_diff = 0
-        percent_diff = float(length_diff) / len(new_stripped_content)
+        try:
+            percent_diff = float(length_diff) / len(new_stripped_content)
+        except ZeroDivisionError:
+            percent_diff = 0
         cos_sim = get_cosine_similarity(doc.body_text, candidate['text'])
         percent_diffs.append(percent_diff)
         gestalt_diffs.append(gen_diff_ratio(candidate_stripped_content, new_stripped_content))
