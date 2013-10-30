@@ -187,10 +187,6 @@ div.shown ul {
     padding: 0 0 0 17px;
 }
 
-.more {
-    float: right;
-}
-
 /* cited by viewer styling */
 #cited-by-viewer hr {
     margin-bottom: 2px;
