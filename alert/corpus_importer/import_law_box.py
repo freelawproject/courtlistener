@@ -5,7 +5,6 @@ execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alert.settings")
 
-from citations.tasks import update_document_by_id
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 from juriscraper.lib import parse_dates
 import pickle
