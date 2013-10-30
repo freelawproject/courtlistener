@@ -143,7 +143,8 @@ def get_case_name(complete_html_tree, case_path):
             case_name = fixes[case_path]['case_name']
         except KeyError:
             if 'input_case_names' in DEBUG:
-                subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
+                if 'firefox' in DEBUG:
+                    subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
                 input_case_name = raw_input('  No case name found. What should be here? ')
                 add_fix(case_path, input_case_name)
                 case_name = input_case_name
