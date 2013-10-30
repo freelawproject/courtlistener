@@ -54,6 +54,8 @@ We welcome a conversion of these notes to a better process using Fabric.
    - Delete the old dump files and kick off the rebuild dump_all_cases.py
    - Kick off cl_add_citations_to_docs to make the data go live in the index.
    - Monitor disk space, htop, iotop.
+   - Run the alerts manually.
+   - Make sure that that the case from 2103 is fixed in Solr
 
 2013-10-21:
  - Removes resource.org polling. If you have used this, remove the cached file in the robots directory and any

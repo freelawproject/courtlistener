@@ -76,7 +76,7 @@
         {% if doc.download_URL or doc.local_path %}
             <div class="sidebar-section">
                 {% if doc.source != 'R' and doc.source != 'L' and doc.source != 'LR' %}
-                    <h3"><span>View Original</span></h3>
+                    <h3><span>View Original</span></h3>
                     <p>
                         {% if doc.download_URL and result.source != 'R' %}
                             <a href="{{doc.download_URL}}" class="visitable">From the court</a>
