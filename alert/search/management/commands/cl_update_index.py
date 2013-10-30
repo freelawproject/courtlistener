@@ -8,7 +8,7 @@ from alert.search.models import Document
 # Celery requires imports like this. Disregard syntax error.
 from search.tasks import delete_docs
 from search.tasks import add_or_update_docs
-from search.tasks import add_or_update_doc_object
+from search.tasks import add_or_update_doc_objects
 
 from celery.task.sets import TaskSet
 from django.conf import settings
@@ -91,7 +91,7 @@ class Command(BaseCommand):
 
         return proceed
 
-    def _chunk_queryset_into_tasks(self, docs, count, chunksize=1000):
+    def _chunk_queryset_into_tasks(self, docs, count, chunksize=5000, bundle_size=250):
         """Chunks the queryset passed in, and dispatches it to Celery for
         adding to the index.
 
@@ -101,20 +101,21 @@ class Command(BaseCommand):
            somehow eliminated while keeping Celery's tasks list from running away?
         """
         processed_count = 0
-        not_in_use = 0
         subtasks = []
+        doc_bundle = []
         for doc in docs:
             # Make a search doc, and add it to the index
+            last_document = (count == processed_count + 1)
             if self.verbosity >= 2:
                 self.stdout.write('Indexing document %s' % doc.pk)
-            if doc.court.in_use:
-                subtasks.append(add_or_update_doc_object.subtask((doc, self.solr_url)))
-                processed_count += 1
-            else:
-                # The document is in an unused court
-                not_in_use += 1
 
-            last_document = (count == processed_count + not_in_use)
+            doc_bundle.append(doc)
+            if (processed_count % bundle_size == 0) or last_document:
+                # Add the every bundle_size documents we create a subtask
+                subtasks.append(add_or_update_doc_objects.subtask((doc_bundle, self.solr_url)))
+                doc_bundle = []
+            processed_count += 1
+
             if (processed_count % chunksize == 0) or last_document:
                 # Every chunksize documents, we send the subtasks off for processing
                 job = TaskSet(tasks=subtasks)
@@ -122,7 +123,6 @@ class Command(BaseCommand):
                 while not result.ready():
                     time.sleep(1)
 
-                # The jobs finished - clean things up for the next round
                 subtasks = []
 
             if (processed_count % 50000 == 0) or last_document:
@@ -130,8 +130,12 @@ class Command(BaseCommand):
                 self.stdout.write("...running commit command...")
                 self.si.commit()
 
-            self.stdout.write("\rProcessed %d of %d.   Not in use: %d" %
-                              (processed_count, count, not_in_use))
+            sys.stdout.write("\rProcessed {}/{} ({:.0%})".format(
+                processed_count,
+                count,
+                processed_count * 1.0 / count,
+            ))
+            self.stdout.flush()
         self.stdout.write('\n')
 
     @print_timing
@@ -217,6 +221,14 @@ class Command(BaseCommand):
         docs = queryset_generator(Document.objects.all())
         count = Document.objects.all().count()
         self._chunk_queryset_into_tasks(docs, count)
+
+    @print_timing
+    def add_or_update_all_fast(self):
+        """Iterates over the entire corpus, adding items to the index in batches of 200.
+        """
+        docs = queryset_generator(Document.objects.all(), chunksize=5000)
+        count = Document.objects.all().count()
+        self._chunk_queryset_into_tasks_fast(docs, count)
 
     @print_timing
     def optimize(self):
