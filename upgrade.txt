@@ -70,6 +70,8 @@ We welcome a conversion of these notes to a better process using Fabric.
         - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/2d/59/People_v._Colon,_110_Misc._2d_917.html
         - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/2d/18/People_v._Clute,_47_Misc._2d_1005.html
         - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/2d/34/People_v._Beltrand,_63_Misc._2d_1041.html
+        - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/2d/8/People_v._Welt,_19_Misc._2d_462.html
+        - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/2d/4/MTR_KARIN_T._v._Michael_T.,_127_Misc._2d_14.html
    - Multi-merges.
    - Update the fixtures.
 
