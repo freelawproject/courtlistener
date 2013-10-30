@@ -26,6 +26,7 @@ We welcome a conversion of these notes to a better process using Fabric.
  - This initiates the work on the API. To roll this out, simply:
    - install django-tastypie: sudo pip install django-tastypie==0.10.0
    - install python-mimeparse: sudo pip install python-mimeparse==0.1.4
+   - install defusedxml: sudo pip install defusedxml
  - Documentation notes:
    - Accept headers are recommended, but can be overridden with the format GET parameter.
    - Allowed formats are json, jsonp and xml
@@ -43,6 +44,7 @@ We welcome a conversion of these notes to a better process using Fabric.
    - Make sure filtering can be done on cases_cited/cited_by
    - Add stat logging to the API
    - Add the API to robots.txt
+   - Resolve unicode issue.
 
 
 2013-10-28:
