@@ -67,7 +67,7 @@
                         </li>
                     {% endfor %}
                 </ul>
-                <a class="more" href="{{ doc.get_absolute_url }}cited-by/?{{ request.META.QUERY_STRING }}">More detail&hellip;</a>
+                <a href="{{ doc.get_absolute_url }}cited-by/?{{ request.META.QUERY_STRING }}">More citations&hellip;</a>
             </div>
         {% endif %}
 
