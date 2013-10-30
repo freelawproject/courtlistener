@@ -747,7 +747,7 @@ def find_duplicates(doc, case_path):
                 log_print("      Docket nums: %s" % doc.citation.docket_number)
                 log_print("                   %s" % filtered_candidates[k].get('docketNumber', 'None'))
                 log_print("      Cosine Similarity: %s" % filtered_stats['cos_sims'][k])
-                log_print("      Candidate URL: %s" % case_path)
+                log_print("      Candidate URL: file://%s" % case_path)
                 log_print("      Match URL: https://www.courtlistener.com%s" %
                                              (filtered_candidates[k]['absolute_url']))
 
