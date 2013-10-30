@@ -28,12 +28,17 @@ def merge_cases_simple(new, target_id):
     print "Merging %s with" % new.citation.case_name
     print "        %s" % target.citation.case_name
 
+    cached_source = target.source  # Original value is needed below.
     if target.source == 'C':
         target.source = 'LC'
     elif target.source == 'R':
         target.source = 'LR'
     elif target.source == 'CR':
         target.source = 'LCR'
+
+    # Add the URL if it's not a court one, replacing resource.org's info in some cases.
+    if cached_source == 'R':
+        target.download_URL = new.download_URL
 
     # Recreate the slug from the new case name (this changes the URL, but the old will continue working)
     target.citation.slug = trunc(slugify(new.citation.case_name), 50)
@@ -58,10 +63,6 @@ def merge_cases_simple(new, target_id):
     target.citation.lexis_cite = new.citation.lexis_cite
     target.citation.westlaw_cite = new.citation.westlaw_cite
     target.citation.neutral_cite = new.citation.neutral_cite
-
-    # Add the URL if it's not a court one, replacing resource.org's info in some cases.
-    if target.source == 'R':
-        target.download_URL = new.download_URL
 
     # Add judge information if lacking. New is dirty, but better than none.
     if not target.judges:
