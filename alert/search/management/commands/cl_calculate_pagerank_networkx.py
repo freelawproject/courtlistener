@@ -26,7 +26,7 @@ class Command(BaseCommand):
         graph_size = Document.objects.all().count()
         citing_graph = nx.DiGraph()
         qs = Document.objects.only(
-            'documentUUID',
+            'pk',
             'cases_cited',
             'pagerank'
         )
@@ -51,8 +51,8 @@ class Command(BaseCommand):
             ))
             sys.stdout.flush()
             for target_case in source_case.cases_cited.values_list('document__pk'):
-                citing_graph.add_edge(str(source_case.documentUUID), str(target_case[0]))
-            pr_db[str(source_case.documentUUID)] = source_case.pagerank
+                citing_graph.add_edge(str(source_case.pk), str(target_case[0]))
+            pr_db[str(source_case.pk)] = source_case.pagerank
 
         ######################
         #      Stage II      #

@@ -8,8 +8,6 @@ class urlToHash(models.Model):
     to the Court table, except that courts often have more than one URL they
     parse.
     """
-    hashUUID = models.AutoField("a unique ID for each hash/url pairing",
-                                primary_key=True)
     url = models.CharField("the URL that is hashed",
                            max_length=5000,
                            blank=True,
@@ -52,5 +50,5 @@ class ErrorLog(models.Model):
     def __unicode__(self):
         return "%s - %s@%s %s" % (self.log_time,
                                   self.log_level,
-                                  self.court.courtUUID,
+                                  self.court.pk,
                                   self.message)

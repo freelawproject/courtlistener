@@ -52,7 +52,7 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
             try:
                 # These are required by the DB, and thus are safe
                 # without the try/except blocks
-                row.set('id', str(doc.documentUUID))
+                row.set('id', str(doc.pk))
                 row.set('path', doc.get_absolute_url())
                 row.set('sha1', doc.sha1)
                 row.set('court', doc.court.full_name)
@@ -140,6 +140,10 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 except:
                     pass
                 try:
+                    row.set('pagerank', doc.pagerank)
+                except:
+                    pass
+                try:
                     row.set('blocked', str(doc.blocked))
                 except:
                     pass
@@ -159,6 +163,8 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 # Gather the doc text
                 if doc.html_with_citations:
                     row.text = doc.html_with_citations.translate(null_map)
+                elif doc.html_lawbox:
+                    row.text = doc.html_lawbox
                 elif doc.html:
                     row.text = doc.html
                 else:

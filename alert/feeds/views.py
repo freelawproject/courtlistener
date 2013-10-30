@@ -83,13 +83,13 @@ class court_feed(Feed):
 
     # get the court info from the URL
     def get_object(self, request, court):
-        return get_object_or_404(Court, courtUUID=court)
+        return get_object_or_404(Court, pk=court)
 
     def title(self, obj):
         return "CourtListener.com: All opinions for the " + obj.full_name
 
     def link(self, obj):
-        return '/feed/court/' + obj.courtUUID + '/'
+        return '/feed/court/' + obj.pk + '/'
 
     author_name = "CourtListener.com"
     author_email = "feeds@courtlistener.com"
@@ -97,7 +97,7 @@ class court_feed(Feed):
     def items(self, obj):
         """Do a Solr query here. Return the first 20 results"""
         conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
-        params = {'q': '*:*', 'court_exact': obj.courtUUID, 'sort': 'dateFiled desc', 'rows': '20', 'start': '0'}
+        params = {'q': '*:*', 'court_exact': obj.pk, 'sort': 'dateFiled desc', 'rows': '20', 'start': '0'}
         results_si = conn.raw_query(**params).execute()
         return results_si
 

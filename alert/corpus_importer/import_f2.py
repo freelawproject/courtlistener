@@ -298,7 +298,7 @@ def scrape_and_parse():
                     court_fix_file.write("%s|%s\n" % (sha1Hash, court))
 
             saved_court = court
-            court = Court.objects.get(courtUUID=court)
+            court = Court.objects.get(pk=court)
             if DEBUG >= 4:
                 print "Court is: %s" % court
 
@@ -449,7 +449,7 @@ def scrape_and_parse():
                 # something is afoot. Throw a big error.
                 print "Duplicate found at volume " + str(i + 1) + \
                     " and row " + str(j + 1) + "!!!!"
-                print "Found document %s in the database with doc id of %d!" % (doc, doc.documentUUID)
+                print "Found document %s in the database with doc id of %d!" % (doc, doc.pk)
                 exit(1)
 
             # save our location within the volume.

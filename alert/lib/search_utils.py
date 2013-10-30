@@ -34,7 +34,7 @@ def get_string_to_dict(get_string):
     return get_dict
 
 
-def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
+def make_stats_variable(solr_facet_values, search_form):
     """Create a useful facet variable for use in a template
 
     This function merges the fields in the form with the facet values from
@@ -45,26 +45,23 @@ def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
       2. The load after form submission. For this, we use the field.value().
     """
     facets = []
-    solr_facet_values = dict(solr_facet_values[solr_field])
+    solr_facet_values = dict(solr_facet_values['status_exact'])
     # Are any of the checkboxes checked?
     no_facets_selected = not any([field.value() for field in search_form
-                                  if field.html_name.startswith(prefix)])
+                                  if field.html_name.startswith('stat_')])
     for field in search_form:
         try:
-            count = solr_facet_values[field.html_name.replace(prefix, '')]
+            count = solr_facet_values[field.html_name.replace('stat_', '')]
         except KeyError:
             # Happens when a field is iterated on that doesn't exist in the
             # facets variable
             continue
 
         if no_facets_selected:
-            if prefix == 'stat_':
-                if field.html_name == 'stat_Precedential':
-                    checked = True
-                else:
-                    checked = False
-            else:
+            if field.html_name == 'stat_Precedential':
                 checked = True
+            else:
+                checked = False
         else:
             if field.value() is True:
                 checked = True
@@ -78,6 +75,105 @@ def make_facets_variable(solr_facet_values, search_form, solr_field, prefix):
                  field.html_name.split('_')[1]]
         facets.append(facet)
     return facets
+
+
+def merge_form_with_courts(COURTS, search_form):
+    """Merges the COURTS dict with the values from the search form.
+
+    Final value is like (note that order is significant):
+    courts = {
+        'federal': [
+            {'name': 'Eighth Circuit', 'id': 'ca8', 'checked': True, 'jurisdiction': 'F'},
+            ...
+        ],
+        'district': [
+            {'name': 'D. Delaware', 'id': 'deld', 'checked' False, 'jurisdiction': 'FD'},
+            ...
+        ],
+        'state': [
+            [{}, {}, {}][][]
+        ],
+        ...
+    }
+
+    State courts are a special exception. For layout purposes, they get bundled by supreme court and then by hand.
+    """
+
+    # Are any of the checkboxes checked?
+    checked_statuses = [field.value() for field in search_form
+                        if field.html_name.startswith('court_')]
+    no_facets_selected = not any(checked_statuses)
+    all_facets_selected = all(checked_statuses)
+    if no_facets_selected or all_facets_selected:
+        court_count = 'All'
+    else:
+        court_count = len([status for status in checked_statuses if status is True])
+
+    for field in search_form:
+        if no_facets_selected:
+            for court in COURTS:
+                court['checked'] = True
+        else:
+            for court in COURTS:
+                # We're merging two lists, so we have to do a nested loop
+                # to find the right value.
+                if 'court_%s' % court['pk'] == field.html_name:
+                    court['checked'] = field.value()
+
+    # Build the dict with jurisdiction keys and arrange courts into tabs
+    courts = {
+        'federal': [],
+        'district': [],
+        'bankruptcy': [],
+        'state': [],
+        'special': [],
+    }
+    bap_bundle = []
+    b_bundle = []
+    state_bundle = []
+    state_bundles = []
+    for court in COURTS:
+        if court['jurisdiction'] == 'F':
+            court['tab'] = 'federal'
+        elif court['jurisdiction'] == 'FD':
+            court['tab'] = 'district'
+        elif court['jurisdiction'] in ['FB', 'FBP']:
+            court['tab'] = 'bankruptcy'
+        elif court['jurisdiction'].startswith('S'):
+            court['tab'] = 'state'  # Merge all state courts.
+        elif court['jurisdiction'] in ['FS', 'C']:
+            court['tab'] = 'special'
+
+        if court['tab'] == 'bankruptcy':
+            # Bankruptcy gets bundled into BAPs and regular courts.
+            if court['jurisdiction'] == 'FBP':
+                bap_bundle.append(court)
+            else:
+                b_bundle.append(court)
+        elif court['tab'] == 'state':
+            # State courts get bundled by supreme courts
+            if court['jurisdiction'] == 'S':
+                # Whenever we hit a state supreme court, we append the previous bundle
+                # and start a new one.
+                if state_bundle:
+                    state_bundles.append(state_bundle)
+                state_bundle = [court]
+            else:
+                state_bundle.append(court)
+        else:
+            courts[court['tab']].append(court)
+    state_bundles.append(state_bundle)  # appends the final state bundle after the loop ends. Hack?
+
+    # Put the bankruptcy bundles in the courts dict
+    courts['bankruptcy'].append(bap_bundle)
+    courts['bankruptcy'].append(b_bundle)
+
+    # Divide the state bundles into the correct partitions
+    courts['state'].append(state_bundles[:15])
+    courts['state'].append(state_bundles[15:34])
+    courts['state'].append(state_bundles[34:])
+
+    return courts, court_count
 
 
 def make_date_query(cd):
@@ -97,6 +193,7 @@ def make_date_query(cd):
         # No date filters were requested
         return ""
     return 'dateFiled:%s' % date_filter
+
 
 def make_cite_count_query(cd):
     """Given the cleaned data from a form, return a valid Solr fq string"""
@@ -206,89 +303,54 @@ def build_main_query(cd, highlight=True):
     if len(main_fq) > 0:
         main_params['fq'] = main_fq
 
-    # For debugging:
     #print "Params sent to search are: %s" % '&'.join(['%s=%s' % (k, v) for k, v in main_params.items()])
     #print results_si.execute()
     return main_params
 
 
-def place_facet_queries(cd):
-    """Get facet values for the court and status filters
+def place_facet_queries(cd, conn=sunburnt.SolrInterface(settings.SOLR_URL, mode='r')):
+    """Get facet values for the status filters
 
-    Using the search form, query Solr and get the values for the court and
-    status filters. Both of these need to be queried in a single function b/c
-    they are dependent on each other. For example, when you filter using one,
-    you need to change the values of the other.
+    Using the search form, query Solr and get the values for the status filters.
     """
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
-    shared_facet_params = {}
-    court_facet_params = {}
-    stat_facet_params = {}
-
     # Build up all the queries needed
-    shared_facet_params['q'] = cd['q'] or '*:*'
-
-    shared_fq = []
-    court_fq = []
-    stat_fq = []
-    # Case Name
+    facet_params = {
+        'rows': '0',
+        'facet': 'true',
+        'facet.mincount': 0,
+        'facet.field': '{!ex=dt}status_exact',
+        'q': cd['q'] or '*:*',
+    }
+    fq = []
     if cd['case_name'] != '' and cd['case_name'] is not None:
-        shared_fq.append('caseName:(%s)' % " AND ".join(cd['case_name'].split()))
+        fq.append('caseName:(%s)' % " AND ".join(cd['case_name'].split()))
     if cd['judge']:
-        shared_fq.append('judge:(%s)' % ' AND '.join(cd['judge'].split()))
-
-    # Citations
+        fq.append('judge:(%s)' % ' AND '.join(cd['judge'].split()))
     if cd['citation']:
-        shared_fq.append('citation:%s' % cd['citation'])
+        fq.append('citation:%s' % cd['citation'])
     if cd['docket_number']:
-        shared_fq.append('docketNumber:%s' % cd['docket_number'])
+        fq.append('docketNumber:%s' % cd['docket_number'])
     if cd['neutral_cite']:
-        shared_fq.append('neutralCite:%s' % cd['neutral_cite'])
+        fq.append('neutralCite:%s' % cd['neutral_cite'])
 
-    # Dates
-    date_query = make_date_query(cd)
-    shared_fq.append(date_query)
-
-    # Citation count
-    cite_count_query = make_cite_count_query(cd)
-    shared_fq.append(cite_count_query)
+    fq.append(make_date_query(cd))
+    fq.append(make_cite_count_query(cd))
 
     # Faceting
-    shared_facet_params['rows'] = '0'
-    shared_facet_params['facet'] = 'true'
-    shared_facet_params['facet.mincount'] = 0
-    court_facet_params['facet.field'] = '{!ex=dt}court_exact'
-    stat_facet_params['facet.field'] = '{!ex=dt}status_exact'
-    selected_courts_string = get_selected_field_string(cd, 'court_')
+    selected_courts_string = get_selected_field_string(cd, 'court_')  # Status facets depend on court checkboxes
     selected_stats_string = get_selected_field_string(cd, 'stat_')
-    if len(selected_courts_string) > 0:
-        court_fq.extend(['{!tag=dt}court_exact:(%s)' % selected_courts_string,
-                         'status_exact:(%s)' % selected_stats_string])
     if len(selected_stats_string) > 0:
-        stat_fq.extend(['{!tag=dt}status_exact:(%s)' % selected_stats_string,
-                        'court_exact:(%s)' % selected_courts_string])
-
-    # Add the shared fq values to each parameter value
-    court_fq.extend(shared_fq)
-    stat_fq.extend(shared_fq)
+        fq.extend(['{!tag=dt}status_exact:(%s)' % selected_stats_string,
+                   'court_exact:(%s)' % selected_courts_string])
 
     # If a param has been added to the fq variables, then we add them to the
     # main_params var. Otherwise, we don't, as doing so throws an error.
-    if len(court_fq) > 0:
-        court_facet_params['fq'] = court_fq
-    if len(stat_fq) > 0:
-        stat_facet_params['fq'] = stat_fq
+    if len(fq) > 0:
+        facet_params['fq'] = fq
 
-    # We add shared parameters to each parameter variable
-    court_facet_params.update(shared_facet_params)
-    stat_facet_params.update(shared_facet_params)
+    stat_facet_fields = conn.raw_query(**facet_params).execute().facet_counts.facet_fields
 
-    court_response = conn.raw_query(**court_facet_params).execute()
-    count = court_response.result.numFound
-    court_facet_fields = court_response.facet_counts.facet_fields
-    stat_facet_fields = conn.raw_query(**stat_facet_params).execute().facet_counts.facet_fields
-
-    return court_facet_fields, stat_facet_fields, count
+    return stat_facet_fields
 
 
 def get_court_start_year(conn, court):

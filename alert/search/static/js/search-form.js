@@ -2,10 +2,16 @@ $(document).ready(function() {
     var cited_gt = $('#id_cited_gt');
     var cited_lt = $('#id_cited_lt');
 
+    ////////////////////////
+    // Sidebar generation //
+    ////////////////////////
     $('#extra-sidebar-fields').prependTo('#sidebar-facet-placeholder');
     $('#extra-sidebar-fields').show();
 
-    $('#search-form, #sidebar-search-form').submit(function (e) {
+    /////////////////////
+    // Form submission //
+    /////////////////////
+    $('#search-form, #sidebar-search-form, #court-picker-search-form').submit(function (e) {
         // Overrides the submit buttons so that they gather the correct
         // form elements before submission.
         e.preventDefault();
@@ -24,21 +30,23 @@ $(document).ready(function() {
             return this.value != "";
         }));
 
-        // Put these last, so they don't make the URL totally insane.
-        if ($('#id_court_all:checked').length == 0) {
-            // Add the court checkboxes that are selected as a single input element
-            var checked_courts = $('.court-checkbox:checked');
+        // Add the court checkboxes that are selected as a single input element
+        var checked_courts = $('.court-checkbox:checked');
+        if (checked_courts.length != $('.court-checkbox').length){
+            // Only do this if all courts aren't checked to keep URLs short.
             var values = [];
             for (var i = 0; i < checked_courts.length; i++) {
-                values.push(checked_courts[i].name.split('_')[1]);
+                values.push(checked_courts[i].id.split('_')[1]);
             }
             var court_str = values.join(" ");
             var el = jQuery('<input/>', {
                 value: court_str,
                 name: 'court'
             });
-            gathered = gathered.add(el);
         }
+
+        gathered = gathered.add(el);
+
         if ($('.status-checkbox:checked').length <= $('.status-checkbox').length) {
             // Add the status checkboxes that are selected
             gathered = gathered.add($('.status-checkbox:checked'));
@@ -54,6 +62,10 @@ $(document).ready(function() {
         document.location = '/?' + $('#search-form').serialize();
     });
 
+
+    ////////////
+    // Slider //
+    ////////////
     if (cited_gt.val() == "") {
         cited_gt.val(0);
     }
@@ -85,31 +97,45 @@ $(document).ready(function() {
         $('#citation-count').text("(" + $("#id_cited_gt").val() + " - " + $("#id_cited_lt").val() + ")")
     }
 
-    $('#id_court_all').click(function() {
-        // Makes the check all box (un)check the other boxes
-        $("input.court-checkbox:not(:disabled)").attr('checked', $('#id_court_all').is(':checked'));
-    });
-    $("input.court-checkbox").click(function(){
-        if ($('input.court-checkbox:not(:disabled)').not(':checked').length == 0) {
-            // If all checkboxes will be checked once this is checked, check the check all box.
-            $("#id_court_all").attr('checked', true);
-        } else {
-            // Else, uncheck the check all.
-            $("#id_court_all").attr('checked', false);
+    //////////////////
+    // Court Picker //
+    //////////////////
+    function listFilter(list, input) {
+        var checkbox_sections = list.find('.sidebar-checkbox');
+        function filter() {
+            var regex = new RegExp('\\b' + this.value, "i");
+            var $els = checkbox_sections.filter(function () {
+                return regex.test($(this).find('label').text());
+            });
+            checkbox_sections.not($els).find('input').prop('checked', false);
+            $els.find('input').prop('checked', true);
         }
+        input.keyup(filter).change(filter)
+    }
+    jQuery(function ($) {
+        listFilter($('.tab-content'), $('#court-filter'));
     });
-
-    $('.sidebar-section h3').click(function() {
-        // Toggles the sidebar sections
-        $(this).siblings('.hidden').toggle('fast');
-        $(this).siblings('.shown').toggle('fast');
-        $(this).toggleClass('arrow-right-before');
-        $(this).toggleClass('arrow-down-before');
+    $('.clear-filter').click(function () {
+        // Clears the input box and reshows any filtered boxes.
+        $('#court-filter').val('');
+        $('.visible-count p').hide();
+        $('.sidebar-checkbox').show();
     });
-
-    $('#create-alert-header').click(function(){
-        // Puts the cursor in the alertName box when the create alert section is expanded.
-        $('#id_alertName').focus();
+    $('#check-all').click(function() {
+        // Makes the check all box (un)check the other boxes
+        $("#modal-court-picker .tab-pane input").prop('checked', true);
+    });
+    $('#clear-all').click(function () {
+        // Makes the check all box (un)check the other boxes
+        $("#modal-court-picker .tab-pane input").prop('checked', false);
+    });
+    $('#check-current').click(function () {
+        // Makes the check all box (un)check the other boxes
+        $("#modal-court-picker .tab-pane.active input").prop('checked', true);
+    });
+    $('#clear-current').click(function () {
+        // Makes the check all box (un)check the other boxes
+        $("#modal-court-picker .tab-pane.active input").prop('checked', false);
     });
 });
 Modernizr.load({

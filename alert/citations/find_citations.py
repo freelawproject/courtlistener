@@ -19,10 +19,10 @@ STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed",
 # Store court values to avoid repeated DB queries
 if 'test' in sys.argv:
     # If it's a test, we can't count on the database being prepped, so we have to load lazily
-    ALL_COURTS = Court.objects.all().values('citation_string', 'courtUUID')
+    ALL_COURTS = Court.objects.all().values('citation_string', 'pk')
 else:
     # list() forces early evaluation of the queryset so we don't have issues with closed cursors.
-    ALL_COURTS = list(Court.objects.all().values('citation_string', 'courtUUID'))
+    ALL_COURTS = list(Court.objects.all().values('citation_string', 'pk'))
 
 
 class Citation(object):
@@ -154,7 +154,7 @@ def get_court_by_paren(paren_string, citation):
         for court in ALL_COURTS:
             # Use startswith because citations are often missing final period, e.g. "2d Cir"
             if court['citation_string'].startswith(court_str):
-                court_code = court['courtUUID']
+                court_code = court['pk']
                 break
 
     return court_code
@@ -295,7 +295,9 @@ def disambiguate_reporters(citations):
         - More than one variation, which is an edition
         - ...
 
-    For variants, we just need to sort out the canonical_reporter
+    For variants, we just need to sort out the canonical_reporter.
+
+    If it's not possible to disambiguate the reporter, we simply have to drop it.
     """
     unambiguous_citations = []
     for citation in citations:
@@ -376,15 +378,6 @@ def disambiguate_reporters(citations):
                     unambiguous_citations.append(citation)
                     continue
 
-    # At this point, unambiguous_citations is as populated with resolved citations as it can be. Add in any missing
-    # ambiguous citations and that's that. There was a possibility that we could disambiguate based on parallel
-    # citation, but that will never work because often the citations we're working with are from vastly different
-    # courts.
-    if len(citations) != len(unambiguous_citations):
-        for citation in citations:
-            if citation not in unambiguous_citations:
-                unambiguous_citations.append(citation)
-
     return unambiguous_citations
 
 
@@ -408,7 +401,7 @@ def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
                 add_defendant(citation, words, i)
             citations.append(citation)
 
-    # Disambiguate all the reporters
+    # Disambiguate or drop all the reporters
     citations = disambiguate_reporters(citations)
 
     for citation in citations:

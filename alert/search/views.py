@@ -3,7 +3,7 @@ from alert.alerts.forms import CreateAlertForm
 from alert.lib import search_utils
 from alert.lib import sunburnt
 from alert.lib.bot_detector import is_bot
-from alert.search.forms import SearchForm, COURTS
+from alert.search.forms import SearchForm, COURTS, _clean_form
 
 from alert import settings
 from django.contrib import messages
@@ -15,32 +15,6 @@ from django.views.decorators.cache import never_cache
 from alert.stats import tally_stat
 
 logger = logging.getLogger(__name__)
-
-
-def _clean_form(request, cd):
-    """Returns cleaned up values as a Form object.
-    """
-    # Make a copy of request.GET so it is mutable
-    mutable_get = request.GET.copy()
-
-    # Send the user the cleaned up query
-    mutable_get['q'] = cd['q']
-    if mutable_get.get('filed_before') and cd.get('filed_before') is not None:
-        # Don't use strftime since it won't work prior to 1900.
-        before = cd['filed_before']
-        mutable_get['filed_before'] = '%s-%02d-%02d' % \
-                                      (before.year, before.month, before.day)
-    if mutable_get.get('filed_after') and cd.get('filed_before') is not None:
-        after = cd['filed_after']
-        mutable_get['filed_after'] = '%s-%02d-%02d' % \
-                                     (after.year, after.month, after.day)
-    mutable_get['court_all'] = cd['court_all']
-    mutable_get['sort'] = cd['sort']
-
-    for court in COURTS:
-        mutable_get['court_%s' % court[0]] = cd['court_%s' % court[0]]
-
-    return SearchForm(mutable_get)
 
 
 @never_cache
@@ -90,12 +64,9 @@ def show_results(request):
             search_form = _clean_form(request, cd)
             try:
                 results_si = conn.raw_query(**search_utils.build_main_query(cd))
-                court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(cd)
-                # Create facet variables that can be used in our templates
-                court_facets = search_utils.make_facets_variable(
-                    court_facet_fields, search_form, 'court_exact', 'court_')
-                status_facets = search_utils.make_facets_variable(
-                    stat_facet_fields, search_form, 'status_exact', 'stat_')
+                stat_facet_fields = search_utils.place_facet_queries(cd, conn)
+                status_facets = search_utils.make_stats_variable(stat_facet_fields, search_form)
+                courts, court_count = search_utils.merge_form_with_courts(COURTS, search_form)
                 if not is_bot(request):
                     tally_stat('search.results')
             except Exception, e:
@@ -126,11 +97,9 @@ def show_results(request):
             initial_values[k] = v.initial
         # Make the queries
         results_si = conn.raw_query(**search_utils.build_main_query(initial_values))
-        court_facet_fields, stat_facet_fields, count = search_utils.place_facet_queries(initial_values)
-        court_facets = search_utils.make_facets_variable(
-            court_facet_fields, search_form, 'court_exact', 'court_')
-        status_facets = search_utils.make_facets_variable(
-            stat_facet_fields, search_form, 'status_exact', 'stat_')
+        stat_facet_fields = search_utils.place_facet_queries(initial_values, conn)
+        status_facets = search_utils.make_stats_variable(stat_facet_fields, search_form)
+        courts, court_count = search_utils.merge_form_with_courts(COURTS, search_form)
 
     # Set up pagination
     try:
@@ -159,10 +128,10 @@ def show_results(request):
         {'search_form': search_form,
          'alert_form': alert_form,
          'results': paged_results,
-         'court_facets': court_facets,
+         'courts': courts,
+         'court_count': court_count,
          'status_facets': status_facets,
          'get_string': get_string,
-         'count': count,
          'private': private},
         RequestContext(request)
     )

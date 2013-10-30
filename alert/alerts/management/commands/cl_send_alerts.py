@@ -22,7 +22,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.template import loader, Context
 
 import datetime
-from optparse import OptionParser, make_option
+from optparse import make_option
 
 
 logger = logging.getLogger(__name__)
@@ -167,7 +167,7 @@ class Command(BaseCommand):
                         # if they want an alert even when no hits.
                         hits.append([alert, None])
                         if self.verbosity >= 1:
-                            print "Sending results for negative alert %s" % alert.alertName
+                            print "Sending results for negative alert '%s'" % alert.alertName
                 except Exception, e:
                     traceback.print_exc()
                     print "Search failed on this alert: %s" % alert.alertText
@@ -182,7 +182,6 @@ class Command(BaseCommand):
         if not self.options['simulate']:
             tally_stat('alerts.sent.%s' % self.options['rate'], inc=alerts_sent_count)
             logger.info("Sent %s %s email alerts." % (alerts_sent_count, self.options['rate']))
-        return "Done"
 
     def handle(self, *args, **options):
         self.verbosity = int(options.get('verbosity', 1))

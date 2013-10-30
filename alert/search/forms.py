@@ -31,7 +31,32 @@ INPUT_FORMATS = [
 ]
 
 # Query the DB so we can build up check boxes for each court in use.
-COURTS = Court.objects.filter(in_use=True).values_list('courtUUID', 'short_name')
+COURTS = Court.objects.filter(in_use=True).values('pk', 'short_name', 'jurisdiction')
+
+
+def _clean_form(request, cd):
+    """Returns cleaned up values as a Form object.
+    """
+    # Make a copy of request.GET so it is mutable
+    mutable_get = request.GET.copy()
+
+    # Send the user the cleaned up query
+    mutable_get['q'] = cd['q']
+    if mutable_get.get('filed_before') and cd.get('filed_before') is not None:
+        # Don't use strftime since it won't work prior to 1900.
+        before = cd['filed_before']
+        mutable_get['filed_before'] = '%s-%02d-%02d' % \
+                                      (before.year, before.month, before.day)
+    if mutable_get.get('filed_after') and cd.get('filed_before') is not None:
+        after = cd['filed_after']
+        mutable_get['filed_after'] = '%s-%02d-%02d' % \
+                                     (after.year, after.month, after.day)
+    mutable_get['sort'] = cd['sort']
+
+    for court in COURTS:
+        mutable_get['court_%s' % court['pk']] = cd['court_%s' % court['pk']]
+
+    return SearchForm(mutable_get)
 
 
 class SearchForm(forms.Form):
@@ -63,14 +88,6 @@ class SearchForm(forms.Form):
             attrs={'class': 'span-5 external-input',
                    'autocomplete': 'off',
                    'tabindex': '11'}
-        )
-    )
-    court_all = forms.BooleanField(
-        label='All Courts / Clear',
-        required=False,
-        initial=True,
-        widget=forms.CheckboxInput(
-            attrs={'class': 'external-input court-checkbox left'}
         )
     )
     court = forms.CharField(
@@ -138,8 +155,8 @@ class SearchForm(forms.Form):
         """
 
         for court in COURTS:
-            self.fields['court_' + court[0]] = forms.BooleanField(
-                label=court[1],
+            self.fields['court_' + court['pk']] = forms.BooleanField(
+                label=court['short_name'],
                 required=False,
                 initial=True,
                 widget=forms.CheckboxInput(attrs={'checked': 'checked'})
@@ -163,12 +180,12 @@ class SearchForm(forms.Form):
     #     part of a cleanup routine. This way a user can do a query for page=2, and still have all the correct
     #     defaults.
     #  2. In our search form, part of what we do is clean up the GET requests that the user sent. This is completed in
-    #     views._clean_form(). This allows a user to be taught what better queries look like. To do this, we have to
+    #     _clean_form(). This allows a user to be taught what better queries look like. To do this, we have to
     #     make a temporary variable in _clean_form() and assign it the values of the cleaned_data. The upshot of this
     #     is that most changes made here will also need to be made in _clean_form(). Failure to do that will result in
     #     the query being processed correctly (search results are all good), but the form on the UI won't be cleaned up
     #     for the user, making things rather confusing.
-    #  3. We do some cleanup work in search_utils.make_facets_variable(). The work that's done there is used to check
+    #  3. We do some cleanup work in search_utils.make_stats_variable(). The work that's done there is used to check
     #     or uncheck the boxes in the sidebar, so if you tweak how they work you'll need to tweak this function.
     # In short: This is a nasty area. Comments this long are a bad sign for the intrepid developer.
     def clean_q(self):

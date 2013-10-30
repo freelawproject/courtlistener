@@ -13,9 +13,9 @@ import re
 
 def fixer(simulate=False, verbose=False):
     """Remove leading slashes by running the new and improved harmonize/clean_string scipts"""
-    docs = Document.objects.raw(r'''select Document.documentUUID
+    docs = Document.objects.raw(r'''select Document.pk
                                     from Document, Citation
-                                    where Document.citation_id = Citation.citationUUID and
+                                    where Document.citation_id = Citation.pk and
                                     Citation.case_name like '(%%';''')
 
     for doc in docs:

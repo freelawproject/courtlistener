@@ -28,7 +28,7 @@ def save_or_update_favorite(request):
         except:
             return HttpResponse("Unknown doc_id")
 
-        doc = Document.objects.get(documentUUID=doc_id)
+        doc = Document.objects.get(pk=doc_id)
         try:
             fave = Favorite.objects.get(doc_id=doc, users__user=request.user)
         except ObjectDoesNotExist:

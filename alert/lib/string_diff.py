@@ -1,32 +1,9 @@
-# This software and any associated files are copyright 2010 Brian Carver and
-# Michael Lissner.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-#  Under Sections 7(a) and 7(b) of version 3 of the GNU Affero General Public
-#  License, that license is supplemented by the following terms:
-#
-#  a) You are required to preserve this legal notice and all author
-#  attributions in this program and its accompanying documentation.
-#
-#  b) You are prohibited from misrepresenting the origin of any material
-#  within this covered work and you are required to mark in reasonable
-#  ways how any modified versions differ from the original version.
-
 import difflib
+import math
 import string
 import re
+
+from collections import Counter
 
 
 def remove_words(phrase):
@@ -51,7 +28,7 @@ def remove_words(phrase):
 
 def gen_diff_ratio(left, right):
     """
-    Genrates a difference between two strings
+    Generates a difference between two strings
     Returns a value between 0 and 1. 0 means the strings are totally different.
     1 means they are identical.
     """
@@ -96,3 +73,31 @@ def find_confidences(results, case_name):
         diff_ratios.append(diff)
 
     return diff_ratios
+
+
+def string_to_vector(text):
+    WORD = re.compile(r'\w+')
+    words = WORD.findall(text)
+    return Counter(words)
+
+
+def get_cosine_similarity(left, right):
+    """Calculate the cosine similarity of two strings.
+
+    This can be useful in circumstances when the counts of the words in the strings have more meaning that the order of
+    the characters or the edit distances of individual words.
+
+    Better for long strings with sentence-length differences, where diff_lib's ratio() can fall down.
+    """
+    left, right = string_to_vector(left), string_to_vector(right)
+    intersection = set(left.keys()) & set(right.keys())
+    numerator = sum([left[x] * right[x] for x in intersection])
+
+    sum1 = sum([left[x] ** 2 for x in left.keys()])
+    sum2 = sum([right[x] ** 2 for x in right.keys()])
+    denominator = math.sqrt(sum1) * math.sqrt(sum2)
+
+    if not denominator:
+        return 0.0
+    else:
+        return float(numerator) / denominator

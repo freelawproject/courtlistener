@@ -7,19 +7,21 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alert.settings")
 
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 from juriscraper.lib import parse_dates
-import os
 import pickle
 import random
 import re
 import subprocess
 import traceback
 from django.utils.timezone import now
+from django import db
 from lxml import html
 from alert.citations.constants import EDITIONS, REPORTERS
 from alert.citations.find_citations import get_citations
 from datetime import date, timedelta
-from alert.corpus_importer.court_regexes import fd_pairs, state_pairs
+from alert.corpus_importer.court_regexes import fd_pairs, state_pairs, disambiguate_by_judge, fb_pairs
 from alert.corpus_importer.judge_extractor import get_judge_from_str
+from alert.corpus_importer import dup_finder, dup_helpers
+from alert.lib.string_utils import anonymize
 from alert.lib.import_lib import map_citations_to_models
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
@@ -31,10 +33,30 @@ import hashlib
 from lxml.html.clean import Cleaner
 from lxml.html import tostring
 
-from alert.search.models import Document, Citation, Court
+from alert.search.models import Document, Citation, Court, save_doc_and_cite
 
 
-DEBUG = 'out'
+DEBUG = [
+    'judge',
+    'citations',
+    'case_name',
+    'date',
+    'docket_number',
+    'court',
+    #'input_citations',
+    'input_dates',
+    #'input_docket_number',
+    'input_court',
+    'input_case_names',
+    #'log_bad_citations',
+    #'log_bad_courts',
+    #'log_judge_disambiguations',
+    'log_bad_dates',
+    #'log_bad_docket_numbers',
+    #'log_bad_judges',
+    'log_multimerge',
+    'counter',
+]
 
 try:
     with open('lawbox_fix_file.pkl', 'rb') as fix_file:
@@ -45,33 +67,21 @@ except (IOError, EOFError):
 try:
     # Load up SCOTUS dates
     scotus_dates = {}
-    with open('../../cleaning_scripts/SupremeCourtCleanup/date_of_decisions.csv') as scotus_date_file:
+    with open(os.path.join(INSTALL_ROOT, 'alert', 'corpus_importer', 'scotus_dates.csv'), 'r') as scotus_date_file:
         for line in scotus_date_file:
-            line_parts = [line.strip() for line in line.split('|')]
-            if line_parts[-1]:
-                scotus_dates[line_parts[0]] = datetime.datetime.strptime(line_parts[-1].strip(), '%Y-%m-%d').date()
+            citation, date_filed = [line.strip() for line in line.split('|')]
+            date_filed = datetime.datetime.strptime(date_filed, '%Y-%m-%d')
+            try:
+                # If we get fail to get a KeyError, we append to the list we got back, else, we create such a list.
+                scotus_dates[citation].append(date_filed)
+            except KeyError:
+                scotus_dates[citation] = [date_filed]
 except IOError:
-    pass
-
-
-##########################################
-# This variable is used to do statistical work on Opinions whose jurisdiction is unclear. The problem is that
-# many Opinions, probably thousands of them, have a court like, "D. Wisconsin." Well, Wisconsin has an east and
-# west district, but no generic district, so this has to be resolved. When we hit such a case, we set it aside
-# for later processing, once we've processed all the easy cases. At that point, we will have the variable below,
-# judge stats, which will have all of the judges along with a count of their jurisdictions:
-# judge_stats = {
-#     'McKensey': {
-#         'wied': 998,
-#         'wis': 2
-#     }
-# }
-# So in this case, you can see quite clearly that McKensey is a judge at wied, and we can classify the case as
-# such.
-##########################################
-judge_stats = {}
+    print "Unable to load scotus data! Exiting."
+    sys.exit(1)
 
 all_courts = Court.objects.all()
+
 
 def add_fix(case_path, fix_dict):
     """Adds a fix to the fix dictionary. This dictionary looks like:
@@ -86,7 +96,13 @@ def add_fix(case_path, fix_dict):
         fixes[case_path] = fix_dict
 
 
-def get_citations_from_tree(complete_html_tree):
+def log_print(msg):
+    print msg
+    with open('/sata/lawbox/import_log.txt', 'a') as log:
+        log.write(msg.encode('utf-8') + '\n')
+
+
+def get_citations_from_tree(complete_html_tree, case_path):
     path = '//center[descendant::text()[not(starts-with(normalize-space(.), "No.") or starts-with(normalize-space(.), "Case No.") or starts-with(normalize-space(.), "Record No."))]]'
     citations = []
     for e in complete_html_tree.xpath(path):
@@ -96,31 +112,51 @@ def get_citations_from_tree(complete_html_tree):
         path = '//title/text()'
         text = complete_html_tree.xpath(path)[0]
         citations = get_citations(text, html=False, do_post_citation=False, do_defendant=False)
-        if not citations:
-            raise
-    if DEBUG >= 3:
-        cite_strs = [str(cite.__dict__) for cite in citations]
-        print "  Citations found: %s" % ',\n                   '.join(cite_strs)
 
+    if not citations:
+        try:
+            citations = fixes[case_path]['citations']
+        except KeyError:
+            if 'input_citations' in DEBUG:
+                subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
+                input_citation = raw_input('  No citations found. What should be here? ')
+                citation_objects = get_citations(input_citation, html=False, do_post_citation=False, do_defendant=False)
+                add_fix(case_path, {'citations': citation_objects})
+                citations = citation_objects
+
+    if 'citations' in DEBUG and len(citations):
+        cite_strs = [str(cite.__dict__) for cite in citations]
+        log_print("  Citations found: %s" % ',\n                   '.join(cite_strs))
+    elif 'citations' in DEBUG:
+        log_print("  No citations found!")
     return citations
 
 
-def get_case_name(complete_html_tree):
+def get_case_name(complete_html_tree, case_path):
     path = '//head/title/text()'
     # Text looks like: 'In re 221A Holding Corp., Inc, 1 BR 506 - Dist. Court, ED Pennsylvania 1979'
     s = complete_html_tree.xpath(path)[0].rsplit('-', 1)[0].rsplit(',', 1)[0]
     # returns 'In re 221A Holding Corp., Inc.'
-    s = harmonize(clean_string(titlecase(s)))
-    if DEBUG >= 3:
-        print "  Case name: %s" % s
-    return s
+    case_name = harmonize(clean_string(titlecase(s)))
+    if not s:
+        try:
+            case_name = fixes[case_path]['case_name']
+        except KeyError:
+            if 'input_case_names' in DEBUG:
+                subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
+                input_case_name = raw_input('  No case name found. What should be here? ')
+                add_fix(case_path, input_case_name)
+                case_name = input_case_name
+
+    if 'case_name' in DEBUG:
+        log_print("  Case name: %s" % case_name)
+    return case_name
 
 
 def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
-    if not scotus_dates:
-        print "Failed to load scotus dates."
     path = '//center[descendant::text()[not(starts-with(normalize-space(.), "No.") or starts-with(normalize-space(.), "Case No.") or starts-with(normalize-space(.), "Record No."))]]'
 
+    # Get a reasonable date range based on reporters in the citations.
     reporter_keys = [citation.reporter for citation in citations]
     range_dates = []
     for reporter_key in reporter_keys:
@@ -142,6 +178,23 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
         # Items like "February 4, 1991, at 9:05 A.M." stump the lexer in the date parser. Consequently, we purge
         # the word at, and anything after it.
         text = re.sub(' at .*', '', text)
+
+        # The parser recognizes numbers like 121118 as a date. This corpus does not have dates in that format.
+        text = re.sub('\d{5,}', '', text)
+
+        # The parser can't handle 'Sept.' so we tweak it.
+        text = text.replace('Sept.', 'Sep.')
+
+        # The parser recognizes dates like December 3, 4, 1908 as 2004-12-3 19:08.
+        re_match = re.search('\d{1,2}, \d{1,2}, \d{4}', text)
+        if re_match:
+            # These are always date argued, thus continue.
+            continue
+
+        # Sometimes there's a string like: "Review Denied July 26, 2006. Skip this.
+        if 'denied' in text.lower():
+            continue
+
         try:
             if range_dates:
                 found = parse_dates.parse_dates(text, sane_start=start, sane_end=end)
@@ -154,41 +207,52 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
             pass
 
     # Get the date from our SCOTUS date table
+    scotus_dates_found = []
     if not dates and court == 'scotus':
         for citation in citations:
             try:
-                dates.append(scotus_dates["%s %s %s" % (citation.volume, citation.reporter, citation.page)])
+                # Scotus dates are in the form of a list, since a single citation can refer to several dates.
+                found = scotus_dates["%s %s %s" % (citation.volume, citation.reporter, citation.page)]
+                if len(found) == 1:
+                    scotus_dates_found.extend(found)
             except KeyError:
                 pass
+        if len(scotus_dates_found) == 1:
+            dates = scotus_dates_found
 
     if not dates:
         # Try to grab the year from the citations, if it's the same in all of them.
         years = set([citation.year for citation in citations if citation.year])
         if len(years) == 1:
-            dates.append(date(list(years)[0], 1, 1))
+            dates.append(datetime.datetime(list(years)[0], 1, 1))
 
     if not dates:
         try:
-            dates = fixes[case_path]['dates']
+            dates = fixes[case_path]['dates'][0]
         except KeyError:
-            if DEBUG >= 4:
-                subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
-                input_date = raw_input('  No date found. What should be here (YYYY-MM-DD)? ')
-                add_fix(case_path, {'dates': [datetime.datetime.strptime(input_date, '%Y-%m-%d').date()]})
-                dates = [input_date]
-            elif DEBUG == 2:
+            if 'input_dates' in DEBUG:
+                #subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
+                print '  No date found for: file://%s' % case_path
+                input_date = raw_input('  What should be here (YYYY-MM-DD)? ')
+                add_fix(case_path, {'dates': [datetime.datetime.strptime(input_date, '%Y-%m-%d')]})
+                dates = [datetime.datetime.strptime(input_date, '%Y-%m-%d')]
+            if 'log_bad_dates' in DEBUG:
                 # Write the failed case out to file.
-                dates.append(now())
                 with open('missing_dates.txt', 'a') as out:
                     out.write('%s\n' % case_path)
 
-    if DEBUG >= 3:
-        print "  Using date: %s of dates found: %s" % (max(dates), dates)
-    return max(dates)
+    if dates:
+        if 'date' in DEBUG:
+            log_print("  Using date: %s of dates found: %s" % (max(dates), dates))
+        return max(dates)
+    else:
+        if 'date' in DEBUG:
+            log_print("  No dates found")
+        return []
 
 
-def get_precedential_status(html_tree):
-    return None
+def get_precedential_status():
+    return 'Published'
 
 
 def get_docket_number(html, case_path=None, court=None):
@@ -240,38 +304,38 @@ def get_docket_number(html, case_path=None, court=None):
             docket_number = docket_number[1:-1]
 
     if docket_number and re.search('submitted|reversed', docket_number, re.I):
-        # False positive. Happens when there's no docket number and the date is incorrectly interpretted.
+        # False positive. Happens when there's no docket number and the date is incorrectly interpreted.
+        docket_number = None
+    elif docket_number == 'Not in Source':
         docket_number = None
 
     if not docket_number:
         try:
             docket_number = fixes[case_path]['docket_number']
         except KeyError:
-            docket_number = None
-            '''
             if 'northeastern' not in case_path and \
                     'federal_reporter/2d' not in case_path and \
                     court not in ['or', 'orctapp', 'cal'] and \
                     ('unsorted' not in case_path and court not in ['ind']) and \
                     ('pacific_reporter/2d' not in case_path and court not in ['calctapp']):
                 # Lots of missing docket numbers here.
-                if DEBUG >= 2:
+                if 'input_docket_number' in DEBUG:
                     subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
-                input_doc_number = raw_input('  No docket number found. What should be here? ')
-                add_fix(case_path, {'docket_number': input_doc_number})
-            '''
-    if DEBUG >= 2:
-        print '  Docket Number: %s' % docket_number
+                    docket_number = raw_input('  No docket number found. What should be here? ')
+                    add_fix(case_path, {'docket_number': docket_number})
+                if 'log_bad_docket_numbers' in DEBUG:
+                    with open('missing_docket_numbers.txt', 'a') as out:
+                        out.write('%s\n' % case_path)
+
+    if 'docket_number' in DEBUG:
+        log_print('  Docket Number: %s' % docket_number)
     return docket_number
 
 
-def get_court_object(html, citations=None, case_path=None):
+def get_court_object(html, citations=None, case_path=None, judge=None):
     """
        Parse out the court string, somehow, and then map it back to our internal ids
     """
-    path = '//center/p/b/text()'
-    text_elements = html.xpath(path)
-
     def string_to_key(str):
         """Given a string, tries to map it to a court key."""
         # State
@@ -286,7 +350,7 @@ def get_court_object(html, citations=None, case_path=None):
 
         # Federal appeals
         if re.search('Court,? of Appeal', str) or \
-                'Circuit of Appeals' in str:
+                                 'Circuit of Appeals' in str:
             if 'First Circuit' in str or \
                     'First District' in str:
                 return 'ca1'
@@ -317,10 +381,12 @@ def get_court_object(html, citations=None, case_path=None):
                 return 'cafc'
             elif 'Emergency' in str:
                 return 'eca'
-            elif 'Court of Appeals of Columbia' in str:
+            elif 'Columbia' in str:
                 return 'cadc'
+        elif 'Judicial Council of the Eighth Circuit' in str:
+            return 'ca8'
         elif 'Judicial Council of the Ninth Circuit' in str or \
-                re.search('Ninth (Judicial )?Circuit', str):
+                re.search('Ninth Judicial Circuit', str):
             return 'ca9'
 
         # Federal district
@@ -330,6 +396,9 @@ def get_court_object(html, citations=None, case_path=None):
                     return value
         elif 'D. Virgin Islands' in str:
             return 'vid'
+        elif 'Territorial Court' in str:
+            if 'Virgin Islands' in str:
+                return 'vid'
 
         # Federal special
         elif 'United States Judicial Conference Committee' in str or \
@@ -339,7 +408,8 @@ def get_court_object(html, citations=None, case_path=None):
             return 'jpml'
         elif 'Court of Customs and Patent Appeals' in str:
             return 'ccpa'
-        elif 'Court of Claims' in str:
+        elif 'Court of Claims' in str or \
+            'Claims Court' in str:
             return 'cc'  # Cannot change
         elif 'United States Foreign Intelligence Surveillance Court' in str:
             return 'fiscr'  # Cannot change
@@ -349,6 +419,8 @@ def get_court_object(html, citations=None, case_path=None):
             return 'cusc'  # Cannot change?
         elif re.search('Special Court(\.|,)? Regional Rail Reorganization Act', str):
             return 'reglrailreorgct'
+        elif re.search('Military Commission Review', str):
+            return 'mc'
 
         # Bankruptcy Courts
         elif re.search('bankrup?tcy', str, re.I):
@@ -373,264 +445,68 @@ def get_court_object(html, citations=None, case_path=None):
 
             # Bankruptcy District Courts
             else:
-                if 'District of Columbia' in str or \
-                        'D. Columbia' in str:
-                    return 'dcb'
-                elif re.search('M(\.|(iddle))? ?D(\.|(istrict))? (of )?Alabama', str):
-                    return 'almb'
-                elif re.search('N\.? ?D(\.|(istrict))? (of )?Alabama', str):
-                    return 'alnb'
-                elif re.search('S\.? ?D(\.|(istrict))? (of )?Alabama', str):
-                    return 'alsb'
-                elif 'D. Alaska' in str:
-                    return 'akb'
-                elif re.search('D(\.|(istrict))? ?Arizona', str):
-                    return 'arb'
-                elif re.search('E\.? ?D(\.|(istrict))? ?(of )?Arkansas', str):
-                    return 'areb'
-                elif re.search('W\.? ?D(\.|(istrict))? ?(of )?Arkansas', str):
-                    return 'arwb'
-                elif re.search('C\.? ?D(\.|(istrict))? ?(of )?Cal(ifornia)?', str):
-                    return 'cacb'
-                elif re.search('E\.? ?D(\.|(istrict))? ?(of )?Cal(ifornia)?', str):
-                    return 'caeb'
-                elif re.search('N\.? ?D(\.|(istrict))? ?(of )?Cal(ifornia)?', str):
-                    return 'canb'
-                elif re.search('S\.? ?D(\.|(istrict))? ?(of )?Cal(ifornia)?', str):
-                    return 'casb'
-                elif re.search('D(\.|(istrict)) ?(of )?Colorado', str):
-                    return 'cob'
-                elif 'Connecticut' in str:
-                    return 'ctb'
-                elif re.search('D(\.|(istrict))? (of )?Delaware', str):
-                    return 'deb'
-                elif re.search('M\.? ?D(\.|(istrict))? ?(of )?Florida', str) or \
-                        re.search('Middle District (of )?Florida', str) or \
-                        'M .D. Florida' in str or \
-                        'Florida, Tampa Division' in str or \
-                        'Florida, Jacksonville Division' in str:
-                    return 'flmb'
-                elif re.search('N(\.|(orthern))? ?D(\.|(istrict))? (of )?Florida', str):
-                    return 'flnb'
-                elif re.search('S\. ?D(\.|(istrict))? (of )?Florida', str):
-                    return 'flsb'
-                elif re.search('M\.? ?D(\.|(istrict))? (of )?Georgia', str):
-                    return 'gamb'
-                elif re.search('N\.? ?D(\.|(istrict))? (of )?Georgia', str) or \
-                        'Atlanta Division' in str:
-                    return 'ganb'
-                elif re.search('S\. ?D(\.|(istrict))? Georgia', str):
-                    return 'gasb'
-                elif re.search('D(\.|(istrict))? ?Hawai', str):
-                    return 'hib'
-                elif 'D. Idaho' in str:
-                    return 'idb'
-                elif re.search('C\.? ?D(\.|(istrict))? ?(of )?Ill(inois)?', str):
-                    return 'ilcb'
-                elif re.search('N\.? ?D(\.|(istrict))? ?(of )?Ill(inois)?', str):
-                    return 'ilnb'
-                elif re.search('S\.? ?D(\.|(istrict))? ?(of )?Ill(inois)?', str):
-                    return 'ilsb'
-                elif re.search('N\.? ?D(\.|(istrict))? ?(of )?Indiana', str):
-                    return 'innb'
-                elif re.search('S.D. (of )?Indiana', str):
-                    return 'insb'
-                elif re.search('N\. ?D(\.|(istrict))? Iowa', str):
-                    return 'ianb'
-                elif re.search('S\. ?D(\.|(istrict))? (of )?Iowa', str):
-                    return 'iasb'
-                elif 'D. Kansas' in str or \
-                        'M. Kansas' in str or \
-                        'District of Kansas' in str or \
-                        'D. Kan' in str:
-                    return 'ksb'
-                elif re.search('E\.? ?D(\.|(istrict))? (of )?Kentucky', str):
-                    return 'kyeb'
-                elif re.search('W\.? ?D(\.|(istrict))? (of )?Kentucky', str):
-                    return 'kywb'
-                elif re.search('E\.? ?D(\.|(istrict))? (of )?Loui?siana', str) or \
-                        'Eastern District, Louisiana' in str:
-                    return 'laeb'
-                elif re.search('M\.? ?D(\.|(istrict))? (of )?Loui?siana', str):
-                    return 'lamb'
-                elif re.search('W\.? ?D(\.|(istrict))? (of )?Loui?siana', str):
-                    return 'lawb'
-                elif 'D. Maine' in str:
-                    return 'meb'
-                elif 'Maryland' in str:
-                    return 'mdb'
-                elif re.search('D(\.|(istrict))? ?(of )?Mass', str) or \
-                        ', Massachusetts' in str:
-                    return 'mab'
-                elif re.search('E\.? ?D(\.|(istrict))? (of )?Michigan', str):
-                    return 'mieb'
-                elif re.search('W\.D(\.|(istrict))? (of )?Michigan', str):
-                    return 'miwb'
-                elif re.search('D(\.|(istrict))? ?Minnesota', str):
-                    return 'mnb'
-                elif re.search('N\.? ?D(\.|(istrict))? (of )?Mississippi', str):
-                    return 'msnb'
-                elif re.search('S\.? ?D(\.|(istrict))? (of )?Mississippi', str):
-                    return 'mssb'
-                elif re.search('E\.? ?D(\.|(istrict))? ?(of )?Missouri', str):
-                    return 'moeb'
-                elif re.search('W\.? ?D(\.|(istrict))? ?(of )?Missouri', str):
-                    return 'mowb'
-                elif 'D. Montana' in str:
-                    return 'mtb'
-                # Here we avoid a conflict with state abbreviations
-                elif re.search('D(\.|(istrict))? (of )?Neb(raska)?', str):
-                    return 'nebraskab'
-                elif 'Nevada' in str:
-                    return 'nvb'
-                elif 'New Hampshire' in str or \
-                        'D.N.H' in str:
-                    return 'nhb'
-                elif re.search('D(\.|(istrict))? ?New Jersey', str) or \
-                        ', New Jersey' in str:
-                    return 'njb'
-                elif 'New Mexico' in str or \
-                        'State of New Mexico' in str:
-                    return 'nmb'
-                elif re.search('E\.? ?D(\.|(istrict))? (of )?New York', str) or \
-                        'E.D.N.Y' in str:
-                    return 'nyeb'
-                elif re.search('N\.? ?D(\.|(istrict))? (of )?New York', str):
-                    return 'nynb'
-                elif re.search('S\. ?D(\.|(istrict))? (of )?New York', str) or \
-                        'Southern District of New York' in str or \
-                        'S.D.N.Y' in str:
-                    return 'nysb'
-                elif re.search('W\.? ?D(\.|(istrict))? (of )?New York', str):
-                    return 'nywb'
-                elif re.search('E\.? ?D(\.|(istrict))? (of )?North Carolina', str):
-                    return 'nceb'
-                elif re.search('M\.? ?D(\.|(istrict))? (of )?North Carolina', str):
-                    return 'ncmb'
-                elif re.search('W\.? ?D(\.|(istrict))? (of )?North Carolina', str):
-                    return 'ncwb'
-                elif 'North Dakota' in str:
-                    return 'ndb'
-                elif re.search('N\.? ?D(\.|(istrict))? (of )?Ohio', str) or \
-                        'Northern District of Ohio' in str:
-                    return 'ohnb'
-                elif re.search('S\. ?D(\.|(istrict))? (of )?Ohio', str):
-                    return 'ohsb'
-                elif re.search('E\.? ?D(\.|(istrict))? (of )?Oklahoma', str):
-                    return 'okeb'
-                elif re.search('N\.? ?D(\.|(istrict))? (of )?Oklahoma', str):
-                    return 'oknb'
-                elif re.search('W\.? ?D(\.|(istrict))? (of )?Oklahoma', str):
-                    return 'okwb'
-                elif 'Oregon' in str:
-                    return 'orb'
-                elif re.search('E\.? ?D(\.|(istrict))? (of )?Pennsylvania', str):
-                    return 'paeb'
-                elif re.search('M\.? ?D(\.|(istrict))? (of )?Pennsylvania', str):
-                    return 'pamb'
-                elif re.search('W\.? ?D(\.|(istrict))? (of )?Pennsylvania', str):
-                    return 'pawb'
-                elif ', Rhode Island' in str or \
-                        re.search('D(\.|(istrict))? ?Rhode Island', str) or \
-                        ', D.R.I' in str:
-                    return 'rib'
-                elif 'D.S.C' in str or \
-                        re.search('D(\.|(istrict))? ?(of )?South Carolina', str):
-                    return 'scb'
-                elif 'D. South Dakota' in str or \
-                        ', South Dakota' in str:
-                    return 'sdb'
-                elif re.search('E\.? ?D(\.|(istrict))? (of )?Te(r|n)n(essee)?', str):
-                    return 'tneb'
-                elif re.search('M\.? ?D(\.|(istrict))? (of )?Tenn(essee)?', str) or \
-                        'Middle District of Tennessee' in str or \
-                        'M.D.S. Tennessee' in str or \
-                        'Nashville' in str:
-                    return 'tnmb'
-                elif re.search('W\.? ?D(\.|(istrict))? (of )?Tennessee', str):
-                    return 'tnwb'
-                elif 'D. Tennessee' in str:
-                    return 'tennesseeb'
-                elif re.search('E\.? ?D(\.|(istrict))? (of )?Texas', str):
-                    return 'txeb'
-                elif re.search('N\.? ?D(\.|(istrict))? (of )?Texas', str):
-                    return 'txnb'
-                elif re.search('S\.? ?D(\.|(istrict))? (of )?Texas', str):
-                    return 'txsb'
-                elif re.search('W\.? ?D(\.|(istrict))? (of )?Texas', str):
-                    return 'txwb'
-                elif 'Utah' in str:
-                    return 'utb'
-                elif re.search('D(\.|(istrict))? ?(of )?Vermont', str):
-                    return 'vtb'
-                elif re.search('E\.? ?D(\.|(istrict))? ?(of )?Virginia', str):
-                    return 'vaeb'
-                elif re.search('W\.? ?D(\.|(istrict))? ?(of )?Virginia', str) or \
-                        re.search('Big Stone Gap', str):
-                    return 'vawb'
-                elif re.search('E\.? ?D(\.|(istrict))? (of )?Washington', str):
-                    return 'waeb'
-                elif re.search('W\.? ?D(\.|(istrict))? (of )?Washington', str):
-                    return 'wawb'
-                elif re.search('N\.? ?D(\.|(istrict))? (of )?W(\.|(est)) Virginia', str):
-                    return 'wvnb'
-                elif re.search('S\.? ?D(\.|(istrict))? (of )?W(\.|(est)) Virginia', str):
-                    return 'wvsb'
-                elif re.search('E\.? ?D(\.|(istrict))? (of )?Wis(consin)?', str):
-                    return 'wieb'
-                elif re.search('W\.? ?D(\.|(istrict))? (of )?Wis(consin)?', str) or \
-                        'Western District of Wisconsin' in str:
-                    return 'wiwb'
-                elif 'D. Wyoming' in str:
-                    return 'wyb'
-                elif 'Guam' in str:
-                    return 'gub'
-                elif 'Northern Mariana' in str:
-                    return 'nmib'
-                elif 'Puerto Rico' in str:
-                    return 'prb'
-                elif 'Virgin Islands' in str:
-                    return 'vib'
+                for regex, value in fb_pairs:
+                    if re.search(regex, str):
+                        return value
         else:
             return False
 
+    path = '//center/p/b/text()'
+    text_elements = html.xpath(path)
     court = None
-    for t in text_elements:
-        t = clean_string(t).strip('.')
-        court = string_to_key(t)
-        if court:
-            break
 
-    # Round two: try the text elements joined together
-    t = clean_string(' '.join(text_elements)).strip('.')
-    court = string_to_key(t)
-
+    # 1: try using the citations as a clue (necessary first because calctapp calls itself simply, "Court of Appeal,
+    # Second District")
     if citations:
-        # Round three: try using the citations as a clue
         reporter_keys = [citation.canonical_reporter for citation in citations]
-        if 'Cal. Rptr.' in reporter_keys:
-            # It's a california court.
-            for t in text_elements:
-                t = clean_string(t).strip('.')
-                if re.search('court of appeal', t, re.I):
+        if 'Cal. Rptr.' in reporter_keys or 'Cal.App.' in reporter_keys:
+            # It's a california court, but which?
+            for text_element in text_elements:
+                text_element = clean_string(text_element).strip('.')
+                if re.search('court of appeal', text_element, re.I):
                     court = 'calctapp'
+                else:
+                    court = 'cal'
+        elif 'U.S.' in reporter_keys:
+            court = 'scotus'
 
+    # 2: Try using a bunch of regular expressions (this catches 95% of items)
+    if not court:
+        for text_element in text_elements:
+            text_element = clean_string(text_element).strip('.')
+            court = string_to_key(text_element)
+            if court:
+                break
+
+    # 3: try the text elements joined together (works if there were line break problems)
+    if not court:
+        t = clean_string(' '.join(text_elements)).strip('.')
+        court = string_to_key(t)
+
+    # 4: Disambiguate by judge
+    if not court and judge:
+        court = disambiguate_by_judge(judge)
+        if court and 'log_judge_disambiguations' in DEBUG:
+            with open('disambiguated_by_judge.txt', 'a') as f:
+                f.write('%s\t%s\t%s\n' % (case_path, court, judge.encode('ISO-8859-1')))
+
+    # 5: give up.
     if not court:
         try:
             court = fixes[case_path]['court']
         except KeyError:
-            if DEBUG == 'firefox':
+            if 'input_court' in DEBUG:
                 subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
                 input_court = raw_input("No court identified! What should be here? ")
                 add_fix(case_path, {'court': input_court})
-            elif DEBUG == 'out':
+            if 'log_bad_courts' in DEBUG:
                 # Write the failed case out to file.
                 court = 'test'
-                with open('missing_courts_judge_generator.txt', 'a') as out:
+                with open('missing_courts.txt', 'a') as out:
                     out.write('%s\n' % case_path)
 
-    if 'print' in DEBUG:
-        print '  Court: %s' % court
+    if 'court' in DEBUG:
+        log_print('  Court: %s' % court)
 
     return court
 
@@ -651,12 +527,19 @@ def get_judge(html, case_path=None):
             break
 
     if not judge:
-        if DEBUG == 'firefox':
-            subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
-            input_judge = raw_input("No judge identified! What should be here? ")
+        try:
+            judge = fixes[case_path]['judge']
+        except KeyError:
+            if 'input_judge' in DEBUG:
+                subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
+                judge = raw_input("No judge identified! What should be here? ")
+                add_fix(case_path, {'judge': judge})
+            if 'log_bad_judges' in DEBUG:
+                with open('missing_judges.txt', 'a') as out:
+                    out.write('%s\n' % case_path)
 
-    if 'print' in DEBUG:
-        print '  Judge: %s' % judge
+    if 'judge' in DEBUG:
+        log_print('  Judge: %s' % judge)
 
     return judge
 
@@ -673,7 +556,8 @@ def get_html_from_raw_text(raw_text):
     """
     complete_html_tree = html.fromstring(raw_text)
     cleaner = Cleaner(style=True,
-                      remove_tags=['a', 'body', 'font', 'noscript'])
+                      remove_tags=('a', 'body', 'font', 'noscript',),
+                      kill_tags=('title',),)
     clean_html_str = cleaner.clean_html(raw_text)
     clean_html_tree = html.fromstring(clean_html_str)
     body_text = tostring(clean_html_tree, method='text', encoding='unicode')
@@ -690,32 +574,36 @@ def import_law_box_case(case_path):
     clean_html_tree, complete_html_tree, clean_html_str, body_text = get_html_from_raw_text(raw_text)
 
     sha1 = hashlib.sha1(clean_html_str).hexdigest()
-    citations = get_citations_from_tree(complete_html_tree)
+    citations = get_citations_from_tree(complete_html_tree, case_path)
     judges = get_judge(clean_html_tree, case_path)
-    court = get_court_object(clean_html_tree, citations, case_path)
+    court = get_court_object(clean_html_tree, citations, case_path, judges)
 
     doc = Document(
-        source='LB',
+        source='L',
         sha1=sha1,
         court_id=court,
         html=clean_html_str,
         date_filed=get_date_filed(clean_html_tree, citations=citations, case_path=case_path, court=court),
-        precedential_status=get_precedential_status(clean_html_tree),
+        precedential_status=get_precedential_status(),
         judges=judges,
+        download_URL=case_path,
     )
 
     cite = Citation(
-        case_name=get_case_name(complete_html_tree),
+        case_name=get_case_name(complete_html_tree, case_path),
         docket_number=get_docket_number(clean_html_tree, case_path=case_path, court=court)
     )
+
+    # Necessary for dup_finder.
+    path = '//p/text()'
+    doc.body_text = ' '.join(clean_html_tree.xpath(path))
 
     # Add the dict of citations to the object as its attributes.
     citations_as_dict = map_citations_to_models(citations)
     for k, v in citations_as_dict.iteritems():
         setattr(cite, k, v)
 
-    # TODO: I'm baffled why this isn't working right now.
-    #doc.citation = cite
+    doc.citation = cite
 
     return doc
 
@@ -729,9 +617,137 @@ def readable_dir(prospective_dir):
         raise argparse.ArgumentTypeError("readable_dir:{0} is not a readable dir".format(prospective_dir))
 
 
-def check_duplicate(doc):
-    """Return true if it should be saved, else False"""
-    return True
+def needs_dup_check(doc):
+    """Checks the document to see whether we need to run our duplicate checking code.
+
+    Based on minimum dates found in the CL database on 2013-10-10 using:
+    courtlistener=> select "court_id", min(date_filed) from "Document" group by court_id order by min(date_filed);
+    """
+    start_dates = {'scotus': '1754-09-01', 'ca5': '1901-07-15', 'ca2': '1904-06-22', 'ca1': '1940-01-23',
+                   'cafc': '1944-09-13', 'ca3': '1947-03-24', 'ca4': '1949-01-15', 'cadc': '1949-05-16',
+                   'ca9': '1949-06-30', 'ca10': '1949-10-31', 'ca8': '1949-11-16', 'ca7': '1949-11-17',
+                   'ca6': '1949-11-17', 'ccpa': '1949-12-12', 'eca': '1949-12-16', 'uscfc': '1960-01-20',
+                   'mont': '1972-01-03', 'ca11': '1981-10-20', 'miss': '1982-02-04', 'tenncrimapp': '1988-12-08',
+                   'tennctapp': '1993-01-28', 'vactapp': '1995-05-02', 'va': '1995-06-09', 'tenn': '1995-10-09',
+                   'sd': '1996-01-10', 'nd': '1996-09-03', 'ind': '1997-12-31', 'or': '1998-01-08',
+                   'ndctapp': '1998-07-07', 'cit': '1999-01-05', 'cavc': '2000-01-12', 'mich': '2000-12-18',
+                   'tex': '2001-10-02', 'ariz': '2002-01-09', 'fiscr': '2002-11-18', 'armfor': '2003-11-18',
+                   'idahoctapp': '2006-06-15', 'vt': '2006-08-04', 'idaho': '2006-11-28', 'nmctapp': '2007-08-31',
+                   'nm': '2008-12-01', 'hawapp': '2010-01-04', 'haw': '2010-01-07', 'cal': '2011-04-22',
+                   'washctapp': '2011-11-08', 'ri': '2012-10-05', 'bap9': '2012-10-10', 'wyo': '2012-12-28',
+                   'alaska': '2013-01-09', 'wva': '2013-01-14', 'utah': '2013-01-15', 'tax': '2013-01-30',
+                   'ill': '2013-02-04', 'wis': '2013-02-13', 'calctapp': '2013-02-25', 'wash': '2013-02-28',
+                   'nev': '2013-03-13', 'nebctapp': '2013-04-02', 'neb': '2013-04-05', 'njsuperctappdiv': '2013-07-30',
+                   'nj': '2013-07-30', 'ark': '2013-08-02', 'arkctapp': '2013-08-28', 'illappct': '2013-09-19', }
+    try:
+        if doc.date_filed >= datetime.datetime.strptime(start_dates[doc.court_id], '%Y-%m-%d'):
+            return True
+    except KeyError:
+        pass
+    return False
+
+
+def find_duplicates(doc, case_path):
+    """Return True if it should be saved, else False"""
+    log_print("Running duplicate checks...")
+
+    # 1. Is the item completely outside of the current corpus?
+    if not needs_dup_check(doc):
+        log_print("  - Not a duplicate: Outside of date range for selected court.")
+        return []
+    else:
+        log_print("  - Could be a duplicate: Inside of date range for selected court.")
+
+    # 2. Can we find any duplicates and information about them?
+    stats, candidates = dup_finder.get_dup_stats(doc)
+    if len(candidates) == 0:
+        log_print("  - Not a duplicate: No candidate matches found.")
+        return []
+    elif len(candidates) == 1:
+
+        if doc.citation.docket_number and candidates[0].get('docketNumber') is not None:
+            # One in the other or vice versa
+            if (re.sub("(\D|0)", "", candidates[0]['docketNumber']) in
+                                        re.sub("(\D|0)", "", doc.citation.docket_number)) or \
+               (re.sub("(\D|0)", "", doc.citation.docket_number) in
+                                        re.sub("(\D|0)", "", candidates[0]['docketNumber'])):
+                log_print("  - Duplicate found: Only one candidate returned and docket number matches.")
+                return [candidates[0]['id']]
+            else:
+                if doc.court_id == 'cit':
+                    # CIT documents have neutral citations in the database. Look that up and compare against that.
+                    candidate_doc = Document.objects.get(pk=candidates[0]['id'])
+                    if doc.citation.neutral_cite and candidate_doc.citation.neutral_cite:
+                        if candidate_doc.citation.neutral_cite in doc.citation.docket_number:
+                            log_print('  - Duplicate found: One candidate from CIT and its neutral citation matches the new document\'s docket number.')
+                            return [candidates[0]['id']]
+                else:
+                    log_print("  - Not a duplicate: Only one candidate but docket number differs.")
+                return []
+        else:
+            log_print("  - Skipping docket_number dup check.")
+
+        if doc.citation.case_name == candidates[0].get('caseName'):
+            log_print("  - Duplicate found: Only one candidate and case name is a perfect match.")
+            return [candidates[0]['id']]
+
+        if dup_helpers.case_name_in_candidate(doc.citation.case_name, candidates[0].get('caseName')):
+            log_print("  - Duplicate found: All words in new document's case name are in the candidate's case name (%s)" % candidates[0].get('caseName'))
+            return [candidates[0]['id']]
+
+    else:
+        # More than one candidate.
+        if doc.citation.docket_number:
+            dups_by_docket_number = dup_helpers.find_same_docket_numbers(doc, candidates)
+            if len(dups_by_docket_number) > 1:
+                log_print("  - Duplicates found: %s candidates matched by docket number." % len(dups_by_docket_number))
+                return [can['id'] for can in dups_by_docket_number]
+            elif len(dups_by_docket_number) == 1:
+                log_print("  - Duplicate found: Multiple candidates returned, but one matched by docket number.")
+                return [dups_by_docket_number[0]['id']]
+            else:
+                log_print("  - Could be a duplicate: Unable to find good match via docket number.")
+        else:
+            log_print("  - Skipping docket_number dup check.")
+
+    # 3. Filter out obviously bad cases and then pass remainder forward for manual review.
+
+    filtered_candidates, filtered_stats = dup_helpers.filter_by_stats(candidates, stats)
+    log_print("  - %s candidates before filtering. With stats: %s" % (stats['candidate_count'], stats))
+    log_print("  - %s candidates after filtering. Using filtered stats: %s" % (filtered_stats['candidate_count'], filtered_stats))
+    if len(filtered_candidates) == 0:
+        log_print("  - Not a duplicate: After filtering no good candidates remained.")
+        return []
+    elif len(filtered_candidates) == 1 and filtered_stats['cos_sims'][0] > 0.93:
+        log_print("  - Duplicate found: One candidate after filtering and cosine similarity is high (%s)" % filtered_stats['cos_sims'][0])
+        return [filtered_candidates[0]['id']]
+    else:
+        duplicates = []
+        for k in range(0, len(filtered_candidates)):
+            # Have to determine by "hand"
+            log_print("  %s) Case name: %s" % (k + 1, doc.citation.case_name))
+            log_print("                 %s" % filtered_candidates[k]['caseName'])
+            log_print("      Docket nums: %s" % doc.citation.docket_number)
+            log_print("                   %s" % filtered_candidates[k].get('docketNumber', 'None'))
+            log_print("      Cosine Similarity: %s" % filtered_stats['cos_sims'][k])
+            log_print("      Candidate URL: %s" % case_path)
+            log_print("      Match URL: https://www.courtlistener.com%s" %
+                                         (filtered_candidates[k]['absolute_url']))
+
+            choice = raw_input("Is this a duplicate? [Y/n]: ")
+            choice = choice or "y"
+            if choice == 'y':
+                duplicates.append(filtered_candidates[k]['id'])
+
+        if len(duplicates) == 0:
+            log_print("  - Not a duplicate: Manual determination found no matches.")
+            return []
+        elif len(duplicates) == 1:
+            log_print("  - Duplicate found: Manual determination found one match.")
+            return [duplicates[0]]
+        elif len(duplicates) > 1:
+            log_print("  - Duplicates found: Manual determination found %s matches." % len(duplicates))
+            return duplicates
 
 
 def main():
@@ -763,7 +779,7 @@ def main():
         def generate_random_line(file_name):
             while True:
                 total_bytes = os.stat(file_name).st_size
-                random_point = random.randint( 0, total_bytes )
+                random_point = random.randint(0, total_bytes)
                 f = open(file_name)
                 f.seek(random_point)
                 f.readline()  # skip this line to clear the partial line
@@ -771,9 +787,10 @@ def main():
 
         def case_generator(line_number):
             """Yield cases from the index file."""
+            enumerated_line_number = line_number - 1  # The enumeration is zero-index, but files are one-index.
             index_file = open(args.file_name)
             for i, line in enumerate(index_file):
-                if i > line_number:
+                if i >= enumerated_line_number:
                     yield line.strip()
 
         if args.random:
@@ -789,25 +806,40 @@ def main():
             i = args.line
 
     for case_path in cases:
-        if DEBUG >= 2:  #and i % 1000 == 0:
-            print "\n%s: Doing case (%s): file://%s" % (datetime.datetime.now(), i, case_path)
+        if i % 1000 == 0:
+            db.reset_queries()  # Else we leak memory when DEBUG is True
+
+        if 'counter' in DEBUG:  #and i % 1000 == 0:
+            log_print("\n%s: Doing case (%s): file://%s" % (datetime.datetime.now(), i, case_path))
         try:
             doc = import_law_box_case(case_path)
-            i += 1
-        finally:
-            traceback.format_exc()
-            with open('lawbox_progress_marker.txt', 'w') as marker:
-                marker.write(str(i))
+            duplicates = find_duplicates(doc, case_path)
+            if not args.simulate:
+                if len(duplicates) == 0:
+                    doc.html_lawbox, blocked = anonymize(doc.html)
+                    doc.html = ''
+                    if blocked:
+                        doc.blocked = True
+                        doc.date_blocked = now()
+                        # Save nothing to the index for now (it'll get done when we find citations)
+                    save_doc_and_cite(doc, index=False)
+                if len(duplicates) == 1:
+                    dup_helpers.merge_cases_simple(doc, duplicates[0])
+                if len(duplicates) > 1:
+                    #complex_merge
+                    if 'log_multimerge' in DEBUG:
+                        with open('index_multimerge.txt', 'a') as log:
+                            log.write('%s\n' % case_path)
+            if args.resume:
+                # Don't change the progress marker unless you're in resume mode.
+                with open('lawbox_progress_marker.txt', 'w') as marker:
+                    marker.write(str(i + 1))  # Files are one-index, not zero-index
             with open('lawbox_fix_file.pkl', 'wb') as fix_file:
                 pickle.dump(fixes, fix_file)
-
-
-        save_it = check_duplicate(doc)  # Need to write this method?
-        if save_it and not args.simulate:
-            # Not a dup, save to disk, Solr, etc.
-            doc.cite.save()  # I think this is the save routine?
-            doc.save()  # Do we index it here, or does that happen automatically?
-
+            i += 1
+        except Exception, err:
+            log_print(traceback.format_exc())
+            exit(1)
 
 if __name__ == '__main__':
     main()
