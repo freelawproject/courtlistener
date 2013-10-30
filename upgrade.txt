@@ -66,6 +66,7 @@ We welcome a conversion of these notes to a better process using Fabric.
         - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/1st/303/Goldberg_Holding_Corp._v._Blier,_60_Misc._2d_374.html (NY Civil Court)
         - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/1st/300/Teska_v._ATL._NAT._INS._CO.,_59_Misc._2d_615.html
    - Multi-merges.
+   - Update the fixtures.
 
 
 2013-10-21:
