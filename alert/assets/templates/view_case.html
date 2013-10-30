@@ -23,14 +23,13 @@
 
 {% block sidebar %}
     <div class="span-6 append-1" id="sidebar">
-        {%  if get_string %}
-            <div class="sidebar-section">
-                <h4>
-                    <i class="fa fa-arrow-circle-o-left gray"></i>
-                    <a href="/?{{ request.META.QUERY_STRING }}">Back to Search Results</a>
-                </h4>
-            </div>
-        {% endif %}
+        <div class="sidebar-section">
+            <h4>
+                <i class="fa fa-arrow-circle-o-left gray"></i>
+                <a href="/?{{ request.META.QUERY_STRING }}">Back to {% if get_string %}Search Results{% else %}Home Page{% endif %}</a>
+            </h4>
+        </div>
+
 
         {# show the admin tools if applicable #}
         {% if user.is_superuser and doc %}
