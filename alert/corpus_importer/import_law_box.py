@@ -496,7 +496,8 @@ def get_court_object(html, citations=None, case_path=None, judge=None):
             court = fixes[case_path]['court']
         except KeyError:
             if 'input_court' in DEBUG:
-                subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
+                if 'firefox' in DEBUG:
+                    subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
                 input_court = raw_input("No court identified! What should be here? ")
                 add_fix(case_path, {'court': input_court})
             if 'log_bad_courts' in DEBUG:
