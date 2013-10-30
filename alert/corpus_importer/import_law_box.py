@@ -147,7 +147,7 @@ def get_case_name(complete_html_tree, case_path):
                     subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
                 input_case_name = raw_input('  No case name found. What should be here? ')
                 input_case_name = unicode(input_case_name)
-                add_fix(case_path, input_case_name)
+                add_fix(case_path, {'case_name': input_case_name})
                 case_name = input_case_name
 
     if 'case_name' in DEBUG:
