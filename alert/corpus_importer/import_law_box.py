@@ -728,13 +728,16 @@ def find_duplicates(doc, case_path):
         high_sims_count = len([sim for sim in filtered_stats['cos_sims'] if sim > 0.98])
         low_sims_count = len([sim for sim in filtered_stats['cos_sims'] if sim < 0.95])
         for k in range(0, len(filtered_candidates)):
-            if all([(filtered_stats['cos_sims'][k] > 0.98),
-                    (high_sims_count == 1),  # Only one high score
+            if all([(high_sims_count == 1),  # Only one high score
                     (low_sims_count == filtered_stats['candidate_count'] - 1)  # All but one have low scores
             ]):
-                # If only one of the items is very high, then we can assume it's right.
-                duplicates.append(filtered_candidates[k]['id'])
-                break
+                # If only one of the items is very high, then we can ignore the others and assume it's right
+                if filtered_stats['cos_sims'][k] > 0.98:
+                    duplicates.append(filtered_candidates[k]['id'])
+                    break
+                else:
+                    # ignore the others
+                    continue
             else:
                 # Have to determine by "hand"
                 log_print("  %s) Case name: %s" % (k + 1, doc.citation.case_name))
