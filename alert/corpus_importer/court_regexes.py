@@ -175,7 +175,7 @@ fd_pairs = (
     # Abolished. 1937-07-26 to 1982-03-31
     (re.compile('Canal Zone', re.I), 'canalzoned'),
     (re.compile('Guam', re.I), 'gud'),
-    (re.compile('Northern Mariana', re.I), 'nmid'),
+    (re.compile('N(\.|(orthern)) Mariana', re.I), 'nmid'),
     (re.compile('Puerto Rico', re.I), 'prd'),
     (re.compile('Virgin Islands', re.I), 'vid'),
 )
