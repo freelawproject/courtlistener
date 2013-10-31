@@ -16,7 +16,7 @@ from celery import task
 
 
 @task
-def add_or_update_doc_object(doc, solr_url=settings.SOLR_URL):
+def add_or_update_doc_objects(docs, solr_url=settings.SOLR_URL):
     """Adds a document object to the solr index.
 
     This function is for use with the update_index command. It's slightly
@@ -27,15 +27,22 @@ def add_or_update_doc_object(doc, solr_url=settings.SOLR_URL):
     build the SearchDocument objects in the task, not in its caller.
     """
     si = sunburnt.SolrInterface(solr_url, mode='w')
+    if hasattr(docs, "items") or not hasattr(docs, "__iter__"):
+        # If it's a dict or a single item make it a list
+        docs = [docs]
+    search_doc_list = []
+    for doc in docs:
+        try:
+            search_doc_list.append(SearchDocument(doc))
+        except AttributeError:
+            print "AttributeError trying to add doc.pk: %s" % doc.pk
+        except InvalidDocumentError:
+            print "Unable to parse document %s" % doc.pk
+
     try:
-        search_doc = SearchDocument(doc)
-        si.add(search_doc)
-    except AttributeError:
-        print "AttributeError trying to add doc.pk: %s" % doc.pk
-    except InvalidDocumentError:
-        print "Unable to parse document %s" % doc.pk
+        si.add(search_doc_list)
     except socket.error, exc:
-        add_or_update_doc_object.retry(exc=exc, countdown=120)
+        add_or_update_doc_objects.retry(exc=exc, countdown=120)
 
 @task
 def delete_docs(docs):
@@ -46,11 +53,13 @@ def delete_docs(docs):
 @task
 def add_or_update_docs(docs):
     si = sunburnt.SolrInterface(settings.SOLR_URL, mode='w')
+    doc_list = []
     for doc in docs:
         doc = Document.objects.get(pk=doc)
-        search_doc = SearchDocument(doc)
-        si.add(search_doc)
-        si.commit()
+        doc_list.append(SearchDocument(doc))
+
+    si.add(doc_list)
+    si.commit()
 
 @task
 def delete_doc(document_id):

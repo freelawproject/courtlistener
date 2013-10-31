@@ -233,8 +233,14 @@ def get_dup_stats(doc):
         candidate_stripped_content = re.sub('\W', '', candidate['text']).lower()
 
         # Calculate the difference in text length and their gestalt difference
-        length_diff = abs(len(candidate_stripped_content) - len(new_stripped_content))
-        percent_diff = float(length_diff) / len(new_stripped_content)
+        try:
+            length_diff = abs(len(candidate_stripped_content) - len(new_stripped_content))
+        except ZeroDivisionError:
+            length_diff = 0
+        try:
+            percent_diff = float(length_diff) / len(new_stripped_content)
+        except ZeroDivisionError:
+            percent_diff = 0
         cos_sim = get_cosine_similarity(doc.body_text, candidate['text'])
         percent_diffs.append(percent_diff)
         gestalt_diffs.append(gen_diff_ratio(candidate_stripped_content, new_stripped_content))
