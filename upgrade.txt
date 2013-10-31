@@ -59,6 +59,23 @@ We welcome a conversion of these notes to a better process using Fabric.
    - Run the alerts manually.
    - Make sure that that the case from 2103 is fixed in Solr
    - https://www.courtlistener.com/scotus/rmu/the-united-states-v-klintock/ has been falsely merged. Unmerge it. (2013-10-29 20:31:03.770218)
+   - There are ~56 duplicates in bad_log.txt, and another 7-8k in bad_log2
+   - There exists a municipal court in the morass. What to do? (for now I've skipped it):
+        - file:///sata/lawbox/dump/com.west.atlantic_reporter/2d/994/State_v._White,_994_A._2d_1042.html
+        - file:///sata/lawbox/dump/com.west.atlantic_reporter/2d/963/State_v._O'CONNOR,_963_A._2d_898.html
+        - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/1st/303/Goldberg_Holding_Corp._v._Blier,_60_Misc._2d_374.html (NY Civil Court)
+        - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/1st/300/Teska_v._ATL._NAT._INS._CO.,_59_Misc._2d_615.html
+        - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/1st/304/McConaghley_v._City_of_NY,_60_Misc._2d_825.html
+        - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/1st/302/Garfinkel_v._LEHMAN_FLOOR_COVERING,_60_Misc._2d_72.html
+        - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/2d/59/People_v._Colon,_110_Misc._2d_917.html
+        - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/2d/18/People_v._Clute,_47_Misc._2d_1005.html
+        - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/2d/34/People_v._Beltrand,_63_Misc._2d_1041.html
+        - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/2d/8/People_v._Welt,_19_Misc._2d_462.html
+        - file:///sata/lawbox/dump/gov.ny.courts.new_york_reports/2d/4/MTR_KARIN_T._v._Michael_T.,_127_Misc._2d_14.html
+   - Multi-merges.
+   - Update the fixtures.
+   - Some bug with the counts on the jurisdiction page
+
 
 2013-10-21:
  - Removes resource.org polling. If you have used this, remove the cached file in the robots directory and any

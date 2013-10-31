@@ -51,7 +51,7 @@ DEBUG = [
     #'log_bad_citations',
     #'log_bad_courts',
     #'log_judge_disambiguations',
-    'log_bad_dates',
+    #'log_bad_dates',
     #'log_bad_docket_numbers',
     #'log_bad_judges',
     'log_multimerge',
@@ -143,9 +143,11 @@ def get_case_name(complete_html_tree, case_path):
             case_name = fixes[case_path]['case_name']
         except KeyError:
             if 'input_case_names' in DEBUG:
-                subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
+                if 'firefox' in DEBUG:
+                    subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
                 input_case_name = raw_input('  No case name found. What should be here? ')
-                add_fix(case_path, input_case_name)
+                input_case_name = unicode(input_case_name)
+                add_fix(case_path, {'case_name': input_case_name})
                 case_name = input_case_name
 
     if 'case_name' in DEBUG:
@@ -459,7 +461,7 @@ def get_court_object(html, citations=None, case_path=None, judge=None):
     # Second District")
     if citations:
         reporter_keys = [citation.canonical_reporter for citation in citations]
-        if 'Cal. Rptr.' in reporter_keys or 'Cal.App.' in reporter_keys:
+        if 'Cal. Rptr.' in reporter_keys or 'Cal. App.' in reporter_keys:
             # It's a california court, but which?
             for text_element in text_elements:
                 text_element = clean_string(text_element).strip('.')
@@ -496,9 +498,10 @@ def get_court_object(html, citations=None, case_path=None, judge=None):
             court = fixes[case_path]['court']
         except KeyError:
             if 'input_court' in DEBUG:
-                subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
-                input_court = raw_input("No court identified! What should be here? ")
-                add_fix(case_path, {'court': input_court})
+                if 'firefox' in DEBUG:
+                    subprocess.Popen(['firefox', 'file://%s' % case_path], shell=False).communicate()
+                court = raw_input("No court identified! What should be here? ")
+                add_fix(case_path, {'court': input})
             if 'log_bad_courts' in DEBUG:
                 # Write the failed case out to file.
                 court = 'test'
@@ -724,21 +727,34 @@ def find_duplicates(doc, case_path):
         return [filtered_candidates[0]['id']]
     else:
         duplicates = []
+        high_sims_count = len([sim for sim in filtered_stats['cos_sims'] if sim > 0.98])
+        low_sims_count = len([sim for sim in filtered_stats['cos_sims'] if sim < 0.95])
         for k in range(0, len(filtered_candidates)):
-            # Have to determine by "hand"
-            log_print("  %s) Case name: %s" % (k + 1, doc.citation.case_name))
-            log_print("                 %s" % filtered_candidates[k]['caseName'])
-            log_print("      Docket nums: %s" % doc.citation.docket_number)
-            log_print("                   %s" % filtered_candidates[k].get('docketNumber', 'None'))
-            log_print("      Cosine Similarity: %s" % filtered_stats['cos_sims'][k])
-            log_print("      Candidate URL: %s" % case_path)
-            log_print("      Match URL: https://www.courtlistener.com%s" %
-                                         (filtered_candidates[k]['absolute_url']))
+            if all([(high_sims_count == 1),  # Only one high score
+                    (low_sims_count == filtered_stats['candidate_count'] - 1)  # All but one have low scores
+            ]):
+                # If only one of the items is very high, then we can ignore the others and assume it's right
+                if filtered_stats['cos_sims'][k] > 0.98:
+                    duplicates.append(filtered_candidates[k]['id'])
+                    break
+                else:
+                    # ignore the others
+                    continue
+            else:
+                # Have to determine by "hand"
+                log_print("  %s) Case name: %s" % (k + 1, doc.citation.case_name))
+                log_print("                 %s" % filtered_candidates[k]['caseName'])
+                log_print("      Docket nums: %s" % doc.citation.docket_number)
+                log_print("                   %s" % filtered_candidates[k].get('docketNumber', 'None'))
+                log_print("      Cosine Similarity: %s" % filtered_stats['cos_sims'][k])
+                log_print("      Candidate URL: file://%s" % case_path)
+                log_print("      Match URL: https://www.courtlistener.com%s" %
+                                             (filtered_candidates[k]['absolute_url']))
 
-            choice = raw_input("Is this a duplicate? [Y/n]: ")
-            choice = choice or "y"
-            if choice == 'y':
-                duplicates.append(filtered_candidates[k]['id'])
+                choice = raw_input("Is this a duplicate? [Y/n]: ")
+                choice = choice or "y"
+                if choice == 'y':
+                    duplicates.append(filtered_candidates[k]['id'])
 
         if len(duplicates) == 0:
             log_print("  - Not a duplicate: Manual determination found no matches.")
@@ -767,6 +783,8 @@ def main():
                         help='Pick cases randomly rather than serially.')
     parser.add_argument('-m', '--marker', type=str, default='lawbox_progress_marker.txt', required=False,
                         help="The name of the file that tracks the progress (useful if multiple versions run at same time)")
+    parser.add_argument('-e', '--end', type=int, required=False, default=2000000,
+                        help="An optional endpoint for an importer.")
     args = parser.parse_args()
 
     if args.dir:
@@ -840,6 +858,9 @@ def main():
             with open('lawbox_fix_file.pkl', 'wb') as fix_file:
                 pickle.dump(fixes, fix_file)
             i += 1
+            if i == args.end:
+                log_print("Hit the endpoint after importing number %s. Breaking." % i)
+                break
         except Exception, err:
             log_print(traceback.format_exc())
             exit(1)
