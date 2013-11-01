@@ -3,6 +3,7 @@ __author__ = 'Krist Jin'
 from alert.search.models import Document
 from alert.lib.db_tools import queryset_generator
 from alert.lib.solr_core_admin import get_solr_core_status
+from alert.lib.solr_core_admin import reload_pagerank_external_file_cache
 from django.core.management.base import BaseCommand
 import logging
 import sys
@@ -16,7 +17,8 @@ class Command(BaseCommand):
     args = '<args>'
     help = 'Calculate pagerank value for every case'
     status_doc = get_solr_core_status()
-    RESULT_FILE_PATH = status_doc.xpath('//*[@name= "dataDir"][../*[@name="name" = "collection1"]]/text()')[0]
+    RESULT_FILE_PATH = str(status_doc.xpath('//*[@name= "dataDir"][../*[@name="name" = "collection1"]]/text()')[0])\
+        + "external_pagerank"
     result_file = open(RESULT_FILE_PATH, 'w')
 
     def do_pagerank(self, verbosity=1):
@@ -118,7 +120,10 @@ class Command(BaseCommand):
                     progress * 1.0 / graph_size
                 ))
                 sys.stdout.flush()
-
+        
+        # Hit the reloadCache to reload ExternalFileField (necessory for Solr version prior to 4.1)
+        reload_pagerank_external_file_cache()
+        
         if verbosity >= 1:
             sys.stdout.write('\nPageRank calculation finish! Updated {} ({:.0%}) cases\n'.format(
                 update_count,
