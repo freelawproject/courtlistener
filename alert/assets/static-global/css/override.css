@@ -42,7 +42,7 @@ Sets up all the overrides or additional CSS that the site uses.
     display: inline;
 }
 
-span.bold {
+.bold {
     font-weight: bold;
 }
 
