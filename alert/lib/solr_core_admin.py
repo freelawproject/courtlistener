@@ -73,3 +73,10 @@ def get_solr_core_status(core='all'):
         raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
 
     return solr_config
+
+
+def reload_pagerank_external_file_cache():
+    """Hit the URL of reloadCache to reload ExternalFileField (necessory for Solr version prior to 4.1)"""
+    r = requests.get('http://localhost:8983/solr/reloadCache')
+    if r.status_code != 200:
+        print "Problem reloading cache. Got status_code of %s. Check the Solr logs for details." % r.status_code

@@ -626,6 +626,7 @@
 
   </query>
 
+  
 
   <!-- Request Dispatcher
 
@@ -1524,6 +1525,9 @@
       <str>elevator</str>
     </arr>
   </requestHandler>
+
+  <requestHandler name="/reloadCache"
+                class="org.apache.solr.search.function.FileFloatSource$ReloadCacheRequestHandler" />
 
   <!-- Highlighting Component
 
