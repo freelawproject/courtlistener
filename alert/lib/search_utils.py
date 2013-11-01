@@ -387,7 +387,7 @@ def build_court_count_query():
     params = {
         'facet': 'true',
         'facet.field': 'court_exact',
+        'facet.limit': -1,
         'rows': 0,
-        'q': '*:*',
     }
     return params
