@@ -40,8 +40,8 @@ $(function() {
                 $("#modal-save-favorite").modal('hide');
 
                 // Fill in the star and reset its title attr
-                $('#favorites-star').removeClass('gray');
-                $('#favorites-star').addClass('gold');
+                $('#favorites-star').removeClass('gray fa-star-o bold');
+                $('#favorites-star').addClass('gold fa-star');
 
                 // Add the new favorites info to the sidebar.
                 if (notes == ''){
@@ -71,8 +71,8 @@ $(function() {
                 // Hide the modal box
                 $("#modal-save-favorite").modal('hide');
                 // Empty the star and reset its titles
-                $('#favorites-star').removeClass('gold');
-                $('#favorites-star').addClass('gray');
+                $('#favorites-star').removeClass('gold fa-star');
+                $('#favorites-star').addClass('gray fa-star-o bold');
 
                 // Hide the sidebar
                 $('#sidebar-notes').hide();

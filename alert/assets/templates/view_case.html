@@ -108,7 +108,7 @@
 {% block content %}
     <article class="span-17 last">
         <i id="favorites-star"
-           class="{% if favorite_form.instance.doc_id %}gold{% else %}gray{% endif %} pointer fa fa-star inline"
+           class="{% if favorite_form.instance.doc_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
            data-toggle="modal"
            data-target="#modal-save-favorite, #modal-logged-out"
            title="Save this record as a favorite in your profile"></i>
