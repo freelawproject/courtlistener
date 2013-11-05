@@ -68,18 +68,18 @@ class Command(BaseCommand):
             index_during_subtask = False
         for doc in documents:
             processed_count += 1
-            if processed_count % 100 == 0:
-                # Send the commit every 100 times.
+            if processed_count % 10000 == 0:
+                # Send the commit every 1000 times.
                 commit = True
             else:
                 commit = False
             subtasks.append(update_document.subtask((doc, index_during_subtask, commit)))
-            if processed_count % 100 == 1:
+            if processed_count % 1000 == 1:
                 t1 = time.time()
-            if processed_count % 100 == 0:
+            if processed_count % 1000 == 0:
                 t2 = time.time()
                 timings.append(t2 - t1)
-                average_per_s = 100 / (sum(timings) / float(len(timings)))
+                average_per_s = 1000 / (sum(timings) / float(len(timings)))
             sys.stdout.write("\rProcessing items in Celery queue: {:.0%} ({}/{}, {:.1f}/s)".format(
                 processed_count * 1.0 / count,
                 processed_count,
@@ -88,8 +88,8 @@ class Command(BaseCommand):
             ))
             sys.stdout.flush()
             last_document = (count == processed_count)
-            if (processed_count % 50 == 0) or last_document:
-                # Every 50 documents, we send the subtasks off for processing
+            if (processed_count % 500 == 0) or last_document:
+                # Every 500 documents, we send the subtasks off for processing
                 # Poll to see when they're done.
                 job = TaskSet(tasks=subtasks)
                 result = job.apply_async()
