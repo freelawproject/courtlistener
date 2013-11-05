@@ -1,6 +1,7 @@
 import os
 import socket
 import sys
+from alert.lib.sunburnt import SolrError
 
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
@@ -79,14 +80,20 @@ def delete_doc(document_id):
     si.commit()
 
 @task
-def add_or_update_doc(document_id):
+def add_or_update_doc(document_id, commit=True):
     """Updates the document in the index. Called by Document save function.
     """
     si = sunburnt.SolrInterface(settings.SOLR_URL, mode='w')
     doc = Document.objects.get(pk=document_id)
     search_doc = SearchDocument(doc)
-    si.add(search_doc)
-    si.commit()
+
+    try:
+        si.add(search_doc)
+        if commit:
+            si.commit()
+    except SolrError, exc:
+        add_or_update_doc.retry(exc=exc, countdown=30)
+
 
 @task
 def update_cite(citation_id):
