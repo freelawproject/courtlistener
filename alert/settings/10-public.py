@@ -103,6 +103,10 @@ MESSAGE_TAGS = {
 ########
 SOLR_URL = 'http://127.0.0.1:8983/solr/collection1'
 #SOLR_URL = 'http://127.0.0.1:8983/solr/swap_core'
+if DEVELOPMENT:
+    SOLR_XMX = '500M'
+else:
+    SOLR_XMX = '15G'
 
 
 ##########

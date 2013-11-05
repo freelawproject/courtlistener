@@ -420,7 +420,7 @@ class Document(models.Model):
                  num_to_ascii(self.pk),
                  self.citation.slug])
 
-    def save(self, index=True, *args, **kwargs):
+    def save(self, index=True, commit=True, *args, **kwargs):
         """
         If the value of blocked changed to True, invalidate the caches
         where that value was stored. Google can later pick it up properly.
@@ -432,7 +432,7 @@ class Document(models.Model):
         if index:
             # Import is here to avoid looped import problem
             from search.tasks import add_or_update_doc
-            add_or_update_doc.delay(self.pk)
+            add_or_update_doc.delay(self.pk, commit)
 
         # Delete the cached sitemaps and dumps if the item is blocked.
         if self.blocked:

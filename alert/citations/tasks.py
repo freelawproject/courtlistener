@@ -60,7 +60,7 @@ def create_stub(citations):
 
 
 @task
-def update_document(document):
+def update_document(document, index=True, commit=True):
     DEBUG = 0
     if DEBUG >= 1:
         print "%s at https://www.courtlistener.com/admin/search/citation/%s/" % \
@@ -86,7 +86,7 @@ def update_document(document):
                 # already been cited by this document.
                 if not matched_doc.citation in document.cases_cited.all():
                     matched_doc.citation_count += 1
-                    matched_doc.save(index=True)
+                    matched_doc.save(index=index)
 
                 # Add citation match to the citing document's list of cases it cites.
                 # cases_cited is a set so duplicates aren't an issue
@@ -113,11 +113,11 @@ def update_document(document):
         if DEBUG >= 3:
             print document.html_with_citations
 
-    # Update Solr because we now have citation counts and such in the index.
-    document.save(index=True)
-    citation_matches = sum(matched_citations)
-    name_matches = len(matched_citations) - citation_matches
+    # Update Solr if requested. In some cases we do it at the end for performance reasons.
+    document.save(index=index, commit=commit)
     if DEBUG >= 1:
+        citation_matches = sum(matched_citations)
+        name_matches = len(matched_citations) - citation_matches
         print "  %d citations" % len(citations)
         print "  %d exact matches" % citation_matches
         print "  %d name matches" % name_matches
