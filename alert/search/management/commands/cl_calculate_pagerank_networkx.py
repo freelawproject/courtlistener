@@ -65,6 +65,7 @@ class Command(BaseCommand):
         if verbosity >= 1:
             sys.stdout.write('\n')
             sys.stdout.write('NetworkX PageRank calculating...')
+            sys.stdout.flush()
         pr_result = nx.pagerank(citing_graph)
         if verbosity >= 1:
             sys.stdout.write('Complete!\n')
@@ -120,10 +121,10 @@ class Command(BaseCommand):
                     progress * 1.0 / graph_size
                 ))
                 sys.stdout.flush()
-        
-        # Hit the reloadCache to reload ExternalFileField (necessory for Solr version prior to 4.1)
+
+        # Hit the reloadCache to reload ExternalFileField (necessary for Solr version prior to 4.1)
         reload_pagerank_external_file_cache()
-        
+
         if verbosity >= 1:
             sys.stdout.write('\nPageRank calculation finish! Updated {} ({:.0%}) cases\n'.format(
                 update_count,

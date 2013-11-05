@@ -1,3 +1,4 @@
+from datetime import datetime
 import time
 import sys
 
@@ -28,6 +29,11 @@ class Command(BaseCommand):
             '--end_id',
             type=int,
             help='end id for a range of documents to update'
+        ),
+        make_option(
+            '--start_date',
+            type=str,
+            help="Start date in ISO-8601 format for a range of documents to update"
         ),
         make_option(
             '--all',
@@ -100,23 +106,33 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         both_list_and_endpoints = (options.get('doc_id') is not None and
-                                   (options.get('start_id') is not None or options.get('end_id') is not None))
+                                   (options.get('start_id') is not None or
+                                    options.get('end_id') is not None or
+                                    options.get('start_date') is not None))
         no_option = (not any([options.get('doc_id') is None,
                               options.get('start_id') is None,
                               options.get('end_id') is None,
+                              options.get('start_date') is None,
                               options.get('all') is False]))
         if both_list_and_endpoints or no_option:
-            raise CommandError('Please specify either a list of documents, a range of ids or everything.')
+            raise CommandError('Please specify either a list of documents, a range of ids, a range of dates, or '
+                               'everything.')
+
+        if options.get('start_date'):
+            start_date = datetime.strptime(options['start_date'], '%Y-%m-%d')
 
         index = options['index'].lower()
 
-        if options.get('doc_id') is not None:
-            query = Document.objects.filter(pk=options.get('doc_id'))
-        elif options.get('end_id'):
-            query = Document.objects.filter(pk__gte=options.get('start_id'),
-                                            pk__lte=options.get('end_id'))
-        elif options.get('start_id') is not None and not options.get('end_id'):
-            query = Document.objects.filter(pk__gte=options.get('start_id'))
+        # Use query chaining to build the query
+        query = Document.objects.all()
+        if options.get('doc_id'):
+            query = query.filter(pk=options.get('doc_id'))
+        if options.get('end_id'):
+            query = query.filter(pk__lte=options.get('end_id'))
+        if options.get('start_id'):
+            query = query.filter(pk__gte=options.get('start_id'))
+        if options.get('start_date'):
+            query = query.filter(date_filed__gte=start_date)
         elif options.get('all'):
             query = Document.object.all()
         count = query.count()
