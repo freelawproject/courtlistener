@@ -29,11 +29,11 @@
         <p class="bottom">For example, let's look at ways to access the First Circuit of Appeals (<strong>ca1</strong>):</p>
         <ul>
             <li>All ca1 cases from 2009: <a href="/dump-api/2009/ca1.xml.gz">
-                http://courtlistner.com/dump-api/<strong>2009/ca1</strong>.xml.gz</a></li>
+                https://www.courtlistener.com/dump-api/<strong>2009/ca1</strong>.xml.gz</a></li>
             <li>All ca1 cases from June 2009: <a href="/dump-api/2009/06/ca1.xml.gz">
-                http://courtlistner.com/dump-api/2009/<strong>06</strong>/ca1.xml.gz</a></li>
+                https://www.courtlistener.com/dump-api/2009/<strong>06</strong>/ca1.xml.gz</a></li>
             <li>All ca1 cases from June 9, 2009: <a href="/dump-api/2009/06/09/ca1.xml.gz">
-                http://courtlistner.com/dump-api/2009/06/<strong>09</strong>/ca1.xml.gz</a></li>
+                https://www.courtlistener.com/dump-api/2009/06/<strong>09</strong>/ca1.xml.gz</a></li>
         </ul>
 
         <p>If you would like <strong>all</strong> cases for a given time period,
@@ -48,6 +48,14 @@
         <a href="/dump-api/all.xml.gz">https://www.courtlistener.com/dump-api/all.xml.gz</a>.
         This dump is currently very large ({{dump_size}}). It's currently not
         possible to obtain complete dumps for individual courts.</p>
+
+        <p>On the backend, dumps are generated when a GET request is placed on a /dump-api/ endpoint
+        and once the dump is generated, the user is redirected to its location on our server's disk.
+        This separation is necessary on our backend and means that consumers of this API will need
+        to automatically follow 302 redirects. If you are using cURL, this can be accomplished with
+        the <code>-L</code> flag, and saving binaries can be done with the <code>-O</code> flag.
+        Thus a complete GET request might look like:</p>
+        <p><code>curl -L -O https://www.courtlistener.com/dump-api/2009/06/09/ca9.xml.gz</code></p>
 
 
         <h3 id="pride">We're Proud of our Data</h3>
@@ -86,23 +94,24 @@
             <li>
                 We help handle the privacy issues for you. Many people don't want their
                 case on the Web, and have contacted us or Resource.org. In our data
-                we provide a field indicating which cases should be kept private,
-                automatically including those cases listed in Resource.org's
-                robots.txt file. In addition, we provide research about how to
-                keep these cases out of search engines (more detail below).
+                we provide a field indicating which cases should be kept private. In
+                addition, we provide research about how to keep these cases out of
+                search engines (more detail below).
             </li>
         </ol>
         <p>
             We believe that our data is the best on the open Web. We hope you agree,
-            but if not, please feel free to tell us where we can improve.
+            but if not, please feel free to tell us where we can improve. And of course,
+            read/write: If you improve our data, we're happy to integrate your improvements.
         </p>
 
 
         <h3 id="privacy">Privacy Concerns</h3>
         <p>As is explained in our <a href="/removal/">removal policy</a>, we
-        have blocked search engines from indexing many of the cases available
-        in our data. As you work with this data, please be cognizant of the
-        privacy and safety issues involved.</p>
+        have blocked public search engines from indexing many of the cases available
+        in our data (though of course, they remain visible via our search engine!).
+        As you work with this data, please be cognizant of the privacy and safety
+        issues involved with public-facing legal documents.</p>
 
         <p>If you wish to respect the privacy wishes of the parties involved,
         there is a field for each case, "<strong>blocked</strong>," which
@@ -113,8 +122,9 @@
 
         <p class="bottom">
             For our approach to blocking, please see our <a href="/removal/">removal
-            policy</a>. We have also blogged several times on the subject and are
-            happy to discuss our findings with interested parties:
+            policy</a>. For our technical approach, please see the blog entries below. If
+            you believe Robots.txt prevents a URL from appearing in search results,
+            please be sure to check these out:
         </p>
         <ul>
             <li>
