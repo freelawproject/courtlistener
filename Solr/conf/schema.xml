@@ -332,6 +332,11 @@
          Class names starting with "solr" refer to java classes in a
        standard package such as org.apache.solr.analysis
     -->
+     <!-- Pagerank External File Field Type-->
+     <fieldType name="pagerank"
+                keyField="id"
+                class="solr.ExternalFileField"
+                valType="float"/>
 
     <!-- The StrField type is not analyzed, but indexed/stored verbatim. -->
     <fieldType name="string" class="solr.StrField" sortMissingLast="true" />
@@ -1182,15 +1187,6 @@
         <filter class="solr.SnowballPorterFilterFactory" language="Turkish"/>
       </analyzer>
     </fieldType>
-
-    <!-- Pagerank External File Field Type-->
-    <fieldType name="pagerank"
-               keyField="id"
-               stored="false"
-               indexed="true"
-               omitNorms="false"
-               class="solr.ExternalFileField"
-               valType="float"/>
 
  </types>
 
