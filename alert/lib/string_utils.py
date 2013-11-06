@@ -37,6 +37,28 @@ def trunc(s, length):
         return s[0:end]
 
 
+def filter_invalid_XML_chars(input):
+    """XML allows:
+
+       Char ::= #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
+
+    This strips out everything else.
+    """
+    def isValidXMLChar(char):
+        codepoint = ord(char)
+        return (  # Ordered by presumed frequency.
+            0x20 <= codepoint <= 0xD7FF or
+            codepoint in (0x9, 0xA, 0xD) or
+            0xE000 <= codepoint <= 0xFFFD or
+            0x10000 <= codepoint <= 0x10FFFF
+        )
+    if isinstance(input, basestring):
+        # Only do str, unicode, etc.
+        return filter(isValidXMLChar, input)
+    else:
+        return input
+
+
 def removeLeftMargin(s):
     """Gets rid of left hand margin.
 

@@ -1,13 +1,13 @@
 import logging
 from tastypie import fields
 from tastypie.authentication import BasicAuthentication, SessionAuthentication, MultiAuthentication
-from tastypie.bundle import Bundle
 from tastypie.constants import ALL
 from tastypie.exceptions import BadRequest
 from tastypie.resources import ModelResource
 from tastypie.throttle import CacheThrottle
 from alert import settings
 from alert.lib import search_utils
+from alert.lib.string_utils import filter_invalid_XML_chars
 from alert.lib.sunburnt import sunburnt
 from alert.search.forms import SearchForm
 from alert.search.models import Citation, Court, Document
@@ -32,6 +32,11 @@ class ModelResourceWithFieldsFilter(ModelResource):
                 if k in bundle.data:
                     new_data[k] = bundle.data[k]
             bundle.data = new_data
+        return bundle
+
+    def dehydrate(self, bundle):
+        for k, v in bundle.data.iteritems():
+            bundle.data[k] = filter_invalid_XML_chars(v)
         return bundle
 
 
