@@ -1,13 +1,12 @@
 from tastypie.api import Api
 
-from alert.api.views import court_index
+from alert.api.views import court_index, documentation_index, dump_index, rest_index, serve_or_gen_dump
 from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
 from alert.casepage.views import view_case, view_case_citations, serve_static_file
 from alert.contact.views import contact, thanks
 from alert.coverage.api import coverage_data
 from alert.coverage.views import coverage_graph
-from alert.data_dumper.views import dump_index, serve_or_gen_dump
 from alert.donate.dwolla import process_dwolla_callback, process_dwolla_transaction_status_callback
 from alert.donate.paypal import process_paypal_callback, donate_paypal_cancel
 from alert.donate.sitemap import donate_sitemap_maker
@@ -138,18 +137,20 @@ urlpatterns = patterns('',
     (r'^tools/$', tools_page),
 
     # The API
+    (r'^api/$', documentation_index),
     (r'^api/jurisdictions/$', court_index),
-    (r'^api/coverage/(all|%s)/' % '|'.join(pacer_codes), coverage_data),
-    (r'^api/', include(v1_api.urls)),
-
-    # Dump index and generation pages
-    (r'^dump-info/$', dump_index),
-    (r'^dump-api/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes), serve_or_gen_dump),
-    (r'^dump-api/(?P<year>\d{4})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes), serve_or_gen_dump),
-    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
-     serve_or_gen_dump),
-    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
-     serve_or_gen_dump),
+    (r'^api/rest/v1/coverage/(all|%s)/' % '|'.join(pacer_codes), coverage_data),
+    (r'^api/rest/', include(v1_api.urls)),
+    (r'^api/rest-info/$', rest_index),
+    (r'^api/bulk-info/$', dump_index),
+    (r'^api/bulk/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
+        serve_or_gen_dump),
+    (r'^api/bulk/(?P<year>\d{4})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
+        serve_or_gen_dump),
+    (r'^api/bulk/(?P<year>\d{4})/(?P<month>\d{2})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
+        serve_or_gen_dump),
+    (r'^api/bulk/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
+        serve_or_gen_dump),
 
     # Feeds
     (r'^feed/(search)/$', search_feed()),  # lacks URL capturing b/c it will use GET queries.
@@ -184,11 +185,20 @@ urlpatterns = patterns('',
     (r'^donate/paypal/cancel/$', donate_paypal_cancel),
 )
 
-# redirects
+# redirects go last
 urlpatterns += patterns(
-    ('^privacy/$', RedirectView.as_view(url='/terms/#privacy')),
-    ('^removal/$', RedirectView.as_view(url='/terms/#removal')),
-    ('^browse/$', RedirectView.as_view(url='/')),
-    ('^report/2010/$', RedirectView.as_view(url='https://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf')),
-    ('^report/2012/$', RedirectView.as_view(url='https://www.ischool.berkeley.edu/files/student_projects/mcdonald_rustad_report.pdf')),
+    (r'^privacy/$',     RedirectView.as_view(url='/terms/#privacy')),
+    (r'^removal/$',     RedirectView.as_view(url='/terms/#removal')),
+    # Dump URLs changed 2013-11-07
+    (r'^dump-info/$',   RedirectView.as_view(url='/api/bulk-info/')),
+    (r'^dump-api/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
+                        RedirectView.as_view(url='/api/bulk/%(court)s.xml.gz')),
+    (r'^dump-api/(?P<year>\d{4})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
+                        RedirectView.as_view(url='/api/bulk/%(year)s/%(court)s.xml.gz')),
+    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
+                        RedirectView.as_view(url='/api/bulk/%(year)s/%(month)s/%(court)s.xml.gz')),
+    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
+                        RedirectView.as_view(url='/api/bulk/%(year)s/%(month)s/%(day)s/%(court)s.xml.gz')),
+    (r'^report/2010/$', RedirectView.as_view(url='https://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf')),
+    (r'^report/2012/$', RedirectView.as_view(url='https://www.ischool.berkeley.edu/files/student_projects/mcdonald_rustad_report.pdf')),
 )

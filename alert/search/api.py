@@ -3,16 +3,14 @@ from tastypie import fields
 from tastypie.authentication import BasicAuthentication, SessionAuthentication, MultiAuthentication
 from tastypie.constants import ALL
 from tastypie.exceptions import BadRequest
-from tastypie.paginator import Paginator
-from tastypie.resources import ModelResource, Resource
+from tastypie.resources import ModelResource
 from tastypie.throttle import CacheThrottle
 from alert import settings
-from alert.lib import search_utils
 from alert.lib.search_utils import build_main_query
 from alert.lib.string_utils import filter_invalid_XML_chars
 from alert.lib.sunburnt import sunburnt
 from alert.search.forms import SearchForm
-from alert.search.models import Citation, Court, Document
+from alert.search.models import Citation, Court, Document, DOCUMENT_SOURCES, DOCUMENT_STATUSES
 from alert.stats import tally_stat
 
 logger = logging.getLogger(__name__)
@@ -71,7 +69,7 @@ class CourtResource(ModelResourceWithFieldsFilter):
 
 class CitationResource(ModelResourceWithFieldsFilter):
     tally_stat('seach.api.citation')
-    opinion_urls = fields.ToManyField('search.api.DocumentResource', 'parent_documents')
+    opinion_uris = fields.ToManyField('search.api.DocumentResource', 'parent_documents')
 
     class Meta:
         authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
@@ -83,7 +81,7 @@ class CitationResource(ModelResourceWithFieldsFilter):
 
 class DocumentResource(ModelResourceWithFieldsFilter):
     tally_stat('search.api.document')
-    citation = fields.ForeignKey(CitationResource, 'citation')
+    citation = fields.ForeignKey(CitationResource, 'citation', full=True)
     court = fields.ForeignKey(CourtResource, 'court')
     cases_cited = fields.ManyToManyField(CitationResource, 'cases_cited', use_in='detail')
     html = fields.CharField(attribute='html', use_in='detail', null=True)
@@ -107,7 +105,6 @@ class DocumentResource(ModelResourceWithFieldsFilter):
             'date_filed': good_date_filters,
             'sha1': ('exact',),
             'court': ('exact',),
-            'citation': numerical_filters,
             'citation_count': numerical_filters,
             'precedential_status': ('exact', 'in'),
             'date_blocked': good_date_filters,
@@ -174,25 +171,90 @@ class SearchResource(ModelResourceWithFieldsFilter):
     tally_stat('search.api.search')
 
     # Roses to the clever person that makes this introspect and removes all this code.
-    absolute_url = fields.CharField(attribute='absolute_url')
-    case_name = fields.CharField(attribute='caseName')
-    case_number = fields.CharField(attribute='caseNumber')
-    citation = fields.CharField(attribute='citation')
-    cite_count = fields.IntegerField(attribute='citeCount')
-    court = fields.CharField(attribute='court')
-    court_id = fields.CharField(attribute='court_id')
-    date_filed = fields.DateField(attribute='dateFiled')
-    docket_number = fields.CharField(attribute='docketNumber')
-    download_url = fields.CharField(attribute='download_url')
-    id = fields.CharField(attribute='id')
-    judge = fields.CharField(attribute='judge')
-    local_path = fields.CharField(attribute='local_path')
-    score = fields.FloatField(attribute='score')
-    source = fields.CharField(attribute='source')
-    status = fields.CharField(attribute='status')
-    suit_nature = fields.CharField(attribute='suitNature')
-    text = fields.CharField(attribute='text', use_in='detail')  # Only shows on the detail page.
-    timestamp = fields.DateField(attribute='timestamp')
+    absolute_url = fields.CharField(
+        attribute='absolute_url',
+        help_text="The URL on CourtListener for the item."
+    )
+    case_name = fields.CharField(
+        attribute='caseName',
+        help_text="The full name of the case"
+    )
+    case_number = fields.CharField(
+        attribute='caseNumber',
+        help_text="The combination of the citation and the docket number."
+    )
+    citation = fields.CharField(
+        attribute='citation',
+        help_text="A concatenated list of all the citations for an opinion."
+    )
+    cite_count = fields.IntegerField(
+        attribute='citeCount',
+        help_text="The number of times this document is cited by other cases"
+    )
+    court = fields.CharField(
+        attribute='court',
+        help_text="The name of the court where the document was filed"
+    )
+    court_id = fields.CharField(
+        attribute='court_id',
+        help_text='The court where the document was filed'
+    )
+    date_filed = fields.DateField(
+        attribute='dateFiled',
+        help_text='The date filed by the court'
+    )
+    docket_number = fields.CharField(
+        attribute='docketNumber',
+        help_text='The docket numbers of a case, can be consolidated and quite long'
+    )
+    download_url = fields.CharField(
+        attribute='download_url',
+        help_text='The URL on the court website where the document was originally scraped'
+    )
+    id = fields.CharField(
+        attribute='id',
+        help_text='The primary key for an opinion.'
+    )
+    judge = fields.CharField(
+        attribute='judge',
+        help_text='The judges that brought the opinion as a simple text string'
+    )
+    local_path = fields.CharField(
+        attribute='local_path',
+        help_text='The location, relative to MEDIA_ROOT on the CourtListener server, where files are stored'
+    )
+    pagerank = fields.FloatField(
+        attribute='pagerank',
+        null=True,
+        help_text="The PageRank score based on the citing relation among documents"
+    )
+    score = fields.FloatField(
+        attribute='score',
+        help_text='The relevance of the result. Will vary from query to query.'
+    )
+    source = fields.CharField(
+        attribute='source',
+        help_text='the source of the document, one of: %s' % ', '.join(['%s (%s)' % (t[0], t[1]) for t in
+                                                                        DOCUMENT_SOURCES])
+    )
+    status = fields.CharField(
+        attribute='status',
+        help_text='The precedential status of document, one of: %s' % ', '.join([('stat_%s' % t[1]).replace(' ', '+')
+                                                                                 for t in DOCUMENT_STATUSES])
+    )
+    suit_nature = fields.CharField(
+        attribute='suitNature',
+        help_text="The nature of the suit. For the moment can be codes or laws or whatever",
+    )
+    text = fields.CharField(
+        attribute='text',
+        use_in='detail',  # Only shows on the detail page.
+        help_text="A concatenated copy of most fields in the item so those fields are avaiable for search."
+    )
+    timestamp = fields.DateField(
+        attribute='timestamp',
+        help_text='The moment when an item was indexed by Solr.'
+    )
 
     class Meta:
         authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
@@ -200,6 +262,26 @@ class SearchResource(ModelResourceWithFieldsFilter):
         resource_name = 'search'
         max_limit = 20
         allowed_methods = ['get']
+        search_field = ('search',)
+        filtering = {
+            'q': search_field,
+            'case_name': search_field,
+            'judge': search_field,
+            'stat_': ('boolean',),
+            'filed_after': ('date', ),
+            'filed_before': ('date',),
+            'citation': search_field,
+            'neutral_cite': search_field,
+            'docket_number': search_field,
+            'cited_gt': ('int',),
+            'cited_lt': ('int',),
+            'courts': ('csv',),
+        }
+        ordering = [
+            'dateFiled+desc', 'dateFiled+asc',
+            'citeCount+desc', 'citeCount+asc',
+            'score+desc',
+        ]
 
     def get_resource_uri(self, bundle_or_obj=None, url_name='api_dispatch_list'):
         """Creates a URI like /api/v1/search/$id/

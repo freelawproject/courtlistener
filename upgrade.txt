@@ -40,17 +40,7 @@ We welcome a conversion of these notes to a better process using Fabric.
    - install defusedxml: sudo pip install defusedxml
    - migrate the database: manage.py migrate
  - Documentation notes:
-   - Accept headers are recommended, but can be overridden with the format GET parameter.
-   - Allowed formats are json, jsonp and xml
-   - Remember to mention the coverage API
-   - Throttle limits
-   - Authentication (basic and session)
    - Notes from here: http://django-tastypie.readthedocs.org/en/latest/interacting.html
-   - Filtering
-   - Date formats
-   - Fields
-   - Citation has no filters -- use search instead.
-   - Explain CitationResource.opinion_urls
 
 
 2013-10-28:
