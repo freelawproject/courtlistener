@@ -181,6 +181,7 @@ STRIPE_REDIRECT = 'https://www.courtlistener.com/donate/stripe/complete/'
 # API #
 #######
 TASTYPIE_DEFAULT_FORMATS = ['json', 'jsonp', 'xml']
+TASTYPIE_FULL_DEBUG = True
 
 ######################
 # Various and Sundry #
