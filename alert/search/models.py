@@ -321,6 +321,7 @@ class Document(models.Model):
     citation = models.ForeignKey(
         Citation,
         help_text="The citation object for the document",
+        related_name="parent_documents",
         blank=True,
         null=True
     )

@@ -50,13 +50,7 @@ We welcome a conversion of these notes to a better process using Fabric.
    - Date formats
    - Fields
    - Citation has no filters -- use search instead.
- - TODO
-   - Attempt to convert the coverage API to tastypie
-   - Make sure filtering can be done on cases_cited/cited_by
-   - Add stat logging to the API
-   - Make sure that citation objects can go to their parent and vice versa.
-   - search API
-        - Does the schema show what it should?
+   - Explain CitationResource.opinion_urls
 
 
 2013-10-28:
