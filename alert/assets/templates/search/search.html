@@ -4,7 +4,11 @@
 {% load humanize %}
 
 {% block title %}
-    Search Results{% if request.GET.q %} for {{ request.GET.q }}{% endif %} - CourtListener.com
+    {% if request.GET.q %}
+        Search Results for {{ request.GET.q }}
+    {% else %}
+        Free Legal Search Engine and Alert System
+    {% endif %} - CourtListener.com
 {% endblock %}
 
 {% block head %}
