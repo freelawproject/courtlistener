@@ -105,6 +105,7 @@ class DocumentResource(ModelResourceWithFieldsFilter):
             'date_filed': good_date_filters,
             'sha1': ('exact',),
             'court': ('exact',),
+            'citation': ALL,
             'citation_count': numerical_filters,
             'precedential_status': ('exact', 'in'),
             'date_blocked': good_date_filters,

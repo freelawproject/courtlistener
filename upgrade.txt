@@ -22,12 +22,7 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
-2013-11-05:
- - This deploys the pagerank algorithm, which requires that Solr be restarted. Restart solr with:
-   % sudo service solr restart
-
-
-2013-10-31:
+2013-11-08:
  - This initiates the work on the API. To roll this out:
    - install django-tastypie: sudo pip install django-tastypie==0.10.0
        - This version has a bug (https://github.com/toastdriven/django-tastypie/issues/1005) that makes migrations fail
@@ -39,9 +34,10 @@ We welcome a conversion of these notes to a better process using Fabric.
    - install python-mimeparse: sudo pip install python-mimeparse==0.1.4
    - install defusedxml: sudo pip install defusedxml
    - migrate the database: manage.py migrate
- - Documentation notes:
-   - Notes from here: http://django-tastypie.readthedocs.org/en/latest/interacting.html
 
+2013-11-05:
+ - This deploys the pagerank algorithm, which requires that Solr be restarted. Restart solr with:
+   % sudo service solr restart
 
 2013-10-28:
  - The lawbox code is ready to go at long last. To make it live and to update all the needed resources on the site:

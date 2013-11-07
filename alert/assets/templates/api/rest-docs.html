@@ -57,8 +57,8 @@
         <h4>Serialization Formats</h4>
         <p>
             With the exception of the coverage endpoint (which is only available as JSON), requests may be serialized
-            as JSON, JSONP, or XML, with JSON as the default. The format you wish to receive may be requested via HTTP
-            Accept Headers or via the <code>format</code> GET parameter.
+            as JSON, JSONP, or XML, with JSON as the default. The format you wish to receive may be requested via the
+            HTTP Accept header or via the <code>format</code> GET parameter.
         </p>
         <p>
             Note that because your browser prioritizes <code>application/xml</code> over <code>application/json</code>,
@@ -77,7 +77,24 @@
             <code>curl <strong>-H "Accept: application/xml"</strong> https://www.courtlistener.com/api/rest/v1/opinion/</code>
         </blockquote>
 
-        <h4>Filtering, Sorting, and Field Selection</h4>
+        <h4>Views, Pagination and Subset Selection</h4>
+        <p>
+            Each endpoint provides both a list view and a detail view. The <em>list</em> view is what you see when you
+            visit an endpoint, and it shows a list of 20 results.  The <em>detail</em> view shows all meta data for a
+            single result and can be viewed by following the <code>resource_uri</code> field for a result on the list
+            view. Occasionally, content is excluded from the list view for performance reasons, but it may be available
+            on the detail view. With the exception of the coverage API, links to the next and previous pages are
+            available in the <code>meta</code> section of the results.
+        </p>
+        <p>
+            A subset of results may be selected by using the <em>set</em> view, and separating the IDs yoou wish to
+            receive with semi-colons. For example this returns three jurisdictions using the <code>jurisdiction</code>
+            endpoint:
+        </p>
+        <blockquote>
+            <code>curl https://www.courtlistener.com/api/rest/v1/jurisdiction/set/scotus;ca9;cal</code>
+        </blockquote>
+        <h4>Filtering</h4>
         <p>
             With the exception of the coverage endpoint, each endpoint can be filtered and sorted in various ways, as
             defined in their schema (available at <code>/api/rest/v1/$endpoint/schema/</code>). In the schemas you will
@@ -90,16 +107,20 @@
             Field lookups can be used by appending them to a field with a double underscore as a separator (examples
             are below in the documentation for various endpoints).
         </p>
+        <h4>Sorting</h4>
         <p>
             With the exception of the coverage endpoint, sorting can be done on fields defined in the <em>ordering</em>
             section of an endpoint's schema. Sorting is done using the <code>order_by</code> GET parameter, with
-            descending sorting available by prepending the minus sign (e.g. <code>order_by=-date_modified</code>).
+            descending sorting available by prepending the minus sign (e.g. <code>order_by=-date_modified</code>). In
+            the <em>search</em> endpoint, sorting is done using the <code>sort</code> parameter, as described in detail
+            below.
         </p>
+        <h4>Field Selection</h4>
         <p>
-            Finally to save on bandwidth and speed up your queries, fields can be limited by using the
-            <code>fields</code> get parameter with a comma-separated list of fields you wish to receive. For
-            example, if you wish to only receive the <code>resource_uri</code> and <code>absolute_url</code> fields from
-            the <code>opinion</code> endpoint you could do so with:
+            To save on bandwidth and speed up your queries, fields can be limited by using the <code>fields</code> GET
+            parameter with a comma-separated list of fields you wish to receive. For example, if you wish to only
+            receive the <code>resource_uri</code> and <code>absolute_url</code> fields from the <code>opinion</code>
+            endpoint you could do so with:
         </p>
         <blockquote>
             <code>curl https://www.courtlistener.com/api/rest/v1/opinion/?<strong>=absolute_url,resource_uri</strong></code>
@@ -121,7 +142,7 @@
             we can investigate easing your thresholds.
         </p>
 
-        <h4>API Expansion</h4>
+        <h4>API and Documentation Upgrades and Fixes</h4>
         <p>
             Like the rest of the CourtListener platform, this API and its documentation are
             <a href="https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/src/tip/alert/search/api.py?at=default">open
@@ -166,7 +187,7 @@
             (<code>__gt</code>), ordered by <code>date_modified</code> (ascending).
         </p>
         <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v1/opinion/?date_modified__gt=2013-06-09+00:00Z&order_by=date_modified</code>
+            <code>curl https://www.courtlistener.com/api/rest/v1/opinion/?<strong>date_modified__gt=2013-06-09+00:00Z&order_by=date_modified</strong></code>
         </blockquote>
         <p>
             And remember, to flip the sorting, you can use a minus sign in your ordering argument
@@ -174,11 +195,12 @@
         </p>
         <p>
             The results of this endpoint can also be sorted by <code>time_retrieved</code>, <code>date_modified</code>,
-            <code>date_filed</code>, <code>pagerank</code>, or <code>date_blocked</code>.
+            <code>date_filed</code>, <code>pagerank</code>, or <code>date_blocked</code>. Again, this is described in
+            more detail in the schema.
         </p>
 
 
-        <h3 id="citation-endpoint">/api/v1/rest/citation/</h3>
+        <h3 id="citation-endpoint">/api/rest/v1/citation/</h3>
         <p>
             This endpoint is integrated into the <code>/opinion/</code> endpoint and is also available individually.
             This endpoint provides each of the many citations that an opinion can have. Since opinions are often included
@@ -208,12 +230,12 @@
             <code>opinion_uris</code>, which references the parent opinion for a citation.
         </p>
         <p>
-            At present it is not possible to filter based on a citation. For this purpose, we recommend the
-            <a href="#search-endpoint">search endpoint</a>.
+            At present for performance reasons it is not possible to filter based on a citation. For this purpose, we
+            recommend the <a href="#search-endpoint">search endpoint</a>.
         </p>
 
 
-        <h3 id="jurisdiction-endpoint">/api/v1/rest/jurisdiction/</h3>
+        <h3 id="jurisdiction-endpoint">/api/rest/v1/jurisdiction/</h3>
         <p>
             This is the simplest of our REST endpoints and currently provides basic information about the
             <strong>{{ court_count }}</strong> jurisdictions in the American court system that we support.
@@ -224,7 +246,7 @@
             as well.
         </p>
 
-        <h3 id="search-endpoint">/api/v1/rest/search/</h3>
+        <h3 id="search-endpoint">/api/rest/v1/search/</h3>
         <p>
             This endpoint allows you to query our search engine along the same lines as is possible in our front end.
             Because this endpoint does not use the Django models directly, the fields and results from this endpoint are
@@ -256,7 +278,8 @@
             <dd>
                 These fields allow you to search for dates greater than or less than a given value. Input dates ascribe
                 to ISO-8601 format, however, partial dates are allowed, and will be interpreted appropriately. For
-                example, placing "2012" in the "filed_after" parameter will assume you mean "2012-01-01".
+                example, placing "2012" in the <code>filed_after</code> parameter will assume you mean opinions after
+                "2012-01-01".
             </dd>
             <dt>Boolean</dt>
             <dd>
@@ -269,27 +292,34 @@
             </dd>
             <dt>CSV</dt>
             <dd>
-                The <code>courts</code> field is currently avaiable as a comma separated list (CSV). Thus to request
-                multiple courts, you can simply separate their IDs with a comma. For example to get all documents from
-                the Supreme Court (<code>scotus</code>) and the Ninth Circuit of Appeals (<code>ca9</code>), you
-                would make a query like:
+                The <code>courts</code> field is currently available as a list of comma separated values (CSV). Thus to
+                request multiple courts, you can simply separate their IDs with a comma. For example to get all
+                documents from the Supreme Court (<code>scotus</code>) and the Ninth Circuit of Appeals
+                (<code>ca9</code>), you would make a query like:
                 <blockquote>
                     <code>curl https://www.courtlistener.com/api/rest/v1/search/?<strong>courts=scotus,ca9</strong></code>
                 </blockquote>
+                IDs for all jurisdictions are in the sidebar.
             </dd>
         </dl>
 
 
-        <h3 id="coverage-endpoint">/api/v1/rest/coverage/</h3>
+        <h3 id="coverage-endpoint">/api/rest/v1/coverage/</h3>
         <p>
             Unlike the other endpoints in this API, the coverage endpoint is not based on the tastypie API framework. As
             a result it is much simpler, only providing data in a very specific manner, serialized as JSON. In the
             future we expect to expand this API to provide faceting along additional fields, but at present it simply
-            provides jurisdiction counts by year for any requested jurisdiction.
+            provides jurisdiction counts by year for any requested jurisdiction. This API does not require
+            authentication and is what powers our live <a href="/coverage/">coverage page</a>.
         </p>
         <p>
-            To receive jurisdiction counts by year, simply provide
+            To receive jurisdiction counts by year, simply provide the jurisdiction ID you wish to query or the special
+            keyword, "all", which returns counts for all jurisdictions. For example, this provides annual counts for the Ninth
+            Circuit of Appeals (<code>ca9</code>):
         </p>
+        <blockquote>
+            <code>curl https://www.courtlistener.com/api/rest/v1/coverage/ca9/</code>
+        </blockquote>
 
 
     </div>
@@ -300,8 +330,8 @@
         <div class="span-9 last sidebar-section">
             <h3><span>Available Jurisdictions</span></h3>
             <p>
-                We currently have <strong>{{ court_count }}</strong> courts that can be accessed with our APIs. Details
-                about the jurisdictions that are available can be found <a href="/api/jurisdictions/">here</a>.
+                We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs.
+                Details about the jurisdictions that are available can be found <a href="/api/jurisdictions/">here</a>.
             </p>
             <p>Below is a cheat sheet listing the abbreviations for all available jurisdictions.</p>
             <div id="scrollable-jurisdictions">
@@ -310,7 +340,7 @@
                         <tr>
                             <th>Name</th>
                             <th title="Gathered from Blue Book, Cornell.edu and ALWD">Abbreviation</th>
-                            <th title="The number of cases in this court on CourtListener">Count</th>
+                            <th title="The number of cases in this jurisdiction on CourtListener">Count</th>
                         </tr>
                     </thead>
                     <tbody>
