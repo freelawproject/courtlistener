@@ -87,7 +87,7 @@
             available in the <code>meta</code> section of the results.
         </p>
         <p>
-            A subset of results may be selected by using the <em>set</em> view, and separating the IDs yoou wish to
+            A subset of results may be selected by using the <em>set</em> view, and separating the IDs you wish to
             receive with semi-colons. For example this returns three jurisdictions using the <code>jurisdiction</code>
             endpoint:
         </p>
@@ -112,12 +112,12 @@
             With the exception of the coverage endpoint, sorting can be done on fields defined in the <em>ordering</em>
             section of an endpoint's schema. Sorting is done using the <code>order_by</code> GET parameter, with
             descending sorting available by prepending the minus sign (e.g. <code>order_by=-date_modified</code>). In
-            the <em>search</em> endpoint, sorting is done using the <code>sort</code> parameter, as described in detail
-            below.
+            the <em>search</em> endpoint, sorting is instead done using the <code>sort</code> parameter, as described
+            in detail below.
         </p>
         <h4>Field Selection</h4>
         <p>
-            To save on bandwidth and speed up your queries, fields can be limited by using the <code>fields</code> GET
+            To save bandwidth and speed up your queries, fields can be limited by using the <code>fields</code> GET
             parameter with a comma-separated list of fields you wish to receive. For example, if you wish to only
             receive the <code>resource_uri</code> and <code>absolute_url</code> fields from the <code>opinion</code>
             endpoint you could do so with:
@@ -142,7 +142,7 @@
             we can investigate easing your thresholds.
         </p>
 
-        <h4>API and Documentation Upgrades and Fixes</h4>
+        <h4>Upgrades and Fixes</h4>
         <p>
             Like the rest of the CourtListener platform, this API and its documentation are
             <a href="https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/src/tip/alert/search/api.py?at=default">open
