@@ -5,17 +5,19 @@ User-agent: Googlebot
 Disallow: /robots.txt
 Disallow: /dumps/
 Disallow: /assets/
+Disallow: /api/v1/
 
 User-agent: bingbot
 Disallow: /robots.txt
 Disallow: /dumps/
 Disallow: /assets/
+Disallow: /api/v1/
 
 User-agent: Slurp
 Disallow: /robots.txt
 Disallow: /dumps/
 Disallow: /assets/
-
+Disallow: /api/v1/
 
 # Yandex, Ask
 # These support meta robots, but not x-robots-tag
@@ -24,6 +26,7 @@ User-agent: YandexBot
 Disallow: /robots.txt
 Disallow: /dumps/
 Disallow: /assets/
+Disallow: /api/v1/
 Disallow: /pdf/
 Disallow: /wpd/
 Disallow: /txt/
@@ -33,6 +36,7 @@ User-agent: teoma
 Disallow: /robots.txt
 Disallow: /dumps/
 Disallow: /assets/
+Disallow: /api/v1/
 Disallow: /pdf/
 Disallow: /wpd/
 Disallow: /txt/
@@ -42,6 +46,7 @@ User-agent: ia_archiver
 Disallow: /robots.txt
 Disallow: /dumps/
 Disallow: /assets/
+Disallow: /api/v1/
 Disallow: /pdf/
 Disallow: /wpd/
 Disallow: /txt/

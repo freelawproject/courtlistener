@@ -52,11 +52,11 @@ We welcome a conversion of these notes to a better process using Fabric.
    - Citation has no filters -- use search instead.
  - TODO
    - Attempt to convert the coverage API to tastypie
-   - Set up the 'fields' get param: https://github.com/toastdriven/django-tastypie/issues/1056
    - Make sure filtering can be done on cases_cited/cited_by
    - Add stat logging to the API
-   - Add the API to robots.txt
-   - Resolve unicode issue in main site.
+   - Make sure that citation objects can go to their parent and vice versa.
+   - search API
+        - Does the schema show what it should?
 
 
 2013-10-28:
