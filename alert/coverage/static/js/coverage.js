@@ -41,7 +41,7 @@ function addNavigation() {
         }
         $.ajax({
             type: "GET",
-            url: "/api/coverage/" + hash + "/",
+            url: "/api/rest/v1/coverage/" + hash + "/",
             success: function(data){
                 // Clean things up
                 canvas.clear();

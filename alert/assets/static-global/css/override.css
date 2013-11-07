@@ -172,6 +172,11 @@ nav ul li {
     color: black;
 }
 
+#scrollable-jurisdictions {
+    overflow-y: scroll;
+    height: 500px;
+}
+
 /* New case view styling, including citations */
 #default-text pre, .citation {
     white-space: pre;
