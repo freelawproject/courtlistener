@@ -45,6 +45,8 @@ class ModelResourceWithFieldsFilter(ModelResource):
 
 
 class CourtResource(ModelResourceWithFieldsFilter):
+    tally_stat('search.api.court')
+
     class Meta:
         authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
         throttle = CacheThrottle(throttle_at=1000)
@@ -68,6 +70,9 @@ class CourtResource(ModelResourceWithFieldsFilter):
 
 
 class CitationResource(ModelResourceWithFieldsFilter):
+    tally_stat('seach.api.citation')
+    opinion_urls = fields.ToManyField('search.api.DocumentResource', 'parent_documents')
+
     class Meta:
         authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
         throttle = CacheThrottle(throttle_at=1000)
@@ -77,6 +82,7 @@ class CitationResource(ModelResourceWithFieldsFilter):
 
 
 class DocumentResource(ModelResourceWithFieldsFilter):
+    tally_stat('search.api.document')
     citation = fields.ForeignKey(CitationResource, 'citation')
     court = fields.ForeignKey(CourtResource, 'court')
     cases_cited = fields.ManyToManyField(CitationResource, 'cases_cited', use_in='detail')
@@ -165,26 +171,28 @@ class SolrObject(object):
 
 
 class SearchResource(ModelResourceWithFieldsFilter):
-    # Roses to the person that makes this introspect and removes all this code.
-    id = fields.CharField(attribute='id', default='id')
-    status = fields.CharField(attribute='status', default='status')
-    suitNature = fields.CharField(attribute='suitNature', default='suitNature')
-    court = fields.CharField(attribute='court', default='court')
-    caseName = fields.CharField(attribute='caseName', default='caseName')
-    citeCount = fields.IntegerField(attribute='citeCount', default='citeCount')
-    text = fields.CharField(attribute='text', default='text', use_in='detail')  # Only shows on the detail page.
-    citation = fields.CharField(attribute='citation', default='citation')
-    download_url = fields.CharField(attribute='download_url', default='download_url')
-    dateFiled = fields.DateField(attribute='dateFiled', default='dateFiled')
-    source = fields.CharField(attribute='source', default='source')
-    local_path = fields.CharField(attribute='local_path', default='local_path')
-    court_id = fields.CharField(attribute='court_id', default='court_id')
-    absolute_url = fields.CharField(attribute='absolute_url', default='absolute_url')
-    judge = fields.CharField(attribute='judge', default='judge')
-    docketNumber = fields.CharField(attribute='docketNumber', default='docketNumber')
-    caseNumber = fields.CharField(attribute='caseNumber', default='caseNumber')
-    timestamp = fields.DateField(attribute='timestamp', default='timestamp')
-    score = fields.FloatField(attribute='score', default='score')
+    tally_stat('search.api.search')
+
+    # Roses to the clever person that makes this introspect and removes all this code.
+    absolute_url = fields.CharField(attribute='absolute_url')
+    case_name = fields.CharField(attribute='caseName')
+    case_number = fields.CharField(attribute='caseNumber')
+    citation = fields.CharField(attribute='citation')
+    cite_count = fields.IntegerField(attribute='citeCount')
+    court = fields.CharField(attribute='court')
+    court_id = fields.CharField(attribute='court_id')
+    date_filed = fields.DateField(attribute='dateFiled')
+    docket_number = fields.CharField(attribute='docketNumber')
+    download_url = fields.CharField(attribute='download_url')
+    id = fields.CharField(attribute='id')
+    judge = fields.CharField(attribute='judge')
+    local_path = fields.CharField(attribute='local_path')
+    score = fields.FloatField(attribute='score')
+    source = fields.CharField(attribute='source')
+    status = fields.CharField(attribute='status')
+    suit_nature = fields.CharField(attribute='suitNature')
+    text = fields.CharField(attribute='text', use_in='detail')  # Only shows on the detail page.
+    timestamp = fields.DateField(attribute='timestamp')
 
     class Meta:
         authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
