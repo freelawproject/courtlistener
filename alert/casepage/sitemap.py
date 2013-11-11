@@ -15,14 +15,19 @@ def sitemap_maker(request, size=250):
     for all of them.
     """
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
-    params = {'q': '*:*'}
+    q = '*:*'
     page = request.GET.get("p", False)
     if page:
         # Page was found, so serve that page.
-        params['rows'] = size
-        params['start'] = (int(page) - 1) * size
-        params['fl'] = 'absolute_url,dateFiled,local_path,citeCount,timestamp'
-        params['sort'] = 'dateFiled asc'
+        start = (int(page) - 1) * size
+        params = {
+            'q': q,
+            'rows': size,
+            'start': start,
+            'fl': 'absolute_url,dateFiled,local_path,citeCount,timestamp',
+            'sort': 'dateFiled asc',
+            'caller': 'sitemap',
+        }
         search_results_object = conn.raw_query(**params).execute()
 
         # Translate Solr object into something Django's template can use
@@ -50,8 +55,12 @@ def sitemap_maker(request, size=250):
 
     else:
         # If no page number, thus the index page.
-        params['rows'] = '0'  # just need the count
-        params['start'] = '0'
+        params = {
+            'q': q,
+            'rows': '0',  # just need the count
+            'start': '0',
+            'caller': 'sitemap-index'
+        }
         search_results_object = conn.raw_query(**params).execute()
         count = search_results_object.result.numFound
 
