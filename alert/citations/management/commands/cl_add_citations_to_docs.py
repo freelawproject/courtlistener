@@ -50,7 +50,8 @@ class Command(BaseCommand):
                   "however this setting will show changes in the index in realtime. Saving 'all_at_end' can be "
                   "considerably more efficient, but will not show changes until the process has finished and the index "
                   "has been completely regenerated from the database. Setting this to False disables changes to Solr, "
-                  "if that is what's desired."),
+                  "if that is what's desired. Finally, only 'concurrently' will avoid reindexing the entire "
+                  "collection."),
         )
     )
     help = 'Parse citations out of documents.'
