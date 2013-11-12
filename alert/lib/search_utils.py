@@ -176,6 +176,21 @@ def merge_form_with_courts(COURTS, search_form):
     return courts, court_count
 
 
+def make_fq(cd, field, key):
+    """Does some minimal processing of the query string to get it into a
+    proper field query.
+
+    This is necessary because despite our putting AND as the default join
+    method, in some cases Solr decides OR is a better approach. So, to work
+    around this bug, we do some minimal query parsing ourselves (ugh!).
+    """
+    if '"' in cd[key]:
+        fq = '%s:(%s)' % (field, cd[key])
+    else:
+        fq = '%s:(%s)' % (field, ' AND '.join(cd[key].split()))
+    return fq
+
+
 def make_date_query(cd):
     """Given the cleaned data from a form, return a valid Solr fq string"""
     before = cd['filed_before']
@@ -269,22 +284,20 @@ def build_main_query(cd, highlight=True):
         pass
 
     main_fq = []
+
     # Case Name and judges
     if cd['case_name']:
-        main_fq.append('caseName:(%s)' % " AND ".join(cd['case_name'].split()))
+        main_fq.append(make_fq(cd, 'caseName', 'case_name'))
     if cd['judge']:
-        main_fq.append('judge:(%s)' % ' AND '.join(cd['judge'].split()))
+        main_fq.append(make_fq(cd, 'judge', 'judge'))
 
     # Citations
     if cd['citation']:
-        if '"' in cd['citation']:
-            main_fq.append('citation:"%s"' % cd['citation'])
-        else:
-            main_fq.append('citation:(%s)' % ' AND '.join(cd['citation'].split()))
+        main_fq.append(make_fq(cd, 'citation', 'citation'))
     if cd['docket_number']:
-        main_fq.append('docketNumber:(%s)' % ' AND '.join(cd['docket_number'].split()))
+        main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
     if cd['neutral_cite']:
-        main_fq.append('neutralCite:(%s)' % ' AND '.join(cd['neutral_cite'].split()))
+        main_fq.append(make_fq(cd, 'neutralCite', 'neutral_cite'))
 
     # Dates
     date_query = make_date_query(cd)
