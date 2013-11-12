@@ -1,0 +1,30 @@
+# Beginning with the globs
+syntax: glob
+
+# no compiled files!
+*.class
+*.pyc
+*~
+*.iml
+
+# Downloaded and generated assets
+alert/assets/media/html
+alert/assets/media/pdf
+alert/assets/media/txt
+alert/assets/media/wpd
+alert/assets/media/sitemaps
+alert/assets/media/doc
+alert/assets/media/dumps
+alert/assets/static
+
+# Solr
+Solr/data
+
+# Eclipse junk
+alert/.metadata
+
+# IntelliJ IDEA files
+.idea
+
+syntax: regexp
+^\.settings$

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load honeypot %}
+
+
+{% block title %}Send Email Confirmation - CourtListener.com{% endblock %}
+
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+    <script type="text/javascript">
+	    $(document).ready(function() {
+		    $('.auto-focus:first').focus();
+	    });
+     </script>
+{% endblock %}
+
+{% block content %}
+    <div class="span-24 last" id="content">
+        <div class="span-6">&nbsp;</div>
+        <div class="span-12">
+            <h2>Request Email Confirmation Link</h2>
+            <form action="" method="post">{% csrf_token %}
+                {% render_honeypot_field "skip_me_if_alive" %}
+                <p class="bottom">
+                    <label for="id_email">Your email address</label><br>
+                    <input id="id_email" type="text" name="email" maxlength="75" class="wide-title auto-focus"/>
+                </p>
+                <button type="submit" class="button">Submit</button>
+            </form>
+            <br><p>If you are unable to confirm your email address, please <a href="/contact/">contact us</a> for assistance.</p>
+        </div>
+        <div class="span-6 last">&nbsp;</div>
+    </div>
+{% endblock %}
