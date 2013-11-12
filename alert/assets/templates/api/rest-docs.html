@@ -184,7 +184,7 @@
             <a href="/api/rest/v1/opinion/schema/">schema document</a>.
         </p>
         <p>
-            As mentioned above, in the schema document, you will find that each filtering field provides a list of
+            As mentioned above, in the schema document you will find that each filtering field provides a list of
             field lookups that are available to it. The following query provides an example of these lookups in
             use. Observe the following query, which gets all items that were modified after June 9th, 2013
             (<code>__gt</code>), ordered by <code>date_modified</code> (ascending).
@@ -233,7 +233,7 @@
             <code>opinion_uris</code>, which references the parent opinion for a citation.
         </p>
         <p>
-            At present for performance reasons it is not possible to filter based on a citation. For this purpose, we
+            At present, for performance reasons it is not possible to filter based on a citation. For this purpose, we
             recommend the <a href="#search-endpoint">search endpoint</a>.
         </p>
 
@@ -286,7 +286,7 @@
             </dd>
             <dt>Boolean</dt>
             <dd>
-                Only the stat_* field is currently available as boolean. This field is represented by a checkboxes in
+                Only the stat_* field is currently available as boolean. This field is represented by checkboxes in
                 the front end, and can be enabled by setting its value to "on". For example to include only
                 Precedential documents, you might place a query like:
                 <blockquote>
