@@ -171,81 +171,95 @@ class SolrObject(object):
 class SearchResource(ModelResourceWithFieldsFilter):
     tally_stat('search.api.search')
 
-    # Roses to the clever person that makes this introspect and removes all this code.
+    # Roses to the clever person that makes this introspect the model and removes all this code.
     absolute_url = fields.CharField(
         attribute='absolute_url',
-        help_text="The URL on CourtListener for the item."
+        help_text="The URL on CourtListener for the item.",
+        null=True,
     )
     case_name = fields.CharField(
         attribute='caseName',
-        help_text="The full name of the case"
+        help_text="The full name of the case",
+        null=True,
     )
     case_number = fields.CharField(
         attribute='caseNumber',
-        help_text="The combination of the citation and the docket number."
+        help_text="The combination of the citation and the docket number.",
+        null=True,
     )
     citation = fields.CharField(
         attribute='citation',
-        help_text="A concatenated list of all the citations for an opinion."
+        help_text="A concatenated list of all the citations for an opinion.",
+        null=True,
     )
     cite_count = fields.IntegerField(
         attribute='citeCount',
-        help_text="The number of times this document is cited by other cases"
+        help_text="The number of times this document is cited by other cases",
     )
     court = fields.CharField(
         attribute='court',
-        help_text="The name of the court where the document was filed"
+        help_text="The name of the court where the document was filed",
+        null=True,
     )
     court_id = fields.CharField(
         attribute='court_id',
-        help_text='The court where the document was filed'
+        help_text='The court where the document was filed',
+        null=True,
     )
     date_filed = fields.DateField(
         attribute='dateFiled',
-        help_text='The date filed by the court'
+        help_text='The date filed by the court',
+        null=True,
     )
     docket_number = fields.CharField(
         attribute='docketNumber',
-        help_text='The docket numbers of a case, can be consolidated and quite long'
+        help_text='The docket numbers of a case, can be consolidated and quite long',
+        null=True,
     )
     download_url = fields.CharField(
         attribute='download_url',
-        help_text='The URL on the court website where the document was originally scraped'
+        help_text='The URL on the court website where the document was originally scraped',
+        null=True,
     )
     id = fields.CharField(
         attribute='id',
-        help_text='The primary key for an opinion.'
+        help_text='The primary key for an opinion.',
     )
     judge = fields.CharField(
         attribute='judge',
-        help_text='The judges that brought the opinion as a simple text string'
+        help_text='The judges that brought the opinion as a simple text string',
+        null=True,
     )
     local_path = fields.CharField(
         attribute='local_path',
-        help_text='The location, relative to MEDIA_ROOT on the CourtListener server, where files are stored'
+        help_text='The location, relative to MEDIA_ROOT on the CourtListener server, where files are stored',
+        null=True,
     )
     pagerank = fields.FloatField(
         attribute='pagerank',
-        null=True,
-        help_text="The PageRank score based on the citing relation among documents"
+        help_text="The PageRank score based on the citing relation among documents",
+        null=True
     )
     score = fields.FloatField(
         attribute='score',
-        help_text='The relevance of the result. Will vary from query to query.'
+        help_text='The relevance of the result. Will vary from query to query.',
     )
     source = fields.CharField(
         attribute='source',
         help_text='the source of the document, one of: %s' % ', '.join(['%s (%s)' % (t[0], t[1]) for t in
-                                                                        DOCUMENT_SOURCES])
+                                                                        DOCUMENT_SOURCES]),
+        null=True,
     )
     status = fields.CharField(
         attribute='status',
         help_text='The precedential status of document, one of: %s' % ', '.join([('stat_%s' % t[1]).replace(' ', '+')
-                                                                                 for t in DOCUMENT_STATUSES])
+                                                                                 for t in DOCUMENT_STATUSES]),
+        null=True,
     )
     suit_nature = fields.CharField(
         attribute='suitNature',
         help_text="The nature of the suit. For the moment can be codes or laws or whatever",
+        null=True,
     )
     text = fields.CharField(
         attribute='text',
