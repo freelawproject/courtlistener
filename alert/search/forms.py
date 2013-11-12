@@ -236,10 +236,8 @@ class SearchForm(forms.Form):
         # 2. Convert the value in the court field to the various court_* fields
         court_str = cleaned_data.get('court')
         if court_str:
-            if ' ' in court_str:
-                court_ids = court_str.split(' ')
-            elif ',' in court_str:
-                court_ids = court_str.split(',')
+
+            court_ids = court_str.split(' ')
             for id in court_ids:
                 cleaned_data['court_%s' % id] = True
 
