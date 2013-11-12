@@ -228,7 +228,7 @@ def build_main_query(cd, highlight=True):
 
     # Sorting for the main query
     main_params['sort'] = cd.get('sort', '')
-    
+
     if str(main_params['sort']).startswith('score'):
         main_params['boost'] = 'pagerank'
 
@@ -277,7 +277,10 @@ def build_main_query(cd, highlight=True):
 
     # Citations
     if cd['citation']:
-        main_fq.append('citation:(%s)' % ' AND '.join(cd['citation'].split()))
+        if '"' in cd['citation']:
+            main_fq.append('citation:"%s"' % cd['citation'])
+        else:
+            main_fq.append('citation:(%s)' % ' AND '.join(cd['citation'].split()))
     if cd['docket_number']:
         main_fq.append('docketNumber:(%s)' % ' AND '.join(cd['docket_number'].split()))
     if cd['neutral_cite']:

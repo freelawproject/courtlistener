@@ -54,7 +54,7 @@ class Command(BaseCommand):
                 average_per_s,
             ))
             sys.stdout.flush()
-            for target_case in source_case.cases_cited.values_list('document__pk'):
+            for target_case in source_case.cases_cited.values_list('parent_documents__pk'):
                 citing_graph.add_edge(str(source_case.pk), str(target_case[0]))
             pr_db[str(source_case.pk)] = source_case.pagerank
 
