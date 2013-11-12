@@ -79,12 +79,12 @@
 
         <h4>Views, Pagination and Subset Selection</h4>
         <p>
-            Each endpoint provides both a list view and a detail view. The <em>list</em> view is what you see when you
-            visit an endpoint, and it shows a list of 20 results.  The <em>detail</em> view shows all meta data for a
-            single result and can be viewed by following the <code>resource_uri</code> field for a result on the list
-            view. Occasionally, content is excluded from the list view for performance reasons, but it may be available
-            on the detail view. With the exception of the coverage API, links to the next and previous pages are
-            available in the <code>meta</code> section of the results.
+            Each endpoint provides a list view, a detail view and a set view. The <em>list</em> view is what you see
+            when you visit an endpoint, when it shows a list of 20 results.  The <em>detail</em> view shows all meta
+            data for a single result and can be viewed by following the <code>resource_uri</code> field for a result on
+            the list view. Occasionally, content is excluded from the list view for performance reasons, but it may be
+            available on the detail view. With the exception of the coverage API, links to the next and previous pages
+            are available in the <code>meta</code> section of the results.
         </p>
         <p>
             A subset of results may be selected by using the <em>set</em> view, and separating the IDs you wish to
@@ -92,8 +92,11 @@
             endpoint:
         </p>
         <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v1/jurisdiction/set/scotus;ca9;cal</code>
+            <code>curl "https://www.courtlistener.com/api/rest/v1/jurisdiction/set/scotus;ca9;cal"</code>
         </blockquote>
+        <p>
+            Note that we use quotation marks in this query in order to escape shell interpretation of the semicolons.
+        </p>
         <h4>Filtering</h4>
         <p>
             With the exception of the coverage endpoint, each endpoint can be filtered and sorted in various ways, as
