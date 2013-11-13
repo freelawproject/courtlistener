@@ -28,16 +28,15 @@
     <script type="text/javascript">
        $(document).ready(function() {
            $('.auto-focus:first').focus();
-           $('#id_sort').change(function() {
+           $('#id_order_by').change(function() {
                // Makes the sort drop down work when changed.
                $('#search-form').submit();
            });
            {% if results.paginator.count > 0 %}
-               $('#id_sort').appendTo('#result-order-chooser-placeholder');
-               $('#id_sort').show();
+               $('#id_order_by').appendTo('#result-order-chooser-placeholder');
+               $('#id_order_by').show();
            {% endif %}
        });
-
     </script>
 {% endblock %}
 

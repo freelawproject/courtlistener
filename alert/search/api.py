@@ -22,6 +22,10 @@ numerical_filters = ('exact', 'gte', 'gt', 'lte', 'lt', 'range',)
 
 
 class ModelResourceWithFieldsFilter(ModelResource):
+    def __init__(self, tally_name=None):
+        super(ModelResourceWithFieldsFilter, self).__init__()
+        self.tally_name = tally_name
+
     def full_dehydrate(self, bundle, *args, **kwargs):
         bundle = super(ModelResourceWithFieldsFilter, self).full_dehydrate(bundle, *args, **kwargs)
         # bundle.obj[0]._data['citeCount'] = 0
@@ -41,10 +45,14 @@ class ModelResourceWithFieldsFilter(ModelResource):
             bundle.data[k] = filter_invalid_XML_chars(v)
         return bundle
 
+    def dispatch(self, request_type, request, **kwargs):
+        """Simple override here to tally stats before sending off the results."""
+        tally_stat(self.tally_name)
+        return super(ModelResourceWithFieldsFilter, self).dispatch(request_type, request, **kwargs)
+
+
 
 class CourtResource(ModelResourceWithFieldsFilter):
-    tally_stat('search.api.court')
-
     class Meta:
         authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
         throttle = CacheThrottle(throttle_at=1000)
@@ -68,7 +76,6 @@ class CourtResource(ModelResourceWithFieldsFilter):
 
 
 class CitationResource(ModelResourceWithFieldsFilter):
-    tally_stat('seach.api.citation')
     opinion_uris = fields.ToManyField('search.api.DocumentResource', 'parent_documents')
 
     class Meta:
@@ -80,7 +87,6 @@ class CitationResource(ModelResourceWithFieldsFilter):
 
 
 class DocumentResource(ModelResourceWithFieldsFilter):
-    tally_stat('search.api.document')
     citation = fields.ForeignKey(CitationResource, 'citation', full=True)
     court = fields.ForeignKey(CourtResource, 'court')
     cases_cited = fields.ManyToManyField(CitationResource, 'cases_cited', use_in='detail')
@@ -169,8 +175,6 @@ class SolrObject(object):
 
 
 class SearchResource(ModelResourceWithFieldsFilter):
-    tally_stat('search.api.search')
-
     # Roses to the clever person that makes this introspect the model and removes all this code.
     absolute_url = fields.CharField(
         attribute='absolute_url',
@@ -252,7 +256,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
     )
     snippet = fields.CharField(
         attribute='snippet',
-        help_text='a list of snippets, as found in search results, utilizing <mark> for highlighting',
+        help_text='a snippet as found in search results, utilizing <mark> for highlighting and &hellip; for ellipses',
         null=True,
     )
     status = fields.CharField(
@@ -269,7 +273,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
     text = fields.CharField(
         attribute='text',
         use_in='detail',  # Only shows on the detail page.
-        help_text="A concatenated copy of most fields in the item so those fields are avaiable for search."
+        help_text="A concatenated copy of most fields in the item so those fields are available for search."
     )
     timestamp = fields.DateField(
         attribute='timestamp',
@@ -322,7 +326,9 @@ class SearchResource(ModelResourceWithFieldsFilter):
         try:
             main_query = build_main_query(kwargs['cd'], highlight='text')
         except KeyError:
-            main_query = {'q': "*:*"}
+            sf = SearchForm({'q': "*:*"})
+            if sf.is_valid():
+                main_query = build_main_query(sf.cleaned_data, highlight='text')
 
         results_si = conn.raw_query(**main_query).execute()
         # Pull the text snippet up a level, where tastypie can find it

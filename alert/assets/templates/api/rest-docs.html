@@ -49,6 +49,22 @@
             Authentication. Both of these authentication mechanisms protect your credentials on the wire via HTTPS.
         </p>
         <p>
+            To do HTTP Basic Authentication using cURL, you might do something like this:
+        </p>
+        <blockquote>
+            <code>curl --user "harvey:your-password" "https://www.courtlistener.com/api/rest/v1/opinion/"</code>
+        </blockquote>
+        <p>
+            You can also do it in your browser with a url like:
+        </p>
+        <blockquote>
+            <code>https://harvey:your-password@www.courtlistener.com/api/rest/v1/opinion/</code>
+        </blockquote>
+        <p>
+            But that's not normally necessary because most browsers will provide you with a popup if you need to
+            authenticate using HTTP Basic Authentication.
+        </p>
+        <p>
             Authentication is necessary so we can monitor usage of the system and so we can assist with any errors that
             may occur. Per our <a href="/terms/#privacy">privacy policy</a>, we do not track your queries in the API,
             though we may collect statistical information for system monitoring.
@@ -99,7 +115,7 @@
         </p>
         <h4>Filtering</h4>
         <p>
-            With the exception of the coverage endpoint, each endpoint can be filtered and sorted in various ways, as
+            With the exception of the coverage endpoint, each endpoint can be filtered in various ways, as
             defined in their schema (available at <code>/api/rest/v1/$endpoint/schema/</code>). In the schemas you will
             find rules defining how each field can be filtered. These correspond to the
             <a href="https://docs.djangoproject.com/en/dev/ref/models/querysets/#field-lookups">field lookups in the
@@ -110,13 +126,13 @@
             Field lookups can be used by appending them to a field with a double underscore as a separator (examples
             are below in the documentation for various endpoints).
         </p>
-        <h4>Sorting</h4>
+        <h4>Ordering</h4>
         <p>
-            With the exception of the coverage endpoint, sorting can be done on fields defined in the <em>ordering</em>
-            section of an endpoint's schema. Sorting is done using the <code>order_by</code> GET parameter, with
-            descending sorting available by prepending the minus sign (e.g. <code>order_by=-date_modified</code>). In
-            the <em>search</em> endpoint, sorting is instead done using the <code>sort</code> parameter, as described
-            in detail below.
+            With the exception of the coverage endpoint, ordering can be done on fields defined in the <em>ordering</em>
+            section of an endpoint's schema. Ordering is done using the <code>order_by</code> GET parameter, with
+            descending ordering available by prepending the minus sign (e.g. <code>order_by=-date_modified</code>).
+            However, because the <em>search</em> endpoint uses Solr for its backend, ordering is instead done using
+            the <code>asc</code> and <code>desc</code>, as described in detail below.
         </p>
         <h4>Field Selection</h4>
         <p>
@@ -149,17 +165,18 @@
         <p>
             Like the rest of the CourtListener platform, this API and its documentation are
             <a href="https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/src/tip/alert/search/api.py?at=default">open
-            source</a>. If it lacks functionality that you desire or if you find these notes lacking, pull requests
-            providing improvements are very welcome. Just get in touch in
+            source</a>. If it lacks functionality that you desire or if you find
+            <a href="https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/src/tip/alert/assets/templates/api/rest-docs.html?at=default">these
+            notes</a> lacking, pull requests providing improvements are very welcome. Just get in touch in
             <a href="http://lists.freelawproject.org/cgi-bin/mailman/listinfo/dev">our developer forum</a> to discuss
-            your ideas.
+            your ideas or, hey, go ahead and send us a pull request.
         </p>
 
 
         <h3 id="opinion-endpoint">/api/rest/v1/opinion/</h3>
         <p>
             This can be considered the main endpoint for many users. It provides access to the opinions in our database
-            and can be filtered or sorted in various ways as mentioned above. As with all endpoints, field descriptions
+            and can be filtered or ordered in various ways as mentioned above. As with all endpoints, field descriptions
             can be found in the schema document. Visiting this endpoint provides the metadata for 20 opinions at a
             time. The full text of the opinions may be found by visiting their detail page, which can be found by
             following the <code>resource_uri</code> attribute for a result. Full text is not provided by default to
@@ -193,11 +210,11 @@
             <code>curl https://www.courtlistener.com/api/rest/v1/opinion/?<strong>date_modified__gt=2013-06-09+00:00Z&order_by=date_modified</strong></code>
         </blockquote>
         <p>
-            And remember, to flip the sorting, you can use a minus sign in your ordering argument
+            And remember, to flip the ordering, you can use a minus sign in your ordering argument
             (<code>order_by=<strong>-</strong>date_modified</code>).
         </p>
         <p>
-            The results of this endpoint can also be sorted by <code>time_retrieved</code>, <code>date_modified</code>,
+            The results of this endpoint can also be ordered by <code>time_retrieved</code>, <code>date_modified</code>,
             <code>date_filed</code>, <code>pagerank</code>, or <code>date_blocked</code>. Again, this is described in
             more detail in the schema.
         </p>
@@ -228,7 +245,7 @@
             federal citations for a single opinion.
         </p>
         <p>
-            All of the filtering, sorting and field lookups described above can be used on this endpoint, as described
+            All of the filtering, ordering and field lookups described above can be used on this endpoint, as described
             in its <a href="/api/rest/v1/citation/schema/">schema</a>. This endpoint also provides a field called
             <code>opinion_uris</code>, which references the parent opinion for a citation.
         </p>
@@ -244,7 +261,7 @@
             <strong>{{ court_count }}</strong> jurisdictions in the American court system that we support.
         </p>
         <p>
-            This endpoint can be filtered or sorted in numerous ways as described in its
+            This endpoint can be filtered or ordered in numerous ways as described in its
             <a href="/api/rest/v1/jurisdiction/schema/">schema</a>. Brief descriptions of the fields can be found there
             as well.
         </p>
@@ -253,9 +270,9 @@
         <p>
             This endpoint allows you to query our search engine along the same lines as is possible in our front end.
             Because this endpoint does not use the Django models directly, the fields and results from this endpoint are
-            slightly different than those in the other endpoints. For example, instead of using <code>order_by</code>
-            for ordering, it uses <code>sort</code> (see <a href="/api/rest/v1/search/schema/">the schema</a> for
-            sorting options).
+            slightly different than those in the other endpoints. For example, instead of using a minus sign to flip
+            ordering, instead it uses <code>asc</code> and <code>desc</code>. (See
+            <a href="/api/rest/v1/search/schema/">the schema</a> for all of the ordering options).
         </p>
         <p>
             Similarly, since this endpoint hits against a Solr search index instead of a database, the filtering works
@@ -295,12 +312,12 @@
             </dd>
             <dt>CSV</dt>
             <dd>
-                The <code>courts</code> field is currently available as a list of comma separated values (CSV). Thus, to
+                The <code>court</code> field is currently available as a list of comma separated values (CSV). Thus, to
                 request multiple courts, you can simply separate their IDs with a comma. For example to get all
                 documents from the Supreme Court (<code>scotus</code>) and the Ninth Circuit of Appeals
                 (<code>ca9</code>), you would make a query like:
                 <blockquote>
-                    <code>curl https://www.courtlistener.com/api/rest/v1/search/?<strong>courts=scotus,ca9</strong></code>
+                    <code>curl https://www.courtlistener.com/api/rest/v1/search/?<strong>court=scotus,ca9</strong></code>
                 </blockquote>
                 IDs for all jurisdictions are in the sidebar.
             </dd>
@@ -359,7 +376,7 @@
                         <tr>
                             <td>{{ court.full_name }}</td>
                             <td>
-                                <a href="/?q=&court_{{ court.pk }}=on&sort=score+desc">
+                                <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc">
                                     {{ court.pk }}
                                 </a>
                             </td>
