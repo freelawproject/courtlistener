@@ -236,7 +236,7 @@ def get_selected_field_string(cd, prefix):
     return selected_field_string
 
 
-def build_main_query(cd, highlight=True):
+def build_main_query(cd, highlight='all'):
     main_params = {}
     # Build up all the queries needed
     main_params['q'] = cd['q'] or '*:*'
@@ -248,35 +248,41 @@ def build_main_query(cd, highlight=True):
         main_params['boost'] = 'pagerank'
 
     if highlight:
-        # Requested fields for the main query. We only need the fields here that
-        # are not requested as part of highlighting. Facet params are not set
-        # here because they do not retrieve results, only counts (they are set
-        # to 0 rows).
-        main_params['fl'] = 'id,absolute_url,court_id,local_path,source,download_url,status,dateFiled,citeCount'
-
-        # Highlighting for the main query.
+        # Common highlighting params up here.
         main_params['hl'] = 'true'
-        main_params['hl.fl'] = 'text,caseName,judge,suitNature,citation,neutralCite,docketNumber,lexisCite,court_citation_string'
-        main_params['f.caseName.hl.fragListBuilder'] = 'single'
-        main_params['f.judge.hl.fragListBuilder'] = 'single'
-        main_params['f.suitNature.hl.fragListBuilder'] = 'single'
-        main_params['f.citation.hl.fragListBuilder'] = 'single'
-        main_params['f.neutralCite.hl.fragListBuilder'] = 'single'
-        main_params['f.docketNumber.hl.fragListBuilder'] = 'single'
-        main_params['f.lexisCite.hl.fragListBuilder'] = 'single'
-        main_params['f.court_citation_string.hl.fragListBuilder'] = 'single'
         main_params['f.text.hl.snippets'] = '5'
-        # If there aren't any hits in the text return the field instead
-        main_params['f.text.hl.alternateField'] = 'text'
         main_params['f.text.hl.maxAlternateFieldLength'] = '500'
-        main_params['f.caseName.hl.alternateField'] = 'caseName'
-        main_params['f.judge.hl.alternateField'] = 'judge'
-        main_params['f.suitNature.hl.alternateField'] = 'suitNature'
-        main_params['f.citation.hl.alternateField'] = 'citation'
-        main_params['f.neutralCite.hl.alternateField'] = 'neutralCite'
-        main_params['f.docketNumber.hl.alternateField'] = 'docketNumber'
-        main_params['f.lexisCite.hl.alternateField'] = 'lexisCite'
-        main_params['f.court_citation_string.hl.alternateField'] = 'court_citation_string'
+        main_params['f.text.hl.alternateField'] = 'text'
+
+        if highlight == 'all':
+            # Requested fields for the main query. We only need the fields here that
+            # are not requested as part of highlighting. Facet params are not set
+            # here because they do not retrieve results, only counts (they are set
+            # to 0 rows).
+            main_params['fl'] = 'id,absolute_url,court_id,local_path,source,download_url,status,dateFiled,citeCount'
+
+            # Highlighting for the main query.
+            main_params['hl.fl'] = 'text,caseName,judge,suitNature,citation,neutralCite,docketNumber,lexisCite,court_citation_string'
+            main_params['f.caseName.hl.fragListBuilder'] = 'single'
+            main_params['f.judge.hl.fragListBuilder'] = 'single'
+            main_params['f.suitNature.hl.fragListBuilder'] = 'single'
+            main_params['f.citation.hl.fragListBuilder'] = 'single'
+            main_params['f.neutralCite.hl.fragListBuilder'] = 'single'
+            main_params['f.docketNumber.hl.fragListBuilder'] = 'single'
+            main_params['f.lexisCite.hl.fragListBuilder'] = 'single'
+            main_params['f.court_citation_string.hl.fragListBuilder'] = 'single'
+
+            # If there aren't any hits in the text return the field instead
+            main_params['f.caseName.hl.alternateField'] = 'caseName'
+            main_params['f.judge.hl.alternateField'] = 'judge'
+            main_params['f.suitNature.hl.alternateField'] = 'suitNature'
+            main_params['f.citation.hl.alternateField'] = 'citation'
+            main_params['f.neutralCite.hl.alternateField'] = 'neutralCite'
+            main_params['f.docketNumber.hl.alternateField'] = 'docketNumber'
+            main_params['f.lexisCite.hl.alternateField'] = 'lexisCite'
+            main_params['f.court_citation_string.hl.alternateField'] = 'court_citation_string'
+        elif highlight == 'text':
+            main_params['hl.fl'] = 'text'
     else:
         # highlighting is off, therefore we get the default fl parameter,
         # which gives us all fields. We could set it manually, but there's

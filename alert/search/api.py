@@ -250,6 +250,11 @@ class SearchResource(ModelResourceWithFieldsFilter):
                                                                         DOCUMENT_SOURCES]),
         null=True,
     )
+    snippet = fields.CharField(
+        attribute='snippet',
+        help_text='a list of snippets, as found in search results, utilizing <mark> for highlighting',
+        null=True,
+    )
     status = fields.CharField(
         attribute='status',
         help_text='The precedential status of document, one of: %s' % ', '.join([('stat_%s' % t[1]).replace(' ', '+')
@@ -315,11 +320,14 @@ class SearchResource(ModelResourceWithFieldsFilter):
         """Performs the Solr work."""
         conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
         try:
-            main_query = build_main_query(kwargs['cd'], highlight=False)
+            main_query = build_main_query(kwargs['cd'], highlight='text')
         except KeyError:
             main_query = {'q': "*:*"}
 
         results_si = conn.raw_query(**main_query).execute()
+        # Pull the text snippet up a level, where tastypie can find it
+        for result in results_si.result.docs:
+            result['snippet'] = '&hellip;'.join(result['solr_highlights']['text'])
         # Return the results as objects, not dicts.
         # Use a SolrList that has a couple of the normal functions built in.
         sl = SolrList(conn=conn, q=main_query, length=results_si.result.numFound,

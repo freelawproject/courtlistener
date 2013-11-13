@@ -264,7 +264,7 @@
             easily apply it to this endpoint.
         </p>
         <p>
-            When examinine the <em>filtering</em> section of the schema, note that fields have been labeled as follows:
+            When examining the <em>filtering</em> section of the schema, note that fields have been labeled as follows:
         </p>
         <dl>
             <dt>search</dt>
@@ -305,6 +305,14 @@
                 IDs for all jurisdictions are in the sidebar.
             </dd>
         </dl>
+        <p>
+            Finally, one field that warrants explanation is the <code>snippet</code> field. This field contains the
+            same values as are found on the front end, utilizing the HTML5 <code>&lt;mark&gt;</code> element to identify
+            up to five matches in an opinion. If you wish to use the snippet but do not want highlighting, simply use
+            CSS to give the <code>mark</code> element no styling, like a <code>span</code> element. This field only
+            responds to arguments provided to the <code>q</code> parameter. If that parameter is not used, the
+            <code>snippet</code> field will show the first 500 characters of the <code>text</code> field.
+        </p>
 
 
         <h3 id="coverage-endpoint">/api/rest/v1/coverage/</h3>
