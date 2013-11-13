@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from alert import settings
+from alert.stats import tally_stat
 from alert.userHandling.forms import ProfileForm, UserForm, UserCreationFormExtended, EmailConfirmationForm
 from alert.userHandling.models import UserProfile
 from alert.honeypot.decorators import check_honeypot
@@ -228,6 +229,7 @@ def register(request):
                           email_body,
                           'CourtListener <noreply@courtlistener.com>',
                           [a[1] for a in settings.ADMINS])
+                tally_stat('user.created')
                 return HttpResponseRedirect('/register/success/?next=%s' % redirect_to)
         else:
             form = UserCreationFormExtended()
