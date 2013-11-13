@@ -1946,8 +1946,10 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                          'name': 'New Jersey Law Reports',
                          'variations': {'N.J.Law': 'N.J.L.'}}],
              'N.M.': [{'cite_type': 'state',
-                       'editions': {'N.M.': (datetime.datetime(1890, 1, 1, tzinfo=utc),
+                       'editions': {'N.M.': (datetime.datetime(1852, 1, 1, tzinfo=utc),
                                              now())},
+                                            # Dates confirmed via citation table at 
+                                            # http://www.nmcompcomm.us/nmcases/pdf/NM%20Reports%20to%20Official%20-%20Vols.%201-75.pdf
                        'mlz_jurisdiction': 'us;nm',
                        'name': 'New Mexico Reports',
                        'variations': {}}],
@@ -2021,8 +2023,10 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                          'name': 'North Dakota Neutral Citation, Court of Appeals',
                          'variations': {}}],
              'NM': [{'cite_type': 'neutral',
-                     'editions': {'NM': (datetime.datetime(1750, 1, 1, tzinfo=utc),
+                     'editions': {'NM': (datetime.datetime(1852, 1, 1, tzinfo=utc),
                                          now())},
+                                        # Dates confirmed via citation table at
+                                        # http://www.nmcompcomm.us/nmcases/pdf/NM%20Reports%20to%20Official%20-%20Vols.%201-75.pdf
                      'mlz_jurisdiction': 'us;nm',
                      'name': 'New Mexico Neutral Citation',
                      'variations': {}}],
