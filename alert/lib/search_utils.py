@@ -242,7 +242,7 @@ def build_main_query(cd, highlight='all'):
     main_params['q'] = cd['q'] or '*:*'
 
     # Sorting for the main query
-    main_params['sort'] = cd.get('sort', '')
+    main_params['sort'] = cd.get('order_by', '')
 
     if str(main_params['sort']).startswith('score'):
         main_params['boost'] = 'pagerank'

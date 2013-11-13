@@ -6,7 +6,7 @@ from django import forms
 
 import re
 
-SORT_CHOICES = (
+ORDER_BY_CHOICES = (
     ('score desc', 'Relevance'),
     ('dateFiled desc', 'Newest first'),
     ('dateFiled asc', 'Oldest first'),
@@ -51,7 +51,7 @@ def _clean_form(request, cd):
         after = cd['filed_after']
         mutable_get['filed_after'] = '%s-%02d-%02d' % \
                                      (after.year, after.month, after.day)
-    mutable_get['sort'] = cd['sort']
+    mutable_get['order_by'] = cd['order_by']
 
     for court in COURTS:
         mutable_get['court_%s' % court['pk']] = cd['court_%s' % court['pk']]
@@ -63,8 +63,8 @@ class SearchForm(forms.Form):
     q = forms.CharField(
         required=False
     )
-    sort = forms.ChoiceField(
-        choices=SORT_CHOICES,
+    order_by = forms.ChoiceField(
+        choices=ORDER_BY_CHOICES,
         required=False,
         initial='dateFiled desc',
         widget=forms.Select(
@@ -210,11 +210,11 @@ class SearchForm(forms.Form):
 
         return q
 
-    def clean_sort(self):
-        """Sets the default sort value if one isn't provided by the user."""
-        if not self.cleaned_data['sort']:
-            return self.fields['sort'].initial
-        return self.cleaned_data['sort']
+    def clean_order_by(self):
+        """Sets the default order_by value if one isn't provided by the user."""
+        if not self.cleaned_data['order_by']:
+            return self.fields['order_by'].initial
+        return self.cleaned_data['order_by']
 
     def clean(self):
         """
