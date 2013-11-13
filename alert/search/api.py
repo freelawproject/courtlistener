@@ -2,7 +2,7 @@ import logging
 from tastypie import fields
 from tastypie.authentication import BasicAuthentication, SessionAuthentication, MultiAuthentication
 from tastypie.constants import ALL
-from tastypie.exceptions import BadRequest
+from tastypie.exceptions import BadRequest, InvalidSortError
 from tastypie.resources import ModelResource
 from tastypie.throttle import CacheThrottle
 from alert import settings
@@ -49,7 +49,6 @@ class ModelResourceWithFieldsFilter(ModelResource):
         """Simple override here to tally stats before sending off the results."""
         tally_stat(self.tally_name)
         return super(ModelResourceWithFieldsFilter, self).dispatch(request_type, request, **kwargs)
-
 
 
 class CourtResource(ModelResourceWithFieldsFilter):
@@ -99,7 +98,7 @@ class DocumentResource(ModelResourceWithFieldsFilter):
         authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
         throttle = CacheThrottle(throttle_at=1000)
         resource_name = 'opinion'
-        queryset = Document.objects.all().select_related('court__pk', 'citation__pk', 'citation__slug')
+        queryset = Document.objects.all().select_related('court__pk', 'citation')
         max_limit = 20
         allowed_methods = ['get']
         include_absolute_url = True
@@ -120,6 +119,17 @@ class DocumentResource(ModelResourceWithFieldsFilter):
         }
         ordering = ['time_retrieved', 'date_modified', 'date_filed', 'pagerank', 'date_blocked']
 
+'''
+class CitesResource(ModelResourceWithFieldsFilter):
+    class Meta:
+        authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
+        throttle = CacheThrottle(throttle_at=1000)
+        resource_name = 'cites'
+        queryset = Document.objects.all().cases_cited.all()
+        max_limit = 20
+        list_allowed_methods = []
+        detail_allowed_methods = ['get']
+'''
 
 class SolrList(list):
     def __init__(self, conn, q, length, offset, limit):
@@ -360,3 +370,11 @@ class SearchResource(ModelResourceWithFieldsFilter):
             return self.get_object_list(bundle.request, cd=cd)[0]
         else:
             BadRequest("Invalid resource lookup data provided. Unable to complete your request.")
+
+    def apply_sorting(self, obj_list, options=None):
+        """Since we're not using Django Model sorting, we just want to use our own, which is already
+        passed into the search form anyway.
+
+        Thus: Do nothing here.
+        """
+        return obj_list
