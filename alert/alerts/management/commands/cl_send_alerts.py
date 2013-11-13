@@ -128,7 +128,7 @@ class Command(BaseCommand):
                     except KeyError:
                         pass
                     data['filed_after'] = cut_off_date
-                    data['sort'] = 'score desc'
+                    data['order_by'] = 'score desc'
                     if self.verbosity >= 1:
                         print "Data sent to SearchForm is: %s" % data
                     search_form = SearchForm(data)

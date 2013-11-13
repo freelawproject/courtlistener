@@ -97,7 +97,13 @@ class court_feed(Feed):
     def items(self, obj):
         """Do a Solr query here. Return the first 20 results"""
         conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
-        params = {'q': '*:*', 'court_exact': obj.pk, 'sort': 'dateFiled desc', 'rows': '20', 'start': '0'}
+        params = {
+            'q': '*:*',
+            'court_exact': obj.pk,
+            'sort': 'dateFiled desc',
+            'rows': '20',
+            'start': '0'
+        }
         results_si = conn.raw_query(**params).execute()
         return results_si
 
@@ -135,7 +141,12 @@ class all_courts_feed(Feed):
     def items(self, obj):
         """Do a Solr query here. Return the first 20 results"""
         conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
-        params = {'q': '*:*', 'sort': 'dateFiled desc', 'rows': '20', 'start': '0'}
+        params = {
+            'q': '*:*',
+            'sort': 'dateFiled desc',
+            'rows': '20',
+            'start': '0'
+        }
         results_si = conn.raw_query(**params).execute()
         return results_si
 
