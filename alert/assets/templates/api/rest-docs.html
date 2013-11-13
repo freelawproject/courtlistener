@@ -49,6 +49,22 @@
             Authentication. Both of these authentication mechanisms protect your credentials on the wire via HTTPS.
         </p>
         <p>
+            To do HTTP Basic Authentication using cURL, you might do something like this:
+        </p>
+        <blockquote>
+            <code>curl --user "harvey:your-password" "https://www.courtlistener.com/api/rest/v1/opinion/"</code>
+        </blockquote>
+        <p>
+            You can also do it in your browser with a url like:
+        </p>
+        <blockquote>
+            <code>https://harvey:your-password@www.courtlistener.com/api/rest/v1/opinion/</code>
+        </blockquote>
+        <p>
+            But that's not normally necessary because most browsers will provide you with a popup if you need to
+            authenticate using HTTP Basic Authentication.
+        </p>
+        <p>
             Authentication is necessary so we can monitor usage of the system and so we can assist with any errors that
             may occur. Per our <a href="/terms/#privacy">privacy policy</a>, we do not track your queries in the API,
             though we may collect statistical information for system monitoring.
@@ -149,10 +165,11 @@
         <p>
             Like the rest of the CourtListener platform, this API and its documentation are
             <a href="https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/src/tip/alert/search/api.py?at=default">open
-            source</a>. If it lacks functionality that you desire or if you find these notes lacking, pull requests
-            providing improvements are very welcome. Just get in touch in
+            source</a>. If it lacks functionality that you desire or if you find
+            <a href="https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/src/tip/alert/assets/templates/api/rest-docs.html?at=default">these
+            notes</a> lacking, pull requests providing improvements are very welcome. Just get in touch in
             <a href="http://lists.freelawproject.org/cgi-bin/mailman/listinfo/dev">our developer forum</a> to discuss
-            your ideas.
+            your ideas or, hey, go ahead and send us a pull request.
         </p>
 
 
@@ -295,12 +312,12 @@
             </dd>
             <dt>CSV</dt>
             <dd>
-                The <code>courts</code> field is currently available as a list of comma separated values (CSV). Thus, to
+                The <code>court</code> field is currently available as a list of comma separated values (CSV). Thus, to
                 request multiple courts, you can simply separate their IDs with a comma. For example to get all
                 documents from the Supreme Court (<code>scotus</code>) and the Ninth Circuit of Appeals
                 (<code>ca9</code>), you would make a query like:
                 <blockquote>
-                    <code>curl https://www.courtlistener.com/api/rest/v1/search/?<strong>courts=scotus,ca9</strong></code>
+                    <code>curl https://www.courtlistener.com/api/rest/v1/search/?<strong>court=scotus,ca9</strong></code>
                 </blockquote>
                 IDs for all jurisdictions are in the sidebar.
             </dd>
