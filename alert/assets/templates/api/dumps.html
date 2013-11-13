@@ -60,7 +60,7 @@
 
         <p>
             If you are interested in maintaining your system in sync with our data, you should look at
-            <a href="/api/rest-info/">our REST API</a>, which provides resources sorted by modification date.
+            <a href="/api/rest-info/">our REST API</a>, which provides resources ordered by modification date.
         </p>
         <p>
             Note that prior to November, 2013 these endpoints were previously located at <code>/dump-api/</code>. The
@@ -90,7 +90,7 @@
                         <tr>
                             <td>{{ court.full_name }}</td>
                             <td>
-                                <a href="/?q=&court_{{ court.pk }}=on&sort=score+desc">
+                                <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc">
                                     {{ court.pk }}
                                 </a>
                             </td>

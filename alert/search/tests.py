@@ -123,10 +123,10 @@ class SearchTest(TestCase):
 
     def test_citation_ordering(self):
         """Can the results be re-ordered by citation count?"""
-        response = self.client.get('/', {'q': '*:*', 'sort': 'citeCount desc'})
+        response = self.client.get('/', {'q': '*:*', 'order_by': 'citeCount desc'})
         self.assertTrue(response.content.index('Disclosure') < response.content.index('Tarrant'),
                         msg="'Disclosure' should come BEFORE 'Tarrant' when ordered by descending citeCount.")
-        response = self.client.get('/', {'q': '*:*', 'sort': 'citeCount asc'})
+        response = self.client.get('/', {'q': '*:*', 'order_by': 'citeCount asc'})
         self.assertTrue(response.content.index('Disclosure') > response.content.index('Tarrant'),
                         msg="'Disclosure' should come AFTER 'Tarrant' when ordered by ascending citeCount.")
 

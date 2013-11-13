@@ -137,10 +137,10 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
     except IOError:
         # Time-based dump
         if court == 'all':
-            # dump everything; disable default sorting
+            # dump everything; disable default ordering
             qs = Document.objects.all().order_by()
         else:
-            # dump just the requested court; disable default sorting
+            # dump just the requested court; disable default ordering
             qs = Document.objects.filter(court=court).order_by()
 
         # check if there are any documents at all

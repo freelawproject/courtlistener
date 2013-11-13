@@ -306,10 +306,10 @@ input.court-checkbox, input.status-checkbox {
 #result-count {
     float: left;
 }
-#id_sort {
+#id_order_by {
     float: right;
 }
-.js #id_sort {
+.js #id_order_by {
     display: none;
 }
 .js #extra-sidebar-fields {
