@@ -241,16 +241,16 @@ class SearchForm(forms.Form):
             elif ',' in court_str:
                 court_ids = court_str.split(',')
             else:
-                court_ids = list(court_str)
-            for id in court_ids:
-                cleaned_data['court_%s' % id] = True
+                court_ids = [court_str]
+            for court_id in court_ids:
+                cleaned_data['court_%s' % court_id] = True
 
         # 3. Make sure that the user has selected at least one facet for each
         #    taxonomy. Note that this logic must be paralleled in search_utils.make_facet_variable
         court_bools = [v for k, v in cleaned_data.iteritems()
                        if k.startswith('court_')]
         if not any(court_bools):
-            # Set all facets to true
+            # Set all facets to True
             for key in cleaned_data.iterkeys():
                 if key.startswith('court_'):
                     cleaned_data[key] = True

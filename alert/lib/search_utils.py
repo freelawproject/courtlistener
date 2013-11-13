@@ -283,6 +283,7 @@ def build_main_query(cd, highlight=True):
         # no need.
         pass
 
+    # Changes here are usually mirrored in place_facet_queries, below.
     main_fq = []
 
     # Case Name and judges
@@ -338,16 +339,20 @@ def place_facet_queries(cd, conn=sunburnt.SolrInterface(settings.SOLR_URL, mode=
         'q': cd['q'] or '*:*',
     }
     fq = []
-    if cd['case_name'] != '' and cd['case_name'] is not None:
-        fq.append('caseName:(%s)' % " AND ".join(cd['case_name'].split()))
+
+    # Case Name and judges
+    if cd['case_name']:
+        fq.append(make_fq(cd, 'caseName', 'case_name'))
     if cd['judge']:
-        fq.append('judge:(%s)' % ' AND '.join(cd['judge'].split()))
+        fq.append(make_fq(cd, 'judge', 'judge'))
+
+    # Citations
     if cd['citation']:
-        fq.append('citation:%s' % cd['citation'])
+        fq.append(make_fq(cd, 'citation', 'citation'))
     if cd['docket_number']:
-        fq.append('docketNumber:%s' % cd['docket_number'])
+        fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
     if cd['neutral_cite']:
-        fq.append('neutralCite:%s' % cd['neutral_cite'])
+        fq.append(make_fq(cd, 'neutralCite', 'neutral_cite'))
 
     fq.append(make_date_query(cd))
     fq.append(make_cite_count_query(cd))
