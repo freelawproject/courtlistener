@@ -48,6 +48,7 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                                            datetime.datetime(2010, 12, 31, tzinfo=utc)),
                                   'A.3d': (datetime.datetime(2010, 1, 1, tzinfo=utc),
                                            now())},
+                                  # Dates can be partially determined via Berkeley Law Online Catalog
                      'mlz_jurisdiction': 'us',
                      'name': 'Atlantic Reporter',
                      'variations': {'A. 2d': 'A.2d',
