@@ -43,10 +43,10 @@ mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html')
 
 # Set up the API
 v1_api = Api(api_name='v1')
-v1_api.register(CitationResource())
-v1_api.register(CourtResource())
-v1_api.register(DocumentResource())
-v1_api.register(SearchResource())
+v1_api.register(CitationResource(tally_name='search.api.citation'))
+v1_api.register(CourtResource(tally_name='search.api.court'))
+v1_api.register(DocumentResource(tally_name='search.api.document'))
+v1_api.register(SearchResource(tally_name='search.api.search'))
 
 
 urlpatterns = patterns('',
