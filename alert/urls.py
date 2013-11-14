@@ -18,7 +18,8 @@ from alert.maintenance_warning.views import show_maintenance_warning
 from alert.pinger.views import validate_for_bing, validate_for_bing2, validate_for_google, validate_for_google2
 from alert.robots.views import robots
 from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert
-from alert.search.api import CitationResource, CourtResource, DocumentResource, SearchResource
+from alert.search.api import (
+    CitationResource, CourtResource, DocumentResource, SearchResource, CitesResource, CitedByResource)
 from alert.search.models import Court
 from alert.search.views import browser_warning, show_results, tools_page
 from alert.userHandling.views import (
@@ -47,6 +48,8 @@ v1_api.register(CitationResource(tally_name='search.api.citation'))
 v1_api.register(CourtResource(tally_name='search.api.court'))
 v1_api.register(DocumentResource(tally_name='search.api.document'))
 v1_api.register(SearchResource(tally_name='search.api.search'))
+v1_api.register(CitesResource(tally_name='search.api.cites'))
+v1_api.register(CitedByResource(tally_name='search.api.citedby'))
 
 
 urlpatterns = patterns('',
