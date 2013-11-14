@@ -7,21 +7,17 @@
 
 {% block content %}
     <div class="span-13 append-2">
-        <h2 id="about">REST API &ndash; Alpha</h2>
+        <h2 id="about">REST API</h2>
         <p>For developers that wish to have a more granular API for our data, we provide a RESTful API
             based on the <a href="http://django-tastypie.readthedocs.org/en/latest/">tastypie toolkit</a>.
         </p>
-
-        <p class="notice">This API is currently in beta until we are able to test it sufficiently. We hope to
-            give it a nice version bump soon. Until then, if you're using it, please give us your feedback.
-        </p>
-
         <p>
-            This API currently has five endpoints that can be consumed via GET requests:
+            This API currently has seven endpoints that can be consumed via GET requests:
         </p>
-
         <ol>
             <li><a href="/api/rest/v1/opinion/">/api/rest/v1/opinion/</a></li>
+            <li><a href="/api/rest/v1/cites/">/api/rest/v1/cites/</a></li>
+            <li><a href="/api/rest/v1/cited-by/">/api/rest/v1/cited-by/</a></li>
             <li><a href="/api/rest/v1/citation/">/api/rest/v1/citation/</a></li>
             <li><a href="/api/rest/v1/jurisdiction/">/api/rest/v1/jurisdiction/</a></li>
             <li><a href="/api/rest/v1/search/">/api/rest/v1/search/</a></li>
@@ -35,10 +31,12 @@
             <a href="/api/rest/v1/opinion/schema/">/api/rest/v1/opinion/schema/</a>).
         </p>
 
+
         <h3>Overview of Endpoints</h3>
         <p>
             This section explains general principles of the API and rules that apply to all of our RESTful endpoints.
         </p>
+
 
         <h4>Authentication</h4>
         <p>
@@ -70,6 +68,7 @@
             though we may collect statistical information for system monitoring.
         </p>
 
+
         <h4>Serialization Formats</h4>
         <p>
             With the exception of the coverage endpoint (which is only available as JSON), requests may be serialized
@@ -92,6 +91,13 @@
         <blockquote>
             <code>curl <strong>-H "Accept: application/xml"</strong> https://www.courtlistener.com/api/rest/v1/opinion/</code>
         </blockquote>
+        <p>
+            Or again, you can use the <code>format</code> GET parameter:
+        </p>
+        <blockquote>
+            <code>curl https://www.courtlistener.com/api/rest/v1/opinion/?<strong>format=xml</strong></code>
+        </blockquote>
+
 
         <h4>Views, Pagination and Subset Selection</h4>
         <p>
@@ -186,6 +192,7 @@
             The results at this endpoint can be filtered by a number of fields. Among others, this includes filtering
             by:
         </p>
+        <!-- A more clever person would generate this *from* the schema itself -->
         <ul>
             <li><code>blocked</code>: Whether the opinion should be blocked from search engines.</li>
             <li><code>citation_count</code>: The number of times the opinion has been cited by other opinions.</li>
@@ -220,7 +227,7 @@
         </p>
 
 
-        <h3 id='cites-endpoint'>/api/rest/v1/cites/ and /api/rest/v1/cited-by/</h3>
+        <h3 id='cites-endpoint'>/api/rest/v1/cites/ <span class="alt bold">and</span> /api/rest/v1/cited-by/</h3>
         <p>
             These endpoints provide interfaces into the citation graph that CourtListener provides between opinions.
             <code>/cites/</code> provides a paginated display of the opinions that an opinion <em>cites</em>, and
@@ -297,8 +304,8 @@
             This endpoint allows you to query our search engine along the same lines as is possible in our front end.
             Because this endpoint does not use the Django models directly, the fields and results from this endpoint are
             slightly different than those in the other endpoints. For example, instead of using a minus sign to flip
-            ordering, instead it uses <code>asc</code> and <code>desc</code>. (See
-            <a href="/api/rest/v1/search/schema/">the schema</a> for all of the ordering options).
+            ordering, it uses <code>asc</code> and <code>desc</code>. (See <a href="/api/rest/v1/search/schema/">the
+            schema</a> for all of the ordering options).
         </p>
         <p>
             Similarly, since this endpoint hits against a Solr search index instead of a database, the filtering works
@@ -421,8 +428,7 @@
                 By" logos</a> available for your website or application. We appreciate a reference, but it's not required.
             </p>
 
-            <a href="http://freelawproject.org/about/assets/"><img src="/static/png/logo-long-w350.png" width="350" height="81"></a>
-
+            <a href="http://freelawproject.org/about/assets/#powered-by"><img src="/static/png/logo-long-w350.png" width="350" height="81"></a>
         </div>
 
         <div class="span-9 last sidebar-section">
