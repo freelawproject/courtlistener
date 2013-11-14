@@ -88,7 +88,6 @@ class CitationResource(ModelResourceWithFieldsFilter):
 class DocumentResource(ModelResourceWithFieldsFilter):
     citation = fields.ForeignKey(CitationResource, 'citation', full=True)
     court = fields.ForeignKey(CourtResource, 'court')
-    cases_cited = fields.ManyToManyField(CitationResource, 'cases_cited', use_in='detail')
     html = fields.CharField(attribute='html', use_in='detail', null=True)
     html_lawbox = fields.CharField(attribute='html_lawbox', use_in='detail', null=True)
     html_with_citations = fields.CharField(attribute='html_with_citations', use_in='detail', null=True)
@@ -102,7 +101,7 @@ class DocumentResource(ModelResourceWithFieldsFilter):
         max_limit = 20
         allowed_methods = ['get']
         include_absolute_url = True
-        excludes = ['is_stub_document']
+        excludes = ['is_stub_document', 'cases_cited',]
         filtering = {
             'id': ('exact',),
             'time_retrieved': good_time_filters,
@@ -119,17 +118,101 @@ class DocumentResource(ModelResourceWithFieldsFilter):
         }
         ordering = ['time_retrieved', 'date_modified', 'date_filed', 'pagerank', 'date_blocked']
 
-'''
+
+class CitedByResource(ModelResourceWithFieldsFilter):
+    id = fields.IntegerField(attribute='id')
+
+    class Meta:
+        authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
+        throttle = CacheThrottle(throttle_at=1000)
+        resource_name = 'citedby'
+        queryset = Document.objects.all()
+        fields = ('cases_cited',)
+        max_limit = 20
+        list_allowed_methods = ['get']
+        detail_allowed_methods = []
+        filtering = {
+            'id': ('exact',),
+        }
+
+    def get_object_list(self, request):
+        id = request.GET.get('id')
+        if id:
+            return super(CitedByResource, self).get_object_list(request).filter(pk=id)[0].citation.citing_cases.all()
+        else:
+            # No ID field --> no results.
+            return super(CitedByResource, self).get_object_list(request).none()
+
+    def apply_filters(self, request, applicable_filters):
+        """The inherited method would attempt to apply filters, but filtering is only turned on so we can slip
+        the id parameter through. If this function is not overridden and nixed, it attempts normal Django
+        filtering, which crashes.
+
+        Thus, do nothing here.
+        """
+        return self.get_object_list(request)
+
+    def get_resource_uri(self, bundle_or_obj=None, url_name='api_dispatch_list'):
+        """Creates a URI like /api/v1/search/$id/
+        """
+        url_str = '/api/rest/%s/%s/%s/'
+        if bundle_or_obj:
+            return url_str % (
+                self.api_name,
+                'opinion',
+                bundle_or_obj.obj.id,
+            )
+        else:
+            return ''
+
+
 class CitesResource(ModelResourceWithFieldsFilter):
     class Meta:
         authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
         throttle = CacheThrottle(throttle_at=1000)
         resource_name = 'cites'
-        queryset = Document.objects.all().cases_cited.all()
+        queryset = Document.objects.all()
+        fields = ('cases_cited', 'id',)
         max_limit = 20
-        list_allowed_methods = []
-        detail_allowed_methods = ['get']
-'''
+        list_allowed_methods = ['get']
+        detail_allowed_methods = []
+        filtering = {
+            'id': ('exact',),
+        }
+
+    def get_object_list(self, request):
+        """Get the citation associated with the document ID, then get all the items that it is cited by."""
+        id = request.GET.get('id')
+        if id:
+            cases_cited = super(CitesResource, self).get_object_list(request).filter(pk=id)[0].cases_cited.all()
+            docs = Document.objects.filter(citation__in=cases_cited)
+            return docs
+        else:
+            # No ID field --> no results.
+            return super(CitesResource, self).get_object_list(request).none()
+
+    def apply_filters(self, request, applicable_filters):
+        """The inherited method would attempt to apply filters, but filtering is only turned on so we can slip
+        the id parameter through. If this function is not overridden and nixed, it attempts normal Django
+        filtering, which crashes.
+
+        Thus, do nothing here.
+        """
+        return self.get_object_list(request)
+
+    def get_resource_uri(self, bundle_or_obj=None, url_name='api_dispatch_list'):
+        """Creates a URI like /api/v1/search/$id/
+        """
+        url_str = '/api/rest/%s/%s/%s/'
+        if bundle_or_obj:
+            return url_str % (
+                self.api_name,
+                'opinion',
+                bundle_or_obj.obj.id,
+            )
+        else:
+            return ''
+
 
 class SolrList(list):
     def __init__(self, conn, q, length, offset, limit):
@@ -320,7 +403,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
     def get_resource_uri(self, bundle_or_obj=None, url_name='api_dispatch_list'):
         """Creates a URI like /api/v1/search/$id/
         """
-        url_str = '/api/%s/%s/%s/'
+        url_str = '/api/rest/%s/%s/%s/'
         if bundle_or_obj:
             return url_str % (
                 self.api_name,
