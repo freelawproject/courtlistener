@@ -123,7 +123,7 @@ class CitedByResource(ModelResourceWithFieldsFilter):
     class Meta:
         authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
         throttle = CacheThrottle(throttle_at=1000)
-        resource_name = 'citedby'
+        resource_name = 'cited-by'
         queryset = Document.objects.all()
         fields = ('cases_cited', 'id')
         max_limit = 20

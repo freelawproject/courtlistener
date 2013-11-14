@@ -76,7 +76,7 @@ urlpatterns = patterns('',
     #(r'/*', show_maintenance_warning),
 
     # Display a case's citations page
-    url(r'^(?:.*)/(.*)/(.*)/cited-by/$',
+    url(r'^(?:%s)/(.*)/(.*)/cited-by/$' % "|".join(pacer_codes),
         view_case_citations,
         name="view_case_citations"),
 
