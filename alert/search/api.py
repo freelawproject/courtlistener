@@ -53,7 +53,7 @@ class ModelResourceWithFieldsFilter(ModelResource):
 
 class CourtResource(ModelResourceWithFieldsFilter):
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
+        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
         throttle = CacheThrottle(throttle_at=1000)
         resource_name = 'jurisdiction'
         queryset = Court.objects.exclude(jurisdiction='T')
@@ -78,7 +78,7 @@ class CitationResource(ModelResourceWithFieldsFilter):
     opinion_uris = fields.ToManyField('search.api.DocumentResource', 'parent_documents')
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
+        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
         throttle = CacheThrottle(throttle_at=1000)
         queryset = Citation.objects.all()
         max_limit = 20
@@ -86,15 +86,48 @@ class CitationResource(ModelResourceWithFieldsFilter):
 
 
 class DocumentResource(ModelResourceWithFieldsFilter):
-    citation = fields.ForeignKey(CitationResource, 'citation', full=True)
-    court = fields.ForeignKey(CourtResource, 'court')
-    html = fields.CharField(attribute='html', use_in='detail', null=True)
-    html_lawbox = fields.CharField(attribute='html_lawbox', use_in='detail', null=True)
-    html_with_citations = fields.CharField(attribute='html_with_citations', use_in='detail', null=True)
-    plain_text = fields.CharField(attribute='plain_text', use_in='detail', null=True)
+    citation = fields.ForeignKey(
+        CitationResource,
+        'citation',
+        full=True
+    )
+    court = fields.ForeignKey(
+        CourtResource,
+        'court'
+    )
+    html = fields.CharField(
+        attribute='html',
+        use_in='detail',
+        null=True,
+        help_text='HTML of the document, if available in the original'
+    )
+    html_lawbox = fields.CharField(
+        attribute='html_lawbox',
+        use_in='detail',
+        null=True,
+        help_text='HTML of lawbox documents'
+    )
+    html_with_citations = fields.CharField(
+        attribute='html_with_citations',
+        use_in='detail',
+        null=True,
+        help_text="HTML of the document with citation links and other post-processed markup added",
+    )
+    plain_text = fields.CharField(
+        attribute='plain_text',
+        use_in='detail',
+        null=True,
+        help_text="Plain text of the document after extraction using pdftotext, wpd2txt, etc.",
+    )
+    date_modified = fields.DateTimeField(
+        attribute='date_modified',
+        null=True,
+        default='1750-01-01T00:00:00Z',
+        help_text='The last moment when the item was modified. A value  in year 1750 indicates the value is unknown'
+    )
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
+        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
         throttle = CacheThrottle(throttle_at=1000)
         resource_name = 'opinion'
         queryset = Document.objects.all().select_related('court__pk', 'citation')
@@ -121,7 +154,7 @@ class DocumentResource(ModelResourceWithFieldsFilter):
 
 class CitedByResource(ModelResourceWithFieldsFilter):
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
+        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
         throttle = CacheThrottle(throttle_at=1000)
         resource_name = 'cited-by'
         queryset = Document.objects.all()
@@ -166,7 +199,7 @@ class CitedByResource(ModelResourceWithFieldsFilter):
 
 class CitesResource(ModelResourceWithFieldsFilter):
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
+        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
         throttle = CacheThrottle(throttle_at=1000)
         resource_name = 'cites'
         queryset = Document.objects.all()
@@ -372,7 +405,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
     )
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
+        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
         throttle = CacheThrottle(throttle_at=1000)
         resource_name = 'search'
         max_limit = 20
