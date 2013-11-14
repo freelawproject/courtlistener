@@ -220,23 +220,23 @@
         </p>
 
 
-        <h3 id='cites-endpoint'>/api/rest/v1/cites/ and /api/rest/v1/citedby/</h3>
+        <h3 id='cites-endpoint'>/api/rest/v1/cites/ and /api/rest/v1/cited-by/</h3>
         <p>
             These endpoints provide interfaces into the citation graph that CourtListener provides between opinions.
             <code>/cites/</code> provides a paginated display of the opinions that an opinion <em>cites</em>, and
-            <code>citedby</code> provides a paginated display of the opinions that cite an opinion. These can be
+            <code>cited-by</code> provides a paginated display of the opinions that cite an opinion. These can be
             thought of as compliments, though the results can be dramatically different. For example, a very important
             opinion, <em><a href="/scotus/z3J/charles-e-strickland-superintendent-florida/">Strickland v.
-            Washington</a></em>, has been cited thousands of times (<code>citedby</code>), however no opinion cites
+            Washington</a></em>, has been cited thousands of times (<code>cited-by</code>), however no opinion cites
             thousands of other opinions (<code>cites</code>).
         </p>
         <p>
             These endpoints only provide limited functionality. They cannot be filtered or ordered, and they do not
-            provide a detail view. To use these endpoints, simply provide the ID of the opinion you wish to analyze,
-            like so:
+            provide a detail or set view. To use these endpoints, provide the ID of the opinion you wish to
+            analyze, like so:
         </p>
         <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v1/citedby/?id=111170</code>
+            <code>curl https://www.courtlistener.com/api/rest/v1/cited-by/?id=111170</code>
         </blockquote>
         <p>Or the reverse:</p>
         <blockquote>
