@@ -120,14 +120,12 @@ class DocumentResource(ModelResourceWithFieldsFilter):
 
 
 class CitedByResource(ModelResourceWithFieldsFilter):
-    id = fields.IntegerField(attribute='id')
-
     class Meta:
         authentication = MultiAuthentication(BasicAuthentication(), SessionAuthentication())
         throttle = CacheThrottle(throttle_at=1000)
         resource_name = 'citedby'
         queryset = Document.objects.all()
-        fields = ('cases_cited',)
+        fields = ('cases_cited', 'id')
         max_limit = 20
         list_allowed_methods = ['get']
         detail_allowed_methods = []
