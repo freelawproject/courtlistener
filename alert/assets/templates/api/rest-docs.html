@@ -154,12 +154,6 @@
             This could save you time and bandwidth if you are making numerous requests.
         </p>
 
-        <h4>Date Formats</h4>
-        <p>
-            As <a href="http://xkcd.com/1179/">required</a>, all date formats are set to
-            <a href="http://en.wikipedia.org/wiki/ISO_8601">ISO-8601 format</a>.
-        </p>
-
         <h4>Limitations</h4>
         <p>
             At present, this API is throttled to 1,000 queries per endpoint per user per hour, while we learn where our
@@ -174,6 +168,47 @@
         <blockquote>
             <code>curl https://www.courtlistener.com/api/rest/v1/jurisdiction/?<strong>limit=50</strong></code>
         </blockquote>
+
+        <h4>Date Formats</h4>
+
+        <p>
+            As <a href="http://xkcd.com/1179/">required</a>, all date formats are set to
+            <a href="http://en.wikipedia.org/wiki/ISO_8601">ISO-8601 format</a>.
+        </p>
+
+        <h4>The <code>absolute_url</code> Field</h4>
+        <p>
+            The <code>absolute_url</code> field shows the URL where a resource can be seen live on the site. It is
+            absolute in the sense that it should never change.
+        </p>
+        <p>
+            In some cases you might only have a URL, and you might want to look up the item in the API. <code>
+            absolute_url</code>s generally look like this:
+        </p>
+        <blockquote>
+            <code>/scotus/z3J/strickland-v-washington/</code>
+        </blockquote>
+        <p>
+            There are three sections:
+        </p>
+        <ol>
+            <li>
+                <strong>scotus</strong>: This is the ID of the jurisdiction where the opinion was written, and it can
+                be <a href="/api/rest/v1/jurisdiction/scotus/">easily queried</a> in our <code>jurisdiction</code> API.
+            </li>
+            <li>
+                <strong>z3j</strong>: This is an ascii representation of the ID for the opinion. To decode this to the
+                item's ID, we have
+                <a href="https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/src/tip/alert/lib/encode_decode.py?at=default">
+                    a simple Python function.
+                </a>. This value increments in a logical manner, but we leave out some of the more ambiguous ascii
+                characters.
+            </li>
+            <li>
+                <strong>strickland-v-washington</strong>: This is the "slug" of the opinion, and generally mirrors its
+                case name.
+            </li>
+        </ol>
 
         <h4>Upgrades and Fixes</h4>
         <p>
@@ -241,7 +276,7 @@
             <code>/cites/</code> provides a paginated display of the opinions that an opinion <em>cites</em>, and
             <code>cited-by</code> provides a paginated display of the opinions that cite an opinion. These can be
             thought of as compliments, though the results can be dramatically different. For example, a very important
-            opinion, <em><a href="/scotus/z3J/charles-e-strickland-superintendent-florida/">Strickland v.
+            opinion, <em><a href="/scotus/z3J/strickland-v-washington/">Strickland v.
             Washington</a></em>, has been cited thousands of times (<code>cited-by</code>), however no opinion cites
             thousands of other opinions (<code>cites</code>).
         </p>
