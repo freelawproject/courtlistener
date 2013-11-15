@@ -153,12 +153,28 @@ class DocumentResource(ModelResourceWithFieldsFilter):
 
 
 class CitedByResource(ModelResourceWithFieldsFilter):
+    citation = fields.ForeignKey(
+        CitationResource,
+        'citation',
+        full=True
+    )
+    court = fields.ForeignKey(
+        CourtResource,
+        'court'
+    )
+    date_modified = fields.DateTimeField(
+        attribute='date_modified',
+        null=True,
+        default='1750-01-01T00:00:00Z',
+        help_text='The last moment when the item was modified. A value  in year 1750 indicates the value is unknown'
+    )
+
     class Meta:
         authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
         throttle = CacheThrottle(throttle_at=1000)
         resource_name = 'cited-by'
         queryset = Document.objects.all()
-        fields = ('cases_cited', 'id')
+        excludes = ('is_stub_document', 'html', 'html_lawbox', 'html_with_citations', 'plain_text',)
         max_limit = 20
         list_allowed_methods = ['get']
         detail_allowed_methods = []
@@ -169,7 +185,8 @@ class CitedByResource(ModelResourceWithFieldsFilter):
     def get_object_list(self, request):
         id = request.GET.get('id')
         if id:
-            return super(CitedByResource, self).get_object_list(request).filter(pk=id)[0].citation.citing_cases.all()
+            return super(CitedByResource, self).get_object_list(request).filter(
+                pk=id)[0].citation.citing_cases.all()
         else:
             # No ID field --> no results.
             return super(CitedByResource, self).get_object_list(request).none()
@@ -198,12 +215,28 @@ class CitedByResource(ModelResourceWithFieldsFilter):
 
 
 class CitesResource(ModelResourceWithFieldsFilter):
+    citation = fields.ForeignKey(
+        CitationResource,
+        'citation',
+        full=True
+    )
+    court = fields.ForeignKey(
+        CourtResource,
+        'court'
+    )
+    date_modified = fields.DateTimeField(
+        attribute='date_modified',
+        null=True,
+        default='1750-01-01T00:00:00Z',
+        help_text='The last moment when the item was modified. A value  in year 1750 indicates the value is unknown'
+    )
+
     class Meta:
         authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
         throttle = CacheThrottle(throttle_at=1000)
         resource_name = 'cites'
         queryset = Document.objects.all()
-        fields = ('cases_cited', 'id',)
+        excludes = ('is_stub_document', 'html', 'html_lawbox', 'html_with_citations', 'plain_text',)
         max_limit = 20
         list_allowed_methods = ['get']
         detail_allowed_methods = []
@@ -215,7 +248,8 @@ class CitesResource(ModelResourceWithFieldsFilter):
         """Get the citation associated with the document ID, then get all the items that it is cited by."""
         id = request.GET.get('id')
         if id:
-            cases_cited = super(CitesResource, self).get_object_list(request).filter(pk=id)[0].cases_cited.all()
+            cases_cited = super(CitesResource, self).get_object_list(request).filter(
+                pk=id)[0].cases_cited.all()
             docs = Document.objects.filter(citation__in=cases_cited)
             return docs
         else:
