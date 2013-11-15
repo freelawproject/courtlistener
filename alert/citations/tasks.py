@@ -93,6 +93,7 @@ def update_document(document, index=True, commit=True):
                 document.cases_cited.add(matched_doc.citation)
                 # URL field will be used for generating inline citation html
                 citation.match_url = matched_doc.get_absolute_url()
+                citation.match_id = matched_doc.pk
             except Document.DoesNotExist:
                 if DEBUG >= 2:
                     print "No database matches found for document id %s" % match_id

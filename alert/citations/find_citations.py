@@ -31,7 +31,8 @@ class Citation(object):
     """
 
     def __init__(self, reporter, page, volume, canonical_reporter=None, lookup_index=None,
-                 extra=None, defendant=None, plaintiff=None, court=None, year=None, match_url=None):
+                 extra=None, defendant=None, plaintiff=None, court=None, year=None, match_url=None,
+                 match_id=None):
         # Note: It will be tempting to resolve reporter variations in the __init__ function, but, alas, you cannot,
         #       because often reporter variations refer to one of several reporters (e.g. P.R. could be a variant of
         #       either ['Pen. & W.', 'P.R.R.', 'P.']).
@@ -47,6 +48,7 @@ class Citation(object):
         self.court = court
         self.year = year
         self.match_url = match_url
+        self.match_id = match_id
 
     def base_citation(self):
         return u"%d %s %d" % (self.volume, self.reporter, self.page)
@@ -62,10 +64,12 @@ class Citation(object):
         inner_html = template % self.__dict__
         span_class = "citation"
         if self.match_url:
-            inner_html = u'<a href="%s">' % self.match_url + inner_html + u'</a>'
+            inner_html = u'<a href="%s">%s</a>' % (self.match_url, inner_html)
+            data_attr = u' data-id="%s"' % self.match_id
         else:
             span_class += " no-link"
-        return u'<span class="%s">%s</span>' % (span_class, inner_html)
+            data_attr = ''
+        return u'<span class="%s"%s>%s</span>' % (span_class, data_attr, inner_html)
 
     def __repr__(self):
         print_string = self.base_citation()
