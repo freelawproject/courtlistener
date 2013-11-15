@@ -57,7 +57,7 @@ class CourtResource(ModelResourceWithFieldsFilter):
         throttle = CacheThrottle(throttle_at=1000)
         resource_name = 'jurisdiction'
         queryset = Court.objects.exclude(jurisdiction='T')
-        max_limit = 20
+        max_limit = 1000
         allowed_methods = ['get']
         filtering = {
             'id': ('exact',),

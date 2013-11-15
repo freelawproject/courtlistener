@@ -82,7 +82,7 @@ class Command(BaseCommand):
             progress += 1
             try:
                 if abs(old_pr - pr_result[id]) > UPDATE_THRESHOLD:
-                    # Save only if the diff is larger enough
+                    # Save only if the diff is large enough
                     Document.objects.filter(pk=int(id)).update(pagerank=pr_result[id])
                     update_count += 1
                     logger.info("ID: {0}\told pagerank is {1}\tnew pagerank is {2}\n".format(

@@ -49,7 +49,7 @@ v1_api.register(CourtResource(tally_name='search.api.court'))
 v1_api.register(DocumentResource(tally_name='search.api.document'))
 v1_api.register(SearchResource(tally_name='search.api.search'))
 v1_api.register(CitesResource(tally_name='search.api.cites'))
-v1_api.register(CitedByResource(tally_name='search.api.citedby'))
+v1_api.register(CitedByResource(tally_name='search.api.cited-by'))
 
 
 urlpatterns = patterns('',
