@@ -112,7 +112,7 @@
            data-toggle="modal"
            data-target="#modal-save-favorite, #modal-logged-out"
            title="Save this record as a favorite in your profile"></i>
-        <h2 class="inline">{{ caption|safe|v_wrapper }}</h2>
+        <h2 class="inline">{{ doc.caption|safe|v_wrapper }}</h2>
         {% if user.is_authenticated %}
             {# Modal box for saving the favorite #}
             <div id="modal-save-favorite" class="modal" role="dialog" aria-hidden="true">

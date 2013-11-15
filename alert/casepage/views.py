@@ -20,39 +20,6 @@ from django.views.decorators.cache import never_cache
 import os
 
 
-def make_caption(doc):
-    """Make a proper caption"""
-    caption = doc.citation.case_name
-    if doc.citation.neutral_cite:
-        caption += ", %s" % doc.citation.neutral_cite
-        return caption  # neutral cites lack the parentheses, so we're done here.
-    elif doc.citation.federal_cite_one:
-        caption += ", %s" % doc.citation.federal_cite_one
-    elif doc.citation.specialty_cite_one:
-        caption += ", %s" % doc.citation.specialty_cite_one
-    elif doc.citation.state_cite_regional:
-        caption += ", %s" % doc.citation.state_cite_regional
-    elif doc.citation.state_cite_one:
-        caption += ", %s" % doc.citation.state_cite_one
-    elif doc.citation.westlaw_cite and doc.citation.lexis_cite:
-        # If both WL and LEXIS
-        caption += ", %s, %s" % (doc.citation.westlaw_cite, doc.citation.lexis_cite)
-    elif doc.citation.westlaw_cite:
-        # If only WL
-        caption += ", %s" % doc.citation.westlaw_cite
-    elif doc.citation.lexis_cite:
-        # If only LEXIS
-        caption += ", %s" % doc.citation.lexis_cite
-    elif doc.citation.docket_number:
-        caption += ", %s" % doc.citation.docket_number
-    caption += ' ('
-    if doc.court.citation_string != 'SCOTUS':
-        caption += re.sub(' ', '&nbsp;', doc.court.citation_string)
-        caption += '&nbsp;'
-    caption += '%s)' % doc.date_filed.isoformat().split('-')[0]  # b/c strftime f's up before 1900.
-    return caption
-
-
 def make_citation_string(doc):
     """Make a citation string, joined by commas
 
@@ -79,7 +46,6 @@ def view_case(request, court, pk, casename):
     # Look up the court, document, title and favorite information
     doc = get_object_or_404(Document, pk=ascii_to_num(pk))
     ct = get_object_or_404(Court, pk=court)
-    caption = make_caption(doc)
     citation_string = make_citation_string(doc)
     title = '%s, %s' % (trunc(doc.citation.case_name, 100), citation_string)
     get_string = search_utils.make_get_string(request)
@@ -100,7 +66,6 @@ def view_case(request, court, pk, casename):
     return render_to_response(
         'view_case.html',
         {'title': title,
-         'caption': caption,
          'citation_string': citation_string,
          'doc': doc,
          'court': ct,
@@ -118,7 +83,6 @@ def view_case_citations(request, pk, casename):
 
     # Look up the document, title
     doc = get_object_or_404(Document, pk=pk)
-    caption = make_caption(doc)
     title = '%s, %s' % (trunc(doc.citation.case_name, 100), make_citation_string(doc))
 
     # Get list of citing cases, ordered by influence
@@ -147,7 +111,6 @@ def view_case_citations(request, pk, casename):
 
     return render_to_response('view_case_citations.html',
                               {'title': title,
-                               'caption': caption,
                                'doc': doc,
                                'private': private,
                                'citing_cases': citing_cases},

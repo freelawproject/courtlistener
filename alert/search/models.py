@@ -1,3 +1,4 @@
+import re
 from alert import settings
 from alert.lib.string_utils import trunc
 from alert.lib.encode_decode import num_to_ascii
@@ -407,6 +408,39 @@ class Document(models.Model):
         'Whether this document is a stub or not',
         default=False
     )
+
+    @property
+    def caption(self):
+        """Make a proper caption"""
+        caption = self.citation.case_name
+        if self.citation.neutral_cite:
+            caption += ", %s" % self.citation.neutral_cite
+            return caption  # neutral cites lack the parentheses, so we're done here.
+        elif self.citation.federal_cite_one:
+            caption += ", %s" % self.citation.federal_cite_one
+        elif self.citation.specialty_cite_one:
+            caption += ", %s" % self.citation.specialty_cite_one
+        elif self.citation.state_cite_regional:
+            caption += ", %s" % self.citation.state_cite_regional
+        elif self.citation.state_cite_one:
+            caption += ", %s" % self.citation.state_cite_one
+        elif self.citation.westlaw_cite and self.citation.lexis_cite:
+            # If both WL and LEXIS
+            caption += ", %s, %s" % (self.citation.westlaw_cite, self.citation.lexis_cite)
+        elif self.citation.westlaw_cite:
+            # If only WL
+            caption += ", %s" % self.citation.westlaw_cite
+        elif self.citation.lexis_cite:
+            # If only LEXIS
+            caption += ", %s" % self.citation.lexis_cite
+        elif self.citation.docket_number:
+            caption += ", %s" % self.citation.docket_number
+        caption += ' ('
+        if self.court.citation_string != 'SCOTUS':
+            caption += re.sub(' ', '&nbsp;', self.court.citation_string)
+            caption += '&nbsp;'
+        caption += '%s)' % self.date_filed.isoformat().split('-')[0]  # b/c strftime f's up before 1900.
+        return caption
 
     def __unicode__(self):
         if self.citation:
