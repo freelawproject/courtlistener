@@ -102,7 +102,7 @@
         <h4>Views, Pagination and Subset Selection</h4>
         <p>
             Each endpoint provides a list view, a detail view and a set view. The <em>list</em> view is what you see
-            when you visit an endpoint, when it shows a list of 20 results.  The <em>detail</em> view shows all meta
+            when you visit an endpoint, when it shows a list of results.  The <em>detail</em> view shows all meta
             data for a single result and can be viewed by following the <code>resource_uri</code> field for a result on
             the list view. Occasionally, content is excluded from the list view for performance reasons, but it may be
             available on the detail view. With the exception of the coverage API, links to the next and previous pages
@@ -166,6 +166,14 @@
             performance bottlenecks are. If you are hitting this limit or anticipate doing so, please get in touch so
             we can investigate easing your thresholds.
         </p>
+        <p>
+            On the list view, 20 results are shown at a time by default. This can be limited to show fewer results, but
+            cannot be set to show more. The <code>jurisdiction</code> endpoint allows up to 1,000 results at a time by
+            setting the <code>limit</code> GET parameter like so:
+        </p>
+        <blockquote>
+            <code>curl https://www.courtlistener.com/api/rest/v1/jurisdiction/?<strong>limit=50</strong></code>
+        </blockquote>
 
         <h4>Upgrades and Fixes</h4>
         <p>
