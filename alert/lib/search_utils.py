@@ -235,6 +235,26 @@ def get_selected_field_string(cd, prefix):
     selected_field_string = ' OR '.join(selected_fields)
     return selected_field_string
 
+qf = {
+    'text': 1.0,
+    'dateFiled': 1.0,
+    'court': 1.0,
+    'caseName': 3,
+    'docketNumber': 1.0,
+    'westCite': 1.0,
+    'neutralCite': 1.0,
+    'lexisCite': 1.0,
+    'status': 1.25,
+    'caseNumber': 1.25,
+}
+
+
+def make_qf_string(qf):
+    qf_array = []
+    for k, v in qf.iteritems():
+        qf_array.append('%s^%s' % (k, v))
+    return ' '.join(qf_array)
+
 
 def build_main_query(cd, highlight='all'):
     main_params = {}
@@ -246,6 +266,15 @@ def build_main_query(cd, highlight='all'):
 
     if str(main_params['sort']).startswith('score'):
         main_params['boost'] = 'pagerank'
+
+    # Give a boost on the case_name field if it's obviously a case_name query.
+    vs_query = ' v ' in main_params['q'] or ' v. ' in main_params['q'] or ' vs. ' in main_params['q']
+    in_re_query = main_params['q'].lower().startswith('in re ')
+    matter_of_query = main_params['q'].lower().startswith('matter of ')
+    ex_parte_query = main_params['q'].lower().startswith('ex parte ')
+    if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
+        qf.update({'caseName': 50})
+        main_params['qf'] = make_qf_string(qf)
 
     if highlight:
         # Common highlighting params up here.

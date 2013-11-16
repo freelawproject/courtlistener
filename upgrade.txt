@@ -22,6 +22,24 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
+2013-11-15:
+ - This upgrades Solr to version 4.1, which supports file listeners. To upgrade Solr, simply:
+   - Download Solr version 4.1 with:
+        - cd ~/Downloads/
+        - wget https://archive.apache.org/dist/lucene/solr/4.1.0/solr-4.1.0.tgz
+   - Unpack the tgz file with:
+        - tar -x -f solr-4.1.0.tgz
+   - Set up the CL_INSTALL_ROOT variable:
+        - source /etc/courtlistener
+   - Stop Solr, swap in the correct version and restart solr:
+        - sudo service solr stop
+        - sudo mv /usr/local/solr /usr/local/solr-4.0.bak && sudo mv ~/Downloads/solr-4.1.0 /usr/local/solr
+        - sudo mv /usr/local/solr/example/solr/collection1/conf/solrconfig.xml /usr/local/solr/example/solr/collection1/conf/solrconfig.orig
+        - sudo ln -s -f $INSTALL_ROOT/Solr/conf/solrconfig.xml /usr/local/solr/example/solr/collection1/conf/solrconfig.xml
+        - sudo ln -s -f $INSTALL_ROOT/Solr/conf/schema.xml /usr/local/solr/example/solr/collection1/conf/schema.xml
+        - sudo service solr start
+
+
 2013-11-08:
  - This initiates the work on the API. To roll this out:
    - install django-tastypie: sudo pip install django-tastypie==0.10.0
