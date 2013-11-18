@@ -64,7 +64,7 @@ def view_case(request, court, pk, casename):
           'citation').order_by('-citation_count', '-date_filed')[:5]
 
     authorities_trunc = doc.cases_cited.all().select_related(
-        'document').order_by('-parent_documents__date_filed', '-parent_documents__citation_count', )[:5]
+        'document').order_by('case_name')[:5]
     authorities_count = doc.cases_cited.all().count()
 
     return render_to_response(
@@ -128,9 +128,9 @@ def view_authorities(request, pk, case_name):
     doc = get_object_or_404(Document, pk=pk)
     title = '%s, %s' % (trunc(doc.citation.case_name, 100), make_citation_string(doc))
 
-    # Ordering is by date, then citation count
+    # Ordering is by case name is the norm.
     authorities = doc.cases_cited.all().select_related(
-        'document').order_by('-parent_documents__date_filed', '-parent_documents__citation_count', )
+        'document').order_by('case_name')
 
     private = False
     if doc.blocked:
