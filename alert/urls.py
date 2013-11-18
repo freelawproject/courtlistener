@@ -3,7 +3,7 @@ from tastypie.api import Api
 from alert.api.views import court_index, documentation_index, dump_index, rest_index, serve_or_gen_dump
 from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
-from alert.casepage.views import view_case, view_case_citations, serve_static_file
+from alert.casepage.views import view_case, view_case_citations, serve_static_file, view_authorities
 from alert.contact.views import contact, thanks
 from alert.coverage.api import coverage_data
 from alert.coverage.views import coverage_graph
@@ -75,12 +75,13 @@ urlpatterns = patterns('',
     # Maintenance and SOPA/PIPA mode!
     #(r'/*', show_maintenance_warning),
 
-    # Display a case's citations page
+    # An opinion, authorities and cited-by/
     url(r'^(?:%s)/(.*)/(.*)/cited-by/$' % "|".join(pacer_codes),
         view_case_citations,
         name="view_case_citations"),
-
-    # Display a case; a named URL because the get_absolute_url uses it.
+    url(r'^(?:%s)/(.*)/(.*)/authorities/$' % "|".join(pacer_codes),
+        view_authorities,
+        name="view_authorities"),
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case, name="view_case"),
 
     # Serve a static file

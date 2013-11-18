@@ -200,13 +200,13 @@
                 <strong>z3j</strong>: This is an ascii representation of the ID for the opinion. To decode this to the
                 item's ID, we have
                 <a href="https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/src/tip/alert/lib/encode_decode.py?at=default">
-                    a simple Python function.
-                </a>. This value increments in a logical manner, but we leave out some of the more ambiguous ascii
-                characters.
+                    a simple Python function</a>. This value increments in a logical manner, but we leave out some of
+                the more ambiguous ascii characters.
             </li>
             <li>
                 <strong>strickland-v-washington</strong>: This is the "slug" of the opinion, and generally mirrors its
-                case name.
+                case name. This value can change if we clean up a case name, but provided it is not omitted, this part
+                of the URL can be any value without ever affecting the page that is loaded.
             </li>
         </ol>
 

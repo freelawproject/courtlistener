@@ -60,14 +60,47 @@
         {% if doc.citation_count > 0 %}
             <div id="cited-by" class="sidebar-section">
                 <h3><span>Cited By ({{ doc.citation_count }})</span></h3>
+                <p class="bottom">This opinion has been cited by these opinions:</p>
                 <ul>
                     {% for case in cited_by_trunc %}
                         <li>
-                            <a href="{{ case.get_absolute_url }}">{{ case.citation.case_name|truncatewords:10|v_wrapper }}</a>
+                            <a href="{{ case.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                                {{ case.caption|safe|truncatewords:10|v_wrapper }}
+                            </a>
                         </li>
                     {% endfor %}
                 </ul>
-                <a href="{{ doc.get_absolute_url }}cited-by/?{{ request.META.QUERY_STRING }}">More citations&hellip;</a>
+                <h4>
+                    <a href="{{ doc.get_absolute_url }}cited-by/?{{ request.META.QUERY_STRING }}">
+                        Full List of Citations
+                        <i class="fa fa-arrow-circle-o-right gray"></i>
+                    </a>
+                </h4>
+            </div>
+        {% endif %}
+
+        {# Show cases this case cites #}
+        {% if authorities_trunc %}
+            <div id="authorities" class="sidebar-section">
+                <h3><span>Authorities ({{ authorities_count }})</span></h3>
+                <p class="bottom">This opinion cites:</p>
+                <ul>
+                    {% for case in authorities_trunc %}
+                        {% with case=case.parent_documents.all.0 %}
+                            <li>
+                                <a href="{{ case.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                                    {{ case.caption|safe|truncatewords:10|v_wrapper }}
+                                </a>
+                            </li>
+                        {% endwith %}
+                    {% endfor %}
+                </ul>
+                <h4>
+                    <a href="{{ doc.get_absolute_url }}authorities/?{{ request.META.QUERY_STRING }}">
+                        Full Authorities Table
+                        <i class="fa fa-arrow-circle-o-right gray"></i>
+                    </a>
+                </h4>
             </div>
         {% endif %}
 
