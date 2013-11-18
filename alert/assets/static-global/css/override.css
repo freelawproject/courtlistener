@@ -192,17 +192,23 @@ div.shown ul {
     padding: 0 0 0 17px;
 }
 
-/* cited by viewer styling */
-#cited-by-viewer hr {
+/* cited by and authorities styling */
+#cited-by-viewer hr,
+#authorities hr,
+#cited-by hr {
     margin-bottom: 2px;
 }
 
-#cited-by-viewer ul {
+#cited-by-viewer ul,
+#authorities ul,
+#cited-by ul {
     padding: 0;
     margin: 0 0 1.5em 0;
 }
 
-#cited-by-viewer ul li {
+#cited-by-viewer ul li,
+#authorities ul li,
+#cited-by ul li {
     list-style-type: none;
     padding: 3px 0 2px 0;
     border-bottom: 1pt solid #DDD;

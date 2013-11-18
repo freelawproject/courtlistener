@@ -70,10 +70,10 @@ class Command(BaseCommand):
         if verbosity >= 1:
             sys.stdout.write('Complete!\n')
 
-        #########################
-        #       Stage III       #
-        # Update Pagerank in DB #
-        #########################
+        ###################
+        #    Stage III    #
+        # Update Pagerank #
+        ###################
         progress = 0
         update_count = 0
         min_value = min(pr_result.values())

@@ -63,6 +63,10 @@ def view_case(request, court, pk, casename):
     cited_by_trunc = doc.citation.citing_cases.select_related(
           'citation').order_by('-citation_count', '-date_filed')[:5]
 
+    authorities_trunc = doc.cases_cited.all().select_related(
+        'document').order_by('-parent_documents__date_filed', '-parent_documents__citation_count', )[:5]
+    authorities_count = doc.cases_cited.all().count()
+
     return render_to_response(
         'view_case.html',
         {'title': title,
@@ -72,20 +76,21 @@ def view_case(request, court, pk, casename):
          'favorite_form': favorite_form,
          'get_string': get_string,
          'private': doc.blocked,
-         'cited_by_trunc': cited_by_trunc},
+         'cited_by_trunc': cited_by_trunc,
+         'authorities_trunc': authorities_trunc,
+         'authorities_count': authorities_count},
         RequestContext(request)
     )
 
 
-def view_case_citations(request, pk, casename):
-    # Decode the id string back to an int
+def view_case_citations(request, pk, case_name):
     pk = ascii_to_num(pk)
 
     # Look up the document, title
     doc = get_object_or_404(Document, pk=pk)
     title = '%s, %s' % (trunc(doc.citation.case_name, 100), make_citation_string(doc))
 
-    # Get list of citing cases, ordered by influence
+    # Get list of cases we cite, ordered by citation count
     citing_cases = doc.citation.citing_cases.select_related(
             'citation', 'court').order_by('-citation_count', '-date_filed')
 
@@ -114,6 +119,33 @@ def view_case_citations(request, pk, casename):
                                'doc': doc,
                                'private': private,
                                'citing_cases': citing_cases},
+                              RequestContext(request))
+
+
+def view_authorities(request, pk, case_name):
+    pk = ascii_to_num(pk)
+
+    doc = get_object_or_404(Document, pk=pk)
+    title = '%s, %s' % (trunc(doc.citation.case_name, 100), make_citation_string(doc))
+
+    # Ordering is by date, then citation count
+    authorities = doc.cases_cited.all().select_related(
+        'document').order_by('-parent_documents__date_filed', '-parent_documents__citation_count', )
+
+    private = False
+    if doc.blocked:
+        private = True
+    else:
+        for case in authorities:
+            if case.parent_documents.all()[0].blocked:
+                private = True
+                break
+
+    return render_to_response('view_case_authorities.html',
+                              {'title': title,
+                               'doc': doc,
+                               'private': private,
+                               'authorities': authorities},
                               RequestContext(request))
 
 
