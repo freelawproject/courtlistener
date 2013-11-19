@@ -6,5 +6,5 @@ Please be sure you understand our license before you get too far along.
 
 If you are a contributor, please review contributor_license_agreement.txt.
 
-Thanks for your interest in the CourtListener platform.
+Thanks for your interest in the CourtListener platform!
 
