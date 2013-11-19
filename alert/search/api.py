@@ -397,11 +397,6 @@ class SearchResource(ModelResourceWithFieldsFilter):
         help_text='The location, relative to MEDIA_ROOT on the CourtListener server, where files are stored',
         null=True,
     )
-    pagerank = fields.FloatField(
-        attribute='pagerank',
-        help_text="The PageRank score based on the citing relation among documents",
-        null=True
-    )
     score = fields.FloatField(
         attribute='score',
         help_text='The relevance of the result. Will vary from query to query.',
@@ -443,6 +438,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
         throttle = CacheThrottle(throttle_at=1000)
         resource_name = 'search'
         max_limit = 20
+        include_absolute_url = True
         allowed_methods = ['get']
         search_field = ('search',)
         filtering = {

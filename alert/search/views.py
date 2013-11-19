@@ -117,9 +117,10 @@ def show_results(request):
         except EmptyPage:
             # If page is out of range (e.g. 9999), deliver last page of results.
             paged_results = paginator.page(paginator.num_pages)
-    except:
+    except Exception, e:
         # Catches any Solr errors, and simply aborts.
         logger.warning("Error loading pagination on search page with request: %s" % request.GET)
+        logger.warning("Error was: %s" % e)
         return render_to_response('search/search.html',
                                   {'error': True, 'private': True},
                                   RequestContext(request))
