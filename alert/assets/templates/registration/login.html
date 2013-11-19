@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In - CourtListener.com{% endblock %}
+
+{% block footer-scripts %}
+    <script type="text/javascript">
+	    $(document).ready(function() {
+		    $('.auto-focus:first').focus();
+	    });
+     </script>
+{% endblock %}
+
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div class="span-24 last" id="content">
+        <hr class="space">
+        <hr class="space">
+        <div class="prepend-9 span-6 last">
+            <div class="box round">
+                {% block h2 %}<h2>Sign in</h2>{% endblock %}
+                {% if form.errors %}
+                    <div class="span-4 error">
+                        {%  for error in form.non_field_errors %}
+                        <p class="bottom">{{ error|safe }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                <form action="" method="post">{% csrf_token %}
+                    <p>
+                        <label for="username">Username</label><br>
+                        <input type="text" name="username" value="" id="username" class="auto-focus span-5">
+                    </p>
+
+                    <p>
+                        <label for="password">Password</label><br>
+                        <input type="password" name="password" value="" id="password" class="span-5">
+
+                    </p>
+                    <input type="hidden" name="next" value="{{ next|escape }}">
+                    <button type="submit" class="button last">Sign In</button>
+                </form>
+                <p class="bottom"><a href="/reset-password/">Forgot username/password?</a></p>
+                <p><a href="/register/">Need to register?</a></p>
+            </div>
+        </div>
+    </div>
+    <hr class="space">
+    <hr class="space">
+{% endblock %}
