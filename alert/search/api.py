@@ -175,6 +175,7 @@ class CitedByResource(ModelResourceWithFieldsFilter):
         resource_name = 'cited-by'
         queryset = Document.objects.all()
         excludes = ('is_stub_document', 'html', 'html_lawbox', 'html_with_citations', 'plain_text',)
+        include_absolute_url = True
         max_limit = 20
         list_allowed_methods = ['get']
         detail_allowed_methods = []
@@ -237,6 +238,7 @@ class CitesResource(ModelResourceWithFieldsFilter):
         resource_name = 'cites'
         queryset = Document.objects.all()
         excludes = ('is_stub_document', 'html', 'html_lawbox', 'html_with_citations', 'plain_text',)
+        include_absolute_url = True
         max_limit = 20
         list_allowed_methods = ['get']
         detail_allowed_methods = []
