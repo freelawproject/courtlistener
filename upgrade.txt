@@ -6,6 +6,8 @@ hg pull -u
 # Gather any new static files
 manage.py collectstatic
 
+(enter yes, when prompted)
+
 # Migrate the database
 manage.py migrate
 
