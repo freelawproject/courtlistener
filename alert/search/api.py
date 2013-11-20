@@ -149,7 +149,7 @@ class DocumentResource(ModelResourceWithFieldsFilter):
             'blocked': ALL,
             'extracted_by_ocr': ALL,
         }
-        ordering = ['time_retrieved', 'date_modified', 'date_filed', 'pagerank', 'date_blocked']
+        ordering = ['time_retrieved', 'date_modified', 'date_filed', 'date_blocked']
 
 
 class CitedByResource(ModelResourceWithFieldsFilter):

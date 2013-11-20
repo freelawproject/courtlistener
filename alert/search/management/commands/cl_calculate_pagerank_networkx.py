@@ -2,7 +2,7 @@ __author__ = 'Krist Jin'
 
 from alert.search.models import Document
 from alert.lib.db_tools import queryset_generator
-from alert.lib.solr_core_admin import get_solr_core_status
+from alert.lib.solr_core_admin import get_solr_core_status, get_data_dir_location
 from django.core.management.base import BaseCommand
 import logging
 import sys
@@ -15,9 +15,7 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     args = '<args>'
     help = 'Calculate pagerank value for every case'
-    status_doc = get_solr_core_status()
-    RESULT_FILE_PATH = str(status_doc.xpath('//*[@name= "dataDir"][../*[@name="name" = "collection1"]]/text()')[0])\
-        + "external_pagerank"
+    RESULT_FILE_PATH = get_data_dir_location() + "external_pagerank"
     result_file = open(RESULT_FILE_PATH, 'w')
 
     def do_pagerank(self, verbosity=1):
@@ -82,7 +80,6 @@ class Command(BaseCommand):
             try:
                 if abs(old_pr - pr_result[id]) > UPDATE_THRESHOLD:
                     # Save only if the diff is large enough
-                    Document.objects.filter(pk=int(id)).update(pagerank=pr_result[id])
                     update_count += 1
                     logger.info("ID: {0}\told pagerank is {1}\tnew pagerank is {2}\n".format(
                         id,
@@ -100,7 +97,6 @@ class Command(BaseCommand):
             #Because NetworkX removed the isolated nodes, which will be updated below
             except KeyError:
                 if abs(old_pr - min_value) > UPDATE_THRESHOLD:
-                    Document.objects.filter(pk=int(id)).update(pagerank=min_value)
                     update_count += 1
                     logger.info("ID: {0}\told pagerank is {1}\tnew pagerank is {2}\n".format(
                         id,

@@ -140,10 +140,6 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 except:
                     pass
                 try:
-                    row.set('pagerank', doc.pagerank)
-                except:
-                    pass
-                try:
                     row.set('blocked', str(doc.blocked))
                 except:
                     pass

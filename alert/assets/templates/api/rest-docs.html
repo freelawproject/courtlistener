@@ -265,8 +265,8 @@
         </p>
         <p>
             The results of this endpoint can also be ordered by <code>time_retrieved</code>, <code>date_modified</code>,
-            <code>date_filed</code>, <code>pagerank</code>, or <code>date_blocked</code>. Again, this is described in
-            more detail in the schema.
+            <code>date_filed</code>, or <code>date_blocked</code>. Again, this is described in more detail in the
+            schema.
         </p>
 
 
@@ -424,8 +424,6 @@
         <blockquote>
             <code>curl https://www.courtlistener.com/api/rest/v1/coverage/ca9/</code>
         </blockquote>
-
-
     </div>
 
 
@@ -470,16 +468,26 @@
                 If you are interested, we have a variety of <a href="http://freelawproject.org/about/assets/">"Powered
                 By" logos</a> available for your website or application. We appreciate a reference, but it's not required.
             </p>
+            <a href="http://freelawproject.org/about/assets/#powered-by">
+                <img src="/static/png/logo-long-w350.png" width="350" height="81">
+            </a>
+        </div>
 
-            <a href="http://freelawproject.org/about/assets/#powered-by"><img src="/static/png/logo-long-w350.png" width="350" height="81"></a>
+        <div class="span-9 last sidebar-section">
+            <h3><span>CiteGeist Scores</span></h3>
+
+            <p>If you are interested in the CiteGeist score for each opinion, it is now available via our
+                <a href="/api/bulk-info/#citegeist">
+                    bulk data API</a>.
+            </p>
         </div>
 
         <div class="span-9 last sidebar-section">
             <h3><span>Browser Tools</span></h3>
             <p>
-                If you are using the Firefox browser, you may be interested in the
-                <a href="https://addons.mozilla.org/en-US/firefox/addon/jsonovich/">JSONovitch extension</a> which
-                provides pretty printing of JSON in your browser.
+                Several tools are available to help view JSON in your browser. If you are using Firefox, check out
+                <a href="https://addons.mozilla.org/en-US/firefox/addon/jsonovich/">JSONovitch</a>. If you are using
+                Chrome, check out <a href="https://chrome.google.com/webstore/detail/jsonview/chklaanhfefbnpoihckbnefhakgolnmc?hl=en">JSONView</a>.
             </p>
         </div>
         <div class="span-9 last sidebar-section">

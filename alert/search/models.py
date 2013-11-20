@@ -378,11 +378,6 @@ class Document(models.Model):
         default=0,
         db_index=True,
     )
-    pagerank = models.FloatField(
-        help_text='PageRank score based on the citing relation among documents',
-        default=0,
-        db_index=True
-    )
     precedential_status = models.CharField(
         help_text='The precedential status of document, one of: %s' % ', '.join([t[0] for t in DOCUMENT_STATUSES]),
         max_length=50,

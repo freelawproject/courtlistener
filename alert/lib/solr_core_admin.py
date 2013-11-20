@@ -73,3 +73,14 @@ def get_solr_core_status(core='all'):
         raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
 
     return solr_config
+
+
+def get_data_dir_location(core='collection1'):
+    """
+    Interrogate Solr to get the location of its data directory.
+
+    Useful when writing the external_pagerank file or when reading it.
+    """
+    status_doc = get_solr_core_status()
+    return str(status_doc.xpath('//*[@name= "dataDir"][../*[@name="name" = "%s"]]/text()')[0] % core)
+
