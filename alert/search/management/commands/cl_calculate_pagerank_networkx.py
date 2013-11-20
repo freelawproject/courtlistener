@@ -1,10 +1,13 @@
 __author__ = 'Krist Jin'
 
+from alert import settings
 from alert.search.models import Document
 from alert.lib.db_tools import queryset_generator
-from alert.lib.solr_core_admin import get_solr_core_status, get_data_dir_location
+from alert.lib.solr_core_admin import get_data_dir_location
 from django.core.management.base import BaseCommand
 import logging
+import os
+import shutil
 import sys
 import time
 import networkx as nx
@@ -124,7 +127,13 @@ class Command(BaseCommand):
             ))
             sys.stdout.write('See the django log for more details.\n')
 
+        if verbosity >= 1:
+            sys.stdout.write('Copying pagerank file to sata...\n')
+
         self.result_file.close()
+        shutil.copyfile(self.RESULT_FILE_PATH, settings.DUMP_DIR)
+        os.chown(settings.DUMP_DIR + 'external_pagerank', 'www-data', 'www-data')
+
 
     def handle(self, *args, **options):
         self.do_pagerank(verbosity=int(options.get('verbosity', 1)))
