@@ -164,12 +164,12 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
 
 def serve_pagerank_file(request):
     """Find the pagerank file by interrogating Solr, then serve it up."""
-    file_loc = get_data_dir_location() + "external_pagerank"
+    file_loc = settings.DUMP_DIR + "external_pagerank"
     file_name = file_loc.split('/')[-1]
     try:
         mimetype = magic.from_file(file_loc, mime=True)
     except IOError:
-        raise Http404
+        raise Http404('Unable to locate external_pagerank file in %s' % settings.DUMP_DIR)
     response = HttpResponse()
     response['X-Sendfile'] = os.path.join(file_loc)
     response['Content-Disposition'] = 'attachment; filename="%s"' % file_name.encode('utf-8')
