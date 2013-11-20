@@ -3,7 +3,6 @@ __author__ = 'Krist Jin'
 from alert.search.models import Document
 from alert.lib.db_tools import queryset_generator
 from alert.lib.solr_core_admin import get_solr_core_status
-from alert.lib.solr_core_admin import reload_pagerank_external_file_cache
 from django.core.management.base import BaseCommand
 import logging
 import sys
@@ -121,9 +120,6 @@ class Command(BaseCommand):
                     progress * 1.0 / graph_size
                 ))
                 sys.stdout.flush()
-
-        # Hit the reloadCache to reload ExternalFileField (necessary for Solr version prior to 4.1)
-        reload_pagerank_external_file_cache()
 
         if verbosity >= 1:
             sys.stdout.write('\nPageRank calculation finish! Updated {} ({:.0%}) cases\n'.format(

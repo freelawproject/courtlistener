@@ -604,6 +604,12 @@
       </arr>
     </listener>
 
+    <!-- mlr added for pagerank -->
+    <listener event="newSearcher"
+              class="org.apache.solr.schema.ExternalFileFieldReloader"/>
+    <listener event="firstSearcher"
+              class="org.apache.solr.schema.ExternalFileFieldReloader"/>
+
     <!-- Use Cold Searcher
 
          If a search request comes in and there is no current
@@ -1526,9 +1532,6 @@
       <str>elevator</str>
     </arr>
   </requestHandler>
-
-  <requestHandler name="/reloadCache"
-                class="org.apache.solr.search.function.FileFloatSource$ReloadCacheRequestHandler" />
 
   <!-- Highlighting Component
 
