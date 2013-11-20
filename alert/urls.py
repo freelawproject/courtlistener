@@ -1,6 +1,6 @@
 from tastypie.api import Api
 
-from alert.api.views import court_index, documentation_index, dump_index, rest_index, serve_or_gen_dump
+from alert.api.views import court_index, documentation_index, dump_index, rest_index, serve_or_gen_dump, serve_pagerank_file
 from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
 from alert.casepage.views import view_case, view_case_citations, serve_static_file, view_authorities
@@ -155,6 +155,7 @@ urlpatterns = patterns('',
         serve_or_gen_dump),
     (r'^api/bulk/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
         serve_or_gen_dump),
+    (r'^api/bulk/external_pagerank/$', serve_pagerank_file),
 
     # Feeds
     (r'^feed/(search)/$', search_feed()),  # lacks URL capturing b/c it will use GET queries.

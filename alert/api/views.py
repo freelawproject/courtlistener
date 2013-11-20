@@ -1,17 +1,17 @@
 import os
 
 from alert import settings
-from alert.lib import search_utils
+from alert.lib import search_utils, magic
 from alert.lib.db_tools import queryset_generator_by_date
 from alert.lib.dump_lib import make_dump_file
 from alert.lib.dump_lib import get_date_range
 from alert.lib.filesize import size
+from alert.lib.solr_core_admin import get_data_dir_location
 from alert.lib.sunburnt import sunburnt
 from alert.search.models import Court, Document
 from alert.stats import tally_stat
 
-from django.http import HttpResponseBadRequest
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseBadRequest, Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.utils.timezone import now
@@ -161,3 +161,18 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
         tally_stat('bulk_data.served.by_date')
         return HttpResponseRedirect('%s.gz' % os.path.join('/dumps', filepath, filename))
 
+
+def serve_pagerank_file(request):
+    """Find the pagerank file by interrogating Solr, then serve it up."""
+    file_loc = get_data_dir_location() + "external_pagerank"
+    file_name = file_loc.split('/')[-1]
+    try:
+        mimetype = magic.from_file(file_loc, mime=True)
+    except IOError:
+        raise Http404
+    response = HttpResponse()
+    response['X-Sendfile'] = os.path.join(file_loc)
+    response['Content-Disposition'] = 'attachment; filename="%s"' % file_name.encode('utf-8')
+    response['Content-Type'] = mimetype
+    tally_stat('bulk_data.pagerank.served')
+    return response
