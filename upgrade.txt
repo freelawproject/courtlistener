@@ -20,7 +20,7 @@ touch apache/django.wsgi
 is all that's necessary. In the case that special instructions are needed, we will attempt to put them here, with the
 most recent at the top.
 
-We welcome a conversion of these notes to a better process using Fabric.
+We welcome a conversion of these notes to a better process using Fabric or a similar technology.
 
 ----------------------------
 
