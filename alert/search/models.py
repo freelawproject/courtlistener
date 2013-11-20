@@ -329,7 +329,9 @@ class Document(models.Model):
     download_URL = models.URLField(
         help_text="The URL on the court website where the document was originally scraped",
         max_length=500,
-        db_index=True
+        db_index=True,
+        null=True,
+        blank=True,
     )
     local_path = models.FileField(
         help_text="The location, relative to MEDIA_ROOT on the CourtListener server, where files are stored",
