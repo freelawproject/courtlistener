@@ -82,5 +82,5 @@ def get_data_dir_location(core='collection1'):
     Useful when writing the external_pagerank file or when reading it.
     """
     status_doc = get_solr_core_status()
-    return str(status_doc.xpath('//*[@name= "dataDir"][../*[@name="name" = "%s"]]/text()')[0] % core)
+    return str(status_doc.xpath('//*[@name= "dataDir"][../*[@name="name" = "%s"]]/text()' % core)[0])
 
