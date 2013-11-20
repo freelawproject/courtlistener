@@ -31,7 +31,7 @@ We welcome a conversion of these notes to a better process using Fabric.
         - wget https://archive.apache.org/dist/lucene/solr/4.1.0/solr-4.1.0.tgz
    - Unpack the tgz file with:
         - tar -x -f solr-4.1.0.tgz
-   - Set up the CL_INSTALL_ROOT variable:
+   - Set up the INSTALL_ROOT variable:
         - source /etc/courtlistener
    - Stop Solr, swap in the correct version and restart solr:
         - sudo service solr stop
