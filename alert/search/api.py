@@ -281,18 +281,22 @@ class CitesResource(ModelResourceWithFieldsFilter):
             return ''
 
 
-class SolrList(list):
-    def __init__(self, conn, q, length, offset, limit):
+class SolrList(object):
+    """This implements a yielding list object that fetches items as they are queried."""
+    def __init__(self, conn, main_query, offset, limit, length=None):
         super(SolrList, self).__init__()
-        self.q = q
+        self.main_query = main_query
         self.conn = conn
-        self.length = length
-        self._item_cache = []
         self.offset = offset
         self.limit = limit
+        self.length = length
+        self._item_cache = []
 
     def __len__(self):
         """Tastypie's paginator takes the len() of the item for its work."""
+        if self.length is None:
+            # We don't yet know length, so call __getitem__, which sets it.
+            self.__getitem__(0)
         return self.length
 
     def __iter__(self):
@@ -302,24 +306,38 @@ class SolrList(list):
             else:
                 yield self.__getitem__(item)
 
-    def _get_offset(self, item):
-        return item + 1
-
     def __getitem__(self, item):
-        if item > (self.offset - 1 + self.limit):
-            # If the item is outside of our initial query, we need to get items and put them in our cache
-            self._item_cache = []
-            self.q['offset'] = self._get_offset(item)
-            results_si = self.conn.raw_query(**self.q).execute()
-            for result in results_si.result.docs:
-                self._item_cache.append(SolrObject(initial=result))
+        self.main_query['start'] = self.offset
+        results_si = self.conn.raw_query(**self.main_query).execute()
+
+        # Set the length if it's not yet set.
+        if self.length is None:
+            self.length = results_si.result.numFound
+
+        # Pull the text snippet up a level, where tastypie can find it
+        for result in results_si.result.docs:
+            result['snippet'] = '&hellip;'.join(result['solr_highlights']['text'])
+
+        # Return the results as objects, not dicts.
+        for result in results_si.result.docs:
+            self._item_cache.append(SolrObject(initial=result))
 
         # Now, assuming our _item_cache is all set, we just get the item.
-        return self._item_cache[item]
+        if isinstance(item, slice):
+            s = slice(item.start - int(self.offset),
+                      item.stop - int(self.offset),
+                      item.step)
+            return self._item_cache[s]
+        else:
+            # Not slicing.
+            try:
+                return self._item_cache[item]
+            except IndexError:
+                # No results!
+                return []
 
     def append(self, p_object):
         """Lightly override the append method so we get items duplicated in our cache."""
-        super(SolrList, self).append(p_object)
         self._item_cache.append(p_object)
 
 
@@ -434,6 +452,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
         attribute='timestamp',
         help_text='The moment when an item was indexed by Solr.'
     )
+    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
 
     class Meta:
         authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
@@ -478,7 +497,6 @@ class SearchResource(ModelResourceWithFieldsFilter):
 
     def get_object_list(self, request=None, **kwargs):
         """Performs the Solr work."""
-        conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
         try:
             main_query = build_main_query(kwargs['cd'], highlight='text')
         except KeyError:
@@ -486,16 +504,9 @@ class SearchResource(ModelResourceWithFieldsFilter):
             if sf.is_valid():
                 main_query = build_main_query(sf.cleaned_data, highlight='text')
 
-        results_si = conn.raw_query(**main_query).execute()
-        # Pull the text snippet up a level, where tastypie can find it
-        for result in results_si.result.docs:
-            result['snippet'] = '&hellip;'.join(result['solr_highlights']['text'])
-        # Return the results as objects, not dicts.
         # Use a SolrList that has a couple of the normal functions built in.
-        sl = SolrList(conn=conn, q=main_query, length=results_si.result.numFound,
-                      offset=request.GET.get('offset', 0), limit=request.GET.get('limit', 20))
-        for result in results_si.result.docs:
-            sl.append(SolrObject(initial=result))
+        sl = SolrList(conn=self.conn, main_query=main_query, offset=request.GET.get('offset', 0),
+                      limit=request.GET.get('limit', 20))
         return sl
 
     def obj_get_list(self, bundle, **kwargs):
