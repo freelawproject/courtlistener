@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load text_filters %}
+
+{% block title %}Available Jurisdictions - CourtListener.com{% endblock %}
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div class="span-24 last">
+        <h2>Available Jurisdictions</h2>
+
+        <p>
+            We currently have <span id="jurisdiction-count">{{ courts.count }}</span> jurisdictions available on CourtListener. These jurisdictions are available via
+            our API or can be used in our bulk data queries.
+        </p>
+
+        <p>
+            Some of the data below is incomplete, missing dates or other information. If you are a legal researcher
+            interested in helping us research this or other data, please get in touch via our <a href="/contact/">contact
+            form</a>. We welcome your contribution.
+        </p>
+
+        <table class="settings-table">
+            <thead>
+            <tr>
+                <th>Name</th>
+                <th title="The number of cases in this court on CourtListener">Count</th>
+                <th>Jurisdiction</th>
+                <th>Homepage</th>
+                <th title="The value used in our URLs, bulk data, etc.">
+                    Abbreviation
+                </th>
+                <th title="Gathered from Blue Book, Cornell.edu and ALWD">
+                    Citation Abbreviation
+                </th>
+                <th title="The date the court came into existence">
+                    Start&nbsp;Date
+                </th>
+                <th title="The date the court was abolished, if applicable">
+                    End&nbsp;Date
+                </th>
+                <th title="Whether the court is in use in CourtListener">
+                    In&nbsp;Use
+                </th>
+                <th title="When this row was last modified in our database">
+                    Modified
+                </th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for court in courts %}
+                <tr>
+                    <td>{{ court.full_name }}</td>
+                    <td>{{ court.count }}</td>
+                    <td>{{ court.get_jurisdiction_display|nbsp }}</td>
+                    <td title="{{ court.URL }}">
+                        <a href="{{ court.URL }}" target="_blank">
+                            {{ court.URL|slice:"20" }}{% if court.URL|length > 20 %}&hellip;{% endif %}
+                        </a>
+                    </td>
+                    <td>
+                        <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc">
+                            {{ court.pk }}
+                        </a>
+                    </td>
+                    <td>{{ court.citation_string }}</td>
+                    <td>{{ court.start_date|date:"Y-m-d"|default:"Unknown" }}</td>
+                    <td>{{ court.end_date|date:"Y-m-d"|default:"Unknown" }}</td>
+                    <td>{{ court.in_use|yesno|title }}</td>
+                    <td>{{ court.date_modified|date:"c"|slice:"16"|default:"None yet" }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}
