@@ -6,7 +6,6 @@ from alert.lib.db_tools import queryset_generator_by_date
 from alert.lib.dump_lib import make_dump_file
 from alert.lib.dump_lib import get_date_range
 from alert.lib.filesize import size
-from alert.lib.solr_core_admin import get_data_dir_location
 from alert.lib.sunburnt import sunburnt
 from alert.search.models import Court, Document
 from alert.stats import tally_stat

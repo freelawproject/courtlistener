@@ -21,7 +21,7 @@
             <li><a href="/api/rest/v1/citation/">/api/rest/v1/citation/</a></li>
             <li><a href="/api/rest/v1/jurisdiction/">/api/rest/v1/jurisdiction/</a></li>
             <li><a href="/api/rest/v1/search/">/api/rest/v1/search/</a></li>
-            <li><a href="/api/rest/v1/coverage/">/api/rest/v1/coverage/</a></li>
+            <li><a href="/api/rest/v1/coverage/all/">/api/rest/v1/coverage/</a></li>
         </ol>
 
         <p>
@@ -221,12 +221,22 @@
             </li>
         </ol>
 
-        <h4>About IDs and SHA1 Sums</h4>
+        <h4>IDs and SHA1 Sums</h4>
         <p>
             Because of the way the data is organized in our backend, there is a unique ID for each citation and each
             opinion. This means that when you are working with the <code>citation</code> endpoint, you cannot use the
-            opinion IDs, and vice versa.
+            opinion IDs, and vice versa. For example, this:
         </p>
+        <blockquote>
+            <code>curl https://www.courtlistener.com/api/rest/v1/opinion/111170/</code>
+        </blockquote>
+        <p>
+            Returns <em><a href="/scotus/z3J/strickland-v-washington/">Strickland v. Washington</a></em>. But this does
+            not:
+        </p>
+        <blockquote>
+            <code>curl https://www.courtlistener.com/api/rest/v1/citation/111170/</code>
+        </blockquote>
         <p>
             In addition to this, each opinion has a globally unique
             <code><a href="https://en.wikipedia.org/wiki/SHA-1">SHA1</a></code> sum that can be queried using the search
@@ -383,6 +393,10 @@
             easily apply it to this endpoint.
         </p>
         <p>
+            Note that like the front end, only precedential results are returned by default. See below for an example
+            that returns non-precedential results as well.
+        </p>
+        <p>
             When examining the <em>filtering</em> section of the schema, note that fields have been labeled as follows:
         </p>
         <dl>
@@ -425,12 +439,29 @@
             </dd>
         </dl>
         <p>
-            Finally, one field that warrants explanation is the <code>snippet</code> field. This field contains the
-            same values as are found on the front end, utilizing the HTML5 <code>&lt;mark&gt;</code> element to identify
-            up to five matches in an opinion. If you wish to use the snippet but do not want highlighting, simply use
-            CSS to give the <code>mark</code> element no styling, like a <code>span</code> element. This field only
-            responds to arguments provided to the <code>q</code> parameter. If that parameter is not used, the
-            <code>snippet</code> field will show the first 500 characters of the <code>text</code> field.
+            Finally, two fields warrants special explanation:
+        <p>
+        <dl>
+            <dt><code>snippet</code></dt>
+            <dd>
+                This field contains the same values as are found on the front end, utilizing the HTML5
+                <code>&lt;mark&gt;</code> element to identify up to five matches in an opinion. If you wish to use the
+                snippet but do not want highlighting, simply use CSS to give the <code>mark</code> element no styling,
+                like a <code>span</code> element. This field only responds to arguments provided to the <code>q</code>
+                parameter. If that parameter is not used, the <code>snippet</code> field will show the first 500
+                characters of the <code>text</code> field.
+            </dd>
+            <dt><code>stat_*</code></dt>
+            <dd>
+                For this Boolean field, we provide opinionated default values. Because most searchers are not interested
+                in non-precedential (unpublished) results, we leave them out by default. If you wish to receive these
+                items, you must explicitly ask for them as you do on the front end. For example, this query returns both
+                precedential (published) and non-precedential (unpublished) results:
+                <blockquote>
+                    <code>curl https://www.courtlistener.com/api/rest/v1/search/?stat_Precedential=on&stat_Non-Precedential=on</code>
+                </blockquote>
+            </dd>
+        </dl>
         </p>
 
 
