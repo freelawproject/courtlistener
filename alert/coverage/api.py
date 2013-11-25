@@ -29,18 +29,20 @@ def coverage_data(request, court):
     """
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     start_year = search_utils.get_court_start_year(conn, court)
-    years = {}
-    total_docs = 0
     response = conn.raw_query(
         **search_utils.build_coverage_query(court, start_year)
     ).execute()
     counts = response.facet_counts.facet_ranges[0][1][0][1]
     counts = strip_trailing_zeroes(counts)
+
+    # Calculate the totals
+    annual_counts = {}
+    total_docs = 0
     for date_string, count in counts:
-        years[date_string[:4]] = count
+        annual_counts[date_string[:4]] = count
         total_docs += count
     response = {
-        'annual_counts': years,
+        'annual_counts': annual_counts,
         'total': total_docs,
     }
 
