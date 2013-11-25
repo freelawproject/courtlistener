@@ -3,7 +3,7 @@ __author__ = 'Krist Jin'
 from alert import settings
 from alert.search.models import Document
 from alert.lib.db_tools import queryset_generator
-from alert.lib.solr_core_admin import get_data_dir_location
+from alert.lib.solr_core_admin import get_data_dir_location, reload_pagerank_external_file_cache
 from django.core.management.base import BaseCommand
 import logging
 import os
@@ -120,6 +120,9 @@ class Command(BaseCommand):
                 ))
                 sys.stdout.flush()
 
+        # Hit the reloadCache to reload ExternalFileField (necessary for Solr version prior to 4.1)
+        reload_pagerank_external_file_cache()
+
         if verbosity >= 1:
             sys.stdout.write('\nPageRank calculation finish! Updated {} ({:.0%}) cases\n'.format(
                 update_count,
@@ -131,6 +134,8 @@ class Command(BaseCommand):
             sys.stdout.write('Copying pagerank file to sata...\n')
 
         self.result_file.close()
+
+        # Copy the pagerank field to the bulk data zone.
         shutil.copyfile(self.RESULT_FILE_PATH, settings.DUMP_DIR)
         os.chown(settings.DUMP_DIR + 'external_pagerank', 'www-data', 'www-data')
 
