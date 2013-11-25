@@ -102,7 +102,7 @@ def update_cite(citation_id):
     """
     si = sunburnt.SolrInterface(settings.SOLR_URL, mode='w')
     cite = Citation.objects.get(pk=citation_id)
-    for doc in cite.document_set.all():
+    for doc in cite.parent_documents.all():
         search_doc = SearchDocument(doc)
         si.add(search_doc)
     si.commit()
