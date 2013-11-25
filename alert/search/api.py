@@ -516,7 +516,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
             'docket_number': search_field,
             'cited_gt': ('int',),
             'cited_lt': ('int',),
-            'courts': ('csv',),
+            'court': ('csv',),
         }
         ordering = [
             'dateFiled+desc', 'dateFiled+asc',

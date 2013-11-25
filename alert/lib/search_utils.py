@@ -435,6 +435,7 @@ def build_coverage_query(court, start_year):
         'facet.range.end': 'NOW/DAY',
         'facet.range.gap': '+1YEAR',
         'rows': 0,
+        'q': '*:*',  # Without this, results will be omitted.
     }
     if court.lower() != 'all':
         params['fq'] = ['court_exact:%s' % court]
