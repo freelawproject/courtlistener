@@ -57,7 +57,7 @@ class ModelResourceWithFieldsFilter(ModelResource):
 class PerUserThrottle(CacheThrottle):
     """Sets up higher throttles for specific users"""
     custom_throttles = {
-        'scout': 4000,
+        'scout': 10000,
         'mlissner': 1,
     }
 
@@ -75,6 +75,7 @@ class PerUserThrottle(CacheThrottle):
         the user should be throttled.
         """
         key = self.convert_identifier_to_key(identifier)
+        logger.warning("API called. Applying throttle to: %s" % key)
 
         # Make sure something is there.
         cache.add(key, [])
@@ -96,7 +97,7 @@ class PerUserThrottle(CacheThrottle):
 class CourtResource(ModelResourceWithFieldsFilter):
     class Meta:
         authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
-        throttle = CacheThrottle(throttle_at=1)
+        throttle = CacheThrottle(throttle_at=1000)
         resource_name = 'jurisdiction'
         queryset = Court.objects.exclude(jurisdiction='T')
         max_limit = 1000
@@ -121,7 +122,7 @@ class CitationResource(ModelResourceWithFieldsFilter):
 
     class Meta:
         authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
-        throttle = CacheThrottle(throttle_at=1000)
+        throttle = PerUserThrottle(throttle_at=1000)
         queryset = Citation.objects.all()
         max_limit = 20
         excludes = ['slug', ]
