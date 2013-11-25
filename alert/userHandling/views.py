@@ -219,9 +219,9 @@ def register(request):
 
                 # Send an email letting the admins know there's somebody to say hi to
                 email_subject = 'New user confirmed on CourtListener: %s' % up.user.username
-                email_body = ("A new user has signed up on CourtListener! Maybe we should say hi?\n\n"
-                              "Their name is: %s\n"
-                              "Their email address is: %s\n\n"
+                email_body = ("A new user has signed up on CourtListener and they'll be automatically welcomed soon!\n\n"
+                              "  Their name is: %s\n"
+                              "  Their email address is: %s\n\n"
                               "Sincerely,\n\n"
                               "The CourtListener Bots" % (up.user.get_full_name() or "Not provided",
                                                           up.user.email))

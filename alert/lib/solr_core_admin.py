@@ -84,3 +84,9 @@ def get_data_dir_location(core='collection1'):
     status_doc = get_solr_core_status()
     return str(status_doc.xpath('//*[@name= "dataDir"][../*[@name="name" = "%s"]]/text()' % core)[0])
 
+
+def reload_pagerank_external_file_cache():
+    """Hit the URL of reloadCache to reload ExternalFileField (necessory for Solr version prior to 4.1)"""
+    r = requests.get('http://localhost:8983/solr/reloadCache')
+    if r.status_code != 200:
+        print "Problem reloading cache. Got status_code of %s. Check the Solr logs for details." % r.status_code
