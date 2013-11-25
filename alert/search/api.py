@@ -1,8 +1,11 @@
 import logging
+import re
+import time
+from django.core.cache import cache
 from tastypie import fields
 from tastypie.authentication import BasicAuthentication, SessionAuthentication, MultiAuthentication
 from tastypie.constants import ALL
-from tastypie.exceptions import BadRequest, InvalidSortError
+from tastypie.exceptions import BadRequest
 from tastypie.resources import ModelResource
 from tastypie.throttle import CacheThrottle
 from alert import settings
@@ -31,9 +34,9 @@ class ModelResourceWithFieldsFilter(ModelResource):
         # bundle.obj[0]._data['citeCount'] = 0
         fields = bundle.request.GET.get("fields", "")
         if fields:
-            fields = fields.split(",")
+            fields_list = re.split(',|__', fields)
             new_data = {}
-            for k in fields:
+            for k in fields_list:
                 if k in bundle.data:
                     new_data[k] = bundle.data[k]
             bundle.data = new_data
@@ -51,10 +54,49 @@ class ModelResourceWithFieldsFilter(ModelResource):
         return super(ModelResourceWithFieldsFilter, self).dispatch(request_type, request, **kwargs)
 
 
+class PerUserThrottle(CacheThrottle):
+    """Sets up higher throttles for specific users"""
+    custom_throttles = {
+        'scout': 4000,
+        'mlissner': 1,
+    }
+
+    def should_be_throttled(self, identifier, **kwargs):
+        """
+        Lightly edits the inherited method to add an additional check of the
+        `custom_throttles` variable.
+
+        Returns whether or not the user has exceeded their throttle limit.
+
+        Maintains a list of timestamps when the user accessed the api within
+        the cache.
+
+        Returns ``False`` if the user should NOT be throttled or ``True`` if
+        the user should be throttled.
+        """
+        key = self.convert_identifier_to_key(identifier)
+
+        # Make sure something is there.
+        cache.add(key, [])
+
+        # Weed out anything older than the timeframe.
+        minimum_time = int(time.time()) - int(self.timeframe)
+        times_accessed = [access for access in cache.get(key) if access >= minimum_time]
+        cache.set(key, times_accessed, self.expiration)
+
+        throttle_at = self.custom_throttles.get(identifier, int(self.throttle_at))
+        if len(times_accessed) >= throttle_at:
+            # Throttle them.
+            return True
+
+        # Let them through.
+        return False
+
+
 class CourtResource(ModelResourceWithFieldsFilter):
     class Meta:
         authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
-        throttle = CacheThrottle(throttle_at=1000)
+        throttle = CacheThrottle(throttle_at=1)
         resource_name = 'jurisdiction'
         queryset = Court.objects.exclude(jurisdiction='T')
         max_limit = 1000
