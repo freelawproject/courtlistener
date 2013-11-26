@@ -24,6 +24,19 @@ good_date_filters = good_time_filters[:-3]
 numerical_filters = ('exact', 'gte', 'gt', 'lte', 'lt', 'range',)
 
 
+class BasicAuthenticationWithUser(BasicAuthentication):
+    """Wraps the BasicAuthentication class, changing the get_identifier method to provide the username instead of
+    essentially nothing.
+
+    Proposed this change in: https://github.com/toastdriven/django-tastypie/pull/1085/commits
+    """
+    def __init__(self, backend=None, realm='django-tastypie', **kwargs):
+        super(BasicAuthenticationWithUser, self).__init__(backend, realm, **kwargs)
+
+    def get_identifier(self, request):
+        return request.META.get('REMOTE_USER', request.user.username)
+
+
 class ModelResourceWithFieldsFilter(ModelResource):
     def __init__(self, tally_name=None):
         super(ModelResourceWithFieldsFilter, self).__init__()
@@ -54,11 +67,10 @@ class ModelResourceWithFieldsFilter(ModelResource):
         return super(ModelResourceWithFieldsFilter, self).dispatch(request_type, request, **kwargs)
 
 
-class PerUserThrottle(CacheThrottle):
+class PerUserCacheThrottle(CacheThrottle):
     """Sets up higher throttles for specific users"""
     custom_throttles = {
         'scout': 10000,
-        'mlissner': 1,
     }
 
     def should_be_throttled(self, identifier, **kwargs):
@@ -96,8 +108,9 @@ class PerUserThrottle(CacheThrottle):
 
 class CourtResource(ModelResourceWithFieldsFilter):
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
-        throttle = CacheThrottle(throttle_at=1000)
+        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
+                                             SessionAuthentication())
+        throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'jurisdiction'
         queryset = Court.objects.exclude(jurisdiction='T')
         max_limit = 1000
@@ -121,8 +134,9 @@ class CitationResource(ModelResourceWithFieldsFilter):
     opinion_uris = fields.ToManyField('search.api.DocumentResource', 'parent_documents')
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
-        throttle = PerUserThrottle(throttle_at=1000)
+        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
+                                             SessionAuthentication())
+        throttle = PerUserCacheThrottle(throttle_at=1000)
         queryset = Citation.objects.all()
         max_limit = 20
         excludes = ['slug', ]
@@ -170,8 +184,9 @@ class DocumentResource(ModelResourceWithFieldsFilter):
     )
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
-        throttle = CacheThrottle(throttle_at=1000)
+        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
+                                             SessionAuthentication())
+        throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'opinion'
         queryset = Document.objects.all().select_related('court__pk', 'citation')
         max_limit = 20
@@ -213,8 +228,9 @@ class CitedByResource(ModelResourceWithFieldsFilter):
     )
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
-        throttle = CacheThrottle(throttle_at=1000)
+        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
+                                             SessionAuthentication())
+        throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'cited-by'
         queryset = Document.objects.all()
         excludes = ('is_stub_document', 'html', 'html_lawbox', 'html_with_citations', 'plain_text',)
@@ -276,8 +292,9 @@ class CitesResource(ModelResourceWithFieldsFilter):
     )
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
-        throttle = CacheThrottle(throttle_at=1000)
+        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
+                                             SessionAuthentication())
+        throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'cites'
         queryset = Document.objects.all()
         excludes = ('is_stub_document', 'html', 'html_lawbox', 'html_with_citations', 'plain_text',)
@@ -498,8 +515,9 @@ class SearchResource(ModelResourceWithFieldsFilter):
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
-        throttle = CacheThrottle(throttle_at=1000)
+        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
+                                             SessionAuthentication())
+        throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'search'
         max_limit = 20
         include_absolute_url = True
@@ -532,7 +550,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
         if bundle_or_obj:
             return url_str % (
                 self.api_name,
-                self._meta.resource_name,
+                'opinion',
                 bundle_or_obj.obj.id,
             )
         else:

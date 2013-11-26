@@ -381,16 +381,22 @@
         <h3 id="search-endpoint">/api/rest/v1/search/</h3>
         <p>
             This endpoint allows you to query our search engine along the same lines as is possible in our front end.
-            Because this endpoint does not use the Django models directly, the fields and results from this endpoint are
-            slightly different than those in the other endpoints. For example, instead of using a minus sign to flip
-            ordering, it uses <code>asc</code> and <code>desc</code>. (See <a href="/api/rest/v1/search/schema/">the
-            schema</a> for all of the ordering options).
+            Because this endpoint does not use the Django models directly, this endpoint is quite different than the
+            others. Several differences should be noted.
+        </p>
+        <p>
+            First, the fields and results from this endpoint are slightly different than those in the other endpoints.
+            For example, instead of using a minus sign to flip ordering, it uses <code>asc</code> and <code>desc</code>.
+            (See <a href="/api/rest/v1/search/schema/">the schema</a> for all of the ordering options).
         </p>
         <p>
             Similarly, since this endpoint hits against a Solr search index instead of a database, the filtering works
             slightly differently. To filter on this endpoint, we recommend identifying an effective query on the front
             end that generates the results you desire. Using that query (and variations thereof), it is possible to
             easily apply it to this endpoint.
+        </p>
+        <p>
+
         </p>
         <p>
             Note that like the front end, only precedential results are returned by default. See below for an example
@@ -439,9 +445,14 @@
             </dd>
         </dl>
         <p>
-            Finally, two fields warrants special explanation:
+            Finally, three fields warrants special explanation:
         <p>
         <dl>
+            <dt><code>resource_uri</code></dt>
+            <dd>
+                Because this endpoint is designed to help find opinions, once you've found the ones you want, we
+
+            </dd>
             <dt><code>snippet</code></dt>
             <dd>
                 This field contains the same values as are found on the front end, utilizing the HTML5
