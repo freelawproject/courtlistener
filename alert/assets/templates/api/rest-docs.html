@@ -228,14 +228,14 @@
             opinion IDs, and vice versa. For example, this:
         </p>
         <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v1/opinion/111170/</code>
+            <code>curl https://www.courtlistener.com/api/rest/v1/<strong>opinion</strong>/111170/</code>
         </blockquote>
         <p>
             Returns <em><a href="/scotus/z3J/strickland-v-washington/">Strickland v. Washington</a></em>. But this does
             not:
         </p>
         <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v1/citation/111170/</code>
+            <code>curl https://www.courtlistener.com/api/rest/v1/<strong>citation</strong>/111170/</code>
         </blockquote>
         <p>
             In addition to this, each opinion has a globally unique
@@ -387,7 +387,10 @@
         <p>
             First, the fields and results from this endpoint are slightly different than those in the other endpoints.
             For example, instead of using a minus sign to flip ordering, it uses <code>asc</code> and <code>desc</code>.
-            (See <a href="/api/rest/v1/search/schema/">the schema</a> for all of the ordering options).
+            And instead of the <code>court</code> field returning a refernce to the <code>jurisdiction</code> endpoint,
+            it provides the name of the jurisdiction where the opinion was issued. (See
+            <a href="/api/rest/v1/search/schema/">the schema</a> and the notes below for all of the ordering options
+            and field information).
         </p>
         <p>
             Similarly, since this endpoint hits against a Solr search index instead of a database, the filtering works
@@ -396,11 +399,8 @@
             easily apply it to this endpoint.
         </p>
         <p>
-
-        </p>
-        <p>
-            Note that like the front end, only precedential results are returned by default. See below for an example
-            that returns non-precedential results as well.
+            Finally, note that like the front end, only precedential results are returned by default. See below for an
+            example that returns non-precedential results as well.
         </p>
         <p>
             When examining the <em>filtering</em> section of the schema, note that fields have been labeled as follows:
@@ -445,13 +445,14 @@
             </dd>
         </dl>
         <p>
-            Finally, three fields warrants special explanation:
-        <p>
+            Three fields warrant special explanation:
+        </p>
         <dl>
             <dt><code>resource_uri</code></dt>
             <dd>
-                Because this endpoint is designed to help find opinions, once you've found the ones you want, we
-
+                Because this endpoint is designed to help find opinions, once you've found the ones you want, we provide
+                a <code>resource_uri</code> that directs you back to the <code>opinion</code> endpoint, which has all of
+                the best meta data. This is in contrast to any of the other endpoints.
             </dd>
             <dt><code>snippet</code></dt>
             <dd>
@@ -472,8 +473,12 @@
                     <code>curl https://www.courtlistener.com/api/rest/v1/search/?stat_Precedential=on&stat_Non-Precedential=on</code>
                 </blockquote>
             </dd>
+            <dt><code>court</code></dt>
+            <dd>
+                This field provides the name of the jurisdiction where the opinion was issued. In other endpoints, this
+                field directs you to the <code>jurisdiction</code> endpoint.
+            </dd>
         </dl>
-        </p>
 
 
         <h3 id="coverage-endpoint">/api/rest/v1/coverage/</h3>
