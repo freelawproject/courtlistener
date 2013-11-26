@@ -15,7 +15,7 @@ class DocumentAdmin(admin.ModelAdmin):
     # ordering is brutal. Don't put it here. Sorry.
     #list_display = ('citation',)
     #list_filter = ('court',)
-    fields = ('citation', 'source', 'sha1', 'date_filed', 'court', 'download_URL', 'local_path', 'precedential_status',
+    fields = ('citation', 'source', 'sha1', 'date_filed', 'court', 'download_url', 'local_path', 'precedential_status',
               'blocked', 'date_blocked', 'extracted_by_ocr', 'time_retrieved', 'date_modified',
               'cases_cited', 'citation_count', 'plain_text', 'nature_of_suit', 'judges', 'html', 'html_lawbox',
               'html_with_citations', )

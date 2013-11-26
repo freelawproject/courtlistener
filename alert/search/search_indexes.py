@@ -41,7 +41,7 @@ class SearchDocument(object):
         self.neutralCite = doc.citation.neutral_cite
         self.status = doc.get_precedential_status_display()
         self.source = doc.source
-        self.download_url = doc.download_URL
+        self.download_url = doc.download_url
         self.local_path = unicode(doc.local_path)
         self.citation = make_citation_string(doc)
         # Assign the docket number and/or the citation to the caseNumber field
