@@ -57,7 +57,7 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 row.set('sha1', doc.sha1)
                 row.set('court', doc.court.full_name)
                 try:
-                    row.set('download_URL', doc.download_URL)
+                    row.set('download_url', doc.download_url)
                 except:
                     pass
                 row.set('time_retrieved', str(doc.time_retrieved))

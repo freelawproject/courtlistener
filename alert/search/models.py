@@ -129,7 +129,7 @@ class Court(models.Model):
         max_length='200',
         blank=False
     )
-    URL = models.URLField(
+    url = models.URLField(
         help_text='the homepage for each court or the closest thing thereto',
         max_length=500,
     )
@@ -326,7 +326,7 @@ class Document(models.Model):
         blank=True,
         null=True
     )
-    download_URL = models.URLField(
+    download_url = models.URLField(
         help_text="The URL on the court website where the document was originally scraped",
         max_length=500,
         db_index=True,

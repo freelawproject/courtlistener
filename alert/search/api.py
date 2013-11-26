@@ -1,4 +1,3 @@
-import logging
 import re
 import time
 from django.core.cache import cache
@@ -15,8 +14,6 @@ from alert.lib.sunburnt import sunburnt
 from alert.search.forms import SearchForm
 from alert.search.models import Citation, Court, Document, DOCUMENT_SOURCES, DOCUMENT_STATUSES
 from alert.stats import tally_stat
-
-logger = logging.getLogger(__name__)
 
 good_time_filters = ('exact', 'gte', 'gt', 'lte', 'lt', 'range',
                      'year', 'month', 'day', 'hour', 'minute', 'second',)
@@ -87,7 +84,6 @@ class PerUserCacheThrottle(CacheThrottle):
         the user should be throttled.
         """
         key = self.convert_identifier_to_key(identifier)
-        logger.warning("API called. Applying throttle to: %s" % key)
 
         # Make sure something is there.
         cache.add(key, [])
@@ -122,7 +118,7 @@ class CourtResource(ModelResourceWithFieldsFilter):
             'position': numerical_filters,
             'short_name': ALL,
             'full_name': ALL,
-            'URL': ALL,
+            'url': ALL,
             'start_date': good_date_filters,
             'end_date': good_date_filters,
             'jurisdictions': ALL,

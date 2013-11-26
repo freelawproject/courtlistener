@@ -589,7 +589,7 @@ def import_law_box_case(case_path):
         date_filed=get_date_filed(clean_html_tree, citations=citations, case_path=case_path, court=court),
         precedential_status=get_precedential_status(),
         judges=judges,
-        download_URL=case_path,
+        download_url=case_path,
     )
 
     cite = Citation(
