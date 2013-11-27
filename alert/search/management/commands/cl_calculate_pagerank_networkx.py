@@ -19,7 +19,8 @@ class Command(BaseCommand):
     args = '<args>'
     help = 'Calculate pagerank value for every case'
     RESULT_FILE_PATH = get_data_dir_location() + "external_pagerank"
-    result_file = open(RESULT_FILE_PATH, 'w')
+    TEMP_EXTENSION = '.tmp'
+    result_file = open(RESULT_FILE_PATH + TEMP_EXTENSION, 'w')
 
     def do_pagerank(self, verbosity=1):
         #####################
@@ -120,8 +121,7 @@ class Command(BaseCommand):
                 ))
                 sys.stdout.flush()
 
-        # Hit the reloadCache to reload ExternalFileField (necessary for Solr version prior to 4.1)
-        reload_pagerank_external_file_cache()
+        self.result_file.close()
 
         if verbosity >= 1:
             sys.stdout.write('\nPageRank calculation finish! Updated {} ({:.0%}) cases\n'.format(
@@ -130,15 +130,25 @@ class Command(BaseCommand):
             ))
             sys.stdout.write('See the django log for more details.\n')
 
+        ########################
+        #       Stage IV       #
+        # Maintenance Routines #
+        ########################
         if verbosity >= 1:
-            sys.stdout.write('Copying pagerank file to sata...\n')
+            sys.stdout.write('Sorting the temp pagerank file, for better Solr performance...\n')
 
-        self.result_file.close()
+        # Sort the temp file, creating a new file without the TEMP_EXTENSION value, then delete the temp file.
+        os.system('sort -n %s%s > %s' % (self.RESULT_FILE_PATH, self.TEMP_EXTENSION, self.RESULT_FILE_PATH))
+        os.remove(self.RESULT_FILE_PATH + self.TEMP_EXTENSION)
 
-        # Copy the pagerank field to the bulk data zone.
+        if verbosity >= 1:
+            sys.stdout.write('Reloading the external file cache in Solr...\n')
+        reload_pagerank_external_file_cache()
+
+        if verbosity >= 1:
+            sys.stdout.write('Copying pagerank file to sata, for bulk downloading...\n')
         shutil.copyfile(self.RESULT_FILE_PATH, settings.DUMP_DIR)
         os.chown(settings.DUMP_DIR + 'external_pagerank', 'www-data', 'www-data')
-
 
     def handle(self, *args, **options):
         self.do_pagerank(verbosity=int(options.get('verbosity', 1)))
