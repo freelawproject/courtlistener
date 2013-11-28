@@ -8,8 +8,6 @@
     This script finds items with that error, fixes them and then saves them back to the index and database.
 """
 
-from lxml import html
-
 import os
 import sys
 
@@ -22,27 +20,8 @@ from alert import settings
 from alert.corpus_importer.import_law_box import get_date_filed
 from alert.lib.sunburnt import sunburnt
 from alert.search.models import Document
+from lxml import html
 from optparse import OptionParser
-
-
-def sunburnt_cached_pager(results, chunksize=100):
-    """Takes the results and pages them, optimizing the number of queries.
-
-    Sunburnt makes very clever queries against Solr when it is sliced, but does not under normal iteratation. This
-    little generator gives iteration without making one query per item.
-    """
-    cache = []
-    count = len(results)
-    i = 0
-    while i < count:
-        if i % chunksize == 0:
-            # Load the cache
-            cache = results[i:i + chunksize]
-
-        # Need temporary var so we can get the item from the cache before incrementing i.
-        item_to_return = cache[i]
-        i += 1
-        yield item_to_return
 
 
 def cleaner(simulate=False, verbose=False):
@@ -65,7 +44,7 @@ def cleaner(simulate=False, verbose=False):
         ]
     }
     results = conn.raw_query(**q)
-    for r in sunburnt_cached_pager(results):
+    for r in results:
         # We iterate over the search results. For each one, we run tests on it to see if it needs a fix.
         # If so, we get the record from the database and update it. If not, re continue.
         if r['source'] != 'L':
