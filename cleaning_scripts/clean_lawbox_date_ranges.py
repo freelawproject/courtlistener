@@ -34,30 +34,38 @@ def cleaner(simulate=False, verbose=False):
      - Match a regex for the funky date pattern
 
     """
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
     q = {
         'q': 'argued',
         'fl': 'id,text,source',
         'fq': [
             'dateFiled:[2002-01-01T00:00:00Z TO 2031-12-31T00:00:00Z]',
             'status_exact:("Precedential")',
-        ]
+        ],
+        'sort': 'dateFiled asc',
+        'caller': 'cleanup_script',
     }
     results = conn.raw_query(**q)
     for r in results:
+        if verbose:
+            print "Running tests on item %s" % r['id']
         # We iterate over the search results. For each one, we run tests on it to see if it needs a fix.
         # If so, we get the record from the database and update it. If not, re continue.
         if r['source'] != 'L':
             # Only affects pure Lawbox cases. Merged cases did not have their date updated.
+            if verbose:
+                print "  - Source is %s. Punting." % r['source']
             continue
 
         re_match = re.search('Argued.{1,12}\d{1,2}-\d{1,2}, \d{4}', r['text'])
         if not re_match:
             # Lacks the affronting line. Onwards.
+            if verbose:
+                print "  - Lacks the bad date string. Punting."
             continue
 
         if verbose:
-            print "Item %s has passed all tests and may be modified." % r['id']
+            print "  - All tests pass. This item may be modified. (Simulate is: %s)" % simulate
 
         doc = Document.objects.get(pk=r['id'])
         clean_html_tree = html.fromstring(doc.html_lawbox)
@@ -65,6 +73,7 @@ def cleaner(simulate=False, verbose=False):
         new_date = get_date_filed(clean_html_tree, citations=[]).date()
 
         if verbose:
+            print "  - https://www.courtlistener.com%s" % doc.get_absolute_url()
             print "  - Old date was: %s" % doc.date_filed
             print "  - New date is:  %s" % new_date
 
