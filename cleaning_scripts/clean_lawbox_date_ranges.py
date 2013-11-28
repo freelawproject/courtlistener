@@ -11,16 +11,16 @@
 from lxml import html
 
 import os
-import re
 import sys
-from alert import settings
-from alert.corpus_importer.import_law_box import get_date_filed
-from alert.lib.sunburnt import sunburnt
 
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
+import re
+from alert import settings
+from alert.corpus_importer.import_law_box import get_date_filed
+from alert.lib.sunburnt import sunburnt
 from alert.search.models import Document
 from optparse import OptionParser
 
