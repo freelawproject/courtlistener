@@ -38,6 +38,10 @@ from django.utils.timezone import now, utc
      - 1.x - International Reporters added?
            - Other features (suggestions welcome)?
 
+    License:
+     - Unlike the rest of the CourtListener platform, this file is available under the permissive BSD license, making it
+       easy and safe to incorporate in your own libraries.
+
     Pull and feature requests welcome. Online editing in BitBucket is possible (and easy!)
 '''
 

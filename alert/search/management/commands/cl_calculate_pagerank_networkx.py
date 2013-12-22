@@ -1,11 +1,13 @@
 __author__ = 'Krist Jin'
 
+from alert import settings
 from alert.search.models import Document
 from alert.lib.db_tools import queryset_generator
-from alert.lib.solr_core_admin import get_solr_core_status
-from alert.lib.solr_core_admin import reload_pagerank_external_file_cache
+from alert.lib.solr_core_admin import get_data_dir_location, reload_pagerank_external_file_cache
 from django.core.management.base import BaseCommand
 import logging
+import os
+import shutil
 import sys
 import time
 import networkx as nx
@@ -16,10 +18,9 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     args = '<args>'
     help = 'Calculate pagerank value for every case'
-    status_doc = get_solr_core_status()
-    RESULT_FILE_PATH = str(status_doc.xpath('//*[@name= "dataDir"][../*[@name="name" = "collection1"]]/text()')[0])\
-        + "external_pagerank"
-    result_file = open(RESULT_FILE_PATH, 'w')
+    RESULT_FILE_PATH = get_data_dir_location() + "external_pagerank"
+    TEMP_EXTENSION = '.tmp'
+    result_file = open(RESULT_FILE_PATH + TEMP_EXTENSION, 'w')
 
     def do_pagerank(self, verbosity=1):
         #####################
@@ -70,10 +71,10 @@ class Command(BaseCommand):
         if verbosity >= 1:
             sys.stdout.write('Complete!\n')
 
-        #########################
-        #       Stage III       #
-        # Update Pagerank in DB #
-        #########################
+        ###################
+        #    Stage III    #
+        # Update Pagerank #
+        ###################
         progress = 0
         update_count = 0
         min_value = min(pr_result.values())
@@ -82,8 +83,7 @@ class Command(BaseCommand):
             progress += 1
             try:
                 if abs(old_pr - pr_result[id]) > UPDATE_THRESHOLD:
-                    # Save only if the diff is larger enough
-                    Document.objects.filter(pk=int(id)).update(pagerank=pr_result[id])
+                    # Save only if the diff is large enough
                     update_count += 1
                     logger.info("ID: {0}\told pagerank is {1}\tnew pagerank is {2}\n".format(
                         id,
@@ -101,7 +101,6 @@ class Command(BaseCommand):
             #Because NetworkX removed the isolated nodes, which will be updated below
             except KeyError:
                 if abs(old_pr - min_value) > UPDATE_THRESHOLD:
-                    Document.objects.filter(pk=int(id)).update(pagerank=min_value)
                     update_count += 1
                     logger.info("ID: {0}\told pagerank is {1}\tnew pagerank is {2}\n".format(
                         id,
@@ -122,8 +121,7 @@ class Command(BaseCommand):
                 ))
                 sys.stdout.flush()
 
-        # Hit the reloadCache to reload ExternalFileField (necessary for Solr version prior to 4.1)
-        reload_pagerank_external_file_cache()
+        self.result_file.close()
 
         if verbosity >= 1:
             sys.stdout.write('\nPageRank calculation finish! Updated {} ({:.0%}) cases\n'.format(
@@ -132,7 +130,25 @@ class Command(BaseCommand):
             ))
             sys.stdout.write('See the django log for more details.\n')
 
-        self.result_file.close()
+        ########################
+        #       Stage IV       #
+        # Maintenance Routines #
+        ########################
+        if verbosity >= 1:
+            sys.stdout.write('Sorting the temp pagerank file, for better Solr performance...\n')
+
+        # Sort the temp file, creating a new file without the TEMP_EXTENSION value, then delete the temp file.
+        os.system('sort -n %s%s > %s' % (self.RESULT_FILE_PATH, self.TEMP_EXTENSION, self.RESULT_FILE_PATH))
+        os.remove(self.RESULT_FILE_PATH + self.TEMP_EXTENSION)
+
+        if verbosity >= 1:
+            sys.stdout.write('Reloading the external file cache in Solr...\n')
+        reload_pagerank_external_file_cache()
+
+        if verbosity >= 1:
+            sys.stdout.write('Copying pagerank file to sata, for bulk downloading...\n')
+        shutil.copyfile(self.RESULT_FILE_PATH, settings.DUMP_DIR)
+        os.chown(settings.DUMP_DIR + 'external_pagerank', 'www-data', 'www-data')
 
     def handle(self, *args, **options):
         self.do_pagerank(verbosity=int(options.get('verbosity', 1)))

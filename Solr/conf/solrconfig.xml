@@ -622,11 +622,11 @@
          Recommend values of 1-2 for read-only slaves, higher for
          masters w/o cache warming.
       -->
-    <maxWarmingSearchers>5</maxWarmingSearchers>
+    <maxWarmingSearchers>10</maxWarmingSearchers>
 
   </query>
 
-  
+
 
   <!-- Request Dispatcher
 
@@ -774,7 +774,8 @@
 
        <str name="defType">edismax</str>
 
-       <!-- Default boosting -->
+       <!-- Default boosting is set up in the query fields
+            Note that these are overridden in search_utils.py-->
        <str name="qf">
           text^1.0 dateFiled^1.0 court^1.0 caseName^3 docketNumber^1.0 westCite^1.0 neutralCite^1.0 lexisCite^1.0 status^1.25 caseNumber^1.25
        </str>

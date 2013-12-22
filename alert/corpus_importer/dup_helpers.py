@@ -38,7 +38,7 @@ def merge_cases_simple(new, target_id):
 
     # Add the URL if it's not a court one, replacing resource.org's info in some cases.
     if cached_source == 'R':
-        target.download_URL = new.download_URL
+        target.download_url = new.download_url
 
     # Recreate the slug from the new case name (this changes the URL, but the old will continue working)
     target.citation.slug = trunc(slugify(new.citation.case_name), 50)

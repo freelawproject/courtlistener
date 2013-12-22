@@ -436,7 +436,7 @@ def scrape_and_parse():
                 # we only do this if it's new
                 doc.html = body
                 doc.sha1 = sha1Hash
-                doc.download_URL = "http://bulk.resource.org/courts.gov/c/F2/"\
+                doc.download_url = "http://bulk.resource.org/courts.gov/c/F2/"\
                     + str(i + 178) + "/" + caseLink
                 doc.date_filed = caseDate
                 doc.source = "R"

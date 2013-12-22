@@ -1,4 +1,4 @@
-from alert.casepage.views import make_caption, make_citation_string
+from alert.casepage.views import make_citation_string
 from alert.search.models import Document
 from alert.favorites.forms import FavoriteForm
 from alert.favorites.models import Favorite
@@ -65,7 +65,6 @@ def edit_favorite(request, fave_id):
     try:
         fave = Favorite.objects.get(id=fave_id, users__user=request.user)
         doc = fave.doc_id
-        caption = make_caption(doc)
         citation_string = make_citation_string(doc)
     except ObjectDoesNotExist:
         # User lacks access to this fave or it doesn't exist.
@@ -88,7 +87,6 @@ def edit_favorite(request, fave_id):
     return render_to_response('profile/edit_favorite.html',
                               {'favorite_form': form,
                                'doc': doc,
-                               'caption': caption,
                                'citation_string': citation_string,
                                'private': False},
                               RequestContext(request))

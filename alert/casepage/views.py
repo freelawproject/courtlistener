@@ -1,5 +1,6 @@
 import re
 from alert import settings
+from alert.lib.bot_detector import is_bot
 from alert.lib.encode_decode import ascii_to_num
 from alert.lib import magic
 from alert.lib import search_utils
@@ -18,39 +19,7 @@ from django.template import RequestContext
 from django.views.decorators.cache import never_cache
 
 import os
-
-
-def make_caption(doc):
-    """Make a proper caption"""
-    caption = doc.citation.case_name
-    if doc.citation.neutral_cite:
-        caption += ", %s" % doc.citation.neutral_cite
-        return caption  # neutral cites lack the parentheses, so we're done here.
-    elif doc.citation.federal_cite_one:
-        caption += ", %s" % doc.citation.federal_cite_one
-    elif doc.citation.specialty_cite_one:
-        caption += ", %s" % doc.citation.specialty_cite_one
-    elif doc.citation.state_cite_regional:
-        caption += ", %s" % doc.citation.state_cite_regional
-    elif doc.citation.state_cite_one:
-        caption += ", %s" % doc.citation.state_cite_one
-    elif doc.citation.westlaw_cite and doc.citation.lexis_cite:
-        # If both WL and LEXIS
-        caption += ", %s, %s" % (doc.citation.westlaw_cite, doc.citation.lexis_cite)
-    elif doc.citation.westlaw_cite:
-        # If only WL
-        caption += ", %s" % doc.citation.westlaw_cite
-    elif doc.citation.lexis_cite:
-        # If only LEXIS
-        caption += ", %s" % doc.citation.lexis_cite
-    elif doc.citation.docket_number:
-        caption += ", %s" % doc.citation.docket_number
-    caption += ' ('
-    if doc.court.citation_string != 'SCOTUS':
-        caption += re.sub(' ', '&nbsp;', doc.court.citation_string)
-        caption += '&nbsp;'
-    caption += '%s)' % doc.date_filed.isoformat().split('-')[0]  # b/c strftime f's up before 1900.
-    return caption
+from alert.stats import tally_stat
 
 
 def make_citation_string(doc):
@@ -79,7 +48,6 @@ def view_case(request, court, pk, casename):
     # Look up the court, document, title and favorite information
     doc = get_object_or_404(Document, pk=ascii_to_num(pk))
     ct = get_object_or_404(Court, pk=court)
-    caption = make_caption(doc)
     citation_string = make_citation_string(doc)
     title = '%s, %s' % (trunc(doc.citation.case_name, 100), citation_string)
     get_string = search_utils.make_get_string(request)
@@ -97,31 +65,34 @@ def view_case(request, court, pk, casename):
     cited_by_trunc = doc.citation.citing_cases.select_related(
           'citation').order_by('-citation_count', '-date_filed')[:5]
 
+    authorities_trunc = doc.cases_cited.all().select_related(
+        'document').order_by('case_name')[:5]
+    authorities_count = doc.cases_cited.all().count()
+
     return render_to_response(
         'view_case.html',
         {'title': title,
-         'caption': caption,
          'citation_string': citation_string,
          'doc': doc,
          'court': ct,
          'favorite_form': favorite_form,
          'get_string': get_string,
          'private': doc.blocked,
-         'cited_by_trunc': cited_by_trunc},
+         'cited_by_trunc': cited_by_trunc,
+         'authorities_trunc': authorities_trunc,
+         'authorities_count': authorities_count},
         RequestContext(request)
     )
 
 
-def view_case_citations(request, pk, casename):
-    # Decode the id string back to an int
+def view_case_citations(request, pk, case_name):
     pk = ascii_to_num(pk)
 
     # Look up the document, title
     doc = get_object_or_404(Document, pk=pk)
-    caption = make_caption(doc)
     title = '%s, %s' % (trunc(doc.citation.case_name, 100), make_citation_string(doc))
 
-    # Get list of citing cases, ordered by influence
+    # Get list of cases we cite, ordered by citation count
     citing_cases = doc.citation.citing_cases.select_related(
             'citation', 'court').order_by('-citation_count', '-date_filed')
 
@@ -147,10 +118,36 @@ def view_case_citations(request, pk, casename):
 
     return render_to_response('view_case_citations.html',
                               {'title': title,
-                               'caption': caption,
                                'doc': doc,
                                'private': private,
                                'citing_cases': citing_cases},
+                              RequestContext(request))
+
+
+def view_authorities(request, pk, case_name):
+    pk = ascii_to_num(pk)
+
+    doc = get_object_or_404(Document, pk=pk)
+    title = '%s, %s' % (trunc(doc.citation.case_name, 100), make_citation_string(doc))
+
+    # Ordering is by case name is the norm.
+    authorities = doc.cases_cited.all().select_related(
+        'document').order_by('case_name')
+
+    private = False
+    if doc.blocked:
+        private = True
+    else:
+        for case in authorities:
+            if case.parent_documents.all()[0].blocked:
+                private = True
+                break
+
+    return render_to_response('view_case_authorities.html',
+                              {'title': title,
+                               'doc': doc,
+                               'private': private,
+                               'authorities': authorities},
                               RequestContext(request))
 
 
@@ -177,4 +174,6 @@ def serve_static_file(request, file_path=''):
     response['X-Sendfile'] = os.path.join(settings.MEDIA_ROOT, file_path.encode('utf-8'))
     response['Content-Disposition'] = 'attachment; filename="%s"' % file_name.encode('utf-8')
     response['Content-Type'] = mimetype
+    if not is_bot(request):
+        tally_stat('case_page.static_file.served')
     return response

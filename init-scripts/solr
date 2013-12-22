@@ -13,6 +13,9 @@
 start () {
     echo -n "Starting solr..."
 
+    # Reset ulimit or else get issues with too many open files (https://issues.apache.org/jira/browse/SOLR-4)
+    ulimit -n 10000
+
     # Use python to determine if this is a dev machine
     . /etc/courtlistener
     if [ -z $INSTALL_ROOT ]; then
