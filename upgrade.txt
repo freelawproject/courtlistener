@@ -6,6 +6,8 @@ hg pull -u
 # Gather any new static files
 manage.py collectstatic
 
+(enter yes, when prompted)
+
 # Migrate the database
 manage.py migrate
 
@@ -21,6 +23,30 @@ most recent at the top.
 We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
+
+2013-11-25:
+ - This revision adds a new script that will welcome new users whenever it is called. It will send an email to anybody
+   that's new in the last 24 hours each time it is called. If you wish to use it, simply add it to your crontab.
+ - This revision also tweaks Solr in a way that should not cause any problems for folks on 4.0 or 4.1, but that will
+   make it perform faster in production.
+
+2013-11-15:
+ - This upgrades Solr to version 4.1, which supports file listeners. To upgrade Solr, simply:
+   - Download Solr version 4.1 with:
+        - cd ~/Downloads/
+        - wget https://archive.apache.org/dist/lucene/solr/4.1.0/solr-4.1.0.tgz
+   - Unpack the tgz file with:
+        - tar -x -f solr-4.1.0.tgz
+   - Set up the INSTALL_ROOT variable:
+        - source /etc/courtlistener
+   - Stop Solr, swap in the correct version and restart solr:
+        - sudo service solr stop
+        - sudo mv /usr/local/solr /usr/local/solr-4.0.bak && sudo mv ~/Downloads/solr-4.1.0 /usr/local/solr
+        - sudo mv /usr/local/solr/example/solr/collection1/conf/solrconfig.xml /usr/local/solr/example/solr/collection1/conf/solrconfig.orig
+        - sudo ln -s -f $INSTALL_ROOT/Solr/conf/solrconfig.xml /usr/local/solr/example/solr/collection1/conf/solrconfig.xml
+        - sudo ln -s -f $INSTALL_ROOT/Solr/conf/schema.xml /usr/local/solr/example/solr/collection1/conf/schema.xml
+        - sudo service solr start
+
 
 2013-11-08:
  - This initiates the work on the API. To roll this out:

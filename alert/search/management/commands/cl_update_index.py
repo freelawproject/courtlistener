@@ -1,5 +1,6 @@
 import ast
 import sys
+from django.utils.timezone import make_aware, utc
 
 from alert.lib import sunburnt
 from alert.lib.db_tools import queryset_generator
@@ -241,12 +242,10 @@ class Command(BaseCommand):
         if options.get('datetime'):
             try:
                 # Parse the date string into a datetime object
-                dt = datetime.datetime(*time.strptime(args[0],
-                                                      '%Y-%m-%d %H:%M:%S')[0:6])
+                dt = make_aware(datetime.datetime(*time.strptime(args[0], '%Y-%m-%d %H:%M:%S')[0:6]), utc)
             except ValueError:
                 try:
-                    dt = datetime.datetime(*time.strptime(args[0],
-                                                          '%Y-%m-%d')[0:5])
+                    dt = make_aware(datetime.datetime(*time.strptime(args[0], '%Y-%m-%d')[0:5]), utc)
                 except ValueError:
                     self.stderr.write('Unable to parse time. Please use '
                                       'format: YYYY-MM-DD HH:MM:SS or '

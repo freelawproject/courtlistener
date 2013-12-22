@@ -76,11 +76,11 @@ class DupChecker(dict):
          - if not
             - carry on
         """
-        # using the hash or the download_URL check for a duplicate in the db.
+        # using the hash or the download_url check for a duplicate in the db.
         if lookup_by == 'sha1':
             exists = Document.objects.filter(sha1=lookup_value).exists()
-        elif lookup_by == 'download_URL':
-            exists = Document.objects.filter(download_URL=lookup_value).exists()
+        elif lookup_by == 'download_url':
+            exists = Document.objects.filter(download_url=lookup_value).exists()
 
         if exists:
             logger.info('Duplicate found on date: %s, with lookup value: %s' % (current_date, lookup_value))

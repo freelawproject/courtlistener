@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from alert import settings
+from alert.stats import tally_stat
 from alert.userHandling.forms import ProfileForm, UserForm, UserCreationFormExtended, EmailConfirmationForm
 from alert.userHandling.models import UserProfile
 from alert.honeypot.decorators import check_honeypot
@@ -218,9 +219,9 @@ def register(request):
 
                 # Send an email letting the admins know there's somebody to say hi to
                 email_subject = 'New user confirmed on CourtListener: %s' % up.user.username
-                email_body = ("A new user has signed up on CourtListener! Maybe we should say hi?\n\n"
-                              "Their name is: %s\n"
-                              "Their email address is: %s\n\n"
+                email_body = ("A new user has signed up on CourtListener and they'll be automatically welcomed soon!\n\n"
+                              "  Their name is: %s\n"
+                              "  Their email address is: %s\n\n"
                               "Sincerely,\n\n"
                               "The CourtListener Bots" % (up.user.get_full_name() or "Not provided",
                                                           up.user.email))
@@ -228,6 +229,7 @@ def register(request):
                           email_body,
                           'CourtListener <noreply@courtlistener.com>',
                           [a[1] for a in settings.ADMINS])
+                tally_stat('user.created')
                 return HttpResponseRedirect('/register/success/?next=%s' % redirect_to)
         else:
             form = UserCreationFormExtended()

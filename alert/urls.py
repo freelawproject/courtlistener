@@ -1,9 +1,9 @@
 from tastypie.api import Api
 
-from alert.api.views import court_index, documentation_index, dump_index, rest_index, serve_or_gen_dump
+from alert.api.views import court_index, documentation_index, dump_index, rest_index, serve_or_gen_dump, serve_pagerank_file
 from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
-from alert.casepage.views import view_case, view_case_citations, serve_static_file
+from alert.casepage.views import view_case, view_case_citations, serve_static_file, view_authorities
 from alert.contact.views import contact, thanks
 from alert.coverage.api import coverage_data
 from alert.coverage.views import coverage_graph
@@ -18,7 +18,8 @@ from alert.maintenance_warning.views import show_maintenance_warning
 from alert.pinger.views import validate_for_bing, validate_for_bing2, validate_for_google, validate_for_google2
 from alert.robots.views import robots
 from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert
-from alert.search.api import CitationResource, CourtResource, DocumentResource, SearchResource
+from alert.search.api import (
+    CitationResource, CourtResource, DocumentResource, SearchResource, CitesResource, CitedByResource)
 from alert.search.models import Court
 from alert.search.views import browser_warning, show_results, tools_page
 from alert.userHandling.views import (
@@ -43,10 +44,12 @@ mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html')
 
 # Set up the API
 v1_api = Api(api_name='v1')
-v1_api.register(CitationResource())
-v1_api.register(CourtResource())
-v1_api.register(DocumentResource())
-v1_api.register(SearchResource())
+v1_api.register(CitationResource(tally_name='search.api.citation'))
+v1_api.register(CourtResource(tally_name='search.api.court'))
+v1_api.register(DocumentResource(tally_name='search.api.document'))
+v1_api.register(SearchResource(tally_name='search.api.search'))
+v1_api.register(CitesResource(tally_name='search.api.cites'))
+v1_api.register(CitedByResource(tally_name='search.api.cited-by'))
 
 
 urlpatterns = patterns('',
@@ -72,12 +75,13 @@ urlpatterns = patterns('',
     # Maintenance and SOPA/PIPA mode!
     #(r'/*', show_maintenance_warning),
 
-    # Display a case's citations page
-    url(r'^(?:.*)/(.*)/(.*)/cited-by/$',
+    # An opinion, authorities and cited-by/
+    url(r'^(?:%s)/(.*)/(.*)/cited-by/$' % "|".join(pacer_codes),
         view_case_citations,
         name="view_case_citations"),
-
-    # Display a case; a named URL because the get_absolute_url uses it.
+    url(r'^(?:%s)/(.*)/(.*)/authorities/$' % "|".join(pacer_codes),
+        view_authorities,
+        name="view_authorities"),
     url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case, name="view_case"),
 
     # Serve a static file
@@ -151,6 +155,7 @@ urlpatterns = patterns('',
         serve_or_gen_dump),
     (r'^api/bulk/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
         serve_or_gen_dump),
+    (r'^api/bulk/external_pagerank/$', serve_pagerank_file),
 
     # Feeds
     (r'^feed/(search)/$', search_feed()),  # lacks URL capturing b/c it will use GET queries.

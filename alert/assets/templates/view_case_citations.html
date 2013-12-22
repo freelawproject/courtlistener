@@ -15,7 +15,7 @@
         <div class="sidebar-section">
             <h4 class="bottom">
                 <i class="fa fa-arrow-circle-o-left gray"></i>
-                <a href="{{ doc.get_absolute_url }}?{{ request.META.QUERY_STRING }}">Back to Document</a></p>
+                <a href="{{ doc.get_absolute_url }}?{{ request.META.QUERY_STRING }}">Back to Document</a>
             </h4>
         </div>
     </div>
@@ -24,7 +24,7 @@
 {% block content %}
     <div class="span-17 last">
         <h2>
-            {{ caption|safe|v_wrapper }}
+            {{ doc.caption|safe|v_wrapper }}
         </h2>
 
         <div id="cited-by-viewer">
@@ -37,7 +37,7 @@
                         <li class="citing-case">
                             <span class="citation-name">
                                 <a href="{{ case.get_absolute_url }}">
-                                    {{ caption|safe|v_wrapper }}
+                                    {{ case.caption|safe|v_wrapper }}
                                 </a>
                             </span>
                             <br/>

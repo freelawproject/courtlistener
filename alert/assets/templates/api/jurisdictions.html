@@ -53,13 +53,13 @@
                     <td>{{ court.full_name }}</td>
                     <td>{{ court.count }}</td>
                     <td>{{ court.get_jurisdiction_display|nbsp }}</td>
-                    <td title="{{ court.URL }}">
-                        <a href="{{ court.URL }}" target="_blank">
-                            {{ court.URL|slice:"20" }}{% if court.URL|length > 20 %}&hellip;{% endif %}
+                    <td title="{{ court.url }}">
+                        <a href="{{ court.url }}" target="_blank">
+                            {{ court.url|slice:"20" }}{% if court.url|length > 20 %}&hellip;{% endif %}
                         </a>
                     </td>
                     <td>
-                        <a href="/?q=&court_{{ court.pk }}=on&sort=score+desc">
+                        <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc">
                             {{ court.pk }}
                         </a>
                     </td>
