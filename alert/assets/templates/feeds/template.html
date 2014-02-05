@@ -1,0 +1,10 @@
+{% if obj.source == "C" or obj.source == "M" %}
+    <pre>{{ obj.plain_text|linebreaksbr|truncatewords:"500"|stringformat:"s" }}</pre><br>
+{% elif obj.source == "R" or obj.source == 'CR' %}
+    {{obj.html|safe|truncatewords:"500"}}<br>
+{% elif obj.source == 'L' or obj.source == 'LC' or obj.source == 'LR' or obj.source == 'LCR' %}
+    {{ obj.html_lawbox|safe|truncatewords:"500" }}<br>
+{% endif %}
+
+
+<a href="{{obj.get_absolute_url}}">Original document</a>

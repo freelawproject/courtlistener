@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Donation Complete - CourtListener.com{% endblock %}
+
+{% block sidebar %}{% endblock %}
+{% block search-form %}{% endblock %}
+
+{% block content %}
+    <div class="span-4">&nbsp;</div>
+    <div class="span-16 append-4 last" id="content">
+        {% if error == 'User Cancelled' %}
+            <h2>Donation Cancelled</h2>
+            <p>It appears you have cancelled the donation you were about to make. Your support means the world to us.</p>
+            <p>Would you like to try again, or just go back to the homepage?</p>
+            <form action="/donate/" method="get" class="inline">
+                <button type="submit" class="button">Try Donating Again</button>
+                &nbsp;&nbsp;<a href="/">Go to the homepage</a>
+            </form>
+        {% elif error == 'Insufficient Funds' %}
+            <h2>Oops, there's a problem with Your Dwolla account</h2>
+            <p>Unfortunately, Dwolla has told us that you have insufficient funds in your account to make this donation.</p>
+            <p>This usually means that your bank account is not configured in your account or that you have not
+                yet verified it with Dwolla.</p>
+            <p>Your donation means the world to us and keeps us going. We'd really appreciate it if you tried again.
+                possibly via PayPal, Check or Credit Card?</p>
+            <p>Would you like to try again?</p>
+            <form action="/donate/" method="get" class="inline">
+                <button type="submit" class="button">Try Donating Again</button>
+                &nbsp;&nbsp;<a href="/">I give up, take me to the homepage</a>
+            </form>
+        {% else %}
+            <h2>Thanks for Your Donation</h2>
+            <p>Thanks for your donation to the Free Law Project and for supporting CourtListener. Your contribution
+                really helps our progress move along. You will be receiving an email from us shortly with a few more
+                details about your contribution.</p>
+            <p>In the meantime, may we suggest reading in more depth about <a href="http://freelawproject.org/about/">
+                our projects</a> or perhaps resuming your research from <a href="/">the homepage</a>?</p>
+            <p><strong>Thanks again from the Free Law Team.</strong></p>
+        {% endif %}
+    </div>
+{% endblock %}

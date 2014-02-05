@@ -1,0 +1,715 @@
+/* --------------------------------------------------------------------------
+Sets up all the overrides or additional CSS that the site uses.
+---------------------------------------------------------------------------*/
+/* Some good stuff from h4pl.com */
+::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
+::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
+
+
+.footer-item {
+    float: left;
+    margin-right: 3em;
+    margin-bottom: 4em;
+    width: auto;
+}
+
+/* for the nav in the settings pages */
+.header {
+    float: left;
+}
+
+.settings-nav-item a,
+.settings-nav-item a:hover,
+.settings-nav-item a:active,
+.settings-nav-item a:focus {
+    color: black;
+}
+
+.settings-nav-item {
+    margin-right: 1em;
+}
+
+.settings-nav-item:last-child {
+    margin-right: 0em;
+}
+
+.settings-nav-item.active {
+    font-weight: bold;
+}
+
+/* General class shortcuts */
+.inline {
+    display: inline;
+}
+
+.bold {
+    font-weight: bold;
+}
+
+.striken {
+	text-decoration: line-through;
+	color: gray;
+}
+
+.gray, .grey {
+    color: gray;
+}
+.gold {
+    color: gold;
+}
+
+.left {
+    float: left;
+}
+.center {
+    text-align: center;
+}
+
+.right {
+    text-align: right;
+}
+
+.float-right {
+    float: right;
+}
+
+.hidden {
+    display: none;
+}
+
+.round {
+    -webkit-border-radius: 6px;
+    border-radius: 6px;
+}
+
+.round-bottom {
+    -webkit-border-bottom-right-radius: 6px;
+    -webkit-border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+}
+
+.pointer {
+    cursor: pointer;
+    cursor: hand;
+}
+
+mark {
+    /* Needs extra declarations for old browsers */
+    background-color: #ffffbf;
+}
+
+.radio-list ul {
+    /* Django creates radio items as a list, but they need to be wrapped in a div with class "radio-list" then this
+       style will make them look normal */
+    list-style-type: none;
+    padding-left: 0;
+}
+
+.serif{ font-family: "Warnock Pro","Palatino","Book Antiqua",Georgia,serif; }
+.meta-data-header{ font-weight: bold; }
+.meta-data-value{ margin-right: 2em; }
+.placeholder{ color: #aaa; }
+
+
+
+/* layout */
+body {
+    background-color: #E9E8E8;
+}
+.container {
+    padding: 20px 30px 0px;
+    background-color: white;
+    border-left: 1px solid #c2c2c2;
+    border-bottom: 1px solid #c2c2c2;
+    border-right: 1px solid #c2c2c2;
+}
+
+nav {
+    padding-bottom: 3em;
+}
+
+nav ul {
+    display: inline;
+    padding: 0;
+}
+
+nav ul li {
+    list-style: none outside none;
+    padding: 0em 0.7em 0em 0.0em;
+    white-space: nowrap;
+    text-align: center;
+    display: inline;
+}
+
+#search-container table{
+    width: auto;
+    margin-bottom: auto;
+}
+
+#search-container td{
+    padding: 0px;
+}
+
+#id_q {
+    border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
+    border-style: solid none solid solid;
+    border-width: 1px 0px 1px 1px;
+    margin: 0px;
+    font-size: 16px;
+    height: 20px;
+    width: 592px;
+}
+
+#search-button {
+    height: 32px;
+    padding: 4px 10px;
+    margin: 0px;
+    border-color: #a6a6a6;
+}
+
+#advanced {
+    color: black;
+}
+
+#scrollable-jurisdictions {
+    overflow-y: scroll;
+    height: 500px;
+}
+
+/* New case view styling, including citations */
+#default-text pre, .citation {
+    white-space: pre;
+}
+
+/* cited by sidebar list styling */
+div.shown {
+    padding-top: 5px;
+}
+
+div.shown ul {
+    margin: 0;
+    padding: 0 0 0 17px;
+}
+
+/* cited by and authorities styling */
+#cited-by-viewer hr,
+#authorities hr,
+#cited-by hr {
+    margin-bottom: 2px;
+}
+
+#cited-by-viewer ul,
+#authorities ul,
+#cited-by ul {
+    padding: 0;
+    margin: 0 0 1.5em 0;
+}
+
+#cited-by-viewer ul li,
+#authorities ul li,
+#cited-by ul li {
+    list-style-type: none;
+    padding: 3px 0 2px 0;
+    border-bottom: 1pt solid #DDD;
+}
+
+.citation-name {
+    font-size: 1.2em;
+}
+
+/* Button formatting */
+a.button, button, .ui-button-text {
+    border-color: #a6a6a6;
+    background-color: #6683B7;
+    color: white;
+    letter-spacing: 0.5px;
+}
+.ui-state-active .ui-button-text,
+.ui-state-hover .ui-button-text,
+.ui-state-focus .ui-button-text {
+    background-color: #7896D0;
+    color: #eeeeee;
+}
+
+.ui-state-active, .ui-state-hover, .ui-state-focus {
+    border-color: transparent;
+}
+
+button:hover, a.button:hover {
+  background-color: #7896D0;
+  border:1px solid gray;
+  color: #eeeeee;
+}
+a.button:active {
+  background-color: #7896D0;
+  color: #eeeeee;
+}
+
+#sidebar {
+    margin-top: 6px;
+}
+
+.sidebar-section {
+    margin-bottom: 3em;
+}
+
+.sidebar-section h3 {
+    margin-bottom: 0.6em;
+}
+
+.sidebar-section h3 > span {
+    padding: 0.5em 0em 0.1em;
+    border-bottom: 1px solid #ddd;
+}
+
+div.sidebar-checkbox {
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+
+div.sidebar-checkbox label {
+    display: block;
+    padding-left: 22px;
+}
+
+div.sidebar-checkbox input {
+    width: 13px;
+    height: 13px;
+    padding: 0;
+    margin: 0 0 0 5px;
+    vertical-align: bottom;
+    position: relative;
+    top: 1px;
+    overflow: hidden;
+}
+
+input.court-checkbox, input.status-checkbox {
+    top: 0;
+}
+#citation-count {
+    float: right;
+}
+#slider-range {
+    margin: 0.5em;
+}
+
+#payment-provider-radio input[type="radio"] {
+    position: absolute;
+    top: auto;
+}
+
+/* Results page */
+#id_q:focus{
+    outline-style: none;
+}
+#search-button {
+    left: 0px;
+}
+#new-search-chooser {
+    float: right;
+}
+#result-count {
+    float: left;
+}
+#id_order_by {
+    float: right;
+}
+.js #id_order_by {
+    display: none;
+}
+.js #extra-sidebar-fields {
+    display: none;
+}
+.nojs #sidebar-search-form {
+    display: none;
+}
+#pagination-left {
+    float: left;
+    width: 200px;
+}
+#pagination-center {
+	margin: auto;
+	text-align: center;
+}
+#pagination-right {
+	float: right;
+	width: 200px;
+	text-align: right;
+}
+
+/* Donations page */
+#id_amount_other {
+    float: none;
+    margin-top: 0;
+}
+
+#how-much-donate-choices {
+    padding-left: 2em;
+}
+
+#cc-month-field {
+    width: 29px;
+}
+#cc-year-field {
+    width: 67px;
+}
+
+#unconfirmed-email-warning{
+    margin-top: 9px;
+    margin-left: 5px;
+}
+
+
+/* link formatting */
+a:link, a:visited {
+    text-decoration: none;
+}
+a:visited.visitable {
+    color: #9d11b3;
+}
+/* Special case for Oregon, which has a name attr with a value of TOP. */
+a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
+    color: #000099;
+    text-decoration: underline;
+}
+.fake-link {
+    color: #009;
+}
+.fake-link:hover {
+    text-decoration: underline;
+    color: #009;
+    cursor: pointer;
+    cursor: hand;
+}
+
+/* errors */
+.error a, .notice a, .success a {
+    text-decoration: underline;
+}
+.error a:focus, .error a:hover {
+    color: #8A1F11;
+}
+.notice a:focus, .notice a:hover, .success a:focus, .success a:hover {
+    color: #514721;
+}
+.errortext {
+    color: #8a1f11;
+}
+
+
+/* Display cases from Resources.org neatly */
+#resource-org-text span.num {
+    position: absolute;
+    color: #999999;
+}
+#resource-org-text p.indent {
+    position: relative;
+    margin-left: 2em;
+    margin-top: 1.5em;
+}
+#resource-org-text div.footnotes {
+    border-top: 1px dotted black;
+    padding-top: 1em;
+}
+#resource-org-text div.footnote > p {
+    margin-left: 2em;
+}
+#resource-org-text div.prelims {
+    background: none repeat scroll 0 0 #eeeeee;
+    border: 1px solid #dddddd;
+    padding-top: 1.5em;
+}
+#resource-org-text div.prelims p {
+    position: relative;
+    margin-left: 2em;
+    margin-right: 2em;
+    margin-top: 0em;
+}
+#resource-org-text p.parties {
+    text-align: center;
+    font-size: 1.25em;
+    font-weight: bold;
+}
+
+#resource-org-text div.footnote a.footnote {
+    /* Needs proper color use */
+    color: #000099;
+    position: absolute;
+}
+#resource-org-text p a.footnote {
+    /* make footnotes superscript */
+    vertical-align: text-top;
+    font-size: 70%;
+    color: #000099;
+}
+/* End Resource.org display CSS */
+
+
+/* Start lawbox display CSS */
+#lawbox-text h1 {
+    font-size: 1.25em;
+    padding-top: 0.75em;
+    padding-bottom: 0.75em;
+    font-weight: bold;
+}
+#lawbox-text h2 {
+    font-size: 1.25em;
+    font-weight: bold;
+}
+span.star-pagination {
+    color: #999999;
+}
+span.star-pagination::after {
+    display: inline;
+    position: relative;
+    content: "•";
+    float: left;
+    left: -1em;
+    font-size: 1em;
+    color: #8a1f11;
+    width: 0px;
+}
+
+blockquote span.star-pagination::after {
+    left: -2.5em;
+}
+
+
+/* End lawbox display CSS */
+
+input.wide-title {
+    width: 390px;
+    padding: 5px;
+    font-size:1.5em;
+}
+
+/* Disabled button formatting */
+button[disabled]:active, button[disabled]:hover, button[disabled] {
+    color: #bdbdbd;
+    background-color: #F5F5F5;
+    -moz-border-bottom-colors: none;
+    -moz-border-image: none;
+    -moz-border-left-colors: none;
+    -moz-border-right-colors: none;
+    -moz-border-top-colors: none;
+    background-color: #F5F5F5;
+    border-color: #EEEEEE #DEDEDE #DEDEDE #EEEEEE;
+    border-right: 1px solid #DEDEDE;
+    border-style: solid;
+    border-width: 1px;
+    cursor: default;
+}
+
+/* Save favorites and modal box configs */
+.modal {
+    box-shadow: 2px 2px 5px #000000;
+    border: 1px solid #dddddd;
+}
+
+.modal-content {
+    padding: 1em;
+}
+
+#modal-court-picker {
+    width: 934px;
+}
+#modal-court-picker p.inline {
+    margin-left: 10px;
+}
+#modal-court-picker span.close {
+    font-size: 2em;
+    position: relative;
+    top: -0.45em;
+    padding: 0.3em 0.7em 0.1em;
+    left: 0.4em;
+}
+
+#modal-court-picker label {
+    font-weight: normal;
+}
+
+#modal-court-picker #tab-state .appeals-court {
+    /* Indent appeals courts in the state tab. */
+    margin-left: 15px;
+}
+
+#court-picker-tabs {
+    text-align: right;
+}
+
+#modal-court-picker #court-picker-tabs li {
+    /* Has very specific selector to beat specific one in Bootstrap */
+    float: none;
+    display: inline-block;
+}
+#court-picker-tabs > li a {
+    text-transform: uppercase;
+}
+#modal-save-favorite .modal-dialog {
+    width: 430px;
+}
+#modal-logged-out .modal-dialog {
+    width: 270px;
+}
+#modal-save-favorite textarea, #modal-save-favorite input {
+    width: 390px !important;
+}
+
+/*
+#modal-save-favorite, #modal-logged-out {
+    z-index: 10;
+    top: -10px;
+    left: 10px;
+    position: absolute;
+    background: white;
+}
+
+#modal-logged-out {
+    top: -10px;
+    left: 10px;
+    padding: 2em;
+}
+*/
+#save-favorite-text-area {
+    height: auto;
+}
+
+#modal-save-favorite .save-favorite-button {
+    margin-right: 0;
+}
+
+#favorites-bottom-section {
+    margin-top: 4em;
+}
+#save-favorite-delete {
+    margin-bottom: 0.3em;
+}
+#favorites-buttons {
+    position: absolute;
+    right: 1em;
+    bottom: 0.3em;
+}
+
+/* Tables on settings pages */
+.settings-table th {
+    border-width: 0px 0px 1px 0px;
+    border-style: solid;
+    border-color: gray;
+}
+.settings-table td {
+    border-width: 0px 0px 1px 0px;
+    border-style: dotted;
+    border-color: gray;
+}
+.settings-table tr:last-child td {
+    border-width: 0px;
+}
+.settings-table tbody tr:hover {
+    background-color: #f0f0f0;
+}
+
+/* Sprites and arrows */
+.sprites {
+    background-image     : url("/static/png/social-sprite.png");
+    background-color     : transparent;
+    background-repeat    : no-repeat;
+    display: inline;
+    float: left;
+}
+.arrow-right-before:before {
+    content: '';
+    display: inline-block;
+    border-color: transparent transparent transparent #6683B7;
+    border-style: solid;
+    border-width: 5px 5px 5px 8px;
+    height: 0;
+    margin: 0 2px 4px 0;
+    width: 0;
+}
+.arrow-left-before:before {
+    content: '';
+    display: inline-block;
+    border-color: transparent #6683B7 transparent transparent;
+    border-style: solid;
+    border-width: 5px 8px 5px 5px;
+    height: 0;
+    margin: 0 2px 2px 0;
+    width: 0;
+}
+.arrow-right-after:after {
+    content: '';
+    display: inline-block;
+    border-color: transparent transparent transparent #6683B7;
+    border-style: solid;
+    border-width: 5px 5px 5px 8px;
+    height: 0;
+    margin: 0 0 2px 2px;
+    width: 0;
+}
+#copy-input {
+    width: 118px;
+}
+#delicious_png {
+    height               : 16px;
+	width                : 16px;
+	background-position  : -16px -16px;
+    margin: .7em 2px 0px 2px;
+}
+#delicious_png:hover {
+	background-position  : -16px 0px;
+}
+#digg_png {
+	height               : 14px;
+	width                : 16px;
+	background-position  : -32px -14px;
+    margin: .7em 2px 0px 2px;
+}
+#digg_png:hover {
+	background-position  : -32px 0px;
+}
+#email_link_png {
+	height               : 16px;
+	width                : 16px;
+	background-position  : -48px -16px;
+    margin: .7em 2px 0px 2px;
+}
+#email_link_png:hover {
+	background-position  : -48px 0px;
+}
+#facebook_png {
+    height               : 16px;
+	width                : 16px;
+    background-position  : -82px -16px;
+    margin: .7em 2px 0px 2px;
+}
+#facebook_png:hover {
+    background-position  : -82px 0px;
+}
+#reddit_png {
+	height               : 18px;
+	width                : 18px;
+	background-position  : -64px -18px;
+    margin: .7em 2px 0px 2px;
+}
+#reddit_png:hover {
+	background-position  : -64px 0px;
+}
+#twitter_gif {
+	height               : 16px;
+	width                : 16px;
+	background-position  : -98px -16px;
+    margin: 0.7em 2px 0px 2px;
+}
+#twitter_gif:hover {
+	background-position  : -98px 0px;
+}
+#favorites-star {
+    font-size: 1.5em;
+    margin-right: 0.5em;
+}
+
+/* Highlights images that need height/width */
+img:not([width]):not([height]) {
+  border: 2px solid red !important;
+}

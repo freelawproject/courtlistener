@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load text_filters %}
+
+{# Shown on authorities pages. #}
+
+{% block title %}Table of Authorities for {{ title }} - CourtListener.com{% endblock %}
+{% block description %}Table of Authorities for {{ title }}{% endblock %}
+
+{% block sidebar %}
+    <div class="span-6 append-1" id="sidebar">
+        <div class="sidebar-section">
+            <h4 class="bottom">
+                <i class="fa fa-arrow-circle-o-left gray"></i>
+                <a href="{{ doc.get_absolute_url }}?{{ request.META.QUERY_STRING }}">Back to Document</a>
+            </h4>
+        </div>
+    </div>
+{% endblock sidebar %}
+
+{% block content %}
+    <div class="span-17 last">
+        <h2>
+            {{ doc.caption|safe|v_wrapper }}
+        </h2>
+
+        <div id="authorities">
+            <h3>This opinion cites {{ authorities.count }} case{{ authorities.count|pluralize }}</h3>
+            <hr>
+            {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
+                <ul>
+                    {% for case in authorities %}
+                        {%  with case=case.parent_documents.all.0 %}
+                        <li>
+                            <a href="{{ case.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                                {{ case.caption|safe|v_wrapper }}
+                            </a>
+                            <br/>
+                            {{ case.court }} |
+                            {{ case.date_filed }} |
+                            {% if case.citation_count != 0 %}
+                                <a href="{{ case.get_absolute_url }}cited-by/">
+                                    Cited {{ case.citation_count }} time{{ case.citation_count|pluralize }}
+                                </a>
+                            {% else %}
+                                Cited 0 times
+                            {% endif %}
+                        </li>
+                        {% endwith %}
+                    {% endfor %}
+                </ul>
+        </div>
+    </div>
+{% endblock %}
