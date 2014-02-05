@@ -7,6 +7,7 @@ from alert.lib.solr_core_admin import get_data_dir_location, reload_pagerank_ext
 from django.core.management.base import BaseCommand
 import logging
 import os
+import pwd
 import shutil
 import sys
 import time
@@ -39,7 +40,22 @@ class Command(BaseCommand):
         case_count = 0
         timings = []
         average_per_s = 0
-        pr_db = {}
+        
+        # Build up a database of the old PR values
+        try:
+            with open(RESULT_FILE_PATH, 'r') as old_result_file:
+                pr_db = {}
+                for line in old_result_file:
+                    id, value = line.split('=')
+                    pr_db[id] = float(value)
+        except IOError:
+            # The old PR file doesn't exist yet.
+            sys.stdout.write("Unable to find old PR file at: %s\n" % RESULT_FILE_PATH)
+            sys.stdout.write("Will assume all old PR values are zero.\n")
+            sys.stdout.flush()
+            pr_db = {}
+
+        # Build up the network graph
         for source_case in case_list:
             case_count += 1
             if case_count % 100 == 1:
@@ -57,7 +73,9 @@ class Command(BaseCommand):
             sys.stdout.flush()
             for target_case in source_case.cases_cited.values_list('parent_documents__id'):
                 citing_graph.add_edge(str(source_case.pk), str(target_case[0]))
-            pr_db[str(source_case.pk)] = source_case.pagerank
+            if not pr_db:
+                # This means that the old PR file didn't exist and we need to load it with zeroes.
+                pr_db[str(source_case.pk)] = 0
 
         ######################
         #      Stage II      #
@@ -124,7 +142,7 @@ class Command(BaseCommand):
         self.result_file.close()
 
         if verbosity >= 1:
-            sys.stdout.write('\nPageRank calculation finish! Updated {} ({:.0%}) cases\n'.format(
+            sys.stdout.write('\nPageRank calculation finished! Updated {} ({:.0%}) cases\n'.format(
                 update_count,
                 update_count * 1.0 / graph_size
             ))
@@ -148,7 +166,8 @@ class Command(BaseCommand):
         if verbosity >= 1:
             sys.stdout.write('Copying pagerank file to sata, for bulk downloading...\n')
         shutil.copyfile(self.RESULT_FILE_PATH, settings.DUMP_DIR)
-        os.chown(settings.DUMP_DIR + 'external_pagerank', 'www-data', 'www-data')
+        www_data_info = pwd.getpwnam('www-data')
+        os.chown(settings.DUMP_DIR + 'external_pagerank', www_data_info.pw_uid, www_data_info.pw_gid)
 
     def handle(self, *args, **options):
         self.do_pagerank(verbosity=int(options.get('verbosity', 1)))
