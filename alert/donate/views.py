@@ -119,7 +119,7 @@ def donate(request):
         if request.user.is_anonymous():
             # Either this is a new account, a stubbed one, or a user that's simply not logged into their account
             try:
-                stub_account = User.objects.filter(userprofile__stub_account=True). \
+                stub_account = User.objects.filter(profile__stub_account=True). \
                                             get(email__iexact=request.POST.get('email'))
             except User.DoesNotExist:
                 pass
