@@ -1,3 +1,4 @@
+import logging
 import re
 import time
 from django.core.cache import cache
@@ -14,6 +15,8 @@ from alert.lib.sunburnt import sunburnt
 from alert.search.forms import SearchForm
 from alert.search.models import Citation, Court, Document, DOCUMENT_SOURCES, DOCUMENT_STATUSES
 from alert.stats import tally_stat
+
+logger = logging.getLogger(__name__)
 
 good_time_filters = ('exact', 'gte', 'gt', 'lte', 'lt', 'range',
                      'year', 'month', 'day', 'hour', 'minute', 'second',)
@@ -38,6 +41,10 @@ class ModelResourceWithFieldsFilter(ModelResource):
     def __init__(self, tally_name=None):
         super(ModelResourceWithFieldsFilter, self).__init__()
         self.tally_name = tally_name
+
+    def alter_list_data_to_serialize(self, request, data):
+        data['meta']['request_uri'] = request.META['REQUEST_URI']
+        return data
 
     def full_dehydrate(self, bundle, *args, **kwargs):
         bundle = super(ModelResourceWithFieldsFilter, self).full_dehydrate(bundle, *args, **kwargs)
