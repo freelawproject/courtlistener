@@ -34,7 +34,6 @@ class Command(BaseCommand):
         qs = Document.objects.only(
             'pk',
             'cases_cited',
-            'pagerank'
         )
         case_list = queryset_generator(qs, chunksize=10000)
         case_count = 0
@@ -42,18 +41,19 @@ class Command(BaseCommand):
         average_per_s = 0
         
         # Build up a database of the old PR values
+        pr_db = {}
         try:
-            with open(RESULT_FILE_PATH, 'r') as old_result_file:
-                pr_db = {}
+            with open(self.RESULT_FILE_PATH, 'r') as old_result_file:
                 for line in old_result_file:
                     id, value = line.split('=')
                     pr_db[id] = float(value)
+            created_pr_db = True
         except IOError:
             # The old PR file doesn't exist yet.
             sys.stdout.write("Unable to find old PR file at: %s\n" % RESULT_FILE_PATH)
             sys.stdout.write("Will assume all old PR values are zero.\n")
             sys.stdout.flush()
-            pr_db = {}
+            created_pr_db = False
 
         # Build up the network graph
         for source_case in case_list:
@@ -73,7 +73,7 @@ class Command(BaseCommand):
             sys.stdout.flush()
             for target_case in source_case.cases_cited.values_list('parent_documents__id'):
                 citing_graph.add_edge(str(source_case.pk), str(target_case[0]))
-            if not pr_db:
+            if not created_pr_db:
                 # This means that the old PR file didn't exist and we need to load it with zeroes.
                 pr_db[str(source_case.pk)] = 0
 
@@ -165,7 +165,7 @@ class Command(BaseCommand):
 
         if verbosity >= 1:
             sys.stdout.write('Copying pagerank file to sata, for bulk downloading...\n')
-        shutil.copyfile(self.RESULT_FILE_PATH, settings.DUMP_DIR)
+        shutil.copy(self.RESULT_FILE_PATH, settings.DUMP_DIR)
         www_data_info = pwd.getpwnam('www-data')
         os.chown(settings.DUMP_DIR + 'external_pagerank', www_data_info.pw_uid, www_data_info.pw_gid)
 
