@@ -6,6 +6,8 @@ hg pull -u
 # Gather any new static files
 manage.py collectstatic
 
+(enter yes, when prompted)
+
 # Migrate the database
 manage.py migrate
 
@@ -22,6 +24,12 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
+2013-11-25:
+ - This revision adds a new script that will welcome new users whenever it is called. It will send an email to anybody
+   that's new in the last 24 hours each time it is called. If you wish to use it, simply add it to your crontab.
+ - This revision also tweaks Solr in a way that should not cause any problems for folks on 4.0 or 4.1, but that will
+   make it perform faster in production.
+
 2013-11-15:
  - This upgrades Solr to version 4.1, which supports file listeners. To upgrade Solr, simply:
    - Download Solr version 4.1 with:
@@ -29,7 +37,7 @@ We welcome a conversion of these notes to a better process using Fabric.
         - wget https://archive.apache.org/dist/lucene/solr/4.1.0/solr-4.1.0.tgz
    - Unpack the tgz file with:
         - tar -x -f solr-4.1.0.tgz
-   - Set up the CL_INSTALL_ROOT variable:
+   - Set up the INSTALL_ROOT variable:
         - source /etc/courtlistener
    - Stop Solr, swap in the correct version and restart solr:
         - sudo service solr stop

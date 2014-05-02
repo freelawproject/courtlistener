@@ -40,11 +40,11 @@ DEBUG = [
     'judge',
     'citations',
     'case_name',
-    'date',
+    #'date',
     'docket_number',
     'court',
     #'input_citations',
-    'input_dates',
+    #'input_dates',
     #'input_docket_number',
     'input_court',
     'input_case_names',
@@ -189,6 +189,13 @@ def get_date_filed(clean_html_tree, citations, case_path=None, court=None):
 
         # The parser recognizes dates like December 3, 4, 1908 as 2004-12-3 19:08.
         re_match = re.search('\d{1,2}, \d{1,2}, \d{4}', text)
+        if re_match:
+            # These are always date argued, thus continue.
+            continue
+
+        # The parser recognizes dates like October 12-13, 1948 as 2013-10-12, not as 1948-10-12
+        # See: https://www.courtlistener.com/scotus/9ANY/grand-river-dam-authority-v-grand-hydro/
+        re_match = re.search('\d{1,2}-\d{1,2}, \d{4}', text)
         if re_match:
             # These are always date argued, thus continue.
             continue
@@ -585,11 +592,11 @@ def import_law_box_case(case_path):
         source='L',
         sha1=sha1,
         court_id=court,
-        html=clean_html_str,
+        html=clean_html_str,  # we clear this field later, putting the value into html_lawbox.
         date_filed=get_date_filed(clean_html_tree, citations=citations, case_path=case_path, court=court),
         precedential_status=get_precedential_status(),
         judges=judges,
-        download_URL=case_path,
+        download_url=case_path,
     )
 
     cite = Citation(

@@ -437,6 +437,7 @@ def build_coverage_query(court, start_year):
         'facet.range.end': 'NOW/DAY',
         'facet.range.gap': '+1YEAR',
         'rows': 0,
+        'q': '*:*',  # Without this, results will be omitted.
         'caller': 'build_coverage_query',
     }
     if court.lower() != 'all':

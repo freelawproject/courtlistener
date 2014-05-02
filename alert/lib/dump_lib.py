@@ -56,7 +56,10 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 row.set('path', doc.get_absolute_url())
                 row.set('sha1', doc.sha1)
                 row.set('court', doc.court.full_name)
-                row.set('download_URL', doc.download_URL)
+                try:
+                    row.set('download_url', doc.download_url)
+                except:
+                    pass
                 row.set('time_retrieved', str(doc.time_retrieved))
                 # All are wrapped in try/except b/c the value might not be found.
                 try:
@@ -137,10 +140,6 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                     pass
                 try:
                     row.set('source', doc.get_source_display())
-                except:
-                    pass
-                try:
-                    row.set('pagerank', doc.pagerank)
                 except:
                     pass
                 try:

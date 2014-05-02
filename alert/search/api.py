@@ -1,8 +1,11 @@
 import logging
+import re
+import time
+from django.core.cache import cache
 from tastypie import fields
 from tastypie.authentication import BasicAuthentication, SessionAuthentication, MultiAuthentication
 from tastypie.constants import ALL
-from tastypie.exceptions import BadRequest, InvalidSortError
+from tastypie.exceptions import BadRequest
 from tastypie.resources import ModelResource
 from tastypie.throttle import CacheThrottle
 from alert import settings
@@ -21,19 +24,36 @@ good_date_filters = good_time_filters[:-3]
 numerical_filters = ('exact', 'gte', 'gt', 'lte', 'lt', 'range',)
 
 
+class BasicAuthenticationWithUser(BasicAuthentication):
+    """Wraps the BasicAuthentication class, changing the get_identifier method to provide the username instead of
+    essentially nothing.
+
+    Proposed this change in: https://github.com/toastdriven/django-tastypie/pull/1085/commits
+    """
+    def __init__(self, backend=None, realm='django-tastypie', **kwargs):
+        super(BasicAuthenticationWithUser, self).__init__(backend, realm, **kwargs)
+
+    def get_identifier(self, request):
+        return request.META.get('REMOTE_USER', request.user.username)
+
+
 class ModelResourceWithFieldsFilter(ModelResource):
     def __init__(self, tally_name=None):
         super(ModelResourceWithFieldsFilter, self).__init__()
         self.tally_name = tally_name
+
+    def alter_list_data_to_serialize(self, request, data):
+        data['meta']['request_uri'] = request.META['REQUEST_URI']
+        return data
 
     def full_dehydrate(self, bundle, *args, **kwargs):
         bundle = super(ModelResourceWithFieldsFilter, self).full_dehydrate(bundle, *args, **kwargs)
         # bundle.obj[0]._data['citeCount'] = 0
         fields = bundle.request.GET.get("fields", "")
         if fields:
-            fields = fields.split(",")
+            fields_list = re.split(',|__', fields)
             new_data = {}
-            for k in fields:
+            for k in fields_list:
                 if k in bundle.data:
                     new_data[k] = bundle.data[k]
             bundle.data = new_data
@@ -51,10 +71,50 @@ class ModelResourceWithFieldsFilter(ModelResource):
         return super(ModelResourceWithFieldsFilter, self).dispatch(request_type, request, **kwargs)
 
 
+class PerUserCacheThrottle(CacheThrottle):
+    """Sets up higher throttles for specific users"""
+    custom_throttles = {
+        'scout': 10000,
+        'scout_test': 10000,
+    }
+
+    def should_be_throttled(self, identifier, **kwargs):
+        """
+        Lightly edits the inherited method to add an additional check of the
+        `custom_throttles` variable.
+
+        Returns whether or not the user has exceeded their throttle limit.
+
+        Maintains a list of timestamps when the user accessed the api within
+        the cache.
+
+        Returns ``False`` if the user should NOT be throttled or ``True`` if
+        the user should be throttled.
+        """
+        key = self.convert_identifier_to_key(identifier)
+
+        # Make sure something is there.
+        cache.add(key, [])
+
+        # Weed out anything older than the timeframe.
+        minimum_time = int(time.time()) - int(self.timeframe)
+        times_accessed = [access for access in cache.get(key) if access >= minimum_time]
+        cache.set(key, times_accessed, self.expiration)
+
+        throttle_at = self.custom_throttles.get(identifier, int(self.throttle_at))
+        if len(times_accessed) >= throttle_at:
+            # Throttle them.
+            return True
+
+        # Let them through.
+        return False
+
+
 class CourtResource(ModelResourceWithFieldsFilter):
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
-        throttle = CacheThrottle(throttle_at=1000)
+        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
+                                             SessionAuthentication())
+        throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'jurisdiction'
         queryset = Court.objects.exclude(jurisdiction='T')
         max_limit = 1000
@@ -66,7 +126,7 @@ class CourtResource(ModelResourceWithFieldsFilter):
             'position': numerical_filters,
             'short_name': ALL,
             'full_name': ALL,
-            'URL': ALL,
+            'url': ALL,
             'start_date': good_date_filters,
             'end_date': good_date_filters,
             'jurisdictions': ALL,
@@ -78,8 +138,9 @@ class CitationResource(ModelResourceWithFieldsFilter):
     opinion_uris = fields.ToManyField('search.api.DocumentResource', 'parent_documents')
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
-        throttle = CacheThrottle(throttle_at=1000)
+        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
+                                             SessionAuthentication())
+        throttle = PerUserCacheThrottle(throttle_at=1000)
         queryset = Citation.objects.all()
         max_limit = 20
         excludes = ['slug', ]
@@ -127,8 +188,9 @@ class DocumentResource(ModelResourceWithFieldsFilter):
     )
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
-        throttle = CacheThrottle(throttle_at=1000)
+        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
+                                             SessionAuthentication())
+        throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'opinion'
         queryset = Document.objects.all().select_related('court__pk', 'citation')
         max_limit = 20
@@ -149,7 +211,7 @@ class DocumentResource(ModelResourceWithFieldsFilter):
             'blocked': ALL,
             'extracted_by_ocr': ALL,
         }
-        ordering = ['time_retrieved', 'date_modified', 'date_filed', 'pagerank', 'date_blocked']
+        ordering = ['time_retrieved', 'date_modified', 'date_filed', 'date_blocked']
 
 
 class CitedByResource(ModelResourceWithFieldsFilter):
@@ -170,11 +232,13 @@ class CitedByResource(ModelResourceWithFieldsFilter):
     )
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
-        throttle = CacheThrottle(throttle_at=1000)
+        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
+                                             SessionAuthentication())
+        throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'cited-by'
         queryset = Document.objects.all()
         excludes = ('is_stub_document', 'html', 'html_lawbox', 'html_with_citations', 'plain_text',)
+        include_absolute_url = True
         max_limit = 20
         list_allowed_methods = ['get']
         detail_allowed_methods = []
@@ -232,11 +296,13 @@ class CitesResource(ModelResourceWithFieldsFilter):
     )
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
-        throttle = CacheThrottle(throttle_at=1000)
+        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
+                                             SessionAuthentication())
+        throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'cites'
         queryset = Document.objects.all()
         excludes = ('is_stub_document', 'html', 'html_lawbox', 'html_with_citations', 'plain_text',)
+        include_absolute_url = True
         max_limit = 20
         list_allowed_methods = ['get']
         detail_allowed_methods = []
@@ -279,18 +345,22 @@ class CitesResource(ModelResourceWithFieldsFilter):
             return ''
 
 
-class SolrList(list):
-    def __init__(self, conn, q, length, offset, limit):
+class SolrList(object):
+    """This implements a yielding list object that fetches items as they are queried."""
+    def __init__(self, conn, main_query, offset, limit, length=None):
         super(SolrList, self).__init__()
-        self.q = q
+        self.main_query = main_query
         self.conn = conn
-        self.length = length
-        self._item_cache = []
         self.offset = offset
         self.limit = limit
+        self.length = length
+        self._item_cache = []
 
     def __len__(self):
         """Tastypie's paginator takes the len() of the item for its work."""
+        if self.length is None:
+            # We don't yet know length, so call __getitem__, which sets it.
+            self.__getitem__(0)
         return self.length
 
     def __iter__(self):
@@ -300,25 +370,38 @@ class SolrList(list):
             else:
                 yield self.__getitem__(item)
 
-    def _get_offset(self, item):
-        return item + 1
-
     def __getitem__(self, item):
-        if item > (self.offset - 1 + self.limit):
-            # If the item is outside of our initial query, we need to get items and put them in our cache
-            self._item_cache = []
-            self.q['offset'] = self._get_offset(item)
-            self.q['caller'] = 'search_api'
-            results_si = self.conn.raw_query(**self.q).execute()
-            for result in results_si.result.docs:
-                self._item_cache.append(SolrObject(initial=result))
+        self.main_query['start'] = self.offset
+        results_si = self.conn.raw_query(**self.main_query).execute()
+
+        # Set the length if it's not yet set.
+        if self.length is None:
+            self.length = results_si.result.numFound
+
+        # Pull the text snippet up a level, where tastypie can find it
+        for result in results_si.result.docs:
+            result['snippet'] = '&hellip;'.join(result['solr_highlights']['text'])
+
+        # Return the results as objects, not dicts.
+        for result in results_si.result.docs:
+            self._item_cache.append(SolrObject(initial=result))
 
         # Now, assuming our _item_cache is all set, we just get the item.
-        return self._item_cache[item]
+        if isinstance(item, slice):
+            s = slice(item.start - int(self.offset),
+                      item.stop - int(self.offset),
+                      item.step)
+            return self._item_cache[s]
+        else:
+            # Not slicing.
+            try:
+                return self._item_cache[item]
+            except IndexError:
+                # No results!
+                return []
 
     def append(self, p_object):
         """Lightly override the append method so we get items duplicated in our cache."""
-        super(SolrList, self).append(p_object)
         self._item_cache.append(p_object)
 
 
@@ -398,11 +481,6 @@ class SearchResource(ModelResourceWithFieldsFilter):
         help_text='The location, relative to MEDIA_ROOT on the CourtListener server, where files are stored',
         null=True,
     )
-    pagerank = fields.FloatField(
-        attribute='pagerank',
-        help_text="The PageRank score based on the citing relation among documents",
-        null=True
-    )
     score = fields.FloatField(
         attribute='score',
         help_text='The relevance of the result. Will vary from query to query.',
@@ -438,12 +516,15 @@ class SearchResource(ModelResourceWithFieldsFilter):
         attribute='timestamp',
         help_text='The moment when an item was indexed by Solr.'
     )
+    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthentication(realm="courtlistener.com"), SessionAuthentication())
-        throttle = CacheThrottle(throttle_at=1000)
+        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
+                                             SessionAuthentication())
+        throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'search'
         max_limit = 20
+        include_absolute_url = True
         allowed_methods = ['get']
         search_field = ('search',)
         filtering = {
@@ -458,7 +539,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
             'docket_number': search_field,
             'cited_gt': ('int',),
             'cited_lt': ('int',),
-            'courts': ('csv',),
+            'court': ('csv',),
         }
         ordering = [
             'dateFiled+desc', 'dateFiled+asc',
@@ -473,7 +554,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
         if bundle_or_obj:
             return url_str % (
                 self.api_name,
-                self._meta.resource_name,
+                'opinion',
                 bundle_or_obj.obj.id,
             )
         else:
@@ -481,7 +562,6 @@ class SearchResource(ModelResourceWithFieldsFilter):
 
     def get_object_list(self, request=None, **kwargs):
         """Performs the Solr work."""
-        conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
         try:
             main_query = build_main_query(kwargs['cd'], highlight='text')
         except KeyError:
@@ -495,10 +575,8 @@ class SearchResource(ModelResourceWithFieldsFilter):
             result['snippet'] = '&hellip;'.join(result['solr_highlights']['text'])
         # Return the results as objects, not dicts.
         # Use a SolrList that has a couple of the normal functions built in.
-        sl = SolrList(conn=conn, q=main_query, length=results_si.result.numFound,
-                      offset=request.GET.get('offset', 0), limit=request.GET.get('limit', 20))
-        for result in results_si.result.docs:
-            sl.append(SolrObject(initial=result))
+        sl = SolrList(conn=self.conn, main_query=main_query, offset=request.GET.get('offset', 0),
+                      limit=request.GET.get('limit', 20))
         return sl
 
     def obj_get_list(self, bundle, **kwargs):

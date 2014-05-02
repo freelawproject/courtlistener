@@ -1,5 +1,6 @@
 import re
 from alert import settings
+from alert.lib.bot_detector import is_bot
 from alert.lib.encode_decode import ascii_to_num
 from alert.lib import magic
 from alert.lib import search_utils
@@ -18,6 +19,7 @@ from django.template import RequestContext
 from django.views.decorators.cache import never_cache
 
 import os
+from alert.stats import tally_stat
 
 
 def make_citation_string(doc):
@@ -172,4 +174,6 @@ def serve_static_file(request, file_path=''):
     response['X-Sendfile'] = os.path.join(settings.MEDIA_ROOT, file_path.encode('utf-8'))
     response['Content-Disposition'] = 'attachment; filename="%s"' % file_name.encode('utf-8')
     response['Content-Type'] = mimetype
+    if not is_bot(request):
+        tally_stat('case_page.static_file.served')
     return response
