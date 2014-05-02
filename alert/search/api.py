@@ -308,6 +308,7 @@ class SolrList(list):
             # If the item is outside of our initial query, we need to get items and put them in our cache
             self._item_cache = []
             self.q['offset'] = self._get_offset(item)
+            self.q['caller'] = 'search_api'
             results_si = self.conn.raw_query(**self.q).execute()
             for result in results_si.result.docs:
                 self._item_cache.append(SolrObject(initial=result))

@@ -372,6 +372,7 @@ def place_facet_queries(cd, conn=sunburnt.SolrInterface(settings.SOLR_URL, mode=
         'facet.mincount': 0,
         'facet.field': '{!ex=dt}status_exact',
         'q': cd['q'] or '*:*',
+        'caller': 'facet_parameters',
     }
     fq = []
 
@@ -436,6 +437,7 @@ def build_coverage_query(court, start_year):
         'facet.range.end': 'NOW/DAY',
         'facet.range.gap': '+1YEAR',
         'rows': 0,
+        'caller': 'build_coverage_query',
     }
     if court.lower() != 'all':
         params['fq'] = ['court_exact:%s' % court]
@@ -449,5 +451,6 @@ def build_court_count_query():
         'facet.field': 'court_exact',
         'facet.limit': -1,
         'rows': 0,
+        'caller': 'build_court_count_query',
     }
     return params
