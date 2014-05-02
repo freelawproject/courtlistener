@@ -417,6 +417,7 @@ def get_court_start_year(conn, court):
         params = {'sort': 'dateFiled asc', 'rows': 1, 'q': '*:*'}
     else:
         params = {'fq': ['court_exact:%s' % court], 'sort': 'dateFiled asc', 'rows': 1}
+    params['caller'] = 'search_utils'
     response = conn.raw_query(**params).execute()
     try:
         year = response.result.docs[0]['dateFiled'].year

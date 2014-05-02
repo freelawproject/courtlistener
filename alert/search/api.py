@@ -487,7 +487,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
             sf = SearchForm({'q': "*:*"})
             if sf.is_valid():
                 main_query = build_main_query(sf.cleaned_data, highlight='text')
-
+        main_query['caller'] = 'api_search'
         results_si = conn.raw_query(**main_query).execute()
         # Pull the text snippet up a level, where tastypie can find it
         for result in results_si.result.docs:

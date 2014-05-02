@@ -135,10 +135,13 @@ class Command(BaseCommand):
                     if search_form.is_valid():
                         cd = search_form.cleaned_data
                         main_params = search_utils.build_main_query(cd)
-                        main_params['rows'] = '20'
-                        main_params['start'] = '0'
-                        main_params['hl.tag.pre'] = '<em><strong>'
-                        main_params['hl.tag.post'] = '</strong></em>'
+                        main_params.update({
+                            'rows': '20',
+                            'start': '0',
+                            'hl.tag.pre': '<em><strong>',
+                            'hl.tag.post': '</strong></em>',
+                            'caller': 'cl_send_alerts',
+                        })
                         results = self.conn.raw_query(**main_params).execute()
                     else:
                         print "Query for alert %s was invalid" % alert.alertText
@@ -153,7 +156,6 @@ class Command(BaseCommand):
                     print "There were %s results" % len(results)
                 if self.verbosity >= 2:
                     print "The value of results is: %s" % results
-
 
                 # hits is a multi-dimensional array. It consists of alerts,
                 # paired with a list of document dicts, of the form:
