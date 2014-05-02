@@ -38,6 +38,10 @@ from django.utils.timezone import now, utc
      - 1.x - International Reporters added?
            - Other features (suggestions welcome)?
 
+    License:
+     - Unlike the rest of the CourtListener platform, this file is available under the permissive BSD license, making it
+       easy and safe to incorporate in your own libraries.
+
     Pull and feature requests welcome. Online editing in BitBucket is possible (and easy!)
 '''
 
@@ -48,6 +52,7 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                                            datetime.datetime(2010, 12, 31, tzinfo=utc)),
                                   'A.3d': (datetime.datetime(2010, 1, 1, tzinfo=utc),
                                            now())},
+                                  # Dates can be partially determined via Berkeley Law Online Catalog
                      'mlz_jurisdiction': 'us',
                      'name': 'Atlantic Reporter',
                      'variations': {'A. 2d': 'A.2d',
@@ -1945,8 +1950,10 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                          'name': 'New Jersey Law Reports',
                          'variations': {'N.J.Law': 'N.J.L.'}}],
              'N.M.': [{'cite_type': 'state',
-                       'editions': {'N.M.': (datetime.datetime(1890, 1, 1, tzinfo=utc),
+                       'editions': {'N.M.': (datetime.datetime(1852, 1, 1, tzinfo=utc),
                                              now())},
+                                            # Dates confirmed via citation table at 
+                                            # http://www.nmcompcomm.us/nmcases/pdf/NM%20Reports%20to%20Official%20-%20Vols.%201-75.pdf
                        'mlz_jurisdiction': 'us;nm',
                        'name': 'New Mexico Reports',
                        'variations': {}}],
@@ -2020,8 +2027,10 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
                          'name': 'North Dakota Neutral Citation, Court of Appeals',
                          'variations': {}}],
              'NM': [{'cite_type': 'neutral',
-                     'editions': {'NM': (datetime.datetime(1750, 1, 1, tzinfo=utc),
+                     'editions': {'NM': (datetime.datetime(1852, 1, 1, tzinfo=utc),
                                          now())},
+                                        # Dates confirmed via citation table at
+                                        # http://www.nmcompcomm.us/nmcases/pdf/NM%20Reports%20to%20Official%20-%20Vols.%201-75.pdf
                      'mlz_jurisdiction': 'us;nm',
                      'name': 'New Mexico Neutral Citation',
                      'variations': {}}],

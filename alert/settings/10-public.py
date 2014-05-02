@@ -190,7 +190,7 @@ TASTYPIE_FULL_DEBUG = True
 if DEVELOPMENT:
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
-    SESSION_COOKIE_DOMAIN = '127.0.0.1'
+    SESSION_COOKIE_DOMAIN = None
     # For debug_toolbar
     MIDDLEWARE_CLASSES.append('debug_toolbar.middleware.DebugToolbarMiddleware')
     INSTALLED_APPS.append('debug_toolbar')

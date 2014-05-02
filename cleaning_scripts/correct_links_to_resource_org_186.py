@@ -33,9 +33,9 @@ def link_fixer(link):
 def cleaner(simulate=False, verbose=False):
     docs = queryset_generator(Document.objects.filter(source = 'R', time_retrieved__gt = '2011-06-01'))
     for doc in docs:
-        original_link = doc.download_URL
+        original_link = doc.download_url
         fixed = link_fixer(original_link)
-        doc.download_URL = fixed
+        doc.download_url = fixed
         if verbose:
             print "Changing: " + original_link
             print "      to: " + fixed

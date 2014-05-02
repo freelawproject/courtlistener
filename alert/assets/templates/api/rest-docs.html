@@ -21,7 +21,7 @@
             <li><a href="/api/rest/v1/citation/">/api/rest/v1/citation/</a></li>
             <li><a href="/api/rest/v1/jurisdiction/">/api/rest/v1/jurisdiction/</a></li>
             <li><a href="/api/rest/v1/search/">/api/rest/v1/search/</a></li>
-            <li><a href="/api/rest/v1/coverage/">/api/rest/v1/coverage/</a></li>
+            <li><a href="/api/rest/v1/coverage/all/">/api/rest/v1/coverage/</a></li>
         </ol>
 
         <p>
@@ -151,7 +151,18 @@
             <code>curl https://www.courtlistener.com/api/rest/v1/opinion/?<strong>fields=absolute_url,resource_uri</strong></code>
         </blockquote>
         <p>
-            This could save you time and bandwidth if you are making numerous requests.
+            Using the double underscore syntax, this can also be used for nested resources. For example, the
+            <code>opinion</code> endpoint nests the <code>citation</code> endpoint in its results and the
+            <code>citation</code> endpoint has a field called <code>federal_cite_one</code>. If you wished to use the
+            <code>opinion</code> endpoint to only get back the nested <code>federal_cite_one</code> field, you could do
+            so with:
+        </p>
+        <blockquote>
+            <code>curl https://www.courtlistener.com/api/rest/v1/opinion/?<strong>fields=citation__federal_cite_one</strong></code>
+        </blockquote>
+        <p>
+            Using the <code>fields</code> parameter in these ways could save you time and bandwidth if you are making
+            many requests.
         </p>
 
         <h4>Limitations</h4>
@@ -210,6 +221,31 @@
             </li>
         </ol>
 
+        <h4>IDs and SHA1 Sums</h4>
+        <p>
+            Because of the way the data is organized in our backend, there is a unique ID for each citation and each
+            opinion. This means that when you are working with the <code>citation</code> endpoint, you cannot use the
+            opinion IDs, and vice versa. For example, this:
+        </p>
+        <blockquote>
+            <code>curl https://www.courtlistener.com/api/rest/v1/<strong>opinion</strong>/111170/</code>
+        </blockquote>
+        <p>
+            Returns <em><a href="/scotus/z3J/strickland-v-washington/">Strickland v. Washington</a></em>. But this does
+            not:
+        </p>
+        <blockquote>
+            <code>curl https://www.courtlistener.com/api/rest/v1/<strong>citation</strong>/111170/</code>
+        </blockquote>
+        <p>
+            In addition to this, each opinion has a globally unique
+            <code><a href="https://en.wikipedia.org/wiki/SHA-1">SHA1</a></code> sum that can be queried using the search
+            endpoint:
+        </p>
+        <blockquote>
+            <code>https://www.courtlistener.com/api/rest/v1/search/?q=a2daab35251795fc2621c6ac46b6031c95a4e0ba</code>
+        </blockquote>
+
         <h4>Upgrades and Fixes</h4>
         <p>
             Like the rest of the CourtListener platform, this API and its documentation are
@@ -265,8 +301,8 @@
         </p>
         <p>
             The results of this endpoint can also be ordered by <code>time_retrieved</code>, <code>date_modified</code>,
-            <code>date_filed</code>, <code>pagerank</code>, or <code>date_blocked</code>. Again, this is described in
-            more detail in the schema.
+            <code>date_filed</code>, or <code>date_blocked</code>. Again, this is described in more detail in the
+            schema.
         </p>
 
 
@@ -327,9 +363,11 @@
         </p>
         <p>
             At present, for performance reasons it is not possible to filter based on a citation. For this purpose, we
-            recommend the <a href="#search-endpoint">search endpoint</a>.
-        </p>
+            recommend the <a href="#search-endpoint">search endpoint</a>. For instance, when you know a citation and
+            want to see what information we have about it, try something like:
+            <a href="https://www.courtlistener.com/api/rest/v1/search/?citation=101 U.S. 99">https://www.courtlistener.com/api/rest/v1/search/?citation=101 U.S. 99</a>.
 
+        </p>
 
         <h3 id="jurisdiction-endpoint">/api/rest/v1/jurisdiction/</h3>
         <p>
@@ -345,16 +383,26 @@
         <h3 id="search-endpoint">/api/rest/v1/search/</h3>
         <p>
             This endpoint allows you to query our search engine along the same lines as is possible in our front end.
-            Because this endpoint does not use the Django models directly, the fields and results from this endpoint are
-            slightly different than those in the other endpoints. For example, instead of using a minus sign to flip
-            ordering, it uses <code>asc</code> and <code>desc</code>. (See <a href="/api/rest/v1/search/schema/">the
-            schema</a> for all of the ordering options).
+            Because this endpoint does not use the Django models directly, this endpoint is quite different than the
+            others. Several differences should be noted.
+        </p>
+        <p>
+            First, the fields and results from this endpoint are slightly different than those in the other endpoints.
+            For example, instead of using a minus sign to flip ordering, it uses <code>asc</code> and <code>desc</code>.
+            And instead of the <code>court</code> field returning a refernce to the <code>jurisdiction</code> endpoint,
+            it provides the name of the jurisdiction where the opinion was issued. (See
+            <a href="/api/rest/v1/search/schema/">the schema</a> and the notes below for all of the ordering options
+            and field information).
         </p>
         <p>
             Similarly, since this endpoint hits against a Solr search index instead of a database, the filtering works
             slightly differently. To filter on this endpoint, we recommend identifying an effective query on the front
             end that generates the results you desire. Using that query (and variations thereof), it is possible to
             easily apply it to this endpoint.
+        </p>
+        <p>
+            Finally, note that like the front end, only precedential results are returned by default. See below for an
+            example that returns non-precedential results as well.
         </p>
         <p>
             When examining the <em>filtering</em> section of the schema, note that fields have been labeled as follows:
@@ -399,13 +447,40 @@
             </dd>
         </dl>
         <p>
-            Finally, one field that warrants explanation is the <code>snippet</code> field. This field contains the
-            same values as are found on the front end, utilizing the HTML5 <code>&lt;mark&gt;</code> element to identify
-            up to five matches in an opinion. If you wish to use the snippet but do not want highlighting, simply use
-            CSS to give the <code>mark</code> element no styling, like a <code>span</code> element. This field only
-            responds to arguments provided to the <code>q</code> parameter. If that parameter is not used, the
-            <code>snippet</code> field will show the first 500 characters of the <code>text</code> field.
+            Three fields warrant special explanation:
         </p>
+        <dl>
+            <dt><code>resource_uri</code></dt>
+            <dd>
+                Because this endpoint is designed to help find opinions, once you've found the ones you want, we provide
+                a <code>resource_uri</code> that directs you back to the <code>opinion</code> endpoint, which has all of
+                the best meta data. This is in contrast to any of the other endpoints.
+            </dd>
+            <dt><code>snippet</code></dt>
+            <dd>
+                This field contains the same values as are found on the front end, utilizing the HTML5
+                <code>&lt;mark&gt;</code> element to identify up to five matches in an opinion. If you wish to use the
+                snippet but do not want highlighting, simply use CSS to give the <code>mark</code> element no styling,
+                like a <code>span</code> element. This field only responds to arguments provided to the <code>q</code>
+                parameter. If that parameter is not used, the <code>snippet</code> field will show the first 500
+                characters of the <code>text</code> field.
+            </dd>
+            <dt><code>stat_*</code></dt>
+            <dd>
+                For this Boolean field, we provide opinionated default values. Because most searchers are not interested
+                in non-precedential (unpublished) results, we leave them out by default. If you wish to receive these
+                items, you must explicitly ask for them as you do on the front end. For example, this query returns both
+                precedential (published) and non-precedential (unpublished) results:
+                <blockquote>
+                    <code>curl https://www.courtlistener.com/api/rest/v1/search/?stat_Precedential=on&stat_Non-Precedential=on</code>
+                </blockquote>
+            </dd>
+            <dt><code>court</code></dt>
+            <dd>
+                This field provides the name of the jurisdiction where the opinion was issued. In other endpoints, this
+                field directs you to the <code>jurisdiction</code> endpoint.
+            </dd>
+        </dl>
 
 
         <h3 id="coverage-endpoint">/api/rest/v1/coverage/</h3>
@@ -424,8 +499,6 @@
         <blockquote>
             <code>curl https://www.courtlistener.com/api/rest/v1/coverage/ca9/</code>
         </blockquote>
-
-
     </div>
 
 
@@ -470,16 +543,35 @@
                 If you are interested, we have a variety of <a href="http://freelawproject.org/about/assets/">"Powered
                 By" logos</a> available for your website or application. We appreciate a reference, but it's not required.
             </p>
+            <a href="http://freelawproject.org/about/assets/#powered-by">
+                <img src="/static/png/logo-long-w350.png" width="350" height="81">
+            </a>
+        </div>
 
-            <a href="http://freelawproject.org/about/assets/#powered-by"><img src="/static/png/logo-long-w350.png" width="350" height="81"></a>
+        <div class="span-9 last sidebar-section">
+            <h3><span>CiteGeist Scores</span></h3>
+
+            <p>If you are interested in the CiteGeist score for each opinion, it is now available via our
+                <a href="/api/bulk-info/#citegeist">
+                    bulk data API</a>.
+            </p>
+        </div>
+
+        <div class="span-9 last sidebar-section">
+            <h3><span>Maintenance Schedule</span></h3>
+            <p>
+                We regularly perform bulk tasks on our servers and have
+                <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a
+                public calendar</a> for tracking them.
+            </p>
         </div>
 
         <div class="span-9 last sidebar-section">
             <h3><span>Browser Tools</span></h3>
             <p>
-                If you are using the Firefox browser, you may be interested in the
-                <a href="https://addons.mozilla.org/en-US/firefox/addon/jsonovich/">JSONovitch extension</a> which
-                provides pretty printing of JSON in your browser.
+                Several tools are available to help view JSON in your browser. If you are using Firefox, check out
+                <a href="https://addons.mozilla.org/en-US/firefox/addon/jsonovich/">JSONovitch</a>. If you are using
+                Chrome, check out <a href="https://chrome.google.com/webstore/detail/jsonview/chklaanhfefbnpoihckbnefhakgolnmc?hl=en">JSONView</a>.
             </p>
         </div>
         <div class="span-9 last sidebar-section">

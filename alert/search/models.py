@@ -129,7 +129,7 @@ class Court(models.Model):
         max_length='200',
         blank=False
     )
-    URL = models.URLField(
+    url = models.URLField(
         help_text='the homepage for each court or the closest thing thereto',
         max_length=500,
     )
@@ -326,10 +326,12 @@ class Document(models.Model):
         blank=True,
         null=True
     )
-    download_URL = models.URLField(
+    download_url = models.URLField(
         help_text="The URL on the court website where the document was originally scraped",
         max_length=500,
-        db_index=True
+        db_index=True,
+        null=True,
+        blank=True,
     )
     local_path = models.FileField(
         help_text="The location, relative to MEDIA_ROOT on the CourtListener server, where files are stored",
@@ -375,11 +377,6 @@ class Document(models.Model):
         help_text='The number of times this document is cited by other cases',
         default=0,
         db_index=True,
-    )
-    pagerank = models.FloatField(
-        help_text='PageRank score based on the citing relation among documents',
-        default=0,
-        db_index=True
     )
     precedential_status = models.CharField(
         help_text='The precedential status of document, one of: %s' % ', '.join([t[0] for t in DOCUMENT_STATUSES]),

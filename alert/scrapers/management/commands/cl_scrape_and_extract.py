@@ -160,7 +160,7 @@ def scrape_court(site, full_crawl=False):
                     current_date,
                     next_date,
                     lookup_value=site.download_urls[i],
-                    lookup_by='download_URL'
+                    lookup_by='download_url'
                 )
             else:
                 onwards = dup_checker.should_we_continue_break_or_carry_on(
@@ -198,7 +198,7 @@ def scrape_court(site, full_crawl=False):
                                sha1=sha1_hash,
                                date_filed=site.case_dates[i],
                                court=court,
-                               download_URL=site.download_urls[i],
+                               download_url=site.download_urls[i],
                                precedential_status=site.precedential_statuses[i])
 
                 # Make and associate the file object
