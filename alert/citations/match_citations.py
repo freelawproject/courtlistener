@@ -53,7 +53,7 @@ def reverse_match(conn, results, citing_doc):
         # ~ performs a proximity search for the preceding phrase
         # See: http://wiki.apache.org/solr/SolrRelevancyCookbook#Term_Proximity
         params['q'] = '"%s"~%d' % (query, len(query_tokens))
-        params['caller'] = 'match_citations'
+        params['caller'] = 'reverse_match'
         new_results = conn.raw_query(**params).execute()
         if len(new_results) == 1:
             return [result]
