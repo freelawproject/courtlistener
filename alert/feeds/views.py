@@ -53,9 +53,12 @@ class search_feed(Feed):
             cd = search_form.cleaned_data
             conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
             main_params = search_utils.build_main_query(cd, highlight=False)
-            main_params.update({'sort': 'dateFiled desc'})
-            main_params['rows'] = '20'
-            main_params['start'] = '0'
+            main_params.update({
+                'sort': 'dateFiled desc',
+                'rows': '20',
+                'start': '0',
+                'caller': 'search_feed',
+            })
             results_si = conn.raw_query(**main_params).execute()
             return results_si
         else:
@@ -102,7 +105,8 @@ class court_feed(Feed):
             'court_exact': obj.pk,
             'sort': 'dateFiled desc',
             'rows': '20',
-            'start': '0'
+            'start': '0',
+            'caller': 'court_feed',
         }
         results_si = conn.raw_query(**params).execute()
         return results_si
@@ -145,7 +149,8 @@ class all_courts_feed(Feed):
             'q': '*:*',
             'sort': 'dateFiled desc',
             'rows': '20',
-            'start': '0'
+            'start': '0',
+            'caller': 'all_courts_feed',
         }
         results_si = conn.raw_query(**params).execute()
         return results_si

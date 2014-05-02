@@ -97,7 +97,7 @@ class IngestionTest(TestCase):
         doc.local_path.save(file_name, cf, save=False)
         doc.save(index=False)
         extract_doc_content(doc.pk, callback=subtask(extract_by_ocr))
-        response = self.si.raw_query(**{'q': 'supreme'}).execute()
+        response = self.si.raw_query(**{'q': 'supreme', 'caller': 'scraper_test',}).execute()
         count = response.result.numFound
         self.assertEqual(count, 1, "There were %s items found when there should have been 1" % count)
 

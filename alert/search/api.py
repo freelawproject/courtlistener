@@ -567,7 +567,12 @@ class SearchResource(ModelResourceWithFieldsFilter):
             sf = SearchForm({'q': "*:*"})
             if sf.is_valid():
                 main_query = build_main_query(sf.cleaned_data, highlight='text')
-
+        main_query['caller'] = 'api_search'
+        results_si = conn.raw_query(**main_query).execute()
+        # Pull the text snippet up a level, where tastypie can find it
+        for result in results_si.result.docs:
+            result['snippet'] = '&hellip;'.join(result['solr_highlights']['text'])
+        # Return the results as objects, not dicts.
         # Use a SolrList that has a couple of the normal functions built in.
         sl = SolrList(
             main_query=main_query,
