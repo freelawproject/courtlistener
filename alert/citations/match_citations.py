@@ -53,6 +53,7 @@ def reverse_match(conn, results, citing_doc):
         # ~ performs a proximity search for the preceding phrase
         # See: http://wiki.apache.org/solr/SolrRelevancyCookbook#Term_Proximity
         params['q'] = '"%s"~%d' % (query, len(query_tokens))
+        params['caller'] = 'reverse_match'
         new_results = conn.raw_query(**params).execute()
         if len(new_results) == 1:
             return [result]
@@ -62,6 +63,7 @@ def reverse_match(conn, results, citing_doc):
 def case_name_query(conn, params, citation, citing_doc):
     query, length = make_name_param(citation.defendant, citation.plaintiff)
     params['q'] = "caseName:(%s)" % query
+    params['caller'] = 'match_citations'
     results = []
     # Use Solr minimum match search, starting with requiring all words to match,
     # and decreasing by one word each time until a match is found
@@ -104,6 +106,7 @@ def match_citation(citation, citing_doc):
     # Take 1: Use citation
     citation_param = 'citation:"%s"' % citation.base_citation()
     main_params['fq'].append(citation_param)
+    main_params['caller'] = 'citations'
     results = conn.raw_query(**main_params).execute()
     if len(results) == 1:
         return results, True

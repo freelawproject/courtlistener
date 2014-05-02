@@ -20,7 +20,7 @@ def cleaner(simulate=False, verbose=True):
     """Fix cases that have mojibake as a result of pdffactory 3.51."""
 
     # Find all the cases using Solr
-    results_si = conn.raw_query(**{'q': u'ÚÑÎ'})
+    results_si = conn.raw_query(**{'q': u'ÚÑÎ', 'caller': 'mojibake',})
     for result in results_si:
         # For each document
         doc = Document.objects.get(pk=result['id'])
