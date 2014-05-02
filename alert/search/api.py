@@ -75,6 +75,7 @@ class PerUserCacheThrottle(CacheThrottle):
     """Sets up higher throttles for specific users"""
     custom_throttles = {
         'scout': 10000,
+        'scout_test': 10000,
     }
 
     def should_be_throttled(self, identifier, **kwargs):
