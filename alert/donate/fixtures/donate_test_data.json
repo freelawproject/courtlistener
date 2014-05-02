@@ -1,0 +1,64 @@
+[
+    {
+        "pk": 1,
+        "model": "auth.user",
+        "fields": {
+            "username": "pandora",
+            "first_name": "pandora",
+            "last_name": "",
+            "is_active": true,
+            "is_superuser": true,
+            "is_staff": true,
+            "last_login": "2013-10-01T16:28:18.203Z",
+            "groups": [],
+            "user_permissions": [],
+            "password": "pbkdf2_sha256$10000$jXE385lWfVo7$DmVuKPO6PJCO2klyqurfrrLOTstYIyaOtQ4Rf9TyYbU=",
+            "email": "pandora@courtlistener.com",
+            "date_joined": "2013-06-04T17:26:15Z"
+        }
+    },
+    {
+        "pk": 2,
+        "model": "userHandling.userprofile",
+        "fields": {
+            "barmembership": [],
+            "city": "Berkeley",
+            "activation_key": "6b2824bc10d068fc22c3256d3f3c84541295e01a",
+            "stub_account": false,
+            "avatar": "",
+            "key_expires": "2013-09-02T23:07:21Z",
+            "address1": "",
+            "address2": "",
+            "favorite": [
+                13
+            ],
+            "donation": [
+                1
+            ],
+            "employer": "",
+            "plaintext_preferred": false,
+            "wants_newsletter": true,
+            "state": "",
+            "user": 1,
+            "alert": [],
+            "email_confirmed": true,
+            "zip_code": ""
+        }
+    },
+    {
+        "pk": 1,
+        "model": "donate.donation",
+        "fields": {
+            "payment_id": "c830e335-da96-498f-a706-d4e9c70b2a3c",
+            "status": 4,
+            "payment_provider": "dwolla",
+            "date_modified": "2013-09-25T00:15:42.386Z",
+            "send_annual_reminder": true,
+            "amount": "1.00",
+            "referrer": "",
+            "date_created": "2012-10-04T07:00:00Z",
+            "clearing_date": "2012-10-05T00:06:14Z",
+            "transaction_id": ""
+        }
+    }
+]

@@ -1,0 +1,12 @@
+#charts {
+    display: inline-block;
+    margin: 0px 5px 5px 5px;
+}
+
+#graph {
+    height: 400px;
+}
+
+#graph table {
+    width: 20%;
+}
