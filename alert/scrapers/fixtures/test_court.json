@@ -1,0 +1,17 @@
+[
+    {
+        "pk": "test",
+        "model": "search.court",
+        "fields": {
+            "end_date": null,
+            "citation_string": "Test",
+            "short_name": "Testing Supreme Court",
+            "in_use": true,
+            "url": "https://www.courtlistener.com/",
+            "jurisdiction": "F",
+            "full_name": "Testing Supreme Court",
+            "position": 0.0,
+            "start_date": "2013-06-13"
+        }
+    }
+]

@@ -1,0 +1,95 @@
+ #!/bin/sh
+
+# Prerequisites:
+# 1. Solr needs to be installed at /usr/local/solr/example
+# 2. daemon needs to be installed
+# 3. Script needs to be executed by root
+# 4. $INSTALL_ROOT must be set in /etc/courtlistener
+
+# This script will launch Solr in a mode that will automatically respawn if it
+# crashes. Output will be sent to /var/log/solr/solr.log. A pid file will be
+# created in the standard location.
+
+start () {
+    echo -n "Starting solr..."
+
+    # Reset ulimit or else get issues with too many open files (https://issues.apache.org/jira/browse/SOLR-4)
+    ulimit -n 10000
+
+    # Use python to determine if this is a dev machine
+    . /etc/courtlistener
+    if [ -z $INSTALL_ROOT ]; then
+      echo "INSTALL_ROOT is not set. Please set it in /etc/courtlistener."
+      exit 1
+    fi
+    cd $INSTALL_ROOT/alert
+    xmx=`python -c 'import os;
+import sys;
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings");
+from django.conf import settings;
+print settings.SOLR_XMX;'`
+
+    # start daemon
+    daemon --chdir='/usr/local/solr/example' --command "java -jar -server -Xmx$xmx start.jar -DINSTALL_ROOT=$INSTALL_ROOT" --respawn --output=/var/log/solr/solr.log --name=solr --verbose
+
+    RETVAL=$?
+    if [ $RETVAL = 0 ]
+    then
+        echo "done."
+    else
+        echo "failed. See error code for more information."
+    fi
+    return $RETVAL
+}
+
+stop () {
+    # stop daemon
+    echo -n "Stopping solr..."
+
+    daemon --stop --name=solr  --verbose
+    RETVAL=$?
+
+    if [ $RETVAL = 0 ]
+    then
+        echo "done."
+    else
+        echo "failed. See error code for more information."
+    fi
+    return $RETVAL
+}
+
+
+restart () {
+    daemon --restart --name=solr  --verbose
+}
+
+
+status () {
+    # report on the status of the daemon
+    daemon --running --verbose --name=solr
+    return $?
+}
+
+
+case "$1" in
+    start)
+        start
+    ;;
+    status)
+        status
+    ;;
+    stop)
+        stop
+    ;;
+    restart)
+        stop
+        sleep 15
+        start
+    ;;
+    *)
+        echo $"Usage: solr {start|status|stop|restart}"
+        exit 3
+    ;;
+esac
+
+exit $RETVAL
