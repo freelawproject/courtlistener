@@ -195,12 +195,14 @@ if DEVELOPMENT:
     MIDDLEWARE_CLASSES.append('debug_toolbar.middleware.DebugToolbarMiddleware')
     INSTALLED_APPS.append('debug_toolbar')
     INTERNAL_IPS = ('127.0.0.1',)
-    DEBUG_TOOLBAR_CONFIG = {'INTERCEPT_REDIRECTS': False}
     # For tests
     SOUTH_TESTS_MIGRATE = False
     if 'test' in sys.argv:
         # Does DB in memory during tests
-        DATABASES['default'] = {'ENGINE': 'django.db.backends.sqlite3'}
+        DATABASES['default'] = {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': 'sqlite_db',
+        }
 
 else:
     SESSION_COOKIE_SECURE = True

@@ -64,7 +64,7 @@ class Migration(SchemaMigration):
             'documentPlainText': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
             'documentSHA1': ('django.db.models.fields.CharField', [], {'max_length': '40', 'db_index': 'True'}),
             'documentType': ('django.db.models.fields.CharField', [], {'max_length': '50', 'blank': 'True'}),
-            'documentUUID': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'download_URL': ('django.db.models.fields.URLField', [], {'max_length': '200', 'db_index': 'True'}),
             'extracted_by_ocr': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
             'html_with_citations': ('django.db.models.fields.TextField', [], {'blank': 'True'}),

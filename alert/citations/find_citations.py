@@ -6,7 +6,7 @@ import re
 import sys
 from alert.citations.constants import EDITIONS, REPORTERS, VARIATIONS_ONLY
 from alert.citations import reporter_tokenizer
-from alert.search.models import Court
+from alert.search.models import ALL_COURTS
 from juriscraper.lib.html_utils import get_visible_text
 
 FORWARD_SEEK = 20
@@ -15,14 +15,6 @@ BACKWARD_SEEK = 70  # Average case name length in the db is 67
 
 STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed",
                "remanded", "see", "granted", "dismissed"]
-
-# Store court values to avoid repeated DB queries
-if 'test' in sys.argv:
-    # If it's a test, we can't count on the database being prepped, so we have to load lazily
-    ALL_COURTS = Court.objects.all().values('citation_string', 'pk')
-else:
-    # list() forces early evaluation of the queryset so we don't have issues with closed cursors.
-    ALL_COURTS = list(Court.objects.all().values('citation_string', 'pk'))
 
 
 class Citation(object):

@@ -98,8 +98,13 @@ def add_fix(case_path, fix_dict):
 
 def log_print(msg):
     print msg
-    with open('/sata/lawbox/import_log.txt', 'a') as log:
-        log.write(msg.encode('utf-8') + '\n')
+    log_location = '/sata/lawbox/import_log.txt'
+    try:
+        with open(log_location, 'a') as log:
+            log.write(msg.encode('utf-8') + '\n')
+    except IOError:
+        # If the log doesn't exist
+        print "WARNING: Unable to find log at %s" % log_location
 
 
 def get_citations_from_tree(complete_html_tree, case_path):

@@ -1,4 +1,5 @@
 import re
+import sys
 from alert import settings
 from alert.lib.string_utils import trunc
 from alert.lib.encode_decode import num_to_ascii
@@ -48,7 +49,6 @@ DOCUMENT_SOURCES = (
     ('M', 'manual input'),
     ('A', 'internet archive'),
 )
-
 
 def make_upload_path(instance, filename):
     """Return a string like pdf/2010/08/13/foo_v._var.pdf, with the date set
@@ -160,6 +160,14 @@ class Court(models.Model):
     class Meta:
         db_table = "Court"
         ordering = ["position"]
+
+# Store court values to avoid repeated DB queries
+if not set(sys.argv).isdisjoint(['test', 'syncdb', 'shell', 'migrate']):
+    # If it's a test or we're syncing the database we can't count on the database being prepped, so we load lazily
+    ALL_COURTS = Court.objects.all().values('citation_string', 'pk', 'in_use')
+else:
+    # list() forces early evaluation of the queryset so we don't have issues with closed cursors.
+    ALL_COURTS = list(Court.objects.all().values('citation_string', 'pk', 'in_use'))
 
 
 class Citation(models.Model):

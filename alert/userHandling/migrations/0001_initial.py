@@ -76,7 +76,7 @@ class Migration(SchemaMigration):
             'alertFrequency': ('django.db.models.fields.CharField', [], {'max_length': '10'}),
             'alertName': ('django.db.models.fields.CharField', [], {'max_length': '75'}),
             'alertText': ('django.db.models.fields.CharField', [], {'max_length': '2500'}),
-            'alertUUID': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'lastHitDate': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
             'sendNegativeAlert': ('django.db.models.fields.BooleanField', [], {'default': 'False'})
         },

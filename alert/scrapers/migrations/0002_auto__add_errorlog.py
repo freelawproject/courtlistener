@@ -40,7 +40,7 @@ class Migration(SchemaMigration):
             'Meta': {'ordering': "['position']", 'object_name': 'Court', 'db_table': "'Court'"},
             'URL': ('django.db.models.fields.URLField', [], {'max_length': '200'}),
             'citation_string': ('django.db.models.fields.CharField', [], {'max_length': '100', 'blank': 'True'}),
-            'courtUUID': ('django.db.models.fields.CharField', [], {'max_length': '6', 'primary_key': 'True'}),
+            'id': ('django.db.models.fields.CharField', [], {'max_length': '6', 'primary_key': 'True'}),
             'end_date': ('django.db.models.fields.DateField', [], {'null': 'True', 'blank': 'True'}),
             'full_name': ('django.db.models.fields.CharField', [], {'max_length': "'200'"}),
             'in_use': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
