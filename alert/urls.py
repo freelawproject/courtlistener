@@ -1,5 +1,4 @@
 from tastypie.api import Api
-
 from alert.api.views import court_index, documentation_index, dump_index, rest_index, serve_or_gen_dump, serve_pagerank_file
 from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
@@ -20,7 +19,7 @@ from alert.robots.views import robots
 from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert
 from alert.search.api import (
     CitationResource, CourtResource, DocumentResource, SearchResource, CitesResource, CitedByResource)
-from alert.search.models import Court
+from alert.search.models import ALL_COURTS
 from alert.search.views import browser_warning, show_results, tools_page
 from alert.userHandling.views import (
     confirmEmail, deleteProfile, deleteProfileDone, emailConfirmSuccess, password_change, register, register_success,
@@ -28,18 +27,20 @@ from alert.userHandling.views import (
 )
 
 from django.conf.urls import include, patterns, url
+from django.contrib import admin
 from django.views.generic import RedirectView
 
 # for the flatfiles in the sitemap
 from django.contrib.auth.views import login as signIn, logout as signOut, password_reset, password_reset_done, \
         password_reset_confirm
 
-# enables the admin:
-from django.contrib import admin
-admin.autodiscover()
+# creates a list of pacer codes for use in URLs
+if not isinstance(ALL_COURTS, list):
+    # Happens when it is being lazy-loaded
+    pacer_codes = ['test']
+else:
+    pacer_codes = [court['pk'] for court in ALL_COURTS if court['in_use'] is True]
 
-# creates a list of the first element of the choices variable for the courts field
-pacer_codes = Court.objects.filter(in_use=True).values_list('pk', flat=True)
 mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html')
 
 # Set up the API
@@ -51,6 +52,8 @@ v1_api.register(SearchResource(tally_name='search.api.search'))
 v1_api.register(CitesResource(tally_name='search.api.cites'))
 v1_api.register(CitedByResource(tally_name='search.api.cited-by'))
 
+# enables the admin (must be last due to autodiscover performing imports from all apps):
+admin.autodiscover()
 
 urlpatterns = patterns('',
     # Admin docs and site

@@ -346,10 +346,9 @@ class CitesResource(ModelResourceWithFieldsFilter):
 
 class SolrList(object):
     """This implements a yielding list object that fetches items as they are queried."""
-    def __init__(self, conn, main_query, offset, limit, length=None):
+    def __init__(self, main_query, offset, limit, length=None):
         super(SolrList, self).__init__()
         self.main_query = main_query
-        self.conn = conn
         self.offset = offset
         self.limit = limit
         self.length = length
@@ -371,7 +370,8 @@ class SolrList(object):
 
     def __getitem__(self, item):
         self.main_query['start'] = self.offset
-        results_si = self.conn.raw_query(**self.main_query).execute()
+        conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+        results_si = conn.raw_query(**self.main_query).execute()
 
         # Set the length if it's not yet set.
         if self.length is None:
@@ -515,7 +515,6 @@ class SearchResource(ModelResourceWithFieldsFilter):
         attribute='timestamp',
         help_text='The moment when an item was indexed by Solr.'
     )
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
 
     class Meta:
         authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
@@ -569,8 +568,11 @@ class SearchResource(ModelResourceWithFieldsFilter):
                 main_query = build_main_query(sf.cleaned_data, highlight='text')
 
         # Use a SolrList that has a couple of the normal functions built in.
-        sl = SolrList(conn=self.conn, main_query=main_query, offset=request.GET.get('offset', 0),
-                      limit=request.GET.get('limit', 20))
+        sl = SolrList(
+            main_query=main_query,
+            offset=request.GET.get('offset', 0),
+            limit=request.GET.get('limit', 20)
+        )
         return sl
 
     def obj_get_list(self, bundle, **kwargs):

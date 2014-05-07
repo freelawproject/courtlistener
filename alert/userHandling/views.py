@@ -194,10 +194,8 @@ def register(request):
 
                 # Build and assign the activation key
                 salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-                activation_key = hashlib.sha1(salt + user.username).hexdigest()
-                key_expires = now() + timedelta(days=5)
-                up.activation_key = activation_key
-                up.key_expires = key_expires
+                up.activation_key = hashlib.sha1(salt + user.username).hexdigest()
+                up.key_expires = now() + timedelta(days=5)
                 up.save()
 
                 # Send an email with the confirmation link to the new user

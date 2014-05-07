@@ -7,7 +7,7 @@ from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_s
 from alert.search.models import Citation, Court, Document
 from alert.scrapers.test_assets import test_scraper
 from alert import settings
-from alert.search.management.commands.cl_calculate_pagerank import Command
+from alert.search.management.commands.cl_calculate_pagerank_networkx import Command
 from datetime import date
 
 
