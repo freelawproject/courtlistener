@@ -3,7 +3,11 @@ from __future__ import absolute_import
 from alert.lib.decorators import retry
 import cStringIO as StringIO
 from itertools import islice
-import socket, time, urllib, urlparse
+import logging
+import socket
+import time
+import urllib
+import urlparse
 import urllib2
 
 from .schema import SolrSchema, SolrError
@@ -13,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 MAX_LENGTH_GET_URL = 2048
 # Jetty default is 4096; Tomcat default is 8192; picking 2048 to be conservative.
+
 
 class SolrConnection(object):
     def __init__(self, url, http_connection, retry_timeout, max_length_get_url):
