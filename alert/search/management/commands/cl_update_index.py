@@ -152,7 +152,7 @@ class Command(BaseCommand):
         """
         Deletes all documents from the database.
         """
-        count = self.si.raw_query(**{'q': '*:*'}).count()
+        count = self.si.raw_query(**{'q': '*:*', 'caller': 'cl_update_index',}).count()
 
         if self._proceed_with_deletion(count):
             self.stdout.write('Removing all documents from your index because '

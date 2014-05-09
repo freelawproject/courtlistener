@@ -140,6 +140,7 @@ def get_dup_stats(doc):
         doc.date_filed,
         DEBUG=DEBUG,
     )
+    main_params['caller'] = 'corpus_importer'
     if DEBUG:
         print "    - main_params are: %s" % main_params
     candidates = conn.raw_query(**main_params).execute()

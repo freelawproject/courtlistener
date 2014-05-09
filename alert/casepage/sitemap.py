@@ -59,7 +59,7 @@ def sitemap_maker(request, size=250):
             'q': q,
             'rows': '0',  # just need the count
             'start': '0',
-            'caller': 'sitemap-index'
+            'caller': 'sitemap_index',
         }
         search_results_object = conn.raw_query(**params).execute()
         count = search_results_object.result.numFound

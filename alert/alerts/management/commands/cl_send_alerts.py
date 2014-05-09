@@ -157,7 +157,6 @@ class Command(BaseCommand):
                 if self.verbosity >= 2:
                     print "The value of results is: %s" % results
 
-
                 # hits is a multi-dimensional array. It consists of alerts,
                 # paired with a list of document dicts, of the form:
                 # [[alert1, [{hit1}, {hit2}, {hit3}]], [alert2, ...]]
