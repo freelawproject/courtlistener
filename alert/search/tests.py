@@ -3,7 +3,7 @@ from django.test.client import Client
 import time
 
 from alert.lib import sunburnt
-from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core
+from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core, get_data_dir_location
 from alert.search.models import Citation, Court, Document
 from alert.scrapers.test_assets import test_scraper
 from alert import settings
@@ -154,7 +154,7 @@ class PagerankTest(TestCase):
             d.citation.save(index=False)
             d.save(index=False)
 
-        #create simple citing relation: 1 cites 2; 2 cites 3; 3 cites 1; 1 cites 3
+        #create simple citing relation: 1 cites 2 and 3; 2 cites 3; 3 cites 1;
         d1.cases_cited.add(d2.citation)
         d2.citation_count += 1
         d2.cases_cited.add(d3.citation)
@@ -170,20 +170,23 @@ class PagerankTest(TestCase):
         #calculate pagerank of these 3 document
         comm = Command()
         self.verbosity = 1
-        comm.do_pagerank()
-        d1, d2, d3 = Document.objects.get(pk=d1.pk), Document.objects.get(pk=d2.pk), Document.objects.get(pk=d3.pk)
-        doc_list = [d1, d2, d3]
+        comm.do_pagerank(chown=False)
 
-        #verify that whether the answer is correct
-        ANS_LIST = [1.16336, 0.64443, 1.19219]
-        result = True
-        for i in range(3):
-            result *= abs(doc_list[i].pagerank - ANS_LIST[i]) / ANS_LIST[i] < 0.0001
-        self.assertEqual(
-            result,
-            1,
-            msg="The pagerank calculation is wrong.\n" +
-                "The answer 1 is {:f}\tYour answer 1 is {:f}\n".format(ANS_LIST[0], doc_list[0].pagerank) +
-                "The answer 2 is {:f}\tYour answer 2 is {:f}\n".format(ANS_LIST[1], doc_list[1].pagerank) +
-                "The answer 3 is {:f}\tYour answer 3 is {:f}\n".format(ANS_LIST[2], doc_list[2].pagerank)
-        )
+        # read in the pagerank file, converting to a dict
+        pr_values_from_file = {}
+        with open(get_data_dir_location() + "external_pagerank") as f:
+            for line in f:
+                pk, value = line.split('=')
+                pr_values_from_file[pk] = float(value.strip())
+
+        # Verify that whether the answer is correct, based on calculations in Gephi
+        answers = {
+            '1': 0.387790,
+            '2': 0.214811,
+            '3': 0.397400,
+        }
+        for key, value in answers.iteritems():
+            self.assertTrue(
+                (abs(pr_values_from_file[key]) - value) < 0.0001,
+                msg="The answer for item %s was %s when it should have been %s" % (key, answers['1'], pr_values_from_file['1'])
+            )

@@ -43,7 +43,7 @@ class ModelResourceWithFieldsFilter(ModelResource):
         self.tally_name = tally_name
 
     def alter_list_data_to_serialize(self, request, data):
-        data['meta']['request_uri'] = request.META['REQUEST_URI']
+        data['meta']['request_uri'] = request.get_full_path()
         return data
 
     def full_dehydrate(self, bundle, *args, **kwargs):
@@ -76,6 +76,7 @@ class PerUserCacheThrottle(CacheThrottle):
     custom_throttles = {
         'scout': 10000,
         'scout_test': 10000,
+        'mlissner': 1e9,  # A billion because I made this.
     }
 
     def should_be_throttled(self, identifier, **kwargs):

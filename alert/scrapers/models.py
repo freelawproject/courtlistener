@@ -1,5 +1,4 @@
 from django.db import models
-
 from alert.search.models import Court
 
 

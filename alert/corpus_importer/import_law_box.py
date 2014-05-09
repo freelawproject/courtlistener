@@ -24,8 +24,6 @@ from alert.corpus_importer import dup_finder, dup_helpers
 from alert.lib.string_utils import anonymize
 from alert.lib.import_lib import map_citations_to_models
 
-os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
-
 import argparse
 import datetime
 import fnmatch

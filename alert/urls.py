@@ -1,4 +1,5 @@
 from tastypie.api import Api
+from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert
 from alert.api.views import court_index, documentation_index, dump_index, rest_index, serve_or_gen_dump, serve_pagerank_file
 from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
@@ -16,10 +17,11 @@ from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, search
 from alert.maintenance_warning.views import show_maintenance_warning
 from alert.pinger.views import validate_for_bing, validate_for_bing2, validate_for_google, validate_for_google2
 from alert.robots.views import robots
-from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert
 from alert.search.api import (
-    CitationResource, CourtResource, DocumentResource, SearchResource, CitesResource, CitedByResource)
-from alert.search.models import ALL_COURTS
+    CitationResource, CourtResource, DocumentResource,
+    SearchResource, CitesResource, CitedByResource
+)
+from alert.search.models import Court
 from alert.search.views import browser_warning, show_results, tools_page
 from alert.userHandling.views import (
     confirmEmail, deleteProfile, deleteProfileDone, emailConfirmSuccess, password_change, register, register_success,
@@ -31,16 +33,12 @@ from django.contrib import admin
 from django.views.generic import RedirectView
 
 # for the flatfiles in the sitemap
-from django.contrib.auth.views import login as signIn, logout as signOut, password_reset, password_reset_done, \
-        password_reset_confirm
+from django.contrib.auth.views import (
+    login as signIn, logout as signOut, password_reset,
+    password_reset_done, password_reset_confirm
+)
 
-# creates a list of pacer codes for use in URLs
-if not isinstance(ALL_COURTS, list):
-    # Happens when it is being lazy-loaded
-    pacer_codes = ['test']
-else:
-    pacer_codes = [court['pk'] for court in ALL_COURTS if court['in_use'] is True]
-
+pacer_codes = Court.objects.filter(in_use=True).values_list('pk', flat=True)
 mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html')
 
 # Set up the API

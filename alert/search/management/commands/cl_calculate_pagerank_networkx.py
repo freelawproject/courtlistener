@@ -23,7 +23,7 @@ class Command(BaseCommand):
     TEMP_EXTENSION = '.tmp'
     result_file = open(RESULT_FILE_PATH + TEMP_EXTENSION, 'w')
 
-    def do_pagerank(self, verbosity=1):
+    def do_pagerank(self, verbosity=1, chown=True):
         #####################
         #      Stage I      #
         # Import Data to NX #
@@ -39,23 +39,9 @@ class Command(BaseCommand):
         case_count = 0
         timings = []
         average_per_s = 0
-        
-        # Build up a database of the old PR values
-        pr_db = {}
-        try:
-            with open(self.RESULT_FILE_PATH, 'r') as old_result_file:
-                for line in old_result_file:
-                    id, value = line.split('=')
-                    pr_db[id] = float(value)
-            created_pr_db = True
-        except IOError:
-            # The old PR file doesn't exist yet.
-            sys.stdout.write("Unable to find old PR file at: %s\n" % RESULT_FILE_PATH)
-            sys.stdout.write("Will assume all old PR values are zero.\n")
-            sys.stdout.flush()
-            created_pr_db = False
 
-        # Build up the network graph
+        # Build up the network graph and a list of all valid ids
+        id_list = []
         for source_case in case_list:
             case_count += 1
             if case_count % 100 == 1:
@@ -73,9 +59,9 @@ class Command(BaseCommand):
             sys.stdout.flush()
             for target_case in source_case.cases_cited.values_list('parent_documents__id'):
                 citing_graph.add_edge(str(source_case.pk), str(target_case[0]))
-            if not created_pr_db:
-                # This means that the old PR file didn't exist and we need to load it with zeroes.
-                pr_db[str(source_case.pk)] = 0
+
+            # Save all the keys since they get dropped by networkx in Stage II
+            id_list.append(str(source_case.pk))
 
         ######################
         #      Stage II      #
@@ -94,47 +80,18 @@ class Command(BaseCommand):
         # Update Pagerank #
         ###################
         progress = 0
-        update_count = 0
         min_value = min(pr_result.values())
-        UPDATE_THRESHOLD = min_value * 1.0e-05
-        for id, old_pr in pr_db.iteritems():
+        for id in id_list:
             progress += 1
             try:
-                if abs(old_pr - pr_result[id]) > UPDATE_THRESHOLD:
-                    # Save only if the diff is large enough
-                    update_count += 1
-                    logger.info("ID: {0}\told pagerank is {1}\tnew pagerank is {2}\n".format(
-                        id,
-                        old_pr,
-                        pr_result[id]
-                    ))
-                    self.result_file.write('{}={}\n'.format(id, pr_result[id]))
-                else:
-                    logger.info("ID: {0}\told pagerank is {1}\tnew pagerank is {2}\n".format(
-                        id,
-                        old_pr,
-                        old_pr
-                    ))
-                    self.result_file.write('{}={}\n'.format(id, old_pr))
-            #Because NetworkX removed the isolated nodes, which will be updated below
+                new_pr = pr_result[id]
             except KeyError:
-                if abs(old_pr - min_value) > UPDATE_THRESHOLD:
-                    update_count += 1
-                    logger.info("ID: {0}\told pagerank is {1}\tnew pagerank is {2}\n".format(
-                        id,
-                        old_pr,
-                        min_value
-                    ))
-                    self.result_file.write('{}={}\n'.format(id, min_value))
-                else:
-                    logger.info("ID: {0}\told pagerank is {1}\tnew pagerank is {2}\n".format(
-                        id,
-                        old_pr,
-                        old_pr
-                    ))
-                    self.result_file.write('{}={}\n'.format(id, old_pr))
+                # NetworkX removes the isolated nodes from the network, but they still need to go into the PR file.
+                new_pr = min_value
+            self.result_file.write('{}={}\n'.format(id, new_pr))
+
             if verbosity >= 1:
-                sys.stdout.write('\rUpdating Pagerank in database and external file...{:.0%}'.format(
+                sys.stdout.write('\rUpdating Pagerank in external file...{:.0%}'.format(
                     progress * 1.0 / graph_size
                 ))
                 sys.stdout.flush()
@@ -142,10 +99,7 @@ class Command(BaseCommand):
         self.result_file.close()
 
         if verbosity >= 1:
-            sys.stdout.write('\nPageRank calculation finished! Updated {} ({:.0%}) cases\n'.format(
-                update_count,
-                update_count * 1.0 / graph_size
-            ))
+            sys.stdout.write('\nPageRank calculation finished!')
             sys.stdout.write('See the django log for more details.\n')
 
         ########################
@@ -153,7 +107,7 @@ class Command(BaseCommand):
         # Maintenance Routines #
         ########################
         if verbosity >= 1:
-            sys.stdout.write('Sorting the temp pagerank file, for better Solr performance...\n')
+            sys.stdout.write('Sorting the temp pagerank file for improved Solr performance...\n')
 
         # Sort the temp file, creating a new file without the TEMP_EXTENSION value, then delete the temp file.
         os.system('sort -n %s%s > %s' % (self.RESULT_FILE_PATH, self.TEMP_EXTENSION, self.RESULT_FILE_PATH))
@@ -164,10 +118,11 @@ class Command(BaseCommand):
         reload_pagerank_external_file_cache()
 
         if verbosity >= 1:
-            sys.stdout.write('Copying pagerank file to sata, for bulk downloading...\n')
+            sys.stdout.write('Copying pagerank file to %s, for bulk downloading...\n' % settings.DUMP_DIR)
         shutil.copy(self.RESULT_FILE_PATH, settings.DUMP_DIR)
-        www_data_info = pwd.getpwnam('www-data')
-        os.chown(settings.DUMP_DIR + 'external_pagerank', www_data_info.pw_uid, www_data_info.pw_gid)
+        if chown:
+            user_info = pwd.getpwnam('www-data')
+            os.chown(settings.DUMP_DIR + 'external_pagerank', user_info.pw_uid, user_info.pw_gid)
 
     def handle(self, *args, **options):
         self.do_pagerank(verbosity=int(options.get('verbosity', 1)))

@@ -1,14 +1,10 @@
 from __future__ import absolute_import
 
 from alert.lib.decorators import retry
-import cgi
 import cStringIO as StringIO
 from itertools import islice
-import logging
 import socket, time, urllib, urlparse
 import urllib2
-import warnings
-
 
 from .schema import SolrSchema, SolrError
 from .search import LuceneQuery, MltSolrSearch, RawSolrSearch, SolrSearch, params_from_dict
