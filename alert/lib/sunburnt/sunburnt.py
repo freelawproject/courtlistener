@@ -9,6 +9,8 @@ import urllib2
 from .schema import SolrSchema, SolrError
 from .search import LuceneQuery, MltSolrSearch, RawSolrSearch, SolrSearch, params_from_dict
 
+logger = logging.getLogger(__name__)
+
 MAX_LENGTH_GET_URL = 2048
 # Jetty default is 4096; Tomcat default is 8192; picking 2048 to be conservative.
 
@@ -222,6 +224,10 @@ class SolrInterface(object):
 
     def raw_query(self, *args, **kwargs):
         # Accepts a query, and builds a RawSolrSearch object from it.
+        if not 'caller' in kwargs:
+            logger.warning('Caller not defined for Solr query.')
+
+
         if not self.readable:
             raise TypeError("This Solr instance is only for writing")
         r = RawSolrSearch(self)
