@@ -77,13 +77,13 @@ class Command(BaseCommand):
             end = date(2013, 6, 5)
             return self.site_yielder([i.date() for i in rrule(DAILY, dtstart=start, until=end)], mod)
         elif court_str == 'uscfc':
-            return self.site_yielder(range(1, 4))
+            return self.site_yielder(range(1, 4), mod)
         elif court_str == 'uscfc_u':
-            return self.site_yielder(range(1,2))
+            return self.site_yielder(range(1,2), mod)
         elif court_str == 'uscfc_vaccine':
-            return self.site_yielder([1])
+            return self.site_yielder([1], mod)
         elif court_str == 'uscfc_vaccine_u':
-            return self.site_yielder(1,10)
+            return self.site_yielder(range(1,10), mod)
 
     def back_scrape(self, mod):
         for site in self.generate_sites(mod):
