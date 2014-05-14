@@ -326,33 +326,16 @@
         "pk": "ariztaxct",
         "model": "search.court",
         "fields": {
-            "jurisdiction": "SA",
-            "end_date": null,
-            "citation_string": "Ariz. Ct. App.",
-            "short_name": "Court of Appeals of Arizona",
-            "in_use": true,
-            "url": "http://www.azcourts.gov/AZCourts/CourtofAppeals.aspx",
-            "notes": "Lawbox",
-            "date_modified": "2013-08-14T22:42:28Z",
-            "full_name": "Court of Appeals of Arizona",
-            "position": 323.0,
-            "start_date": null
-        }
-    },
-    {
-        "pk": "ariztc",
-        "model": "search.court",
-        "fields": {
             "jurisdiction": "SS",
             "end_date": null,
             "citation_string": "Ariz. T.C.",
             "short_name": "Arizona Tax Court",
             "in_use": true,
             "url": "http://www.superiorcourt.maricopa.gov/SuperiorCourt/TaxCourt/",
-            "notes": "",
-            "date_modified": "2013-08-15T20:58:07Z",
+            "notes": "Lawbox",
+            "date_modified": "2013-08-14T22:42:28Z",
             "full_name": "Arizona Tax Court",
-            "position": 322.5,
+            "position": 323.0,
             "start_date": null
         }
     },
