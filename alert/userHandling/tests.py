@@ -36,14 +36,14 @@ class UserTest(TestCase):
         # Update the expiration since the fixture has one some time ago.
         UserProfile.objects.filter(pk=2).update(key_expires=now() + timedelta(days=2))
 
-        response = self.client.get('/email/confirm/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/')
+        response = self.client.get('/email/confirm/key1/')
         self.assertIn('has been confirmed', response.content,
                       msg="Test string not found in response.content")
 
     def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(self):
         """Tests the trickier case when an email is associted with many accounts."""
         UserProfile.objects.filter(pk__in=(3, 4,)).update(key_expires=now() + timedelta(days=2))
-        response = self.client.get('/email/confirm/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab/')
+        response = self.client.get('/email/confirm/key1/')
         self.assertIn('has been confirmed', response.content,
                       msg="Test string not found in response.content")
         ups = UserProfile.objects.filter(pk__in=(3, 4,))
