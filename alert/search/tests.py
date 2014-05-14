@@ -1,6 +1,8 @@
 from django.test import TestCase
 from django.test.client import Client
+import simplejson
 import time
+
 
 from alert.lib import sunburnt
 from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core, get_data_dir_location
@@ -16,7 +18,7 @@ class SetupException(Exception):
         Exception.__init__(self, message)
 
 
-class SearchTest(TestCase):
+class SolrTestCase(TestCase):
     fixtures = ['test_court.json']
 
     def setUp(self):
@@ -48,11 +50,15 @@ class SearchTest(TestCase):
                                 judges=self.site.judges[i])
             self.doc.save()
 
+        self.expected_num_results = 2
+
     def tearDown(self):
         self.doc.delete()
         swap_solr_core(self.core_name, 'collection1')
         delete_solr_core(self.core_name)
 
+
+class SearchTest(SolrTestCase):
     def test_a_simple_text_query(self):
         """Does typing into the main query box work?"""
         response = self.client.get('/', {'q': 'supreme'})
@@ -129,6 +135,60 @@ class SearchTest(TestCase):
         response = self.client.get('/', {'q': '*:*', 'order_by': 'citeCount asc'})
         self.assertTrue(response.content.index('Disclosure') > response.content.index('Tarrant'),
                         msg="'Disclosure' should come AFTER 'Tarrant' when ordered by ascending citeCount.")
+
+
+class ApiTest(SolrTestCase):
+    fixtures = ['test_court.json', 'authtest_data.json']
+
+    def test_api_meta_data(self):
+        """Does the content of the search API have the right meta data?"""
+        # Log in our fake user that we created with the fixture
+        self.client.login(username='pandora', password='password')
+        r = self.client.get('/api/rest/v1/search/?q=*:*&format=json')
+        json_actual = simplejson.loads(r.content)
+
+        with open('search/test_assets/api_test_results.json', 'r') as f:
+            json_correct = simplejson.load(f)
+
+        # Drop the timestamps everywhere b/c otherwise they'll always differ
+        for j in [json_actual, json_correct]:
+            for o in j['objects']:
+                o['timestamp'] = None
+
+        self.assertEqual(
+            json_actual,
+            json_correct,
+            msg="Response from search API did not match expected results."
+        )
+
+    def test_api_result_count(self):
+        """Do we get back the number of results we expect in the meta data and in 'objects'?"""
+        self.client.login(username='pandora', password='password')
+        r = self.client.get('/api/rest/v1/search/?q=*:*&format=json')
+        json = simplejson.loads(r.content)
+        # Test the meta data
+        self.assertEqual(self.expected_num_results,
+                         json['meta']['total_count'],
+                         msg="Metadata result count does not match:\n"
+                             "  Got:\t%s\n"
+                             "  Expected:\t%s\n" % (json['meta']['total_count'],
+                                                    self.expected_num_results,))
+        # Test the actual data
+        num_actual_results = len(json['objects'])
+        self.assertEqual(self.expected_num_results,
+                         num_actual_results,
+                         msg="Actual number of results varies from expected number:\n"
+                             "  Got:\t%s\n"
+                             "  Expected:\t%s\n" % (num_actual_results, self.expected_num_results))
+
+    def test_api_able_to_login(self):
+        """Can we login properly?"""
+        username, password = 'pandora', 'password'
+        logged_in_successfully = self.client.login(username=username, password=password)
+        self.assertTrue(logged_in_successfully,
+                        msg="Unable to log into the test client with:\n"
+                            "  Username:\t%s\n"
+                            "  Password:\t%s\n" % (username, password))
 
 
 class PagerankTest(TestCase):

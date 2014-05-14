@@ -355,12 +355,16 @@ class SolrList(object):
         self.limit = limit
         self.length = length
         self._item_cache = []
+        self.conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
 
     def __len__(self):
         """Tastypie's paginator takes the len() of the item for its work."""
         if self.length is None:
-            # We don't yet know length, so call __getitem__, which sets it.
-            self.__getitem__(0)
+            mq = self.main_query.copy()  # local copy for manipulation
+            mq['rows'] = 0  # For performance, we just want the count
+            mq['caller'] = 'api_search_count'
+            r = self.conn.raw_query(**mq).execute()
+            self.length = r.result.numFound
         return self.length
 
     def __iter__(self):
@@ -372,8 +376,7 @@ class SolrList(object):
 
     def __getitem__(self, item):
         self.main_query['start'] = self.offset
-        conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
-        results_si = conn.raw_query(**self.main_query).execute()
+        results_si = self.conn.raw_query(**self.main_query).execute()
 
         # Set the length if it's not yet set.
         if self.length is None:
@@ -569,6 +572,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
             if sf.is_valid():
                 main_query = build_main_query(sf.cleaned_data, highlight='text')
 
+        main_query['caller'] = 'api_search'
         # Use a SolrList that has a couple of the normal functions built in.
         sl = SolrList(
             main_query=main_query,
