@@ -2,10 +2,7 @@
     rotate 36500
     daily
     dateext
-    notifempty    
+    notifempty
     noolddir
     sharedscripts
-    postrotate
-        /etc/init.d/scraper restart 
-    endscript
 }
