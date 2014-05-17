@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
+from django.utils.timezone import utc
 import logging
 import simplejson
 import stripe
@@ -20,25 +21,25 @@ def process_stripe_callback(request):
         # Now use the API to call back.
         stripe.api_key = settings.STRIPE_SECRET_KEY
         event = simplejson.loads(str(stripe.Event.retrieve(event_id)))
-        logger.info('Stripe callback triggered. See website for details.')
+        logger.info('Stripe callback triggered. See webhook documentation for details.')
         if event['type'].startswith('charge') and \
                         event['livemode'] != settings.PAYMENT_TESTING_MODE:  # Livemode is opposite of testing mode
             charge = event['data']['object']
             d = get_object_or_404(Donation, payment_id=charge['id'])
             # See: https://stripe.com/docs/api#event_types
             if event['type'].endswith('succeeded'):
-                d.clearing_date = datetime.utcfromtimestamp(charge['created'])
+                d.clearing_date = datetime.utcfromtimestamp(charge['created']).replace(tzinfo=utc)
                 d.status = 4
                 from alert.donate.views import send_thank_you_email
                 send_thank_you_email(d)
             elif event['type'].endswith('failed'):
-                d.clearing_date = datetime.utcfromtimestamp(charge['created'])
+                d.clearing_date = datetime.utcfromtimestamp(charge['created']).replace(tzinfo=utc)
                 d.status = 1
             elif event['type'].endswith('refunded'):
-                d.clearing_date = datetime.utcfromtimestamp(charge['created'])
+                d.clearing_date = datetime.utcfromtimestamp(charge['created']).replace(tzinfo=utc)
                 d.status = 7
             elif event['type'].endswith('captured'):
-                d.clearing_date = datetime.utcfromtimestamp(charge['created'])
+                d.clearing_date = datetime.utcfromtimestamp(charge['created']).replace(tzinfo=utc)
                 d.status = 8
             elif event['type'].endswith('dispute.created'):
                 logger.critical("Somebody has created a dispute in Stripe: %s" % charge['id'])
