@@ -124,6 +124,7 @@ class CourtResource(ModelResourceWithFieldsFilter):
             'id': ('exact',),
             'date_modified': good_time_filters,
             'in_use': ALL,
+            'has_scraper': ALL,
             'position': numerical_filters,
             'short_name': ALL,
             'full_name': ALL,

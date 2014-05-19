@@ -108,6 +108,10 @@ class Court(models.Model):
         help_text='Whether this jurisdiction is in use in CourtListener -- increasingly True',
         default=False
     )
+    has_scraper = models.BooleanField(
+        help_text='Whether the jurisdiction has a scraper that obtains opinions automatically.',
+        default=False,
+    )
     position = models.FloatField(
         help_text='A dewey-decimal-style numeral indicating a hierarchical ordering of jurisdictions',
         null=True,

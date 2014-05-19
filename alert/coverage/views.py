@@ -35,7 +35,13 @@ def coverage_graph(request):
             count_scraper += d['source__count']
         if 'L' in d['source']:
             count_lawbox += d['source__count']
+
+    courts_with_scrapers = Court.objects.filter(in_use=True, has_scraper=True)
     return render_to_response('coverage/coverage_graph.html',
-                              {'sorted_courts': courts_json, 'count_pro': count_pro, 'count_lawbox': count_lawbox,
-                               'count_scraper': count_scraper, 'private': False},
+                              {'sorted_courts': courts_json,
+                               'count_pro': count_pro,
+                               'count_lawbox': count_lawbox,
+                               'count_scraper': count_scraper,
+                               'courts_with_scrapers': courts_with_scrapers,
+                               'private': False},
                               RequestContext(request))
