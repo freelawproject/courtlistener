@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load humanize %}
+{% load partition_util %}
 
 {% block title %}Coverage - CourtListener.com{% endblock %}
 {% block search-form %}{% endblock %}
@@ -58,6 +59,31 @@
                 <a href="/contact/">get in touch</a>.</p>
 
             <p>For more information about our jurisdictions, see <a href="/api/jurisdictions/">our jurisdiction page</a>.
+            </p>
+
+            <h4 id="scraped-jurisdictions">Realtime Coverage</h4>
+            <p>We have realtime coverage of many courts, but if you are setting up an alert, it's important to
+                note that we do not yet have realtime coverage for all of the 350 courts on CourtListener. The courts
+                for which we currently can provide realtime coverage and alerts are:
+            </p>
+            <div class="span-24">
+                {% for row in courts_with_scrapers|rows:3 %}
+                    <div class="span-8 {% if forloop.last %}last{% endif %}">
+                        <ul>
+                            {% for court in row %}
+                                {% if court.has_scraper %}
+                                    <li>
+                                        <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc">{{ court }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <p>This list continues to grow as we receive <a href="/donate/">support</a> and <a href="/contact/">requests</a>
+                for additional jurisdictions. Your support helps make this project possible.
             </p>
         </div>
     </div>

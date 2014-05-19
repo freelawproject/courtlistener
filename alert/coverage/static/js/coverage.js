@@ -34,11 +34,14 @@ function addNavigation() {
 
     // Do this when the hash of the page changes (i.e. at page load or when a select is chosen.
     $(window).hashchange(function(){
-        if (window.location.hash.substr(1) === "") {
-            var hash = 'all';
-        } else {
-            var hash = window.location.hash.substr(1);
+        var hash = window.location.hash.substr(1)
+        if (hash === "") {
+            hash = 'all';
+        } else if (document.getElementById(hash)){
+            // The user tried to get to an unrelated ID
+            hash = 'all';
         }
+
         $.ajax({
             type: "GET",
             url: "/api/rest/v1/coverage/" + hash + "/",

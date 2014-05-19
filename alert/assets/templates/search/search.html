@@ -61,7 +61,7 @@
                             <p class="bottom">Please fix the errors below.</p>
                         </div>
                     {% endif %}
-                    <p>Create an alert to get regular notifications about this query whenever there are new results.</p>
+                    <p>Get regular notifications about this query by creating an alert.</p>
                     <form action="" method="post">{% csrf_token %}
                         {{ alert_form.alertText }}
                         <p class="span-6 append-1">
@@ -91,7 +91,10 @@
                             <label for="id_sendNegativeAlert">Send me an email even if there are no new hits</label>
                             <br>
                         </p>
-                        <button type="submit" class="button title" name="alertSave">Create alert</button>
+                        <button type="submit" class="button title span-5" name="alertSave">Create alert</button>
+                        <p class="gray">Some jurisdictions do not yet support alerts. Check
+                            <a href="/coverage/#scraped-jurisdictions">our list</a> to be
+                            sure your query is supported.</p>
                     </form>
                 {% else %}
                     <p>To create an alert, place a query.</p>
