@@ -1,0 +1,25 @@
+
+Hi,
+
+We haven't sent out a newsletter in a while but today we have some very exciting news. Starting immediately, we at Free Law Project will begin working with Princeton University's Center for Information Technology Policy (CITP) to further the goals of their “RECAP” platform. RECAP is a system they developed beginning in 2009 that utilizes free browser extensions to improve the experience of using PACER, the electronic public access system for U.S. federal courts.
+
+RECAP will be operated as a joint project, with FLP taking the lead on maintaining and developing the system. Initially we will work on the day-to-day maintenance of RECAP, but over time we will seek funding to integrate the project's code and documents with our CourtListener platform. We  believe that with the right funding, this partnership will create the largest freely downloadable collection of court documents online.
+
+CITP will continue to support RECAP and is excited to have found such fitting partners in the effort to improve access to public court records.
+
+For more information, we've written a number of blog posts and a press release on the topic:
+
+ - Stephen Schultz on CITP's Freedom to Tinker blog: https://freedom-to-tinker.com/blog/sjs/free-law-project-partnering-in-stewardship-of-recap/
+ - Brian Carver on FLP's blog: http://freelawproject.org/2014/05/19/our-recap-partnership-with-princeton-universitys-citp/
+ - Press release: http://www.prlog.org/12324795-recap-partnership-forged-between-princeton-universitys-citp-and-non-profit-free-law-project.html
+
+You can also follow updates to RECAP on Twitter at @recapthelaw.
+
+We are extremely excited to share this news and together we look forward to delivering the next generation of legal research tools and materials.
+
+
+Mike & Brian
+Founders, FLP
+
+-----------
+If you wish to unsubscribe from these newsletters, just reply and we'll take you right off.
