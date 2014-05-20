@@ -73,7 +73,7 @@
                             {% for court in row %}
                                 {% if court.has_scraper %}
                                     <li>
-                                        <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc">{{ court }}</a>
+                                        <a href="/?q=&court_{{ court.pk }}=on&order_by=dateFiled+desc">{{ court }}</a>
                                     </li>
                                 {% endif %}
                             {% endfor %}
