@@ -23,4 +23,4 @@ Precedential Status: {{doc.status}}
 
 
 {% endif %}{% endfor %}{% endfor %}
---CourtListener.com
+-- This alert brought to you by the non-profit Free Law Project. Donate here to support our work: https://www.courtlistener.com/donate/
