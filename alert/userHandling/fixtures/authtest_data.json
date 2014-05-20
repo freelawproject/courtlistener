@@ -65,7 +65,7 @@
         "fields": {
             "barmembership": [],
             "city": "",
-            "activation_key": "key1",
+            "activation_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "stub_account": false,
             "avatar": "",
             "key_expires": "2013-07-20T18:31:04.327Z",
@@ -107,7 +107,7 @@
         "fields": {
             "barmembership": [],
             "city": "",
-            "activation_key": "key1",
+            "activation_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
             "stub_account": false,
             "avatar": "",
             "key_expires": "2013-07-20T18:31:04.327Z",
