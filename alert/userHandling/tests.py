@@ -34,18 +34,24 @@ class UserTest(TestCase):
     def test_confirming_an_email_address(self):
         """Tests whether we can confirm the case where an email is associated with a single account."""
         # Update the expiration since the fixture has one some time ago.
-        UserProfile.objects.filter(pk=2).update(key_expires=now() + timedelta(days=2))
+        u = UserProfile.objects.get(pk=2)
+        u.key_expires = now() + timedelta(days=2)
+        u.save()
 
-        response = self.client.get('/email/confirm/key1/')
+        response = self.client.get('/email/confirm/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/')
+        self.assertEqual(200, response.status_code,
+                         msg="Did not get 200 code when activating account. Instead got %s" % response.status_code)
         self.assertIn('has been confirmed', response.content,
                       msg="Test string not found in response.content")
 
     def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(self):
-        """Tests the trickier case when an email is associted with many accounts."""
+        """Tests the trickier case when an email is associated with many accounts."""
         UserProfile.objects.filter(pk__in=(3, 4,)).update(key_expires=now() + timedelta(days=2))
-        response = self.client.get('/email/confirm/key1/')
+        response = self.client.get('/email/confirm/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab/')
         self.assertIn('has been confirmed', response.content,
                       msg="Test string not found in response.content")
+        self.assertEqual(200, response.status_code,
+                         msg="Did not get 200 code when activating account. Instead got %s" % response.status_code)
         ups = UserProfile.objects.filter(pk__in=(3, 4,))
         for up in ups:
             self.assertTrue(up.email_confirmed)
