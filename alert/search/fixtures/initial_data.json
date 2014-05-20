@@ -1374,7 +1374,7 @@
             "citation_string": "D.C.",
             "short_name": "District of Columbia",
             "in_use": true,
-            "has_scraper": false,
+            "has_scraper": true,
             "url": "http://www.dcd.uscourts.gov/",
             "notes": "Lawbox",
             "date_modified": "2013-08-15T16:28:54Z",
