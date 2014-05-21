@@ -6,11 +6,19 @@ Sets up all the overrides or additional CSS that the site uses.
 ::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 
 
+footer {
+    padding-top: 2em;
+    border-top: 1px solid gray;
+}
+
 .footer-item {
-    float: left;
-    margin-right: 3em;
-    margin-bottom: 4em;
-    width: auto;
+    margin-bottom: 0.2em;
+    font-size: 110%;
+}
+
+#by-line a {
+    color: gray;
+    text-decoration: underline;
 }
 
 /* for the nav in the settings pages */
@@ -118,11 +126,17 @@ body {
     background-color: #E9E8E8;
 }
 .container {
-    padding: 20px 30px 0px;
+    padding: 20px 0px 0px 0px;
     background-color: white;
     border-left: 1px solid #c2c2c2;
     border-bottom: 1px solid #c2c2c2;
     border-right: 1px solid #c2c2c2;
+    width: 1010px;
+}
+
+.content, footer, header {
+    padding-left: 30px;
+    padding-right: 30px;
 }
 
 nav {

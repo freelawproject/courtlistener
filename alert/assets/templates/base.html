@@ -95,53 +95,80 @@
                 <hr class="space">
             {% endblock %}
 
-            {% block sidebar %}
-                <div class="span-6 append-1" id="sidebar">
-                </div>
-            {% endblock %}
+            <div class="content">
+                {% block sidebar %}
+                    <div class="span-6 append-1" id="sidebar"></div>
+                {% endblock %}
 
-            {# for the settings pages #}
-            {% block nav %}{% endblock %}
+                {# for the settings pages #}
+                {% block nav %}{% endblock %}
 
-            {% block content %}
-                <div class="span-17 last" id="content">
+                {% block content %}
                     <p>Your content seems to be missing! This is never good.</p>
-                </div>
-            {% endblock %}
+                {% endblock %}
+            </div>
 
             {% block footer %}
-                <div class="span-24 last">
-                    <hr class="space">
-                    <hr>
-                </div>
-                <footer class="span-24 last">
-                    <span class="footer-item">
-                        <a href="/about/">About</a>
-                    </span>
-                    <span class="footer-item">
-                        <a href="/donate/?referrer=footer">Donate</a>
-                    </span>
-                    <span class="footer-item">
-                        <a href="/api/">APIs and Bulk Data</a>
-                    </span>
-                    <span class="footer-item">
-                        <a href="/tools/">Tools</a>
-                    </span>
-                    <span class="footer-item">
-                        <a href="/contribute/">Contribute</a>
-                    </span>
-                    <span class="footer-item">
-                        <a href="/coverage/">Coverage</a>
-                    </span>
-                    <span class="footer-item">
-                        <a href="/terms/">Terms &amp; Privacy</a>
-                    </span>
-                    <span class="footer-item">
-                        <a href="/sitemap/">Sitemap</a>
-                    </span>
-                    <span class="footer-item">
-                        <a href="/contact/">Contact / Engage</a>
-                    </span>
+                <footer class="span-24">
+                    <div class="span-4">
+                        <div class="footer-item">
+                            <a href="/about/">About</a>
+                        </div>
+                        <div class="footer-item">
+                            <a href="/faq/">FAQ</a>
+                        </div>
+                        <div class="footer-item">
+                            <a href="/faq/">Feature Tour</a>
+                        </div>
+                    </div>
+
+                    <div class="span-4">
+                        <div class="footer-item">
+                            <a href="/coverage/">Coverage</a>
+                        </div>
+                        <div class="footer-item">
+                            <a href="/api/">APIs and Bulk Data</a>
+                        </div>
+                        <div class="footer-item">
+                            <a href="/jurisdictions/">Jurisdictions</a>
+                        </div>
+                    </div>
+
+                    <div class="span-4">
+                        <div class="footer-item">
+                            <a href="http://freelawproject.org">Blog</a>
+                        </div>
+                        <div class="footer-item">
+                            <a href="http://twitter.com/courtlistener">Twitter</a>
+                        </div>
+                        <div class="footer-item">
+                            <a href="/contribute/">Contribute</a>
+                        </div>
+                    </div>
+
+                    <div class="span-4">
+                        <div class="footer-item">
+                            <a href="/terms/">Terms &amp; Privacy</a>
+                        </div>
+                        <div class="footer-item">
+                            <a href="/removal/">Removal</a>
+                        </div>
+                        <div class="footer-item">
+                            <a href="/contact/">Contact Us</a>
+                        </div>
+                    </div>
+
+                    <div class="span-8 last right">
+                        <a href="/donate/">
+                            <img src="{{ STATIC_PREFIX }}png/donate-button.png"
+                                 alt="Donate to support our work"
+                                 height="75"
+                                 width="227">
+                        </a>
+                    </div>
+                    <div class="span-24 last gray" id="by-line">
+                        <p>CourtListener is sponsored by the non-profit <a href="http://freelawproject.org">Free Law Project</a>.</p>
+                    </div>
                 </footer>
              {% endblock %}
         </div>

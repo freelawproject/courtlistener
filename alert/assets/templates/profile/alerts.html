@@ -7,8 +7,8 @@
 {% block nav-alerts %}active{% endblock %}
 
 {% block content %}
-    <div class="span-24 last" id="content">
-        <div class="span-24 last content">
+    <div class="span-24 last">
+        <div class="span-24 last">
             {% if messages %}
                 <div class="span-17 last">
                     <div class="span-10">
@@ -21,7 +21,7 @@
             {% endif %}
         </div>
         {% if user.profile.alert.all %}
-            <div class="span-24 last content">
+            <div class="span-24 last">
                 <table class="settings-table">
                     <thead>
                         <tr>
