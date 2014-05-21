@@ -69,8 +69,6 @@ INSTALLED_APPS = [
     'casepage',
     'citations',
     'corpus_importer',
-    'contact',
-    'coverage',
     'custom_filters',
     'donate',
     'favorites',
@@ -80,6 +78,7 @@ INSTALLED_APPS = [
     'pinger',
     'scrapers',
     'search',
+    'simple_pages',
     'stats',
     'userHandling',
 ]

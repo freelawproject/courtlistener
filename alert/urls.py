@@ -4,9 +4,8 @@ from alert.api.views import court_index, documentation_index, dump_index, rest_i
 from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
 from alert.casepage.views import view_case, view_case_citations, serve_static_file, view_authorities
-from alert.contact.views import contact, thanks
-from alert.coverage.api import coverage_data
-from alert.coverage.views import coverage_graph
+from alert.simple_pages.api import coverage_data
+from alert.simple_pages.views import about, contact, coverage_graph, contact_thanks, robots
 from alert.donate.dwolla import process_dwolla_callback, process_dwolla_transaction_status_callback
 from alert.donate.paypal import process_paypal_callback, donate_paypal_cancel
 from alert.donate.sitemap import donate_sitemap_maker
@@ -16,7 +15,6 @@ from alert.favorites.views import delete_favorite, edit_favorite, save_or_update
 from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, search_feed
 from alert.maintenance_warning.views import show_maintenance_warning
 from alert.pinger.views import validate_for_bing, validate_for_bing2, validate_for_google, validate_for_google2
-from alert.robots.views import robots
 from alert.search.api import (
     CitationResource, CourtResource, DocumentResource,
     SearchResource, CitesResource, CitedByResource
@@ -91,7 +89,7 @@ urlpatterns = patterns('',
 
     # Contact us pages
     (r'^contact/$', contact),
-    (r'^contact/thanks/$', thanks),
+    (r'^contact/thanks/$', contact_thanks),
 
     # Various sign in/out etc. functions as provided by django
     url(
