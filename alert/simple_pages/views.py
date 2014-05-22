@@ -26,10 +26,10 @@ def about(request):
 
 def faq(request):
     """Loads the FAQ page"""
-    return render_to_response(
-        'simple_pages/faqs.html',
-        {'ptivate': False},
-        RequestContext(request)
+    return contact(
+        request,
+        template_path='simple_pages/faqs.html',
+        initial={'subject': 'FAQs'}
     )
 
 
@@ -74,7 +74,7 @@ def coverage_graph(request):
 
 
 @check_honeypot(field_name='skip_me_if_alive')
-def contact(request):
+def contact(request, template_path='simple_pages/contact_form.html', initial={}):
     if request.method == 'POST':
         form = ContactForm(request.POST)
         if form.is_valid():
@@ -98,19 +98,19 @@ def contact(request):
     else:
         # the form is loading for the first time
         try:
-            email_addy = request.user.email
-            full_name = request.user.get_full_name()
-            form = ContactForm(
-                initial={'name': full_name, 'email': email_addy}
-            )
-        except:
+            initial['email'] = request.user.email
+            initial['name'] = request.user.get_full_name()
+            form = ContactForm(initial=initial)
+        except AttributeError:
             # for anonymous users, who lack full_names, and emails
-            form = ContactForm()
+            form = ContactForm(initial=initial)
 
-    return render_to_response('simple_pages/contact_form.html',
-                              {'form': form,
-                               'private': False},
-                              RequestContext(request))
+    return render_to_response(
+        template_path,
+        {'form': form,
+         'private': False},
+        RequestContext(request)
+    )
 
 
 def contact_thanks(request):

@@ -8,6 +8,7 @@ Sets up all the overrides or additional CSS that the site uses.
 
 footer {
     padding-top: 2em;
+    margin-top: 4em;
     border-top: 1px solid gray;
 }
 
