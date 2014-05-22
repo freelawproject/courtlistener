@@ -4,8 +4,6 @@ from alert.api.views import court_index, documentation_index, dump_index, rest_i
 from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
 from alert.casepage.views import view_case, view_case_citations, serve_static_file, view_authorities
-from alert.simple_pages.api import coverage_data
-from alert.simple_pages.views import about, contact, coverage_graph, contact_thanks, robots
 from alert.donate.dwolla import process_dwolla_callback, process_dwolla_transaction_status_callback
 from alert.donate.paypal import process_paypal_callback, donate_paypal_cancel
 from alert.donate.sitemap import donate_sitemap_maker
@@ -21,6 +19,8 @@ from alert.search.api import (
 )
 from alert.search.models import Court
 from alert.search.views import browser_warning, show_results, tools_page
+from alert.simple_pages.api import coverage_data
+from alert.simple_pages.views import about, contact, coverage_graph, contact_thanks, faq, robots
 from alert.userHandling.views import (
     confirmEmail, deleteProfile, deleteProfileDone, emailConfirmSuccess, password_change, register, register_success,
     request_email_confirmation, view_favorites, view_alerts, view_settings
@@ -87,7 +87,10 @@ urlpatterns = patterns('',
     (r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$',
         serve_static_file),
 
-    # Contact us pages
+    # Simple pages
+    (r'^about/$', about),
+    (r'^faq/$', faq),
+    (r'^coverage/$', coverage_graph),
     (r'^contact/$', contact),
     (r'^contact/thanks/$', contact_thanks),
 
@@ -173,9 +176,6 @@ urlpatterns = patterns('',
     (r'^sitemap-flat\.xml$', flat_sitemap_maker),
     (r'^sitemap-donate\.xml$', donate_sitemap_maker),
     (r'^robots.txt$', robots),
-
-    # Coverage
-    (r'^coverage/$', coverage_graph),
 
     # Donations
     (r'^donate/$', donate),
