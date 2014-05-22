@@ -17,9 +17,20 @@ from alert.honeypot.decorators import check_honeypot
 
 def about(request):
     """Loads the about page"""
-    return render_to_response('simple_pages/about.html',
-                              {'private': False},
-                              RequestContext(request))
+    return render_to_response(
+        'simple_pages/about.html',
+        {'private': False},
+        RequestContext(request)
+    )
+
+
+def faq(request):
+    """Loads the FAQ page"""
+    return render_to_response(
+        'simple_pages/faqs.html',
+        {'ptivate': False},
+        RequestContext(request)
+    )
 
 
 def build_court_dicts(courts):
