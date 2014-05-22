@@ -1,75 +1,190 @@
 {% extends "base.html" %}
+{% load honeypot %}
 
-{% block title %}About - CourtListener.com{% endblock %}
+{% block title %}Frequently Asked Questions - CourtListener.com{% endblock %}
 {% block search-form %}{% endblock %}
 {% block sidebar %}{% endblock %}
 
 {% block content %}
+    <div class="span-24 last">
+        <h2 id="qs">Frequently Asked Questions</h2>
+    </div>
+
     <div class="span-9 append-2">
-        <h2 id="the-site">About</h2>
+        <h3 class="bottom">General</h3>
+        <p>
+            <a href="#who-and-what">What is this site? Who runs it?</a><br>
+            <a href="#contact">How do I contact you?</a>
+        </p>
 
-        <p>Started in 2010, CourtListener is a core project of the <a href="http://freelawproject.org/">Free Law
-            Project</a>, a California Non-Profit corporation. The goal of the site is to provide powerful free legal
-            tools for everybody while giving away all our data in <a href="/dump-info/">bulk downloads</a>.</p>
 
-        <p>We collect legal opinions from court websites and from data donations, and are aiming to have the best, most
-            complete data on the open Web within the next couple years. We are slowly expanding to provide search and
-            awareness tools for as many state courts as possible, and we already have tools for all of the Federal
-            Appeals Courts. For more details on which jurisdictions we support, see our <a href="/coverage/">coverage
-                page</a>. If you're able to help us acquire more cases, please <a href="/contact/">get in touch</a>.</p>
-        <hr class="space">
-        <h3 id="contribute">You Make CourtListener.</h3>
+        <h3 class="bottom">Features</h3>
+        <p>
+            <a href="#why-use">Why should I use this site (and not something else)?</a><br>
+            <a href="#how-different">What makes this site different from other sites that put legal documents
+                online?</a><br>
+            <a href="#explain-alerts">How do alerts work?</a><br>
+            <a href="#explain-citations">How do you identify citations?</a>
+        </p>
 
-        <p>CourtListener is a community project and we enthusiastically welcome contributions. There are many ways to
-            contribute, which are detailed on our <a href="/contribute/">contribute page</a>.
+        <h3 class="bottom">Coverage and Content</h3>
+        <p>
+            <a href="#what-coverage-exists">What is your coverage of legal materials and how comprehensive is
+                it?</a><br>
+            <a href="#why-my-case">Why is my case appearing on this site?</a><br>
+            <a href="#non-precedential">Why does this site contain documents that say "Not for Publication",
+                "Unpublished" etc?</a><br>
+            <a href="#why-bulk">Why do you provide bulk data files?</a><br>
+            <a href="#bulk-frequency">How often are your bulk data files generated?</a><br>
+            <a href="#explain-fingerprint">What is the "fingerprint" of the document?</a>
+        </p>
 
-        <p>We are thankful for the hard work of our past contributors:</p>
-        <ul>
-            <li>Karen Rustad &amp; Rowyn McDonald for creating our citator, cross-linker and coverage graphs.</li>
-            <li>Bo Jin (Krist) for creating the heart of our relevance engine.</li>
-            <li>Josh de-Larios Heiman for his pro-bono legal expertise.</li>
-            <li>Siddharth Agrawal &amp; Andrew McConachie for their research on keyword identification.</li>
-            <li>Sarah Tyler for her research into search relevance and user interfaces.</li>
-            <li>Peter Nguyen for his design work for the jurisdiction picker.</li>
-            <li>Ben Cassidy, Commetric, Inc., Bo Jin (Krist), Deb Linton, Matt Meiske, Andrew McConachie, Taliah B.
-                Mirmalek, David Zvenyach for their work on the Juriscraper scraper framework.
-            </li>
-        </ul>
-        <p>We've also had generous support from a handful of organizations including
-            <a href="http://casetext.com">CaseText</a>,
-            <a href="http://www.fastcase.com">FastCase</a>,
-            <a href="http://justia">Justia</a>,
-            <a href="http://lawboxapps.com/">Lawbox, Inc.</a> and
-            <a href="http://resource.org">Resource.org</a>.
+        <h3 class="bottom">Contributions</h3>
+        <p>
+            <a href="#kinds-of-help">What kinds of help do you need?</a><br>
+            <a href="#how-supported">How is the project supported?</a><br>
+            <a href="#can-i-contribute">Can I contribute to the project somehow?</a>
+        </p>
+
+        <h3 class="bottom">Past and Future</h3>
+        <p>
+            <a href="#orgin-story">What's the history of CourtListener?</a><br>
+            <a href="#future">What plans or features are in the works?</a>
+        </p>
+
+        <h3 class="bottom">Something Else?</h3>
+        <p>
+            <a href="#other">Something else?</a>
         </p>
     </div>
 
     <div class="span-13 last">
-        <h2 id="Team">Team</h2>
+        {% if form.errors %}
+            <p class="bottom error">There were errors with your submission. See <a href="#other">below</a> for details.
+            </p>
+        {% endif %}
 
-        <div class="span-7">
-            <img src="{{ STATIC_URL }}jpeg/brian.jpeg" height="270" width="270">
-        </div>
-        <div class="span-6 last">
-            <p>Brian W. Carver is the Co-Founder of the non-profit <a href="http://freelawproject.org">Free Law
-                Project</a>, and an Assistant Professor at the <a href="http://ischool.berkeley.edu">University of
-                California, Berkeley School of Information</a>. He researches and teaches about intellectual property
-                law and cyberlaw and is also engaged in efforts to increase the public's access to the law.</p>
-        </div>
-        <hr class="space">
-        <div class="span-13 last">
-            <div class="span-7">
-                <img src="{{ STATIC_URL }}jpeg/mike.jpeg" height="270" width="270">
-            </div>
-            <div class="span-6 last">
-                <p>Michael Lissner is the Lead Developer and Co-Founder of the non-profit
-                    <a href="http://freelawproject.org">Free Law Project</a>. Before founding the Free Law Project, he
-                    spent several years working in the enterprise search and e-discovery fields, building bespoke search
-                    systems. He is a graduate of the <a href="http://ischool.berkeley.edu">University of California,
-                        Berkeley School of Information</a> and a long-distance walker, crossing both the
-                    <a href="http://pcta.org">United States</a> and <a href="http://www.teararoa.org.nz/">New
-                        Zealand</a> on foot.</p>
-            </div>
-        </div>
+
+        <h3 id="general">General</h3>
+        <h4 id="who-and-what" class="bottom">What is this site? Who runs it?</h4>
+        <p>CourtListener is a legal research website currently containing more than 2.5M legal
+            opinions, commonly known as judgements.
+        </p>
+
+        <h4 id="contact" class="bottom">How do I contact you?</h4>
+        <p>We can be contacted via the address on our <a href="/contact/">contact form</a>, or via email at
+            <a href="mailto:info@freelawproject.org">info@freelawproject.org</a>. If you require a secure channel when
+            contacting us, please use the PGP key listed
+            <a href="http://pgp.mit.edu/pks/lookup?op=get&search=0xDE79459CD047ACFE">here</a>.
+        </p>
+
+
+        <h3 id="features">Features</h3>
+        <h4 id="why-use" class="bottom">Why should I use this site (and not something else)?</h4>
+        <p></p>
+
+        <h4 id="how-different" class="bottom">What makes this site different from other sites that put legal documents
+            online?</h4>
+        <p></p>
+
+        <h4 id="explain-alerts" class="bottom">How do alerts work?</h4>
+        <p></p>
+
+        <h4 id="explain-citations" class="bottom">How do you identify citations?</h4>
+        <p></p>
+
+
+        <h3 id="coverage-and-content">Coverage and Content</h3>
+        <h4 id="what-coverage-exists" class="bottom">What is your coverage of legal materials and how comprehensive is
+            it?</h4>
+        <p></p>
+
+        <h4 id="why-my-case" class="bottom">Why is my case appearing on this site?</h4>
+        <p></p>
+
+        <h4 id="non-precedential" class="bottom">Why does this site contain documents that say "Not for Publication",
+            "Unpublished" etc?</h4>
+        <p>In many jurisdictions of the United States, these statements do not mean that the case should not be
+            published. Instead, it means that the issuing court is claiming they should not be used as a precedent in
+            subsequent cases. You can read more about this policy <a
+                    href="https://en.wikipedia.org/wiki/Non-publication_of_legal_opinions_in_the_United_States">on
+                wikipedia</a>, if you are interested in the details.
+        </p>
+
+        <h4 id="why-bulk" class="bottom">Why do you provide bulk data files?</h4>
+        <p></p>
+
+        <h4 id="bulk-frequency" class="bottom">How often are your bulk data files generated?</h4>
+        <p></p>
+
+        <h4 id="explain-fingerprint" class="bottom">What is the "fingerprint" of the document?</h4>
+        <p></p>
+
+
+        <h3 id="contributions">Contributions</h3>
+        <h4 id="kinds-of-help" class="bottom">What kinds of help do you need?</h4>
+        <p></p>
+
+        <h4 id="how-supported" class="bottom">How is the project supported?</h4>
+        <p></p>
+
+        <h4 id="can-i-contribute" class="bottom">Can I contribute to the project somehow?</h4>
+        <p></p>
+
+
+        <h3 id="past-and-future">Past and Future</h3>
+        <h4 id="orgin-story" class="bottom">What's the history of CourtListener?</h4>
+        <p></p>
+
+        <h4 id="future" class="bottom">What plans or features are in the works?</h4>
+        <p></p>
+
+
+        <h3 id="other">Something else?</h3>
+        <p>If you have another question, don't hesitate to get in touch using the form below.
+        </p>
+
+
+        <form action="" method="post">{% csrf_token %}
+            {% render_honeypot_field "skip_me_if_alive" %}
+            <p>
+                <label for="id_name">Name</label>
+                {% if form.name.errors %}
+                    <span class="errortext">
+                        {% for error in form.name.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.name }}
+            </p>
+
+            <p>
+                <label for="id_email">Email (optional)</label>
+                {% if form.email.errors %}
+                    <span class="errortext">
+                        {% for error in form.email.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.email }}
+            </p>
+
+            <input id="id_subject" maxlength="150" name="subject" value="FAQs" type="hidden">
+
+            <p>
+                <label for="id_message">Message</label>
+                {% if form.message.errors %}
+                    <span class="errortext">
+                        {% for error in form.message.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.message }}
+            </p>
+            <button type="submit" class="button">Ask Us</button>
+        </form>
     </div>
 {% endblock %}
