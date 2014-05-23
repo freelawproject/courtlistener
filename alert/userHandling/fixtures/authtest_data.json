@@ -1,0 +1,170 @@
+[
+    {
+        "pk": "1",
+        "model": "auth.user",
+        "fields": {
+            "username": "pandora",
+            "first_name": "Dora with password 'password'",
+            "last_name": "☠☠☠☠☠☠☠☠☠☠☠",
+            "is_active": true,
+            "is_superuser": false,
+            "is_staff": false,
+            "last_login": "2006-12-17T16:46:30Z",
+            "groups": [],
+            "user_permissions": [],
+            "password": "sha1$6efc0$f93efe9fd7542f25a7be94871ea45aa95de57161",
+            "email": "pandora@courtlistener.com",
+            "date_joined": "2006-12-17T16:46:30Z"
+        }
+    },
+    {
+        "pk": 1,
+        "model": "userHandling.userprofile",
+        "fields": {
+            "barmembership": [],
+            "city": "Berkeley",
+            "activation_key": "301efc12443eb62d708ef57e2715fc5c22c82f2a",
+            "stub_account": false,
+            "avatar": "",
+            "key_expires": "2013-07-20T18:31:04.327Z",
+            "address1": null,
+            "address2": null,
+            "favorite": [],
+            "donation": [],
+            "employer": "",
+            "plaintext_preferred": false,
+            "wants_newsletter": false,
+            "state": "CA",
+            "user": 1,
+            "alert": [],
+            "email_confirmed": true,
+            "zip_code": null
+        }
+    },
+    {
+        "pk": "2",
+        "model": "auth.user",
+        "fields": {
+            "username": "unconfirmed_email",
+            "first_name": "",
+            "last_name": "",
+            "is_active": true,
+            "is_superuser": false,
+            "is_staff": false,
+            "last_login": "2006-12-17T16:46:30Z",
+            "groups": [],
+            "user_permissions": [],
+            "password": "sha1$6efc0$f93efe9fd7542f25a7be94871ea45aa95de57161",
+            "email": "unconfirmed@courtlistener.com",
+            "date_joined": "2006-12-17T16:46:30Z"
+        }
+    },
+    {
+        "pk": 2,
+        "model": "userHandling.userprofile",
+        "fields": {
+            "barmembership": [],
+            "city": "",
+            "activation_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "stub_account": false,
+            "avatar": "",
+            "key_expires": "2013-07-20T18:31:04.327Z",
+            "address1": null,
+            "address2": null,
+            "favorite": [],
+            "donation": [],
+            "employer": "",
+            "plaintext_preferred": false,
+            "wants_newsletter": false,
+            "state": "CA",
+            "user": 2,
+            "alert": [],
+            "email_confirmed": false,
+            "zip_code": null
+        }
+    },
+    {
+        "pk": "3",
+        "model": "auth.user",
+        "fields": {
+            "username": "unconfirmed_email2",
+            "first_name": "",
+            "last_name": "",
+            "is_active": true,
+            "is_superuser": false,
+            "is_staff": false,
+            "last_login": "2006-12-17T16:46:30Z",
+            "groups": [],
+            "user_permissions": [],
+            "password": "sha1$6efc0$f93efe9fd7542f25a7be94871ea45aa95de57161",
+            "email": "unconfirmed2@courtlistener.com",
+            "date_joined": "2006-12-17T16:46:30Z"
+        }
+    },
+    {
+        "pk": 3,
+        "model": "userHandling.userprofile",
+        "fields": {
+            "barmembership": [],
+            "city": "",
+            "activation_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+            "stub_account": false,
+            "avatar": "",
+            "key_expires": "2013-07-20T18:31:04.327Z",
+            "address1": null,
+            "address2": null,
+            "favorite": [],
+            "donation": [],
+            "employer": "",
+            "plaintext_preferred": false,
+            "wants_newsletter": false,
+            "state": "CA",
+            "user": 3,
+            "alert": [],
+            "email_confirmed": false,
+            "zip_code": null
+        }
+    },
+    {
+        "pk": "4",
+        "model": "auth.user",
+        "fields": {
+            "username": "unconfirmed_email3",
+            "first_name": "",
+            "last_name": "",
+            "is_active": true,
+            "is_superuser": false,
+            "is_staff": false,
+            "last_login": "2006-12-17T16:46:30Z",
+            "groups": [],
+            "user_permissions": [],
+            "password": "sha1$6efc0$f93efe9fd7542f25a7be94871ea45aa95de57161",
+            "email": "unconfirmed2@courtlistener.com",
+            "date_joined": "2006-12-17T16:46:30Z"
+        }
+    },
+    {
+        "pk": 4,
+        "model": "userHandling.userprofile",
+        "fields": {
+            "barmembership": [],
+            "city": "",
+            "activation_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+            "stub_account": false,
+            "avatar": "",
+            "key_expires": "2013-07-20T18:31:04.327Z",
+            "address1": null,
+            "address2": null,
+            "favorite": [],
+            "donation": [],
+            "employer": "",
+            "plaintext_preferred": false,
+            "wants_newsletter": false,
+            "state": "CA",
+            "user": 4,
+            "alert": [],
+            "email_confirmed": false,
+            "zip_code": null
+        }
+    }
+]

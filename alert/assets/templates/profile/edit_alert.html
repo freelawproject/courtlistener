@@ -1,0 +1,57 @@
+{% extends "profile/nav.html" %}
+
+{% block title %}Edit Alerts - CourtListener.com{% endblock %}
+
+{% block search-form %}{% endblock %}
+{% block nav-alerts %}active{% endblock %}
+
+{% block content %}
+    <div class="span-8 last">
+        {% if form.errors %}
+            <div class="span-6 error">
+                <p class="bottom">There were errors with your submission.</p>
+            </div>
+        {% endif %}
+
+        <div class="span-8">
+            <form action="" method="post">{% csrf_token %}
+                {{ form.alertText }}
+                <p>
+                    <label for="id_alertName">Give the alert a name</label>
+                    {% if form.alertName.errors %}
+                        <span class="errortext">
+                            {% for error in form.alertName.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </span>
+                    {% endif %}
+                    <input type="text" maxlength="75" name="alertName" class="span-8" value="{{form.alertName.value}}" id="id_alertName">
+                </p>
+                <p>
+                    <label for="id_alertFrequency">How often should we notify you?</label>
+                    {% if form.alertFrequency.errors %}
+                        <br><span class="errortext">
+                            {% for error in form.alertFrequency.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                    {{ form.alertFrequency }}
+                </p>
+                <p>
+                    {{ form.sendNegativeAlert }}
+                    <label for="id_sendNegativeAlert">Send me an email even when there are no hits</label>
+                    {% if form.sendNegativeAlert.errors %}
+                        <span class="errortext">
+                            {% for error in form.sendNegativeAlert.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </span>
+                    {% endif %}<br>
+                </p>
+                <button type="submit" class="button title" name="alertSave">Save alert</button>
+                <a href="/alert/delete/confirm/{{alert_id}}">Delete this alert</a>
+            </form>
+        </div>
+    </div>
+{% endblock %}

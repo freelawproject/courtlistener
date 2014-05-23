@@ -1,0 +1,65 @@
+{% extends "profile/nav.html" %}
+
+{% block title %}Alerts - CourtListener.com{% endblock %}
+
+{% block search-form %}{% endblock %}
+
+{% block nav-alerts %}active{% endblock %}
+
+{% block content %}
+    <div class="span-24 last">
+        <div class="span-24 last">
+            {% if messages %}
+                <div class="span-17 last">
+                    <div class="span-10">
+                        {% for message in messages %}
+                            <p class="bottom {{message.tags}}">{{message|safe}}</p>
+                        {% endfor %}
+                    </div>
+                    <div class="span-6 last">&nbsp;</div>
+                </div>
+            {% endif %}
+        </div>
+        {% if user.profile.alert.all %}
+            <div class="span-24 last">
+                <table class="settings-table">
+                    <thead>
+                        <tr>
+                            <th>Query&nbsp;name</th>
+                            <th>Frequency</th>
+                            <th>Last&nbsp;hit</th>
+                            <th colspan="2">Subscribe</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for alert in user.profile.alert.all %}
+                        <tr>
+                            <td>
+                                <p class="bottom" title="{{alert.alertName}}">
+                                    <a href="/?{{alert.alertText}}">{{ alert.alertName|capfirst|truncatewords:"6" }}</a>
+                                </p>
+                            </td>
+                            <td>{{ alert.get_alertFrequency_display }}</td>
+                            <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"Never" }}</td>
+                            <td>
+                                <a href="/feed/search/?{{ alert.alertText }}">
+                                    <img src="{{  STATIC_URL }}png/atom-feed.png" alt="atom icon" height="12px" width="12px">
+                                </a>
+                            </td>
+                            <td><a href="/alert/edit/{{ alert.pk }}/">edit/delete</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <form action="/" method="post">{% csrf_token %}
+                    <button type="submit" class="button">Make new alert</button>
+                </form>
+            </div>
+        {% else %}
+            <h3>You have not made any alerts.</h3>
+            <form action="/" method="get">
+                <button type="submit" class="button">Make new alert</button>
+            </form>
+        {% endif %}
+    </div>
+{% endblock %}
