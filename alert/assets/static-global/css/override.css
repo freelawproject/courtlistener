@@ -5,6 +5,10 @@ Sets up all the overrides or additional CSS that the site uses.
 ::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 ::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 
+/* for the nav in the settings pages */
+.header {
+    float: left;
+}
 
 footer {
     padding-top: 2em;
@@ -22,9 +26,19 @@ footer {
     text-decoration: underline;
 }
 
-/* for the nav in the settings pages */
-.header {
-    float: left;
+#social-container {
+    display: block;
+    background: none;
+    width: 200px;
+    margin: 2em auto;
+}
+
+#social-container a {
+    margin-right: 0.75em;
+}
+
+#social-container .fa-lg:hover i.fa-circle{
+    color: #6683b7;
 }
 
 .settings-nav-item a,

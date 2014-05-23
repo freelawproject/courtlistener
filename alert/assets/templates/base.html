@@ -42,7 +42,7 @@
     </head>
 
     <body>
-        <div class="container">
+        <div class="container round-bottom">
             {% block header %}
                 <header class="header-container span-24">
                     <div class="span-7 header" id="header">
@@ -130,7 +130,7 @@
                             <a href="/api/">APIs and Bulk Data</a>
                         </div>
                         <div class="footer-item">
-                            <a href="/jurisdictions/">Jurisdictions</a>
+                            <a href="/api/jurisdictions/">Jurisdictions</a>
                         </div>
                     </div>
 
@@ -172,6 +172,28 @@
                 </footer>
              {% endblock %}
         </div>
+
+        {% block social %}
+            <div id="social-container">
+                <a href="https://twitter.com/courtlistener" class="fa-stack fa-lg">
+                    <i class="fa fa-circle fa-stack-2x gray"></i>
+                    <i class="fa fa-twitter fa-stack-1x fa-inverse"></i>
+                </a>
+                <a href="https://www.facebook.com/freelawproject" class="fa-stack fa-lg">
+                    <i class="fa fa-circle fa-stack-2x gray"></i>
+                    <i class="fa fa-facebook fa-stack-1x fa-inverse"></i>
+                </a>
+                <a href="https://www.linkedin.com/company/free-law-project" class="fa-stack fa-lg">
+                    <i class="fa fa-circle fa-stack-2x gray"></i>
+                    <i class="fa fa-linkedin fa-stack-1x fa-inverse"></i>
+                </a>
+                <a href="https://plus.google.com/u/0/b/101318679730088826987/101318679730088826987/about"
+                   class="fa-stack fa-lg">
+                    <i class="fa fa-circle fa-stack-2x gray"></i>
+                    <i class="fa fa-google-plus fa-stack-1x fa-inverse"></i>
+                </a>
+            </div>
+        {% endblock %}
 
         <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
         <script>window.jQuery || document.write('<script src="{{ STATIC_PREFIX }}js/jquery-1.7.2.min.js"><\/script>')</script>
