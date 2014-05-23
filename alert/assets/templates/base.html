@@ -1,4 +1,4 @@
-{% load static %}{% get_static_prefix as STATIC_PREFIX %}<!DOCTYPE html>
+{% load static %}{% get_static_prefix as STATIC_PREFIX %}{% load humanize %}{% load widget_tweaks %}<!DOCTYPE html>
 <!--[if lt IE 7]> <html class="no-js ie6 lt8 lt7 oldie" lang="en"> <![endif]-->
 <!--[if IE 7]>    <html class="no-js ie7 lt8 oldie" lang="en"> <![endif]-->
 <!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en"> <![endif]-->
@@ -89,7 +89,41 @@
 
                     {% block search-form %}
                     <div class="span-17 last" id="searchform">
-                        {% include "search/search_form_snippet.html" %}
+                        <form action="/" method="get" id="search-form">
+                            <div id="search-container">
+                                <table>
+                                    <tbody>
+                                    <tr>
+                                        <td>
+                                            <input class="{% if count == 0 or error %}auto-focus{% endif %} wide-title"
+                                                   value="{{ search_form.q.value|default:'' }}"
+                                                   name="q"
+                                                   id="id_q"
+                                                   autocomplete="off"
+                                                   type="text"
+                                                   tabindex="5">
+                                        </td>
+                                        <td>
+                                            <button type="submit"
+                                                    class="button title"
+                                                    name="search"
+                                                    id="search-button"
+                                                    tabindex="6">Search
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2">
+                                            <div class="left">
+                                                <a href="/search/advanced-techniques/" id="advanced" tabindex="8">Advanced</a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                                {# search_form #}
+                            </div>
+                        </form>
                     </div>
                     {% endblock %}
                 </header>
@@ -200,23 +234,7 @@
         <script type="text/javascript" src="{{ STATIC_PREFIX }}js/jquery-ui-1.10.3.custom.min.js"></script>
         <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.min.js"></script>
         <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap-tour.min.js"></script>
-
-        <!-- Feature Tour -->
-        <script type="text/javascript">
-            var tour = new Tour({
-                steps: [
-                    {
-                        element: "#create-alert-header",
-                        title: "Create Alerts",
-                        content: "You can create alerts for many jurisdictions to get the latest updates."
-                    }
-                ]
-            });
-            $('#tour-link').click(function(){
-                tour.init();
-                tour.start();
-            });
-        </script>
+        <script type="text/javascript" src="{{ STATIC_URL }}js/base.js"></script>
 
         {# Allows your own scripts in the footer. #}
         {% block footer-scripts %}{% endblock %}
