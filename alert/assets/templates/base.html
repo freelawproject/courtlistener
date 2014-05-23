@@ -39,6 +39,8 @@
               media="screen, projection">
         <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/jquery-ui-1.10.3.custom.css" type="text/css"
               media="screen, projection">
+        <link rel="stylesheet" href="{{ STATIC_URL }}css/bootstrap-tour.min.css" type="text/css"
+              media="screen, projection">
     </head>
 
     <body>
@@ -118,7 +120,7 @@
                             <a href="/faq/">FAQ</a>
                         </div>
                         <div class="footer-item">
-                            <a href="/features/">Feature Tour</a>
+                            <p class="fake-link" id="tour-link">Feature Tour</p>
                         </div>
                     </div>
 
@@ -156,7 +158,7 @@
                     </div>
 
                     <div class="span-8 last right">
-                        <a href="/donate/">
+                        <a href="/donate/?referrer=footer-button">
                             <img src="{{ STATIC_PREFIX }}png/donate-button.png"
                                  alt="Donate to support our work"
                                  height="75"
@@ -192,10 +194,29 @@
             </div>
         {% endblock %}
 
-        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
-        <script>window.jQuery || document.write('<script src="{{ STATIC_PREFIX }}js/jquery-1.7.2.min.js"><\/script>')</script>
+        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+        <script>window.jQuery || document.write('<script src="{{ STATIC_PREFIX }}js/jquery-1.11.1.min.js"><\/script>')</script>
+        <script type="text/javascript" src="http://code.jquery.com/jquery-migrate-1.2.1.js"></script>
         <script type="text/javascript" src="{{ STATIC_PREFIX }}js/jquery-ui-1.10.3.custom.min.js"></script>
         <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.min.js"></script>
+        <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap-tour.min.js"></script>
+
+        <!-- Feature Tour -->
+        <script type="text/javascript">
+            var tour = new Tour({
+                steps: [
+                    {
+                        element: "#create-alert-header",
+                        title: "Create Alerts",
+                        content: "You can create alerts for many jurisdictions to get the latest updates."
+                    }
+                ]
+            });
+            $('#tour-link').click(function(){
+                tour.init();
+                tour.start();
+            });
+        </script>
 
         {# Allows your own scripts in the footer. #}
         {% block footer-scripts %}{% endblock %}
