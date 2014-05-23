@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% load honeypot %}
+
+{% block title %}Frequently Asked Questions - CourtListener.com{% endblock %}
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div class="span-24 last">
+        <h2 id="qs">Frequently Asked Questions</h2>
+    </div>
+
+    <div class="span-9 append-2">
+        <h3 class="bottom">General</h3>
+        <p>
+            <a href="#who-and-what">What is this site? Who runs it?</a><br>
+            <a href="#contact">How do I contact you?</a>
+        </p>
+
+
+        <h3 class="bottom">Features</h3>
+        <p>
+            <a href="#why-use">Why should I use this site (and not something else)?</a><br>
+            <a href="#how-different">What makes this site different from other sites that put legal documents
+                online?</a><br>
+            <a href="#explain-alerts">How do alerts work?</a><br>
+            <a href="#explain-citations">How do you identify citations?</a>
+        </p>
+
+        <h3 class="bottom">Coverage and Content</h3>
+        <p>
+            <a href="#what-coverage-exists">What is your coverage of legal materials and how comprehensive is
+                it?</a><br>
+            <a href="#why-my-case">Why is my case appearing on this site?</a><br>
+            <a href="#non-precedential">Why does this site contain documents that say "Not for Publication",
+                "Unpublished" etc?</a><br>
+            <a href="#why-bulk">Why do you provide bulk data files?</a><br>
+            <a href="#bulk-frequency">How often are your bulk data files generated?</a><br>
+            <a href="#explain-fingerprint">What is the "fingerprint" of the document?</a>
+        </p>
+
+        <h3 class="bottom">Contributions</h3>
+        <p>
+            <a href="#kinds-of-help">What kinds of help do you need?</a><br>
+            <a href="#how-supported">How is the project supported?</a><br>
+            <a href="#can-i-contribute">Can I contribute to the project somehow?</a>
+        </p>
+
+        <h3 class="bottom">Past and Future</h3>
+        <p>
+            <a href="#orgin-story">What's the history of CourtListener?</a><br>
+            <a href="#future">What plans or features are in the works?</a>
+        </p>
+
+        <h3 class="bottom">Something Else?</h3>
+        <p>
+            <a href="#other">Something else?</a>
+        </p>
+    </div>
+
+    <div class="span-13 last">
+        {% if form.errors %}
+            <p class="bottom error">There were errors with your submission. See <a href="#other">below</a> for details.
+            </p>
+        {% endif %}
+
+
+        <h3 id="general">General</h3>
+        <h4 id="who-and-what" class="bottom">What is this site? Who runs it?</h4>
+        <p>CourtListener is a legal research website currently containing more than 2.5 million legal
+            opinions from federal and state courts. CourtListener is operated by the non-proft Free
+            Law Project. Free Law Project seeks to provide free access to primary legal materials,
+            develop legal research tools, and support academic research on legal corpora. CourtListener
+            embodies all of these efforts, as the primary free repository of all the court opinions we
+            have collected, as the platform on which we attempt to deploy legal research tools, and as
+            the source of bulk downloads that enable academic researchers to study our collection.
+        </p>
+
+        <h4 id="contact" class="bottom">How do I contact you?</h4>
+        <p>We can be contacted via the address on our <a href="/contact/">contact form</a>, or via email at
+            <a href="mailto:info@freelawproject.org">info@freelawproject.org</a>. If you require a secure channel when
+            contacting us, please use the PGP key listed
+            <a href="http://pgp.mit.edu/pks/lookup?op=get&search=0xDE79459CD047ACFE">here</a>.
+        </p>
+
+
+        <h3 id="features">Features</h3>
+        <h4 id="why-use" class="bottom">Why should I use this site (and not something else)?</h4>
+        <p>While Free Law Project seeks to put the entirety of United States case law online, for the
+        public, for free, we have not reached that goal yet. So, we hope you find what you are looking
+        for here, but if not, you should absolutely use other sites too! Other no-cost sites include
+        <a href="http://scholar.google.com/">Google Scholar</a> and <a href=": http://www.justia.com/">
+        Justia</a>. There are many fee-based sites too, including <a href="http://fastcase.com/">Fastcase</a>
+        and <a href="http://www.casemaker.us/">Casemaker</a>.</p>
+
+        <h4 id="how-different" class="bottom">What makes this site different from other sites that put legal documents
+            online?</h4>
+        <p>Our site has a citator that shows you which subsequent opinions have cited to the opinion you
+        are viewing, an important tool in researching whether a given precedent is still good law. Many free
+        sites lack such a tool. We also think our search filters, advanced search options, and relevancy
+        search enhancements that we call 
+        <a href="http://freelawproject.org/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/">
+        CiteGeist</a>, produce search results that are particularly impressive.
+
+        Unlike many sites that may be several days or weeks behind, we strive to collect new opinions from 
+        the courts in near real time. For the courts we cover, new opinions should typically appear within
+        30 minutes of being posted on the court's website. 
+
+        But the most important distinguishing factor about this site is that it is open source and open access.
+        Anyone can download all the source code we use to operate this site and run their own site that does
+        exactly the same thing. And since our bulkd downloads provide free access to our entire collection of
+        opinions, we hope we've given our effort its own life that can continue no matter what. Many people
+        have tried to provide free access to U.S. case law, but when their efforts finally end, their collection
+        and software typically disappears too and the next effort has to start over from the beginning. We hope
+        instead to be the last people who ever have to attempt to collect the entirety of United States case law. 
+        Everyone who comes after can build upon this effort.</p>
+
+        <h4 id="explain-alerts" class="bottom">How do alerts work?</h4>
+        <p>You can sign up to receive free daily email alerts for any search query that interests you and 
+        when a new opinion matches your search, you'll get an email alert at about 5:30 Pacific time. Get started
+        by running a search and the "Create an alert" option will be in the sidebar next to your results.</p>
+
+        <h4 id="explain-citations" class="bottom">How do you identify citations?</h4>
+        <p>It's not easy. Currently we only detect citaitons to court opinions. Citations to statutes, law 
+        review articles, or other resources are currently ignored. When a new document is added, we search
+        the document text for standard case law citation formats and if we can match what we find with one (and
+        only one) document in our collection, then we create a hyperlink from the original document's citation
+        to the cited document, making it easier to browse through our collection. When there are multiple
+        documents in our collection that appear to match the citation we use what we call "reverse matching"
+        to try to resolve the citation. The case name from each potential match is searched in the original document
+        and if there is only one match, then that becomes the linked citation.</p>
+
+        <h3 id="coverage-and-content">Coverage and Content</h3>
+        <h4 id="what-coverage-exists" class="bottom">What is your coverage of legal materials and how comprehensive is
+            it?</h4>
+        <p>See our <a href="https://www.courtlistener.com/coverage/">coverage</a> page for all the details. We are
+        constantly working to fill gaps in our coverage, but until we have the entirety of United States case law,
+        you should consult additional sources for any important legal research task.
+
+        When we think we are closer to having everything, we intend to conduct an "audit" of our documents to confirm
+        that we have every opinion that appears in the bound volumes of case law. Once that audit is underway, we will
+        be able to post even more details about our coverage.</p>
+
+        <h4 id="why-my-case" class="bottom">Why is the opinion in my case appearing on this site?</h4>
+        <p>Court opinions are public records and create the precedents that determine the results in future cases.
+        Court opinions contain statements of the law and legal reasoning that guide legal researchers. We are
+        attempting to build a site useful to legal researchers. If you have a concern about information from one
+        of these opinions appearing in search engines, such as Google, you should review our <a href=
+        "https://courtlistener.com/terms/#removal">removal</a> policy.</p>
+
+        <h4 id="non-precedential" class="bottom">Why does this site contain documents that say "Not for Publication",
+            "Unpublished" etc?</h4>
+        <p>In many jurisdictions of the United States, these statements do not mean that the case should not be
+            published. Instead, it means that the issuing court is claiming they should not be used as a precedent in
+            subsequent cases. You can read more about this policy <a
+                    href="https://en.wikipedia.org/wiki/Non-publication_of_legal_opinions_in_the_United_States">on
+                wikipedia</a>, if you are interested in the details.
+        </p>
+
+        <h4 id="why-bulk" class="bottom">Why do you provide bulk data files?</h4>
+        <p>Two groups tend to find this useful. First are academic researchers who wish to do empirical research
+        on large portions of U.S. case law. They often cannot answer certain questions with full generality without
+        including all or almost all opinions in their research. Second are legal technology startups or those who 
+        want to test out some new legal research tool. These groups can use the documents we have collected to test
+        out a prototype of their new tools. Most regular users will not need to use our bulk downloads.</p>
+
+        <h4 id="bulk-frequency" class="bottom">How often are your bulk data files generated?</h4>
+        <p></p>
+
+        <h4 id="explain-fingerprint" class="bottom">What is the "fingerprint" of the document?</h4>
+        <p>We generate these digital fingerprints for each document we retrieve from court websites. The algorithm that
+        generates the fingerprint guarantees that the fingerprint generated will be unique for every file. If even one 
+        character is changed in a document, a different fingerprint will be generated. This helps us in our document 
+        retrieval process, so that if a court uses the same file name for a different document we will still detect that
+        the document has changed and know to save it. This means it also helps us detect the rare instances where a file
+        might be corrupted during the download process.
+        
+        If courts would publish these fingerprints as well, then we could develop tools that would allow our users to
+        confirm that the backup copy on our site is identical to the version released by the court. Without that, users
+        that wish to verify the authenticity of our backup copies would have to engage in the cumbersome process of 
+        downloading the document from the court, generating the fingerprint, download the document from us, generating
+        the fingerprint from that copy, and then comparing the fingerprints to confirm that they are identical.</p>
+
+
+        <h3 id="contributions">Contributions</h3>
+        <h4 id="kinds-of-help" class="bottom">What kinds of help do you need?</h4>
+        <p></p>
+
+        <h4 id="how-supported" class="bottom">How is the project supported?</h4>
+        <p></p>
+
+        <h4 id="can-i-contribute" class="bottom">Can I contribute to the project somehow?</h4>
+        <p></p>
+
+
+        <h3 id="past-and-future">Past and Future</h3>
+        <h4 id="orgin-story" class="bottom">What's the history of CourtListener?</h4>
+        <p></p>
+
+        <h4 id="future" class="">What plans or features are in the works?</h4>
+        <p></p>
+
+
+        <h3 id="other">Something else?</h3>
+        <p>If you have another question, don't hesitate to get in touch using the form below.
+        </p>
+
+
+        <form action="" method="post">{% csrf_token %}
+            {% render_honeypot_field "skip_me_if_alive" %}
+            <p>
+                <label for="id_name">Name</label>
+                {% if form.name.errors %}
+                    <span class="errortext">
+                        {% for error in form.name.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.name }}
+            </p>
+
+            <p>
+                <label for="id_email">Email (optional)</label>
+                {% if form.email.errors %}
+                    <span class="errortext">
+                        {% for error in form.email.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.email }}
+            </p>
+
+            <input id="id_subject" maxlength="150" name="subject" value="FAQ" type="hidden">
+
+            <p>
+                <label for="id_message">Message</label>
+                {% if form.message.errors %}
+                    <span class="errortext">
+                        {% for error in form.message.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </span>
+                {% endif %}<br>
+                {{ form.message }}
+            </p>
+            <button type="submit" class="button">Ask Us</button>
+        </form>
+    </div>
+{% endblock %}
