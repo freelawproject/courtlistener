@@ -924,13 +924,13 @@
             "jurisdiction": "SA",
             "end_date": null,
             "citation_string": "Cal. Ct. App.",
-            "short_name": "California Courts of Appeal",
+            "short_name": "California Court of Appeal",
             "in_use": true,
             "has_scraper": true,
             "url": "http://www.courts.ca.gov/courtsofappeal.htm",
             "notes": "Lawbox",
             "date_modified": "2013-08-15T22:50:09Z",
-            "full_name": "California Courts of Appeal",
+            "full_name": "California Court of Appeal",
             "position": 350.1,
             "start_date": null
         }
