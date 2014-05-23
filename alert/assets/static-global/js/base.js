@@ -2,22 +2,9 @@ $(document).ready(function() {
     var cited_gt = $('#id_cited_gt');
     var cited_lt = $('#id_cited_lt');
 
-    ////////////////////////
-    // Sidebar generation //
-    ////////////////////////
-    $('#extra-sidebar-fields').prependTo('#sidebar-facet-placeholder');
-    $('#extra-sidebar-fields').show();
-
-    /////////////////////
-    // Form submission //
-    /////////////////////
-    $('#search-form, #sidebar-search-form, #court-picker-search-form').submit(function (e) {
-        // Overrides the submit buttons so that they gather the correct
-        // form elements before submission.
-        e.preventDefault();
-
+    function makeSearchPath(){
         // Empty the sliders if they are both at their max
-        if (cited_gt.val() == 0 && cited_lt.val() == 15000){
+        if (cited_gt.val() == 0 && cited_lt.val() == 15000) {
             cited_gt.val("");
             cited_lt.val("");
         }
@@ -32,7 +19,7 @@ $(document).ready(function() {
 
         // Add the court checkboxes that are selected as a single input element
         var checked_courts = $('.court-checkbox:checked');
-        if (checked_courts.length != $('.court-checkbox').length){
+        if (checked_courts.length != $('.court-checkbox').length) {
             // Only do this if all courts aren't checked to keep URLs short.
             var values = [];
             for (var i = 0; i < checked_courts.length; i++) {
@@ -59,9 +46,19 @@ $(document).ready(function() {
                 .val(el.val())
                 .appendTo('#search-form');
         });
-        document.location = '/?' + $('#search-form').serialize();
-    });
+        var path = '/?' + $('#search-form').serialize();
+        return path
+    }
 
+    /////////////////////
+    // Form submission //
+    /////////////////////
+    $('#search-form, #sidebar-search-form, #court-picker-search-form').submit(function (e) {
+        // Overrides the submit buttons so that they gather the correct
+        // form elements before submission.
+        e.preventDefault();
+        document.location = makeSearchPath();
+    });
 
     ////////////
     // Slider //
@@ -137,7 +134,39 @@ $(document).ready(function() {
         // Makes the check all box (un)check the other boxes
         $("#modal-court-picker .tab-pane.active input").prop('checked', false);
     });
+
+    //////////
+    // Tour //
+    //////////
+    var tour = new Tour({
+        steps: [
+            {
+                path: '/',
+                element: '#id_q',
+                placement: 'bottom',
+                title: 'Welcome to the tour!',
+                content: 'Broad queries can be a great way to start a research task. Type in a query and press next to get started.',
+                redirect: function () {
+                    document.location.href = makeSearchPath();
+                }
+            },
+            {
+                path: new RegExp('/*'),
+                element: "#create-alert-header",
+                title: "Create Alerts",
+                content: "You can create alerts for many jurisdictions to get the latest updates."
+            }
+        ],
+        debug: true,
+        storage: false
+    });
+    tour.init();
+    $('#tour-link').click(function () {
+        tour.start(true);
+    });
 });
+
+
 Modernizr.load({
     // Sets up HTML5 input placeholders in browsers that don't support them.
     test: Modernizr.placeholder,

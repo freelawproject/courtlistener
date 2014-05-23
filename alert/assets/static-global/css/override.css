@@ -347,9 +347,6 @@ input.court-checkbox, input.status-checkbox {
 .js #id_order_by {
     display: none;
 }
-.js #extra-sidebar-fields {
-    display: none;
-}
 .nojs #sidebar-search-form {
     display: none;
 }
