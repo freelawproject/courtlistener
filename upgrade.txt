@@ -24,6 +24,18 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
+2014-05-22:
+ - This upgrade brings several major improvements including a new footer, social links, several new or updated pages, a
+   new homepage and a feature tour. It's much-needed polish. However, for all these things to be possible, we've also
+   had to upgrade jquery to a version that is not backwards compatible, and that's meant some hand-wringing.
+
+   The good news is, this should all be transparent to developers and users. Following the usual upgrade guide should
+   take care of business handily.
+
+   - Remember to remove the jquery migration code from base.html.
+   -
+
+
 2013-11-25:
  - This revision adds a new script that will welcome new users whenever it is called. It will send an email to anybody
    that's new in the last 24 hours each time it is called. If you wish to use it, simply add it to your crontab.
