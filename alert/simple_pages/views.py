@@ -8,6 +8,8 @@ from django.http import HttpResponseRedirect
 from django.http import HttpResponse
 from django.template import loader, Context
 from django.views.decorators.cache import cache_page
+from alert.lib import search_utils
+from alert.lib.sunburnt import sunburnt
 
 from alert.search.models import Court, Document
 from alert import settings
@@ -26,10 +28,19 @@ def about(request):
 
 def faq(request):
     """Loads the FAQ page"""
+    scraped_court_count = Court.objects.filter(in_use=True, has_scraper=True).count()
+    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+    response = conn.raw_query(
+        **search_utils.build_total_count_query()).execute()
+    total_opinion_count = response.result.numFound
     return contact(
         request,
-        template_path='simple_pages/faqs.html',
-        initial={'subject': 'FAQs'}
+        template_path='simple_pages/faq.html',
+        template_data={
+            'scraped_court_count': scraped_court_count,
+            'total_opinion_count': total_opinion_count,
+        },
+        initial={'subject': 'FAQs'},
     )
 
 
@@ -74,7 +85,15 @@ def coverage_graph(request):
 
 
 @check_honeypot(field_name='skip_me_if_alive')
-def contact(request, template_path='simple_pages/contact_form.html', initial={}):
+def contact(
+        request,
+        template_path='simple_pages/contact_form.html',
+        template_data={},
+        initial={}):
+    """This is a fairly run-of-the-mill contact form, except that it can be overridden in various ways so that its
+    logic can be called from other functions.
+    """
+
     if request.method == 'POST':
         form = ContactForm(request.POST)
         if form.is_valid():
@@ -105,17 +124,20 @@ def contact(request, template_path='simple_pages/contact_form.html', initial={})
             # for anonymous users, who lack full_names, and emails
             form = ContactForm(initial=initial)
 
+    template_data.update(
+        {'form': form,
+         'private': False}
+    )
     return render_to_response(
         template_path,
-        {'form': form,
-         'private': False},
+        template_data,
         RequestContext(request)
     )
 
 
 def contact_thanks(request):
     return render_to_response('simple_pages/contact_thanks.html',
-                              {'private': False},
+                              {'private': True},
                               RequestContext(request))
 
 

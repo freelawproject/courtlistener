@@ -455,3 +455,13 @@ def build_court_count_query():
         'caller': 'build_court_count_query',
     }
     return params
+
+
+def build_total_count_query():
+    """Build a query that returns the total result count as quickly as possible."""
+    params = {
+        'rows': 0,
+        'q': '*:*',
+        'caller': 'build_total_count_query',
+    }
+    return params
