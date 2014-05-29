@@ -136,9 +136,19 @@ def contact(
 
 
 def contact_thanks(request):
-    return render_to_response('simple_pages/contact_thanks.html',
-                              {'private': True},
-                              RequestContext(request))
+    return render_to_response(
+        'simple_pages/contact_thanks.html',
+        {'private': True},
+        RequestContext(request)
+    )
+
+
+def advanced_search(request):
+    return render_to_response(
+        'simple_pages/advanced_search.html',
+        {'private': False},
+        RequestContext(request)
+    )
 
 
 @cache_page(60 * 60)

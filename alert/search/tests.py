@@ -19,6 +19,8 @@ class SetupException(Exception):
 
 
 class SolrTestCase(TestCase):
+    """A generic class that contains the setUp and tearDown functions for inheriting children.
+    """
     fixtures = ['test_court.json']
 
     def setUp(self):
@@ -135,6 +137,24 @@ class SearchTest(SolrTestCase):
         response = self.client.get('/', {'q': '*:*', 'order_by': 'citeCount asc'})
         self.assertTrue(response.content.index('Disclosure') > response.content.index('Tarrant'),
                         msg="'Disclosure' should come AFTER 'Tarrant' when ordered by ascending citeCount.")
+
+    def test_homepage(self):
+        """Is the homepage loaded when no GET parameters are provided?"""
+        pass
+
+    def test_fail_gracefully(self):
+        """Do we fail gracefully when an invalid search is created?"""
+        pass
+
+
+class AlertTest(TestCase):
+    def test_create_alert(self):
+        """Can we create an alert by sending a post?"""
+        pass
+
+    def test_fail_gracefully(self):
+        """Do we fail gracefully when an invalid alert form is sent?"""
+        pass
 
 
 class ApiTest(SolrTestCase):

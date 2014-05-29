@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Non-Profit Free Legal Search Engine and Alert System - CourtListener.com{% endblock %}
+
+{% block search-form %}{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block main-nav %}{% endblock %}
+
+{% block footer-scripts %}
+<script type="text/javascript">
+    $(document).ready(function () {
+        $('#id_q').focus();
+    });
+    // Initialize popovers (required because they're "opt-in for performance reasons")
+    $("[data-toggle='popover']").popover();
+</script>
+{% endblock %}
+
+{% block logo %}
+    <img src="{{ STATIC_PREFIX }}png/logo-large.png"
+         alt="CourtListener logo"
+         width="364"
+         height="40"/>
+{% endblock %}
+
+{% block sign-in %}
+
+    <div class="span-17 last">
+        {% if not user.is_authenticated %}
+            <form action="/sign-in/" method="post" class="float-right">{% csrf_token %}
+                <div class="span-3">
+                    <label for="username" class="hidden">Username</label>
+                    <input type="text"
+                           name="username"
+                           value=""
+                           id="username"
+                           placeholder="User Name"
+                           class="span-3 bottom">
+                    <a href="/register/" class="small">Want to sign up?</a>
+                </div>
+                <div class="span-3">
+                    <label for="password" class="hidden">Password</label>
+                    <input type="password"
+                           name="password"
+                           value=""
+                           id="password"
+                           placeholder="Password"
+                           class="span-3 bottom">
+                    <a href="/reset-password/" class="small">Need help?</a>
+                </div>
+                <button type="submit" class="button small">Sign In</button>
+            </form>
+        {% else %}
+            <nav class="float-right">
+                <ul>
+                    <li><a href="/profile/">Profile&nbsp;<i class="gray fa fa-user"></i></a></li>
+                    <li><a href="/sign-out">Sign Out&nbsp;<i class="gray fa fa-sign-out"></i></a></li>
+                </ul>
+            </nav>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div id="homepage">
+        <hr class="space">
+        <hr class="space">
+        <hr class="space">
+
+        <h2 class="center bottom">Search millions of opinions by case name, topic or citation.</h2>
+        <h3 class="center gray">350 Jurisdictions. Sponsored by the Non-Profit Free Law Project.</h3>
+
+        <div class="span-24 last">
+            <div id="main-query-box">
+                {% include "includes/main_query_box.html" with homepage=True %}
+            </div>
+        </div>
+        <hr class="space">
+        <div id="advanced-search-inputs" class="hidden">
+            <div id="extra-sidebar-fields" class="span-17 append-2">
+                {#  Modal is at bottom of results, so it loads last. #}
+                <div class="span-11 append-1">
+                    <div class="span-11 last">
+                        <div class="span-5 append-1">
+                            <div class="pointer"
+                                 data-toggle="modal"
+                                 data-target="#court-picker">
+                                <h4 class="bottom">
+                                    Select Jurisdictions <i class="gray fa fa-external-link"></i>
+                                </h4>
+
+                                <p class="bottom"><span id="jurisdiction-count">{{ court_count }}</span>
+                                    jurisdictions selected</p>
+                            </div>
+                        </div>
+                        <div class="span-5 last">
+                            <h4 class="bottom">Result Ordering</h4>
+                            {{ search_form.order_by }}
+                        </div>
+                    </div>
+                    <hr class="space">
+                    <hr class="space">
+
+                    <div class="span-11 last">
+                        <div class="span-5 append-1">
+                            <h4 class="bottom">Case Name</h4>
+
+                            <p class="bottom span-6">{{ search_form.case_name }}</p>
+                        </div>
+                        <div class="span-5 last">
+                            <h4 class="bottom">Judge</h4>
+
+                            <p class="bottom span-6">{{ search_form.judge }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="span-5 last">
+                    <h4 class="bottom">Precedential Status</h4>
+                    {% for status in status_facets %}
+                        <div class="sidebar-checkbox">
+                            <input
+                                    id="id_{{ status.1 }}"
+                                    type="checkbox"
+                                    name="{{ status.1 }}"
+                                    class="external-input status-checkbox left"
+                                    {% if status.3 %}checked="checked"{% endif %}>
+                            <label
+                                    for="id_{{ status.1 }}"
+                                    class="pointer {% if status.2 == 0 %}gray{% endif %}">
+                                <div>{{ status.0 }}&nbsp;<span
+                                        class="gray small">({{ status.2|intcomma }})</span></div>
+                            </label>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <hr class="space">
+                <hr class="space">
+
+                <div class="span-17 append-2">
+                    <div class="span-5 append-1">
+                        <h4 class="bottom">Filed After</h4>
+                        <p class="bottom span-6">{{ search_form.filed_after }}</p>
+                    </div>
+                    <div class="span-5 append-1">
+                        <h4 class="bottom">Filed Before</h4>
+                        <p class="bottom span-6">
+                            <div class="date input-append" data-date-format="yyyy-mm-dd" data-date="12-02-2012">
+                                {{ search_form.filed_before }}
+                                <span class="add-on"><i class="icon-th"></i></span>
+                            </div>
+                        </p>
+
+                    </div>
+                    <div class="span-5 last">
+                        <div class="span-5">
+                            {{ search_form.cited_gt }}
+                            {{ search_form.cited_lt }}
+                            <h4 class="bottom inline">Citation Count</h4>
+                            <span type="text" id="citation-count" class="gray small bottom">(Any)</span>
+                        </div>
+                        <div id="slider-range" class="span-5 bottom"></div>
+                    </div>
+                </div>
+                <hr class="space">
+                <hr class="space">
+
+                <div class="span-17 append-2">
+                    <div class="span-5 append-1">
+                        <h4 class="bottom">Citation</h4>
+                        <p class="bottom">{{ search_form.citation }}</p>
+                    </div>
+                    <div class="span-5 append-1">
+                        <h4 class="bottom">Neutral Citation</h4>
+                        <p class="bottom">{{ search_form.neutral_cite }}</p>
+                    </div>
+                    <div class="span-5 last">
+                        <h4 class="bottom">Docket Number</h4>
+                        <p class="bottom">{{ search_form.docket_number }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="span-5 last">
+                {% include "includes/operators_quick_list.html" %}
+                <div class="span-5 last right">
+                    <a href="/search/advanced-techniques/">More details&hellip;</a>
+                </div>
+            </div>
+
+        </div>
+        {# Jurisdiction modal is at the bottom so it loads last #}
+
+
+        <div id="advanced-search-starter">
+            <h2 class="center alt gray">&ndash; or &ndash;</h2>
+            <h3 class="fake-link center">Advanced Search</h3>
+        </div>
+        <hr class="space">
+        <hr class="space">
+        <hr class="space">
+        <hr class="space">
+        <hr class="space">
+        <div class="span-24">
+            <div class="span-11 append-2">
+                <h3>About CourtListener</h3>
+                <p>Nulla id erat sit amet risus ultrices condimentum sed eu mauris. Maecenas mattis augue sodales
+                    facilisis sagittis. Praesent posuere aliquet volutpat. Proin scelerisque ipsum est. Donec orci orci,
+                    laoreet et odio ut, dignissim commodo ipsum. In tristique est et leo dapibus aliquam. Integer in
+                    vehicula dui. Proin pretium vel nisl eu mattis. Nunc fringilla enim at varius tempus. Nunc quam
+                    nisl, convallis at nisl sed, sodales blandit enim. In tristique ante purus, sed elementum enim porta
+                    nec. </p>
+            </div>
+            <div class="span-11 last">
+                <h3>About Free Law Project</h3>
+                <p>Phasellus tincidunt pharetra libero, scelerisque
+                    tincidunt justo elementum quis. Vestibulum ullamcorper egestas sodales. Etiam hendrerit fringilla
+                    porttitor. Suspendisse at lectus at leo euismod volutpat vel vel libero. In hac habitasse platea
+                    dictumst. Aliquam placerat eros vitae libero tempus, sit amet porttitor mauris egestas. In eu quam
+                    vel quam tristique tincidunt quis ut purus. Pellentesque ultricies orci eu volutpat pretium. Donec
+                    ultricies viverra nulla consequat dignissim.</p>
+            </div>
+        </div>
+        <hr class="space">
+        <hr class="space">
+        <hr class="space">
+        <div class="span-24">
+            <div class="span-7 append-1">
+                <h3>Great video</h3>
+                <iframe width="270" height="203" src="//www.youtube.com/embed/txqiwrbYGrs" frameborder="0"
+                        allowfullscreen></iframe>
+            </div>
+
+            <div class="span-7 append-1">
+                <h3>Latest Cases</h3>
+                <p>Suspendisse at lectus at leo euismod volutpat vel vel libero. In hac habitasse platea
+                    dictumst. Aliquam placerat eros vitae libero tempus, sit amet porttitor mauris egestas. In eu quam
+                    vel quam tristique tincidunt quis ut purus. Pellentesque ultricies orci eu volutpat pretium. Donec
+                    ultricies viverra
+                </p>
+            </div>
+
+            <div class="span-8 last">
+                <h3>The Numbers</h3>
+                <p>Suspendisse at lectus at leo euismod volutpat vel vel libero. In hac habitasse platea
+                    dictumst. Aliquam placerat eros vitae libero tempus, sit amet porttitor mauris egestas. In eu quam
+                    vel quam tristique tincidunt quis ut purus. Pellentesque ultricies orci eu volutpat pretium. Donec
+                    ultricies viverra
+                </p>
+            </div>
+        </div>
+
+        {% include "includes/jurisdiction_picker_modal.html" %}
+    </div>
+{% endblock %}

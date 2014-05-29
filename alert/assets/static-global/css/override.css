@@ -5,7 +5,32 @@ Sets up all the overrides or additional CSS that the site uses.
 ::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 ::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 
-/* for the nav in the settings pages */
+
+#homepage #main-query-box {
+    margin: 0 auto;
+    width: 713px;
+    -webkit-transition : all 0.5 s ease;
+    -moz-transition: all 0.5s ease;
+    -o-transition: all 0.5s ease;
+    transition: all 0.5s ease;
+}
+
+#homepage #main-query-box.wide {
+    width: 950px;
+    margin: 0px;
+}
+
+#homepage #main-query-box.wide #id_q {
+    width: 830px;
+}
+#homepage #jurisdiction-count {
+    -webkit-transition: all 0.5s ease;
+    -moz-transition: all 0.5s ease;
+    -o-transition: all 0.5s ease;
+    transition: all 0.5s ease;
+}
+
+
 .header {
     float: left;
 }
@@ -170,6 +195,9 @@ nav ul li {
     text-align: center;
     display: inline;
 }
+nav ul li:last-child {
+    padding: 0;
+}
 
 #search-container table{
     width: auto;
@@ -187,7 +215,11 @@ nav ul li {
     margin: 0px;
     font-size: 16px;
     height: 20px;
-    width: 592px;
+    width: 549px;
+    -webkit-transition: all 0.5s ease;
+    -moz-transition: all 0.5s ease;
+    -o-transition: all 0.5s ease;
+    transition: all 0.5s ease;
 }
 
 #search-button {
@@ -254,6 +286,14 @@ a.button, button, .ui-button-text {
     color: white;
     letter-spacing: 0.5px;
 }
+button.small {
+    padding: 2px 8px 2px 5px;
+    font-size: 90%;
+}
+input.bottom {
+    margin-bottom: 0px;
+}
+
 .ui-state-active .ui-button-text,
 .ui-state-hover .ui-button-text,
 .ui-state-focus .ui-button-text {
@@ -341,11 +381,8 @@ input.court-checkbox, input.status-checkbox {
 #result-count {
     float: left;
 }
-#id_order_by {
+.search-page #id_order_by {
     float: right;
-}
-.js #id_order_by {
-    display: none;
 }
 .nojs #sidebar-search-form {
     display: none;

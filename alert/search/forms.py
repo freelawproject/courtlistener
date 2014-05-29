@@ -66,9 +66,9 @@ class SearchForm(forms.Form):
     order_by = forms.ChoiceField(
         choices=ORDER_BY_CHOICES,
         required=False,
-        initial='dateFiled desc',
+        initial='score desc',
         widget=forms.Select(
-            attrs={'class': 'external-input',
+            attrs={'class': 'external-input span-5',
                    'tabindex': '9'}
         )
     )
