@@ -17,18 +17,93 @@ from alert.stats import tally_stat
 logger = logging.getLogger(__name__)
 
 
+def do_search(request, get_string, alert_form=None, template='search/search.html', privacy=True):
+    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+    # Bind the search form.
+    search_form = SearchForm(request.GET)
+    if search_form.is_valid():
+        cd = search_form.cleaned_data
+        search_form = _clean_form(request, cd)
+        try:
+            results_si = conn.raw_query(**search_utils.build_main_query(cd))
+            stat_facet_fields = search_utils.place_facet_queries(cd, conn)
+            status_facets = search_utils.make_stats_variable(stat_facet_fields, search_form)
+            courts, court_count = search_utils.merge_form_with_courts(COURTS, search_form)
+        except Exception, e:
+            logger.warning("Error loading search page with request: %s" % request.GET)
+            logger.warning("Error was %s" % e)
+            return render_to_response(
+                template,
+                {'error': True, 'private': privacy},
+                RequestContext(request)
+            )
+
+    else:
+        # Invalid form, send it back
+        logger.warning("Invalid form when loading search page with request: %s" % request.GET)
+        return render_to_response(
+            template,
+            {'error': True, 'private': privacy},
+            RequestContext(request)
+        )
+
+    # Set up pagination
+    try:
+        paginator = Paginator(results_si, 20)
+        page = request.GET.get('page', 1)
+        try:
+            paged_results = paginator.page(page)
+        except PageNotAnInteger:
+            # If page is not an integer, deliver first page.
+            paged_results = paginator.page(1)
+        except EmptyPage:
+            # If page is out of range (e.g. 9999), deliver last page of results.
+            paged_results = paginator.page(paginator.num_pages)
+    except Exception, e:
+        # Catches any Solr errors, and aborts.
+        logger.warning("Error loading pagination on search page with request: %s" % request.GET)
+        logger.warning("Error was: %s" % e)
+        return render_to_response(
+            template,
+            {'error': True, 'private': privacy},
+            RequestContext(request)
+        )
+
+    return render_to_response(
+        template,
+        {'search_form': search_form,
+         'alert_form': alert_form,
+         'results': paged_results,
+         'courts': courts,
+         'court_count': court_count,
+         'status_facets': status_facets,
+         'get_string': get_string,
+         'private': privacy},
+        RequestContext(request)
+    )
+
 @never_cache
 def show_results(request):
-    """Show the results for a query
+    """
+    This view can vary significantly, depending on how it is called:
+     - In its most simple form, it is called via GET and without any parameters.
+        --> This loads the homepage.
+     - It might also be called with GET *with* parameters.
+        --> This loads search results.
+     - It might be called with a POST.
+        --> This attempts to save an alert.
 
-    Implements a parallel faceted search interface with Solr as the backend.
+    It also has a few failure modes it needs to support:
+     - It must react properly to an invalid alert form.
+     - It must react properly to an invalid or failing search form.
+
+    All of these paths have tests in tests.py.
     """
     # Create a search string that does not contain the page numbers
     get_string = search_utils.make_get_string(request)
 
-    # this handles the alert creation form.
     if request.method == 'POST':
-        # an alert has been created
+        # The user is trying to save an alert.
         alert_form = CreateAlertForm(request.POST)
         if alert_form.is_valid():
             cd = alert_form.cleaned_data
@@ -45,106 +120,52 @@ def show_results(request):
 
             # and redirect to the alerts page
             return HttpResponseRedirect('/profile/alerts/')
-    else:
-        # the form is loading for the first time, load it, then load the rest
-        # of the page
-        alert_form = CreateAlertForm(initial={'alertText': get_string,
-                                              'alertFrequency': "dly"})
-
-    '''
-    Code beyond this point will be run if the alert form failed, or if the
-    submission was a GET request. Beyond this point, we run the searches.
-    '''
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
-    if len(request.GET) > 0:
-        # Bind the search form.
-        search_form = SearchForm(request.GET)
-        if search_form.is_valid():
-            cd = search_form.cleaned_data
-            search_form = _clean_form(request, cd)
-            try:
-                results_si = conn.raw_query(**search_utils.build_main_query(cd))
-                stat_facet_fields = search_utils.place_facet_queries(cd, conn)
-                status_facets = search_utils.make_stats_variable(stat_facet_fields, search_form)
-                courts, court_count = search_utils.merge_form_with_courts(COURTS, search_form)
-                if not is_bot(request):
-                    tally_stat('search.results')
-            except Exception, e:
-                logger.warning("Error loading search page with request: %s" % request.GET)
-                logger.warning("Error was %s" % e)
-                return render_to_response(
-                    'search/search.html',
-                    {'error': True, 'private': True},
-                    RequestContext(request)
-                )
-
         else:
-            # Invalid form, send it back
-            logger.warning("Invalid form when loading search page with request: %s" % request.GET)
-            return render_to_response(
-                'search/search.html',
-                {'error': True, 'private': True},
-                RequestContext(request)
+            # Invalid form. Do the search again and show them the alert form with the errors
+            return do_search(
+                request,
+                get_string,
+                alert_form=alert_form,
             )
 
     else:
-        # No search placed. Show default page after placing the needed queries.
-        search_form = SearchForm()
+        # Either a search or the homepage
+        if len(request.GET) == 0:
+            # No parameters --> Homepage.
+            if not is_bot(request):
+                tally_stat('search.homepage_loaded')
+            return do_search(
+                request,
+                get_string,
+                template='homepage.html',
+                privacy=False,
+            )
 
-        # Gather the initial values
-        initial_values = {}
-        for k, v in dict(search_form.fields).iteritems():
-            initial_values[k] = v.initial
-        # Make the queries
-        results_si = conn.raw_query(**search_utils.build_main_query(initial_values))
-        stat_facet_fields = search_utils.place_facet_queries(initial_values, conn)
-        status_facets = search_utils.make_stats_variable(stat_facet_fields, search_form)
-        courts, court_count = search_utils.merge_form_with_courts(COURTS, search_form)
+        else:
+            # User placed a search
+            if not is_bot(request):
+                tally_stat('search.results')
+            # Create bare-bones alert form.
+            alert_form = CreateAlertForm(initial={'alertText': get_string,
+                                                  'alertFrequency': "dly"})
+            return do_search(
+                request,
+                get_string,
+                alert_form=alert_form
+            )
 
-    # Set up pagination
-    try:
-        paginator = Paginator(results_si, 20)
-        page = request.GET.get('page', 1)
-        private = True
-        if page == 1:
-            # It's the homepage -- not private.
-            private = False
-        try:
-            paged_results = paginator.page(page)
-        except PageNotAnInteger:
-            # If page is not an integer, deliver first page.
-            paged_results = paginator.page(1)
-        except EmptyPage:
-            # If page is out of range (e.g. 9999), deliver last page of results.
-            paged_results = paginator.page(paginator.num_pages)
-    except Exception, e:
-        # Catches any Solr errors, and simply aborts.
-        logger.warning("Error loading pagination on search page with request: %s" % request.GET)
-        logger.warning("Error was: %s" % e)
-        return render_to_response('search/search.html',
-                                  {'error': True, 'private': True},
-                                  RequestContext(request))
+
+def tools_page(request):
     return render_to_response(
-        'search/search.html',
-        {'search_form': search_form,
-         'alert_form': alert_form,
-         'results': paged_results,
-         'courts': courts,
-         'court_count': court_count,
-         'status_facets': status_facets,
-         'get_string': get_string,
-         'private': private},
+        'tools.html',
+        {'private': False},
         RequestContext(request)
     )
 
 
-def tools_page(request):
-    return render_to_response('tools.html',
-                              {'private': False},
-                              RequestContext(request))
-
-
 def browser_warning(request):
-    return render_to_response('browser_warning.html',
-                              {'private': False},
-                              RequestContext(request))
+    return render_to_response(
+        'browser_warning.html',
+        {'private': True},
+        RequestContext(request)
+    )

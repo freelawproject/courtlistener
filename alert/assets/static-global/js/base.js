@@ -50,15 +50,46 @@ $(document).ready(function() {
         return path
     }
 
-    /////////////////////
-    // Form submission //
-    /////////////////////
-    $('#search-form, #sidebar-search-form, #court-picker-search-form').submit(function (e) {
+    //////////////
+    // Homepage //
+    //////////////
+    function showAdvancedHomepage() {
+        $('#homepage #advanced-search-starter, #homepage #search-container td > i').hide();
+        $('#homepage #advanced-search-inputs').show("fast");
+        $("#main-query-box").addClass('wide');
+        $('#id_q').focus();
+    }
+    $('#homepage #advanced-search-starter h3').click(function () {
+        showAdvancedHomepage();
+    });
+
+    ///////////////////////
+    // Search submission //
+    ///////////////////////
+    $('#search-form, #sidebar-search-form, .search-page #court-picker-search-form').submit(function (e) {
         // Overrides the submit buttons so that they gather the correct
         // form elements before submission.
         e.preventDefault();
         document.location = makeSearchPath();
     });
+
+    $('#homepage #court-picker-search-form').submit(function(e){
+        e.preventDefault();
+        $('#jurisdiction-count').text($(this).find('input:checked').length);
+        $('#court-picker').modal('hide');
+        showAdvancedHomepage();
+        $('#jurisdiction-count').css({
+            'background-color': 'yellow',
+            'font-weight': 'bold'
+        });
+        setTimeout(function () {
+            $('#jurisdiction-count').css({
+                'background-color': 'transparent',
+                'font-weight': 'normal'
+            })
+        }, 1000);
+    });
+
 
     ////////////
     // Slider //
@@ -112,26 +143,18 @@ $(document).ready(function() {
     jQuery(function ($) {
         listFilter($('.tab-content'), $('#court-filter'));
     });
-    $('.clear-filter').click(function () {
-        // Clears the input box and reshows any filtered boxes.
-        $('#court-filter').val('');
-        $('.visible-count p').hide();
-        $('.sidebar-checkbox').show();
-    });
+
+    // Check/clear the tab/everything
     $('#check-all').click(function() {
-        // Makes the check all box (un)check the other boxes
         $("#modal-court-picker .tab-pane input").prop('checked', true);
     });
     $('#clear-all').click(function () {
-        // Makes the check all box (un)check the other boxes
         $("#modal-court-picker .tab-pane input").prop('checked', false);
     });
     $('#check-current').click(function () {
-        // Makes the check all box (un)check the other boxes
         $("#modal-court-picker .tab-pane.active input").prop('checked', true);
     });
     $('#clear-current').click(function () {
-        // Makes the check all box (un)check the other boxes
         $("#modal-court-picker .tab-pane.active input").prop('checked', false);
     });
 

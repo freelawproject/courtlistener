@@ -19,7 +19,7 @@
         <meta name="msapplication-starturl" content="https://www.courtlistener.com"/>
         <meta name="msapplication-navbutton-color" content="#6683B7"/>
 
-        <link href="https://netdna.bootstrapcdn.com/font-awesome/4.0.0/css/font-awesome.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
         <script src="{{ STATIC_PREFIX }}js/modernizr-2.0.6.min.js"></script>
         {% block privacy %}
             {% if private %}
@@ -88,46 +88,12 @@
                     </div>
 
                     {% block search-form %}
-                    <div class="span-17 last" id="searchform">
-                        <form action="/" method="get" id="search-form">
-                            <div id="search-container">
-                                <table>
-                                    <tbody>
-                                    <tr>
-                                        <td>
-                                            <input class="{% if count == 0 or error %}auto-focus{% endif %} wide-title"
-                                                   value="{{ search_form.q.value|default:'' }}"
-                                                   name="q"
-                                                   id="id_q"
-                                                   autocomplete="off"
-                                                   type="text"
-                                                   tabindex="5">
-                                        </td>
-                                        <td>
-                                            <button type="submit"
-                                                    class="button title"
-                                                    name="search"
-                                                    id="search-button"
-                                                    tabindex="6">Search
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2">
-                                            <div class="left">
-                                                <a href="/search/advanced-techniques/" id="advanced" tabindex="8">Advanced</a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    </tbody>
-                                </table>
-                                {# search_form #}
-                            </div>
-                        </form>
-                    </div>
+                        {% include "includes/main_query_box.html" with homepage=False %}
                     {% endblock %}
+
+                    {% block sign-in %}{% endblock %}
                 </header>
-                <hr>
+                <hr class="space">
                 <hr class="space">
             {% endblock %}
 

@@ -1,0 +1,168 @@
+{% load partition_util %}
+
+<div class="modal" id="court-picker" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" id="modal-court-picker">
+        <form id="court-picker-search-form" method="get" action="/">
+            <div class="modal-content">
+                <div class="span-23">
+                    <span class="close float-right pointer" data-dismiss="modal" aria-hidden="true">&times;</span>
+
+                    <h2 class="inline">Select Jurisdictions</h2>
+
+                    <p class="inline fake-link" id="check-all">Check All</p>
+
+                    <p class="inline fake-link" id="clear-all">Clear All</p>
+
+                    <p class="inline fake-link" id="check-current">Check Current Tab</p>
+
+                    <p class="inline fake-link" id="clear-current">Clear Current Tab</p>
+                </div>
+                <hr class="space">
+                <input id="court-filter" class="left span-6" type="text" placeholder="Select Jurisdictions by Typing"
+                       autocomplete="off"/>
+                <ul class="nav nav-tabs" id="court-picker-tabs">
+                    <li class="active"><a href="#tab-federal-appellate" data-toggle="tab">Federal Appellate</a></li>
+                    <li><a href="#tab-federal-district" data-toggle="tab">Federal District</a></li>
+                    <li><a href="#tab-bankruptcy" data-toggle="tab">Bankruptcy</a></li>
+                    <li><a href="#tab-state" data-toggle="tab">State</a></li>
+                    <li><a href="#tab-special" data-toggle="tab">Special</a></li>
+                </ul>
+
+                <div class="tab-content">
+                    <div class="tab-pane active" id="tab-federal-appellate">
+                        <div class="span-23">
+                            {% for row in courts.federal|rows:4 %}
+                                <div class="span-5 {% if forloop.last %}last{% else %}append-1{% endif %}">
+                                    {% for court in row %}
+                                        <div class="sidebar-checkbox">
+                                            <input
+                                                    id="id_{{ court.pk }}"
+                                                    name="{{ court.pk }}"
+                                                    {% if court.checked %}checked="checked"{% endif %}
+                                                    type="checkbox"
+                                                    class="external-input court-checkbox left">
+                                            <label
+                                                    for="id_{{ court.pk }}"
+                                                    class="pointer">
+                                                {{ court.short_name }}
+                                            </label>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="tab-pane" id="tab-federal-district">
+                        <div class="span-23">
+                            {% for row in courts.district|rows:4 %}
+                                <div class="span-5 {% if forloop.last %}last{% else %}append-1{% endif %}">
+                                    {% for court in row %}
+                                        <div class="sidebar-checkbox">
+                                            <input
+                                                    id="id_{{ court.pk }}"
+                                                    name="{{ court.pk }}"
+                                                    {% if court.checked %}checked="checked"{% endif %}
+                                                    type="checkbox"
+                                                    class="external-input court-checkbox left">
+                                            <label
+                                                    for="id_{{ court.pk }}"
+                                                    class="pointer">
+                                                {{ court.short_name }}
+                                            </label>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="tab-pane" id="tab-bankruptcy">
+                        {% for bank_bundle in courts.bankruptcy %}
+                            <div class="span-23">
+                                <h4 class="bottom inline">
+                                    {% if forloop.counter == 1 %}
+                                        Bankruptcy Appellate Panels
+                                    {% else %}
+                                        Bankruptcy District Courts
+                                    {% endif %}
+                                </h4>
+                            </div>
+                            <div class="span-23">
+                                {% for row in bank_bundle|rows:4 %}
+                                    <div class="span-5 {% if forloop.last %}last{% else %}append-1{% endif %}">
+                                        {% for court in row %}
+                                            <div class="sidebar-checkbox">
+                                                <input
+                                                        id="id_{{ court.pk }}"
+                                                        name="{{ court.pk }}"
+                                                        {% if court.checked %}checked="checked"{% endif %}
+                                                        type="checkbox"
+                                                        class="external-input court-checkbox left">
+                                                <label
+                                                        for="id_{{ court.pk }}"
+                                                        class="pointer">
+                                                    {{ court.short_name }}
+                                                </label>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            <hr class="space">
+                        {% endfor %}
+                    </div>
+                    <div class="tab-pane" id="tab-state">
+                        <div class="span-23">
+                            {% for col_bundle in courts.state %}
+                                <div class="span-7 {% if forloop.last %}last{% else %}append-1{% endif %}">
+                                    {% for court_bundle in col_bundle %}
+                                        {% for court in court_bundle %}
+                                            <div class="sidebar-checkbox {% if court.jurisdiction == 'SA' or court.jurisdiction == 'SS' %}appeals-court{% endif %}">
+                                                <input
+                                                        id="id_{{ court.pk }}"
+                                                        name="{{ court.pk }}"
+                                                        {% if court.checked %}checked="checked"{% endif %}
+                                                        type="checkbox"
+                                                        class="external-input court-checkbox left">
+                                                <label
+                                                        for="id_{{ court.pk }}"
+                                                        class="pointer">
+                                                    {{ court.short_name }}
+                                                </label>
+                                            </div>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="tab-pane" id="tab-special">
+                        <div class="span-23">
+                            {% for row in courts.special|rows:3 %}
+                                <div class="span-7 {% if forloop.last %}last{% else %}append-1{% endif %}">
+                                    {% for court in row %}
+                                        <div class="sidebar-checkbox">
+                                            <input
+                                                    id="id_{{ court.pk }}"
+                                                    name="{{ court.pk }}"
+                                                    {% if court.checked %}checked="checked"{% endif %}
+                                                    type="checkbox"
+                                                    class="external-input court-checkbox left">
+                                            <label
+                                                    for="id_{{ court.pk }}"
+                                                    class="pointer">
+                                                {{ court.short_name }}
+                                            </label>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="clearfix">
+                    <button type="submit" class="float-right">Apply</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

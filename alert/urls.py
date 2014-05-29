@@ -20,7 +20,6 @@ from alert.search.api import (
 from alert.search.models import Court
 from alert.search.views import browser_warning, show_results, tools_page
 from alert.simple_pages.api import coverage_data
-from alert.simple_pages.views import about, contact, coverage_graph, contact_thanks, faq, robots
 from alert.userHandling.views import (
     confirmEmail, deleteProfile, deleteProfileDone, emailConfirmSuccess, password_change, register, register_success,
     request_email_confirmation, view_favorites, view_alerts, view_settings
@@ -87,12 +86,7 @@ urlpatterns = patterns('',
     (r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$',
         serve_static_file),
 
-    # Simple pages
-    (r'^about/$', about),
-    (r'^faq/$', faq),
-    (r'^coverage/$', coverage_graph),
-    (r'^contact/$', contact),
-    (r'^contact/thanks/$', contact_thanks),
+    url('^', include('alert.simple_pages.urls')),
 
     # Various sign in/out etc. functions as provided by django
     url(
@@ -171,11 +165,10 @@ urlpatterns = patterns('',
     (r'^googleef3d845637ccb353.html$', validate_for_google),
     (r'^google646349975c2495b6.html$', validate_for_google2),
 
-    # Sitemaps & robots
+    # Sitemaps
     (r'^sitemap\.xml$', sitemap_maker),
     (r'^sitemap-flat\.xml$', flat_sitemap_maker),
     (r'^sitemap-donate\.xml$', donate_sitemap_maker),
-    (r'^robots.txt$', robots),
 
     # Donations
     (r'^donate/$', donate),

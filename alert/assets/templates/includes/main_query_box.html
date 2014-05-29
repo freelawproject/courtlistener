@@ -1,0 +1,50 @@
+<div id="searchform">
+    <form action="/" method="get" id="search-form">
+        <div id="search-container">
+            <table>
+                <tbody>
+                    <tr>
+                        <td>
+                            <input class="{% if count == 0 or error %}auto-focus{% endif %} wide-title"
+                                   value="{{ search_form.q.value|default:'' }}"
+                                   name="q"
+                                   id="id_q"
+                                   autocomplete="off"
+                                   type="text"
+                                   tabindex="5">
+                        </td>
+                        <td>
+                            <button type="submit"
+                                    class="button title span-3"
+                                    name="search"
+                                    id="search-button"
+                                    tabindex="6"><i class="fa fa-search"></i>&nbsp;Search
+                            </button>
+                        </td>
+                        {% if homepage %}
+                            <td data-container="body"
+                                data-toggle="popover"
+                                data-placement="top"
+                                data-content="Select Jurisdictions"
+                                data-trigger="hover"
+                                class="pointer">
+                                <i class="fa fa-university fa-2x fa-fw gray"
+                                   data-toggle="modal"
+                                   data-target="#court-picker"></i>
+                            </td>
+                        {% endif %}
+                    </tr>
+                    {% if not homepage %}
+                        <tr>
+                            <td colspan="2">
+                                <div class="left">
+                                    <a href="/search/advanced-techniques/" id="advanced" tabindex="8">Advanced</a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
