@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-{% load text_filters %}
 {% load humanize %}
 
 {% block title %}
@@ -56,7 +55,7 @@
                                         Select Jurisdictions <i class="gray fa fa-external-link"></i>
                                     </h4>
 
-                                    <p class="bottom"><span id="jurisdiction-count">{{ court_count }}</span>
+                                    <p class="bottom"><span id="jurisdiction-count">{{ court_count_human }}</span>
                                         jurisdictions selected</p>
                                 </div>
                                 <hr class="space">
@@ -127,11 +126,6 @@
             <h3 id="create-alert-header"><span>Create an Alert</span> <i class="fa fa-bell gold"></i></h3>
             {% if user.is_authenticated %}
                 {% if get_string %}
-                    {% if alert_form.errors %}
-                        <div class="span-4 error">
-                            <p class="bottom">Please fix the errors below.</p>
-                        </div>
-                    {% endif %}
                     <p>Get regular notifications about this query by creating an alert.</p>
                     <form action="" method="post">{% csrf_token %}
                         {{ alert_form.alertText }}
@@ -190,71 +184,19 @@
                 {% endfor %}
             </div>
         {% endif %}
+        {% if alert_form.errors %}
+            <div class="span-16 last error">
+                <p class="bottom">There was an error creating your alert. Please <a href="#create-alert-header">see
+                    below</a>.</p>
+            </div>
+        {% endif %}
 
         {% if results.paginator.count > 0 %}
             <h2 id="result-count" class="bottom">{{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }}</h2>
             <div id="result-order-chooser-placeholder"></div>
             <span class="small gray span-17 last top">{{ results.object_list.QTime }}ms</span>
             <hr class="space"/>
-            {% for result in results.object_list %}
-                <article>
-                    <h3 class="bottom serif">
-                        <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}" class="visitable">
-                            {{result.solr_highlights.caseName.0|safe}}
-                            ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
-                        </a>
-                    </h3>
-
-                    <p class="bottom">
-                        <span class="meta-data-header">Date Filed:</span>
-                        <time class="meta-data-value" datetime="{{ result.dateFiled|date:'Y-m-d'}}" pubdate>
-                            {% if result.dateFiled %}
-                                {{result.dateFiled|date:"F jS, Y"}}
-                            {% else %}
-                                Unknown date
-                            {% endif %}
-                        </time>
-                        <span class="meta-data-header">Status:</span>
-                        <span class="meta-data-value">{{ result.status }}</span>
-                        {% if result.solr_highlights.citation.0 %}
-                            <span class="meta-data-header">Citations: </span>
-                            <span class="meta-data-value">{{ result.solr_highlights.citation.0|safe }}</span>
-                        {% endif %}
-                        {% if result.solr_highlights.docketNumber.0 %}
-                            <span class="meta-data-header">Docket Number:</span>
-                            <span class="meta-data-value">{{ result.solr_highlights.docketNumber.0|safe }}</span>
-                        {% endif %}
-                    </p>
-                    <p class="bottom">
-                        {% if result.solr_highlights.judge.0 %}
-                            <span class="meta-data-header">Judge:</span>
-                            <span class="meta-data-value">{{ result.solr_highlights.judge.0|safe }}</span>
-                        {%  endif %}
-                        {% if result.solr_highlights.suitNature.0 %}
-                            <span class="meta-data-header">Nature of suit:</span>
-                            <span class="meta-data-value">
-                                <a href="?q=suitNature:{{ result.solr_highlights.suitNature.0|safe }}">
-                                    {{ result.solr_highlights.suitNature.0|safe }}
-                                </a>
-                            </span>
-                        {%  endif %}
-                    </p>
-                    {% if result.citeCount > 0 %}
-                        <p class="bottom">
-                            <span class="meta-data-value">
-                                <a href="{{ result.absolute_url }}cited-by/?{{ request.META.QUERY_STRING }}">
-                                    Cited {{ result.citeCount|intcomma }} time{{ result.citeCount|pluralize }}
-                                </a>
-                            </span>
-                        </p>
-                    {% endif %}
-                    <p>
-                        {% if request.GET.q %}&hellip;{% endif %}{% for frag in result.solr_highlights.text %}
-                           {{ frag|safe|underscore_to_space }}&hellip;
-                        {% endfor %}
-                    </p>
-                </article>
-            {% endfor %}
+            {% include "includes/search_result.html" %}
         {% else %}
             {% if not error %}
                 <h2 class="alt">Your search
@@ -273,7 +215,7 @@
                 We value your feedback.</p>
             {% else %}
                 <h2 class="alt">Your search
-                    {% if request.GET.q != "" %}
+                    {% if request.GET.q %}
                         &mdash; <strong>{{ request.GET.q }}</strong> &mdash;
                     {% endif %}
                     encountered a <strong>deadly</strong> error.</h2>

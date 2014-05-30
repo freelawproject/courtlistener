@@ -140,21 +140,47 @@ class SearchTest(SolrTestCase):
 
     def test_homepage(self):
         """Is the homepage loaded when no GET parameters are provided?"""
-        pass
+        response = self.client.get('/')
+        self.assertIn('id="homepage"', response.content, msg="Did not find the #homepage id when attempting to load the "
+                                                         "homepage")
 
     def test_fail_gracefully(self):
         """Do we fail gracefully when an invalid search is created?"""
-        pass
+        response = self.client.get('/?citation=-')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('deadly', response.content, msg="Invalid search did not result in \"deadly\" error.")
 
 
 class AlertTest(TestCase):
+    fixtures = ['authtest_data.json']
+
+    def setUp(self):
+        # Set up some handy variables
+        self.client = Client()
+        self.alert_params = {
+            'alertText': 'q=asdf',
+            'alertName': 'dummy alert',
+            'alertFrequency': 'dly',
+            'sendNegativeAlert': 'on',
+        }
+
     def test_create_alert(self):
         """Can we create an alert by sending a post?"""
-        pass
+        self.client.login(username='pandora', password='password')
+        r = self.client.post('/', self.alert_params, follow=True)
+        self.assertEqual(r.redirect_chain[0][1], 302)
+        self.assertIn('successfully', r.content)
 
     def test_fail_gracefully(self):
         """Do we fail gracefully when an invalid alert form is sent?"""
-        pass
+        # Use a copy to shield other tests from changes.
+        bad_alert_params = self.alert_params.copy()
+        # Break the form
+        bad_alert_params.pop('alertText', None)
+        self.client.login(username='pandora', password='password')
+        r = self.client.post('/', bad_alert_params, follow=True)
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('error creating your alert', r.content)
 
 
 class ApiTest(SolrTestCase):
