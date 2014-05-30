@@ -104,10 +104,10 @@ def merge_form_with_courts(COURTS, search_form):
                         if field.html_name.startswith('court_')]
     no_facets_selected = not any(checked_statuses)
     all_facets_selected = all(checked_statuses)
+    court_count = len([status for status in checked_statuses if status is True])
+    court_count_human = court_count
     if no_facets_selected or all_facets_selected:
-        court_count = 'All'
-    else:
-        court_count = len([status for status in checked_statuses if status is True])
+        court_count_human = 'All'
 
     for field in search_form:
         if no_facets_selected:
@@ -173,7 +173,7 @@ def merge_form_with_courts(COURTS, search_form):
     courts['state'].append(state_bundles[15:34])
     courts['state'].append(state_bundles[34:])
 
-    return courts, court_count
+    return courts, court_count_human, court_count
 
 
 def make_fq(cd, field, key):
@@ -257,12 +257,10 @@ def make_qf_string(qf):
 
 
 def build_main_query(cd, highlight='all'):
-    main_params = {}
-    # Build up all the queries needed
-    main_params['q'] = cd['q'] or '*:*'
-
-    # Sorting for the main query
-    main_params['sort'] = cd.get('order_by', '')
+    main_params = {
+        'q': cd['q'] or '*:*',
+        'sort': cd.get('order_by', ''),
+    }
 
     if str(main_params['sort']).startswith('score'):
         main_params['boost'] = 'pagerank'
@@ -278,38 +276,42 @@ def build_main_query(cd, highlight='all'):
 
     if highlight:
         # Common highlighting params up here.
-        main_params['hl'] = 'true'
-        main_params['f.text.hl.snippets'] = '5'
-        main_params['f.text.hl.maxAlternateFieldLength'] = '500'
-        main_params['f.text.hl.alternateField'] = 'text'
+        main_params.update({
+            'hl': 'true',
+            'f.text.hl.snippets': '5',
+            'f.text.hl.maxAlternateFieldLength': '500',
+            'f.text.hl.alternateField': 'text',
+        })
 
         if highlight == 'all':
             # Requested fields for the main query. We only need the fields here that
             # are not requested as part of highlighting. Facet params are not set
             # here because they do not retrieve results, only counts (they are set
             # to 0 rows).
-            main_params['fl'] = 'id,absolute_url,court_id,local_path,source,download_url,status,dateFiled,citeCount'
+            main_params.update({
+                'fl': 'id,absolute_url,court_id,local_path,source,download_url,status,dateFiled,citeCount',
 
-            # Highlighting for the main query.
-            main_params['hl.fl'] = 'text,caseName,judge,suitNature,citation,neutralCite,docketNumber,lexisCite,court_citation_string'
-            main_params['f.caseName.hl.fragListBuilder'] = 'single'
-            main_params['f.judge.hl.fragListBuilder'] = 'single'
-            main_params['f.suitNature.hl.fragListBuilder'] = 'single'
-            main_params['f.citation.hl.fragListBuilder'] = 'single'
-            main_params['f.neutralCite.hl.fragListBuilder'] = 'single'
-            main_params['f.docketNumber.hl.fragListBuilder'] = 'single'
-            main_params['f.lexisCite.hl.fragListBuilder'] = 'single'
-            main_params['f.court_citation_string.hl.fragListBuilder'] = 'single'
+                # Highlighting for the main query.
+                'hl.fl': 'text,caseName,judge,suitNature,citation,neutralCite,docketNumber,lexisCite,court_citation_string',
+                'f.caseName.hl.fragListBuilder': 'single',
+                'f.judge.hl.fragListBuilder': 'single',
+                'f.suitNature.hl.fragListBuilder': 'single',
+                'f.citation.hl.fragListBuilder': 'single',
+                'f.neutralCite.hl.fragListBuilder': 'single',
+                'f.docketNumber.hl.fragListBuilder': 'single',
+                'f.lexisCite.hl.fragListBuilder': 'single',
+                'f.court_citation_string.hl.fragListBuilder': 'single',
 
-            # If there aren't any hits in the text return the field instead
-            main_params['f.caseName.hl.alternateField'] = 'caseName'
-            main_params['f.judge.hl.alternateField'] = 'judge'
-            main_params['f.suitNature.hl.alternateField'] = 'suitNature'
-            main_params['f.citation.hl.alternateField'] = 'citation'
-            main_params['f.neutralCite.hl.alternateField'] = 'neutralCite'
-            main_params['f.docketNumber.hl.alternateField'] = 'docketNumber'
-            main_params['f.lexisCite.hl.alternateField'] = 'lexisCite'
-            main_params['f.court_citation_string.hl.alternateField'] = 'court_citation_string'
+                # If there aren't any hits in the text return the field instead
+                'f.caseName.hl.alternateField': 'caseName',
+                'f.judge.hl.alternateField': 'judge',
+                'f.suitNature.hl.alternateField': 'suitNature',
+                'f.citation.hl.alternateField': 'citation',
+                'f.neutralCite.hl.alternateField': 'neutralCite',
+                'f.docketNumber.hl.alternateField': 'docketNumber',
+                'f.lexisCite.hl.alternateField': 'lexisCite',
+                'f.court_citation_string.hl.alternateField': 'court_citation_string',
+            })
         elif highlight == 'text':
             main_params['hl.fl'] = 'text'
     else:

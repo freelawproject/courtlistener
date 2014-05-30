@@ -70,8 +70,8 @@
         <hr class="space">
         <hr class="space">
 
-        <h2 class="center bottom">Search millions of opinions by case name, topic or citation.</h2>
-        <h3 class="center gray">350 Jurisdictions. Sponsored by the Non-Profit Free Law Project.</h3>
+        <h2 class="center bottom">Search millions of opinions by case name, topic, or citation.</h2>
+        <h3 class="center gray">{{ court_count }} Jurisdictions. Sponsored by the Non-Profit Free Law Project.</h3>
 
         <div class="span-24 last">
             <div id="main-query-box">
@@ -197,7 +197,7 @@
 
 
         <div id="advanced-search-starter">
-            <h2 class="center alt gray">&ndash; or &ndash;</h2>
+            <h2 class="center alt gray bottom">&ndash; or &ndash;</h2>
             <h3 class="fake-link center">Advanced Search</h3>
         </div>
         <hr class="space">
@@ -208,49 +208,81 @@
         <div class="span-24">
             <div class="span-11 append-2">
                 <h3>About CourtListener</h3>
-                <p>Nulla id erat sit amet risus ultrices condimentum sed eu mauris. Maecenas mattis augue sodales
-                    facilisis sagittis. Praesent posuere aliquet volutpat. Proin scelerisque ipsum est. Donec orci orci,
-                    laoreet et odio ut, dignissim commodo ipsum. In tristique est et leo dapibus aliquam. Integer in
-                    vehicula dui. Proin pretium vel nisl eu mattis. Nunc fringilla enim at varius tempus. Nunc quam
-                    nisl, convallis at nisl sed, sodales blandit enim. In tristique ante purus, sed elementum enim porta
-                    nec. </p>
+                <p>CourtListener is a free legal research website containing millions of legal opinions from federal and
+                    state courts. With CourtListener, lawyers, journalists, academics, and the public can research an
+                    important case, stay up to date with new opinions as they are filed, or do deep analysis using our
+                    raw data.
+                </p>
             </div>
             <div class="span-11 last">
                 <h3>About Free Law Project</h3>
-                <p>Phasellus tincidunt pharetra libero, scelerisque
-                    tincidunt justo elementum quis. Vestibulum ullamcorper egestas sodales. Etiam hendrerit fringilla
-                    porttitor. Suspendisse at lectus at leo euismod volutpat vel vel libero. In hac habitasse platea
-                    dictumst. Aliquam placerat eros vitae libero tempus, sit amet porttitor mauris egestas. In eu quam
-                    vel quam tristique tincidunt quis ut purus. Pellentesque ultricies orci eu volutpat pretium. Donec
-                    ultricies viverra nulla consequat dignissim.</p>
+                <p>Free Law Project seeks to provide free access to primary legal materials, develop legal research
+                    tools, and support academic research on legal corpora. We work diligently with volunteers to expand
+                    our efforts at building an open source, open access, legal research ecosystem. Currently Free Law
+                    Project sponsors the development of CourtListener, <a
+                            href="https://bitbucket.org/mlissner/juriscraper/">Juriscraper</a>, and <a
+                            href="https://www.recapthelaw.org">RECAP</a>.
+                </p>
             </div>
         </div>
         <hr class="space">
         <hr class="space">
         <hr class="space">
         <div class="span-24">
+            {% comment %}
             <div class="span-7 append-1">
-                <h3>Great video</h3>
+                <h3>Learn About CourtListener&nbsp;<i class="gray fa fa-youtube-play"></i></h3>
                 <iframe width="270" height="203" src="//www.youtube.com/embed/txqiwrbYGrs" frameborder="0"
                         allowfullscreen></iframe>
             </div>
+            {% endcomment %}
 
-            <div class="span-7 append-1">
-                <h3>Latest Cases</h3>
-                <p>Suspendisse at lectus at leo euismod volutpat vel vel libero. In hac habitasse platea
-                    dictumst. Aliquam placerat eros vitae libero tempus, sit amet porttitor mauris egestas. In eu quam
-                    vel quam tristique tincidunt quis ut purus. Pellentesque ultricies orci eu volutpat pretium. Donec
-                    ultricies viverra
-                </p>
+            <div class="span-11 append-2">
+                <h3>The Numbers&nbsp;<i class="gray fa fa-cogs"></i></h3>
+
+                <div class="span-2 center">
+                    <span class="homepage-stat bold">{{ results.paginator.count|intcomma }}</span>
+                </div>
+                <div class="span-9 last"><p>Number of <a href="/?order_by=dateFiled+desc">precedential
+                    opinions</a> in CourtListener.</p></div>
+
+                <div class="span-2 center">
+                    <span class="homepage-stat bold">{{ opinions_in_last_ten|intcomma }}</span>
+                </div>
+                <div class="span-9 last"><p>Opinions added in last ten days.</p></div>
+
+                <div class="span-2 center">
+                    <span class="homepage-stat bold">{{ queries_in_last_ten|intcomma }}</span>
+                </div>
+                <div class="span-9 last"><p>Number of queries made in last ten days.</p></div>
+
+                <div class="span-2 center">
+                    <span class="homepage-stat bold">{{ alerts_in_last_ten|intcomma }}</span>
+                </div>
+                <div class="span-9 last"><p>Number of <a href="/faq/#explain-alerts">alerts</a> sent in last ten days.</p></div>
+
+                {% if bulk_in_last_ten > 0 %}
+                    <div class="span-2 center">
+                        <span class="homepage-stat bold">{{ bulk_in_last_ten|intcomma }}</span>
+                    </div>
+                    <div class="span-9 last"><p>Times the bulk data has been downloaded in last ten days.</p></div>
+                {% endif %}
+
+                <div class="span-2 center">
+                    <span class="homepage-stat bold">{{ api_in_last_ten|intcomma }}</span>
+                </div>
+                <div class="span-9 last"><p><a href="/api/">API calls</a> made against our system in last ten days.</p></div>
             </div>
 
-            <div class="span-8 last">
-                <h3>The Numbers</h3>
-                <p>Suspendisse at lectus at leo euismod volutpat vel vel libero. In hac habitasse platea
-                    dictumst. Aliquam placerat eros vitae libero tempus, sit amet porttitor mauris egestas. In eu quam
-                    vel quam tristique tincidunt quis ut purus. Pellentesque ultricies orci eu volutpat pretium. Donec
-                    ultricies viverra
+            <div class="span-11 last">
+                <h3>Latest Cases&nbsp;<i class="gray fa fa-clock-o"></i></h3>
+                <p>We download opinions from many jurisdictions on an ongoing basis. Here are the most recent ones.
                 </p>
+                {% include "includes/search_result.html" with simple=True %}
+                <div class="right">
+                    <hr class="space">
+                    <a href="/?order_by=dateFiled+desc">See all recent opinions&hellip;</a>
+                </div>
             </div>
         </div>
 

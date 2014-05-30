@@ -1,4 +1,7 @@
 import logging
+from datetime import datetime, timedelta
+from django.db.models import Sum
+from django.utils.timezone import utc, make_aware
 from alert.alerts.forms import CreateAlertForm
 from alert.lib import search_utils
 from alert.lib import sunburnt
@@ -12,12 +15,13 @@ from django.shortcuts import render_to_response
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
 from django.views.decorators.cache import never_cache
-from alert.stats import tally_stat
+from alert.search.models import Document
+from alert.stats import tally_stat, Stat
 
 logger = logging.getLogger(__name__)
 
 
-def do_search(request, get_string, alert_form=None, template='search/search.html', privacy=True):
+def do_search(request, rows=20):
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     # Bind the search form.
     search_form = SearchForm(request.GET)
@@ -28,28 +32,20 @@ def do_search(request, get_string, alert_form=None, template='search/search.html
             results_si = conn.raw_query(**search_utils.build_main_query(cd))
             stat_facet_fields = search_utils.place_facet_queries(cd, conn)
             status_facets = search_utils.make_stats_variable(stat_facet_fields, search_form)
-            courts, court_count = search_utils.merge_form_with_courts(COURTS, search_form)
+            courts, court_count_human, court_count = search_utils.merge_form_with_courts(COURTS, search_form)
         except Exception, e:
             logger.warning("Error loading search page with request: %s" % request.GET)
             logger.warning("Error was %s" % e)
-            return render_to_response(
-                template,
-                {'error': True, 'private': privacy},
-                RequestContext(request)
-            )
+            return {'error': True}
 
     else:
         # Invalid form, send it back
         logger.warning("Invalid form when loading search page with request: %s" % request.GET)
-        return render_to_response(
-            template,
-            {'error': True, 'private': privacy},
-            RequestContext(request)
-        )
+        return  {'error': True}
 
     # Set up pagination
     try:
-        paginator = Paginator(results_si, 20)
+        paginator = Paginator(results_si, rows)
         page = request.GET.get('page', 1)
         try:
             paged_results = paginator.page(page)
@@ -63,24 +59,15 @@ def do_search(request, get_string, alert_form=None, template='search/search.html
         # Catches any Solr errors, and aborts.
         logger.warning("Error loading pagination on search page with request: %s" % request.GET)
         logger.warning("Error was: %s" % e)
-        return render_to_response(
-            template,
-            {'error': True, 'private': privacy},
-            RequestContext(request)
-        )
+        return {'error': True}
 
-    return render_to_response(
-        template,
-        {'search_form': search_form,
-         'alert_form': alert_form,
-         'results': paged_results,
-         'courts': courts,
-         'court_count': court_count,
-         'status_facets': status_facets,
-         'get_string': get_string,
-         'private': privacy},
-        RequestContext(request)
-    )
+    return {'search_form': search_form,
+            'results': paged_results,
+            'courts': courts,
+            'court_count_human': court_count_human,
+            'court_count': court_count,
+            'status_facets': status_facets}
+
 
 @never_cache
 def show_results(request):
@@ -101,6 +88,10 @@ def show_results(request):
     """
     # Create a search string that does not contain the page numbers
     get_string = search_utils.make_get_string(request)
+    render_dict = {
+        'private': True,
+        'get_string': get_string,
+    }
 
     if request.method == 'POST':
         # The user is trying to save an alert.
@@ -122,10 +113,12 @@ def show_results(request):
             return HttpResponseRedirect('/profile/alerts/')
         else:
             # Invalid form. Do the search again and show them the alert form with the errors
-            return do_search(
-                request,
-                get_string,
-                alert_form=alert_form,
+            render_dict.update(do_search(request))
+            render_dict.update({'alert_form': alert_form})
+            return render_to_response(
+                'search/search.html',
+                render_dict,
+                RequestContext(request),
             )
 
     else:
@@ -134,11 +127,41 @@ def show_results(request):
             # No parameters --> Homepage.
             if not is_bot(request):
                 tally_stat('search.homepage_loaded')
-            return do_search(
-                request,
-                get_string,
-                template='homepage.html',
-                privacy=False,
+            render_dict.update(do_search(request, rows=5))
+            ten_days_ago = make_aware(datetime.today() - timedelta(days=10), utc)
+            alerts_in_last_ten = Stat.objects\
+                .filter(
+                    name__contains='alerts.sent',
+                    date_logged__gte=ten_days_ago)\
+                .aggregate(Sum('count'))['count__sum']
+            queries_in_last_ten = Stat.objects\
+                .filter(
+                    name='search.results',
+                    date_logged__gte=ten_days_ago) \
+                .aggregate(Sum('count'))['count__sum']
+            bulk_in_last_ten = Stat.objects\
+                .filter(
+                    name__contains='bulk_data',
+                    date_logged__gte=ten_days_ago)\
+                .aggregate(Sum('count'))['count__sum']
+            api_in_last_ten = Stat.objects \
+                .filter(
+                    name__contains='api',
+                    date_logged__gte=ten_days_ago) \
+                .aggregate(Sum('count'))['count__sum']
+            opinions_in_last_ten = Document.objects.filter(time_retrieved__gte=ten_days_ago).count()
+            render_dict.update({
+                'alerts_in_last_ten': alerts_in_last_ten,
+                'queries_in_last_ten': queries_in_last_ten,
+                'opinions_in_last_ten': opinions_in_last_ten,
+                'bulk_in_last_ten': bulk_in_last_ten,
+                'api_in_last_ten': api_in_last_ten,
+                'private': False
+            })
+            return render_to_response(
+                'homepage.html',
+                render_dict,
+                RequestContext(request)
             )
 
         else:
@@ -148,10 +171,12 @@ def show_results(request):
             # Create bare-bones alert form.
             alert_form = CreateAlertForm(initial={'alertText': get_string,
                                                   'alertFrequency': "dly"})
-            return do_search(
-                request,
-                get_string,
-                alert_form=alert_form
+            render_dict.update(do_search(request))
+            render_dict.update({'alert_form': alert_form})
+            return render_to_response(
+                'search/search.html',
+                render_dict,
+                RequestContext(request),
             )
 
 

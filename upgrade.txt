@@ -30,18 +30,27 @@ We welcome a conversion of these notes to a better process using Fabric.
  - Several small apps have been combined into the "simple_pages" app. This should vastly simplify finding the right
    code for the task at hand but otherwise should not have any noticeable effects.
 
-   - Remember to remove the jquery migration code from base.html after testing everything that uses JQuery.
-   - Disable debugging in the feature tour
+   + Remember to remove the jquery migration code from base.html after testing everything that uses JQuery.
+   - Feature tour:
+        - Disable debugging
+        - Make sure it restarts properly
+        - Fix button alignment and make disabled buttons look that way.
+        - Make sure it takes you straight to the homepage if you start it on a search result page.
    - Figure out whether the 'tools' page should be deleted, updated linked to from somewhere, or what.
    + Change default ordering to relevance not dateFiled+desc
    + Make the query box have auto-focus on the homepage
-   - Make sure tests exist and pass
+   + Make sure tests exist and pass
    + Fix appearance of advanced search page header at http://127.0.0.1:8000/search/advanced-techniques/
    + Add spy glass to the search button in the sidebar
    + Test that the order by drop down doesn't appear when no results and does appear when there are results.
    + Make jurisdiction count dynamic on the homepage
    + Add login stuff to the homepage
-   - Complete the blurbs on the homepage
+   + Complete the blurbs on the homepage
+   + Make court-count dynamic in the h2 on the homepage
+   + update pic on about page
+   + FAQ: What are neutral citations?
+   + Fix result meta data wrapping
+   + Change "Advanced" to "Query Help" or something.
 
  - After upgrade, delete any flatpages that have been replaced by the new simple_pages app.
 

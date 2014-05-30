@@ -17,12 +17,19 @@ Sets up all the overrides or additional CSS that the site uses.
 
 #homepage #main-query-box.wide {
     width: 950px;
-    margin: 0px;
+    margin: 0;
 }
 
 #homepage #main-query-box.wide #id_q {
     width: 830px;
 }
+
+#homepage #advanced-search-starter h3 {
+    margin: 0 auto;
+    width: 200px;
+    padding: 1em;
+}
+
 #homepage #jurisdiction-count {
     -webkit-transition: all 0.5s ease;
     -moz-transition: all 0.5s ease;
@@ -119,6 +126,10 @@ footer {
 
 .float-right {
     float: right;
+}
+
+.nowrap {
+    white-space: nowrap;
 }
 
 .hidden {
