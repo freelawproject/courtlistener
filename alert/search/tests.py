@@ -152,7 +152,7 @@ class SearchTest(SolrTestCase):
 
 
 class AlertTest(TestCase):
-    fixtures = ['authtest_data.json']
+    fixtures = ['test_court.json', 'authtest_data.json']
 
     def setUp(self):
         # Set up some handy variables
@@ -170,6 +170,7 @@ class AlertTest(TestCase):
         r = self.client.post('/', self.alert_params, follow=True)
         self.assertEqual(r.redirect_chain[0][1], 302)
         self.assertIn('successfully', r.content)
+        self.client.logout()
 
     def test_fail_gracefully(self):
         """Do we fail gracefully when an invalid alert form is sent?"""
@@ -181,6 +182,7 @@ class AlertTest(TestCase):
         r = self.client.post('/', bad_alert_params, follow=True)
         self.assertEqual(r.status_code, 200)
         self.assertIn('error creating your alert', r.content)
+        self.client.logout()
 
 
 class ApiTest(SolrTestCase):
@@ -196,10 +198,11 @@ class ApiTest(SolrTestCase):
         with open('search/test_assets/api_test_results.json', 'r') as f:
             json_correct = simplejson.load(f)
 
-        # Drop the timestamps everywhere b/c otherwise they'll always differ
+        # Drop the timestamps and scores b/c they can differ
         for j in [json_actual, json_correct]:
             for o in j['objects']:
                 o['timestamp'] = None
+                o['score'] = None
 
         self.assertEqual(
             json_actual,
