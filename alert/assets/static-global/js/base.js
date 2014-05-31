@@ -161,21 +161,25 @@ $(document).ready(function() {
     //////////
     // Tour //
     //////////
-    var tour = new Tour({
+    var tour = {
+        id: "feature-tour",
+        showPrevButton: true,
         steps: [
-            {
-                path: '/',
-                element: '#id_q',
+            {//0
+                target: '#id_q',
                 placement: 'bottom',
+                xOffset: 'center',
+                arrowOffset: 'center',
                 title: 'Welcome to the tour!',
                 content: 'Broad queries can be a great way to start a research task. Our search box can understand ' +
                     'everything you might expect...terms, concepts, citations, you name it.'
             },
-            {
-                path: '/',
-                element: '#advanced-search-starter',
+            {//1
+                target: '#advanced-search-starter',
                 placement: 'bottom',
-                reflex: true,
+                xOffset: 'center',
+                arrowOffset: 'center',
+                nextOnTargetClick: true,
                 title: 'More power please!',
                 content: "If you are the kind of person that wants more power, you'll love the advanced search box. " +
                     "Click on \"Advanced Search\" to turn it on.",
@@ -183,75 +187,80 @@ $(document).ready(function() {
                     showAdvancedHomepage();
                 }
             },
-            {
-                path: '/',
-                element: "#extra-sidebar-fields",
-                backdrop: true,
+            {//2
+                target: "#extra-sidebar-fields",
+                placement: 'right',
+                arrowOffset: 'center',
                 title: "Sophisticated Search",
                 content: "In the Advanced Search area, you can make sophisticated searches against many fields. " +
-                    "Press \"Next\" and we'll make a query for you."
+                    "Press \"Next\" and we'll make a query for you.",
+                multipage: true,
+                onNext: function(){
+                    window.location = '/?q=roe+v.+wade&order_by=score+desc&stat_Precedential=on&court=scotus';
+                }
             },
-            {
-                /*onShow: function () {
-                    window.location = '/?q=test&court=scotus&stat_Precedential=on&order_by=score+desc';
-                },*/
-                path: '/',
-                element: '.search-page article:first',
+            {//3
+                target: document.querySelector('.search-page article'),
                 placement: 'top',
-                orphan: true,
+                arrowOffset: 'center',
                 title: 'Detailed Results',
-                content: 'Here you can see the results for the query "Roe v Wade" sorted by relevance and filtered to ' +
+                content: 'Here you can see the results for the query "Roe v. Wade" sorted by relevance and filtered to ' +
                     'only one jurisdiction, the Supreme Court.'
             },
-            {
-                path: '/',
-                element: '#create-alert-header',
+            {//4
+                target: '#create-alert-header',
                 placement: 'right',
+                arrowOffset: 'center',
                 title: 'Make alerts',
-                content: 'Once you have placed a query, you can create an alert. If there are ever any new results for ' +
-                    'your query, CourtListener will send you an email. Hit next to check out Roe v. Wade.'
+                content: '<p>Once you have placed a query, you can create an alert. If there are ever any new results for ' +
+                    'your query, CourtListener will send you an email.</p> <p>Hit next to check out Roe v. Wade.</p>',
+                multipage: true,
+                onNext: function(){
+                    window.location = '/scotus/yjn/roe-v-wade/';
+                }
             },
-            {
-                path: '/scotus/eq/town-of-greece-v-galloway/', //'/scotus/yjn/roe-v-wade/',
-                element: '#cited-by',
-                orphan: true,
+            {//5
+                target: '#cited-by',
                 placement: 'right',
+                arrowOffset: 'center',
                 title: 'The Power of Citation',
                 content: 'Roe v. Wade has been cited hundreds of times since it was issued in 1973. Looking at these ' +
                     'citations can be a good way to see related cases.'
             },
-            {
-                path: '/scotus/eq/town-of-greece-v-galloway/', //'/scotus/yjn/roe-v-wade/',
-                element: '#authorities',
+            {//6
+                target: '#authorities',
                 placement: 'right',
+                arrowOffset: 'center',
                 title: 'Authorities',
-                content: 'The Authorities section lists all of the opinions that Roe v. Wade references. These can be ' +
-                    'thought of as the principles it rests on.'
-            },
-            {
-                orphan: true,
-                title: 'Thanks',
-                content: 'This concludes a brief tour of some of our features. We hope you enjoy using CourtListener, ' +
-                    'and if you have any questions do not hesitate to get in touch.'
+                content: '<p>The Authorities section lists all of the opinions that Roe v. Wade references. These can be ' +
+                    'thought of as the principles it rests on.</p><p>That\'s everything for now! Let us know if ' +
+                    'you have any questions.</p>',
+                onNext: function(){
+                    hopscotch.endTour();
+                }
             }
-        ],
-        debug: true
-    });
-    tour._isRedirect = function(path, currentPath){
-        return (path != null) && //Return false if path is undefined.
-            path !== "" && (
-            ({}.toString.call(path) === "[object RegExp]" && !path.test(currentPath)) ||
-                ({}.toString.call(path) === "[object String]" &&
-                    path.replace(/\/?$/, "") !== currentPath.replace(/\/?$/, "")
-                    )
-            );
-    }
+        ]
+    };
 
-    tour.init();
     $('#tour-link').click(function () {
-        tour.restart();
-        tour.start(true);
+        var loc = location.pathname + location.search;
+        if (loc !== '/') {
+            sessionStorage.setItem("hopscotch.tour.state", 'feature-tour:0');
+            window.location = '/';
+        } else {
+            hopscotch.startTour(tour, 0);
+        }
     });
+    // Start it automatically for certain steps.
+    if (hopscotch.getState() === "feature-tour:0") {
+        hopscotch.startTour(tour);
+    }
+    if (hopscotch.getState() === "feature-tour:3") {
+        hopscotch.startTour(tour);
+    }
+    if (hopscotch.getState() === "feature-tour:5") {
+        hopscotch.startTour(tour);
+    }
 });
 
 
