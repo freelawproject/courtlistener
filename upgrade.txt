@@ -31,7 +31,6 @@ We welcome a conversion of these notes to a better process using Fabric.
    code for the task at hand but otherwise should not have any noticeable effects.
  - After upgrade, delete any flatpages that have been replaced by the new simple_pages app.
 
-
 2013-11-25:
  - This revision adds a new script that will welcome new users whenever it is called. It will send an email to anybody
    that's new in the last 24 hours each time it is called. If you wish to use it, simply add it to your crontab.

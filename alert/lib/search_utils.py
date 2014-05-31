@@ -256,10 +256,10 @@ def make_qf_string(qf):
     return ' '.join(qf_array)
 
 
-def build_main_query(cd, highlight='all'):
+def build_main_query(cd, highlight='all', order_by=''):
     main_params = {
         'q': cd['q'] or '*:*',
-        'sort': cd.get('order_by', ''),
+        'sort': cd.get('order_by', order_by),
     }
 
     if str(main_params['sort']).startswith('score'):
