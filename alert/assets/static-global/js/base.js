@@ -172,7 +172,13 @@ $(document).ready(function() {
                 arrowOffset: 'center',
                 title: 'Welcome to the tour!',
                 content: 'Broad queries can be a great way to start a research task. Our search box can understand ' +
-                    'everything you might expect...terms, concepts, citations, you name it.'
+                    'everything you might expect...terms, concepts, citations, you name it.',
+                // If the advanced page is already shown, we skip to step 2.
+                onNext: function(){
+                    if (!$('#advanced-search-starter').is(":visible")){
+                        hopscotch.showStep(2);
+                    }
+                }
             },
             {//1
                 target: '#advanced-search-starter',

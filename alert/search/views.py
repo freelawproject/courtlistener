@@ -21,12 +21,14 @@ from alert.stats import tally_stat, Stat
 logger = logging.getLogger(__name__)
 
 
-def do_search(request, rows=20):
+def do_search(request, rows=20, order_by= None):
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     # Bind the search form.
     search_form = SearchForm(request.GET)
     if search_form.is_valid():
         cd = search_form.cleaned_data
+        if order_by:
+            cd['order_by'] = order_by
         search_form = _clean_form(request, cd)
         try:
             results_si = conn.raw_query(**search_utils.build_main_query(cd))
@@ -127,7 +129,11 @@ def show_results(request):
             # No parameters --> Homepage.
             if not is_bot(request):
                 tally_stat('search.homepage_loaded')
-            render_dict.update(do_search(request, rows=5))
+
+            # Load the render_dict with good results that can be shown in the "Latest Cases" section
+            render_dict.update(do_search(request, rows=5, order_by='dateFiled desc'))
+            # But give it a fresh form for the advanced search section
+            render_dict.update({'search_form': SearchForm(request.GET)})
             ten_days_ago = make_aware(datetime.today() - timedelta(days=10), utc)
             alerts_in_last_ten = Stat.objects\
                 .filter(
