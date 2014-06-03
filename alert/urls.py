@@ -11,7 +11,7 @@ from alert.donate.stripe_helpers import process_stripe_callback
 from alert.donate.views import view_donations, donate, donate_complete
 from alert.favorites.views import delete_favorite, edit_favorite, save_or_update_favorite
 from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, search_feed
-from alert.maintenance_warning.views import show_maintenance_warning
+from alert.simple_pages.views import show_maintenance_warning
 from alert.search.api import (
     CitationResource, CourtResource, DocumentResource,
     SearchResource, CitesResource, CitedByResource

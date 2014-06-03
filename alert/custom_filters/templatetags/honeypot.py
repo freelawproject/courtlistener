@@ -3,7 +3,7 @@ from django.conf import settings
 
 register = template.Library()
 
-@register.inclusion_tag('honeypot/honeypot_field.html')
+@register.inclusion_tag('includes/honeypot_field.html')
 def render_honeypot_field(field_name=None):
     """
         Renders honeypot field named field_name (defaults to HONEYPOT_FIELD_NAME).

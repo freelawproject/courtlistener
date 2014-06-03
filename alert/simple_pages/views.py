@@ -7,14 +7,14 @@ from django.core.mail import send_mail
 from django.http import HttpResponseRedirect
 from django.http import HttpResponse
 from django.template import loader, Context
-from django.views.decorators.cache import cache_page
+from django.views.decorators.cache import cache_page, never_cache
 from alert.lib import search_utils
 from alert.lib.sunburnt import sunburnt
 
 from alert.search.models import Court, Document
 from alert import settings
 from alert.simple_pages.forms import ContactForm
-from alert.honeypot.decorators import check_honeypot
+from alert.custom_filters.decorators import check_honeypot
 
 
 def about(request):
@@ -149,6 +149,20 @@ def advanced_search(request):
         {'private': False},
         RequestContext(request)
     )
+
+
+class HttpResponseTemporaryUnavailable(HttpResponse):
+    status_code = 503
+
+@never_cache
+def show_maintenance_warning(request):
+    """Blocks access to a URL, and instead loads a maintenance warning.
+
+    Uses a 503 status code, which preserves SEO. See:
+    https://plus.google.com/115984868678744352358/posts/Gas8vjZ5fmB
+    """
+    t = loader.get_template('simple_pages/maintenance.html')
+    return HttpResponseTemporaryUnavailable(t.render(Context({'private': True})))
 
 
 @cache_page(60 * 60)

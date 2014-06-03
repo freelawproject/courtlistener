@@ -1,27 +1,27 @@
-from django.contrib.auth.models import User
-from alert import settings
-from alert.stats import tally_stat
-from alert.userHandling.forms import ProfileForm, UserForm, UserCreationFormExtended, EmailConfirmationForm
-from alert.userHandling.models import UserProfile
-from alert.honeypot.decorators import check_honeypot
+import hashlib
+import logging
+import random
+import re
 
-from datetime import timedelta
+from django.contrib.auth.models import User
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.core.mail import send_mail
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
-from django.shortcuts import redirect
 from django.template import RequestContext
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
 
-import hashlib
-import logging
-import random
-import re
+from alert import settings
+from alert.stats import tally_stat
+from alert.userHandling.forms import ProfileForm, UserForm, UserCreationFormExtended, EmailConfirmationForm
+from alert.userHandling.models import UserProfile
+from alert.custom_filters.decorators import check_honeypot
+from datetime import timedelta
+
 
 logger = logging.getLogger(__name__)
 
