@@ -8,6 +8,7 @@ from django.utils.safestring import mark_safe
 from django.http import HttpResponseBadRequest
 from django.template.loader import render_to_string
 
+
 def honeypot_equals(val):
     """
         Default verifier used if HONEYPOT_VERIFIER is not specified.
@@ -17,6 +18,7 @@ def honeypot_equals(val):
     if callable(expected):
         expected = expected()
     return val == expected
+
 
 def verify_honeypot_value(request, field_name):
     """
@@ -29,7 +31,7 @@ def verify_honeypot_value(request, field_name):
     if request.method == 'POST':
         field = field_name or settings.HONEYPOT_FIELD_NAME
         if field not in request.POST or not verifier(request.POST[field]):
-            resp = render_to_string('honeypot/honeypot_error.html',
+            resp = render_to_string('simple_pages/honeypot_error.html',
                                     {'fieldname': field})
             return HttpResponseBadRequest(resp)
 
