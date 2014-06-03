@@ -176,10 +176,6 @@ def robots(request):
 
 
 def validate_for_bing(request):
-    return HttpResponse('<?xml version="1.0"?><users><user>3251009A11EF3EB9D6A7B40EAD9264AD</user></users>')
-
-
-def validate_for_bing2(request):
     return HttpResponse('<?xml version="1.0"?><users><user>8BA95D8EAA744379D80D9F70847EA156</user></users>')
 
 
