@@ -75,7 +75,6 @@ INSTALLED_APPS = [
     'honeypot',
     'lib',
     'maintenance_warning',
-    'pinger',
     'scrapers',
     'search',
     'simple_pages',
