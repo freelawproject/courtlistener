@@ -15,8 +15,7 @@ urlpatterns = patterns('simple_pages.views',
     (r'^robots.txt$', 'robots'),
 
     # SEO-related stuff
-    (r'^LiveSearchSiteAuth.xml$', 'validate_for_bing'),
-    (r'^BingSiteAuth.xml$', 'validate_for_bing2'),
+    (r'^BingSiteAuth.xml$', 'validate_for_bing'),
     (r'^googleef3d845637ccb353.html$', 'validate_for_google'),
     (r'^google646349975c2495b6.html$', 'validate_for_google2'),
     (r'^mywot8f5568174e171ff0acff.html$', 'validate_for_wot'),
