@@ -12,7 +12,6 @@ from alert.donate.views import view_donations, donate, donate_complete
 from alert.favorites.views import delete_favorite, edit_favorite, save_or_update_favorite
 from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, search_feed
 from alert.maintenance_warning.views import show_maintenance_warning
-from alert.pinger.views import validate_for_bing, validate_for_bing2, validate_for_google, validate_for_google2
 from alert.search.api import (
     CitationResource, CourtResource, DocumentResource,
     SearchResource, CitesResource, CitedByResource
@@ -86,6 +85,7 @@ urlpatterns = patterns('',
     (r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$',
         serve_static_file),
 
+    # Simple pages
     url('^', include('alert.simple_pages.urls')),
 
     # Various sign in/out etc. functions as provided by django
@@ -158,12 +158,6 @@ urlpatterns = patterns('',
     (r'^feed/court/all/$', all_courts_feed()),
     (r'^feed/court/(?P<court>' + '|'.join(pacer_codes) + ')/$', court_feed()),
     (r'^feed/(?P<doc_id>.*)/cited-by/$', cited_by_feed()),
-
-    # SEO-related stuff
-    (r'^LiveSearchSiteAuth.xml$', validate_for_bing),
-    (r'^BingSiteAuth.xml$', validate_for_bing2),
-    (r'^googleef3d845637ccb353.html$', validate_for_google),
-    (r'^google646349975c2495b6.html$', validate_for_google2),
 
     # Sitemaps
     (r'^sitemap\.xml$', sitemap_maker),
