@@ -70,7 +70,7 @@ def follow_redirections(r, s):
 
 
 def get_extension(content):
-    """A handful of workarounds for gettings extensions we can trust."""
+    """A handful of workarounds for getting extensions we can trust."""
     file_str = magic.from_buffer(content)
     if file_str.startswith('Composite Document File V2 Document'):
         # Workaround for issue with libmagic1==5.09-2 in Ubuntu 12.04. Fixed in libmagic 5.11-2.
@@ -84,8 +84,12 @@ def get_extension(content):
         mime = magic.from_buffer(content, mime=True)
     extension = mimetypes.guess_extension(mime)
     if extension == '.obj':
-        # It's actually a wpd
-        extension = '.wpd'
+        # It could be a wpd, if it's not a PDF
+        if 'PDF' in content[0:40]:
+            # Does 'PDF' appear in the beginning of the content?
+            extension = '.pdf'
+        else:
+            extension = '.wpd'
     if extension == '.wsdl':
         # It's probably an HTML file, like those from Resource.org
         extension = '.html'
