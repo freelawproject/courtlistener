@@ -57,7 +57,7 @@ class Command(BaseCommand):
         elif court_str == 'mont':
             return self.site_yielder(range(1972, 2014), mod)
         elif court_str == 'nc':
-            return self.site_yielder([2012], mod)
+            return self.site_yielder([2013], mod)
         elif 'neb' in court_str:
             return self.site_yielder(range(0, 11), mod)
         elif court_str in ['nd', 'ndctapp']:
