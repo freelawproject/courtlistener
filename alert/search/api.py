@@ -1,20 +1,23 @@
 import logging
 import re
 import time
-from django.core.cache import cache
-from tastypie import fields
-from tastypie.authentication import BasicAuthentication, SessionAuthentication, MultiAuthentication
-from tastypie.constants import ALL
-from tastypie.exceptions import BadRequest
-from tastypie.resources import ModelResource
-from tastypie.throttle import CacheThrottle
+
 from alert import settings
 from alert.lib.search_utils import build_main_query
 from alert.lib.string_utils import filter_invalid_XML_chars
-from alert.lib.sunburnt import sunburnt
+from alert.lib.sunburnt import sunburnt, SolrError
 from alert.search.forms import SearchForm
 from alert.search.models import Citation, Court, Document, DOCUMENT_SOURCES, DOCUMENT_STATUSES
 from alert.stats import tally_stat
+
+from django.core.cache import cache
+from lxml import etree
+from tastypie import fields, http
+from tastypie.authentication import BasicAuthentication, SessionAuthentication, MultiAuthentication
+from tastypie.constants import ALL
+from tastypie.exceptions import BadRequest, TastypieError
+from tastypie.resources import ModelResource
+from tastypie.throttle import CacheThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +44,25 @@ class ModelResourceWithFieldsFilter(ModelResource):
     def __init__(self, tally_name=None):
         super(ModelResourceWithFieldsFilter, self).__init__()
         self.tally_name = tally_name
+
+    def _handle_500(self, request, exception):
+        # Note that this will only be run if DEBUG=False
+        if isinstance(exception, SolrError):
+            solr_status_code = exception[0]['status']
+            error_xml = etree.fromstring(exception[1])
+            solr_msg = error_xml.xpath('//lst[@name = "error"]/str[@name = "msg"]/text()')[0]
+            data = {
+                'error_message': "SolrError raised while interpreting your query.",
+                'solr_status_code': solr_status_code,
+                'solr_msg': solr_msg,
+            }
+            return self.error_response(
+                request,
+                data,
+                response_class=http.HttpApplicationError
+            )
+        else:
+            return super(ModelResourceWithFieldsFilter, self)._handle_500(request, exception)
 
     def alter_list_data_to_serialize(self, request, data):
         data['meta']['request_uri'] = request.get_full_path()

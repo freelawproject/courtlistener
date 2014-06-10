@@ -1,5 +1,5 @@
-# Google, AOL, Bing, Yahoo!
-# These support meta robots and x-robots-tag.
+# Google, AOL, Bing, Yahoo!, DuckDuckGo
+# These support meta robots and x-robots-tag or are otherwise harmless (DDG)
 # Crawl everything except a few explicit blocks
 User-agent: Googlebot
 Disallow: /robots.txt
@@ -18,6 +18,13 @@ Disallow: /robots.txt
 Disallow: /dumps/
 Disallow: /assets/
 Disallow: /api/rest/v1/
+
+User-agent: DuckDuckBot
+Disallow: /robots.txt
+Disallow: /dumps/
+Disallow: /assets/
+Disallow: /api/rest/v1/
+
 
 # Yandex, Ask
 # These support meta robots, but not x-robots-tag
@@ -53,7 +60,7 @@ Disallow: /txt/
 Disallow: /doc/
 
 
-# Duckduckgo, Baidu, Blekko, Others
+# Baidu, Blekko, Others
 # No support for robots meta tag nor x-robots-tag.
 # Be conservative; Block everything.
 User-agent: *
