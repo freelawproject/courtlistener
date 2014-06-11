@@ -6,13 +6,23 @@
 {% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="span-17 last">
+    <div class="span-7">&nbsp;</div>
+    <div class="span-10 box round center">
         <h2>You have successfully signed out</h2>
-        <p>Thank you for using CourtListener.com</p>
+        <br class="space">
 
-        <form action="/" method="post" class="inline">{% csrf_token %}
-        <button type="submit" class="button">Return to Homepage</button></form>&nbsp;&nbsp;
-        <form action="/sign-in/" method="get" class="inline">{% csrf_token %}
-        <button type="submit" class="button">Sign In Again</button></form>
+        <h3 class="center">
+            <i class="fa fa-arrow-circle-o-right gray"></i> <a href="/">Go to the homepage</a>
+        </h3>
+
+        <h3>
+            <i class="fa fa-arrow-circle-o-right gray"></i> <a href="http://freelawproject.org">Read our blog</a>
+        </h3>
+
+        <h3>
+            <i class="fa fa-arrow-circle-o-right gray"></i> <a href="/sign-in/">Sign back in</a>
+        </h3>
+
     </div>
+    <div class="span-7 last"></div>
 {% endblock %}

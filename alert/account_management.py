@@ -89,7 +89,7 @@ def notify_unconfirmed(verbose, simulate):
                           "has not yet been confirmed. To confirm your email address and continue using our site, "
                           "please click the following link:\n\n"
                           " - https://www.courtlistener.com/email/confirm/%s\n\n"
-                          "Unfortuantely, accounts that are not confirmed will stop receiving alerts, and must "
+                          "Unfortunately, accounts that are not confirmed will stop receiving alerts, and must "
                           "eventually be deleted from our system.\n\n"
                           "Thanks for using our site,\n\n"
                           "The CourtListener team\n\n\n"
