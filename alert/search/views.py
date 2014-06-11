@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta
+from django.contrib.auth.models import User
 from django.db.models import Sum
 from django.utils.timezone import utc, make_aware
 from alert.alerts.forms import CreateAlertForm
@@ -155,6 +156,7 @@ def show_results(request):
                     name__contains='api',
                     date_logged__gte=ten_days_ago) \
                 .aggregate(Sum('count'))['count__sum']
+            users_in_last_ten = User.objects.filter(date_joined__gte=ten_days_ago).count()
             opinions_in_last_ten = Document.objects.filter(time_retrieved__gte=ten_days_ago).count()
             render_dict.update({
                 'alerts_in_last_ten': alerts_in_last_ten,
@@ -162,6 +164,7 @@ def show_results(request):
                 'opinions_in_last_ten': opinions_in_last_ten,
                 'bulk_in_last_ten': bulk_in_last_ten,
                 'api_in_last_ten': api_in_last_ten,
+                'users_in_last_ten': users_in_last_ten,
                 'private': False
             })
             return render_to_response(
