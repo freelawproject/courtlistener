@@ -20,6 +20,7 @@ class UserProfileInline(admin.StackedInline):
 class UserAdmin(admin.ModelAdmin):
     inlines = [UserProfileInline, ]
     list_display = ('username', get_email_confirmed, get_stub_account)
+    search_fields = ['username', 'first_name', 'last_name', 'email']
 
 
 class FavoriteAdmin(admin.ModelAdmin):
