@@ -1,4 +1,3 @@
-import datetime
 from urllib import urlencode
 from urlparse import parse_qs
 from django.utils.timezone import now

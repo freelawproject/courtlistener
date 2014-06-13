@@ -17,7 +17,7 @@ from django import db
 from lxml import html
 from alert.citations.constants import EDITIONS, REPORTERS
 from alert.citations.find_citations import get_citations
-from datetime import date, timedelta
+from datetime import timedelta
 from alert.corpus_importer.court_regexes import fd_pairs, state_pairs, disambiguate_by_judge, fb_pairs
 from alert.corpus_importer.judge_extractor import get_judge_from_str
 from alert.corpus_importer import dup_finder, dup_helpers
