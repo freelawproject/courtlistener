@@ -882,6 +882,24 @@
         }
     },
     {
+        "pk": "caed",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "FD",
+            "end_date": null,
+            "citation_string": "E.D. Cal.",
+            "short_name": "E.D. California",
+            "in_use": true,
+            "url": "http://www.caed.uscourts.gov/",
+            "notes": "",
+            "date_modified": "2014-06-13T18:53:09.142Z",
+            "full_name": "District Court, E.D. California",
+            "position": 205.06,
+            "has_scraper": false,
+            "start_date": null
+        }
+    },
+    {
         "pk": "cafc",
         "model": "search.court",
         "fields": {
