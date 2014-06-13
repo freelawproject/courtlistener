@@ -19,6 +19,7 @@ fd_pairs = (
     (re.compile('C(\.|(entral))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?Cal(ifornia)?', re.I), 'cacd'),
     (re.compile('N(\.|(orthern))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?Cal(ifornia)?', re.I), 'cand'),
     (re.compile('S(\.|(outhern))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?Cal(ifornia)?', re.I), 'casd'),
+    (re.compile('E(\.|(astern))? ?D(\.|:|,|(ist(\.|(rict)))),? ?(of )?Cal(ifornia)?', re.I), 'caed'),
     # No longer exists. Existed 1866-07-27 to 1886-08-05
     (re.compile('D(\.|:|,|(ist(\.|(rict))))? ?(of )?California', re.I), 'californiad'),  # Must go last for Cal.
     (re.compile('D(\.|:|,|(ist(\.|(rict))))? ?(of )?Colo(rado)?', re.I), 'cod'),
