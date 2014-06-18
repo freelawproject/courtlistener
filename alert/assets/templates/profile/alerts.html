@@ -28,7 +28,7 @@
                             <th>Query&nbsp;name</th>
                             <th>Frequency</th>
                             <th>Last&nbsp;hit</th>
-                            <th colspan="2">Subscribe</th>
+                            <th colspan="3">RSS</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -46,14 +46,12 @@
                                     <img src="{{  STATIC_URL }}png/atom-feed.png" alt="atom icon" height="12px" width="12px">
                                 </a>
                             </td>
-                            <td><a href="/alert/edit/{{ alert.pk }}/">edit/delete</a></td>
+                            <td><a href="/?{{ alert.alertText }}&edit_alert={{ alert.pk }}">edit</a></td>
+                            <td><a href="/alert/delete/confirm/{{ alert.pk }}">delete&hellip;</a></td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
-                <form action="/" method="post">{% csrf_token %}
-                    <button type="submit" class="button">Make new alert</button>
-                </form>
             </div>
         {% else %}
             <h3>You have not made any alerts.</h3>
