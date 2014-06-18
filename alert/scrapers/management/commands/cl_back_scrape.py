@@ -36,7 +36,7 @@ class Command(BaseCommand):
                 continue
 
     def generate_sites(self, mod):
-        # opinions.united_states.federal.ca9u --> ca9
+        # opinions.united_states.federal.ca9_u --> ca9
         court_str = mod.__name__.split('.')[-1].split('_')[0]
         logger.info("Using court_str: \"%s\"" % court_str)
 

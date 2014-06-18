@@ -24,6 +24,25 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
+2014-06-16:
+ - This is a very large upgrade and brings the concept of the "Case" into CourtListener. After this point, we will have
+   both opinions and oral arguments for the first time, with the result being that we need some kind of container that
+   we can hold them in. A new class has been added to search.models called "Case" to hold this kind of information.
+ - When upgrading to this version, everything will completely break until your database is updated. I recommend enabling
+   the maintenance mode URL if you wish to avoid chaos.
+ - The database upgrade for this version will take some time, as we are moving a number of fields from one database
+   table to another.
+
+ TODO:
+  - A new flag was added to the Court for has_oral_argument_scraper. We should add the corresponding information to the
+    coverage page.
+  - API 1.1 will need to be released.
+  - When a Case object is saved, it should check if the "name" attribute has changed. If so, it needs to update the
+    search index and slug.
+
+ API breakages:
+  - The has_scraper field is now renamed has_opinion_scraper, and there is a new field, has_oral_argument_scraper.
+
 2014-05-22:
  - This upgrade brings several major improvements including a new footer, social links, several new or updated pages, a
    new homepage and a feature tour. It's much-needed polish.
