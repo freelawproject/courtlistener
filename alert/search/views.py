@@ -92,9 +92,11 @@ def show_results(request):
     """
     # Create a search string that does not contain the page numbers
     get_string = search_utils.make_get_string(request)
+    get_string_sans_alert = search_utils.make_get_string(request, ['page', 'edit_alert'])
     render_dict = {
         'private': True,
         'get_string': get_string,
+        'get_string_sans_alert': get_string_sans_alert,
     }
 
     if request.method == 'POST':
@@ -197,7 +199,7 @@ def show_results(request):
                 )
                 alert_form = CreateAlertForm(
                     instance=alert,
-                    initial={'alertText': get_string},
+                    initial={'alertText': get_string_sans_alert},
                 )
             else:
                 # Just a regular search

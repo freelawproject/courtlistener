@@ -132,7 +132,9 @@
             </h3>
             {% if user.is_authenticated %}
                 {% if get_string %}
-                    <p>Get regular notifications about this query by creating an alert.</p>
+                    {% if not request.GET.edit_alert %}
+                        <p>Get regular notifications about this query by creating an alert.</p>
+                    {% endif %}
                     <form action="" method="post">{% csrf_token %}
                         {{ alert_form.alertText }}
                         <p class="span-6 append-1">
@@ -209,7 +211,7 @@
             <div class="span-16 last notice">
                 <p class="bottom span-10">You are currently editing your alert,
                     "<strong>{{ alert_form.alertName.value }}</strong>".</p>
-                <p class="bottom span-6 last right"><a href="?{{ get_string }}"><i
+                <p class="bottom span-6 last right"><a href="?{{ get_string_sans_alert }}"><i
                         class="gray fa fa-times" title="Cancel editing and redo the search"></i></a></p>
             </div>
         {% endif %}
