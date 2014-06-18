@@ -18,9 +18,12 @@ def edit_alert(request, alert_id):
         return HttpResponseRedirect('/')
 
     # check if the user can edit this, or if they are url hacking
-    alert = get_object_or_404(Alert, pk=alert_id,
-                              userprofile=request.user.profile)
-    from django.contrib.auth.models import User
+    alert = get_object_or_404(
+        Alert,
+        pk=alert_id,
+        userprofile=request.user.profile
+    )
+
     # If they've made it this far, they can edit the item, therefore, we load
     # the form.
     if request.method == 'POST':
@@ -31,8 +34,11 @@ def edit_alert(request, alert_id):
             # save the changes
             alert_form = CreateAlertForm(cd, instance=alert)
             alert_form.save() # this method saves it and returns it
-            messages.add_message(request, messages.SUCCESS,
-                'Your alert was saved successfully.')
+            messages.add_message(
+                request,
+                messages.SUCCESS,
+                'Your alert was saved successfully.'
+            )
 
             # redirect to the alerts page
             return HttpResponseRedirect('/profile/alerts/')
