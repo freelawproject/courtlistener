@@ -1,6 +1,11 @@
-"""Goes through the text file full of briefs and sorts them into more sane types of documents.
+"""This is an experiment to see how well we can automate figuring out the document types of CA9 briefs created at
+resource.org.
 
-Pretty prints a dict of the findings once complete. This is a TDD method for finding and sorting doc types.
+Basic idea is to go through a text file full of briefs and sort them into more sane types of documents.
+
+Pretty prints a dict of the findings once complete.
+
+This is a TDD method for finding and sorting doc types.
 """
 
 import re
