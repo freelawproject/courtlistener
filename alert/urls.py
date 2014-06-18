@@ -1,5 +1,5 @@
 from tastypie.api import Api
-from alert.alerts.views import delete_alert, delete_alert_confirm
+from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert_redirect
 from alert.api.views import court_index, documentation_index, dump_index, rest_index, serve_or_gen_dump, serve_pagerank_file
 from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
@@ -131,6 +131,7 @@ urlpatterns = patterns('',
     (r'^$', show_results),  # the home page!
 
     # Alert pages
+    (r'^alert/edit/(\d{1,6})/$', edit_alert_redirect),
     (r'^alert/delete/(\d{1,6})/$', delete_alert),
     (r'^alert/delete/confirm/(\d{1,6})/$', delete_alert_confirm),
     (r'^tools/$', tools_page),
