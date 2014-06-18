@@ -123,7 +123,13 @@
         </div>
 
         <div class="sidebar-section">
-            <h3 id="create-alert-header"><span>Create an Alert</span> <i class="fa fa-bell gold"></i></h3>
+            <h3 id="create-alert-header">
+                {% if request.GET.edit_alert %}
+                    <span>Edit Your Alert</span> <i class="fa fa-pencil gray"></i>
+                {% else %}
+                    <span>Create an Alert</span> <i class="fa fa-bell gold"></i>
+                {% endif %}
+            </h3>
             {% if user.is_authenticated %}
                 {% if get_string %}
                     <p>Get regular notifications about this query by creating an alert.</p>
@@ -156,7 +162,16 @@
                             <label for="id_sendNegativeAlert">Send me an email even if there are no new hits</label>
                             <br>
                         </p>
-                        <button type="submit" class="button title span-5" name="alertSave">Create alert</button>
+                        {% if request.GET.edit_alert %}
+                            {# Used when editing an alert. Because it has class external-input it will get gathered by the JS#}
+                            <input class="external-input"
+                                   type="hidden"
+                                   value="{{ request.GET.edit_alert }}"
+                                   name="edit_alert">
+                        {% endif %}
+                        <button type="submit" class="button title span-5" name="alertSave">
+                            {% if request.GET.edit_alert %}Edit Alert{% else %}Create Alert{% endif %}
+                        </button>
                         <p class="gray">Some jurisdictions do not yet support alerts. Check
                             <a href="/coverage/#scraped-jurisdictions">our list</a> to be
                             sure your query is supported.</p>
@@ -188,6 +203,14 @@
             <div class="span-16 last error">
                 <p class="bottom">There was an error creating your alert. Please <a href="#create-alert-header">see
                     below</a>.</p>
+            </div>
+        {% endif %}
+        {% if request.GET.edit_alert %}
+            <div class="span-16 last notice">
+                <p class="bottom span-10">You are currently editing your alert,
+                    "<strong>{{ alert_form.alertName.value }}</strong>".</p>
+                <p class="bottom span-6 last right"><a href="?{{ get_string }}"><i
+                        class="gray fa fa-times" title="Cancel editing and redo the search"></i></a></p>
             </div>
         {% endif %}
 

@@ -9,7 +9,7 @@ from alert.search.models import Document
 from celery.task.sets import subtask
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
-from juriscraper.GenericSite import logger
+from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import build_module_list
 from scrapers.tasks import extract_doc_content, extract_by_ocr
 from requests.exceptions import SSLError

@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.db.models import Sum
 from django.utils.timezone import utc, make_aware
 from alert.alerts.forms import CreateAlertForm
+from alert.alerts.models import Alert
 from alert.lib import search_utils
 from alert.lib import sunburnt
 from alert.lib.bot_detector import is_bot
@@ -12,7 +13,7 @@ from alert.search.forms import SearchForm, COURTS, _clean_form
 from alert import settings
 from django.contrib import messages
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.shortcuts import render_to_response
+from django.shortcuts import render_to_response, get_object_or_404
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
 from django.views.decorators.cache import never_cache
@@ -103,14 +104,26 @@ def show_results(request):
             cd = alert_form.cleaned_data
 
             # save the alert
-            a = CreateAlertForm(cd)
-            alert = a.save()
+            if request.POST.get('edit_alert'):
+                # check if the user can edit this, or if they are url hacking
+                alert = get_object_or_404(
+                    Alert,
+                    pk=request.POST.get('edit_alert'),
+                    userprofile=request.user.profile
+                )
+                alert_form = CreateAlertForm(cd, instance=alert)
+                alert_form.save()
+                action = "edited"
+            else:
+                alert_form = CreateAlertForm(cd)
+                alert = alert_form.save()
 
-            # associate the user with the alert
-            up = request.user.profile
-            up.alert.add(alert)
+                # associate the user with the alert
+                up = request.user.profile
+                up.alert.add(alert)
+                action = "created"
             messages.add_message(request, messages.SUCCESS,
-                                 'Your alert was created successfully.')
+                                 'Your alert was %s successfully.' % action)
 
             # and redirect to the alerts page
             return HttpResponseRedirect('/profile/alerts/')
@@ -174,12 +187,26 @@ def show_results(request):
             )
 
         else:
-            # User placed a search
-            if not is_bot(request):
-                tally_stat('search.results')
-            # Create bare-bones alert form.
-            alert_form = CreateAlertForm(initial={'alertText': get_string,
-                                                  'alertFrequency': "dly"})
+            # User placed a search or is trying to edit an alert
+            if request.GET.get('edit_alert'):
+                # They're editing an alert
+                alert = get_object_or_404(
+                    Alert,
+                    pk=request.GET.get('edit_alert'),
+                    userprofile=request.user.profile
+                )
+                alert_form = CreateAlertForm(
+                    instance=alert,
+                    initial={'alertText': get_string},
+                )
+            else:
+                # Just a regular search
+                if not is_bot(request):
+                    tally_stat('search.results')
+
+                # Create bare-bones alert form.
+                alert_form = CreateAlertForm(initial={'alertText': get_string,
+                                                      'alertFrequency': "dly"})
             render_dict.update(do_search(request))
             render_dict.update({'alert_form': alert_form})
             return render_to_response(

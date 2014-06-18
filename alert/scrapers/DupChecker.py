@@ -1,7 +1,7 @@
 from alert.scrapers.models import urlToHash
 from alert.search.models import Document
 
-from juriscraper.GenericSite import logger
+from juriscraper.AbstractSite import logger
 
 
 class DupChecker(dict):

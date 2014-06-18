@@ -24,7 +24,8 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
-2014-06-16:
+
+2014-06-20:
  - This is a very large upgrade and brings the concept of the "Case" into CourtListener. After this point, we will have
    both opinions and oral arguments for the first time, with the result being that we need some kind of container that
    we can hold them in. A new class has been added to search.models called "Case" to hold this kind of information.
@@ -42,6 +43,9 @@ We welcome a conversion of these notes to a better process using Fabric.
 
  API breakages:
   - The has_scraper field is now renamed has_opinion_scraper, and there is a new field, has_oral_argument_scraper.
+
+2014-06-18:
+ - This update makes alert editing a lot more intuitive.
 
 2014-05-22:
  - This upgrade brings several major improvements including a new footer, social links, several new or updated pages, a
