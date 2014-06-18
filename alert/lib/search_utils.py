@@ -6,15 +6,16 @@ from alert.lib import sunburnt
 from django.conf import settings
 
 
-def make_get_string(request):
+def make_get_string(request, nuke_fields=['page']):
     """Makes a get string from the request object. If necessary, it removes
     the pagination parameters.
     """
     get_dict = parse_qs(request.META['QUERY_STRING'])
-    try:
-        del get_dict['page']
-    except KeyError:
-        pass
+    for key in nuke_fields:
+        try:
+            del get_dict[key]
+        except KeyError:
+            pass
     get_string = urlencode(get_dict, True)
     if len(get_string) > 0:
         get_string += '&'
