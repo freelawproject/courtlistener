@@ -23,7 +23,7 @@ from alert.stats import tally_stat, Stat
 logger = logging.getLogger(__name__)
 
 
-def do_search(request, rows=20, order_by= None):
+def do_search(request, rows=20, order_by=None):
     conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
     # Bind the search form.
     search_form = SearchForm(request.GET)

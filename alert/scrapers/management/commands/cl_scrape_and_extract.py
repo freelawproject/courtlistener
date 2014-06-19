@@ -233,7 +233,7 @@ def scrape_court(site, full_crawl=False):
                 # Extract the contents asynchronously.
                 extract_doc_content(doc.pk, callback=subtask(extract_by_ocr))
 
-                logger.info("Successfully added: %s" % site.case_names[i])
+                logger.info("Successfully added doc %s: %s" % (doc.pk, site.case_names[i]))
 
         # Update the hash if everything finishes properly.
         logger.info("%s: Successfully crawled." % site.court_id)
