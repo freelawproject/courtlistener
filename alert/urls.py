@@ -12,10 +12,8 @@ from alert.donate.views import view_donations, donate, donate_complete
 from alert.favorites.views import delete_favorite, edit_favorite, save_or_update_favorite
 from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, search_feed
 from alert.simple_pages.views import show_maintenance_warning
-from alert.search.api import (
-    CitationResource, CourtResource, DocumentResource,
-    SearchResource, CitesResource, CitedByResource
-)
+from alert.search import api
+from alert.search import api2
 from alert.search.models import Court
 from alert.search.views import browser_warning, show_results, tools_page
 from alert.simple_pages.api import coverage_data
@@ -39,12 +37,19 @@ mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html')
 
 # Set up the API
 v1_api = Api(api_name='v1')
-v1_api.register(CitationResource(tally_name='search.api.citation'))
-v1_api.register(CourtResource(tally_name='search.api.court'))
-v1_api.register(DocumentResource(tally_name='search.api.document'))
-v1_api.register(SearchResource(tally_name='search.api.search'))
-v1_api.register(CitesResource(tally_name='search.api.cites'))
-v1_api.register(CitedByResource(tally_name='search.api.cited-by'))
+v1_api.register(api.CitationResource(tally_name='search.api.citation'))
+v1_api.register(api.CourtResource(tally_name='search.api.court'))
+v1_api.register(api.DocumentResource(tally_name='search.api.document'))
+v1_api.register(api.SearchResource(tally_name='search.api.search'))
+v1_api.register(api.CitesResource(tally_name='search.api.cites'))
+v1_api.register(api.CitedByResource(tally_name='search.api.cited-by'))
+v2_api = Api(api_name='v2')
+v2_api.register(api2.CitationResource(tally_name='search.api2.citation'))
+v2_api.register(api2.CourtResource(tally_name='search.api2.court'))
+v2_api.register(api2.DocumentResource(tally_name='search.api2.document'))
+v2_api.register(api2.SearchResource(tally_name='search.api2.search'))
+v2_api.register(api2.CitesResource(tally_name='search.api2.cites'))
+v2_api.register(api2.CitedByResource(tally_name='search.api2.cited-by'))
 
 # enables the admin (must be last due to autodiscover performing imports from all apps):
 admin.autodiscover()
@@ -139,8 +144,9 @@ urlpatterns = patterns('',
     # The API
     (r'^api/$', documentation_index),
     (r'^api/jurisdictions/$', court_index),
-    (r'^api/rest/v1/coverage/(all|%s)/' % '|'.join(pacer_codes), coverage_data),
+    (r'^api/rest/v[12]/coverage/(all|%s)/' % '|'.join(pacer_codes), coverage_data),
     (r'^api/rest/', include(v1_api.urls)),
+    (r'^api/rest/', include(v2_api.urls)),
     (r'^api/rest-info/$', rest_index),
     (r'^api/bulk-info/$', dump_index),
     (r'^api/bulk/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),

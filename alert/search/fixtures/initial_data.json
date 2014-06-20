@@ -13,7 +13,8 @@
             "date_modified": "2013-08-15T00:32:31Z",
             "full_name": "United States Bankruptcy Court, D. Alaska",
             "position": 157.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -31,7 +32,8 @@
             "date_modified": "2013-08-15T17:49:55Z",
             "full_name": "District Court, D. Alaska",
             "position": 202.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -49,7 +51,8 @@
             "date_modified": "2013-09-09T06:05:54Z",
             "full_name": "Supreme Court of Alabama",
             "position": 305.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -67,7 +70,8 @@
             "date_modified": "2013-09-09T01:36:11Z",
             "full_name": "Court of Civil Appeals of Alabama",
             "position": 311.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -85,7 +89,8 @@
             "date_modified": "2013-09-09T01:12:30Z",
             "full_name": "Court of Criminal Appeals of Alabama",
             "position": 310.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -103,7 +108,8 @@
             "date_modified": "2013-10-16T19:06:37.371Z",
             "full_name": "Alabama Court of Appeals",
             "position": 306.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -121,7 +127,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Alaska Supreme Court",
             "position": 320.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -139,7 +146,8 @@
             "date_modified": "2013-08-14T22:42:38Z",
             "full_name": "Court of Appeals of Alaska",
             "position": 321.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -157,7 +165,8 @@
             "date_modified": "2013-08-14T23:55:33Z",
             "full_name": "United States Bankruptcy Court, M.D. Alabama",
             "position": 155.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -175,7 +184,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, M.D. Alabama",
             "position": 201.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -193,7 +203,8 @@
             "date_modified": "2013-08-15T01:21:42Z",
             "full_name": "United States Bankruptcy Court, N.D. Alabama",
             "position": 156.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -211,7 +222,8 @@
             "date_modified": "2013-08-15T05:35:30Z",
             "full_name": "District Court, N.D. Alabama",
             "position": 201.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -229,7 +241,8 @@
             "date_modified": "2013-08-15T16:44:48Z",
             "full_name": "United States Bankruptcy Court, S.D. Alabama",
             "position": 156.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -247,7 +260,8 @@
             "date_modified": "2013-10-22T15:47:52.502Z",
             "full_name": "District Court, S.D. Alabama",
             "position": 202.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -265,7 +279,8 @@
             "date_modified": "2013-08-15T05:40:49Z",
             "full_name": "United States Bankruptcy Court, D. Arizona",
             "position": 157.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -283,7 +298,8 @@
             "date_modified": "2013-08-15T05:23:56Z",
             "full_name": "United States Bankruptcy Court, E.D. Arkansas",
             "position": 157.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -301,7 +317,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, E.D. Arkansas",
             "position": 204.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -319,7 +336,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Arizona Supreme Court",
             "position": 322.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -337,7 +355,8 @@
             "date_modified": "2013-10-16T18:58:49.362Z",
             "full_name": "Court of Appeals of Arizona",
             "position": 322.2,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -355,7 +374,8 @@
             "date_modified": "2013-08-14T22:42:28Z",
             "full_name": "Arizona Tax Court",
             "position": 323.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -373,7 +393,8 @@
             "date_modified": "2013-09-09T01:32:48Z",
             "full_name": "Supreme Court of Arkansas",
             "position": 330.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -391,7 +412,8 @@
             "date_modified": "2013-09-09T17:36:41Z",
             "full_name": "Court of Appeals of Arkansas",
             "position": 331.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -409,7 +431,8 @@
             "date_modified": "2013-08-14T22:18:37Z",
             "full_name": "Court of Appeals for the Armed Forces",
             "position": 113.2,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": "1951-05-31"
         }
     },
@@ -427,7 +450,8 @@
             "date_modified": "2013-08-15T01:00:53Z",
             "full_name": "United States Bankruptcy Court, W.D. Arkansas",
             "position": 157.3,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -445,7 +469,8 @@
             "date_modified": "2013-10-22T15:48:19.676Z",
             "full_name": "District Court, W.D. Arkansas",
             "position": 204.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -463,7 +488,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Arizona",
             "position": 203.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -481,7 +507,8 @@
             "date_modified": "2013-10-25T01:27:23.371Z",
             "full_name": "Bankruptcy Appellate Panel of the First Circuit",
             "position": 150.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -499,7 +526,8 @@
             "date_modified": "2013-10-25T01:28:42.188Z",
             "full_name": "Bankruptcy Appellate Panel of the Tenth Circuit",
             "position": 154.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -517,7 +545,8 @@
             "date_modified": "2013-10-25T01:28:18.159Z",
             "full_name": "Bankruptcy Appellate Panel of the Second Circuit",
             "position": 150.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -535,7 +564,8 @@
             "date_modified": "2013-10-25T01:28:23.950Z",
             "full_name": "Bankruptcy Appellate Panel of the Sixth Circuit",
             "position": 152.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -553,7 +583,8 @@
             "date_modified": "2013-10-25T01:28:29.427Z",
             "full_name": "United States Bankruptcy Appellate Panel for the Eighth Circuit",
             "position": 153.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -571,7 +602,8 @@
             "date_modified": "2013-10-25T01:28:35.262Z",
             "full_name": "United States Bankruptcy Appellate Panel for the Ninth Circuit",
             "position": 154.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -589,7 +621,8 @@
             "date_modified": "2013-10-25T01:28:53.666Z",
             "full_name": "Bankruptcy Appellate Panel of Massachusetts",
             "position": 154.16,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -607,7 +640,8 @@
             "date_modified": "2013-10-25T01:28:48.311Z",
             "full_name": "Bankruptcy Appellate Panel, D. Maine",
             "position": 154.15,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -625,7 +659,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Court of Appeals for the First Circuit",
             "position": 101.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": true,
             "start_date": "1891-03-03"
         }
     },
@@ -643,7 +678,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Court of Appeals for the Tenth Circuit",
             "position": 110.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": "1929-02-28"
         }
     },
@@ -661,7 +697,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Court of Appeals for the Eleventh Circuit",
             "position": 111.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": "1980-10-14"
         }
     },
@@ -679,7 +716,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Court of Appeals for the Second Circuit",
             "position": 102.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": "1891-03-03"
         }
     },
@@ -697,7 +735,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Court of Appeals for the Third Circuit",
             "position": 103.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": "1891-03-03"
         }
     },
@@ -715,7 +754,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Court of Appeals for the Fourth Circuit",
             "position": 104.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": "1891-03-03"
         }
     },
@@ -733,7 +773,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Court of Appeals for the Fifth Circuit",
             "position": 105.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": "1891-03-03"
         }
     },
@@ -751,7 +792,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Court of Appeals for the Sixth Circuit",
             "position": 106.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": "1891-03-03"
         }
     },
@@ -769,7 +811,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Court of Appeals for the Seventh Circuit",
             "position": 107.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": "1891-03-03"
         }
     },
@@ -787,7 +830,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Court of Appeals for the Eighth Circuit",
             "position": 108.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": "1891-03-03"
         }
     },
@@ -805,7 +849,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Court of Appeals for the Ninth Circuit",
             "position": 109.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": "1891-03-03"
         }
     },
@@ -823,7 +868,8 @@
             "date_modified": "2013-08-15T00:19:32Z",
             "full_name": "United States Bankruptcy Court, C.D. California",
             "position": 158.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -841,7 +887,8 @@
             "date_modified": "2013-08-20T00:00:54Z",
             "full_name": "District Court, C.D. California",
             "position": 205.05,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -859,7 +906,8 @@
             "date_modified": "2013-10-18T20:02:39.958Z",
             "full_name": "Court of Appeals for the D.C. Circuit",
             "position": 112.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": "1893-02-09"
         }
     },
@@ -877,7 +925,8 @@
             "date_modified": "2013-08-15T01:03:17Z",
             "full_name": "United States Bankruptcy Court, E.D. California",
             "position": 158.05,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -895,7 +944,8 @@
             "date_modified": "2014-06-13T18:53:09.142Z",
             "full_name": "District Court, E.D. California",
             "position": 205.06,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -913,7 +963,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Court of Appeals for the Federal Circuit",
             "position": 113.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": "1982-04-02"
         }
     },
@@ -931,7 +982,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "California Supreme Court",
             "position": 350.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -949,7 +1001,8 @@
             "date_modified": "2014-05-23T15:31:20.590Z",
             "full_name": "California Court of Appeal",
             "position": 350.1,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -967,7 +1020,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. California",
             "position": 205.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1866-07-27"
         }
     },
@@ -985,7 +1039,8 @@
             "date_modified": "2013-08-20T02:04:00Z",
             "full_name": "District Court, Canal Zone",
             "position": 299.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1937-07-26"
         }
     },
@@ -1003,7 +1058,8 @@
             "date_modified": "2013-08-15T00:30:39Z",
             "full_name": "United States Bankruptcy Court, N.D. California",
             "position": 158.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1021,7 +1077,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, N.D. California",
             "position": 205.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1039,7 +1096,8 @@
             "date_modified": "2013-08-15T00:30:39Z",
             "full_name": "United States Bankruptcy Court, S.D. California",
             "position": 158.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1057,7 +1115,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, S.D. California",
             "position": 205.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1075,7 +1134,8 @@
             "date_modified": "2013-08-14T22:20:17Z",
             "full_name": "United States Court of Appeals for Veterans Claims",
             "position": 115.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1093,7 +1153,8 @@
             "date_modified": "2013-10-18T00:47:36.613Z",
             "full_name": "United States Court of Claims",
             "position": 113.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1855-02-24"
         }
     },
@@ -1111,7 +1172,8 @@
             "date_modified": "2013-08-14T22:19:17Z",
             "full_name": "Court of Customs and Patent Appeals",
             "position": 114.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1909-08-05"
         }
     },
@@ -1129,7 +1191,8 @@
             "date_modified": "2013-08-14T22:20:46Z",
             "full_name": "United States Court of International Trade",
             "position": 141.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1147,7 +1210,8 @@
             "date_modified": "2013-10-30T06:08:47.628Z",
             "full_name": "Court of Judicial Discipline of Pennsylvania",
             "position": 367.26,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1165,7 +1229,8 @@
             "date_modified": "2013-08-15T00:23:06Z",
             "full_name": "United States Bankruptcy Court, D. Colorado",
             "position": 159.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1183,7 +1248,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Colorado",
             "position": 206.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1201,7 +1267,8 @@
             "date_modified": "2013-09-07T21:34:46Z",
             "full_name": "Supreme Court of Colorado",
             "position": 350.9,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1219,7 +1286,8 @@
             "date_modified": "2013-08-14T22:42:22Z",
             "full_name": "Colorado Court of Appeals",
             "position": 351.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1237,7 +1305,8 @@
             "date_modified": "2013-08-14T22:19:08Z",
             "full_name": "Commerce Court",
             "position": 113.9,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1910-01-01"
         }
     },
@@ -1255,7 +1324,8 @@
             "date_modified": "2013-09-09T16:31:46Z",
             "full_name": "Supreme Court of Connecticut",
             "position": 351.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1273,7 +1343,8 @@
             "date_modified": "2013-10-16T19:02:10.922Z",
             "full_name": "Connecticut Appellate Court",
             "position": 351.6,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1291,7 +1362,8 @@
             "date_modified": "2013-10-16T22:03:58.049Z",
             "full_name": "Connecticut Superior Court",
             "position": 351.7,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1309,7 +1381,8 @@
             "date_modified": "2013-08-15T00:24:05Z",
             "full_name": "United States Bankruptcy Court, D. Connecticut",
             "position": 159.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1327,7 +1400,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Connecticut",
             "position": 207.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1345,7 +1419,8 @@
             "date_modified": "2014-06-19T00:34:16.654Z",
             "full_name": "United States Customs Court",
             "position": 114.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1926-01-01"
         }
     },
@@ -1363,7 +1438,8 @@
             "date_modified": "2013-10-16T18:54:09.220Z",
             "full_name": "District of Columbia Court of Appeals",
             "position": 353.6,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1381,7 +1457,8 @@
             "date_modified": "2013-08-15T00:00:41Z",
             "full_name": "United States Bankruptcy Court, District of Columbia",
             "position": 160.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1399,7 +1476,8 @@
             "date_modified": "2014-05-20T00:58:40.714Z",
             "full_name": "District Court, District of Columbia",
             "position": 200.5,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1417,7 +1495,8 @@
             "date_modified": "2013-08-15T16:45:48Z",
             "full_name": "United States Bankruptcy Court, D. Delaware",
             "position": 159.7,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1435,7 +1514,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Delaware",
             "position": 208.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1453,7 +1533,8 @@
             "date_modified": "2013-09-09T02:19:02Z",
             "full_name": "Supreme Court of Delaware",
             "position": 352.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1471,7 +1552,8 @@
             "date_modified": "2013-09-09T19:19:32Z",
             "full_name": "Court of Chancery of Delaware",
             "position": 353.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1489,7 +1571,8 @@
             "date_modified": "2013-10-16T21:32:24.279Z",
             "full_name": "Delaware Family Court",
             "position": 353.59,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1507,7 +1590,8 @@
             "date_modified": "2013-10-30T06:19:05.675Z",
             "full_name": "Court on the Judiciary of Delaware.",
             "position": 353.595,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1525,7 +1609,8 @@
             "date_modified": "2013-09-09T20:12:01Z",
             "full_name": "Superior Court of Delaware",
             "position": 353.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1543,7 +1628,8 @@
             "date_modified": "2013-08-14T22:20:25Z",
             "full_name": "Emergency Court of Appeals",
             "position": 116.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1942-01-30"
         }
     },
@@ -1561,7 +1647,8 @@
             "date_modified": "2014-05-27T15:58:47.570Z",
             "full_name": "Foreign Intelligence Surveillance Court",
             "position": 140.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1978-10-25"
         }
     },
@@ -1579,7 +1666,8 @@
             "date_modified": "2014-05-27T15:58:53.457Z",
             "full_name": "Foreign Intelligence Surveillance Court of Review",
             "position": 140.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1978-10-25"
         }
     },
@@ -1597,7 +1685,8 @@
             "date_modified": "2013-09-09T05:12:52Z",
             "full_name": "Supreme Court of Florida",
             "position": 354.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1615,7 +1704,8 @@
             "date_modified": "2013-09-09T00:16:01Z",
             "full_name": "District Court of Appeal of Florida",
             "position": 355.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1633,7 +1723,8 @@
             "date_modified": "2013-08-15T00:05:00Z",
             "full_name": "United States Bankruptcy Court, M.D. Florida",
             "position": 176.9,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1651,7 +1742,8 @@
             "date_modified": "2013-08-15T16:43:34Z",
             "full_name": "District Court, M.D. Florida",
             "position": 208.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1669,7 +1761,8 @@
             "date_modified": "2013-08-15T00:44:44Z",
             "full_name": "United States Bankruptcy Court, N.D. Florida",
             "position": 176.95,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1687,7 +1780,8 @@
             "date_modified": "2013-08-15T16:43:34Z",
             "full_name": "District Court, N.D. Florida",
             "position": 208.51,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1705,7 +1799,8 @@
             "date_modified": "2013-08-14T23:54:25Z",
             "full_name": "United States Bankruptcy Court, S.D. Florida.",
             "position": 177.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1723,7 +1818,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, S.D. Florida",
             "position": 208.52,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1741,7 +1837,8 @@
             "date_modified": "2013-09-09T06:24:04Z",
             "full_name": "Supreme Court of Georgia",
             "position": 355.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1759,7 +1856,8 @@
             "date_modified": "2013-09-09T00:18:38Z",
             "full_name": "Court of Appeals of Georgia.",
             "position": 356.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1777,7 +1875,8 @@
             "date_modified": "2013-08-15T05:53:20Z",
             "full_name": "United States Bankruptcy Court, M.D. Georgia",
             "position": 179.8,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1795,7 +1894,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, M.D. Georgia",
             "position": 208.6,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1813,7 +1913,8 @@
             "date_modified": "2013-08-15T00:41:37Z",
             "full_name": "United States Bankruptcy Court, N.D. Georgia",
             "position": 179.9,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1831,7 +1932,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, N.D. Georgia",
             "position": 208.61,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1849,7 +1951,8 @@
             "date_modified": "2013-08-14T23:32:41Z",
             "full_name": "United States Bankruptcy Court, S.D. Georgia",
             "position": 180.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1867,7 +1970,8 @@
             "date_modified": "2013-10-22T15:48:39.610Z",
             "full_name": "District Court, S.D. Georgia",
             "position": 208.62,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1885,7 +1989,8 @@
             "date_modified": "2013-08-15T18:08:37Z",
             "full_name": "United States Bankruptcy Court, D. Guam",
             "position": 199.6,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1903,7 +2008,8 @@
             "date_modified": "2013-08-20T00:14:40Z",
             "full_name": "District Court, D. Guam",
             "position": 299.3,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1921,7 +2027,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Hawaii Supreme Court",
             "position": 359.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1939,7 +2046,8 @@
             "date_modified": "2013-08-14T22:42:16Z",
             "full_name": "Hawaii Intermediate Court of Appeals",
             "position": 359.1,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1957,7 +2065,8 @@
             "date_modified": "2013-08-15T16:30:24Z",
             "full_name": "United States Bankruptcy Court, D. Hawaii",
             "position": 180.05,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1975,7 +2084,8 @@
             "date_modified": "2013-08-15T16:58:25Z",
             "full_name": "District Court, D. Hawaii",
             "position": 208.9,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -1993,7 +2103,8 @@
             "date_modified": "2013-08-15T00:37:04Z",
             "full_name": "United States Bankruptcy Court, N.D. Iowa",
             "position": 185.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2011,7 +2122,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, N.D. Iowa",
             "position": 215.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2029,7 +2141,8 @@
             "date_modified": "2013-08-15T01:01:52Z",
             "full_name": "United States Bankruptcy Court, S.D. Iowa",
             "position": 185.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2047,7 +2160,8 @@
             "date_modified": "2013-10-22T15:49:26.365Z",
             "full_name": "District Court, S.D. Iowa",
             "position": 216.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2065,7 +2179,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Idaho Supreme Court",
             "position": 359.2,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2083,7 +2198,8 @@
             "date_modified": "2013-08-14T22:42:09Z",
             "full_name": "Idaho Court of Appeals",
             "position": 359.25,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2101,7 +2217,8 @@
             "date_modified": "2013-08-15T01:15:42Z",
             "full_name": "United States Bankruptcy Court, D. Idaho",
             "position": 180.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2119,7 +2236,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Idaho",
             "position": 209.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2137,7 +2255,8 @@
             "date_modified": "2013-08-14T23:57:38Z",
             "full_name": "  United States Bankruptcy Court, C.D. Illinois",
             "position": 182.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2155,7 +2274,8 @@
             "date_modified": "2013-08-15T05:33:05Z",
             "full_name": "District Court, C.D. Illinois",
             "position": 209.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2173,7 +2293,8 @@
             "date_modified": "2013-09-07T21:34:46Z",
             "full_name": "Illinois Supreme Court",
             "position": 359.5,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2191,7 +2312,8 @@
             "date_modified": "2013-08-14T22:42:02Z",
             "full_name": "Appellate Court of Illinois",
             "position": 359.6,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2209,7 +2331,8 @@
             "date_modified": "2013-09-07T22:00:00Z",
             "full_name": "District Court, D. Illinois",
             "position": 210.6,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1819-03-03"
         }
     },
@@ -2227,7 +2350,8 @@
             "date_modified": "2013-10-22T15:49:04.742Z",
             "full_name": "District Court, E.D. Illinois",
             "position": 210.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1905-03-03"
         }
     },
@@ -2245,7 +2369,8 @@
             "date_modified": "2013-08-14T23:57:38Z",
             "full_name": "  United States Bankruptcy Court, N.D. Illinois",
             "position": 183.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2263,7 +2388,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, N.D. Illinois",
             "position": 210.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2281,7 +2407,8 @@
             "date_modified": "2013-08-15T16:06:52Z",
             "full_name": "United States Bankruptcy Court, S.D. Illinois",
             "position": 183.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2299,7 +2426,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, S.D. Illinois",
             "position": 210.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2317,7 +2445,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Indiana Supreme Court",
             "position": 360.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2335,7 +2464,8 @@
             "date_modified": "2013-10-16T18:51:42.323Z",
             "full_name": "Indiana Court of Appeals",
             "position": 360.1,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2353,7 +2483,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Indiana",
             "position": 214.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1817-03-03"
         }
     },
@@ -2371,7 +2502,8 @@
             "date_modified": "2013-08-15T20:58:23Z",
             "full_name": "Indiana Tax Court",
             "position": 360.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2389,7 +2521,8 @@
             "date_modified": "2013-08-15T16:34:52Z",
             "full_name": "United States Bankruptcy Court, N.D. Indiana",
             "position": 183.15,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2407,7 +2540,8 @@
             "date_modified": "2013-08-20T00:50:55Z",
             "full_name": "District Court, N.D. Indiana",
             "position": 211.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2425,7 +2559,8 @@
             "date_modified": "2013-08-15T16:19:31Z",
             "full_name": "United States Bankruptcy Court, S.D. Indiana",
             "position": 183.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2443,7 +2578,8 @@
             "date_modified": "2013-08-20T00:51:08Z",
             "full_name": "District Court, S.D. Indiana",
             "position": 212.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2461,7 +2597,8 @@
             "date_modified": "2013-09-09T17:34:16Z",
             "full_name": "Supreme Court of Iowa",
             "position": 360.9,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2479,7 +2616,8 @@
             "date_modified": "2013-09-09T05:59:52Z",
             "full_name": "Court of Appeals of Iowa",
             "position": 361.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2497,7 +2635,8 @@
             "date_modified": "2013-08-16T00:19:11Z",
             "full_name": "United States Judicial Panel on Multidistrict Litigation",
             "position": 451.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2515,7 +2654,8 @@
             "date_modified": "2013-09-07T21:34:46Z",
             "full_name": "Supreme Court of Kansas",
             "position": 362.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2533,7 +2673,8 @@
             "date_modified": "2013-08-14T22:43:39Z",
             "full_name": "Court of Appeals of Kansas",
             "position": 362.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2551,7 +2692,8 @@
             "date_modified": "2013-08-14T23:43:21Z",
             "full_name": "United States Bankruptcy Court, D. Kansas",
             "position": 187.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2569,7 +2711,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Kansas",
             "position": 228.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2587,7 +2730,8 @@
             "date_modified": "2013-10-16T19:03:38.458Z",
             "full_name": "Kentucky Supreme Court",
             "position": 362.25,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2605,7 +2749,8 @@
             "date_modified": "2013-09-09T16:45:42Z",
             "full_name": "Court of Appeals of Kentucky",
             "position": 362.3,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2623,7 +2768,8 @@
             "date_modified": "2013-08-15T17:03:04Z",
             "full_name": "United States Bankruptcy Court, E.D. Kentucky",
             "position": 187.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2641,7 +2787,8 @@
             "date_modified": "2013-10-22T15:49:45.772Z",
             "full_name": "District Court, E.D. Kentucky",
             "position": 229.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2659,7 +2806,8 @@
             "date_modified": "2013-08-15T16:23:29Z",
             "full_name": "United States Bankruptcy Court, W.D. Kentucky",
             "position": 187.8,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2677,7 +2825,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, W.D. Kentucky",
             "position": 230.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2695,7 +2844,8 @@
             "date_modified": "2013-09-09T01:06:32Z",
             "full_name": "Supreme Court of Louisiana",
             "position": 362.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2713,7 +2863,8 @@
             "date_modified": "2013-10-16T18:52:46.228Z",
             "full_name": "Louisiana Court of Appeal",
             "position": 362.51,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2731,7 +2882,8 @@
             "date_modified": "2013-08-15T05:54:39Z",
             "full_name": "United States Bankruptcy Court, E.D. Louisiana",
             "position": 187.9,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2749,7 +2901,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, E.D. Louisiana.",
             "position": 231.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2767,7 +2920,8 @@
             "date_modified": "2013-08-15T05:37:19Z",
             "full_name": "United States Bankruptcy Court, M.D. Louisiana",
             "position": 188.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2785,7 +2939,8 @@
             "date_modified": "2013-08-15T17:47:53Z",
             "full_name": "District Court, M.D. Louisiana",
             "position": 231.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2803,7 +2958,8 @@
             "date_modified": "2013-08-15T16:01:13Z",
             "full_name": "United States Bankruptcy Court, W.D. Louisiana",
             "position": 188.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2821,7 +2977,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, W.D. Louisiana",
             "position": 231.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2839,7 +2996,8 @@
             "date_modified": "2013-08-14T23:41:46Z",
             "full_name": "United States Bankruptcy Court, D. Massachusetts",
             "position": 189.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2857,7 +3015,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Massachusetts",
             "position": 240.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2875,7 +3034,8 @@
             "date_modified": "2013-09-07T21:34:46Z",
             "full_name": "Massachusetts Supreme Judicial Court",
             "position": 362.99,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2893,7 +3053,8 @@
             "date_modified": "2013-08-14T22:43:33Z",
             "full_name": "Massachusetts Appeals Court",
             "position": 363.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2911,7 +3072,8 @@
             "date_modified": "2013-10-30T08:26:53.314Z",
             "full_name": "U.S. Court of Military Commission Review",
             "position": 114.99,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2929,7 +3091,8 @@
             "date_modified": "2013-09-09T01:26:23Z",
             "full_name": "Court of Appeals of Maryland",
             "position": 362.6,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2947,7 +3110,8 @@
             "date_modified": "2013-08-15T01:06:47Z",
             "full_name": "United States Bankruptcy Court, D. Maryland",
             "position": 188.9,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2965,7 +3129,8 @@
             "date_modified": "2013-09-09T01:39:30Z",
             "full_name": "Court of Special Appeals of Maryland",
             "position": 362.61,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -2983,7 +3148,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Maryland",
             "position": 240.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3001,7 +3167,8 @@
             "date_modified": "2013-09-09T16:42:25Z",
             "full_name": "Supreme Judicial Court of Maine",
             "position": 362.55,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3019,7 +3186,8 @@
             "date_modified": "2013-08-15T16:12:53Z",
             "full_name": "  United States Bankruptcy Court, D. Maine",
             "position": 188.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3037,7 +3205,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Maine",
             "position": 239.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3055,7 +3224,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Michigan Supreme Court",
             "position": 365.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3073,7 +3243,8 @@
             "date_modified": "2013-09-09T00:56:20Z",
             "full_name": "Michigan Court of Appeals",
             "position": 365.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3091,7 +3262,8 @@
             "date_modified": "2013-08-15T01:10:56Z",
             "full_name": "United States Bankruptcy Court, E.D. Michigan",
             "position": 189.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3109,7 +3281,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, E.D. Michigan",
             "position": 240.6,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3127,7 +3300,8 @@
             "date_modified": "2013-09-09T01:08:15Z",
             "full_name": "Supreme Court of Minnesota",
             "position": 365.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3145,7 +3319,8 @@
             "date_modified": "2013-09-09T01:55:23Z",
             "full_name": "Court of Appeals of Minnesota",
             "position": 365.3,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3163,7 +3338,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Mississippi Supreme Court",
             "position": 366.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3181,7 +3357,8 @@
             "date_modified": "2013-09-09T06:27:05Z",
             "full_name": "Court of Appeals of Mississippi",
             "position": 366.01,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3199,7 +3376,8 @@
             "date_modified": "2013-08-15T00:48:40Z",
             "full_name": "United States Bankruptcy Court, W.D. Michigan",
             "position": 189.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3217,7 +3395,8 @@
             "date_modified": "2013-10-22T15:50:02.654Z",
             "full_name": "District Court, W.D. Michigan",
             "position": 240.7,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3235,7 +3414,8 @@
             "date_modified": "2013-08-15T00:13:08Z",
             "full_name": "United States Bankruptcy Court, D. Minnesota",
             "position": 189.3,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3253,7 +3433,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Minnesota",
             "position": 241.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3271,7 +3452,8 @@
             "date_modified": "2013-09-09T02:00:23Z",
             "full_name": "Supreme Court of Missouri",
             "position": 366.04,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3289,7 +3471,8 @@
             "date_modified": "2013-10-22T15:51:15.355Z",
             "full_name": "District Court, C.D. Missouri",
             "position": 241.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3307,7 +3490,8 @@
             "date_modified": "2013-09-09T00:58:10Z",
             "full_name": "Missouri Court of Appeals",
             "position": 366.05,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3325,7 +3509,8 @@
             "date_modified": "2013-08-15T01:05:40Z",
             "full_name": "United States Bankruptcy Court, E.D. Missouri",
             "position": 189.4,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3343,7 +3528,8 @@
             "date_modified": "2013-10-22T15:53:29.670Z",
             "full_name": "District Court, E.D. Missouri",
             "position": 242.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3361,7 +3547,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Montana Supreme Court",
             "position": 366.1,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3379,7 +3566,8 @@
             "date_modified": "2013-10-30T07:51:33.340Z",
             "full_name": "District Court, S.D. Missouri",
             "position": 242.15,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3397,7 +3585,8 @@
             "date_modified": "2013-08-15T00:06:19Z",
             "full_name": "United States Bankruptcy Court, W.D. Missouri",
             "position": 189.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3415,7 +3604,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, W.D. Missouri",
             "position": 242.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3433,7 +3623,8 @@
             "date_modified": "2013-08-15T16:22:25Z",
             "full_name": "United States Bankruptcy Court, N.D. Mississippi",
             "position": 189.34,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3451,7 +3642,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, N.D. Mississippi",
             "position": 241.12,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3469,7 +3661,8 @@
             "date_modified": "2013-08-15T16:05:56Z",
             "full_name": "United States Bankruptcy Court, S.D. Mississippi",
             "position": 189.35,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3487,7 +3680,8 @@
             "date_modified": "2013-10-22T15:50:58.078Z",
             "full_name": "District Court, S.D. Mississippi",
             "position": 241.15,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3505,7 +3699,8 @@
             "date_modified": "2013-08-15T01:04:23Z",
             "full_name": "United States Bankruptcy Court, D. Montana",
             "position": 189.6,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3523,7 +3718,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Montana",
             "position": 242.19,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3541,7 +3737,8 @@
             "date_modified": "2013-09-09T01:10:03Z",
             "full_name": "Supreme Court of North Carolina",
             "position": 366.97,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3559,7 +3756,8 @@
             "date_modified": "2013-09-09T01:44:15Z",
             "full_name": "Court of Appeals of North Carolina",
             "position": 366.98,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3577,7 +3775,8 @@
             "date_modified": "2013-08-15T16:17:48Z",
             "full_name": "United States Bankruptcy Court, E.D. North Carolina",
             "position": 190.3,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3595,7 +3794,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, E.D. North Carolina",
             "position": 245.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3613,7 +3813,8 @@
             "date_modified": "2013-08-15T00:10:22Z",
             "full_name": "United States Bankruptcy Court, M.D. North Carolina",
             "position": 190.4,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3631,7 +3832,8 @@
             "date_modified": "2013-08-15T16:24:58Z",
             "full_name": "District Court, M.D. North Carolina",
             "position": 245.15,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3649,7 +3851,8 @@
             "date_modified": "2013-08-15T16:47:21Z",
             "full_name": "United States Bankruptcy Court, W.D. North Carolina",
             "position": 190.45,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3667,7 +3870,8 @@
             "date_modified": "2013-10-22T15:54:24.087Z",
             "full_name": "District Court, W.D. North Carolina",
             "position": 245.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3685,7 +3889,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "North Dakota Supreme Court",
             "position": 366.99,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3703,7 +3908,8 @@
             "date_modified": "2013-08-15T16:09:56Z",
             "full_name": "  United States Bankruptcy Court, D. North Dakota",
             "position": 190.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3721,7 +3927,8 @@
             "date_modified": "2013-08-14T22:43:15Z",
             "full_name": "North Dakota Court of Appeals",
             "position": 366.991,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3739,7 +3946,8 @@
             "date_modified": "2013-08-15T16:04:07Z",
             "full_name": "District Court, D. North Dakota",
             "position": 245.3,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3757,7 +3965,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Nebraska Supreme Court",
             "position": 366.2,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3775,7 +3984,8 @@
             "date_modified": "2013-08-14T22:43:28Z",
             "full_name": "Nebraska Court of Appeals",
             "position": 366.25,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3793,7 +4003,8 @@
             "date_modified": "2013-08-15T05:49:06Z",
             "full_name": "United States Bankruptcy Court, D. Nebraska",
             "position": 189.61,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3811,7 +4022,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Nebraska",
             "position": 242.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3829,7 +4041,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Nevada Supreme Court",
             "position": 366.5,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3847,7 +4060,8 @@
             "date_modified": "2013-09-09T06:17:09Z",
             "full_name": "Supreme Court of New Hampshire",
             "position": 366.52,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3865,7 +4079,8 @@
             "date_modified": "2013-08-15T00:07:27Z",
             "full_name": "United States Bankruptcy Court, D. New Hampshire",
             "position": 189.7,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3883,7 +4098,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. New Hampshire",
             "position": 243.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3901,7 +4117,8 @@
             "date_modified": "2013-09-09T01:34:43Z",
             "full_name": "Supreme Court of New Jersey",
             "position": 366.55,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3919,7 +4136,8 @@
             "date_modified": "2013-08-15T00:15:30Z",
             "full_name": "United States Bankruptcy Court, D. New Jersey",
             "position": 189.8,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3937,7 +4155,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. New Jersey",
             "position": 243.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3955,7 +4174,8 @@
             "date_modified": "2013-09-09T01:18:02Z",
             "full_name": "New Jersey Superior Court",
             "position": 366.6,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3973,7 +4193,8 @@
             "date_modified": "2013-10-16T21:42:27.913Z",
             "full_name": "New Jersey Tax Court",
             "position": 366.7,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -3991,7 +4212,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "New Mexico Supreme Court",
             "position": 366.9,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4009,7 +4231,8 @@
             "date_modified": "2013-08-15T00:14:18Z",
             "full_name": "United States Bankruptcy Court, D. New Mexico",
             "position": 189.9,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4027,7 +4250,8 @@
             "date_modified": "2013-08-14T22:43:21Z",
             "full_name": "New Mexico Court of Appeals",
             "position": 366.95,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4045,7 +4269,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. New Mexico",
             "position": 243.7,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4063,7 +4288,8 @@
             "date_modified": "2013-09-07T21:24:00Z",
             "full_name": "United States Bankruptcy Court, Northern Mariana Islands",
             "position": 199.65,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4081,7 +4307,8 @@
             "date_modified": "2013-08-15T19:41:12Z",
             "full_name": "District Court, Northern Mariana Islands",
             "position": 299.4,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4099,7 +4326,8 @@
             "date_modified": "2013-08-15T01:16:45Z",
             "full_name": "United States Bankruptcy Court, D. Nevada",
             "position": 189.65,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4117,7 +4345,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Nevada",
             "position": 242.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4135,7 +4364,8 @@
             "date_modified": "2013-09-07T21:34:46Z",
             "full_name": "New York Court of Appeals",
             "position": 366.96,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4153,7 +4383,8 @@
             "date_modified": "2013-10-16T21:51:47.773Z",
             "full_name": "Appellate Division of the Supreme Court of the State of New York",
             "position": 366.965,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4171,7 +4402,8 @@
             "date_modified": "2013-08-14T23:38:17Z",
             "full_name": "United States Bankruptcy Court, E.D. New York",
             "position": 190.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4189,7 +4421,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, E.D. New York",
             "position": 244.8,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4207,7 +4440,8 @@
             "date_modified": "2013-10-23T18:03:49.272Z",
             "full_name": "New York Family Court",
             "position": 366.966,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4225,7 +4459,8 @@
             "date_modified": "2013-08-15T05:26:47Z",
             "full_name": "United States Bankruptcy Court, N.D. New York",
             "position": 190.05,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4243,7 +4478,8 @@
             "date_modified": "2013-10-22T15:53:49.353Z",
             "full_name": "District Court, N.D. New York",
             "position": 244.9,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4261,7 +4497,8 @@
             "date_modified": "2013-08-14T23:39:46Z",
             "full_name": "United States Bankruptcy Court, S.D. New York",
             "position": 190.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4279,7 +4516,8 @@
             "date_modified": "2013-10-22T15:54:04.692Z",
             "full_name": "District Court, S.D. New York",
             "position": 245.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4297,7 +4535,8 @@
             "date_modified": "2013-10-30T10:35:46.737Z",
             "full_name": "New York Surrogate's Court",
             "position": 366.9665,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4315,7 +4554,8 @@
             "date_modified": "2013-08-15T00:26:14Z",
             "full_name": "United States Bankruptcy Court, W.D. New York",
             "position": 190.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4333,7 +4573,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, W.D. New York",
             "position": 245.05,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4351,7 +4592,8 @@
             "date_modified": "2013-08-15T20:09:12Z",
             "full_name": "Ohio Supreme Court",
             "position": 366.995,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4369,7 +4611,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Ohio",
             "position": 245.92,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1803-02-19"
         }
     },
@@ -4387,7 +4630,8 @@
             "date_modified": "2013-08-15T00:20:46Z",
             "full_name": "United States Bankruptcy Court, N.D. Ohio",
             "position": 190.6,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4405,7 +4649,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, N.D. Ohio",
             "position": 245.8,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4423,7 +4668,8 @@
             "date_modified": "2013-08-15T00:43:08Z",
             "full_name": "United States Bankruptcy Court, S.D. Ohio",
             "position": 190.7,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4441,7 +4687,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, S.D. Ohio",
             "position": 245.91,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4459,7 +4706,8 @@
             "date_modified": "2013-08-15T16:53:11Z",
             "full_name": "United States Bankruptcy Court, E.D. Oklahoma",
             "position": 191.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4477,7 +4725,8 @@
             "date_modified": "2013-10-22T15:54:40.816Z",
             "full_name": "District Court, E.D. Oklahoma",
             "position": 245.95,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4495,7 +4744,8 @@
             "date_modified": "2013-09-07T21:34:46Z",
             "full_name": "Supreme Court of Oklahoma",
             "position": 366.999,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4513,7 +4763,8 @@
             "date_modified": "2013-08-14T22:43:08Z",
             "full_name": "Court of Civil Appeals of Oklahoma",
             "position": 366.9995,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1908-01-01"
         }
     },
@@ -4531,7 +4782,8 @@
             "date_modified": "2013-09-07T20:16:00Z",
             "full_name": "Court on the Judiciary of Oklahoma",
             "position": 366.9998,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4549,7 +4801,8 @@
             "date_modified": "2013-08-14T22:43:03Z",
             "full_name": "Court of Criminal Appeals of Oklahoma",
             "position": 366.9996,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4567,7 +4820,8 @@
             "date_modified": "2013-08-15T21:14:18Z",
             "full_name": "Oklahoma Judicial Ethics Advisory Panel",
             "position": 366.9997,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4585,7 +4839,8 @@
             "date_modified": "2013-08-15T01:12:42Z",
             "full_name": "United States Bankruptcy Court, N.D. Oklahoma",
             "position": 192.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4603,7 +4858,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, N.D. Oklahoma",
             "position": 245.99,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4621,7 +4877,8 @@
             "date_modified": "2013-08-15T05:18:32Z",
             "full_name": "United States Bankruptcy Court, W.D. Oklahoma",
             "position": 192.3,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4639,7 +4896,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, W.D. Oklahoma",
             "position": 246.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4657,7 +4915,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Oregon Supreme Court",
             "position": 367.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4675,7 +4934,8 @@
             "date_modified": "2013-08-15T01:13:53Z",
             "full_name": "United States Bankruptcy Court, D. Oregon",
             "position": 193.7,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4693,7 +4953,8 @@
             "date_modified": "2013-08-14T22:42:57Z",
             "full_name": "Court of Appeals of Oregon",
             "position": 367.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4711,7 +4972,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Oregon",
             "position": 247.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4729,7 +4991,8 @@
             "date_modified": "2013-09-09T01:15:45Z",
             "full_name": "Supreme Court of Pennsylvania",
             "position": 367.15,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4747,7 +5010,8 @@
             "date_modified": "2013-09-09T01:24:06Z",
             "full_name": "Commonwealth Court of Pennsylvania.",
             "position": 367.25,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4765,7 +5029,8 @@
             "date_modified": "2013-08-15T00:25:16Z",
             "full_name": "United States Bankruptcy Court, E.D. Pennsylvania",
             "position": 193.8,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4783,7 +5048,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, E.D. Pennsylvania",
             "position": 247.9,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4801,7 +5067,8 @@
             "date_modified": "2013-08-15T00:40:18Z",
             "full_name": "United States Bankruptcy Court, M.D. Pennsylvania",
             "position": 193.9,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4819,7 +5086,8 @@
             "date_modified": "2013-10-22T15:25:27.235Z",
             "full_name": "District Court, M.D. Pennsylvania",
             "position": 247.95,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4837,7 +5105,8 @@
             "date_modified": "2013-09-09T00:54:52Z",
             "full_name": "Superior Court of Pennsylvania",
             "position": 367.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4855,7 +5124,8 @@
             "date_modified": "2013-08-15T00:11:54Z",
             "full_name": "United States Bankruptcy Court, W.D. Pennsylvania",
             "position": 194.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4873,7 +5143,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, W.D. Pennsylvania",
             "position": 248.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4891,7 +5162,8 @@
             "date_modified": "2013-08-20T01:25:05Z",
             "full_name": "District Court, D. Pennsylvania",
             "position": 248.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4909,7 +5181,8 @@
             "date_modified": "2013-08-15T18:07:43Z",
             "full_name": "United States Bankruptcy Court, D. Puerto Rico",
             "position": 199.7,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4927,7 +5200,8 @@
             "date_modified": "2013-08-15T17:00:09Z",
             "full_name": "District Court, D. Puerto Rico",
             "position": 299.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4945,7 +5219,8 @@
             "date_modified": "2013-08-14T22:20:40Z",
             "full_name": "Special Court under the Regional Rail Reorganization Act",
             "position": 140.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1973-01-01"
         }
     },
@@ -4963,7 +5238,8 @@
             "date_modified": "2013-09-09T16:33:17Z",
             "full_name": "Supreme Court of Rhode Island",
             "position": 367.3,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4981,7 +5257,8 @@
             "date_modified": "2013-08-15T16:38:50Z",
             "full_name": "United States Bankruptcy Court, D. Rhode Island",
             "position": 194.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -4999,7 +5276,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Rhode Island",
             "position": 248.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5017,7 +5295,8 @@
             "date_modified": "2013-09-09T06:22:31Z",
             "full_name": "Supreme Court of South Carolina",
             "position": 367.4,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5035,7 +5314,8 @@
             "date_modified": "2013-08-15T16:15:18Z",
             "full_name": "United States Bankruptcy Court, District of South Carolina",
             "position": 194.8,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5053,7 +5333,8 @@
             "date_modified": "2013-09-09T16:44:02Z",
             "full_name": "Court of Appeals of South Carolina",
             "position": 367.41,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5071,7 +5352,8 @@
             "date_modified": "2013-08-15T17:25:16Z",
             "full_name": "United States District Court, D. South Carolina",
             "position": 248.6,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5089,7 +5371,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Supreme Court of the United States",
             "position": 1.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": "1789-09-24"
         }
     },
@@ -5107,7 +5390,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "South Dakota Supreme Court",
             "position": 367.5,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5125,7 +5409,8 @@
             "date_modified": "2013-08-15T16:33:31Z",
             "full_name": "United States Bankruptcy Court, D. South Dakota",
             "position": 194.85,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5143,7 +5428,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. South Dakota",
             "position": 249.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5161,7 +5447,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, E.D. South Carolina",
             "position": 249.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1823-02-21"
         }
     },
@@ -5179,7 +5466,8 @@
             "date_modified": "2013-10-22T15:55:33.706Z",
             "full_name": "District Court, W.D. South Carolina",
             "position": 249.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1823-02-21"
         }
     },
@@ -5197,7 +5485,8 @@
             "date_modified": "2013-10-30T08:53:33.763Z",
             "full_name": "U.S. Special Tribunal of Pennsylvania",
             "position": 452.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5215,7 +5504,8 @@
             "date_modified": "2013-08-14T22:20:02Z",
             "full_name": "United States Tax Court",
             "position": 114.2,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5233,7 +5523,8 @@
             "date_modified": "2013-08-14T22:20:33Z",
             "full_name": "Temporary Emergency Court of Appeals",
             "position": 116.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1971-12-01"
         }
     },
@@ -5251,7 +5542,8 @@
             "date_modified": "2013-09-08T23:57:47Z",
             "full_name": "Tennessee Supreme Court",
             "position": 367.6,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5269,7 +5561,8 @@
             "date_modified": "2013-09-09T16:30:08Z",
             "full_name": "Court of Criminal Appeals of Tennessee",
             "position": 367.8,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5287,7 +5580,8 @@
             "date_modified": "2013-09-09T02:23:19Z",
             "full_name": "Court of Appeals of Tennessee",
             "position": 367.7,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5305,7 +5599,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, D. Tennessee",
             "position": 249.9,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1797-01-31"
         }
     },
@@ -5323,7 +5618,8 @@
             "date_modified": "2013-09-07T21:56:01Z",
             "full_name": "United States Bankruptcy Court, D. Tennessee",
             "position": 195.3,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5341,7 +5637,8 @@
             "date_modified": "2013-08-14T22:38:31Z",
             "full_name": "Testing Supreme Court",
             "position": 999.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5359,7 +5656,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Texas Supreme Court",
             "position": 368.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5377,7 +5675,8 @@
             "date_modified": "2013-09-09T01:31:31Z",
             "full_name": "Court of Appeals of Texas",
             "position": 368.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5395,7 +5694,8 @@
             "date_modified": "2013-09-09T16:53:34Z",
             "full_name": "Court of Criminal Appeals of Texas",
             "position": 368.3,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5413,7 +5713,8 @@
             "date_modified": "2013-10-30T07:11:37.284Z",
             "full_name": "Texas Special Court of Review",
             "position": 368.4,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5431,7 +5732,8 @@
             "date_modified": "2013-08-15T01:07:53Z",
             "full_name": "United States Bankruptcy Court, E.D. Tennessee",
             "position": 195.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5449,7 +5751,8 @@
             "date_modified": "2013-10-22T15:55:49.696Z",
             "full_name": "District Court, E.D. Tennessee",
             "position": 249.6,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5467,7 +5770,8 @@
             "date_modified": "2013-08-15T05:51:52Z",
             "full_name": "United States Bankruptcy Court, M.D. Tennessee",
             "position": 195.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5485,7 +5789,8 @@
             "date_modified": "2013-10-22T15:25:43.332Z",
             "full_name": "District Court, M.D. Tennessee",
             "position": 249.7,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5503,7 +5808,8 @@
             "date_modified": "2013-08-15T05:47:53Z",
             "full_name": "United States Bankruptcy Court, W.D. Tennessee",
             "position": 195.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5521,7 +5827,8 @@
             "date_modified": "2013-10-22T15:56:11.964Z",
             "full_name": "District Court, W.D. Tennessee",
             "position": 249.8,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5539,7 +5846,8 @@
             "date_modified": "2013-08-15T00:28:15Z",
             "full_name": "United States Bankruptcy Court, E.D. Texas",
             "position": 196.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5557,7 +5865,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, E.D. Texas",
             "position": 250.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5575,7 +5884,8 @@
             "date_modified": "2013-08-15T05:25:39Z",
             "full_name": "United States Bankruptcy Court, N.D. Texas",
             "position": 196.2,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5593,7 +5903,8 @@
             "date_modified": "2013-08-14T22:23:53Z",
             "full_name": "District Court, N.D. Texas",
             "position": 250.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5611,7 +5922,8 @@
             "date_modified": "2013-08-15T05:42:03Z",
             "full_name": "United States Bankruptcy Court, S.D. Texas",
             "position": 196.25,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5629,7 +5941,8 @@
             "date_modified": "2013-10-22T15:56:25.488Z",
             "full_name": "District Court, S.D. Texas",
             "position": 250.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5647,7 +5960,8 @@
             "date_modified": "2013-08-15T00:38:18Z",
             "full_name": "United States District Court, W.D. Texas",
             "position": 196.3,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5665,7 +5979,8 @@
             "date_modified": "2013-10-22T15:56:39.023Z",
             "full_name": "District Court, W.D. Texas",
             "position": 251.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5683,7 +5998,8 @@
             "date_modified": "2013-08-14T22:19:01Z",
             "full_name": "United States Court of Federal Claims",
             "position": 113.6,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1982-04-02"
         }
     },
@@ -5701,7 +6017,8 @@
             "date_modified": "2013-08-14T22:40:00Z",
             "full_name": "United States Judicial Conference Committee",
             "position": 450.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5719,7 +6036,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Utah Supreme Court",
             "position": 369.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5737,7 +6055,8 @@
             "date_modified": "2013-08-14T22:42:52Z",
             "full_name": "Court of Appeals of Utah",
             "position": 369.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5755,7 +6074,8 @@
             "date_modified": "2013-08-15T05:45:05Z",
             "full_name": "United States Bankruptcy Court, D. Utah",
             "position": 196.34,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5773,7 +6093,8 @@
             "date_modified": "2013-08-15T16:21:05Z",
             "full_name": "United States District Court, D. Utah",
             "position": 251.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5791,7 +6112,8 @@
             "date_modified": "2013-09-09T17:23:22Z",
             "full_name": "Supreme Court of Virginia",
             "position": 369.4,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5809,7 +6131,8 @@
             "date_modified": "2013-09-09T17:05:43Z",
             "full_name": "Court of Appeals of Virginia",
             "position": 369.5,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5827,7 +6150,8 @@
             "date_modified": "2013-08-15T00:50:05Z",
             "full_name": "United States Bankruptcy Court, E.D. Virginia",
             "position": 196.4,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5845,7 +6169,8 @@
             "date_modified": "2013-08-14T22:23:54Z",
             "full_name": "District Court, E.D. Virginia",
             "position": 279.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5863,7 +6188,8 @@
             "date_modified": "2013-08-15T00:29:34Z",
             "full_name": "United States Bankruptcy Court, W.D. Virginia",
             "position": 197.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5881,7 +6207,8 @@
             "date_modified": "2013-08-14T22:23:54Z",
             "full_name": "District Court, W.D. Virginia",
             "position": 280.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5899,7 +6226,8 @@
             "date_modified": "2013-08-15T17:29:17Z",
             "full_name": "United States Bankruptcy Court, D. Virgin Islands",
             "position": 199.8,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5917,7 +6245,8 @@
             "date_modified": "2013-08-15T17:06:23Z",
             "full_name": "District Court, Virgin Islands",
             "position": 299.9,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5935,7 +6264,8 @@
             "date_modified": "2013-09-09T17:24:51Z",
             "full_name": "Supreme Court of Vermont",
             "position": 369.2,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5953,7 +6283,8 @@
             "date_modified": "2013-08-15T05:43:46Z",
             "full_name": "United States Bankruptcy Court, D. Vermont",
             "position": 196.35,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5971,7 +6302,8 @@
             "date_modified": "2013-08-15T05:50:47Z",
             "full_name": "District Court, D. Vermont",
             "position": 252.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -5989,7 +6321,8 @@
             "date_modified": "2013-08-15T16:52:08Z",
             "full_name": "United States Bankruptcy Court, E.D. Washington",
             "position": 197.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6007,7 +6340,8 @@
             "date_modified": "2013-10-22T15:57:02.054Z",
             "full_name": "District Court, E.D. Washington",
             "position": 289.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1905-03-02"
         }
     },
@@ -6025,7 +6359,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Washington Supreme Court",
             "position": 370.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6043,7 +6378,8 @@
             "date_modified": "2013-08-14T22:42:46Z",
             "full_name": "Court of Appeals of Washington",
             "position": 385.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6061,7 +6397,8 @@
             "date_modified": "2013-08-15T16:32:09Z",
             "full_name": "United States Bankruptcy Court, W.D. Washington",
             "position": 198.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6079,7 +6416,8 @@
             "date_modified": "2013-10-22T15:57:18.365Z",
             "full_name": "District Court, W.D. Washington",
             "position": 290.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": "1905-03-02"
         }
     },
@@ -6097,7 +6435,8 @@
             "date_modified": "2013-08-14T23:59:05Z",
             "full_name": "United States Bankruptcy Court, E.D. Wisconsin",
             "position": 199.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6115,7 +6454,8 @@
             "date_modified": "2013-10-22T15:57:56.363Z",
             "full_name": "District Court, E.D. Wisconsin",
             "position": 297.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6133,7 +6473,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Wisconsin Supreme Court",
             "position": 386.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6151,7 +6492,8 @@
             "date_modified": "2013-09-09T01:29:37Z",
             "full_name": "Court of Appeals of Wisconsin",
             "position": 387.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6169,7 +6511,8 @@
             "date_modified": "2013-08-15T05:27:47Z",
             "full_name": "United States Bankruptcy Court, W.D. Wisconsin",
             "position": 199.1,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6187,7 +6530,8 @@
             "date_modified": "2013-10-22T15:58:08.306Z",
             "full_name": "District Court, W.D. Wisconsin",
             "position": 298.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6205,7 +6549,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "West Virginia Supreme Court",
             "position": 385.1,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6223,7 +6568,8 @@
             "date_modified": "2013-08-15T00:16:38Z",
             "full_name": "United States District Court, N.D. West Virginia",
             "position": 198.8,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6241,7 +6587,8 @@
             "date_modified": "2013-10-22T15:57:29.828Z",
             "full_name": "District Court, N.D. West Virginia",
             "position": 294.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6259,7 +6606,8 @@
             "date_modified": "2013-08-15T17:08:04Z",
             "full_name": "United States Bankruptcy Court, S.D. West Virginia",
             "position": 198.9,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6277,7 +6625,8 @@
             "date_modified": "2013-10-22T15:57:43.703Z",
             "full_name": "District Court, S.D. West Virginia.",
             "position": 295.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6295,7 +6644,8 @@
             "date_modified": "2013-08-15T17:09:02Z",
             "full_name": "United States Bankruptcy Court, D. Wyoming",
             "position": 199.5,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6313,7 +6663,8 @@
             "date_modified": "2013-08-14T22:23:54Z",
             "full_name": "District Court, D. Wyoming",
             "position": 299.0,
-            "has_scraper": false,
+            "has_opinion_scraper": false,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     },
@@ -6331,7 +6682,8 @@
             "date_modified": "2013-08-14T16:46:30Z",
             "full_name": "Wyoming Supreme Court",
             "position": 390.0,
-            "has_scraper": true,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false,
             "start_date": null
         }
     }

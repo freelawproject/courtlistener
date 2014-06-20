@@ -108,8 +108,12 @@ class Court(models.Model):
         help_text='Whether this jurisdiction is in use in CourtListener -- increasingly True',
         default=False
     )
-    has_scraper = models.BooleanField(
+    has_opinion_scraper = models.BooleanField(
         help_text='Whether the jurisdiction has a scraper that obtains opinions automatically.',
+        default=False,
+    )
+    has_oral_argument_scraper = models.BooleanField(
+        help_text='Whather the jurisdiction has a scraper that obtains oral arguments automatically.',
         default=False,
     )
     position = models.FloatField(
