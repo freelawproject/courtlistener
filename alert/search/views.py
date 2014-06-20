@@ -30,6 +30,7 @@ def do_search(request, rows=20, order_by=None):
     if search_form.is_valid():
         cd = search_form.cleaned_data
         if order_by:
+            # Allows an override by calling methods.
             cd['order_by'] = order_by
         search_form = _clean_form(request, cd)
         try:
