@@ -65,9 +65,7 @@ class ModelResourceWithFieldsFilter(ModelResource):
             return super(ModelResourceWithFieldsFilter, self)._handle_500(request, exception)
 
     def alter_list_data_to_serialize(self, request, data):
-        # Add a request_uri field
         data['meta']['request_uri'] = request.get_full_path()
-
         return data
 
     def full_dehydrate(self, bundle, *args, **kwargs):
@@ -136,11 +134,6 @@ class PerUserCacheThrottle(CacheThrottle):
 
 
 class CourtResource(ModelResourceWithFieldsFilter):
-    has_scraper = fields.BooleanField(
-        attribute='has_opinion_scraper',
-        help_text='Whether the jurisdiction has a scraper that obtains opinions automatically.'
-    )
-
     class Meta:
         authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
                                              SessionAuthentication())
@@ -153,7 +146,8 @@ class CourtResource(ModelResourceWithFieldsFilter):
             'id': ('exact',),
             'date_modified': good_time_filters,
             'in_use': ALL,
-            'has_scraper': ALL,
+            'has_opinion_scraper': ALL,
+            'has_oral_argument_scraper': ALL,
             'position': numerical_filters,
             'short_name': ALL,
             'full_name': ALL,
@@ -163,7 +157,6 @@ class CourtResource(ModelResourceWithFieldsFilter):
             'jurisdictions': ALL,
         }
         ordering = ['date_modified', 'start_date', 'end_date', 'position', 'jurisdiction']
-        excludes = ['has_opinion_scraper', 'has_oral_argument_scraper']
 
 
 class CitationResource(ModelResourceWithFieldsFilter):

@@ -1,3 +1,4 @@
+from datadiff import diff
 from django.test import TestCase
 from django.test.client import Client
 import simplejson
@@ -190,45 +191,72 @@ class ApiTest(SolrTestCase):
 
     def test_api_meta_data(self):
         """Does the content of the search API have the right meta data?"""
-        # Log in our fake user that we created with the fixture
         self.client.login(username='pandora', password='password')
-        r = self.client.get('/api/rest/v1/search/?q=*:*&format=json')
-        json_actual = simplejson.loads(r.content)
+        api_versions = ['v1', 'v2']
+        api_endpoint_parameters = {
+            'search': '?q=*:*&format=json',
+            'jurisdiction': '?format=json',
+        }
+        for v in api_versions:
+            for endpoint, params in api_endpoint_parameters.iteritems():
+                r = self.client.get('/api/rest/%s/%s/%s' % (v, endpoint, params))
+                json_actual = simplejson.loads(r.content)
 
-        with open('search/test_assets/api_test_results.json', 'r') as f:
-            json_correct = simplejson.load(f)
+                with open('search/test_assets/api_%s_%s_test_results.json' % (v, endpoint), 'r') as f:
+                    json_correct = simplejson.load(f)
 
-        # Drop the timestamps and scores b/c they can differ
-        for j in [json_actual, json_correct]:
-            for o in j['objects']:
-                o['timestamp'] = None
-                o['score'] = None
-
-        self.assertEqual(
-            json_actual,
-            json_correct,
-            msg="Response from search API did not match expected results."
-        )
+                if endpoint == 'search':
+                    # Drop the timestamps and scores b/c they can differ
+                    for j in [json_actual, json_correct]:
+                        for o in j['objects']:
+                            o['timestamp'] = None
+                            o['score'] = None
+                elif endpoint == 'jurisdiction':
+                    # Drop any non-testing jurisdiction, cause they change over time
+                    objects = []
+                    for court in json_actual['objects']:
+                        if court['id'] == 'test':
+                            court['date_modified'] = None
+                            objects.append(court)
+                            json_actual['objects'] = objects
+                            break
+                    json_actual['meta']['total_count'] = 1
+                msg = "Response from search API did not match expected results (api version: %s, endpoint: %s):\n%s" % (
+                    v,
+                    endpoint,
+                    diff(json_actual,
+                         json_correct,
+                         fromfile='actual',
+                         tofile='correct')
+                )
+                self.assertEqual(
+                    json_actual,
+                    json_correct,
+                    msg=msg,
+                )
 
     def test_api_result_count(self):
         """Do we get back the number of results we expect in the meta data and in 'objects'?"""
         self.client.login(username='pandora', password='password')
-        r = self.client.get('/api/rest/v1/search/?q=*:*&format=json')
-        json = simplejson.loads(r.content)
-        # Test the meta data
-        self.assertEqual(self.expected_num_results,
-                         json['meta']['total_count'],
-                         msg="Metadata result count does not match:\n"
-                             "  Got:\t%s\n"
-                             "  Expected:\t%s\n" % (json['meta']['total_count'],
-                                                    self.expected_num_results,))
-        # Test the actual data
-        num_actual_results = len(json['objects'])
-        self.assertEqual(self.expected_num_results,
-                         num_actual_results,
-                         msg="Actual number of results varies from expected number:\n"
-                             "  Got:\t%s\n"
-                             "  Expected:\t%s\n" % (num_actual_results, self.expected_num_results))
+        api_versions = ['v1', 'v2']
+        for v in api_versions:
+            r = self.client.get('/api/rest/%s/search/?q=*:*&format=json' % v)
+            json = simplejson.loads(r.content)
+            # Test the meta data
+            self.assertEqual(self.expected_num_results,
+                             json['meta']['total_count'],
+                             msg="Metadata result count does not match (api version: '%s'):\n"
+                                 "  Got:\t%s\n"
+                                 "  Expected:\t%s\n" % (v,
+                                                        json['meta']['total_count'],
+                                                        self.expected_num_results,))
+            # Test the actual data
+            num_actual_results = len(json['objects'])
+            self.assertEqual(self.expected_num_results,
+                             num_actual_results,
+                             msg="Actual number of results varies from expected number (api version: '%s'):\n"
+                                 "  Got:\t%s\n"
+                                 "  Expected:\t%s\n" % (v, num_actual_results, self.expected_num_results))
 
     def test_api_able_to_login(self):
         """Can we login properly?"""

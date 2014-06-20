@@ -11,7 +11,9 @@
             "jurisdiction": "F",
             "full_name": "Testing Supreme Court",
             "position": 0.0,
-            "start_date": "2013-06-13"
+            "start_date": "2013-06-13",
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": false
         }
     }
 ]
