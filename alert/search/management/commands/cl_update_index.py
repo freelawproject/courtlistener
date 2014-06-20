@@ -32,7 +32,8 @@ class Command(BaseCommand):
                     dest='delete_mode',
                     default=False,
                     help=('Run the command in delete mode. Use this to remove documents '
-                          'from the index.')),
+                          'from the index. Note that this will not delete items from the index '
+                          'that do not exist in the database.')),
         make_option('--optimize',
                     action='store_true',
                     dest='optimize_mode',
