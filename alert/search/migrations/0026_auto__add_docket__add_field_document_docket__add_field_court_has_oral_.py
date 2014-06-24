@@ -8,19 +8,27 @@ from django.db import models
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        db.rename_column('Court', 'has_scraper', 'has_opinion_scraper')
+        # Adding model 'Docket'
+        db.create_table(u'search_docket', (
+            (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
+            ('date_modified', self.gf('django.db.models.fields.DateTimeField')(auto_now=True, null=True, db_index=True, blank=True)),
+            ('court', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['search.Court'], null=True)),
+            ('case_name', self.gf('django.db.models.fields.TextField')(blank=True)),
+            ('slug', self.gf('django.db.models.fields.SlugField')(max_length=50, null=True)),
+        ))
+        db.send_create_signal(u'search', ['Docket'])
 
-        # Adding field 'Court.has_oral_argument_scraper'
-        db.add_column('Court', 'has_oral_argument_scraper',
-                      self.gf('django.db.models.fields.BooleanField')(default=False),
+        # Adding field 'Document.docket'
+        db.add_column('Document', 'docket',
+                      self.gf('django.db.models.fields.related.ForeignKey')(blank=True, related_name='documents', null=True, to=orm['search.Docket']),
                       keep_default=False)
 
-
     def backwards(self, orm):
-        db.rename_column('Court', 'has_opinion_scraper', 'has_scraper')
+        # Deleting model 'Docket'
+        db.delete_table(u'search_docket')
 
-        # Deleting field 'Court.has_oral_argument_scraper'
-        db.delete_column('Court', 'has_oral_argument_scraper')
+        # Deleting field 'Document.docket'
+        db.delete_column('Document', 'docket_id')
 
 
     models = {
@@ -50,6 +58,7 @@ class Migration(SchemaMigration):
             'end_date': ('django.db.models.fields.DateField', [], {'null': 'True', 'blank': 'True'}),
             'full_name': ('django.db.models.fields.CharField', [], {'max_length': "'200'"}),
             'has_opinion_scraper': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
+            'has_oral_argument_scraper': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
             'id': ('django.db.models.fields.CharField', [], {'max_length': '15', 'primary_key': 'True'}),
             'in_use': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
             'jurisdiction': ('django.db.models.fields.CharField', [], {'max_length': '3'}),
@@ -58,6 +67,14 @@ class Migration(SchemaMigration):
             'short_name': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
             'start_date': ('django.db.models.fields.DateField', [], {'null': 'True', 'blank': 'True'}),
             'url': ('django.db.models.fields.URLField', [], {'max_length': '500'})
+        },
+        u'search.docket': {
+            'Meta': {'object_name': 'Docket'},
+            'case_name': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
+            'court': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['search.Court']", 'null': 'True'}),
+            'date_modified': ('django.db.models.fields.DateTimeField', [], {'auto_now': 'True', 'null': 'True', 'db_index': 'True', 'blank': 'True'}),
+            u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'slug': ('django.db.models.fields.SlugField', [], {'max_length': '50', 'null': 'True'})
         },
         u'search.document': {
             'Meta': {'object_name': 'Document', 'db_table': "'Document'"},
@@ -69,6 +86,7 @@ class Migration(SchemaMigration):
             'date_blocked': ('django.db.models.fields.DateField', [], {'db_index': 'True', 'null': 'True', 'blank': 'True'}),
             'date_filed': ('django.db.models.fields.DateField', [], {'db_index': 'True', 'null': 'True', 'blank': 'True'}),
             'date_modified': ('django.db.models.fields.DateTimeField', [], {'auto_now': 'True', 'null': 'True', 'db_index': 'True', 'blank': 'True'}),
+            'docket': ('django.db.models.fields.related.ForeignKey', [], {'blank': 'True', 'related_name': "'documents'", 'null': 'True', 'to': u"orm['search.Docket']"}),
             'download_url': ('django.db.models.fields.URLField', [], {'db_index': 'True', 'max_length': '500', 'null': 'True', 'blank': 'True'}),
             'extracted_by_ocr': ('django.db.models.fields.BooleanField', [], {'default': 'False', 'db_index': 'True'}),
             'html': ('django.db.models.fields.TextField', [], {'null': 'True', 'blank': 'True'}),
