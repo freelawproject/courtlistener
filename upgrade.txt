@@ -238,7 +238,7 @@ We welcome a conversion of these notes to a better process using Fabric.
 
      http://stackoverflow.com/questions/8677504/setting-environment-variable-globally-without-restarting-ubuntu/18388854#18388854
 
- - Hundreds of new courts have been added to initial_data.json and will be installed automatically, but there are some
+ - Hundreds of new courts have been added to court_data.json and will be installed automatically, but there are some
    conflicts with the current courts that need to be fixed first. To do that, in a Python shell run:
 
         from search.models import Court
