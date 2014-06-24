@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'south',
     'tastypie',
     'alerts',
+    'audio',
     'api',
     'casepage',
     'citations',

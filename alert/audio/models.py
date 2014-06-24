@@ -1,5 +1,5 @@
 from alert.lib.model_helpers import make_upload_path
-from alert.search.models import Case, Court
+from alert.search.models import Docket
 from django.db import models
 
 
@@ -13,13 +13,13 @@ MP3_SAMPLE_RATES = (
 )
 
 
-class OralArgument(models.Model):
+class Audio(models.Model):
     """A class representing oral arguments and their associated metadata
 
     """
-    case = models.ForeignKey(
-        Case,
-        help_text="The case that the oral argument is a part of",
+    docket = models.ForeignKey(
+        Docket,
+        help_text="The docket that the oral argument is a part of",
         related_name="oral_arguments",
         blank=True,
         null=True
@@ -47,12 +47,6 @@ class OralArgument(models.Model):
         max_length=40,
         db_index=True
     )
-    court = models.ForeignKey(
-        Court,
-        help_text="The court where the document was filed",
-        db_index=True,
-        null=True,
-    )
     download_url = models.URLField(
         help_text="The URL on the court website where the document was originally scraped",
         max_length=500,
@@ -68,6 +62,17 @@ class OralArgument(models.Model):
     )
     length = models.SmallIntegerField(
         help_text="the length of the file, in seconds",
+    )
+    date_blocked = models.DateField(
+        help_text="The date that this opinion was blocked from indexing by search engines",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    blocked = models.BooleanField(
+        help_text="Whether a document should be blocked from indexing by search engines",
+        db_index=True,
+        default=False
     )
 
     class Meta:
