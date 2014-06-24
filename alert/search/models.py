@@ -1,5 +1,4 @@
 import re
-import sys
 from alert import settings
 from alert.lib.string_utils import trunc
 from alert.lib.encode_decode import num_to_ascii
@@ -87,6 +86,32 @@ def invalidate_dumps_by_date_and_court(date, court):
             os.remove(os.path.join(settings.DUMP_DIR, year, month, day, court + '.xml.gz'))
         except OSError:
             pass
+
+
+class Docket(models.Model):
+    """A class to sit above Documents and Audio files and link them together"""
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified. A value in year 1750 indicates the value is unknown",
+        auto_now=True,
+        editable=False,
+        db_index=True,
+        null=True,
+    )
+    court = models.ForeignKey(
+        'Court',
+        help_text="The court where the docket was filed",
+        db_index=True,
+        null=True
+    )
+    case_name = models.TextField(
+        help_text="The full name of the case",
+        blank=True
+    )
+    slug = models.SlugField(
+        help_text="URL that the document should map to (the slug)",
+        max_length=50,
+        null=True
+    )
 
 
 class Court(models.Model):
@@ -298,7 +323,7 @@ class Document(models.Model):
         db_index=True
     )
     date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified. A value  in year 1750 indicates the value is unknown",
+        help_text="The last moment when the item was modified. A value in year 1750 indicates the value is unknown",
         auto_now=True,
         editable=False,
         db_index=True,
@@ -331,6 +356,13 @@ class Document(models.Model):
         Citation,
         help_text="The citation object for the document",
         related_name="parent_documents",
+        blank=True,
+        null=True
+    )
+    docket = models.ForeignKey(
+        Docket,
+        help_text="The docket that the document is a part of",
+        related_name="documents",
         blank=True,
         null=True
     )

@@ -53,18 +53,19 @@ We welcome a conversion of these notes to a better process using Fabric.
         - Make sure that we flip the has_oral_argument_scraper flag to true on CA1 or else the coverage page will look off.
 
   API Changes:
-  - /api/rest-info/ makes reference to a number of API calls that go to v1. These should go to v2 instead and some
-    solution should be found for versioning the rest documentation.
+   - /api/rest-info/ makes reference to a number of API calls that go to v1. These should go to v2 instead and some
+     solution should be found for versioning the rest documentation.
+   - In v2, the has_scraper field is now renamed has_opinion_scraper, and there is a new field, has_oral_argument_scraper.
 
-  - A new flag was added to the Court for has_oral_argument_scraper. We should add the corresponding information to the
-    coverage page.
-  - API 1.1 will need to be released.
   - When a Case object is saved, it should check if the "name" attribute has changed. If so, it needs to update the
     search index and slug.
   -
 
  API breakages:
-  - The has_scraper field is now renamed has_opinion_scraper, and there is a new field, has_oral_argument_scraper.
+  -
+
+ Other:
+  - favorites cannot be created correctly for some reason
 
 2014-06-18:
  - This update makes alert editing a lot more intuitive.

@@ -36,11 +36,9 @@ def load_stopwords():
     an array.
     """
     stopwords = []
-    with open('%s/alert/corpus_importer/word_freq.5000.txt' % INSTALL_ROOT, 'r') as stopwords_file:
-        for word in stopwords_file:
-            stopwords.append(word.strip().decode('utf-8'))
+    raise Exception("Deprecated. Use the get_term_frequency function in solr_core_admin.py")
     return stopwords
-stopwords = load_stopwords()  # Module-level.
+stopwords = load_stopwords()
 
 
 def get_good_words(word_list, stop_words_size=500):

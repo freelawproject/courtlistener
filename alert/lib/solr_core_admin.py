@@ -1,4 +1,5 @@
 import os
+import simplejson
 import lxml
 import requests
 import StringIO
@@ -73,6 +74,40 @@ def get_solr_core_status(core='all'):
         raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
 
     return solr_config
+
+
+def get_term_frequency(count=500, result_type='json', field='text'):
+    """Get the term frequency in the index.
+
+    result_type can be json, list or dict.
+    """
+    params = {
+        'fl': field,
+        'numTerms': str(count),
+        'wt': 'json',
+    }
+    r = requests.get('http://localhost:8983/solr/admin/luke', params=params)
+    content_as_json = simplejson.loads(r.content)
+    if result_type == 'json':
+        return content_as_json
+    elif result_type == 'list':
+        top_terms = []
+        for result in content_as_json['fields']['text']['topTerms']:
+            # Top terms is a list of alternating terms and counts. Their types are different, so we'll use that.
+            if isinstance(result, basestring):
+                top_terms.append(result)
+        return top_terms
+    elif result_type == 'dict':
+        top_terms = {}
+        for result in content_as_json['fields']['text']['topTerms']:
+            # We set aside the term until we reach its count, then we add them as a k,v pair
+            if isinstance(result, basestring):
+                key = result
+            else:
+                top_terms[key] = result
+        return top_terms
+    else:
+        raise ValueError("Unknown output type!")
 
 
 def get_data_dir_location(core='collection1'):

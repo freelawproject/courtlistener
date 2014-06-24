@@ -831,7 +831,7 @@
             "full_name": "Court of Appeals for the Eighth Circuit",
             "position": 108.0,
             "has_opinion_scraper": true,
-            "has_oral_argument_scraper": false,
+            "has_oral_argument_scraper": true,
             "start_date": "1891-03-03"
         }
     },
@@ -3167,7 +3167,7 @@
             "date_modified": "2013-09-09T16:42:25Z",
             "full_name": "Supreme Judicial Court of Maine",
             "position": 362.55,
-            "has_opinion_scraper": false,
+            "has_opinion_scraper": true,
             "has_oral_argument_scraper": false,
             "start_date": null
         }
