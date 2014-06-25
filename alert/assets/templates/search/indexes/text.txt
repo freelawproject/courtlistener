@@ -12,8 +12,8 @@
 {{ object.citation.case_name|default_if_none:"" }}
 {{ object.precedential_status|default_if_none:"" }}
 {{ object.sha1|default_if_none:"" }}
-{{ object.court.full_name|default_if_none:"" }}
-{{ object.court.citation_string|default_if_none:"" }}
-{{ object.court.pk|default_if_none:"" }}
+{{ object.docket.court.full_name|default_if_none:"" }}
+{{ object.docket.court.citation_string|default_if_none:"" }}
+{{ object.docket.court.pk|default_if_none:"" }}
 {{ object.judges|default_if_none:"" }}
 {{ object.nature_of_suit|default_if_none:"" }}

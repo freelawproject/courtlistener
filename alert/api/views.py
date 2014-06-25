@@ -140,7 +140,7 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
             qs = Document.objects.all().order_by()
         else:
             # dump just the requested court; disable default ordering
-            qs = Document.objects.filter(court=court).order_by()
+            qs = Document.objects.filter(docket__court=court).order_by()
 
         # check if there are any documents at all
         dump_has_docs = qs.filter(date_filed__gte=start_date,

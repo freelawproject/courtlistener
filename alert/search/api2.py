@@ -217,7 +217,7 @@ class DocumentResource(ModelResourceWithFieldsFilter):
                                              SessionAuthentication())
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'opinion'
-        queryset = Document.objects.all().select_related('court__pk', 'citation')
+        queryset = Document.objects.all().select_related('docket__court__pk', 'citation')
         max_limit = 20
         allowed_methods = ['get']
         include_absolute_url = True

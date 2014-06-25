@@ -24,16 +24,16 @@ def delete_data_by_time_and_court(courtID, SIMULATE, delTime=None, VERBOSITY=0):
     if delTime is not None:
         if VERBOSITY >= 1:
             print "Deleting data newer than %s for court %s" % (delTime, courtID)
-        count = Document.objects.filter(time_retrieved__gt=delTime, court=courtID).count()
+        count = Document.objects.filter(time_retrieved__gt=delTime, docket__court=courtID).count()
         if count != 0:
-            docs = queryset_generator(Document.objects.filter(time_retrieved__gt=delTime, court=courtID))
+            docs = queryset_generator(Document.objects.filter(time_retrieved__gt=delTime, docket__court=courtID))
 
     else:
         if VERBOSITY >= 1:
             print "Deleting all data for court %s" % courtID
-        count = Document.objects.filter(court=courtID).count()
+        count = Document.objects.filter(docket__court=courtID).count()
         if count != 0:
-            docs = queryset_generator(Document.objects.filter(court=courtID))
+            docs = queryset_generator(Document.objects.filter(docket__court=courtID))
 
     if VERBOSITY >= 1:
         print "Deleting %s documents from the database." % count

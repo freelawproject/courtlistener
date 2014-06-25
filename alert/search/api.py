@@ -15,7 +15,7 @@ from lxml import etree
 from tastypie import fields, http
 from tastypie.authentication import BasicAuthentication, SessionAuthentication, MultiAuthentication
 from tastypie.constants import ALL
-from tastypie.exceptions import BadRequest, TastypieError
+from tastypie.exceptions import BadRequest
 from tastypie.resources import ModelResource
 from tastypie.throttle import CacheThrottle
 
@@ -224,7 +224,7 @@ class DocumentResource(ModelResourceWithFieldsFilter):
                                              SessionAuthentication())
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'opinion'
-        queryset = Document.objects.all().select_related('court__pk', 'citation')
+        queryset = Document.objects.all().select_related('docket__court__pk', 'citation')
         max_limit = 20
         allowed_methods = ['get']
         include_absolute_url = True

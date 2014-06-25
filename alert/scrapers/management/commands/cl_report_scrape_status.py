@@ -59,15 +59,15 @@ class Command(BaseCommand):
         thirty_days_ago = now() - timedelta(days=30)
 
         cts_last_day = Court.objects \
-            .filter(document__date_filed__gt=last_day) \
+            .filter(docket__document__date_filed__gt=last_day) \
             .annotate(count=Count('document__pk')) \
             .values('pk', 'count')
         cts_seven_days = Court.objects \
-            .filter(document__date_filed__gt=seven_days_ago) \
+            .filter(docket__document__date_filed__gt=seven_days_ago) \
             .annotate(count=Count('document__pk')) \
             .values('pk', 'count')
         cts_thirty_days = Court.objects \
-            .filter(document__date_filed__gt=thirty_days_ago) \
+            .filter(docket__document__date_filed__gt=thirty_days_ago) \
             .annotate(count=Count('document__pk')) \
             .values('pk', 'count')
 

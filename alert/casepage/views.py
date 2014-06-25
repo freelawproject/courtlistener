@@ -38,7 +38,7 @@ def make_citation_string(doc):
 
 @never_cache
 def view_case(request, court, pk, casename):
-    """Take a court and an ID, and return the document.
+    """Using the ID, return the document.
 
     We also test if the document ID is a favorite for the user, and send data
     as such. If it's a favorite, we send the bound form for the favorite so
@@ -47,7 +47,6 @@ def view_case(request, court, pk, casename):
     """
     # Look up the court, document, title and favorite information
     doc = get_object_or_404(Document, pk=ascii_to_num(pk))
-    ct = get_object_or_404(Court, pk=court)
     citation_string = make_citation_string(doc)
     title = '%s, %s' % (trunc(doc.citation.case_name, 100), citation_string)
     get_string = search_utils.make_get_string(request)
@@ -74,7 +73,7 @@ def view_case(request, court, pk, casename):
         {'title': title,
          'citation_string': citation_string,
          'doc': doc,
-         'court': ct,
+         'court': doc.docket.court,
          'favorite_form': favorite_form,
          'get_string': get_string,
          'private': doc.blocked,
@@ -94,7 +93,7 @@ def view_case_citations(request, pk, case_name):
 
     # Get list of cases we cite, ordered by citation count
     citing_cases = doc.citation.citing_cases.select_related(
-            'citation', 'court').order_by('-citation_count', '-date_filed')
+            'citation', 'docket__court').order_by('-citation_count', '-date_filed')
 
     paginator = Paginator(citing_cases, 20, orphans=2)
     page = request.GET.get('page')

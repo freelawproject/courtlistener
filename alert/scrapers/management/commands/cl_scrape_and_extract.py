@@ -2,7 +2,7 @@ from alert.lib import magic
 from alert.lib.string_utils import trunc
 from alert.scrapers.models import ErrorLog
 from alert.scrapers.DupChecker import DupChecker
-from alert.search.models import Citation
+from alert.search.models import Citation, Docket
 from alert.search.models import Court
 from alert.search.models import Document
 
@@ -186,8 +186,7 @@ def scrape_court(site, full_crawl=False):
                 logger.info('Adding new document found at: %s' % site.download_urls[i])
                 dup_checker.reset()
 
-                # Make a citation
-                cite = Citation(case_name=site.case_names[i])
+                cite = Citation()
                 if site.docket_numbers:
                     cite.docket_number = site.docket_numbers[i]
                 if site.neutral_citations:
@@ -197,13 +196,18 @@ def scrape_court(site, full_crawl=False):
                 if site.west_state_citations:
                     cite.west_state_cite = site.west_state_citations[i]
 
-                # Make the document object
-                doc = Document(source='C',
-                               sha1=sha1_hash,
-                               date_filed=site.case_dates[i],
-                               court=court,
-                               download_url=site.download_urls[i],
-                               precedential_status=site.precedential_statuses[i])
+                docket = Docket(
+                    case_name=site.case_names[i],
+                    court=court,
+                )
+
+                doc = Document(
+                    source='C',
+                    sha1=sha1_hash,
+                    date_filed=site.case_dates[i],
+                    download_url=site.download_urls[i],
+                    precedential_status=site.precedential_statuses[i]
+                )
 
                 # Make and associate the file object
                 try:
@@ -228,6 +232,8 @@ def scrape_court(site, full_crawl=False):
                 # Save everything, but don't update Solr index yet
                 cite.save(index=False)
                 doc.citation = cite
+                docket.save()
+                doc.docket = docket
                 doc.save(index=False)
 
                 # Extract the contents asynchronously.

@@ -31,7 +31,7 @@ import hashlib
 from lxml.html.clean import Cleaner
 from lxml.html import tostring
 
-from alert.search.models import Document, Citation, Court, save_doc_and_cite
+from alert.search.models import Document, Citation, Court, save_doc_and_cite, Docket
 
 
 DEBUG = [
@@ -594,7 +594,6 @@ def import_law_box_case(case_path):
     doc = Document(
         source='L',
         sha1=sha1,
-        court_id=court,
         html=clean_html_str,  # we clear this field later, putting the value into html_lawbox.
         date_filed=get_date_filed(clean_html_tree, citations=citations, case_path=case_path, court=court),
         precedential_status=get_precedential_status(),
@@ -603,8 +602,12 @@ def import_law_box_case(case_path):
     )
 
     cite = Citation(
-        case_name=get_case_name(complete_html_tree, case_path),
         docket_number=get_docket_number(clean_html_tree, case_path=case_path, court=court)
+    )
+
+    docket = Docket(
+        case_name=get_case_name(complete_html_tree, case_path),
+        court=court,
     )
 
     # Necessary for dup_finder.
@@ -617,6 +620,7 @@ def import_law_box_case(case_path):
         setattr(cite, k, v)
 
     doc.citation = cite
+    doc.docket = docket
 
     return doc
 
@@ -687,7 +691,7 @@ def find_duplicates(doc, case_path):
                 log_print("  - Duplicate found: Only one candidate returned and docket number matches.")
                 return [candidates[0]['id']]
             else:
-                if doc.court_id == 'cit':
+                if doc.docket.court_id == 'cit':
                     # CIT documents have neutral citations in the database. Look that up and compare against that.
                     candidate_doc = Document.objects.get(pk=candidates[0]['id'])
                     if doc.citation.neutral_cite and candidate_doc.citation.neutral_cite:

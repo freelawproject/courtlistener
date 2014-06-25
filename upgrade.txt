@@ -66,6 +66,9 @@ We welcome a conversion of these notes to a better process using Fabric.
 
  Other:
   - favorites cannot be created correctly for some reason
+  - make tests for serve_or_gen_dump function
+  - make sure that the create_stub function wasn't used anywhere (I just deleted it)
+  - add tests for cl_report_scrape_status (it's likely broken)
 
 2014-06-18:
  - This update makes alert editing a lot more intuitive.

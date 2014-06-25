@@ -12,7 +12,7 @@ from alert.scrapers.management.commands.cl_scrape_and_extract import get_extensi
 from alert.scrapers.management.commands.cl_scrape_and_extract import scrape_court
 from alert.scrapers.tasks import extract_from_txt
 from alert.scrapers.test_assets import test_scraper
-from alert.search.models import Citation, Court, Document
+from alert.search.models import Citation, Court, Document, Docket
 from alert import settings
 from celery.task.sets import subtask
 from datetime import date, timedelta
@@ -64,11 +64,18 @@ class IngestionTest(TestCase):
                 content = f.read()
                 cf = ContentFile(content)
                 extension = get_extension(content)
-            cite = Citation(case_name=site.case_names[i])
+            cite = Citation()
             cite.save(index=False)
-            doc = Document(date_filed=site.case_dates[i],
-                           court=self.court,
-                           citation=cite)
+            docket = Docket(
+                case_name=site.case_names[i],
+                court=self.court,
+            )
+            docket.save()
+            doc = Document(
+                date_filed=site.case_dates[i],
+                citation=cite,
+                docket=docket,
+            )
             file_name = trunc(site.case_names[i].lower(), 75) + extension
             doc.local_path.save(file_name, cf, save=False)
             doc.save(index=False)
@@ -88,11 +95,18 @@ class IngestionTest(TestCase):
             content = f.read()
             cf = ContentFile(content)
             extension = get_extension(content)
-        cite = Citation(case_name=site.case_names[0])
+        cite = Citation()
         cite.save(index=False)
-        doc = Document(date_filed=site.case_dates[0],
-                       court=self.court,
-                       citation=cite)
+        docket = Docket(
+            court=self.court,
+            case_name=site.case_names[0],
+        )
+        docket.save()
+        doc = Document(
+            date_filed=site.case_dates[0],
+            docket=docket,
+            citation=cite,
+        )
         file_name = trunc(site.case_names[0].lower(), 75) + extension
         doc.local_path.save(file_name, cf, save=False)
         doc.save(index=False)
@@ -183,13 +197,17 @@ class DupcheckerTest(TestCase):
         content = "this is dummy content that we hash"
         content_hash = hashlib.sha1(content).hexdigest()
         for dup_checker in self.dup_checkers:
-            # Create a document, then use the dup_cheker to see if it exists.
-            doc = Document(sha1=content_hash, court=self.court)
+            # Create a document, then use the dup_checker to see if it exists.
+            docket = Docket(court=self.court)
+            docket.save()
+            doc = Document(sha1=content_hash, docket=docket)
             doc.save(index=False)
-            onwards = dup_checker.should_we_continue_break_or_carry_on(now(),
-                                                                       now(),
-                                                                       lookup_value=content_hash,
-                                                                       lookup_by='sha1')
+            onwards = dup_checker.should_we_continue_break_or_carry_on(
+                now(),
+                now(),
+                lookup_value=content_hash,
+                lookup_by='sha1'
+            )
             if dup_checker.full_crawl:
                 self.assertEqual(onwards, 'CONTINUE',
                                  'DupChecker says to %s during a full crawl.' % onwards)
@@ -205,7 +223,9 @@ class DupcheckerTest(TestCase):
         content = "this is dummy content that we hash"
         content_hash = hashlib.sha1(content).hexdigest()
         for dup_checker in self.dup_checkers:
-            doc = Document(sha1=content_hash, court=self.court)
+            docket = Docket(court=self.court)
+            docket.save()
+            doc = Document(sha1=content_hash, docket=docket)
             doc.save(index=False)
             # Note that the next case occurs prior to the current one
             onwards = dup_checker.should_we_continue_break_or_carry_on(now(), now() - timedelta(days=1),

@@ -41,7 +41,7 @@
                                 </a>
                             </span>
                             <br/>
-                            {{ case.court }} |
+                            {{ case.docket.court }} |
                             {{ case.date_filed }} |
                             {% if case.citation_count != 0 %}
                                 <a href="{{ case.get_absolute_url }}cited-by/">

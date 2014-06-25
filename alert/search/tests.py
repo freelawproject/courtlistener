@@ -7,7 +7,7 @@ import time
 
 from alert.lib import sunburnt
 from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core, get_data_dir_location
-from alert.search.models import Citation, Court, Document
+from alert.search.models import Citation, Court, Document, Docket
 from alert.scrapers.test_assets import test_scraper
 from alert import settings
 from alert.search.management.commands.cl_calculate_pagerank_networkx import Command
@@ -278,16 +278,26 @@ class PagerankTest(TestCase):
         # Set up some handy variables
         self.court = Court.objects.get(pk='test')
 
-        #create 3 documents with their citations
-        c1, c2, c3 = Citation(case_name=u"c1"), Citation(case_name=u"c2"), Citation(case_name=u"c3")
+        #create 3 documents with their citations and dockets
+        c1 = Citation()
         c1.save(index=False)
-        c2.save(index=False)
-        c3.save(index=False)
+        docket1 = Docket(
+            case_name=u"c1",
+            court=self.court,
+        )
+        docket2 = Docket(
+            case_name=u"c2",
+            court=self.court,
+        )
+        docket3 = Docket(
+            case_name=u"c3",
+            court=self.court,
+        )
         d1, d2, d3 = Document(date_filed=date.today()), Document(date_filed=date.today()), Document(date_filed=date.today())
-        d1.citation, d2.citation, d3.citation = c1, c2, c3
+        d1.citation, d2.citation, d3.citation = c1, c1, c1
+        d1.docket, d2.docket, d3.docket = docket1, docket2, docket3
         doc_list = [d1, d2, d3]
         for d in doc_list:
-            d.court = self.court
             d.citation.save(index=False)
             d.save(index=False)
 

@@ -22,9 +22,9 @@ class SearchDocument(object):
         if doc.date_filed is not None:
             self.dateFiled = datetime.combine(doc.date_filed, time())  # Midnight, PST
         self.citeCount = doc.citation_count
-        self.court = doc.court.full_name
-        self.court_id = doc.court.pk
-        self.court_citation_string = doc.court.citation_string
+        self.court = doc.docket.court.full_name
+        self.court_id = doc.docket.court.pk
+        self.court_citation_string = doc.docket.court.citation_string
         try:
             self.caseName = doc.citation.case_name
             self.absolute_url = doc.get_absolute_url()
@@ -33,7 +33,7 @@ class SearchDocument(object):
         except NoReverseMatch:
             raise InvalidDocumentError("Unable to save to index due to missing absolute_url (court_id: %s, doc.pk: %s). "
                                        "Might the court have in_use set to False?"
-                                       % (self.court_id, doc.pk))
+                                       % (self.docket.court_id, doc.pk))
         self.judge = doc.judges
         self.suitNature = doc.nature_of_suit
         self.docketNumber = doc.citation.docket_number
@@ -59,4 +59,4 @@ class SearchDocument(object):
 
         # Faceting fields
         self.status_exact = doc.get_precedential_status_display()
-        self.court_exact = doc.court.pk
+        self.court_exact = doc.docket.court.pk
