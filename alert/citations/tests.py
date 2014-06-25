@@ -4,7 +4,7 @@ from alert.citations.find_citations import get_citations, is_date_in_reporter
 from alert.citations import find_citations
 from alert.citations.reporter_tokenizer import tokenize
 from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core
-from alert.search.models import Court
+from alert.search.models import Court, Docket
 from alert.search import models
 from citations.tasks import create_stub, update_document
 from django.test import TestCase
@@ -166,21 +166,31 @@ class MatchingTest(TestCase):
         This becomes a bit of an integration test, which is likely fine.
         """
         # Set up a document
-        c1 = models.Citation(case_name=u"Lissner v. Saad", federal_cite_one=u'1 Yeates 1 (test 1795)')
+        c1 = models.Citation(federal_cite_one=u'1 Yeates 1 (test 1795)')
         c1.save(index=False)
+        docket1 = Docket(
+            case_name=u"Lissner v. Saad",
+            court=self.court,
+        )
+        docket1.save()
         d1 = models.Document(
             date_filed=date(1795, 6, 9),
-            court=self.court,
             citation=c1,
+            docket=docket1,
             precedential_status='Published',
         )
         d1.save(index=True)
         # Reference d1 from the text of another document
-        c2 = models.Citation(case_name=u"Reference to Lissner v. Saad")
+        c2 = models.Citation()
         c2.save(index=False)
+        docket2 = Docket(
+            case_name=u"Reference to Lissner v. Saad",
+            court=self.court,
+        )
+        docket2.save()
         d2 = models.Document(
             date_filed=date(1982, 6, 9),
-            court=self.court,
+            docket=docket2,
             citation=c2,
             plain_text=u"1 Yeates 1"
         )

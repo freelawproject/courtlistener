@@ -55,7 +55,7 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 row.set('id', str(doc.pk))
                 row.set('path', doc.get_absolute_url())
                 row.set('sha1', doc.sha1)
-                row.set('court', doc.court.full_name)
+                row.set('court', doc.docket.court.full_name)
                 try:
                     row.set('download_url', doc.download_url)
                 except:

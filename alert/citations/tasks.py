@@ -40,25 +40,6 @@ def create_cited_html(document, citations):
     return new_html.encode('utf-8')
 
 
-def create_stub(citations):
-    """Creates a stub document with the bare minimum of meta data."""
-    cite = Citation()
-    # Add the dict of citations to the object as its attributes.
-    citations_as_dict = map_citations_to_models(citations)
-    for k, v in citations_as_dict.iteritems():
-        setattr(cite, k, v)
-    # TODO: We can use the court information in the citation here. Failure to do so will mean that our URLs will later
-    #       change -- something we wish to avoid.
-    stub_doc = Document(
-        is_stub_document=True,
-        sha1='!',
-        court=None,
-        citation=cite,
-    )
-    stub_doc.save(index=False)
-    return stub_doc
-
-
 @task
 def update_document(document, index=True, commit=True):
     DEBUG = 0

@@ -113,6 +113,23 @@ class Docket(models.Model):
         null=True
     )
 
+    def __unicode__(self):
+        if self.case_name:
+            return smart_unicode('%s: %s' % (self.pk, self.case_name))
+        else:
+            return str(self.pk)
+
+    def save(self, *args, **kwargs):
+        """
+        create the URL from the case name, but only if this is the first
+        time it has been saved.
+        """
+        created = self.pk is None
+        if created:
+            # it's the first time it has been saved; generate the slug stuff
+            self.slug = trunc(slugify(self.case_name), 50)
+        super(Docket, self).save(*args, **kwargs)
+
 
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
@@ -346,12 +363,6 @@ class Document(models.Model):
         max_length=40,
         db_index=True
     )
-    court = models.ForeignKey(
-        Court,
-        help_text="The court where the document was filed",
-        db_index=True,
-        null=True
-    )
     citation = models.ForeignKey(
         Citation,
         help_text="The citation object for the document",
@@ -474,7 +485,7 @@ class Document(models.Model):
             caption += ", %s" % self.citation.docket_number
         caption += ' ('
         if self.court.citation_string != 'SCOTUS':
-            caption += re.sub(' ', '&nbsp;', self.court.citation_string)
+            caption += re.sub(' ', '&nbsp;', self.docket.court.citation_string)
             caption += '&nbsp;'
         caption += '%s)' % self.date_filed.isoformat().split('-')[0]  # b/c strftime f's up before 1900.
         return caption
@@ -488,7 +499,7 @@ class Document(models.Model):
     @models.permalink
     def get_absolute_url(self, slug=True):
         return ('view_case',
-                [str(self.court_id),
+                [str(self.docket.court_id),
                  num_to_ascii(self.pk),
                  self.citation.slug])
 

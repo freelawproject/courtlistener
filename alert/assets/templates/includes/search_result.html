@@ -5,7 +5,7 @@
     <h3 class="bottom serif">
         <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}" class="visitable">
             {{ result.solr_highlights.caseName.0|safe }}
-            ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}
+            ({% if result.docket.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}
             &nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
         </a>
     </h3>

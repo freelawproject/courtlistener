@@ -134,7 +134,7 @@ def get_dup_stats(doc):
     ##########################################
     main_params = make_case_name_solr_query(
         doc.citation.case_name,
-        doc.court_id,
+        doc.docket.court_id,
         doc.date_filed,
         DEBUG=DEBUG,
     )
@@ -160,7 +160,7 @@ def get_dup_stats(doc):
         if docket_q:
             main_params = {
                 'fq': [
-                    'court_exact:%s' % doc.court_id,
+                    'court_exact:%s' % doc.docket.court_id,
                     'dateFiled:%s' % build_date_range(doc.date_filed, range=15),
                     'docketNumber:(%s)' % docket_q
                 ],
@@ -171,12 +171,12 @@ def get_dup_stats(doc):
                 print "    - main_params are: %s" % main_params
             candidates = conn.raw_query(**main_params).execute()
 
-    if not len(candidates) and doc.court_id == 'scotus':
+    if not len(candidates) and doc.docket.court_id == 'scotus':
         if doc.citation.federal_cite_one:
             # Scotus case, try by citation.
             main_params = {
                 'fq': [
-                    'court_exact:%s' % doc.court_id,
+                    'court_exact:%s' % doc.docket.court_id,
                     'dateFiled:%s' % build_date_range(doc.date_filed, range=90),  # Creates ~6 month span.
                     'citation:(%s)' % ' '.join([re.sub(r"\D", '', w) for w in doc.citation.federal_cite_one.split()])
                 ],

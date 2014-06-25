@@ -6,6 +6,7 @@ class Migration(DataMigration):
     def forwards(self, orm):
         # Note: Remember to use orm['appname.ModelName'] rather than "from appname.models..."
         for doc in orm.Document.objects.all().iterator():
+            print "Working on document: %s" % doc.pk
             docket = orm.Docket.objects.create(
                 court=doc.court,
                 case_name=doc.citation.case_name,
@@ -13,14 +14,14 @@ class Migration(DataMigration):
             )
             docket.save()
             doc.docket = docket
-            doc.save(index=False)
+            doc.save()
 
     def backwards(self, orm):
         for doc in orm.Document.objects.all().iterator():
             docket = doc.docket
             docket.delete()
             doc.docket = None
-            doc.save(index=False)
+            doc.save()
 
     models = {
         u'search.citation': {
