@@ -1,7 +1,7 @@
 {
     "meta": {
         "limit": 20,
-        "next": "/api/rest/v2/jurisdiction/?offset=20&limit=20&format=json",
+        "next": null,
         "offset": 0,
         "previous": null,
         "request_uri": "/api/rest/v2/jurisdiction/?format=json",

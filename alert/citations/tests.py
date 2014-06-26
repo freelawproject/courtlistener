@@ -6,13 +6,15 @@ from alert.citations.reporter_tokenizer import tokenize
 from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core
 from alert.search.models import Court, Docket
 from alert.search import models
-from citations.tasks import create_stub, update_document
+from citations.tasks import update_document
 from django.test import TestCase
 
 from datetime import date
 
 
 class CiteTest(TestCase):
+    fixtures = ['court_data.json']
+
     def test_reporter_tokenizer(self):
         """Do we tokenize correctly?"""
         self.assertEqual(tokenize('See Roe v. Wade, 410 U. S. 113 (1973)'),
@@ -48,8 +50,8 @@ class CiteTest(TestCase):
             # Test with court and extra information
             ('bob lissner v. test 1 U.S. 12, 347-348 (4th Cir. 1982)',
              find_citations.Citation(plaintiff='lissner', defendant='test', volume=1, reporter='U.S.', page=12,
-                                      year=1982,
-                                      extra=u'347-348', court='ca4', canonical_reporter='U.S.', lookup_index=0)),
+                                      year=1982, extra=u'347-348', court='ca4', canonical_reporter='U.S.',
+                                      lookup_index=0)),
             # Test with text before and after and a variant reporter
             ('asfd 22 U. S. 332 (1975) asdf',
              find_citations.Citation(volume=22, reporter='U.S.', page=332, year=1975, canonical_reporter='U.S.',
@@ -204,26 +206,6 @@ class MatchingTest(TestCase):
         )
         d1.delete()
         d2.delete()
-
-    def test_stub_document_creation(self):
-        """Creates a stub document, then ensures it has the right meta data."""
-        citations = [
-            find_citations.Citation(volume=1, page=1, reporter='U.S.', canonical_reporter='U.S.', lookup_index=0),
-            find_citations.Citation(volume=2, page=2, reporter='A.2d', canonical_reporter='A.', lookup_index=0),
-            find_citations.Citation(volume=3, page=3, reporter='F.2d', canonical_reporter='F.', lookup_index=0),
-            find_citations.Citation(volume=4, page=4, reporter='FL', canonical_reporter='FL', lookup_index=0),
-            find_citations.Citation(volume=5, page=5, reporter='F.R.D.', canonical_reporter='F.R.D.', lookup_index=0),
-            find_citations.Citation(volume=6, page=6, reporter='Fla.', canonical_reporter='Fla.', lookup_index=0),
-            find_citations.Citation(volume=7, page=7, reporter='Wall.', canonical_reporter='Wall.', lookup_index=0),
-        ]
-        stub = create_stub(citations)
-        self.assertIn('U.S.', stub.citation.federal_cite_one)
-        self.assertIn('F.2d', stub.citation.federal_cite_two)
-        self.assertIn('A.2d', stub.citation.state_cite_regional)
-        self.assertIn('F.R.D.', stub.citation.specialty_cite_one)
-        self.assertIn('FL', stub.citation.neutral_cite)
-        self.assertIn('Fla', stub.citation.state_cite_one)
-        self.assertIn('Wall.', stub.citation.scotus_early_cite)
 
 
 class ConstantsTest(TestCase):

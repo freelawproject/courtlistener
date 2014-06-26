@@ -460,7 +460,7 @@ class Document(models.Model):
     @property
     def caption(self):
         """Make a proper caption"""
-        caption = self.citation.case_name
+        caption = self.docket.case_name
         if self.citation.neutral_cite:
             caption += ", %s" % self.citation.neutral_cite
             return caption  # neutral cites lack the parentheses, so we're done here.
@@ -484,7 +484,7 @@ class Document(models.Model):
         elif self.citation.docket_number:
             caption += ", %s" % self.citation.docket_number
         caption += ' ('
-        if self.court.citation_string != 'SCOTUS':
+        if self.docket.court.citation_string != 'SCOTUS':
             caption += re.sub(' ', '&nbsp;', self.docket.court.citation_string)
             caption += '&nbsp;'
         caption += '%s)' % self.date_filed.isoformat().split('-')[0]  # b/c strftime f's up before 1900.
@@ -501,7 +501,7 @@ class Document(models.Model):
         return ('view_case',
                 [str(self.docket.court_id),
                  num_to_ascii(self.pk),
-                 self.citation.slug])
+                 self.docket.slug])
 
     def save(self, index=True, commit=True, *args, **kwargs):
         """
@@ -540,7 +540,7 @@ class Document(models.Model):
 
         # Invalidate the sitemap and dump caches
         if self.date_filed:
-            invalidate_dumps_by_date_and_court(self.date_filed, self.court_id)
+            invalidate_dumps_by_date_and_court(self.date_filed, self.docket.court_id)
 
     class Meta:
         db_table = "Document"

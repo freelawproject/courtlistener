@@ -4,8 +4,11 @@ import time
 import os
 
 from datetime import datetime, date
-from django.utils.timezone import utc
+from django.utils.timezone import utc, now
+from django.conf import settings
 from lxml import etree
+from alert.lib.db_tools import queryset_generator_by_date
+from alert.search.models import Document
 
 
 class myGzipFile(gzip.GzipFile):
@@ -197,6 +200,23 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
     return os.path.join(path_from_root, filename)
 
 
+def dump_it_all():
+    start_date = datetime(1754, 9, 1, tzinfo=utc)  # First American case
+    end_date = now()
+    # Get the documents from the database.
+    qs = Document.objects.all()
+    docs_to_dump = queryset_generator_by_date(
+        qs,
+        'date_filed',
+        start_date,
+        end_date
+    )
+
+    path_from_root = settings.DUMP_DIR
+    filename = 'all.xml'
+    make_dump_file(docs_to_dump, path_from_root, filename)
+
+
 def get_date_range(year, month, day):
     """ Create a date range to be queried.
 
@@ -216,7 +236,7 @@ def get_date_range(year, month, day):
         start_day = int(day)
 
     start_year = int(year)
-    start_date = datetime(start_year, start_month, start_day, tzinfo=utc)
+    start_date = date(start_year, start_month, start_day)
 
     annual = False
     monthly = False
@@ -239,6 +259,6 @@ def get_date_range(year, month, day):
         end_day = int(day)
 
     end_year = int(year)
-    end_date = datetime(end_year, end_month, end_day, tzinfo=utc)
+    end_date = date(end_year, end_month, end_day)
 
     return start_date, end_date, annual, monthly, daily

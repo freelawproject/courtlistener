@@ -76,7 +76,7 @@ def get_solr_core_status(core='all'):
     return solr_config
 
 
-def get_term_frequency(count=500, result_type='json', field='text'):
+def get_term_frequency(count=500, result_type='dict', field='text'):
     """Get the term frequency in the index.
 
     result_type can be json, list or dict.
@@ -88,24 +88,28 @@ def get_term_frequency(count=500, result_type='json', field='text'):
     }
     r = requests.get('http://localhost:8983/solr/admin/luke', params=params)
     content_as_json = simplejson.loads(r.content)
-    if result_type == 'json':
-        return content_as_json
-    elif result_type == 'list':
-        top_terms = []
-        for result in content_as_json['fields']['text']['topTerms']:
-            # Top terms is a list of alternating terms and counts. Their types are different, so we'll use that.
-            if isinstance(result, basestring):
-                top_terms.append(result)
-        return top_terms
+    if result_type == 'list':
+        if len(content_as_json['fields']) == 0:
+            return []
+        else:
+            top_terms = []
+            for result in content_as_json['fields']['text']['topTerms']:
+                # Top terms is a list of alternating terms and counts. Their types are different, so we'll use that.
+                if isinstance(result, basestring):
+                    top_terms.append(result)
+            return top_terms
     elif result_type == 'dict':
-        top_terms = {}
-        for result in content_as_json['fields']['text']['topTerms']:
-            # We set aside the term until we reach its count, then we add them as a k,v pair
-            if isinstance(result, basestring):
-                key = result
-            else:
-                top_terms[key] = result
-        return top_terms
+        if len(content_as_json['fields']) == 0:
+            return {}
+        else:
+            top_terms = {}
+            for result in content_as_json['fields']['text']['topTerms']:
+                # We set aside the term until we reach its count, then we add them as a k,v pair
+                if isinstance(result, basestring):
+                    key = result
+                else:
+                    top_terms[key] = result
+            return top_terms
     else:
         raise ValueError("Unknown output type!")
 

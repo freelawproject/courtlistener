@@ -109,11 +109,12 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
         # Date-based dump
         start_date, end_date, annual, monthly, daily = get_date_range(year, month, day)
 
+        today = now().date()
         # Ensure that it's a valid request.
-        if (now() < end_date) and (now() < start_date):
+        if (today < end_date) and (today < start_date):
             # It's the future. They fail.
             return HttpResponseBadRequest('<h2>Error 400: Requested date is in the future. Please try again then.</h2>')
-        elif now() <= end_date:
+        elif today <= end_date:
             # Some of the data is in the past, some could be in the future.
             return HttpResponseBadRequest('<h2>Error 400: Requested date is partially in the future. Please try again '
                                           'then.</h2>')
@@ -153,8 +154,7 @@ def serve_or_gen_dump(request, court, year=None, month=None, day=None):
 
             make_dump_file(docs_to_dump, path_from_root, filename)
         else:
-            print "Bad request!"
-            return HttpResponseBadRequest('<h2>Error 400: We do not have any data for this time period.</h2>',
+            return HttpResponseBadRequest('<h2>Error 404: We do not have any data for this time period.</h2>',
                                           status=404)
 
         tally_stat('bulk_data.served.by_date')
