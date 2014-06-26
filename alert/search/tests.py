@@ -39,18 +39,27 @@ class SolrTestCase(TestCase):
         self.site = test_scraper.Site().parse()
         cite_counts = (4, 6)
         for i in range(0, 2):
-            cite = Citation(case_name=self.site.case_names[i],
-                            docket_number=self.site.docket_numbers[i],
-                            neutral_cite=self.site.neutral_citations[i],
-                            federal_cite_one=self.site.west_citations[i])
+            cite = Citation(
+                case_name=self.site.case_names[i],
+                docket_number=self.site.docket_numbers[i],
+                neutral_cite=self.site.neutral_citations[i],
+                federal_cite_one=self.site.west_citations[i],
+            )
             cite.save(index=False)
-            self.doc = Document(date_filed=self.site.case_dates[i],
-                                court=self.court,
-                                citation=cite,
-                                precedential_status=self.site.precedential_statuses[i],
-                                citation_count=cite_counts[i],
-                                nature_of_suit=self.site.nature_of_suit[i],
-                                judges=self.site.judges[i])
+            docket = Docket(
+                case_name=self.site.case_names[i],
+                court=self.court,
+            )
+            docket.save()
+            self.doc = Document(
+                date_filed=self.site.case_dates[i],
+                citation=cite,
+                docket=docket,
+                precedential_status=self.site.precedential_statuses[i],
+                citation_count=cite_counts[i],
+                nature_of_suit=self.site.nature_of_suit[i],
+                judges=self.site.judges[i],
+            )
             self.doc.save()
 
         self.expected_num_results = 2
@@ -279,8 +288,10 @@ class PagerankTest(TestCase):
         self.court = Court.objects.get(pk='test')
 
         #create 3 documents with their citations and dockets
-        c1 = Citation()
+        c1, c2, c3 = Citation(case_name=u"c1"), Citation(case_name=u"c2"), Citation(case_name=u"c3")
         c1.save(index=False)
+        c2.save(index=False)
+        c3.save(index=False)
         docket1 = Docket(
             case_name=u"c1",
             court=self.court,
@@ -294,7 +305,7 @@ class PagerankTest(TestCase):
             court=self.court,
         )
         d1, d2, d3 = Document(date_filed=date.today()), Document(date_filed=date.today()), Document(date_filed=date.today())
-        d1.citation, d2.citation, d3.citation = c1, c1, c1
+        d1.citation, d2.citation, d3.citation = c1, c2, c3
         d1.docket, d2.docket, d3.docket = docket1, docket2, docket3
         doc_list = [d1, d2, d3]
         for d in doc_list:
@@ -335,5 +346,6 @@ class PagerankTest(TestCase):
         for key, value in answers.iteritems():
             self.assertTrue(
                 (abs(pr_values_from_file[key]) - value) < 0.0001,
-                msg="The answer for item %s was %s when it should have been %s" % (key, answers['1'], pr_values_from_file['1'])
+                msg="The answer for item %s was %s when it should have been %s" % (key, pr_values_from_file[key],
+                                                                                   answers[key], )
             )

@@ -41,10 +41,8 @@ We welcome a conversion of these notes to a better process using Fabric.
         + Check coverage page to make sure that it shows up properly when there are 1 or more oral-arg scrapers
         + update api.py so it continues returning has_scraper with the correct values
     - Create Docket table with following fields
-        - Court
-        - Document
-        - Audio
-        ...
+        - Make sure that the Docket object gets updated when the case-name or slug are updated elsewhere?
+
     - Search:
         - Make sure that the link to the oral arguments on the coverage page properly uses the type argument to only
           return oral-argument results.
@@ -66,8 +64,6 @@ We welcome a conversion of these notes to a better process using Fabric.
 
  Other:
   - favorites cannot be created correctly for some reason
-  - make tests for serve_or_gen_dump function
-  - make sure that the create_stub function wasn't used anywhere (I just deleted it)
   - add tests for cl_report_scrape_status (it's likely broken)
 
 2014-06-18:
