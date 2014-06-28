@@ -24,22 +24,22 @@
         </h2>
 
         <div id="authorities">
-            <h3>This opinion cites {{ authorities.count }} case{{ authorities.count|pluralize }}</h3>
+            <h3>This opinion cites {{ authorities.count }} opinion{{ authorities.count|pluralize }}</h3>
             <hr>
             {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
                 <ul>
-                    {% for case in authorities %}
-                        {%  with case=case.parent_documents.all.0 %}
+                    {% for opinion in authorities %}
+                        {%  with opinion=opinion.parent_documents.all.0 %}
                         <li>
-                            <a href="{{ case.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                                {{ case.caption|safe|v_wrapper }}
+                            <a href="{{ opinion.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                                {{ opinion.caption|safe|v_wrapper }}
                             </a>
                             <br/>
-                            {{ case.docket.court }} |
-                            {{ case.date_filed }} |
-                            {% if case.citation_count != 0 %}
-                                <a href="{{ case.get_absolute_url }}cited-by/">
-                                    Cited {{ case.citation_count }} time{{ case.citation_count|pluralize }}
+                            {{ opinion.docket.court }} |
+                            {{ opinion.date_filed }} |
+                            {% if opinion.citation_count != 0 %}
+                                <a href="{{ opinion.get_absolute_url }}cited-by/">
+                                    Cited {{ opinion.citation_count }} time{{ opinion.citation_count|pluralize }}
                                 </a>
                             {% else %}
                                 Cited 0 times

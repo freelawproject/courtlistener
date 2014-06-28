@@ -37,34 +37,25 @@ We welcome a conversion of these notes to a better process using Fabric.
 
  TODO:
   - This change has a lot of changes to the database that need to be made, including:
-    - Add has_oral_argument_scraper to Court and rename has_scraper to has_opinion_scraper:
+    + Add has_oral_argument_scraper to Court and rename has_scraper to has_opinion_scraper:
         + Check coverage page to make sure that it shows up properly when there are 1 or more oral-arg scrapers
         + update api.py so it continues returning has_scraper with the correct values
-    - Create Docket table with following fields
-        - Make sure that the Docket object gets updated when the case-name or slug are updated elsewhere?
-
-    - Search:
-        - Make sure that the link to the oral arguments on the coverage page properly uses the type argument to only
-          return oral-argument results.
+    + Create Docket table
+        + Make sure that the Docket object gets updated when the case-name or slug are updated elsewhere?
+    + Case_name and slugs need to be pulled from the correct places (opinions should pull from Citation and Dockets
+      from Docket, for example).
+    - favorites cannot be created correctly for some reason
+    - Why doesn't the button in the admin site work? It should use get_absolute_url of Document, but it fails weirdly.
 
     - Scraper:
-        - Make sure that we flip the has_oral_argument_scraper flag to true on CA1 or else the coverage page will look off.
+        - Make sure that we flip the has_oral_argument_scraper flag to true on CA1 or else the coverage page will look
+          off.
 
   API Changes:
    - /api/rest-info/ makes reference to a number of API calls that go to v1. These should go to v2 instead and some
      solution should be found for versioning the rest documentation.
    - In v2, the has_scraper field is now renamed has_opinion_scraper, and there is a new field, has_oral_argument_scraper.
-
-  - When a Case object is saved, it should check if the "name" attribute has changed. If so, it needs to update the
-    search index and slug.
-  -
-
- API breakages:
-  -
-
- Other:
-  - favorites cannot be created correctly for some reason
-  - add tests for cl_report_scrape_status (it's likely broken)
+   - V2 needs to be updated to serve Docket objects.
 
 2014-06-18:
  - This update makes alert editing a lot more intuitive.

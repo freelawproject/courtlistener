@@ -38,6 +38,6 @@ class ViewDocumentTest(TestCase):
 
     def test_simple_url_check_for_document(self):
         """Does the page load properly?"""
-        response = self.client.get('/test/2/asdf/')
+        response = self.client.get('/opinion/1/asdf/')
         self.assertEqual(response.status_code, 200)
         self.assertIn('Tarrant', response.content)

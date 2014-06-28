@@ -275,7 +275,7 @@ class CitedByResource(ModelResourceWithFieldsFilter):
         id = request.GET.get('id')
         if id:
             return super(CitedByResource, self).get_object_list(request).filter(
-                pk=id)[0].citation.citing_cases.all()
+                pk=id)[0].citation.citing_opinions.all()
         else:
             # No ID field --> no results.
             return super(CitedByResource, self).get_object_list(request).none()

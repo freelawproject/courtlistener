@@ -1,17 +1,16 @@
-import re
+from django.core.urlresolvers import reverse
 from alert import settings
 from alert.lib.bot_detector import is_bot
-from alert.lib.encode_decode import ascii_to_num
 from alert.lib import magic
 from alert.lib import search_utils
+from alert.lib.encode_decode import ascii_to_num
 from alert.lib.string_utils import trunc
-from alert.search.models import Court, Document
+from alert.search.models import Document, Docket
 from alert.favorites.forms import FavoriteForm
 from alert.favorites.models import Favorite
-from datetime import datetime
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.http import Http404
+from django.http import Http404, HttpResponseRedirect
 from django.http import HttpResponse
 from django.shortcuts import render_to_response
 from django.shortcuts import get_object_or_404
@@ -36,8 +35,17 @@ def make_citation_string(doc):
     return citation_string
 
 
+def view_docket(request, pk, _):
+    docket = get_object_or_404(Docket, pk=pk)
+    return render_to_response(
+        'casepage/view_docket.html',
+        {'docket': docket,
+         'private': docket.blocked,},
+        RequestContext(request),
+    )
+
 @never_cache
-def view_case(request, court, pk, casename):
+def view_opinion(request, pk, _):
     """Using the ID, return the document.
 
     We also test if the document ID is a favorite for the user, and send data
@@ -46,7 +54,7 @@ def view_case(request, court, pk, casename):
     unbound form.
     """
     # Look up the court, document, title and favorite information
-    doc = get_object_or_404(Document, pk=ascii_to_num(pk))
+    doc = get_object_or_404(Document, pk=pk)
     citation_string = make_citation_string(doc)
     title = '%s, %s' % (trunc(doc.citation.case_name, 100), citation_string)
     get_string = search_utils.make_get_string(request)
@@ -60,8 +68,8 @@ def view_case(request, court, pk, casename):
         favorite_form = FavoriteForm(initial={'doc_id': doc.pk,
             'name': doc.citation.case_name})
 
-    # get most influential cases that cite this case
-    cited_by_trunc = doc.citation.citing_cases.select_related(
+    # get most influential opinions that cite this opinion
+    cited_by_trunc = doc.citation.citing_opinions.select_related(
           'citation').order_by('-citation_count', '-date_filed')[:5]
 
     authorities_trunc = doc.cases_cited.all().select_related(
@@ -69,7 +77,7 @@ def view_case(request, court, pk, casename):
     authorities_count = doc.cases_cited.all().count()
 
     return render_to_response(
-        'view_case.html',
+        'casepage/view_opinion.html',
         {'title': title,
          'citation_string': citation_string,
          'doc': doc,
@@ -84,48 +92,44 @@ def view_case(request, court, pk, casename):
     )
 
 
-def view_case_citations(request, pk, case_name):
-    pk = ascii_to_num(pk)
-
+def view_opinion_citations(request, pk, _):
     # Look up the document, title
     doc = get_object_or_404(Document, pk=pk)
     title = '%s, %s' % (trunc(doc.citation.case_name, 100), make_citation_string(doc))
 
     # Get list of cases we cite, ordered by citation count
-    citing_cases = doc.citation.citing_cases.select_related(
+    citing_opinions = doc.citation.citing_opinions.select_related(
             'citation', 'docket__court').order_by('-citation_count', '-date_filed')
 
-    paginator = Paginator(citing_cases, 20, orphans=2)
+    paginator = Paginator(citing_opinions, 20, orphans=2)
     page = request.GET.get('page')
     try:
-        citing_cases = paginator.page(page)
+        citing_opinions = paginator.page(page)
     except (TypeError, PageNotAnInteger):
         # TypeError can be removed in Django 1.4, where it properly will be
         # caught upstream.
-        citing_cases = paginator.page(1)
+        citing_opinions = paginator.page(1)
     except EmptyPage:
-        citing_cases = paginator.page(paginator.num_pages)
+        citing_opinions = paginator.page(paginator.num_pages)
 
     private = False
     if doc.blocked:
         private = True
     else:
-        for case in citing_cases.object_list:
+        for case in citing_opinions.object_list:
             if case.blocked:
                 private = True
                 break
 
-    return render_to_response('view_case_citations.html',
+    return render_to_response('casepage/view_opinion_citations.html',
                               {'title': title,
                                'doc': doc,
                                'private': private,
-                               'citing_cases': citing_cases},
+                               'citing_opinions': citing_opinions},
                               RequestContext(request))
 
 
-def view_authorities(request, pk, case_name):
-    pk = ascii_to_num(pk)
-
+def view_authorities(request, pk, _):
     doc = get_object_or_404(Document, pk=pk)
     title = '%s, %s' % (trunc(doc.citation.case_name, 100), make_citation_string(doc))
 
@@ -142,12 +146,24 @@ def view_authorities(request, pk, case_name):
                 private = True
                 break
 
-    return render_to_response('view_case_authorities.html',
+    return render_to_response('casepage/view_opinion_authorities.html',
                               {'title': title,
                                'doc': doc,
                                'private': private,
                                'authorities': authorities},
                               RequestContext(request))
+
+
+def redirect_opinion_pages(request, id, slug):
+    pk = ascii_to_num(id)
+    path = reverse('view_case', args=[pk, slug])
+    if request.path.endswith('/authorities/'):
+        path += 'authorities/'
+    elif request.path.endswith('/cited-by/'):
+        path += 'cited-by/'
+    if request.META['QUERY_STRING']:
+        path = '%s?%s' % (path, request.META['QUERY_STRING'])
+    return HttpResponseRedirect(path)
 
 
 def serve_static_file(request, file_path=''):

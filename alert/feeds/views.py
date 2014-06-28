@@ -176,7 +176,7 @@ class cited_by_feed(Feed):
 
     def items(self, obj):
         """Return the latest 20 cases citing this one."""
-        return obj.citation.citing_cases.all().order_by('-date_filed')[:20]
+        return obj.citation.citing_opinions.all().order_by('-date_filed')[:20]
 
     def item_link(self, item):
         return item.get_absolute_url()

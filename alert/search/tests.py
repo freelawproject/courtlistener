@@ -19,6 +19,32 @@ class SetupException(Exception):
         Exception.__init__(self, message)
 
 
+class DocketUpdateSignalTest(TestCase):
+    fixtures = ['test_court.json']
+
+    def test_updating_the_docket_when_the_citation_case_name_changes(self):
+        """Makes sure that the docket changes when the citation does."""
+        court = Court.objects.get(pk='test')
+
+        original_case_name = u'original case name'
+        new_case_name = u'new case name'
+        cite = Citation(case_name=original_case_name)
+        cite.save(index=False)
+        docket = Docket(
+            case_name=original_case_name,
+            court=court,
+        )
+        docket.save()
+        Document(
+            citation=cite,
+            docket=docket,
+        ).save(index=False)
+        cite.case_name = new_case_name
+        cite.save(index=False)
+        changed_docket = Docket.objects.get(pk=docket.pk)
+        self.assertEqual(changed_docket.case_name, new_case_name)
+
+
 class SolrTestCase(TestCase):
     """A generic class that contains the setUp and tearDown functions for inheriting children.
     """

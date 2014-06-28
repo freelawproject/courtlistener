@@ -7,9 +7,10 @@ from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_s
 from alert.lib.string_utils import trunc
 from alert.lib import sunburnt
 from alert.scrapers.DupChecker import DupChecker
-from alert.scrapers.models import urlToHash
+from alert.scrapers.models import urlToHash, ErrorLog
 from alert.scrapers.management.commands.cl_scrape_and_extract import get_extension
 from alert.scrapers.management.commands.cl_scrape_and_extract import scrape_court
+from alert.scrapers.management.commands.cl_report_scrape_status import calculate_counts, tally_errors
 from alert.scrapers.tasks import extract_from_txt
 from alert.scrapers.test_assets import test_scraper
 from alert.search.models import Citation, Court, Document, Docket
@@ -124,6 +125,46 @@ class ExtractionTest(TestCase):
         self.assertFalse(err, "Error reported while extracting text from %s" % path)
         self.assertIn(u'¶  1.  DOOLEY, J.   Plaintiffs', content,
                       "Issue extracting/encoding text from file at: %s" % path)
+
+
+class ReportScrapeStatusTest(TestCase):
+    fixtures = ['test_court.json']
+
+    def setUp(self):
+        # Add a document today, within the last week and two weeks ago (within 30 days)
+        today = now()
+        five_days_ago = now() - timedelta(days=5)
+        fourteen_days_ago = now() - timedelta(days=14)
+
+        court = Court.objects.get(pk='test')
+        case_name = u'In Re Gaby and Jalal'
+        docket = Docket(case_name=case_name, court=court)
+        docket.save()
+        cite = Citation(case_name=case_name)
+        cite.save()
+        Document(date_filed=today, citation=cite, docket=docket).save()
+        Document(date_filed=five_days_ago, citation=cite, docket=docket).save()
+        Document(date_filed=fourteen_days_ago, citation=cite, docket=docket).save()
+
+        # Make some errors that we can tally
+        ErrorLog(log_level='WARNING',
+                 court=court,
+                 message="test_msg").save()
+        ErrorLog(log_level='CRITICAL',
+                 court=court,
+                 message="test_msg").save()
+
+    def test_calculating_counts(self):
+        counts, _, _ = calculate_counts()
+        self.assertEqual(counts['test'],
+                         [3, 2, 1],
+                         msg="Did not get expected counts. Instead got: %s" % counts['test'])
+
+    def test_tallying_errors(self):
+        errors, _ = tally_errors()
+        self.assertEqual(errors['test'],
+                         [1, 1],
+                         msg="Did not get expected error counts. Instead got: %s" % errors['test'])
 
 
 class DupcheckerTest(TestCase):

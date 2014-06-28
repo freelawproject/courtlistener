@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load text_filters %}
+{% load humanize %}
+
+{% block title %}Docket for {{ docket.case_name }} - CourtListener.com{% endblock %}
+{% block description %}Docket for {{ docket.case_name }}{% endblock %}
+
+{% block sidebar %}{% endblock sidebar %}
+
+{% block content %}
+    <div class="span-24 last">
+        <h2>{{ docket.case_name|safe|v_wrapper }}</h2>
+
+        <div>
+            <h3>There {% if docket.documents.count == 1 %}is{% else %}are{% endif %} {{ docket.documents.count|apnumber|intcomma }} item{{ docket.documents.count|pluralize }} on this docket.</h3>
+            <hr>
+            <ul>
+                {% for document in docket.documents.all %}
+                    <li>
+                        <a href="{{ document.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                            {{ document.caption|safe|v_wrapper }}
+                        </a>
+                        <br/>
+                        {{ document.date_filed }}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endblock %}

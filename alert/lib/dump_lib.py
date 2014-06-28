@@ -158,7 +158,7 @@ def make_dump_file(docs_to_dump, path_from_root, filename):
                 except:
                     pass
 
-                ids = ','.join([str(pk) for pk in doc.citation.citing_cases.all().values_list('pk', flat=True)])
+                ids = ','.join([str(pk) for pk in doc.citation.citing_opinions.all().values_list('pk', flat=True)])
                 if len(ids) > 0:
                     row.set('cited_by', ids)
 
