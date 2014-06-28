@@ -1,6 +1,6 @@
 from django.http import Http404
 
-# alphabet used for url encoding and decoding. Omits some letters, like O0l1.
+# alphabet used for url encoding and decoding. Omits some letters, like O0l.
 ALPHABET = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
 
 
@@ -9,7 +9,6 @@ def ascii_to_num(string, alphabet=ALPHABET):
 
     `string`: The string to decode
     """
-
     base = len(alphabet)
     strlen = len(string)
     num = 0

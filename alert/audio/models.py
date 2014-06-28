@@ -20,7 +20,7 @@ class Audio(models.Model):
     docket = models.ForeignKey(
         Docket,
         help_text="The docket that the oral argument is a part of",
-        related_name="oral_arguments",
+        related_name="audio_files",
         blank=True,
         null=True
     )

@@ -1,13 +1,15 @@
+import os
 import re
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 from alert import settings
 from alert.lib.string_utils import trunc
-from alert.lib.encode_decode import num_to_ascii
-
+from django.core.urlresolvers import reverse
+from django.db import models
 from django.utils.text import slugify
 from django.utils.text import get_valid_filename
 from django.utils.encoding import smart_unicode
-from django.db import models
-import os
+
 
 # changes here need to be mirrored in the coverage page view and Solr configs
 # Note that spaces cannot be used in the keys, or else the SearchForm won't work
@@ -112,6 +114,17 @@ class Docket(models.Model):
         max_length=50,
         null=True
     )
+    date_blocked = models.DateField(
+        help_text="The date that this opinion was blocked from indexing by search engines",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    blocked = models.BooleanField(
+        help_text="Whether a document should be blocked from indexing by search engines",
+        db_index=True,
+        default=False
+    )
 
     def __unicode__(self):
         if self.case_name:
@@ -120,15 +133,11 @@ class Docket(models.Model):
             return str(self.pk)
 
     def save(self, *args, **kwargs):
-        """
-        create the URL from the case name, but only if this is the first
-        time it has been saved.
-        """
-        created = self.pk is None
-        if created:
-            # it's the first time it has been saved; generate the slug stuff
-            self.slug = trunc(slugify(self.case_name), 50)
+        self.slug = trunc(slugify(self.case_name), 50)
         super(Docket, self).save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        return reverse('view_docket', args=[self.pk, self.slug])
 
 
 class Court(models.Model):
@@ -303,13 +312,10 @@ class Citation(models.Model):
 
     def save(self, index=True, *args, **kwargs):
         """
-        create the URL from the case name, but only if this is the first
-        time it has been saved.
+        Note that there is a pre_save receiver below.
         """
         created = self.pk is None
-        if created:
-            # it's the first time it has been saved; generate the slug stuff
-            self.slug = trunc(slugify(self.case_name), 50)
+        self.slug = trunc(slugify(self.case_name), 50)
         super(Citation, self).save(*args, **kwargs)
 
         # We only do this on update, not creation
@@ -326,6 +332,32 @@ class Citation(models.Model):
 
     class Meta:
         db_table = "Citation"
+
+
+@receiver(pre_save, sender=Citation)
+def update_dockets_if_citation_case_name_changed(sender, instance, **kwargs):
+    """Updates the docket.case_name field for all associated Dockets when the
+    Citation.case_name field changes.
+
+     - From http://stackoverflow.com/a/7934958/64911.
+
+    There are a few alternative ways to implement this that don't hit the database
+    an extra time (as this one does). However, those solutions are longer and more
+    controversial, so I chose this one based on the fact that we rarely change
+    objects once they are saved and the performance penalty is probably acceptable.
+    """
+    try:
+        cite = Citation.objects.get(pk=instance.pk)
+    except Citation.DoesNotExist:
+        # Object is new
+        pass
+    else:
+        if not cite.case_name == instance.case_name:
+            # Update the associated dockets
+            for d in cite.parent_documents.all():
+                d.docket.case_name = instance.case_name
+                d.docket.slug = trunc(slugify(instance.case_name), 50)
+                d.docket.save()
 
 
 class Document(models.Model):
@@ -419,13 +451,13 @@ class Document(models.Model):
     )
     cases_cited = models.ManyToManyField(
         Citation,
-        help_text="Cases cited by this opinion",
-        related_name="citing_cases",
+        help_text="Opinions cited by this opinion",
+        related_name="citing_opinions",
         null=True,
         blank=True
     )
     citation_count = models.IntegerField(
-        help_text='The number of times this document is cited by other cases',
+        help_text='The number of times this document is cited by other opinion',
         default=0,
         db_index=True,
     )
@@ -496,12 +528,8 @@ class Document(models.Model):
         else:
             return str(self.pk)
 
-    @models.permalink
-    def get_absolute_url(self, slug=True):
-        return ('view_case',
-                [str(self.docket.court_id),
-                 num_to_ascii(self.pk),
-                 self.docket.slug])
+    def get_absolute_url(self):
+        return reverse('view_case', args=[self.pk, self.citation.slug])
 
     def save(self, index=True, commit=True, *args, **kwargs):
         """

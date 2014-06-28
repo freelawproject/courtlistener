@@ -3,11 +3,11 @@
 
 {# Shown on document citation pages. #}
 
-{% block title %}Cases Citing {{ title }} - CourtListener.com{% endblock %}
+{% block title %}Opinions Citing {{ title }} - CourtListener.com{% endblock %}
 {% block description %}{{ title }}{% endblock %}
 
 {% block head %}
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{doc|truncatewords:10}}" href="/feed/{{doc.pk|num_to_ascii}}/cited-by/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for opinions citing {{doc|truncatewords:10}}" href="/feed/{{doc.pk|num_to_ascii}}/cited-by/">
 {% endblock %}
 
 {% block sidebar %}
@@ -28,24 +28,24 @@
         </h2>
 
         <div id="cited-by-viewer">
-            <h3>Cited by {{ doc.citation_count }} case{{ doc.citation_count|pluralize }}</h3>
+            <h3>Cited by {{ doc.citation_count }} opinion{{ doc.citation_count|pluralize }}</h3>
             <hr>
             {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
                 <ul>
-                    {% for case in citing_cases.object_list %}
+                    {% for opinion in citing_opinions.object_list %}
                         {# Changing the attributes on this li may break the js above. #}
-                        <li class="citing-case">
+                        <li class="citing-opinion">
                             <span class="citation-name">
-                                <a href="{{ case.get_absolute_url }}">
-                                    {{ case.caption|safe|v_wrapper }}
+                                <a href="{{ opinion.get_absolute_url }}">
+                                    {{ opinion.caption|safe|v_wrapper }}
                                 </a>
                             </span>
                             <br/>
-                            {{ case.docket.court }} |
-                            {{ case.date_filed }} |
-                            {% if case.citation_count != 0 %}
-                                <a href="{{ case.get_absolute_url }}cited-by/">
-                                    Cited {{ case.citation_count }} time{{ case.citation_count|pluralize }}
+                            {{ opinion.docket.court }} |
+                            {{ opinion.date_filed }} |
+                            {% if opinion.citation_count != 0 %}
+                                <a href="{{ opinion.get_absolute_url }}cited-by/">
+                                    Cited {{ opinion.citation_count }} time{{ opinion.citation_count|pluralize }}
                                 </a>
                             {% else %}
                                 Cited 0 times
@@ -56,12 +56,12 @@
         </div>
 
         {# Pagination #}
-        {% if citing_cases.has_previous or citing_cases.has_next %}
+        {% if citing_opinions.has_previous or citing_opinions.has_next %}
             <div class="box">
                 <div id="pagination-left">
-                    {% if citing_cases.has_previous %}
+                    {% if citing_opinions.has_previous %}
                         <h3 class="bottom arrow-left-before">
-                            <a href="?page={{ citing_cases.previous_page_number }}" rel="prev">
+                            <a href="?page={{ citing_opinions.previous_page_number }}" rel="prev">
                                 Previous
                             </a>
                         </h3>
@@ -70,9 +70,9 @@
                     {% endif %}
                 </div>
                 <div id="pagination-right">
-                    {% if citing_cases.has_next %}
+                    {% if citing_opinions.has_next %}
                         <h3 class="bottom arrow-right-after">
-                            <a href="?page={{ citing_cases.next_page_number }}" rel="next">Next</a>
+                            <a href="?page={{ citing_opinions.next_page_number }}" rel="next">Next</a>
                         </h3>
                     {% else %}
                         &nbsp;
@@ -80,7 +80,7 @@
                 </div>
                 <div id="pagination-center">
                     <h3 class="bottom">
-                        Page {{ citing_cases.number }} of {{ citing_cases.paginator.num_pages }}
+                        Page {{ citing_opinions.number }} of {{ citing_opinions.paginator.num_pages }}
                     </h3>
                 </div>
             </div>

@@ -1,9 +1,11 @@
 from tastypie.api import Api
 from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert_redirect
-from alert.api.views import court_index, documentation_index, dump_index, rest_index, serve_or_gen_dump, serve_pagerank_file
+from alert.api.views import (
+    court_index, documentation_index, dump_index, rest_index, serve_or_gen_dump, serve_pagerank_file)
 from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
-from alert.casepage.views import view_case, view_case_citations, serve_static_file, view_authorities
+from alert.casepage.views import (
+    view_opinion, view_opinion_citations, view_authorities, view_docket, serve_static_file, redirect_opinion_pages)
 from alert.donate.dwolla import process_dwolla_callback, process_dwolla_transaction_status_callback
 from alert.donate.paypal import process_paypal_callback, donate_paypal_cancel
 from alert.donate.sitemap import donate_sitemap_maker
@@ -19,8 +21,7 @@ from alert.search.views import browser_warning, show_results, tools_page
 from alert.simple_pages.api import coverage_data
 from alert.userHandling.views import (
     confirmEmail, deleteProfile, deleteProfileDone, emailConfirmSuccess, password_change, register, register_success,
-    request_email_confirmation, view_favorites, view_alerts, view_settings
-)
+    request_email_confirmation, view_favorites, view_alerts, view_settings)
 
 from django.conf.urls import include, patterns, url
 from django.contrib import admin
@@ -78,13 +79,10 @@ urlpatterns = patterns('',
     #(r'/*', show_maintenance_warning),
 
     # An opinion, authorities and cited-by/
-    url(r'^(?:%s)/(.*)/(.*)/cited-by/$' % "|".join(pacer_codes),
-        view_case_citations,
-        name="view_case_citations"),
-    url(r'^(?:%s)/(.*)/(.*)/authorities/$' % "|".join(pacer_codes),
-        view_authorities,
-        name="view_authorities"),
-    url(r'^(' + "|".join(pacer_codes) + ')/(.*)/(.*)/$', view_case, name="view_case"),
+    url(r'^opinion/(\d*)/(.*)/cited-by/$', view_opinion_citations, name='view_case_citations'),
+    url(r'^opinion/(\d*)/(.*)/authorities/$', view_authorities, name='view_authorities'),
+    url(r'^opinion/(\d*)/(.*)/$', view_opinion, name="view_case"),
+    url(r'^docket/(\d*)/(.*)/$', view_docket, name="view_docket"),
 
     # Serve a static file
     (r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$',
@@ -182,20 +180,27 @@ urlpatterns = patterns('',
     (r'^donate/paypal/cancel/$', donate_paypal_cancel),
 )
 
-# redirects go last
 urlpatterns += patterns(
-    (r'^privacy/$',     RedirectView.as_view(url='/terms/#privacy')),
-    (r'^removal/$',     RedirectView.as_view(url='/terms/#removal')),
+    (r'^privacy/$', RedirectView.as_view(url='/terms/#privacy')),
+    (r'^removal/$', RedirectView.as_view(url='/terms/#removal')),
+    (r'^report/2010/$', RedirectView.as_view(
+        url='https://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf')),
+    (r'^report/2012/$', RedirectView.as_view(
+        url='https://www.ischool.berkeley.edu/files/student_projects/mcdonald_rustad_report.pdf')),
+
     # Dump URLs changed 2013-11-07
-    (r'^dump-info/$',   RedirectView.as_view(url='/api/bulk-info/')),
+    (r'^dump-info/$', RedirectView.as_view(url='/api/bulk-info/')),
     (r'^dump-api/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
-                        RedirectView.as_view(url='/api/bulk/%(court)s.xml.gz')),
+     RedirectView.as_view(url='/api/bulk/%(court)s.xml.gz')),
     (r'^dump-api/(?P<year>\d{4})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
-                        RedirectView.as_view(url='/api/bulk/%(year)s/%(court)s.xml.gz')),
+     RedirectView.as_view(url='/api/bulk/%(year)s/%(court)s.xml.gz')),
     (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
-                        RedirectView.as_view(url='/api/bulk/%(year)s/%(month)s/%(court)s.xml.gz')),
+     RedirectView.as_view(url='/api/bulk/%(year)s/%(month)s/%(court)s.xml.gz')),
     (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
-                        RedirectView.as_view(url='/api/bulk/%(year)s/%(month)s/%(day)s/%(court)s.xml.gz')),
-    (r'^report/2010/$', RedirectView.as_view(url='https://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf')),
-    (r'^report/2012/$', RedirectView.as_view(url='https://www.ischool.berkeley.edu/files/student_projects/mcdonald_rustad_report.pdf')),
+     RedirectView.as_view(url='/api/bulk/%(year)s/%(month)s/%(day)s/%(court)s.xml.gz')),
+
+    # Court stripped from the URL on 2014-06-26
+    (r'^(?:%s)/(.*)/(.*)/authorities/$' % "|".join(pacer_codes), redirect_opinion_pages),
+    (r'^(?:%s)/(.*)/(.*)/cited-by/$' % "|".join(pacer_codes), redirect_opinion_pages),
+    (r'^(?:%s)/(.*)/(.*)/$' % "|".join(pacer_codes), redirect_opinion_pages),
 )
