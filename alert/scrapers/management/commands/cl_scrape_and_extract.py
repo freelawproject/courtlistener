@@ -143,7 +143,7 @@ def scrape_court(site, full_crawl=False):
     if not abort:
         for i in range(0, len(site.case_names)):
             msg, r = get_binary_content(site.download_urls[i])
-            r.content = site._cleanup_content(r.content)
+            clean_content = site._cleanup_content(r.content)
             if msg:
                 logger.warn(msg)
                 ErrorLog(log_level='WARNING',
@@ -158,7 +158,7 @@ def scrape_court(site, full_crawl=False):
                 next_date = None
 
             # Make a hash of the data
-            sha1_hash = hashlib.sha1(r.content).hexdigest()
+            sha1_hash = hashlib.sha1(clean_content).hexdigest()
             if court_str == 'nev' and site.precedential_statuses[i] == 'Unpublished':
                 # Nevada's non-precedential cases have different SHA1 sums every time.
                 onwards = dup_checker.should_we_continue_break_or_carry_on(
@@ -208,8 +208,8 @@ def scrape_court(site, full_crawl=False):
 
                 # Make and associate the file object
                 try:
-                    cf = ContentFile(r.content)
-                    extension = get_extension(r.content)
+                    cf = ContentFile(clean_content)
+                    extension = get_extension(clean_content)
                     # See issue #215 for why this must be lower-cased.
                     file_name = trunc(site.case_names[i].lower(), 75) + extension
                     doc.local_path.save(file_name, cf, save=False)
