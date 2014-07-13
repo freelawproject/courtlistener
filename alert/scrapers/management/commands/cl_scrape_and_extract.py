@@ -157,8 +157,12 @@ def scrape_court(site, full_crawl=False):
             except IndexError:
                 next_date = None
 
-            # Make a hash of the data
-            sha1_hash = hashlib.sha1(clean_content).hexdigest()
+            # Make a hash of the data. Need to convert unicode to binary before hashing.
+            if type(clean_content) == 'unicode':
+                hash_content = clean_content.encode('utf-8')
+            else:
+                hash_content = clean_content
+            sha1_hash = hashlib.sha1(hash_content).hexdigest()
             if court_str == 'nev' and site.precedential_statuses[i] == 'Unpublished':
                 # Nevada's non-precedential cases have different SHA1 sums every time.
                 onwards = dup_checker.should_we_continue_break_or_carry_on(
