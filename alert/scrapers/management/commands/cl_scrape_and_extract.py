@@ -158,7 +158,7 @@ def scrape_court(site, full_crawl=False):
                 next_date = None
 
             # Make a hash of the data. Need to convert unicode to binary before hashing.
-            if type(clean_content) == 'unicode':
+            if type(clean_content) == unicode:
                 hash_content = clean_content.encode('utf-8')
             else:
                 hash_content = clean_content
