@@ -140,7 +140,7 @@ DEFAULT_FROM_EMAIL = 'CourtListener <noreply@courtlistener.com>'
 # SEO #
 #######
 SITEMAP_PING_URLS = (
-    'http://search.yahooapis.com/SiteExplorerService/V1/ping',
+    #'http://search.yahooapis.com/SiteExplorerService/V1/ping',  # Broke: 2014-06-30
     'http://www.google.com/webmasters/tools/ping',
     'http://www.bing.com/webmaster/ping.aspx',
 )

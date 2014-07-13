@@ -51,6 +51,7 @@ DOCUMENT_SOURCES = (
     ('A', 'internet archive'),
 )
 
+
 def make_upload_path(instance, filename):
     """Return a string like pdf/2010/08/13/foo_v._var.pdf, with the date set
     as the date_filed for the case."""
