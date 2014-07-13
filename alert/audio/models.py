@@ -35,12 +35,12 @@ class Audio(models.Model):
         auto_now=True,
         editable=False,
         db_index=True,
-        null=True,
     )
     date_argued = models.DateField(
         help_text="the date the case was argued",
         blank=True,
         null=True,
+        db_index=True,
     )
     sha1 = models.CharField(
         help_text="unique ID for the document, as generated via SHA1 of the binary file or text data",

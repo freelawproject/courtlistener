@@ -60,7 +60,17 @@ def court_index(request):
 def rest_index(request):
     courts = make_court_variable()
     court_count = len(courts)
-    return render_to_response('api/rest-docs.html',
+    return render_to_response('api/rest-docs-latest.html',
+                              {'court_count': court_count,
+                               'courts': courts,
+                               'private': False},
+                              RequestContext(request))
+
+
+def rest_index_v1(request):
+    courts = make_court_variable()
+    court_count = len(courts)
+    return render_to_response('api/rest-docs-v1.html',
                               {'court_count': court_count,
                                'courts': courts,
                                'private': False},

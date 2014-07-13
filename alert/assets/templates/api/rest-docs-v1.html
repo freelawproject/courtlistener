@@ -7,7 +7,13 @@
 
 {% block content %}
     <div class="span-13 append-2">
-        <h2 id="about">REST API</h2>
+        <h2 id="about">REST API V1</h2>
+        <div class="notice span-13 last">
+            <p class="bottom">These notes are for an outdated version of the API. Please use the <a
+                    href="/api/rest-info/">latest
+                version</a>, as these notes will soon be obsolete.
+            </p>
+        </div>
         <p>For developers that wish to have a more granular API for our data, we provide a RESTful API
             based on the <a href="http://django-tastypie.readthedocs.org/en/latest/">tastypie toolkit</a>.
         </p>
@@ -562,7 +568,8 @@
             <p>
                 We regularly perform bulk tasks on our servers and have
                 <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a
-                public calendar</a> for tracking them.
+                public calendar</a> for tracking them. If you intend to do bulk crawling of our API, please be mindful
+                of this schedule.
             </p>
         </div>
 
