@@ -143,6 +143,7 @@ def scrape_court(site, full_crawl=False):
     if not abort:
         for i in range(0, len(site.case_names)):
             msg, r = get_binary_content(site.download_urls[i])
+            r.content = site._cleanup_content(r.content)
             if msg:
                 logger.warn(msg)
                 ErrorLog(log_level='WARNING',
