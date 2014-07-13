@@ -13,7 +13,6 @@ from alert.lib.mojibake import fix_mojibake
 from celery import task
 from celery.task.sets import subtask
 from citations.tasks import update_document_by_id
-from datetime import date
 from django.utils.encoding import smart_text, DjangoUnicodeDecodeError
 from django.utils.timezone import now
 from lxml.html.clean import Cleaner

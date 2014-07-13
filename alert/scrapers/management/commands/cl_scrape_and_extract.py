@@ -213,7 +213,7 @@ def scrape_court(site, full_crawl=False):
                 # Make and associate the file object
                 try:
                     cf = ContentFile(clean_content)
-                    extension = get_extension(clean_content)
+                    extension = get_extension(r.content)
                     # See issue #215 for why this must be lower-cased.
                     file_name = trunc(site.case_names[i].lower(), 75) + extension
                     doc.local_path.save(file_name, cf, save=False)
