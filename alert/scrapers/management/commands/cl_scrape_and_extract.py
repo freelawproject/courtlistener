@@ -155,7 +155,7 @@ def scrape_court(site, full_crawl=False):
     abort = dup_checker.abort_by_url_hash(site.url, site.hash)
     if not abort:
         for i in range(0, len(site.case_names)):
-            msg, r = get_binary_content(site.download_urls[i], site._get_cookies())
+            msg, r = get_binary_content(site.download_urls[i], site._get_cookies(site))
             clean_content = site._cleanup_content(r.content)
             if msg:
                 logger.warn(msg)
