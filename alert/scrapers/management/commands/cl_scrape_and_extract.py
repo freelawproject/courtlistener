@@ -98,7 +98,17 @@ def get_extension(content):
     return extension
 
 
-def get_binary_content(download_url):
+def convert_from_selenium_style_cookies(cookies):
+    """Selenium uses a different format for cookies than does requests. This converts from a Selenium dict to a
+    requests dict.
+    """
+    requests_cookies = {}
+    for cookie in cookies:
+        requests_cookies[cookie['name']] = cookie['value']
+    return requests_cookies
+
+
+def get_binary_content(download_url, cookies):
     if not download_url:
         # Occurs when a DeferredList fetcher fails.
         msg = 'NoDownloadUrlError: %s\n%s' % (download_url, traceback.format_exc())
@@ -107,14 +117,17 @@ def get_binary_content(download_url):
     try:
         s = requests.session()
         headers = {'User-Agent': 'CourtListener'}
+        cookies = convert_from_selenium_style_cookies(cookies)
         try:
             r = s.get(download_url,
-                      headers=headers)
+                      headers=headers,
+                      cookies=cookies)
         except SSLError:
             # Washington has a certificate we don't understand.
             r = s.get(download_url,
                       verify=False,
-                      headers=headers)
+                      headers=headers,
+                      cookies=cookies)
 
         # test for empty files (thank you CA1)
         if len(r.content) == 0:
@@ -142,7 +155,7 @@ def scrape_court(site, full_crawl=False):
     abort = dup_checker.abort_by_url_hash(site.url, site.hash)
     if not abort:
         for i in range(0, len(site.case_names)):
-            msg, r = get_binary_content(site.download_urls[i])
+            msg, r = get_binary_content(site.download_urls[i], site.cookies)
             clean_content = site._cleanup_content(r.content)
             if msg:
                 logger.warn(msg)
