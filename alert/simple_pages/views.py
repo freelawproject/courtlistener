@@ -88,11 +88,18 @@ def coverage_graph(request):
 def contact(
         request,
         template_path='simple_pages/contact_form.html',
-        template_data={},
-        initial={}):
+        template_data=None,
+        initial=None):
     """This is a fairly run-of-the-mill contact form, except that it can be overridden in various ways so that its
     logic can be called from other functions.
     """
+    # For why this is necessary, see https://stackoverflow.com/questions/24770130/ and the related link,
+    # http://effbot.org/zone/default-values.htm. Basically, you can't have a mutable data type like a dict
+    # as a default argument without its state being carried around from one function call to the next.
+    if template_data is None:
+        template_data = {}
+    if initial is None:
+        initial = {}
 
     if request.method == 'POST':
         form = ContactForm(request.POST)
