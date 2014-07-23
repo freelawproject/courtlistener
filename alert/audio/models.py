@@ -3,16 +3,6 @@ from alert.search.models import Docket
 from django.db import models
 
 
-# Flash is a jerk about only accepting these three rates.
-# If an mp3 has a different sample rate, we downgrade it as necessary.
-
-MP3_SAMPLE_RATES = (
-    ('low', '11025'),
-    ('medium', '22050'),
-    ('high', '44100'),
-)
-
-
 class Audio(models.Model):
     """A class representing oral arguments and their associated metadata
 
@@ -55,9 +45,14 @@ class Audio(models.Model):
         blank=True,
     )
     local_path_mp3 = models.FileField(
-        help_text="The location, relative to MEDIA_ROOT on the CourtListener server, where files are stored",
+        help_text="The location, relative to MEDIA_ROOT, on the CourtListener server, where encoded file is stored",
         upload_to=make_upload_path,
         blank=True,
+        db_index=True,
+    )
+    local_path_original_file = models.FileField(
+        help_text="The location, relative to MEDIA_ROOT, on the CourtListener server, where the original file is stored",
+        upload_to=make_upload_path,
         db_index=True,
     )
     length = models.SmallIntegerField(

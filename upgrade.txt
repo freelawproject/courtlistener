@@ -33,7 +33,8 @@ We welcome a conversion of these notes to a better process using Fabric.
    the maintenance mode URL if you wish to avoid chaos.
  - The database upgrade for this version will take some time, as we are moving a number of fields from one database
    table to another.
- - New dependency sudo pip install datadiff==1.1.5
+ - New dependency for datadiff (sudo pip install datadiff==1.1.5)
+ - New dependency for eyeD3? (sudo pip install --allow-external eyeD3 --allow-unverified eyeD3 eyeD3==0.7.4)
 
  TODO:
   - This change has a lot of changes to the database that need to be made, including:
@@ -50,6 +51,7 @@ We welcome a conversion of these notes to a better process using Fabric.
     - Scraper:
         - Make sure that we flip the has_oral_argument_scraper flag to true on CA1 or else the coverage page will look
           off.
+    - Atom feeds for audio
 
   API Changes:
    - /api/rest-info/ makes reference to a number of API calls that go to v1. These should go to v2 instead and some
@@ -409,7 +411,3 @@ We welcome a conversion of these notes to a better process using Fabric.
 
  - The scrape_and_extract.py script has been converted to the cl_scrape_and_extract management command. It is API
    compatible in terms of args, but any jobs calling the script will need to be updated.
-
-
-
-
