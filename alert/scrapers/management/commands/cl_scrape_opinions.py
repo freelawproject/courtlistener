@@ -98,7 +98,17 @@ def get_extension(content):
     return extension
 
 
-def get_binary_content(download_url):
+def convert_from_selenium_style_cookies(cookies):
+    """Selenium uses a different format for cookies than does requests. This converts from a Selenium dict to a
+    requests dict.
+    """
+    requests_cookies = {}
+    for cookie in cookies:
+        requests_cookies[cookie['name']] = cookie['value']
+    return requests_cookies
+
+
+def get_binary_content(download_url, cookies):
     if not download_url:
         # Occurs when a DeferredList fetcher fails.
         msg = 'NoDownloadUrlError: %s\n%s' % (download_url, traceback.format_exc())
@@ -107,6 +117,7 @@ def get_binary_content(download_url):
     try:
         s = requests.session()
         headers = {'User-Agent': 'CourtListener'}
+        cookies = convert_from_selenium_style_cookies(cookies)
         try:
             r = s.get(download_url,
                       headers=headers)
@@ -158,7 +169,7 @@ class Command(BaseCommand):
                     action='store_true',
                     help="Disable duplicate aborting."),
     )
-    args = "-c COURTID [-d] [-r RATE]"
+    args = "-c COURTID [-d] [-f] [-r RATE]"
     help = 'Runs the Juriscraper toolkit against one or many courts.'
 
     def scrape_court(self, site, full_crawl=False):
