@@ -98,13 +98,18 @@ def get_extension(content):
     return extension
 
 
-def convert_from_selenium_style_cookies(cookies):
+def normalize_cookies(cookies):
     """Selenium uses a different format for cookies than does requests. This converts from a Selenium dict to a
-    requests dict.
+    requests dict, if a selenium dict is found.
     """
     requests_cookies = {}
     for cookie in cookies:
-        requests_cookies[cookie['name']] = cookie['value']
+        try:
+            # If it's a selenium-style cookie, convert to requests-style.
+            requests_cookies[cookie['name']] = cookie['value']
+        except KeyError:
+            # If above fails, it's already a requests-style cookie. Simply move on.
+            return cookies
     return requests_cookies
 
 
@@ -117,7 +122,7 @@ def get_binary_content(download_url, cookies):
     try:
         s = requests.session()
         headers = {'User-Agent': 'CourtListener'}
-        cookies = convert_from_selenium_style_cookies(cookies)
+        cookies = normalize_cookies(cookies)
         logger.info("Using cookies: %s" % cookies)
         try:
             r = s.get(download_url,
