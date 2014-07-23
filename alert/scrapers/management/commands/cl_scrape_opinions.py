@@ -131,126 +131,6 @@ def get_binary_content(download_url):
     return '', r
 
 
-<<<<<<< local
-=======
-def scrape_court(site, full_crawl=False):
-    download_error = False
-    # Get the court object early for logging
-    # opinions.united_states.federal.ca9_u --> ca9
-    court_str = site.court_id.split('.')[-1].split('_')[0]
-    court = Court.objects.get(pk=court_str)
-
-    dup_checker = DupChecker(court, full_crawl=full_crawl)
-    abort = dup_checker.abort_by_url_hash(site.url, site.hash)
-    if not abort:
-        for i in range(0, len(site.case_names)):
-            msg, r = get_binary_content(site.download_urls[i])
-            if msg:
-                logger.warn(msg)
-                ErrorLog(log_level='WARNING',
-                         court=court,
-                         message=msg).save()
-                continue
-
-            current_date = site.case_dates[i]
-            try:
-                next_date = site.case_dates[i + 1]
-            except IndexError:
-                next_date = None
-
-            # Make a hash of the data
-            sha1_hash = hashlib.sha1(r.content).hexdigest()
-            if court_str == 'nev' and site.precedential_statuses[i] == 'Unpublished':
-                # Nevada's non-precedential cases have different SHA1 sums every time.
-                onwards = dup_checker.should_we_continue_break_or_carry_on(
-                    current_date,
-                    next_date,
-                    lookup_value=site.download_urls[i],
-                    lookup_by='download_url'
-                )
-            else:
-                onwards = dup_checker.should_we_continue_break_or_carry_on(
-                    current_date,
-                    next_date,
-                    lookup_value=sha1_hash,
-                    lookup_by='sha1'
-                )
-
-            if onwards == 'CONTINUE':
-                # It's a duplicate, but we haven't hit any thresholds yet.
-                continue
-            elif onwards == 'BREAK':
-                # It's a duplicate, and we hit a date or dup_count threshold.
-                dup_checker.update_site_hash(sha1_hash)
-                break
-            elif onwards == 'CARRY_ON':
-                # Not a duplicate, carry on
-                logger.info('Adding new document found at: %s' % site.download_urls[i])
-                dup_checker.reset()
-
-                cite = Citation()
-                if site.docket_numbers:
-                    cite.docket_number = site.docket_numbers[i]
-                if site.neutral_citations:
-                    cite.neutral_cite = site.neutral_citations[i]
-                if site.west_citations:
-                    cite.federal_cite_one = site.west_citations[i]
-                if site.west_state_citations:
-                    cite.west_state_cite = site.west_state_citations[i]
-
-                docket = Docket(
-                    case_name=site.case_names[i],
-                    court=court,
-                )
-
-                doc = Document(
-                    source='C',
-                    sha1=sha1_hash,
-                    date_filed=site.case_dates[i],
-                    download_url=site.download_urls[i],
-                    precedential_status=site.precedential_statuses[i]
-                )
-
-                # Make and associate the file object
-                try:
-                    cf = ContentFile(r.content)
-                    extension = get_extension(r.content)
-                    # See issue #215 for why this must be lower-cased.
-                    file_name = trunc(site.case_names[i].lower(), 75) + extension
-                    doc.local_path.save(file_name, cf, save=False)
-                except:
-                    msg = 'Unable to save binary to disk. Deleted document: % s.\n % s' % \
-                          (cite.case_name, traceback.format_exc())
-                    logger.critical(msg)
-                    ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
-                    download_error = True
-                    continue
-
-                if site.judges:
-                    doc.judges = site.judges[i]
-                if site.nature_of_suit:
-                    doc.nature_of_suit = site.nature_of_suit[i]
-
-                # Save everything, but don't update Solr index yet
-                cite.save(index=False)
-                doc.citation = cite
-                docket.save()
-                doc.docket = docket
-                doc.save(index=False)
-
-                # Extract the contents asynchronously.
-                extract_doc_content(doc.pk, callback=subtask(extract_by_ocr))
-
-                logger.info("Successfully added doc %s: %s" % (doc.pk, site.case_names[i]))
-
-        # Update the hash if everything finishes properly.
-        logger.info("%s: Successfully crawled." % site.court_id)
-        if not download_error and not full_crawl:
-            # Only update the hash if no errors occurred.
-            dup_checker.update_site_hash(site.hash)
-
-
->>>>>>> other
 class Command(BaseCommand):
     option_list = BaseCommand.option_list + (
         make_option('-d',
@@ -336,7 +216,7 @@ class Command(BaseCommand):
                     logger.info('Adding new document found at: %s' % site.download_urls[i])
                     dup_checker.reset()
 
-                    cite = Citation()
+                    cite = Citation(case_name=site.case_names[i])
                     if site.docket_numbers:
                         cite.docket_number = site.docket_numbers[i]
                     if site.neutral_citations:

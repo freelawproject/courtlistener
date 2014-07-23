@@ -8,15 +8,15 @@ from alert.lib.string_utils import trunc
 from alert.lib import sunburnt
 from alert.scrapers.DupChecker import DupChecker
 from alert.scrapers.models import urlToHash, ErrorLog
-from alert.scrapers.management.commands.cl_scrape_and_extract import get_extension
-from alert.scrapers.management.commands.cl_scrape_and_extract import scrape_court
+from alert.scrapers.management.commands.cl_scrape_opinions import get_extension
+from alert.scrapers.management.commands.cl_scrape_opinions import Command
 from alert.scrapers.management.commands.cl_report_scrape_status import calculate_counts, tally_errors
 from alert.scrapers.tasks import extract_from_txt
 from alert.scrapers.test_assets import test_scraper
 from alert.search.models import Citation, Court, Document, Docket
 from alert import settings
 from celery.task.sets import subtask
-from datetime import date, timedelta
+from datetime import timedelta
 from django.core.files.base import ContentFile
 from django.test import TestCase
 from scrapers.tasks import extract_doc_content
@@ -28,7 +28,7 @@ class IngestionTest(TestCase):
 
     def ingest_documents(self):
         site = test_scraper.Site().parse()
-        scrape_court(site)
+        Command().scrape_court(site, full_crawl=True)
 
     def setUp(self):
         # Set up a testing core in Solr and swap it in
