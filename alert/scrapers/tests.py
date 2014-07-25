@@ -3,16 +3,18 @@ import hashlib
 import os
 import time
 from django.utils.timezone import now
+from alert.audio.models import Audio
 from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core
 from alert.lib.string_utils import trunc
 from alert.lib import sunburnt
 from alert.scrapers.DupChecker import DupChecker
 from alert.scrapers.models import urlToHash, ErrorLog
 from alert.scrapers.management.commands.cl_scrape_opinions import get_extension
-from alert.scrapers.management.commands.cl_scrape_opinions import Command
+from alert.scrapers.management.commands.cl_scrape_opinions import Command as OpinionCommand
+from alert.scrapers.management.commands.cl_scrape_oral_arguments import Command as OralArgCommand
 from alert.scrapers.management.commands.cl_report_scrape_status import calculate_counts, tally_errors
 from alert.scrapers.tasks import extract_from_txt
-from alert.scrapers.test_assets import test_scraper
+from alert.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from alert.search.models import Citation, Court, Document, Docket
 from alert import settings
 from celery.task.sets import subtask
@@ -25,10 +27,6 @@ from scrapers.tasks import extract_by_ocr
 
 class IngestionTest(TestCase):
     fixtures = ['test_court.json']
-
-    def ingest_documents(self):
-        site = test_scraper.Site().parse()
-        Command().scrape_court(site, full_crawl=True)
 
     def setUp(self):
         # Set up a testing core in Solr and swap it in
@@ -44,14 +42,37 @@ class IngestionTest(TestCase):
         swap_solr_core(self.core_name, 'collection1')
         delete_solr_core(self.core_name)
 
-    def test_parsing_xml_document_to_site_object(self):
+    def test_ingest_opinions(self):
+        """Can we successfully ingest opinions at a high level?"""
+        site = test_opinion_scraper.Site()
+        site.method = "LOCAL"
+        parsed_site = site.parse()
+        OpinionCommand().scrape_court(parsed_site, full_crawl=True)
+
+    def test_ingest_oral_arguments(self):
+        """Can we successfully ingest oral arguments at a high level?"""
+        site = test_oral_arg_scraper.Site()
+        site.method = "LOCAL"
+        parsed_site = site.parse()
+        OralArgCommand().scrape_court(parsed_site, full_crawl=True)
+
+        # There should now be two items in the database.
+        audio_files = Audio.objects.all()
+        self.assertEqual(2, audio_files.count())
+
+    def test_parsing_xml_opinion_site_to_site_object(self):
         """Does a basic parse of a site reveal the right number of items?"""
-        site = test_scraper.Site().parse()
+        site = test_opinion_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 6)
+
+    def test_parsing_xml_oral_arg_site_to_site_object(self):
+        """Does a basic parse of an oral arg site work?"""
+        site = test_oral_arg_scraper.Site().parse()
+        self.assertEqual(len(site.case_names), 2)
 
     def test_content_extraction(self):
         """Do all of the supported mimetypes get extracted to text successfully, including OCR?"""
-        site = test_scraper.Site().parse()
+        site = test_opinion_scraper.Site().parse()
 
         test_strings = ['supreme',
                         'intelligence',
@@ -90,7 +111,7 @@ class IngestionTest(TestCase):
 
     def test_solr_ingestion_and_deletion(self):
         """Do items get added to the Solr index when they are ingested?"""
-        site = test_scraper.Site().parse()
+        site = test_opinion_scraper.Site().parse()
         path = os.path.join(settings.INSTALL_ROOT, 'alert', site.download_urls[0])  # a simple PDF
         with open(path) as f:
             content = f.read()
@@ -119,7 +140,7 @@ class IngestionTest(TestCase):
 
 class ExtractionTest(TestCase):
     def test_txt_extraction_with_bad_data(self):
-        """Verifies that we can extract text from nasty files lacking encodings."""
+        """Can we extract text from nasty files lacking encodings?"""
         path = os.path.join(settings.INSTALL_ROOT, 'alert', 'scrapers', 'test_assets', 'txt_file_with_no_encoding.txt')
         content, err = extract_from_txt(path)
         self.assertFalse(err, "Error reported while extracting text from %s" % path)
@@ -177,7 +198,7 @@ class DupcheckerTest(TestCase):
 
     def test_abort_when_new_court_website(self):
         """Tests what happens when a new website is discovered."""
-        site = test_scraper.Site()
+        site = test_opinion_scraper.Site()
         site.hash = 'this is a dummy hash code string'
 
         for dup_checker in self.dup_checkers:
@@ -192,7 +213,7 @@ class DupcheckerTest(TestCase):
 
     def test_abort_on_unchanged_court_website(self):
         """Similar to the above, but we create a url2hash object before checking if it exists."""
-        site = test_scraper.Site()
+        site = test_opinion_scraper.Site()
         site.hash = 'this is a dummy hash code string'
         for dup_checker in self.dup_checkers:
             urlToHash(url=site.url, SHA1=site.hash).save()
@@ -207,7 +228,7 @@ class DupcheckerTest(TestCase):
 
     def test_abort_on_changed_court_website(self):
         """Similar to the above, but we create a url2Hash with a different hash before checking if it exists."""
-        site = test_scraper.Site()
+        site = test_opinion_scraper.Site()
         site.hash = 'this is a dummy hash code string'
         for dup_checker in self.dup_checkers:
             urlToHash(url=site.url, SHA1=site.hash).save()
@@ -221,10 +242,13 @@ class DupcheckerTest(TestCase):
 
     def test_should_we_continue_break_or_carry_on_with_an_empty_database(self):
         for dup_checker in self.dup_checkers:
-            onwards = dup_checker.should_we_continue_break_or_carry_on(now(),
-                                                                       now() - timedelta(days=1),
-                                                                       lookup_value='content',
-                                                                       lookup_by='sha1')
+            onwards = dup_checker.should_we_continue_break_or_carry_on(
+                Document,
+                now(),
+                now() - timedelta(days=1),
+                lookup_value='content',
+                lookup_by='sha1'
+            )
             if not dup_checker.full_crawl:
                 self.assertTrue(onwards, "DupChecker says to abort during a full crawl.")
             else:
@@ -244,6 +268,7 @@ class DupcheckerTest(TestCase):
             doc = Document(sha1=content_hash, docket=docket)
             doc.save(index=False)
             onwards = dup_checker.should_we_continue_break_or_carry_on(
+                Document,
                 now(),
                 now(),
                 lookup_value=content_hash,
@@ -269,8 +294,13 @@ class DupcheckerTest(TestCase):
             doc = Document(sha1=content_hash, docket=docket)
             doc.save(index=False)
             # Note that the next case occurs prior to the current one
-            onwards = dup_checker.should_we_continue_break_or_carry_on(now(), now() - timedelta(days=1),
-                                                                       lookup_value=content_hash, lookup_by='sha1')
+            onwards = dup_checker.should_we_continue_break_or_carry_on(
+                Document,
+                now(),
+                now() - timedelta(days=1),
+                lookup_value=content_hash,
+                lookup_by='sha1'
+            )
             if dup_checker.full_crawl:
                 self.assertEqual(onwards, 'CONTINUE',
                                  'DupChecker says to %s during a full crawl.' % onwards)

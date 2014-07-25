@@ -1,5 +1,4 @@
 from alert.scrapers.models import urlToHash
-from alert.search.models import Document
 
 from juriscraper.AbstractSite import logger
 
@@ -61,7 +60,7 @@ class DupChecker(dict):
             # If it's a full crawl, we don't care about the hash. We do not abort no matter what.
             return False
 
-    def should_we_continue_break_or_carry_on(self, current_date, next_date, lookup_value, lookup_by='sha1'):
+    def should_we_continue_break_or_carry_on(self, object_type, current_date, next_date, lookup_value, lookup_by='sha1'):
         """Checks if a we have a document with identical content in the CL corpus by making a hash of the data and
         attempting to look that up. Depending on the result of that, we either CONTINUE to the next item, we CARRY_ON
         with adding this item to the DB or we BREAK from the court entirely.
@@ -78,9 +77,9 @@ class DupChecker(dict):
         """
         # using the hash or the download_url check for a duplicate in the db.
         if lookup_by == 'sha1':
-            exists = Document.objects.filter(sha1=lookup_value).exists()
+            exists = object_type.objects.filter(sha1=lookup_value).exists()
         elif lookup_by == 'download_url':
-            exists = Document.objects.filter(download_url=lookup_value).exists()
+            exists = object_type.objects.filter(download_url=lookup_value).exists()
 
         if exists:
             logger.info('Duplicate found on date: %s, with lookup value: %s' % (current_date, lookup_value))

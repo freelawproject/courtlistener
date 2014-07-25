@@ -8,7 +8,7 @@ import time
 from alert.lib import sunburnt
 from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core, get_data_dir_location
 from alert.search.models import Citation, Court, Document, Docket
-from alert.scrapers.test_assets import test_scraper
+from alert.scrapers.test_assets import test_opinion_scraper
 from alert import settings
 from alert.search.management.commands.cl_calculate_pagerank_networkx import Command
 from datetime import date
@@ -62,7 +62,7 @@ class SolrTestCase(TestCase):
         self.si = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
 
         # Add two documents to the index, but don't extract their contents
-        self.site = test_scraper.Site().parse()
+        self.site = test_opinion_scraper.Site().parse()
         cite_counts = (4, 6)
         for i in range(0, 2):
             cite = Citation(

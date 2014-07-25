@@ -39,7 +39,7 @@ DOCUMENT_STATUSES = (
     ('Unknown', 'Unknown Status'),
 )
 
-DOCUMENT_SOURCES = (
+SOURCES = (
     ('C', 'court website'),
     ('R', 'resource.org'),
     ('CR', 'court website merged with resource.org'),
@@ -386,9 +386,9 @@ class Document(models.Model):
         db_index=True
     )
     source = models.CharField(
-        help_text="the source of the document, one of: %s" % ', '.join(['%s (%s)' % (t[0], t[1]) for t in DOCUMENT_SOURCES]),
+        help_text="the source of the document, one of: %s" % ', '.join(['%s (%s)' % (t[0], t[1]) for t in SOURCES]),
         max_length=3,
-        choices=DOCUMENT_SOURCES,
+        choices=SOURCES,
         blank=True
     )
     sha1 = models.CharField(
