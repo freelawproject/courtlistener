@@ -1,5 +1,5 @@
 from alert.search.models import Citation, Court, Document, Docket
-from alert.scrapers.test_assets import test_scraper
+from alert.scrapers.test_assets import test_opinion_scraper
 from django.test import TestCase
 from django.test.client import Client
 
@@ -13,7 +13,7 @@ class ViewDocumentTest(TestCase):
         self.client = Client()
 
         # Add a document to the index
-        site = test_scraper.Site().parse()
+        site = test_opinion_scraper.Site().parse()
         cite = Citation(
             docket_number=site.docket_numbers[0],
             neutral_cite=site.neutral_citations[0],

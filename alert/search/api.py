@@ -7,7 +7,7 @@ from alert.lib.search_utils import build_main_query
 from alert.lib.string_utils import filter_invalid_XML_chars
 from alert.lib.sunburnt import sunburnt, SolrError
 from alert.search.forms import SearchForm
-from alert.search.models import Citation, Court, Document, DOCUMENT_SOURCES, DOCUMENT_STATUSES
+from alert.search.models import Citation, Court, Document, SOURCES, DOCUMENT_STATUSES
 from alert.stats import tally_stat
 
 from django.core.cache import cache
@@ -523,7 +523,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
     source = fields.CharField(
         attribute='source',
         help_text='the source of the document, one of: %s' % ', '.join(['%s (%s)' % (t[0], t[1]) for t in
-                                                                        DOCUMENT_SOURCES]),
+                                                                        SOURCES]),
         null=True,
     )
     snippet = fields.CharField(

@@ -1,5 +1,5 @@
 from alert.lib.model_helpers import make_upload_path
-from alert.search.models import Docket
+from alert.search.models import Docket, SOURCES
 from django.db import models
 
 
@@ -13,6 +13,27 @@ class Audio(models.Model):
         related_name="audio_files",
         blank=True,
         null=True
+    )
+    source = models.CharField(
+        help_text="the source of the audio file, one of: %s" % ', '.join(['%s (%s)' % (t[0], t[1]) for t in SOURCES]),
+        max_length=3,
+        choices=SOURCES,
+        blank=True
+    )
+    case_name = models.TextField(
+        help_text="The full name of the case",
+        blank=True
+    )
+    docket_number = models.CharField(
+        help_text="The docket numbers of a case, can be consolidated and quite long",
+        max_length=5000,  # sometimes these are consolidated, hence they need to be long (was 50, 100, 300, 1000).
+        blank=True,
+        null=True
+    )
+    judges = models.TextField(
+        help_text="The judges that brought the opinion as a simple text string",
+        blank=True,
+        null=True,
     )
     time_retrieved = models.DateTimeField(
         help_text="The original creation date for the item",
@@ -57,6 +78,7 @@ class Audio(models.Model):
     )
     length = models.SmallIntegerField(
         help_text="the length of the file, in seconds",
+        null=True,
     )
     date_blocked = models.DateField(
         help_text="The date that this opinion was blocked from indexing by search engines",
@@ -72,3 +94,4 @@ class Audio(models.Model):
 
     class Meta:
         ordering = ["-time_retrieved"]
+        verbose_name_plural = 'Audio Files'

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<court>
+    <!-- A template for adding more test cases -->
+    <!--
+    <oral_arg>
+        <url></url>
+        <name></name>
+        <date></date>
+        <docket_number></docket_number>
+    </oral_arg>
+    -->
+
+    <!--
+      Test files cropped using:
+        % avconv -ss 0 -i 1.wma -t 60 -vcodec copy -acodec copy 1-cropped.wma
+    -->
+    <oral_arg>
+        <!-- a WMA -->
+        <url>1.wma</url>
+        <name>Jeremy v. Julian</name>
+        <date>2014/06/09</date>
+        <docket_number>23-232388</docket_number>
+    </oral_arg>
+
+    <oral_arg>
+        <!-- an MP3 -->
+        <url>2.mp3</url>
+        <name>Ander v. Leo</name>
+        <date>2014/06/09</date>
+        <docket_number>239=239283</docket_number>
+    </oral_arg>
+</court>

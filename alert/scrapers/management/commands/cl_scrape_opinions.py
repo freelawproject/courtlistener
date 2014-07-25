@@ -1,3 +1,5 @@
+from juriscraper.tests import MockRequest
+import os
 from alert.lib import magic
 from alert.lib.string_utils import trunc
 from alert.scrapers.models import ErrorLog
@@ -7,6 +9,7 @@ from alert.search.models import Court
 from alert.search.models import Document
 
 from celery.task.sets import subtask
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
 from juriscraper.AbstractSite import logger
@@ -98,44 +101,66 @@ def get_extension(content):
     return extension
 
 
-def convert_from_selenium_style_cookies(cookies):
+def normalize_cookies(cookies):
     """Selenium uses a different format for cookies than does requests. This converts from a Selenium dict to a
-    requests dict.
+    requests dict, if a selenium dict is found.
     """
     requests_cookies = {}
     for cookie in cookies:
-        requests_cookies[cookie['name']] = cookie['value']
+        try:
+            # If it's a selenium-style cookie, convert to requests-style.
+            requests_cookies[cookie['name']] = cookie['value']
+        except KeyError:
+            # If above fails, it's already a requests-style cookie. Simply move on.
+            return cookies
     return requests_cookies
 
 
-def get_binary_content(download_url, cookies):
+def get_binary_content(download_url, cookies, method='GET'):
+    """ Downloads the file, covering a few special cases such as invalid SSL certificates and empty file errors.
+
+    :param download_url: The URL for the item you wish to download.
+    :param cookies: Cookies that might be necessary to download the item.
+    :param method: The HTTP method used to get the item, or "LOCAL" to get an item during testing
+    :return: Two values. The first is a msg indicating any errors encountered. If blank, that indicates success. The
+    second value is the response object containing the downloaded file.
+    """
     if not download_url:
         # Occurs when a DeferredList fetcher fails.
         msg = 'NoDownloadUrlError: %s\n%s' % (download_url, traceback.format_exc())
         return msg, None
     # noinspection PyBroadException
     try:
-        s = requests.session()
-        headers = {'User-Agent': 'CourtListener'}
-        cookies = convert_from_selenium_style_cookies(cookies)
-        try:
-            r = s.get(download_url,
-                      headers=headers)
-        except SSLError:
-            # Washington has a certificate we don't understand.
-            r = s.get(download_url,
-                      verify=False,
-                      headers=headers)
+        if method == 'LOCAL':
+            mr = MockRequest(url=os.path.join(settings.INSTALL_ROOT, 'alert', download_url))
+            r = mr.get()
+        else:
+            # Note that we do a GET even if site.method is POST. This is deliberate.
+            s = requests.session()
+            headers = {'User-Agent': 'CourtListener'}
+            cookies = normalize_cookies(cookies)
+            logger.info("Using cookies: %s" % cookies)
+            try:
+                r = s.get(download_url,
+                          headers=headers,
+                          cookies=cookies)
+            except SSLError:
+                # Washington has a certificate we don't understand.
+                r = s.get(download_url,
+                          verify=False,
+                          headers=headers,
+                          cookies=cookies)
 
-        # test for empty files (thank you CA1)
-        if len(r.content) == 0:
-            msg = 'EmptyFileError: %s\n%s' % (download_url, traceback.format_exc())
-            return msg, r
+            # test for empty files (thank you CA1)
+            if len(r.content) == 0:
+                msg = 'EmptyFileError: %s\n%s' % (download_url, traceback.format_exc())
+                return msg, r
 
-        # test for and follow meta redirects
-        r = follow_redirections(r, s)
+            # test for and follow meta redirects
+            r = follow_redirections(r, s)
     except:
         msg = 'DownloadingError: %s\n%s' % (download_url, traceback.format_exc())
+        print msg
         return msg, r
 
     # Success!
@@ -148,8 +173,9 @@ class Command(BaseCommand):
                     '--daemon',
                     action='store_true',
                     dest='daemonmode',
-                    help=('Use this flag to turn on daemon mode, in which all courts requested will be scraped in turn, '
-                          'nonstop.')),
+                    help=(
+                        'Use this flag to turn on daemon mode, in which all courts requested will be scraped in turn, '
+                        'nonstop.')),
         make_option('-r',
                     '--rate',
                     dest='rate',
@@ -172,6 +198,48 @@ class Command(BaseCommand):
     args = "-c COURTID [-d] [-f] [-r RATE]"
     help = 'Runs the Juriscraper toolkit against one or many courts.'
 
+    def associate_meta_data_to_objects(self, site, i, court, sha1_hash):
+        """Takes the meta data from the scraper and assocites it with objects. Returns the created objects.
+        """
+        cite = Citation(case_name=site.case_names[i])
+        if site.docket_numbers:
+            cite.docket_number = site.docket_numbers[i]
+        if site.neutral_citations:
+            cite.neutral_cite = site.neutral_citations[i]
+        if site.west_citations:
+            cite.federal_cite_one = site.west_citations[i]
+        if site.west_state_citations:
+            cite.west_state_cite = site.west_state_citations[i]
+
+        docket = Docket(
+            case_name=site.case_names[i],
+            court=court,
+        )
+
+        doc = Document(
+            source='C',
+            sha1=sha1_hash,
+            date_filed=site.case_dates[i],
+            download_url=site.download_urls[i],
+            precedential_status=site.precedential_statuses[i]
+        )
+        if site.judges:
+            doc.judges = site.judges[i]
+        if site.nature_of_suit:
+            doc.nature_of_suit = site.nature_of_suit[i]
+
+        return cite, docket, doc
+
+    @staticmethod
+    def save_everything(cite, docket, doc, index=False):
+        """Saves all the sub items and associates them as appropriate.
+        """
+        cite.save(index=index)
+        doc.citation = cite
+        docket.save()
+        doc.docket = docket
+        doc.save(index=index)
+
     def scrape_court(self, site, full_crawl=False):
         download_error = False
         # Get the court object early for logging
@@ -183,7 +251,11 @@ class Command(BaseCommand):
         abort = dup_checker.abort_by_url_hash(site.url, site.hash)
         if not abort:
             for i in range(0, len(site.case_names)):
-                msg, r = get_binary_content(site.download_urls[i])
+                msg, r = get_binary_content(
+                    site.download_urls[i],
+                    site._get_cookies(),
+                    method=site.method
+                )
                 if msg:
                     logger.warn(msg)
                     ErrorLog(log_level='WARNING',
@@ -202,6 +274,7 @@ class Command(BaseCommand):
                 if court_str == 'nev' and site.precedential_statuses[i] == 'Unpublished':
                     # Nevada's non-precedential cases have different SHA1 sums every time.
                     onwards = dup_checker.should_we_continue_break_or_carry_on(
+                        Document,
                         current_date,
                         next_date,
                         lookup_value=site.download_urls[i],
@@ -209,6 +282,7 @@ class Command(BaseCommand):
                     )
                 else:
                     onwards = dup_checker.should_we_continue_break_or_carry_on(
+                        Document,
                         current_date,
                         next_date,
                         lookup_value=sha1_hash,
@@ -227,28 +301,7 @@ class Command(BaseCommand):
                     logger.info('Adding new document found at: %s' % site.download_urls[i])
                     dup_checker.reset()
 
-                    cite = Citation(case_name=site.case_names[i])
-                    if site.docket_numbers:
-                        cite.docket_number = site.docket_numbers[i]
-                    if site.neutral_citations:
-                        cite.neutral_cite = site.neutral_citations[i]
-                    if site.west_citations:
-                        cite.federal_cite_one = site.west_citations[i]
-                    if site.west_state_citations:
-                        cite.west_state_cite = site.west_state_citations[i]
-
-                    docket = Docket(
-                        case_name=site.case_names[i],
-                        court=court,
-                    )
-
-                    doc = Document(
-                        source='C',
-                        sha1=sha1_hash,
-                        date_filed=site.case_dates[i],
-                        download_url=site.download_urls[i],
-                        precedential_status=site.precedential_statuses[i]
-                    )
+                    cite, docket, doc = self.associate_meta_data_to_objects(site, i, court, sha1_hash)
 
                     # Make and associate the file object
                     try:
@@ -259,31 +312,20 @@ class Command(BaseCommand):
                         doc.local_path.save(file_name, cf, save=False)
                     except:
                         msg = 'Unable to save binary to disk. Deleted document: % s.\n % s' % \
-                              (cite.case_name, traceback.format_exc())
+                              (site.case_names[i], traceback.format_exc())
                         logger.critical(msg)
                         ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
                         download_error = True
                         continue
 
-                    if site.judges:
-                        doc.judges = site.judges[i]
-                    if site.nature_of_suit:
-                        doc.nature_of_suit = site.nature_of_suit[i]
-
                     # Save everything, but don't update Solr index yet
-                    cite.save(index=False)
-                    doc.citation = cite
-                    docket.save()
-                    doc.docket = docket
-                    doc.save(index=False)
-
-                    # Extract the contents asynchronously.
+                    self.save_everything(cite, docket, doc, index=False)
                     extract_doc_content(doc.pk, callback=subtask(extract_by_ocr))
 
                     logger.info("Successfully added doc %s: %s" % (doc.pk, site.case_names[i]))
 
             # Update the hash if everything finishes properly.
-            logger.info("%s: Successfully crawled." % site.court_id)
+            logger.info("%s: Successfully crawled opinions." % site.court_id)
             if not download_error and not full_crawl:
                 # Only update the hash if no errors occurred.
                 dup_checker.update_site_hash(site.hash)
