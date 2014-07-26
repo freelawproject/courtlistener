@@ -1,6 +1,3 @@
-# Beginning with the globs
-syntax: glob
-
 # no compiled files!
 *.class
 *.pyc
@@ -15,16 +12,17 @@ alert/assets/media/wpd
 alert/assets/media/sitemaps
 alert/assets/media/doc
 alert/assets/media/dumps
+
+# Audio
+alert/assets/media/mp3
+alert/assets/media/wav
+alert/assets/media/wma
+
+# Generated static content
 alert/assets/static
 
 # Solr
 Solr/data
 
-# Eclipse junk
-alert/.metadata
-
 # IntelliJ IDEA files
 .idea
-
-syntax: regexp
-^\.settings$

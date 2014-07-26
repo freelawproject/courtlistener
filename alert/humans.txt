@@ -29,11 +29,13 @@
   Standards: HTML5, CSS3
   Components:
         Text Extraction: Antiword, libwpd-tools, pdf2text
+        Audio: avconv, eyeD3
         Code: Celery, Django, jQuery (NobelCount), lxml,
-              Mercurial, RabbitMQ, requests, sunburnt, titlecase
-        Display: Silk icons, Blueprint CSS
+              Mercurial, RabbitMQ, requests, sunburnt,
+              Tesseract, titlecase
+        Display: Silk icons, Blueprint CSS, Bootstrap, Font Awesome
         Infrastructure: Apache2, Linux, Postgres, Solr
-  Source: https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/overview
+  Source: https://github.com/freelawproject/courtlistener
 
 
 

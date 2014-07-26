@@ -20,7 +20,7 @@ Fields that we care about:
  - plain_text - generally, this is the PDF plaintext from the document, but in this case, we have well formed HTML. Either we create a new field (html) and integrate that into templates, or we put HTML into this field, and render it nicely when applicable. The only way to do that is to have a "source" flag in the DB that loads templates differently based on the "source" of the document. A further solution might be to add the source field for good measure, and to also have a html field instead of the plain_text field. There is also some footer information and other cruft from resource.org that will need to be sloughed off so things are clean.
  - precedential_status - these are all Slip Opinions, I believe, so this gets set to 'S'.
 
-Associated bug is here: http://bitbucket.org/mlissner/legal-current-awareness/issue/45/
+Associated bug is here: http://bitbucket.org/mlissner/courtlistener/issue/45/
 
 
 Volume 44, 96, 154, 186, 207, 307, 335, 353, 355, 361, 364, 372, 375, 377, 389, 441, 453, 457, 475, 489,  has a data error.
