@@ -1,3 +1,6 @@
+# Beginning with the globs
+syntax: glob
+
 # no compiled files!
 *.class
 *.pyc
@@ -30,4 +33,5 @@ Solr/data
 # IntelliJ IDEA files
 .idea
 
-
+syntax: regexp
+^\.settings$
