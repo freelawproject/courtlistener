@@ -48,6 +48,8 @@ class Command(BaseCommand):
             return self.site_yielder([i.date() for i in rrule(WEEKLY, dtstart=start, until=end)], mod)
         elif court_str == 'cafc':
             return self.site_yielder(range(0, 185), mod)
+        elif court_str == 'fla':
+            return self.site_yielder([2013, ], mod)
         elif 'haw' in court_str:
             return self.site_yielder(range(2010, 2013), mod)
         elif court_str == 'mich':
@@ -66,6 +68,34 @@ class Command(BaseCommand):
             return self.site_yielder([i.date() for i in rrule(MONTHLY, dtstart=start, until=end)], mod)
         elif court_str in ['nmctapp', 'nm']:
             return self.site_yielder(range(2009, 2013), mod)
+        elif court_str == 'ohio':
+            return self.site_yielder(range(1, 153), mod)
+        elif 'ohioctapp_1' in mod.__name__:
+            return self.site_yielder(range(1, 24), mod)
+        elif 'ohioctapp_2' in mod.__name__:
+            return self.site_yielder(range(1, 80), mod)
+        elif 'ohioctapp_3' in mod.__name__:
+            return self.site_yielder(range(1, 44), mod)
+        elif 'ohioctapp_4' in mod.__name__:
+            return self.site_yielder(range(1, 37), mod)
+        elif 'ohioctapp_5' in mod.__name__:
+            return self.site_yielder(range(1, 99), mod)
+        elif 'ohioctapp_6' in mod.__name__:
+            return self.site_yielder(range(1, 1), mod)
+        elif 'ohioctapp_7' in mod.__name__:
+            return self.site_yielder(range(1, 42), mod)
+        elif 'ohioctapp_8' in mod.__name__:
+            return self.site_yielder(range(1, 133), mod)
+        elif 'ohioctapp_9' in mod.__name__:
+            return self.site_yielder(range(1, 67), mod)
+        elif 'ohioctapp_10' in mod.__name__:
+            return self.site_yielder(range(1, 88), mod)
+        elif 'ohioctapp_11' in mod.__name__:
+            return self.site_yielder(range(1, 58), mod)
+        elif 'ohioctapp_12' in mod.__name__:
+            return self.site_yielder(range(1, 43), mod)
+        elif court_str == 'ohioctcl':
+            return self.site_yielder(range(1, 58), mod)
         elif court_str == 'sd':
             return self.site_yielder(range(1996, 2013), mod)
         elif court_str == 'tenn':
