@@ -285,7 +285,7 @@ class Command(BaseCommand):
             elif options.get('datetime'):
                 self.delete_by_datetime(dt)
             elif options.get('query'):
-                self.delete_by_query(args[0])
+                self.delete_by_query(options.get('query'))
             elif options.get('document'):
                 for doc in args:
                     try:

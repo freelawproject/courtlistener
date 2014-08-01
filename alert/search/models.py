@@ -1,5 +1,4 @@
 import re
-import sys
 from alert import settings
 from alert.lib.string_utils import trunc
 from alert.lib.encode_decode import num_to_ascii
