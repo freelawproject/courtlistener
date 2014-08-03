@@ -1,6 +1,7 @@
 from datetime import datetime
 import time
 import sys
+from django.utils.timezone import make_aware, utc
 
 from alert.lib.db_tools import queryset_generator
 from django.core.management import call_command
@@ -114,20 +115,22 @@ class Command(BaseCommand):
         both_list_and_endpoints = (options.get('doc_id') is not None and
                                    (options.get('start_id') is not None or
                                     options.get('end_id') is not None or
-                                    options.get('start_date') is not None))
+                                    options.get('filed_after') is not None or
+                                    options.get('modified_after') is not None))
         no_option = (not any([options.get('doc_id') is None,
                               options.get('start_id') is None,
                               options.get('end_id') is None,
-                              options.get('start_date') is None,
+                              options.get('filed_after') is None,
+                              options.get('modified_after') is None,
                               options.get('all') is False]))
         if both_list_and_endpoints or no_option:
             raise CommandError('Please specify either a list of documents, a range of ids, a range of dates, or '
                                'everything.')
 
         if options.get('filed_after'):
-            start_date = datetime.strptime(options['filed_after'], '%Y-%m-%d')
+            start_date = make_aware(datetime.strptime(options['filed_after'], '%Y-%m-%d'), utc)
         if options.get('modified_after'):
-            modified_date = datetime.strptime(options['modified_after'], '%Y-%m-%d')
+            modified_date = make_aware(datetime.strptime(options['modified_after'], '%Y-%m-%d'), utc)
 
         index = options['index'].lower()
 
