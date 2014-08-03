@@ -31,7 +31,12 @@ class Command(BaseCommand):
             help='end id for a range of documents to update'
         ),
         make_option(
-            '--start_date',
+            '--filed_after',
+            type=str,
+            help="Start date in ISO-8601 format for a range of documents to update"
+        ),
+        make_option(
+            '--modified_after',
             type=str,
             help="Start date in ISO-8601 format for a range of documents to update"
         ),
@@ -70,7 +75,7 @@ class Command(BaseCommand):
         for doc in documents:
             processed_count += 1
             if processed_count % 10000 == 0:
-                # Send the commit every 1000 times.
+                # Send the commit every 10000 times.
                 commit = True
             else:
                 commit = False
@@ -119,8 +124,10 @@ class Command(BaseCommand):
             raise CommandError('Please specify either a list of documents, a range of ids, a range of dates, or '
                                'everything.')
 
-        if options.get('start_date'):
-            start_date = datetime.strptime(options['start_date'], '%Y-%m-%d')
+        if options.get('filed_after'):
+            start_date = datetime.strptime(options['filed_after'], '%Y-%m-%d')
+        if options.get('modified_after'):
+            modified_date = datetime.strptime(options['modified_after'], '%Y-%m-%d')
 
         index = options['index'].lower()
 
@@ -132,9 +139,11 @@ class Command(BaseCommand):
             query = query.filter(pk__lte=options.get('end_id'))
         if options.get('start_id'):
             query = query.filter(pk__gte=options.get('start_id'))
-        if options.get('start_date'):
+        if options.get('filed_after'):
             query = query.filter(date_filed__gte=start_date)
-        elif options.get('all'):
+        if options.get('modified_after'):
+            query = query.filter(date_modified__gte=modified_date)
+        if options.get('all'):
             query = Document.object.all()
         count = query.count()
         docs = queryset_generator(query.order_by('date_filed'), chunksize=10000)
