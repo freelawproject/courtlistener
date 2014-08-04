@@ -171,9 +171,9 @@ def merge_form_with_courts(COURTS, search_form):
     courts['bankruptcy'].append(b_bundle)
 
     # Divide the state bundles into the correct partitions
-    courts['state'].append(state_bundles[:16])
-    courts['state'].append(state_bundles[16:35])
-    courts['state'].append(state_bundles[35:])
+    courts['state'].append(state_bundles[:15])
+    courts['state'].append(state_bundles[15:34])
+    courts['state'].append(state_bundles[34:])
 
     return courts, court_count_human, court_count
 
