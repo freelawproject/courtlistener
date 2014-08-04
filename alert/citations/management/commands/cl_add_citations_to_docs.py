@@ -32,12 +32,11 @@ class Command(BaseCommand):
             help='end id for a range of documents to update'
         ),
         make_option(
+            # Note that there's a temptation to add a field here for date_modified, so get any recently modified files.
+            # the danger of doing this is that you modify files as you process them, creating an endless loop. You'll
+            # start the program reporting X files to modify, but after those items finish, you'll discover that the
+            # program continues onto the newly edited files, including those files that have new citations to them.
             '--filed_after',
-            type=str,
-            help="Start date in ISO-8601 format for a range of documents to update"
-        ),
-        make_option(
-            '--modified_after',
             type=str,
             help="Start date in ISO-8601 format for a range of documents to update"
         ),
@@ -45,7 +44,7 @@ class Command(BaseCommand):
             '--all',
             default=False,
             action='store_true',
-            help='parse citations for all items',
+            help='Parse citations for all items',
         ),
         make_option(
             '--index',
@@ -115,13 +114,11 @@ class Command(BaseCommand):
         both_list_and_endpoints = (options.get('doc_id') is not None and
                                    (options.get('start_id') is not None or
                                     options.get('end_id') is not None or
-                                    options.get('filed_after') is not None or
-                                    options.get('modified_after') is not None))
+                                    options.get('filed_after') is not None))
         no_option = (not any([options.get('doc_id') is None,
                               options.get('start_id') is None,
                               options.get('end_id') is None,
                               options.get('filed_after') is None,
-                              options.get('modified_after') is None,
                               options.get('all') is False]))
         if both_list_and_endpoints or no_option:
             raise CommandError('Please specify either a list of documents, a range of ids, a range of dates, or '
@@ -129,8 +126,6 @@ class Command(BaseCommand):
 
         if options.get('filed_after'):
             start_date = make_aware(datetime.strptime(options['filed_after'], '%Y-%m-%d'), utc)
-        if options.get('modified_after'):
-            modified_date = make_aware(datetime.strptime(options['modified_after'], '%Y-%m-%d'), utc)
 
         index = options['index'].lower()
 
@@ -144,10 +139,8 @@ class Command(BaseCommand):
             query = query.filter(pk__gte=options.get('start_id'))
         if options.get('filed_after'):
             query = query.filter(date_filed__gte=start_date)
-        if options.get('modified_after'):
-            query = query.filter(date_modified__gte=modified_date)
         if options.get('all'):
             query = Document.object.all()
         count = query.count()
-        docs = queryset_generator(query.order_by('date_filed'), chunksize=10000)
+        docs = queryset_generator(query, chunksize=10000)
         self.update_documents(docs, count, index)
