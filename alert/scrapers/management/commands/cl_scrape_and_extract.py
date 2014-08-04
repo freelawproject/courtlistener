@@ -13,6 +13,7 @@ from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import build_module_list
 from scrapers.tasks import extract_doc_content, extract_by_ocr
 from requests.exceptions import SSLError
+from requests.models import Response
 from urlparse import urljoin
 
 import hashlib
@@ -118,7 +119,7 @@ def get_binary_content(download_url, cookies):
         # Occurs when a DeferredList fetcher fails.
         msg = 'NoDownloadUrlError: %s\n%s' % (download_url, traceback.format_exc())
         return msg, None
-    # noinspection PyBroadException
+    r = Response()
     try:
         s = requests.session()
         headers = {'User-Agent': 'CourtListener'}
@@ -143,6 +144,7 @@ def get_binary_content(download_url, cookies):
 
         # test for and follow meta redirects
         r = follow_redirections(r, s)
+    # noinspection PyBroadException
     except:
         msg = 'DownloadingError: %s\n%s' % (download_url, traceback.format_exc())
         return msg, r
