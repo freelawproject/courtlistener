@@ -172,7 +172,7 @@
                                    name="edit_alert">
                         {% endif %}
                         <button type="submit" class="button title span-5" name="alertSave">
-                            {% if request.GET.edit_alert %}Edit Alert{% else %}Create Alert{% endif %}
+                            {% if request.GET.edit_alert %}Save Changes{% else %}Create Alert{% endif %}
                         </button>
                         <p class="gray">Some jurisdictions do not yet support alerts. Check
                             <a href="/coverage/#scraped-jurisdictions">our list</a> to be
@@ -210,7 +210,7 @@
         {% if request.GET.edit_alert %}
             <div class="span-16 last notice">
                 <p class="bottom span-10">You are currently editing your alert,
-                    "<strong>{{ alert_form.alertName.value }}</strong>".</p>
+                    "<strong>{{ alert_form.alertName.value }}</strong>". To save changes, press "Save Changes", below.</p>
                 <p class="bottom span-6 last right"><a href="?{{ get_string_sans_alert }}"><i
                         class="gray fa fa-times" title="Cancel editing and redo the search"></i></a></p>
             </div>
