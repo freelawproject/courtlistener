@@ -48,7 +48,7 @@ class Command(BaseCommand):
         calculate the number of cases found for each court.
 
         Returns a list like so:
-        [('ca1': date1), ('ca2': date2), ('ca3':...)]
+        [('ca1', date1, link), ('ca2', date2, link), ('ca3',...)]
         """
         sixty_days_ago = now() - timedelta(days=60)
         cts_sixty_days = Court.objects \
@@ -68,7 +68,7 @@ class Command(BaseCommand):
         for court in all_active_courts:
             if cts_sixty_days.get(court, 0) == 0:
                 # No results in sixty days. Get date of most recent item.
-                date_filed = Document.objects.filter(court_id=court).order_by('-date_filed')[0].date_filed
+                date_filed = Document.objects.filter(court_id=court).order_by('date_filed')[0].date_filed
                 most_recent_opinions.append((court, date_filed))
 
         # Sort by date (index 1)
