@@ -57,6 +57,7 @@ class Command(BaseCommand):
         last_day = now() - timedelta(days=1)
         seven_days_ago = now() - timedelta(days=7)
         thirty_days_ago = now() - timedelta(days=30)
+        sixty_days_ago = now() - timedelta(days=60)
 
         cts_last_day = Court.objects \
             .filter(document__date_filed__gt=last_day) \
@@ -70,6 +71,11 @@ class Command(BaseCommand):
             .filter(document__date_filed__gt=thirty_days_ago) \
             .annotate(count=Count('document__pk')) \
             .values('pk', 'count')
+        cts_sixty_days = Court.objects \
+            .filter(document__date_filed__gt=sixty_days_ago) \
+            .annotate(count=Count('document__pk')) \
+            .values('pk', 'count')
+
 
         # Needed because annotation calls above don't return courts with no new
         # opinions
@@ -79,21 +85,24 @@ class Command(BaseCommand):
         cts_last_day = self._make_query_dict(cts_last_day)
         cts_seven_days = self._make_query_dict(cts_seven_days)
         cts_thirty_days = self._make_query_dict(cts_thirty_days)
+        cts_sixty_days = self._make_query_dict(cts_sixty_days)
 
         # Combine everything
         counts = {}
-        totals = ['TOTAL', 0, 0, 0]
+        totals = ['TOTAL', 0, 0, 0, 0]
         for court in all_active_courts:
+            sixty = cts_sixty_days.get(court['pk'], 0)
             thirty = cts_thirty_days.get(court['pk'], 0)
             seven = cts_seven_days.get(court['pk'], 0)
             last = cts_last_day.get(court['pk'], 0)
-            totals[1] += thirty
-            totals[2] += seven
-            totals[3] += last
-            if seven > 0:
+            totals[1] += sixty
+            totals[2] += thirty
+            totals[3] += seven
+            totals[4] += last
+            if sixty > 0:
                 # We got stuff, move along.
                 continue
-            counts[court['pk']] = [thirty, seven, last]
+            counts[court['pk']] = [sixty, thirty, seven, last]
 
         if len(counts) > 0:
             critical_history = True

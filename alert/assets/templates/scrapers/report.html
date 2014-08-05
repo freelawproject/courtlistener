@@ -88,7 +88,7 @@
                       vertical-align: baseline;
                       font-style: inherit;
                       margin: 0 0 1.5em;
-                      padding: 0;">A court has 0 results for the past seven days. This is a critical problem.</p>
+                      padding: 0;">A court has 0 results for the past sixty days. This is a critical problem.</p>
         {% endif %}
 
         <table style="text-align: center;">
@@ -96,6 +96,7 @@
                 <tr>
                     <th style="padding-right: 10px;
                                text-align: left;">Court</th>
+                    <th style="padding-right: 10px;">60 day count</th>
                     <th style="padding-right: 10px;">30 day count</th>
                     <th style="padding-right: 10px;">7 day count</th>
                     <th style="padding-right: 10px;">Today's count</th>
@@ -117,18 +118,23 @@
                         <td style="border-color: gray;
                                    border-style: dotted;
                                    border-width: 0 0 1px;"><p>{{ values.2 }}</p></td>
+                        <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;"><p>{{ values.3 }}</p></td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
 
-        <p style="font-size: 1em;
-                      font-weight: normal;
-                      font-family: inherit;
-                      vertical-align: baseline;
-                      font-style: inherit;
-                      margin: 0 0 1.5em;
-                      padding: 0;">Grant Totals</p>
+        <h2 style="font-size: 1.5em;
+                   font-weight: normal;
+                   line-height: 1;
+                   font-family: inherit;
+                   color: #111;
+                   vertical-align: baseline;
+                   font-style: inherit;
+                   margin: 10px;
+                   padding: 0;">Grand Totals</h2>
 
         <table style="text-align: center;">
             <thead>
@@ -136,6 +142,7 @@
                 <th style="padding-right: 10px;
                                text-align: left;">Court
                 </th>
+                <th style="padding-right: 10px;">60 day count</th>
                 <th style="padding-right: 10px;">30 day count</th>
                 <th style="padding-right: 10px;">7 day count</th>
                 <th style="padding-right: 10px;">Today's count</th>
