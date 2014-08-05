@@ -53,7 +53,7 @@ class Command(BaseCommand):
         elif 'haw' in court_str:
             return self.site_yielder(range(2010, 2013), mod)
         elif court_str == 'mich':
-            return self.site_yielder(range(0, 868), mod)
+            return self.site_yielder(range(0, 148), mod)
         elif court_str == 'miss':
             return self.site_yielder(range(1990, 2012), mod)
         elif court_str == 'mont':
