@@ -58,7 +58,7 @@ class Command(BaseCommand):
 
         # Needed because annotation calls above don't return courts with no new
         # opinions
-        all_active_courts = Court.objects.filter(has_scraper=True).values('pk').order_by('position')
+        all_active_courts = Court.objects.filter(has_scraper=True).values_list('pk', flat=True).order_by('position')
 
         # Reformat the results into dicts...
         cts_sixty_days = self._make_query_dict(cts_sixty_days)
@@ -66,10 +66,10 @@ class Command(BaseCommand):
         # Combine everything
         most_recent_opinions = []
         for court in all_active_courts:
-            if cts_sixty_days.get(court['pk'], 0) == 0:
+            if cts_sixty_days.get(court, 0) == 0:
                 # No results in sixty days. Get date of most recent item.
                 date_filed = Document.objects.filter(court_id=court).order_by('-date_filed')[0].date_filed
-                most_recent_opinions.append((court['pk'], date_filed))
+                most_recent_opinions.append((court, date_filed))
 
         # Sort by date (index 1)
         most_recent_opinions.sort(key=itemgetter(1), reverse=True)
