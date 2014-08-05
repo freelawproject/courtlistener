@@ -73,7 +73,7 @@ class Command(BaseCommand):
 
         # Needed because annotation calls above don't return courts with no new
         # opinions
-        all_active_courts = Court.objects.filter(in_use=True).values('pk').order_by('position')
+        all_active_courts = Court.objects.filter(has_scraper=True).values('pk').order_by('position')
 
         # Reformat the results into dicts...
         cts_last_day = self._make_query_dict(cts_last_day)
@@ -87,23 +87,18 @@ class Command(BaseCommand):
             thirty = cts_thirty_days.get(court['pk'], 0)
             seven = cts_seven_days.get(court['pk'], 0)
             last = cts_last_day.get(court['pk'], 0)
-            if thirty + seven + last == 0:
-                # Not a court we scrape. Move along.
-                continue
             totals[1] += thirty
             totals[2] += seven
             totals[3] += last
+            if seven > 0:
+                # We got stuff, move along.
+                continue
             counts[court['pk']] = [thirty, seven, last]
 
-        # Determine if any court has 0 results for the past seven days, but
-        # more than 10 for the past 30. That's usually a critical problem.
-        critical_history = False
-        for court in all_active_courts:
-            last_thirty_day_count = cts_thirty_days.get(court['pk'], 0)
-            last_seven_day_count = cts_seven_days.get(court['pk'], 0)
-            if last_seven_day_count == 0 and last_thirty_day_count > 10:
-                critical_history = True
-                break
+        if len(counts) > 0:
+            critical_history = True
+        else:
+            critical_history = False
 
         return counts, totals, critical_history
 
@@ -127,10 +122,10 @@ class Command(BaseCommand):
         cts_critical = self._make_query_dict(cts_critical)
         cts_warnings = self._make_query_dict(cts_warnings)
 
-        # Set the critical flag if any court has more than 10 critical problems
+        # Set the critical flag if any court has more than 5 critical problems
         critical_today = False
         for value in cts_critical.values():
-            if value > 10:
+            if value > 5:
                 critical_today = True
                 break
 

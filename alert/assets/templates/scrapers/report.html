@@ -88,7 +88,7 @@
                       vertical-align: baseline;
                       font-style: inherit;
                       margin: 0 0 1.5em;
-                      padding: 0;">A court has 0 results for the past seven days and more than 10 for the past 30. This is a critical problem.</p>
+                      padding: 0;">A court has 0 results for the past seven days. This is a critical problem.</p>
         {% endif %}
 
         <table style="text-align: center;">
@@ -119,6 +119,29 @@
                                    border-width: 0 0 1px;"><p>{{ values.2 }}</p></td>
                     </tr>
                 {% endfor %}
+            </tbody>
+        </table>
+
+        <p style="font-size: 1em;
+                      font-weight: normal;
+                      font-family: inherit;
+                      vertical-align: baseline;
+                      font-style: inherit;
+                      margin: 0 0 1.5em;
+                      padding: 0;">Grant Totals</p>
+
+        <table style="text-align: center;">
+            <thead>
+            <tr>
+                <th style="padding-right: 10px;
+                               text-align: left;">Court
+                </th>
+                <th style="padding-right: 10px;">30 day count</th>
+                <th style="padding-right: 10px;">7 day count</th>
+                <th style="padding-right: 10px;">Today's count</th>
+            </tr>
+            </thead>
+            <tbody>
                 <tr>
                     {% for total in totals %}
                         <td>{{ total }} </td>
@@ -126,5 +149,6 @@
                 </tr>
             </tbody>
         </table>
+
     </body>
 </html>
