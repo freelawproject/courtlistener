@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
+from operator import itemgetter
 from django.utils.timezone import now
 
 from alert.scrapers.models import ErrorLog
-from alert.search.models import Court
+from alert.search.models import Court, Document
 from datetime import date, timedelta
 from django.conf import settings
 from django.core import mail
@@ -46,70 +47,38 @@ class Command(BaseCommand):
         """Grab the information for new documents over the past 30 days, and
         calculate the number of cases found for each court.
 
-        Returns a dict like so:
-        {'ca1':['40','42', '39'], 'ca2': ['23', '23', '0'], 'ca3':...}
-
-        Note that the values in the list are:
-         0: The count for the past 30 days.
-         1: The count for the past 7 days.
-         2: The count for today
+        Returns a list like so:
+        [('ca1': date1), ('ca2': date2), ('ca3':...)]
         """
-        last_day = now() - timedelta(days=1)
-        seven_days_ago = now() - timedelta(days=7)
-        thirty_days_ago = now() - timedelta(days=30)
         sixty_days_ago = now() - timedelta(days=60)
-
-        cts_last_day = Court.objects \
-            .filter(document__date_filed__gt=last_day) \
-            .annotate(count=Count('document__pk')) \
-            .values('pk', 'count')
-        cts_seven_days = Court.objects \
-            .filter(document__date_filed__gt=seven_days_ago) \
-            .annotate(count=Count('document__pk')) \
-            .values('pk', 'count')
-        cts_thirty_days = Court.objects \
-            .filter(document__date_filed__gt=thirty_days_ago) \
-            .annotate(count=Count('document__pk')) \
-            .values('pk', 'count')
         cts_sixty_days = Court.objects \
             .filter(document__date_filed__gt=sixty_days_ago) \
             .annotate(count=Count('document__pk')) \
             .values('pk', 'count')
-
 
         # Needed because annotation calls above don't return courts with no new
         # opinions
         all_active_courts = Court.objects.filter(has_scraper=True).values('pk').order_by('position')
 
         # Reformat the results into dicts...
-        cts_last_day = self._make_query_dict(cts_last_day)
-        cts_seven_days = self._make_query_dict(cts_seven_days)
-        cts_thirty_days = self._make_query_dict(cts_thirty_days)
         cts_sixty_days = self._make_query_dict(cts_sixty_days)
 
         # Combine everything
-        counts = {}
-        totals = ['TOTAL', 0, 0, 0, 0]
+        most_recent_opinions = []
         for court in all_active_courts:
-            sixty = cts_sixty_days.get(court['pk'], 0)
-            thirty = cts_thirty_days.get(court['pk'], 0)
-            seven = cts_seven_days.get(court['pk'], 0)
-            last = cts_last_day.get(court['pk'], 0)
-            totals[1] += sixty
-            totals[2] += thirty
-            totals[3] += seven
-            totals[4] += last
-            if sixty > 0:
-                # We got stuff, move along.
-                continue
-            counts[court['pk']] = [sixty, thirty, seven, last]
+            if cts_sixty_days.get(court['pk'], 0) == 0:
+                # No results in sixty days. Get date of most recent item.
+                date_filed = Document.objects.all().sort('-date_filed')[0].date_filed
+                most_recent_opinions.append(([court['pk']], date_filed))
 
-        if len(counts) > 0:
+        # Sort by date (index 1)
+        most_recent_opinions.sort(key=itemgetter(1), reverse=True)
+
+        critical_history = False
+        if len(most_recent_opinions) > 0:
             critical_history = True
-        else:
-            critical_history = False
 
-        return counts, totals, critical_history
+        return most_recent_opinions, critical_history
 
     def _tally_errors(self):
         """Look at the error db and gather the latest errors from it"""
@@ -154,12 +123,12 @@ class Command(BaseCommand):
         """Look at the counts and errors, generate and return a report.
 
         """
-        averages, totals, critical_history = self._calculate_counts()
+        most_recent_opinions, critical_history = self._calculate_counts()
         errors, critical_today = self._tally_errors()
 
         # Make the report!
         html_template = loader.get_template('scrapers/report.html')
-        c = Context({'averages': averages, 'totals': totals, 'errors': errors,
+        c = Context({'most_recent_opinions': most_recent_opinions, 'errors': errors,
                      'critical_today': critical_today,
                      'critical_history': critical_history})
         report = html_template.render(c)

@@ -96,14 +96,11 @@
                 <tr>
                     <th style="padding-right: 10px;
                                text-align: left;">Court</th>
-                    <th style="padding-right: 10px;">60 day count</th>
-                    <th style="padding-right: 10px;">30 day count</th>
-                    <th style="padding-right: 10px;">7 day count</th>
-                    <th style="padding-right: 10px;">Today's count</th>
+                    <th style="padding-right: 10px;">Most Recent Case</th>
                 </tr>
             </thead>
             <tbody>
-                {% for court, values in averages.items %}
+                {% for court, value in most_recent_opinions %}
                     <tr>
                         <td style="border-color: gray;
                                    border-style: dotted;
@@ -111,51 +108,10 @@
                                    text-align: left;"><p>{{ court }}</p></td>
                         <td style="border-color: gray;
                                    border-style: dotted;
-                                   border-width: 0 0 1px;"><p>{{ values.0 }}</p></td>
-                        <td style="border-color: gray;
-                                   border-style: dotted;
-                                   border-width: 0 0 1px;"><p>{{ values.1 }}</p></td>
-                        <td style="border-color: gray;
-                                   border-style: dotted;
-                                   border-width: 0 0 1px;"><p>{{ values.2 }}</p></td>
-                        <td style="border-color: gray;
-                                   border-style: dotted;
-                                   border-width: 0 0 1px;"><p>{{ values.3 }}</p></td>
+                                   border-width: 0 0 1px;"><p>{{ value }}</p></td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
-
-        <h2 style="font-size: 1.5em;
-                   font-weight: normal;
-                   line-height: 1;
-                   font-family: inherit;
-                   color: #111;
-                   vertical-align: baseline;
-                   font-style: inherit;
-                   margin: 10px;
-                   padding: 0;">Grand Totals</h2>
-
-        <table style="text-align: center;">
-            <thead>
-            <tr>
-                <th style="padding-right: 10px;
-                               text-align: left;">Court
-                </th>
-                <th style="padding-right: 10px;">60 day count</th>
-                <th style="padding-right: 10px;">30 day count</th>
-                <th style="padding-right: 10px;">7 day count</th>
-                <th style="padding-right: 10px;">Today's count</th>
-            </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    {% for total in totals %}
-                        <td>{{ total }} </td>
-                    {% endfor %}
-                </tr>
-            </tbody>
-        </table>
-
     </body>
 </html>
