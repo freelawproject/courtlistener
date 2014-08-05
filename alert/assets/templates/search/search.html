@@ -209,9 +209,9 @@
         {% endif %}
         {% if request.GET.edit_alert %}
             <div class="span-16 last notice">
-                <p class="bottom span-10">You are currently editing your alert,
+                <p class="bottom span-15">You are currently editing your alert,
                     "<strong>{{ alert_form.alertName.value }}</strong>". To save changes, press "Save Changes", below.</p>
-                <p class="bottom span-6 last right"><a href="?{{ get_string_sans_alert }}"><i
+                <p class="bottom span-1 last right"><a href="?{{ get_string_sans_alert }}"><i
                         class="gray fa fa-times" title="Cancel editing and redo the search"></i></a></p>
             </div>
         {% endif %}
