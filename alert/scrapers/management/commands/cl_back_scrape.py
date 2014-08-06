@@ -97,7 +97,20 @@ class Command(BaseCommand):
         elif court_str == 'ohioctcl':
             return self.site_yielder(range(1, 58), mod)
         elif court_str == 'sd':
-            return self.site_yielder(range(1996, 2013), mod)
+            page_year = [
+                (0, 2014),
+                (1, 2014),
+                (2, 2014),
+                (3, 2014),
+                (0, 2013),
+                (1, 2013),
+                (2, 2013),
+                (3, 2013),
+                (4, 2013),
+                (5, 2013),
+                (6, 2013),
+            ]
+            return self.site_yielder(page_year, mod)
         elif court_str == 'tenn':
             return self.site_yielder(range(0, 131), mod)
         elif court_str == 'tenncrimapp':

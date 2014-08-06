@@ -68,7 +68,7 @@ class Command(BaseCommand):
         for court in all_active_courts:
             if cts_sixty_days.get(court, 0) == 0:
                 # No results in sixty days. Get date of most recent item.
-                date_filed = Document.objects.filter(court_id=court).order_by('date_filed')[0].date_filed
+                date_filed = Document.objects.filter(court_id=court).order_by('-date_filed')[0].date_filed
                 most_recent_opinions.append((court, date_filed))
 
         # Sort by date (index 1)
