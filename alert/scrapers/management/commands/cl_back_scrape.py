@@ -129,6 +129,12 @@ class Command(BaseCommand):
             return self.site_yielder([1], mod)
         elif court_str == 'uscfc_vaccine_u':
             return self.site_yielder(range(1,10), mod)
+        elif 'wash' in court_str:
+            return self.site_yielder([i.date() for i in rrule(
+                MONTHLY,
+                dtstart=date(2014, 02, 01),
+                until=date.today(),
+            )], mod)
 
     def back_scrape(self, mod):
         for site in self.generate_sites(mod):
