@@ -100,15 +100,16 @@ def get_extension(content):
 
 
 def normalize_cookies(cookies):
-    """Selenium uses a different format for cookies than does requests. This converts from a Selenium dict to a
-    requests dict, if a selenium dict is found.
+    """Selenium uses a different format for cookies than does requests. This
+    converts from a Selenium dict to a requests dict, if a selenium dict is
+    found.
     """
     requests_cookies = {}
     for cookie in cookies:
         try:
             # If it's a selenium-style cookie, convert to requests-style.
             requests_cookies[cookie['name']] = cookie['value']
-        except KeyError:
+        except (TypeError, AttributeError):
             # If above fails, it's already a requests-style cookie. Simply move on.
             return cookies
     return requests_cookies
