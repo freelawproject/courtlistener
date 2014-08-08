@@ -160,8 +160,8 @@ def scrape_court(site, full_crawl=False):
     court_str = site.court_id.split('.')[-1].split('_')[0]
     court = Court.objects.get(pk=court_str)
 
-    dup_checker = DupChecker(court, full_crawl=full_crawl)
-    abort = dup_checker.abort_by_url_hash(site.url, site.hash)
+    dup_checker = DupChecker(site.court_id, full_crawl=full_crawl)
+    abort = dup_checker.abort_by_hash(site.hash)
     if not abort:
         for i in range(0, len(site.case_names)):
             msg, r = get_binary_content(site.download_urls[i], site._get_cookies())
