@@ -42,7 +42,7 @@ from django.utils.timezone import now, utc
      - Unlike the rest of the CourtListener platform, this file is available under the permissive BSD license, making it
        easy and safe to incorporate in your own libraries.
 
-    Pull and feature requests welcome. Online editing in BitBucket is possible (and easy!)
+    Pull and feature requests welcome. Online editing in Github is possible (and easy!)
 '''
 
 REPORTERS = {'A.': [{'cite_type': 'state_regional',
@@ -1952,7 +1952,7 @@ REPORTERS = {'A.': [{'cite_type': 'state_regional',
              'N.M.': [{'cite_type': 'state',
                        'editions': {'N.M.': (datetime.datetime(1852, 1, 1, tzinfo=utc),
                                              now())},
-                                            # Dates confirmed via citation table at 
+                                            # Dates confirmed via citation table at
                                             # http://www.nmcompcomm.us/nmcases/pdf/NM%20Reports%20to%20Official%20-%20Vols.%201-75.pdf
                        'mlz_jurisdiction': 'us;nm',
                        'name': 'New Mexico Reports',
