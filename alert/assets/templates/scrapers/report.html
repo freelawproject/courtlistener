@@ -82,15 +82,33 @@
             <tr>
                 <th style="padding-right: 10px;
                                text-align: left;">Court</th>
+                <th style="padding-right: 10px;
+                               text-align: left;">Most Recent Case</th>
+                <th style="padding-right: 10px;
+                               text-align: left;">GET / POST</th>
+                <th style="padding-right: 10px;
+                               text-align: left;">URL</th>
             </tr>
             </thead>
             <tbody>
-            {% for court in recently_dying_courts %}
+            {% for court, d, method, url in recently_dying_courts %}
                 <tr>
                     <td style="border-color: gray;
                                    border-style: dotted;
                                    border-width: 0 0 1px;
                                    text-align: left;"><p>{{ court }}</p></td>
+                    <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;
+                                   text-align: left;"><p>{{ d }}</p></td>
+                    <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;
+                                   text-align: left;"><p>{{ method }}</p></td>
+                    <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;
+                                   text-align: left;"><p>{{ url }}</p></td>
                 </tr>
             {% endfor %}
             </tbody>
@@ -117,12 +135,21 @@
             <thead>
                 <tr>
                     <th style="padding-right: 10px;
-                               text-align: left;">Court</th>
-                    <th style="padding-right: 10px;">Most Recent Case</th>
+                               text-align: left;">Court
+                    </th>
+                    <th style="padding-right: 10px;
+                               text-align: left;">Most Recent Case
+                    </th>
+                    <th style="padding-right: 10px;
+                               text-align: left;">GET / POST
+                    </th>
+                    <th style="padding-right: 10px;
+                               text-align: left;">URL
+                    </th>
                 </tr>
             </thead>
             <tbody>
-                {% for court, value in most_recent_opinions %}
+                {% for court, d, method, url in most_recent_opinions %}
                     <tr>
                         <td style="border-color: gray;
                                    border-style: dotted;
@@ -130,7 +157,16 @@
                                    text-align: left;"><p>{{ court }}</p></td>
                         <td style="border-color: gray;
                                    border-style: dotted;
-                                   border-width: 0 0 1px;"><p>{{ value }}</p></td>
+                                   border-width: 0 0 1px;
+                                   text-align: left;"><p>{{ d }}</p></td>
+                        <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;
+                                   text-align: left;"><p>{{ method }}</p></td>
+                        <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;
+                                   text-align: left;"><p>{{ url }}</p></td>
                     </tr>
                 {% endfor %}
             </tbody>

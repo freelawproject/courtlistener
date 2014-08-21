@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from juriscraper.lib import importer
 from operator import itemgetter
 from django.utils.timezone import now
 
@@ -68,15 +69,33 @@ class Command(BaseCommand):
         # Combine everything
         most_recent_opinions = []
         recently_dying_courts = []
+        mod_list = importer.build_module_list('juriscraper')
+        mod_dict = {}
+        for v in mod_list:
+            court = v.rsplit('.')[-1]
+            mod_dict[court] = v
+
         for court in all_active_courts:
             if cts_more_than_30_days.get(court, 0) == 0:
                 # No results in newer than 35 days. Get date of most recent
                 # item.
                 date_filed = Document.objects.filter(court_id=court).order_by('-date_filed')[0].date_filed
+                mod = __import__(
+                    mod_dict[court],
+                    globals(),
+                    locals(),
+                    [mod_dict[court].rsplit('.')[0]],
+                )
+                url = mod.Site().url
+                method = mod.Site().method
                 if thirty_five_days_ago.date() < date_filed < \
                         thirty_days_ago.date():
-                    recently_dying_courts.append(court)
-                most_recent_opinions.append((court, date_filed))
+                    recently_dying_courts.append(
+                        (court, date_filed, method, url)
+                    )
+                most_recent_opinions.append(
+                    (court, date_filed, method, url)
+                )
 
         # Sort by date (index 1)
         most_recent_opinions.sort(key=itemgetter(1), reverse=True)
