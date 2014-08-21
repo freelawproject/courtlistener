@@ -50,35 +50,43 @@ class Command(BaseCommand):
         Returns a list like so:
         [('ca1', date1, link), ('ca2', date2, link), ('ca3',...)]
         """
-        sixty_days_ago = now() - timedelta(days=60)
-        cts_sixty_days = Court.objects \
-            .filter(document__date_filed__gt=sixty_days_ago) \
+        thirty_days_ago = now() - timedelta(days=30)
+        thirty_five_days_ago = now() - timedelta(days=35)
+        cts_30_35_days = Court.objects \
+            .filter(document__date_filed__gt=thirty_days_ago) \
+            .filter(document__date_filed__lte=thirty_five_days_ago) \
+            .annotate(count=Count('document__pk')) \
+            .values('pk', 'count')
+        cts_more_than_35_days = Court.objects \
+            .filter(document__date_filed__gt=thirty_five_days_ago) \
             .annotate(count=Count('document__pk')) \
             .values('pk', 'count')
 
         # Needed because annotation calls above don't return courts with no new
         # opinions
-        all_active_courts = Court.objects.filter(has_scraper=True).values_list('pk', flat=True).order_by('position')
+        all_active_courts = Court.objects.filter(has_scraper=True)\
+            .values_list('pk', flat=True).order_by('position')
 
         # Reformat the results into dicts...
-        cts_sixty_days = self._make_query_dict(cts_sixty_days)
+        cts_30_35_days = self._make_query_dict(cts_30_35_days)
+        cts_more_than_35_days = self._make_query_dict(cts_more_than_35_days)
 
         # Combine everything
         most_recent_opinions = []
+        recently_dying_courts = []
         for court in all_active_courts:
-            if cts_sixty_days.get(court, 0) == 0:
-                # No results in sixty days. Get date of most recent item.
+            if cts_more_than_35_days.get(court, 0) == 0:
+                # No results in newer than 35 days. Get date of most recent
+                # item.
                 date_filed = Document.objects.filter(court_id=court).order_by('-date_filed')[0].date_filed
                 most_recent_opinions.append((court, date_filed))
+            if cts_30_35_days.get(court, 0) == 0:
+                recently_dying_courts.append(court)
 
         # Sort by date (index 1)
         most_recent_opinions.sort(key=itemgetter(1), reverse=True)
 
-        critical_history = False
-        if len(most_recent_opinions) > 0:
-            critical_history = True
-
-        return most_recent_opinions, critical_history
+        return most_recent_opinions, recently_dying_courts
 
     def _tally_errors(self):
         """Look at the error db and gather the latest errors from it"""
@@ -100,13 +108,6 @@ class Command(BaseCommand):
         cts_critical = self._make_query_dict(cts_critical)
         cts_warnings = self._make_query_dict(cts_warnings)
 
-        # Set the critical flag if any court has more than 5 critical problems
-        critical_today = False
-        for value in cts_critical.values():
-            if value > 5:
-                critical_today = True
-                break
-
         # Make a union of the dicts
         errors = {}
         for court in all_active_courts:
@@ -117,27 +118,26 @@ class Command(BaseCommand):
                 continue
             errors[court['pk']] = [critical_count, warning_count]
 
-        return errors, critical_today
+        return errors
 
     def generate_report(self):
         """Look at the counts and errors, generate and return a report.
 
         """
-        most_recent_opinions, critical_history = self._calculate_counts()
-        errors, critical_today = self._tally_errors()
+        most_recent_opinions, recently_dying_courts = self._calculate_counts()
+        errors = self._tally_errors()
 
-        # Make the report!
         html_template = loader.get_template('scrapers/report.html')
-        c = Context({'most_recent_opinions': most_recent_opinions, 'errors': errors,
-                     'critical_today': critical_today,
-                     'critical_history': critical_history})
+        c = Context({
+            'most_recent_opinions': most_recent_opinions,
+            'recently_dying_courts': recently_dying_courts,
+            'errors': errors,
+        })
         report = html_template.render(c)
 
-        # Sort out if the subject is critical and add a date to it
-        subject = 'CourtListener status email for %s' % \
-                  date.strftime(now(), '%Y-%m-%d')
-        if critical_history or critical_today:
-            subject = 'CRITICAL - ' + subject
+        subject = 'CourtListener status email for {date}'.format(
+            date=date.strftime(now(), '%Y-%m-%d')
+        )
 
         return report, subject
 

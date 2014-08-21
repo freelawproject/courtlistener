@@ -32,17 +32,6 @@
                    font-style: inherit;
                    margin: 10px;
                    padding: 0;">Error Counts</h2>
-
-        {% if critical_today %}
-            <p style="font-size: 1em;
-                      font-weight: normal;
-                      font-family: inherit;
-                      vertical-align: baseline;
-                      font-style: inherit;
-                      margin: 0 0 1.5em;
-                      padding: 0;">More than 10 critical in a court today. This is a critical problem.</p>
-        {% endif %}
-
         <table style="text-align: center;">
             <thead>
             <tr>
@@ -79,18 +68,51 @@
                    vertical-align: baseline;
                    font-style: inherit;
                    margin: 10px;
-                   padding: 0;">Result Counts</h2>
-
-        {% if critical_history %}
-            <p style="font-size: 1em;
+                   padding: 0;">New Problem Courts</h2>
+        <p style="font-size: 1em;
                       font-weight: normal;
                       font-family: inherit;
                       vertical-align: baseline;
                       font-style: inherit;
                       margin: 0 0 1.5em;
-                      padding: 0;">A court has 0 results for the past sixty days. This is a critical problem.</p>
-        {% endif %}
+                      padding: 0;">These courts have 0 results for more than 30 days but
+            less than 35 days.</p>
+        <table style="text-align: center;">
+            <thead>
+            <tr>
+                <th style="padding-right: 10px;
+                               text-align: left;">Court</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for court in recently_dying_courts %}
+                <tr>
+                    <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;
+                                   text-align: left;"><p>{{ court }}</p></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
 
+
+        <h2 style="font-size: 1.5em;
+                   font-weight: normal;
+                   line-height: 1;
+                   font-family: inherit;
+                   color: #111;
+                   vertical-align: baseline;
+                   font-style: inherit;
+                   margin: 10px;
+                   padding: 0;">Old Problem Courts</h2>
+        <p style="font-size: 1em;
+                      font-weight: normal;
+                      font-family: inherit;
+                      vertical-align: baseline;
+                      font-style: inherit;
+                      margin: 0 0 1.5em;
+                      padding: 0;">These courts have 0 results for more than 35 days.</p>
         <table style="text-align: center;">
             <thead>
                 <tr>
