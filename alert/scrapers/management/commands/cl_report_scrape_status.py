@@ -73,7 +73,8 @@ class Command(BaseCommand):
                 # No results in newer than 35 days. Get date of most recent
                 # item.
                 date_filed = Document.objects.filter(court_id=court).order_by('-date_filed')[0].date_filed
-                if thirty_five_days_ago < date_filed < thirty_days_ago:
+                if thirty_five_days_ago.date() < date_filed < \
+                        thirty_days_ago.date():
                     recently_dying_courts.append(court)
                 most_recent_opinions.append((court, date_filed))
 
