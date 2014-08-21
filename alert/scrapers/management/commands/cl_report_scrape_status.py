@@ -80,14 +80,19 @@ class Command(BaseCommand):
                 # No results in newer than 35 days. Get date of most recent
                 # item.
                 date_filed = Document.objects.filter(court_id=court).order_by('-date_filed')[0].date_filed
-                mod = __import__(
-                    mod_dict[court],
-                    globals(),
-                    locals(),
-                    [mod_dict[court].rsplit('.')[0]],
-                )
-                url = mod.Site().url
-                method = mod.Site().method
+                try:
+                    mod = __import__(
+                        mod_dict[court],
+                        globals(),
+                        locals(),
+                        [mod_dict[court].rsplit('.')[0]],
+                    )
+                    url = mod.Site().url
+                    method = mod.Site().method
+                except KeyError:
+                    # Happens when multiple scrapers for single court.
+                    url = "Multiple URLs found for jurisdiction"
+                    method = "Unknown"
                 if thirty_five_days_ago.date() < date_filed < \
                         thirty_days_ago.date():
                     recently_dying_courts.append(
