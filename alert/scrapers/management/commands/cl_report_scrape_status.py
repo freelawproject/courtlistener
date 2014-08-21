@@ -69,7 +69,7 @@ class Command(BaseCommand):
         # Combine everything
         most_recent_opinions = []
         recently_dying_courts = []
-        mod_list = importer.build_module_list('juriscraper')
+        mod_list = importer.build_module_list('juriscraper.opinions')
         mod_dict = {}
         for v in mod_list:
             court = v.rsplit('.')[-1]
