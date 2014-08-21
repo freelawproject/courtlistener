@@ -52,13 +52,8 @@ class Command(BaseCommand):
         """
         thirty_days_ago = now() - timedelta(days=30)
         thirty_five_days_ago = now() - timedelta(days=35)
-        cts_30_35_days = Court.objects \
+        cts_more_than_30_days = Court.objects \
             .filter(document__date_filed__gt=thirty_days_ago) \
-            .filter(document__date_filed__lte=thirty_five_days_ago) \
-            .annotate(count=Count('document__pk')) \
-            .values('pk', 'count')
-        cts_more_than_35_days = Court.objects \
-            .filter(document__date_filed__gt=thirty_five_days_ago) \
             .annotate(count=Count('document__pk')) \
             .values('pk', 'count')
 
@@ -68,20 +63,19 @@ class Command(BaseCommand):
             .values_list('pk', flat=True).order_by('position')
 
         # Reformat the results into dicts...
-        cts_30_35_days = self._make_query_dict(cts_30_35_days)
-        cts_more_than_35_days = self._make_query_dict(cts_more_than_35_days)
+        cts_more_than_30_days = self._make_query_dict(cts_more_than_30_days)
 
         # Combine everything
         most_recent_opinions = []
         recently_dying_courts = []
         for court in all_active_courts:
-            if cts_more_than_35_days.get(court, 0) == 0:
+            if cts_more_than_30_days.get(court, 0) == 0:
                 # No results in newer than 35 days. Get date of most recent
                 # item.
                 date_filed = Document.objects.filter(court_id=court).order_by('-date_filed')[0].date_filed
+                if thirty_five_days_ago < date_filed < thirty_days_ago:
+                    recently_dying_courts.append(court)
                 most_recent_opinions.append((court, date_filed))
-            if cts_30_35_days.get(court, 0) == 0:
-                recently_dying_courts.append(court)
 
         # Sort by date (index 1)
         most_recent_opinions.sort(key=itemgetter(1), reverse=True)
