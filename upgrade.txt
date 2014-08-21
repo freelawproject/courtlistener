@@ -1,7 +1,8 @@
-This file contains notes for upgrades when special instructions are necessary. In general, simply doing:
+This file contains notes for upgrades when special instructions are necessary.
+In general, simply doing:
 
 # Get the latest code
-hg pull -u
+git fetch
 
 # Gather any new static files
 manage.py collectstatic
@@ -17,8 +18,8 @@ sudo service celeryd restart
 # Restart apache's code
 touch apache/django.wsgi
 
-is all that's necessary. In the case that spclecial instructions are needed, we will attempt to put them here, with the
-most recent at the top.
+is all that's necessary. In the case that special instructions are needed, we
+will attempt to put them here, with the most recent at the top.
 
 We welcome a conversion of these notes to a better process using Fabric.
 

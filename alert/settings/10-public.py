@@ -7,10 +7,10 @@ import sys
 # Loads the variable INSTALL_ROOT
 execfile('/etc/courtlistener')
 
+################
+# Misc. Django #
+################
 SITE_ID = 1
-
-# If you set this to False, Django will make some optimizations so as not
-# to load the internationalization machinery.
 USE_I18N = False
 DEFAULT_CHARSET = 'utf-8'
 LANGUAGE_CODE = 'en-us'
@@ -22,7 +22,6 @@ warnings.filterwarnings(
         RuntimeWarning, r'django\.db\.models\.fields'
 )
 
-# List of callables that know how to import templates from various sources.
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',
     'django.template.loaders.app_directories.Loader',
@@ -149,11 +148,10 @@ SITEMAP_PING_URLS = (
 # Directories #
 ###############
 MEDIA_ROOT = os.path.join(INSTALL_ROOT, 'alert/assets/media/')
-
-# Static files configuration...
 STATIC_URL = '/static/'
 STATICFILES_DIRS = (os.path.join(INSTALL_ROOT, 'alert/assets/static-global/'),)
-STATIC_ROOT = os.path.join(INSTALL_ROOT, 'alert/assets/static/')  # This is where things get collected to
+# This is where things get collected to
+STATIC_ROOT = os.path.join(INSTALL_ROOT, 'alert/assets/static/')
 
 # Where should the data dumps be stored?
 DUMP_DIR = os.path.join(INSTALL_ROOT, 'alert/assets/media/dumps/')
