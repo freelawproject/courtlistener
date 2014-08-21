@@ -91,7 +91,7 @@ class Command(BaseCommand):
                     method = mod.Site().method
                 except KeyError:
                     # Happens when multiple scrapers for single court.
-                    url = "Multiple URLs found for jurisdiction"
+                    url = ""
                     method = "Unknown"
                 if thirty_five_days_ago.date() < date_filed < \
                         thirty_days_ago.date():

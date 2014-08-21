@@ -101,14 +101,25 @@
                                    border-style: dotted;
                                    border-width: 0 0 1px;
                                    text-align: left;"><p>{{ d }}</p></td>
-                    <td style="border-color: gray;
+                    {% if method == 'Unknown' %}
+                        <td style="border-color: gray;
                                    border-style: dotted;
                                    border-width: 0 0 1px;
-                                   text-align: left;"><p>{{ method }}</p></td>
-                    <td style="border-color: gray;
-                                   border-style: dotted;
-                                   border-width: 0 0 1px;
-                                   text-align: left;"><p><a href="{{ url }}">Link</a></p></td>
+                                   text-align: left;"
+                            colspan="2"><p>Unknown: Multiple scrapers
+                            found for jurisdiction.</p></td>
+                    {% else %}
+                        <td style="border-color: gray;
+                                       border-style: dotted;
+                                       border-width: 0 0 1px;
+                                       text-align: left;"><p>{{ method }}</p>
+                        </td>
+                        <td style="border-color: gray;
+                                       border-style: dotted;
+                                       border-width: 0 0 1px;
+                                       text-align: left;"><p><a
+                                href="{{ url }}">Link</a></p></td>
+                    {% endif %}
                 </tr>
             {% endfor %}
             </tbody>
@@ -159,14 +170,23 @@
                                    border-style: dotted;
                                    border-width: 0 0 1px;
                                    text-align: left;"><p>{{ d }}</p></td>
-                        <td style="border-color: gray;
+                        {% if method == 'Unknown' %}
+                            <td style="border-color: gray;
                                    border-style: dotted;
                                    border-width: 0 0 1px;
-                                   text-align: left;"><p>{{ method }}</p></td>
-                        <td style="border-color: gray;
-                                   border-style: dotted;
-                                   border-width: 0 0 1px;
-                                   text-align: left;"><p><a href="{{ url }}">Link</a></p></td>
+                                   text-align: left;"
+                                colspan="2"><p>Unknown: Multiple scrapers
+                                found for jurisdiction.</p></td>
+                        {% else %}
+                            <td style="border-color: gray;
+                                       border-style: dotted;
+                                       border-width: 0 0 1px;
+                                       text-align: left;"><p>{{ method }}</p></td>
+                            <td style="border-color: gray;
+                                       border-style: dotted;
+                                       border-width: 0 0 1px;
+                                       text-align: left;"><p><a href="{{ url }}">Link</a></p></td>
+                        {% endif %}
                     </tr>
                 {% endfor %}
             </tbody>
