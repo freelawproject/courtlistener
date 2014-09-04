@@ -14,7 +14,7 @@ def sitemap_maker(request, size=250):
     Counts the number of cases in the site, divides by 1,000 and provides links
     for all of them.
     """
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
     q = '*:*'
     page = request.GET.get("p", False)
     if page:

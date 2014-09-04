@@ -29,7 +29,7 @@ def about(request):
 def faq(request):
     """Loads the FAQ page"""
     scraped_court_count = Court.objects.filter(in_use=True, has_opinion_scraper=True).count()
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
     response = conn.raw_query(
         **search_utils.build_total_count_query()).execute()
     total_opinion_count = response.result.numFound

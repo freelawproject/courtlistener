@@ -8,8 +8,8 @@ def make_upload_path(instance, filename):
     mimetype = filename.split('.')[-1] + '/'
 
     try:
-        # Cannot do proper type checking here because of circular import problems
-        # when importing Audio, Document, etc.
+        # Cannot do proper type checking here because of circular import
+        # problems when importing Audio, Document, etc.
         if 'Audio' in str(type(instance)):
             path = mimetype + instance.date_argued.strftime("%Y/%m/%d/") + \
                    get_valid_filename(filename)

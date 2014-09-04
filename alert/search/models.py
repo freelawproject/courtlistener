@@ -537,12 +537,9 @@ class Document(models.Model):
         If the value of blocked changed to True, invalidate the caches
         where that value was stored. Google can later pick it up properly.
         """
-        # Run the standard save function.
         super(Document, self).save(*args, **kwargs)
 
-        # Update the search index.
         if index:
-            # Import is here to avoid looped import problem
             from search.tasks import add_or_update_doc
             add_or_update_doc.delay(self.pk, commit)
 
@@ -556,16 +553,10 @@ class Document(models.Model):
         contained it. Note that this doesn't get called when an entire queryset
         is deleted, but that should be OK.
         """
-        # Get the ID for later use
-        doc_id_was = self.pk
-
-        # Delete the item from the DB.
+        id_cache = self.pk
         super(Document, self).delete(*args, **kwargs)
-
-        # Update the search index.
-        # Import is here to avoid looped import problem
-        from search.tasks import delete_doc
-        delete_doc.delay(doc_id_was)
+        from search.tasks import delete_item
+        delete_item.delay(id_cache, settings.SOLR_OPINION_URL)
 
         # Invalidate the sitemap and dump caches
         if self.date_filed:

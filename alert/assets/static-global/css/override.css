@@ -37,6 +37,19 @@ Sets up all the overrides or additional CSS that the site uses.
     transition: all 0.5s ease;
 }
 
+#source-switcher h3 {
+    padding-bottom: 8px;
+}
+#source-switcher h3 span {
+    border-bottom: 3px solid #ae0b0b;
+}
+#source-switcher h3 a,
+#source-switcher h3 a:hover,
+#source-switcher h3 a:active {
+    color: gray;
+    text-decoration: none;
+}
+
 
 .header {
     float: left;

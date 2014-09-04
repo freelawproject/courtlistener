@@ -1,15 +1,19 @@
 import hashlib
-from juriscraper.AbstractSite import logger
 import traceback
-from django.core.files.base import ContentFile
+
 from alert.audio.models import Audio
 from alert.lib.string_utils import trunc
 from alert.scrapers.DupChecker import DupChecker
 from alert.scrapers.management.commands import cl_scrape_opinions
-from alert.scrapers.management.commands.cl_scrape_opinions import get_binary_content, get_extension
+from alert.scrapers.management.commands.cl_scrape_opinions import \
+    get_binary_content, get_extension
 from alert.scrapers.models import ErrorLog
-from alert.scrapers.tasks import process_audio_file
 from alert.search.models import Court, Docket
+from scrapers.tasks import process_audio_file
+
+from juriscraper.AbstractSite import logger
+
+from django.core.files.base import ContentFile
 
 
 class Command(cl_scrape_opinions.Command):
@@ -20,14 +24,14 @@ class Command(cl_scrape_opinions.Command):
             sha1=sha1_hash,
             case_name=site.case_names[i],
             date_argued=site.case_dates[i],
-            download_url=site.download_urls[i]
+            download_url=site.download_urls[i],
+            processing_complete=False,
         )
         if site.judges:
             audio_file.judges = site.judges[i]
         if site.docket_numbers:
             audio_file.docket_number = site.docket_numbers[i]
 
-        # TODO: RETURN TO THIS AND ADD MATCHING ALGO.
         docket = Docket(
             case_name=site.case_names[i],
             court=court,
@@ -39,7 +43,7 @@ class Command(cl_scrape_opinions.Command):
     def save_everything(docket, audio_file):
         docket.save()
         audio_file.docket = docket
-        audio_file.save()
+        audio_file.save(index=False)
 
     def scrape_court(self, site, full_crawl=False):
         download_error = False
@@ -91,13 +95,15 @@ class Command(cl_scrape_opinions.Command):
                     logger.info('Adding new document found at: %s' % site.download_urls[i])
                     dup_checker.reset()
 
-                    docket, audio_file = self.associate_meta_data_to_objects(site, i, court, sha1_hash)
+                    docket, audio_file = self.associate_meta_data_to_objects(
+                        site, i, court, sha1_hash)
 
                     # Make and associate the file object
                     try:
                         cf = ContentFile(r.content)
                         extension = get_extension(r.content)
-                        # See issue #215 for why this must be lower-cased.
+                        # See bitbucket issue #215 for why this must be
+                        # lower-cased.
                         file_name = trunc(site.case_names[i].lower(), 75) + extension
                         audio_file.local_path_original_file.save(file_name, cf, save=False)
                     except:

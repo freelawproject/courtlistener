@@ -81,7 +81,7 @@ def case_name_query(conn, params, citation, citing_doc):
 
 def match_citation(citation, citing_doc):
     # TODO: Create shared solr connection to use across multiple citations/documents
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
     main_params = {'fq': []}
     # Set up filter parameters
     start_year = 1750

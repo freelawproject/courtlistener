@@ -187,7 +187,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.verbosity = int(options.get('verbosity', 1))
-        self.conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+        self.conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
         self.options = options
         if not options.get('rate'):
             self.stderr.write("You must specify a rate")

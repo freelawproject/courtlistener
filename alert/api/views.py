@@ -40,7 +40,7 @@ def annotate_courts_with_counts(courts, court_count_tuples):
 
 def make_court_variable():
     courts = Court.objects.exclude(jurisdiction='T')  # Non-testing courts
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
     response = conn.raw_query(
         **search_utils.build_court_count_query()).execute()
     court_count_tuples = response.facet_counts.facet_fields['court_exact']

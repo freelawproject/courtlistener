@@ -16,7 +16,7 @@ from optparse import OptionParser
 def cleaner(simulate=False, verbose=False):
     """Find items that are in californiad and change them to be in caed by using an updated set of regexes.
     """
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='rw')
     q = {'fq': ['court_exact:%s' % 'californiad']}
 
     results = conn.raw_query(**q)

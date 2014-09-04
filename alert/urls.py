@@ -32,6 +32,7 @@ from django.contrib.auth.views import (
     login as signIn, logout as signOut, password_reset,
     password_reset_done, password_reset_confirm
 )
+from audio.views import view_audio_file
 
 pacer_codes = Court.objects.filter(in_use=True).values_list('pk', flat=True)
 mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html')
@@ -83,6 +84,7 @@ urlpatterns = patterns('',
     url(r'^opinion/(\d*)/(.*)/authorities/$', view_authorities, name='view_authorities'),
     url(r'^opinion/(\d*)/(.*)/$', view_opinion, name="view_case"),
     url(r'^docket/(\d*)/(.*)/$', view_docket, name="view_docket"),
+    url(r'^audio/(\d*)/(.*)/$', view_audio_file, name="view_audio_file"),
 
     # Serve a static file
     (r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$',

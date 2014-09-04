@@ -38,7 +38,13 @@
 
 {% block sidebar %}
     <div class="span-6 append-1 search-page" id="sidebar">
+        <div class="sidebar-section" id="source-switcher">
+            <h3><span class="pointer">Opinions</span></h3>
+            <h3><a href="/audio+other+random+get+params">Oral Arguments</a></h3>
+        </div>
+
         {% if not error %}
+        <hr>
         <div class="sidebar-section">
             <h3><span>Refine Your Query</span></h3>
             <form action="/" method="get" id="sidebar-search-form">

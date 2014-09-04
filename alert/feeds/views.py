@@ -35,7 +35,7 @@ class search_feed(Feed):
         search_form = SearchForm(obj.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-            conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+            conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
             main_params = search_utils.build_main_query(cd, highlight=False)
             main_params.update({
                 'sort': 'dateFiled desc',
@@ -83,7 +83,7 @@ class court_feed(Feed):
 
     def items(self, obj):
         """Do a Solr query here. Return the first 20 results"""
-        conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+        conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
         params = {
             'q': '*:*',
             'court_exact': obj.pk,
@@ -128,7 +128,7 @@ class all_courts_feed(Feed):
 
     def items(self, obj):
         """Do a Solr query here. Return the first 20 results"""
-        conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+        conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
         params = {
             'q': '*:*',
             'sort': 'dateFiled desc',

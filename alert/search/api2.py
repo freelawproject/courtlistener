@@ -379,7 +379,7 @@ class SolrList(object):
         self.limit = limit
         self.length = length
         self._item_cache = []
-        self.conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+        self.conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
 
     def __len__(self):
         """Tastypie's paginator takes the len() of the item for its work."""

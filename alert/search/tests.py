@@ -59,7 +59,7 @@ class SolrTestCase(TestCase):
         self.core_name = '%s.test-%s' % (self.__module__, time.time())
         create_solr_core(self.core_name)
         swap_solr_core('collection1', self.core_name)
-        self.si = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
+        self.si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='rw')
 
         # Add two documents to the index, but don't extract their contents
         self.site = test_opinion_scraper.Site().parse()

@@ -1,5 +1,12 @@
-from juriscraper.tests import MockRequest
+import hashlib
+import mimetypes
 import os
+import signal
+import sys
+import requests
+import time
+import traceback
+
 from alert.lib import magic
 from alert.lib.string_utils import trunc
 from alert.scrapers.models import ErrorLog
@@ -7,26 +14,19 @@ from alert.scrapers.DupChecker import DupChecker
 from alert.search.models import Citation, Docket
 from alert.search.models import Court
 from alert.search.models import Document
+from juriscraper.AbstractSite import logger
+from juriscraper.lib.importer import build_module_list
+from juriscraper.tests import MockRequest
+from scrapers.tasks import extract_doc_content, extract_by_ocr
 
 from celery.task.sets import subtask
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
-from juriscraper.AbstractSite import logger
-from juriscraper.lib.importer import build_module_list
-from scrapers.tasks import extract_doc_content, extract_by_ocr
-from requests.exceptions import SSLError
-from urlparse import urljoin
-
-import hashlib
-import mimetypes
-import signal
-import sys
-import requests
-import time
-import traceback
 from lxml import html
 from optparse import make_option
+from requests.exceptions import SSLError
+from urlparse import urljoin
 
 # for use in catching the SIGINT (Ctrl+4)
 die_now = False
@@ -98,6 +98,8 @@ def get_extension(content):
         extension = '.html'
     if extension == '.ksh':
         extension = '.txt'
+    if extension == '.asf':
+        extension = '.wma'
     return extension
 
 
@@ -196,7 +198,7 @@ class Command(BaseCommand):
                     help="Disable duplicate aborting."),
     )
     args = "-c COURTID [-d] [-f] [-r RATE]"
-    help = 'Runs the Juriscraper toolkit against one or many courts.'
+    help = 'Runs the Juriscraper toolkit against one or many jurisdictions.'
 
     def associate_meta_data_to_objects(self, site, i, court, sha1_hash):
         """Takes the meta data from the scraper and assocites it with objects. Returns the created objects.
@@ -301,13 +303,15 @@ class Command(BaseCommand):
                     logger.info('Adding new document found at: %s' % site.download_urls[i])
                     dup_checker.reset()
 
-                    cite, docket, doc = self.associate_meta_data_to_objects(site, i, court, sha1_hash)
+                    cite, docket, doc = self.associate_meta_data_to_objects(
+                        site, i, court, sha1_hash)
 
                     # Make and associate the file object
                     try:
                         cf = ContentFile(r.content)
                         extension = get_extension(r.content)
-                        # See issue #215 for why this must be lower-cased.
+                        # See bitbucket issue #215 for why this must be
+                        # lower-cased.
                         file_name = trunc(site.case_names[i].lower(), 75) + extension
                         doc.local_path.save(file_name, cf, save=False)
                     except:
@@ -322,7 +326,10 @@ class Command(BaseCommand):
                     self.save_everything(cite, docket, doc, index=False)
                     extract_doc_content(doc.pk, callback=subtask(extract_by_ocr))
 
-                    logger.info("Successfully added doc %s: %s" % (doc.pk, site.case_names[i]))
+                    logger.info("Successfully added doc {pk}: {name}".format(
+                        pk=doc.pk,
+                        name=site.case_names[i]
+                    ))
 
             # Update the hash if everything finishes properly.
             logger.info("%s: Successfully crawled opinions." % site.court_id)
@@ -337,7 +344,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         global die_now
 
-        # this line is used for handling SIGTERM (CTRL+4), so things can die safely
+        # this line is used for handling SIGTERM (CTRL+4), so things can die
+        # safely
         signal.signal(signal.SIGTERM, signal_handler)
 
         self.verbosity = int(options.get('verbosity', 1))

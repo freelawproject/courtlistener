@@ -7,14 +7,19 @@ class urlToHash(models.Model):
     to the Court table, except that courts often have more than one URL they
     parse.
     """
-    url = models.CharField("the URL that is hashed",
-                           max_length=5000,
-                           blank=True,
-                           editable=False)
-    SHA1 = models.CharField("a SHA1 of the court's website HTML",
-                            max_length=40,
-                            blank=True,
-                            editable=False)
+    id = models.CharField(
+        "the ID of the item that is hashed",
+        max_length=5000,
+        blank=True,
+        editable=False,
+        primary_key=True,
+    )
+    SHA1 = models.CharField(
+        "a SHA1 corresponding to the item",
+        max_length=40,
+        blank=True,
+        editable=False,
+    )
 
     def __unicode__(self):
         return self.url
@@ -33,18 +38,22 @@ class ErrorLog(models.Model):
         'the exact date and time of the error',
         auto_now_add=True,
         editable=False,
-        null=True)
+        null=True
+    )
     log_level = models.CharField(
         'the loglevel of the error encountered',
         max_length=15,
-        editable=False)
+        editable=False
+    )
     court = models.ForeignKey(
         Court,
-        verbose_name='the court where the document was filed')
+        verbose_name='the court where the document was filed'
+    )
     message = models.TextField(
         'the message produced in the log',
         blank=True,
-        editable=False)
+        editable=False
+    )
 
     def __unicode__(self):
         return "%s - %s@%s %s" % (self.log_time,

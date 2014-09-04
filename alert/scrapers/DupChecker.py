@@ -33,7 +33,7 @@ class DupChecker(dict):
         in the DB, if there is one. If there is a value and it is the same, it
         returns False. Else, it returns True.
         """
-        url2Hash, created = urlToHash.objects.get_or_create(url=url)
+        url2Hash, created = urlToHash.objects.get_or_create(pk=url)
         if not created and url2Hash.SHA1 == hash:
             # it wasn't created, and it has the same SHA --> not changed.
             return False, url2Hash

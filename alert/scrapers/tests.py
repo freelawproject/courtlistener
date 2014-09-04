@@ -33,7 +33,7 @@ class IngestionTest(TestCase):
         self.core_name = '%s.test-%s' % (self.__module__, time.time())
         create_solr_core(self.core_name)
         swap_solr_core('collection1', self.core_name)
-        self.si = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
+        self.si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='rw')
 
         # Set up a handy court object
         self.court = Court.objects.get(pk='test')
@@ -216,7 +216,7 @@ class DupcheckerTest(TestCase):
         site = test_opinion_scraper.Site()
         site.hash = 'this is a dummy hash code string'
         for dup_checker in self.dup_checkers:
-            urlToHash(url=site.url, SHA1=site.hash).save()
+            urlToHash(pk=site.url, SHA1=site.hash).save()
             abort = dup_checker.abort_by_url_hash(site.url, site.hash)
             if dup_checker.full_crawl:
                 self.assertFalse(abort, "DupChecker says to abort during a full crawl.")
@@ -231,7 +231,7 @@ class DupcheckerTest(TestCase):
         site = test_opinion_scraper.Site()
         site.hash = 'this is a dummy hash code string'
         for dup_checker in self.dup_checkers:
-            urlToHash(url=site.url, SHA1=site.hash).save()
+            urlToHash(pk=site.url, SHA1=site.hash).save()
             abort = dup_checker.abort_by_url_hash(site.url, "this is a *different* hash!")
             if dup_checker.full_crawl:
                 self.assertFalse(abort, "DupChecker says to abort during a full crawl.")

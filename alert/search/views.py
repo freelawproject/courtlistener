@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 def do_search(request, rows=20, order_by=None):
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
     # Bind the search form.
     search_form = SearchForm(request.GET)
     if search_form.is_valid():
@@ -46,7 +46,7 @@ def do_search(request, rows=20, order_by=None):
     else:
         # Invalid form, send it back
         logger.warning("Invalid form when loading search page with request: %s" % request.GET)
-        return  {'error': True}
+        return {'error': True}
 
     # Set up pagination
     try:
@@ -131,7 +131,8 @@ def show_results(request):
             # and redirect to the alerts page
             return HttpResponseRedirect('/profile/alerts/')
         else:
-            # Invalid form. Do the search again and show them the alert form with the errors
+            # Invalid form. Do the search again and show them the alert form
+            # with the errors
             render_dict.update(do_search(request))
             render_dict.update({'alert_form': alert_form})
             return render_to_response(
@@ -147,7 +148,8 @@ def show_results(request):
             if not is_bot(request):
                 tally_stat('search.homepage_loaded')
 
-            # Load the render_dict with good results that can be shown in the "Latest Cases" section
+            # Load the render_dict with good results that can be shown in the
+            # "Latest Cases" section
             render_dict.update(do_search(request, rows=5, order_by='dateFiled desc'))
             # But give it a fresh form for the advanced search section
             render_dict.update({'search_form': SearchForm(request.GET)})
@@ -172,8 +174,10 @@ def show_results(request):
                     name__contains='api',
                     date_logged__gte=ten_days_ago) \
                 .aggregate(Sum('count'))['count__sum']
-            users_in_last_ten = User.objects.filter(date_joined__gte=ten_days_ago).count()
-            opinions_in_last_ten = Document.objects.filter(time_retrieved__gte=ten_days_ago).count()
+            users_in_last_ten = User.objects\
+                .filter(date_joined__gte=ten_days_ago).count()
+            opinions_in_last_ten = Document.objects\
+                .filter(time_retrieved__gte=ten_days_ago).count()
             render_dict.update({
                 'alerts_in_last_ten': alerts_in_last_ten,
                 'queries_in_last_ten': queries_in_last_ten,

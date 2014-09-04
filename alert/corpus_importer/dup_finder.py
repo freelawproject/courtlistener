@@ -121,7 +121,7 @@ def get_dup_stats(doc):
             - Similarity of docket number
             - Comparison of content length
     """
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
     DEBUG = True
 
     ##########################################
