@@ -134,7 +134,7 @@ class Command(BaseCommand):
                     search_form = SearchForm(data)
                     if search_form.is_valid():
                         cd = search_form.cleaned_data
-                        main_params = search_utils.build_main_query(cd)
+                        main_params = search_utils.build_main_query(cd, 'opinion')
                         main_params.update({
                             'rows': '20',
                             'start': '0',

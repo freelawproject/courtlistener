@@ -597,11 +597,19 @@ class SearchResource(ModelResourceWithFieldsFilter):
     def get_object_list(self, request=None, **kwargs):
         """Performs the Solr work."""
         try:
-            main_query = build_main_query(kwargs['cd'], highlight='text')
+            main_query = build_main_query(
+                kwargs['cd'],
+                'opinion',
+                highlight='text'
+            )
         except KeyError:
             sf = SearchForm({'q': "*:*"})
             if sf.is_valid():
-                main_query = build_main_query(sf.cleaned_data, highlight='text')
+                main_query = build_main_query(
+                    sf.cleaned_data,
+                    'opinion',
+                    highlight='text'
+                )
 
         main_query['caller'] = 'api_search'
         # Use a SolrList that has a couple of the normal functions built in.

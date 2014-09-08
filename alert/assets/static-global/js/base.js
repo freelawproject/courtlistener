@@ -13,9 +13,13 @@ $(document).ready(function() {
         var gathered = $();
 
         // Add the input boxes that aren't empty
-        gathered = gathered.add($('.external-input:not([type=checkbox])').filter(function () {
+        var selector = '.external-input:not([type=checkbox]):not([type=radio])';
+        gathered = gathered.add($(selector).filter(function () {
             return this.value != "";
         }));
+
+        // Add selected radio buttons
+        gathered = gathered.add($('.external-input[type=radio]:checked'));
 
         // Add the court checkboxes that are selected as a single input element
         var checked_courts = $('.court-checkbox:checked');
@@ -31,7 +35,6 @@ $(document).ready(function() {
                 name: 'court'
             });
         }
-
         gathered = gathered.add(el);
 
         if ($('.status-checkbox:checked').length <= $('.status-checkbox').length) {
@@ -66,7 +69,8 @@ $(document).ready(function() {
     ///////////////////////
     // Search submission //
     ///////////////////////
-    $('#search-form, #sidebar-search-form, .search-page #court-picker-search-form').submit(function (e) {
+    $('#search-form, #sidebar-search-form, ' +
+        '.search-page #court-picker-search-form').submit(function (e) {
         // Overrides the submit buttons so that they gather the correct
         // form elements before submission.
         e.preventDefault();
@@ -156,6 +160,29 @@ $(document).ready(function() {
     });
     $('#clear-current').click(function () {
         $("#modal-court-picker .tab-pane.active input").prop('checked', false);
+    });
+
+    ///////////////////
+    // Tab Switching //
+    ///////////////////
+    $('input[name=source]').change(function () {
+        // Map or eliminate the ordering drop down's value, then submit.
+        var drop_down = $('#id_order_by');
+        if (drop_down.val() === 'dateFiled desc'){
+            drop_down.val('dateArgued desc');
+        } else if (drop_down.val() === 'dateFiled asc'){
+            drop_down.val('dateArgued asc');
+        } else if (drop_down.val() === 'dateArgued desc'){
+            drop_down.val('dateFiled desc')
+        } else if (drop_down.val() === 'dateArgued asc') {
+            drop_down.val('dateFiled asc')
+        } else if (drop_down.val() === 'score desc') {
+            // Do nothing, but this block prevents the else clause from
+            // triggering.
+        } else {
+                drop_down.val('')
+        }
+        $('#search-form').submit();
     });
 
     //////////

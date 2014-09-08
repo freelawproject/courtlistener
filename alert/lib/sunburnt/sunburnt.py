@@ -147,8 +147,10 @@ class SolrInterface(object):
     readable = True
     writeable = True
     remote_schema_file = "admin/file/?file=schema.xml"
-    def __init__(self, url, schemadoc=None, http_connection=None, mode='', retry_timeout= -1, max_length_get_url=MAX_LENGTH_GET_URL):
-        self.conn = SolrConnection(url, http_connection, retry_timeout, max_length_get_url)
+    def __init__(self, url, schemadoc=None, http_connection=None, mode='',
+                 retry_timeout= -1, max_length_get_url=MAX_LENGTH_GET_URL):
+        self.conn = SolrConnection(url, http_connection, retry_timeout,
+                                   max_length_get_url)
         self.schemadoc = schemadoc
         if mode == 'r':
             self.writeable = False

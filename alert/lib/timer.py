@@ -17,7 +17,7 @@
 import time
 
 def print_timing(func):
-    """A simple decorator to print the length of time a function takes to
+    """A decorator to print the length of time a function takes to
     complete.
     """
     def wrapper(*arg):
