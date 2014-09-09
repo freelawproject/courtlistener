@@ -42,7 +42,7 @@ COURTS = Court.objects.filter(in_use=True)\
     .values('pk', 'short_name', 'jurisdiction')
 
 
-def _clean_opinion_form(request, cd):
+def _clean_form(request, cd):
     """Returns cleaned up values as a Form object.
     """
     # Make a copy of request.GET so it is mutable

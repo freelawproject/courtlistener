@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 def do_search(request, rows=20, order_by=None):
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
+
     # Bind the search form.
     search_form = SearchForm(request.GET)
     if search_form.is_valid():
@@ -33,11 +33,22 @@ def do_search(request, rows=20, order_by=None):
             # Allows an override by calling methods.
             cd['order_by'] = order_by
         search_form = _clean_form(request, cd)
+
         try:
+            if cd['source'] == 'o':
+                conn = sunburnt.SolrInterface(
+                    settings.SOLR_OPINION_URL, mode='r')
+                stat_facet_fields = search_utils.place_facet_queries(cd, conn)
+                status_facets = search_utils.make_stats_variable(
+                    stat_facet_fields, search_form)
+            elif cd['source'] == 'oa':
+                conn = sunburnt.SolrInterface(
+                    settings.SOLR_AUDIO_URL, mode='r')
+                status_facets = None
             results_si = conn.raw_query(**search_utils.build_main_query(cd))
-            stat_facet_fields = search_utils.place_facet_queries(cd, conn)
-            status_facets = search_utils.make_stats_variable(stat_facet_fields, search_form)
-            courts, court_count_human, court_count = search_utils.merge_form_with_courts(COURTS, search_form)
+            courts, court_count_human, court_count = search_utils\
+                .merge_form_with_courts(COURTS, search_form)
+
         except Exception, e:
             logger.warning("Error loading search page with request: %s" % request.GET)
             logger.warning("Error was %s" % e)

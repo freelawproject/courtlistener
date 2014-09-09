@@ -8,11 +8,10 @@ from alert import settings
 from alert.lib.sunburnt import SolrError
 
 
-def create_solr_core(
-        core_name,
-        data_dir='/tmp/solr/data',
-        schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf', 'schema.xml'),
-    ):
+def create_solr_core(core_name, data_dir='/tmp/solr/data',
+        schema=os.path.join(settings.INSTALL_ROOT, 'Solr',
+                            'conf', 'schema.xml'),
+        instance_dir='/usr/local/solr/example/solr/collection1'):
     """ Create a new core for use in testing."""
     if data_dir == '/tmp/solr/data':
         # If the user doesn't specify a data directory, we give them one with
@@ -25,8 +24,9 @@ def create_solr_core(
         'action': 'CREATE',
         'name': core_name,
         'dataDir': data_dir,
-        'instanceDir': '/usr/local/solr/example/solr/collection1',
-        'config': os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf', 'solrconfig.xml'),
+        'instanceDir': instance_dir,
+        'config': os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
+                               'solrconfig.xml'),
         'schema': schema,
         'persist': 'true',
     }
@@ -71,7 +71,8 @@ def get_solr_core_status(core='all'):
         core_query = ''
     else:
         core_query = '&core=%s' % core
-    r = requests.get('http://localhost:8983/solr/admin/cores?action=STATUS%s' % core_query)
+    r = requests.get(
+        'http://localhost:8983/solr/admin/cores?action=STATUS%s' % core_query)
     if r.status_code != 200:
         print "Problem getting the core status. Got status_code of %s. Check the Solr logs for details." % r.status_code
 
@@ -128,7 +129,8 @@ def get_data_dir_location(core='collection1'):
     Useful when writing the external_pagerank file or when reading it.
     """
     status_doc = get_solr_core_status()
-    return str(status_doc.xpath('//*[@name= "dataDir"][../*[@name="name" = "%s"]]/text()' % core)[0])
+    return str(status_doc.xpath(
+        '//*[@name= "dataDir"][../*[@name="name" = "%s"]]/text()' % core)[0])
 
 
 def reload_pagerank_external_file_cache():

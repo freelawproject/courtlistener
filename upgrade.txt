@@ -17,7 +17,7 @@ sudo service celeryd restart
 # Restart apache's code
 touch apache/django.wsgi
 
-is all that's necessary. In the case that spclecial instructions are needed, we will attempt to put them here, with the
+is all that's necessary. In the case that special instructions are needed, we will attempt to put them here, with the
 most recent at the top.
 
 We welcome a conversion of these notes to a better process using Fabric.
@@ -83,14 +83,23 @@ We welcome a conversion of these notes to a better process using Fabric.
   - Add a new core to Solr (paths below may need changing to correspond with
     the location of your current configurations):
 
-       from alert.lib.solr_core_admin import create_solr_core
-       from alert import settings
-       import os
-       create_solr_core(
-          core_name='audio',
-          data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data_audio'),
-          schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf', 'audio_schema.xml'),
-       )
+        1. Create a new configuration directory based on our current one:
+
+           % sudo cp -r /usr/local/solr/example/solr/collection1 /usr/local/solr/example/solr/audio
+           % source /etc/courtlistener
+           % sudo ln -s -f $INSTALL_ROOT/Solr/conf/audio_schema.xml /usr/local/solr/example/solr/audio/conf/schema.xml
+
+        2. Create the new core in Python:
+
+            from alert.lib.solr_core_admin import create_solr_core
+            from alert import settings
+            import os
+            create_solr_core(
+               core_name='audio',
+               data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data_audio'),
+               schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf', 'audio_schema.xml'),
+               instance_dir='/usr/local/solr/example/solr/audio',
+            )
 
 
 2014-06-18:

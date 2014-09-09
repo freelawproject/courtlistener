@@ -39,8 +39,34 @@
 {% block sidebar %}
     <div class="span-6 append-1 search-page" id="sidebar">
         <div class="sidebar-section" id="source-switcher">
-            <h3><span class="pointer">Opinions</span></h3>
-            <h3><a href="/audio+other+random+get+params">Oral Arguments</a></h3>
+            <h3>
+                <label for="id_source_0" class="pointer
+                       {% if search_form.source.value == 'o' %}
+                            selected
+                       {% endif %}">
+                    <input {% if search_form.source.value == 'o' %}
+                                checked="checked"
+                           {% endif %}
+                           class="external-input"
+                           id="id_source_0"
+                           name="source"
+                           value="o"
+                           type="radio">Opinions</label>
+            </h3>
+            <h3>
+                <label for="id_source_1" class="pointer
+                       {% if search_form.source.value == 'oa' %}
+                           selected
+                       {% endif %}">
+                    <input {% if search_form.source.value == 'oa' %}
+                               checked="checked"
+                           {% endif %}
+                           class="external-input"
+                           id="id_source_1"
+                           name="source"
+                           value="oa"
+                           type="radio">Oral Arguments</label>
+            </h3>
         </div>
 
         {% if not error %}
@@ -51,7 +77,7 @@
                 <div id="sidebar-facet-placeholder">
                     {% if not error %}
                         <div id="extra-search-fields">
-                            {{ search_form.order_by }}
+                            {% include "includes/order_by_dropdown.html" %}
                             <div id="extra-sidebar-fields">
                                 {#  Modal is at bottom of results, so it loads last. #}
                                 <div class="pointer"
@@ -71,50 +97,62 @@
                                 <h4 class="bottom">Judge</h4>
 
                                 <p class="bottom span-6">{{ search_form.judge }}</p>
-                                <hr class="space">
-                                <h4 class="bottom">Precedential Status</h4>
-                                {% for status in status_facets %}
-                                    <div class="sidebar-checkbox">
-                                        <input
-                                                id="id_{{ status.1 }}"
-                                                type="checkbox"
-                                                name="{{ status.1 }}"
-                                                class="external-input status-checkbox left"
-                                                {% if status.3 %}checked="checked"{% endif %}>
-                                        <label
-                                                for="id_{{ status.1 }}"
-                                                class="pointer {% if status.2 == 0 %}gray{% endif %}">
-                                            <div>{{ status.0 }}&nbsp;<span
-                                                    class="gray small">({{ status.2|intcomma }})</span></div>
-                                        </label>
-                                    </div>
-                                {% endfor %}
-                                <hr class="space">
-                                <h4 class="bottom">Filed After</h4>
 
-                                <p class="bottom span-6">{{ search_form.filed_after }}</p>
-                                <h4 class="bottom">Filed Before</h4>
+                                {% if search_form.source == 'o' %}
+                                    <hr class="space">
+                                    <h4 class="bottom">Precedential Status</h4>
+                                    {% for status in status_facets %}
+                                        <div class="sidebar-checkbox">
+                                            <input
+                                                    id="id_{{ status.1 }}"
+                                                    type="checkbox"
+                                                    name="{{ status.1 }}"
+                                                    class="external-input status-checkbox left"
+                                                    {% if status.3 %}checked="checked"{% endif %}>
+                                            <label
+                                                    for="id_{{ status.1 }}"
+                                                    class="pointer {% if status.2 == 0 %}gray{% endif %}">
+                                                <div>{{ status.0 }}&nbsp;<span
+                                                        class="gray small">({{ status.2|intcomma }})</span></div>
+                                            </label>
+                                        </div>
+                                    {% endfor %}
+                                    <hr class="space">
 
-                                <p class="bottom span-6">{{ search_form.filed_before }}</p>
+                                    <h4 class="bottom">Filed After</h4>
+                                    <p class="bottom span-6">{{ search_form.filed_after }}</p>
 
-                                <hr class="space">
-                                <h4 class="bottom">Citation</h4>
+                                    <h4 class="bottom">Filed Before</h4>
+                                    <p class="bottom span-6">{{ search_form.filed_before }}</p>
 
-                                <p class="bottom">{{ search_form.citation }}</p>
-                                <h4 class="bottom">Neutral Citation</h4>
+                                    <hr class="space">
 
-                                <p class="bottom">{{ search_form.neutral_cite }}</p>
+                                    <h4 class="bottom">Citation</h4>
+                                    <p class="bottom">{{ search_form.citation }}</p>
+
+                                    <h4 class="bottom">Neutral Citation</h4>
+                                    <p class="bottom">{{ search_form.neutral_cite }}</p>
+                                {% elif search_form.source == 'oa' %}
+                                    <h4 class="bottom">Argued After</h4>
+                                    <p class="bottom span-6">{{ search_form.argued_after }}</p>
+
+                                    <h4 class="bottom">Argued Before</h4>
+                                    <p class="bottom span-6">{{ search_form.argued_before }}</p>
+                                {% endif %}
+
                                 <h4 class="bottom">Docket Number</h4>
-
                                 <p class="bottom">{{ search_form.docket_number }}</p>
 
-                                <div class="span-5">
-                                    {{ search_form.cited_gt }}
-                                    {{ search_form.cited_lt }}
-                                    <h4 class="bottom inline">Citation Count</h4>
-                                    <span type="text" id="citation-count" class="gray small bottom">(Any)</span>
-                                </div>
-                                <div id="slider-range" class="span-5 bottom"></div>
+
+                                {% if search_form.source == 'o' %}
+                                    <div class="span-5">
+                                        {{ search_form.cited_gt }}
+                                        {{ search_form.cited_lt }}
+                                        <h4 class="bottom inline">Citation Count</h4>
+                                        <span type="text" id="citation-count" class="gray small bottom">(Any)</span>
+                                    </div>
+                                    <div id="slider-range" class="span-5 bottom"></div>
+                                {% endif %}
 
                                 <button type="submit"
                                         class="button title span-5"

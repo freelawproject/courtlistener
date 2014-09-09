@@ -8,17 +8,17 @@
 alert/assets/media/doc/
 alert/assets/media/dumps/
 alert/assets/media/html/
-alert/assets/mp3/
-alert/assets/wma/
+alert/assets/media/mp3/
 alert/assets/media/pdf/
 alert/assets/media/sitemaps/
 alert/assets/media/txt/
+alert/assets/media/wma/
 alert/assets/media/wpd/
 alert/assets/static/
 
 # Solr
 Solr/data/
-Sold/data_audio/index/
+Solr/data_audio/
 
 # IntelliJ IDEA files
 .idea

@@ -40,16 +40,16 @@ Sets up all the overrides or additional CSS that the site uses.
 #source-switcher h3 {
     padding-bottom: 8px;
 }
-#source-switcher h3 span {
+#source-switcher label{
+    font-weight: normal;
+}
+#source-switcher .selected {
     border-bottom: 3px solid #ae0b0b;
 }
-#source-switcher h3 a,
-#source-switcher h3 a:hover,
-#source-switcher h3 a:active {
+#source-switcher label:not(.selected) {
     color: gray;
     text-decoration: none;
 }
-
 
 .header {
     float: left;

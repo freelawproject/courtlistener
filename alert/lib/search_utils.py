@@ -191,10 +191,8 @@ def make_fq(cd, field, key):
     return fq
 
 
-def make_date_query(cd):
+def make_date_query(before, after):
     """Given the cleaned data from a form, return a valid Solr fq string"""
-    before = cd['filed_before']
-    after = cd['filed_after']
     if any([before, after]):
         if hasattr(after, 'strftime'):
             date_filter = '[%sT00:00:00Z TO ' % after.isoformat()
@@ -262,11 +260,14 @@ def build_main_query(cd, highlight='all', order_by=''):
         'sort': cd.get('order_by', order_by),
     }
 
-    if str(main_params['sort']).startswith('score'):
+    if str(main_params['sort']).startswith('score') and \
+            cd['source'] == 'o':
         main_params['boost'] = 'pagerank'
 
     # Give a boost on the case_name field if it's obviously a case_name query.
-    vs_query = ' v ' in main_params['q'] or ' v. ' in main_params['q'] or ' vs. ' in main_params['q']
+    vs_query = any([' v ' in main_params['q'],
+                    ' v. ' in main_params['q'],
+                    ' vs. ' in main_params['q']])
     in_re_query = main_params['q'].lower().startswith('in re ')
     matter_of_query = main_params['q'].lower().startswith('matter of ')
     ex_parte_query = main_params['q'].lower().startswith('ex parte ')
@@ -284,32 +285,46 @@ def build_main_query(cd, highlight='all', order_by=''):
         })
 
         if highlight == 'all':
-            # Requested fields for the main query. We only need the fields here that
-            # are not requested as part of highlighting. Facet params are not set
-            # here because they do not retrieve results, only counts (they are set
-            # to 0 rows).
-            main_params.update({
-                'fl': 'id,absolute_url,court_id,local_path,source,download_url,status,dateFiled,citeCount',
+            # Requested fields for the main query. We only need the fields
+            # here that are not requested as part of highlighting. Facet
+            # params are not set here because they do not retrieve results,
+            # only counts (they are set to 0 rows).
+            common_fl = ['id', 'absolute_url', 'court_id',
+                          'local_path', 'source', 'download_url']
+            common_hlfl = ['text', 'caseName', 'judge', 'docketNumber',
+                            'court_citation_string']
 
-                # Highlighting for the main query.
-                'hl.fl': 'text,caseName,judge,suitNature,citation,neutralCite,docketNumber,lexisCite,court_citation_string',
+            if cd['source'] == 'o':
+                main_params.update({
+                    'fl': ','.join(common_fl + ['status', 'dateFiled',
+                                                 'citeCount']),
+                    'hl.fl': ','.join(common_hlfl +
+                                      ['suitNature', 'citation', 'neutralCite',
+                                       'lexisCite']),
+                    'f.suitNature.hl.fragListBuilder': 'single',
+                    'f.citation.hl.fragListBuilder': 'single',
+                    'f.neutralCite.hl.fragListBuilder': 'single',
+                    'f.lexisCite.hl.fragListBuilder': 'single',
+                    'f.suitNature.hl.alternateField': 'suitNature',
+                    'f.citation.hl.alternateField': 'citation',
+                    'f.neutralCite.hl.alternateField': 'neutralCite',
+                    'f.lexisCite.hl.alternateField': 'lexisCite',
+                })
+            elif cd['source'] == 'oa':
+                main_params.update({
+                    'fl': ','.join(common_fl + ['docket_id', 'dateArgued']),
+                    'hl.fl': ','.join(common_hlfl),
+                })
+            main_params.update({
                 'f.caseName.hl.fragListBuilder': 'single',
                 'f.judge.hl.fragListBuilder': 'single',
-                'f.suitNature.hl.fragListBuilder': 'single',
-                'f.citation.hl.fragListBuilder': 'single',
-                'f.neutralCite.hl.fragListBuilder': 'single',
                 'f.docketNumber.hl.fragListBuilder': 'single',
-                'f.lexisCite.hl.fragListBuilder': 'single',
                 'f.court_citation_string.hl.fragListBuilder': 'single',
 
                 # If there aren't any hits in the text return the field instead
                 'f.caseName.hl.alternateField': 'caseName',
                 'f.judge.hl.alternateField': 'judge',
-                'f.suitNature.hl.alternateField': 'suitNature',
-                'f.citation.hl.alternateField': 'citation',
-                'f.neutralCite.hl.alternateField': 'neutralCite',
                 'f.docketNumber.hl.alternateField': 'docketNumber',
-                'f.lexisCite.hl.alternateField': 'lexisCite',
                 'f.court_citation_string.hl.alternateField': 'court_citation_string',
             })
         elif highlight == 'text':
@@ -323,34 +338,40 @@ def build_main_query(cd, highlight='all', order_by=''):
     # Changes here are usually mirrored in place_facet_queries, below.
     main_fq = []
 
-    # Case Name and judges
     if cd['case_name']:
         main_fq.append(make_fq(cd, 'caseName', 'case_name'))
     if cd['judge']:
         main_fq.append(make_fq(cd, 'judge', 'judge'))
-
-    # Citations
-    if cd['citation']:
-        main_fq.append(make_fq(cd, 'citation', 'citation'))
     if cd['docket_number']:
         main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
-    if cd['neutral_cite']:
-        main_fq.append(make_fq(cd, 'neutralCite', 'neutral_cite'))
 
-    # Dates
-    date_query = make_date_query(cd)
-    main_fq.append(date_query)
+    if cd['source'] == 'o':
+        if cd['citation']:
+            main_fq.append(make_fq(cd, 'citation', 'citation'))
+        if cd['neutral_cite']:
+            main_fq.append(make_fq(cd, 'neutralCite', 'neutral_cite'))
+        main_fq.append(make_date_query(cd['filed_before'], cd['filed_after']))
 
-    # Citation count
-    cite_count_query = make_cite_count_query(cd)
-    main_fq.append(cite_count_query)
+        # Citation count
+        cite_count_query = make_cite_count_query(cd)
+        main_fq.append(cite_count_query)
+    elif cd['source'] == 'oa':
+        main_fq.append(make_date_query(cd['argued_before'], cd['argued_after']))
 
     # Facet filters
     selected_courts_string = get_selected_field_string(cd, 'court_')
-    selected_stats_string = get_selected_field_string(cd, 'stat_')
-    if len(selected_courts_string) + len(selected_stats_string) > 0:
-        main_fq.extend(['{!tag=dt}status_exact:(%s)' % selected_stats_string,
-                        '{!tag=dt}court_exact:(%s)' % selected_courts_string])
+    if cd['source'] == 'o':
+        selected_stats_string = get_selected_field_string(cd, 'stat_')
+        if len(selected_courts_string) + len(selected_stats_string) > 0:
+            main_fq.extend([
+                '{!tag=dt}status_exact:(%s)' % selected_stats_string,
+                '{!tag=dt}court_exact:(%s)' % selected_courts_string
+            ])
+    elif cd['source'] == 'oa':
+        if len(selected_courts_string) > 0:
+            main_fq.extend([
+                '{!tag=dt}court_exact:(%s)' % selected_courts_string
+            ])
 
     # If a param has been added to the fq variables, then we add them to the
     # main_params var. Otherwise, we don't, as doing so throws an error.
@@ -392,7 +413,7 @@ def place_facet_queries(cd, conn=sunburnt.SolrInterface(settings.SOLR_OPINION_UR
     if cd['neutral_cite']:
         fq.append(make_fq(cd, 'neutralCite', 'neutral_cite'))
 
-    fq.append(make_date_query(cd))
+    fq.append(make_date_query(cd['filed_before'], cd['filed_after']))
     fq.append(make_cite_count_query(cd))
 
     # Faceting
