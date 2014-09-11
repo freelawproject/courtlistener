@@ -45,10 +45,12 @@ Sets up all the overrides or additional CSS that the site uses.
 }
 #source-switcher .selected {
     border-bottom: 3px solid #ae0b0b;
+    color: #111;
 }
-#source-switcher label:not(.selected) {
+#source-switcher label {
     color: gray;
     text-decoration: none;
+    border-bottom: none;
 }
 
 .header {

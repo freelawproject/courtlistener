@@ -2,9 +2,9 @@ $(document).ready(function() {
     var cited_gt = $('#id_cited_gt');
     var cited_lt = $('#id_cited_lt');
 
-    function makeSearchPath(){
+    function makeSearchPath(tab_switch){
         // Empty the sliders if they are both at their max
-        if (cited_gt.val() == 0 && cited_lt.val() == 15000) {
+        if (cited_gt.val() == 0 && cited_lt.val() == 20000) {
             cited_gt.val("");
             cited_lt.val("");
         }
@@ -12,8 +12,29 @@ $(document).ready(function() {
         // Gather all form fields that are necessary
         var gathered = $();
 
+        // If the user is switching tabs, then make sure their ordering is
+        // valid for the tab they're headed to.
+        if (tab_switch){
+            var drop_down = $('#id_order_by');
+            var value;
+            if (drop_down.val() === 'dateFiled desc') {
+                value = 'dateArgued desc';
+            } else if (drop_down.val() === 'dateFiled asc') {
+                value = 'dateArgued asc';
+            } else if (drop_down.val() === 'dateArgued desc') {
+                value = 'dateFiled desc';
+            } else if (drop_down.val() === 'dateArgued asc') {
+                value = 'dateFiled asc';
+            } else {
+                // Restore the default.
+                value = 'score desc';
+            }
+            var el = $('<input type="hidden" name="order_by" />').val(value);
+            gathered = gathered.add(el);
+        }
+
         // Add the input boxes that aren't empty
-        var selector = '.external-input:not([type=checkbox]):not([type=radio])';
+        var selector = '.external-input[type=text]';
         gathered = gathered.add($(selector).filter(function () {
             return this.value != "";
         }));
@@ -42,6 +63,10 @@ $(document).ready(function() {
             gathered = gathered.add($('.status-checkbox:checked'));
         }
 
+        // Remove any inputs that are direct children of the form. These are
+        // pernicious leftovers caused by the evils of the back button.
+        $("#search-form > input").remove();
+
         gathered.each(function () {
             // Make and submit a hidden input element for all gathered fields
             var el = $(this);
@@ -69,12 +94,24 @@ $(document).ready(function() {
     ///////////////////////
     // Search submission //
     ///////////////////////
-    $('#search-form, #sidebar-search-form, ' +
-        '.search-page #court-picker-search-form').submit(function (e) {
+    $('#search-form, ' +
+      '#sidebar-search-form, ' +
+      '.search-page #court-picker-search-form').submit(function (e) {
         // Overrides the submit buttons so that they gather the correct
         // form elements before submission.
         e.preventDefault();
-        document.location = makeSearchPath();
+
+        // Ensure that the correct value is set in the radio button (correct
+        // is defined by the label that is .selected). This is needed because
+        // the "wrong" value will be selected after a user presses the back
+        // button in their browser.
+        $('#source-switcher .selected input').prop("checked", true);
+
+        document.location = makeSearchPath(false);
+    });
+
+    $('#id_order_by').change(function () {
+        $('#search-form').submit();
     });
 
     $('#homepage #court-picker-search-form').submit(function(e){
@@ -91,7 +128,17 @@ $(document).ready(function() {
                 'background-color': 'transparent',
                 'font-weight': 'normal'
             })
-        }, 1000);
+        }, 1500);
+    });
+
+
+    ///////////////////
+    // Tab Switching //
+    ///////////////////
+    $('#source-switcher label:not(.selected) input[name=source]').click(function () {
+        // Note that we can't do submit here, because that'd trigger a
+        // switching of the the checked radio button, and nothing would happen.
+        document.location = makeSearchPath(true);
     });
 
 
@@ -102,20 +149,20 @@ $(document).ready(function() {
         cited_gt.val(0);
     }
     if (cited_lt.val() == ""){
-        cited_lt.val(15000);
+        cited_lt.val(20000);
     }
     $(function() {
         // Load up the slider in the UI
         $("#slider-range").slider({
             range: true,
             min: 0,
-            max: 15000,
+            max: 20000,
             step: 10,
             values: [cited_gt.val(),
                      cited_lt.val()],
             slide: function(event, ui) {
                 // Update the text
-                if (ui.values[0] == 0 && ui.values[1] == 15000){
+                if (ui.values[0] == 0 && ui.values[1] == 20000){
                     $('#citation-count').text("(Any)");
                 } else {
                     $("#citation-count").text( "(" + ui.values[0] + " - " + ui.values[1] + ")");
@@ -125,9 +172,10 @@ $(document).ready(function() {
             }
         });
     });
-    if (cited_gt.val() != 0 || cited_lt.val() != 15000) {
+    if (cited_gt.val() != 0 || cited_lt.val() != 20000) {
         $('#citation-count').text("(" + $("#id_cited_gt").val() + " - " + $("#id_cited_lt").val() + ")")
     }
+
 
     //////////////////
     // Court Picker //
@@ -162,28 +210,12 @@ $(document).ready(function() {
         $("#modal-court-picker .tab-pane.active input").prop('checked', false);
     });
 
-    ///////////////////
-    // Tab Switching //
-    ///////////////////
-    $('input[name=source]').change(function () {
-        // Map or eliminate the ordering drop down's value, then submit.
-        var drop_down = $('#id_order_by');
-        if (drop_down.val() === 'dateFiled desc'){
-            drop_down.val('dateArgued desc');
-        } else if (drop_down.val() === 'dateFiled asc'){
-            drop_down.val('dateArgued asc');
-        } else if (drop_down.val() === 'dateArgued desc'){
-            drop_down.val('dateFiled desc')
-        } else if (drop_down.val() === 'dateArgued asc') {
-            drop_down.val('dateFiled asc')
-        } else if (drop_down.val() === 'score desc') {
-            // Do nothing, but this block prevents the else clause from
-            // triggering.
-        } else {
-                drop_down.val('')
-        }
-        $('#search-form').submit();
-    });
+
+    ////////////////
+    // Auto Focus //
+    ////////////////
+    $('.auto-focus:first').focus();
+
 
     //////////
     // Tour //
