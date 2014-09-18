@@ -1,5 +1,6 @@
 from django.utils.feedgenerator import Rss201rev2Feed
 
+# For more details on the Podcast "Spec" see: https://www.apple.com/itunes/podcasts/specs.html
 
 class iTunesPodcastsFeedGenerator(Rss201rev2Feed):
     def rss_attributes(self):
@@ -25,3 +26,4 @@ class iTunesPodcastsFeedGenerator(Rss201rev2Feed):
             handler, item)
         handler.addQuickElement(u'itunes:duration', item['duration'])
         handler.addQuickElement(u'itunes:explicit', item['explicit'])
+        handler.addQuickElement(u'itunes:author', item['author'])

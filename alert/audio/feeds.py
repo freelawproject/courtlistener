@@ -43,7 +43,8 @@ class JurisdictionPodcast(JurisdictionFeed):
                 'iTunes_explicit': self.iTunes_explicit}
 
     def item_extra_kwargs(self, item):
-        return {'duration': str(item['duration']),
+        return {'author': item['court'],
+                'duration': str(item['duration']),
                 'explicit': u'no'}
 
     def item_enclosure_url(self, item):
@@ -57,7 +58,7 @@ class JurisdictionPodcast(JurisdictionFeed):
 
     description_template = None
     def item_description(self, item):
-        return u''
+        return None
 
     def item_categories(self, item):
         return None
