@@ -27,7 +27,7 @@ class IngestionTest(TestCase):
 
     def ingest_documents(self):
         site = test_scraper.Site().parse()
-        scrape_court(site)
+        scrape_court(site, test=True)
 
     def setUp(self):
         # Set up a testing core in Solr and swap it in
@@ -52,12 +52,14 @@ class IngestionTest(TestCase):
         """Do all of the supported mimetypes get extracted to text successfully, including OCR?"""
         site = test_scraper.Site().parse()
 
-        test_strings = ['supreme',
-                        'intelligence',
-                        'indiana',
-                        'reagan',
-                        'indiana',
-                        'fidelity']
+        test_strings = [
+            'supreme',
+            'intelligence',
+            'indiana',
+            'reagan',
+            'indiana',
+            'fidelity'
+        ]
         for i in range(0, len(site.case_names)):
             path = os.path.join(settings.INSTALL_ROOT, 'alert', site.download_urls[i])
             with open(path) as f:
