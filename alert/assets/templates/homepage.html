@@ -17,6 +17,18 @@
     // Initialize popovers (required because they're "opt-in for performance reasons")
     $("[data-toggle='popover']").popover();
 </script>
+<script type="application/ld+json">
+    {
+      "@context": "http://schema.org",
+      "@type": "WebSite",
+      "url": "https://www.courtlistener.com/",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://www.courtlistener.com/?q={search_term}",
+        "query-input": "required name=search_term"
+      }
+    }
+</script>
 {% endblock %}
 
 {% block logo %}
