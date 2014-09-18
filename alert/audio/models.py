@@ -83,8 +83,8 @@ class Audio(models.Model):
         upload_to=make_upload_path,
         db_index=True,
     )
-    length = models.SmallIntegerField(
-        help_text="the length of the file, in seconds",
+    duration = models.SmallIntegerField(
+        help_text="the length of the item, in seconds",
         null=True,
     )
     processing_complete = models.BooleanField(

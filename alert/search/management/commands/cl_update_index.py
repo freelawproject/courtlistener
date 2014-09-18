@@ -269,9 +269,10 @@ class Command(BaseCommand):
             self.stderr.write("solr-url is a required parameter.\n")
             exit(1)
 
-        if options.get('type').lower() == 'opinions':
+        t = options.get('type')
+        if t is not None and t.lower() == 'opinions':
             self.type = Document
-        elif options.get('type').lower() == 'audio':
+        elif t is not None and t == 'audio':
             self.type = Audio
         else:
             self.stderr.write('Unable to parse --type argument. See help for '

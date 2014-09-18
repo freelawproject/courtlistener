@@ -30,14 +30,15 @@ We welcome a conversion of these notes to a better process using Fabric.
    CourtListener. After this point, we will have both opinions and oral
    arguments for the first time, with the result being that we need some kind
    of container that we can hold them in. A new class has been added to
-   search.models called "Case" to hold this kind of information.
+   search.models called "Docket" to hold this kind of information.
  - When upgrading to this version, everything will completely break until your
    database is updated. I recommend enabling the maintenance mode URL if you
    wish to avoid chaos.
  - The database upgrade for this version will take some time, as we are moving
    a number of fields from one database table to another.
  - New dependency for datadiff (sudo pip install datadiff==1.1.5)
- - New dependency for eyeD3? (sudo pip install --allow-external eyeD3 --allow-unverified eyeD3 eyeD3==0.7.4)
+ - New dependency for eyeD3 (sudo pip install --allow-external eyeD3 --allow-unverified eyeD3 eyeD3==0.7.4)
+ - New dependency for avconv (how to install this?)
 
  TODO:
   - This change has a lot of changes to the database that need to be made,
@@ -57,14 +58,24 @@ We welcome a conversion of these notes to a better process using Fabric.
     - Why doesn't the button in the admin site work? It should use
       get_absolute_url of Document, but it fails weirdly.
     - Write some kind of script to handle matching up oral args with opinions
-    - Make audio searchable?
+    + Make audio searchable?
     + Make sure the processing_complete flag is triggered properly.
+    - Test and tweak the jurisdiction picker.
+    - Make the audio page
+    + Podcasts/Audio feeds
+    - Audio alerts?
+    - Bulk files
+    - Sitemaps
+    - selecting order drop down has weirdness on OA page.
+    - Do citation feeds redirect properly now that we're using the PK rather than an ascii conversion?
+    - can't click tabs in the jurisdiction picker in opinions!
 
     - Scraper:
         + The scrapers for audio and opinions need to be finalized and tested.
     - Atom feeds for audio
     - Rewrite bulk files and ensure that the save and delete routines of
       Document and Audio properly invalidates the bulk files if necessary.
+    - Alerts functionality?
 
   API Changes:
    - /api/rest-info/ makes reference to a number of API calls that go to v1.
@@ -76,6 +87,7 @@ We welcome a conversion of these notes to a better process using Fabric.
    - V2 needs to support searching by oral args or opinions
 
   Deployment:
+  - Install new dependencies (see above)
   - Flip the has_oral_argument_scraper flag to true on all correct courts and
     ensure that coverage page looks OK.
   - Update cron jobs to point to cl_scrape_opinions and cl_scrape_oral_arguments
@@ -100,6 +112,7 @@ We welcome a conversion of these notes to a better process using Fabric.
                schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf', 'audio_schema.xml'),
                instance_dir='/usr/local/solr/example/solr/audio',
             )
+  - Install the seal-rookery.
 
 
 2014-06-18:

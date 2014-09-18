@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% load partition_util %}
+
+{% block title %}Feeds &amp; Podcasts - CourtListener.com{% endblock %}
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block head %}
+    <link rel="alternate"
+          type="application/rss+xml"
+          title="Atom feed for all courts"
+          href="/feed/court/all/">
+{% endblock %}
+
+{% block content %}
+    <div class="span-24 last">
+        <h2 id="background">Feeds &amp; Podcasts&nbsp;<i class="gray fa fa-rss"></i></h2>
+        <p>We have a number of <a
+                href="https://en.wikipedia.org/wiki/RSS">feeds</a> and <a
+                href="https://en.wikipedia.org/wiki/Podcast">podcasts</a> so
+            that you can easily stay up to date with the latest content from
+            the courts without having to visit any website each day.</p>
+        <p>To subscribe to these feeds you will need an app or other program
+            that can regularly check the feed for new content. <a
+                    href="https://en.wikipedia.org/wiki/Comparison_of_feed_aggregators">Numerous
+            options</a> for this are available for almost any device.</p>
+        <p>The feeds and podcasts we provide are powered by <a
+                href="https://github.com/freelawproject/juriscraper/">Juriscraper</a>.
+            We are able to add and support more feeds as we receive <a
+                    href="/donate/?referrer=feeds">support</a> from you.</p>
+
+        <hr class="space">
+        <div class="span-24 last">
+            <div class="span-11 append-2">
+                <h3 id="search-feeds">Search Feeds</h3>
+                <p>As you use the search engine, a feed or podcast is generated for
+                    every search that you do. For opinions, tou can subscribe to these
+                    feeds using a URL like:</p>
+                <blockquote>
+                    <code>https://www.courtlistener.com/feed/search/?q=your-query</code>
+                </blockquote>
+                <p>For oral arguments, a podcast is created at:</p>
+                <blockquote>
+                    <code>https://www.courtlistener.com/podcast/search/?q=your-query</code>
+                </blockquote>
+                <p>The best way to create these feeds is to do your search like you
+                    always do, and then use the subscribe button in your browser to
+                    identify the correct link.</p>
+            </div>
+            <div class="span-11 last">
+                <h3 id="cited-by-feeds">Feeds for New Citations</h3>
+                <p>As we add items to our collection, we regularly discover new
+                    citations to existing opinions. If you wish to stay up to date
+                    with these new citations, you can do so using a citation feed.</p>
+                <p>Citation feeds take the form like so:</p>
+                <blockquote>
+                    <code>https://www.courtlistener.com/feed/{doc_id}/cited-by/</code>
+                </blockquote>
+                <p>As with search feeds, the best way to create these feeds is to go
+                    to an opinion that you wish to follow, and then to use the
+                    subscribe button in your browser to identify the correct link.</p>
+            </div>
+        </div>
+
+        <hr class="space">
+        <h3 id="opinion-feeds">Jurisdiction Feeds for Opinions</h3>
+        <p>At present, the jurisdictions below get opinions as they are
+            published on court websites. Subscribing to the feeds listed below
+            will provide you with the latest opinions as they are written.</p>
+        <div class="span-24">
+            {% for row in opinion_courts|rows:3 %}
+                <div class="span-8 {% if forloop.last %}last{% endif %}">
+                    <ul>
+                        {% for court in row %}
+                            <li>
+                                <a href="/feed/court/{{ court.pk }}/">{{ court }}</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endfor %}
+        </div>
+        <p>We also have <a href="/feed/court/all/">a feed for all of the
+            opinions</a>.</p>
+
+
+        <h3 id="podcasts">Podcasts for Oral Argument Jurisdictions</h3>
+        <p>At present, the jurisdictions below get oral arguments as they are
+            posted on the court websites. Subscribing to these podcasts will
+            ensure that you stay up to date with the latest oral arguments as
+            they are posted.</p>
+        <div class="span-24">
+            {% for row in oral_argument_courts|rows:3 %}
+                <div class="span-8 {% if forloop.last %}last{% endif %}">
+                    <ul>
+                        {% for court in row %}
+                            <li>
+                                <a href="/podcast/court/{{ court.pk }}/">{{ court }}</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endfor %}
+        </div>
+        <p>We also have <a href="/podcast/court/all/">a podcast for all of the
+            oral arguments listed above</a>.</p>
+    </div>
+{% endblock %}

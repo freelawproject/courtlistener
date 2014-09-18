@@ -25,8 +25,10 @@
             {% if private %}
                 <meta name="robots" content="noindex, noodp, noarchive, noimageindex" />
             {% elif private == None %}
-                <!-- This bit of invalid HTML is to give you a loud warning. -->
-                <h1>You did not supply the "private" variable to your template.</h1>
+                <!-- This bit of invalid HTML is to give developers a loud warning. -->
+                <h1>You did not supply the "private" variable to your template.
+                    Please indicate if it is True or False to remove this
+                    awful message.</h1>
             {% endif %}
         {% endblock %}
         <title>{% block title %}CourtListener.com{% endblock %}</title>
@@ -132,6 +134,10 @@
                             <a href="/api/">APIs and Bulk Data</a>
                         </div>
                         <div class="footer-item">
+                            <a href="/feeds/">Feeds &amp; Podcasts</a>
+                            <i class="gray fa fa-rss"></i>
+                        </div>
+                        <div class="footer-item">
                             <a href="/api/jurisdictions/">Jurisdictions</a>
                         </div>
                     </div>
@@ -165,6 +171,7 @@
                                  width="227">
                         </a>
                     </div>
+                    <hr class="space">
                     <div class="span-24 last gray" id="by-line">
                         <p>CourtListener is sponsored by the non-profit <a href="http://freelawproject.org">Free Law Project</a>.</p>
                     </div>

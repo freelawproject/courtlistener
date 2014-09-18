@@ -24,13 +24,16 @@ from alert.stats import tally_stat
 def make_citation_string(doc):
     """Make a citation string, joined by commas
 
-    This function creates a series of citations separated by commas that can be listed as meta data for a document. The
-    order of the items in this list follows BlueBook order, so our citations aren't just willy nilly.
+    This function creates a series of citations separated by commas that can be
+    listed as meta data for a document. The order of the items in this list
+    follows BlueBook order, so our citations aren't just willy nilly.
     """
-    cites = [doc.citation.neutral_cite, doc.citation.federal_cite_one, doc.citation.federal_cite_two,
-             doc.citation.federal_cite_three, doc.citation.specialty_cite_one, doc.citation.state_cite_regional,
-             doc.citation.state_cite_one, doc.citation.state_cite_two, doc.citation.state_cite_three,
-             doc.citation.westlaw_cite, doc.citation.lexis_cite]
+    cites = [doc.citation.neutral_cite, doc.citation.federal_cite_one,
+             doc.citation.federal_cite_two, doc.citation.federal_cite_three,
+             doc.citation.specialty_cite_one, doc.citation.state_cite_regional,
+             doc.citation.state_cite_one, doc.citation.state_cite_two,
+             doc.citation.state_cite_three, doc.citation.westlaw_cite,
+             doc.citation.lexis_cite]
     citation_string = ', '.join([cite for cite in cites if cite])
     return citation_string
 
@@ -40,9 +43,10 @@ def view_docket(request, pk, _):
     return render_to_response(
         'casepage/view_docket.html',
         {'docket': docket,
-         'private': docket.blocked,},
+         'private': docket.blocked},
         RequestContext(request),
     )
+
 
 @never_cache
 def view_opinion(request, pk, _):
@@ -66,11 +70,11 @@ def view_opinion(request, pk, _):
     except (ObjectDoesNotExist, TypeError):
         # Not favorited or anonymous user
         favorite_form = FavoriteForm(initial={'doc_id': doc.pk,
-            'name': doc.citation.case_name})
+                                              'name': doc.citation.case_name})
 
     # get most influential opinions that cite this opinion
     cited_by_trunc = doc.citation.citing_opinions.select_related(
-          'citation').order_by('-citation_count', '-date_filed')[:5]
+        'citation').order_by('-citation_count', '-date_filed')[:5]
 
     authorities_trunc = doc.cases_cited.all().select_related(
         'document').order_by('case_name')[:5]
@@ -93,13 +97,13 @@ def view_opinion(request, pk, _):
 
 
 def view_opinion_citations(request, pk, _):
-    # Look up the document, title
     doc = get_object_or_404(Document, pk=pk)
-    title = '%s, %s' % (trunc(doc.citation.case_name, 100), make_citation_string(doc))
+    title = '%s, %s' % (
+        trunc(doc.citation.case_name, 100), make_citation_string(doc))
 
     # Get list of cases we cite, ordered by citation count
     citing_opinions = doc.citation.citing_opinions.select_related(
-            'citation', 'docket__court').order_by('-citation_count', '-date_filed')
+        'citation', 'docket__court').order_by('-citation_count', '-date_filed')
 
     paginator = Paginator(citing_opinions, 20, orphans=2)
     page = request.GET.get('page')
@@ -131,7 +135,8 @@ def view_opinion_citations(request, pk, _):
 
 def view_authorities(request, pk, _):
     doc = get_object_or_404(Document, pk=pk)
-    title = '%s, %s' % (trunc(doc.citation.case_name, 100), make_citation_string(doc))
+    title = '%s, %s' % (
+        trunc(doc.citation.case_name, 100), make_citation_string(doc))
 
     # Ordering is by case name is the norm.
     authorities = doc.cases_cited.all().select_related(
@@ -154,8 +159,8 @@ def view_authorities(request, pk, _):
                               RequestContext(request))
 
 
-def redirect_opinion_pages(request, id, slug):
-    pk = ascii_to_num(id)
+def redirect_opinion_pages(request, pk, slug):
+    pk = ascii_to_num(pk)
     path = reverse('view_case', args=[pk, slug])
     if request.path.endswith('/authorities/'):
         path += 'authorities/'
@@ -186,8 +191,11 @@ def serve_static_file(request, file_path=''):
     response = HttpResponse()
     if doc.blocked:
         response['X-Robots-Tag'] = 'noindex, noodp, noarchive, noimageindex'
-    response['X-Sendfile'] = os.path.join(settings.MEDIA_ROOT, file_path.encode('utf-8'))
-    response['Content-Disposition'] = 'attachment; filename="%s"' % file_name.encode('utf-8')
+    response['X-Sendfile'] = os.path.join(settings.MEDIA_ROOT,
+                                          file_path.encode('utf-8'))
+    response[
+        'Content-Disposition'] = 'attachment; filename="%s"' % file_name.encode(
+        'utf-8')
     response['Content-Type'] = mimetype
     if not is_bot(request):
         tally_stat('case_page.static_file.served')

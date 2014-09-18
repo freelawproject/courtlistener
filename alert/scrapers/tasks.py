@@ -1,24 +1,23 @@
 # -*- coding: utf-8 -*-
 
 import os
-import re
-from django.core.files.base import ContentFile
 import eyed3
 import sys
-from alert.audio.models import Audio
-from alert.scrapers.models import ErrorLog
 
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 from django.conf import settings
 
-from alert.search.models import Document
+from alert.audio.models import Audio
 from alert.lib.string_utils import anonymize, trunc
 from alert.lib.mojibake import fix_mojibake
+from alert.scrapers.models import ErrorLog
+from alert.search.models import Document
 from celery import task
 from celery.task.sets import subtask
 from citations.tasks import update_document_by_id
+from django.core.files.base import ContentFile
 from django.utils.encoding import smart_text, DjangoUnicodeDecodeError
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
@@ -375,7 +374,7 @@ def set_mp3_meta_data(audio_obj, mp3_path):
                 frame,
                 f.read(),
                 'image/png',
-                u'This file created for the public domain by Free Law Project',
+                u'Created for the public domain by Free Law Project',
             )
 
     audio_file.tag.save()
@@ -391,61 +390,34 @@ def process_audio_file(pk):
 
     path_to_tmp_location = os.path.join('/tmp', str(time.time()) + '.mp3')
 
-    # Convert original file to mono at 22050Hz using avconv.
-    avconv_command = ['avconv', '-i', path_to_original, '-ac', '1', '-ar',
-                      '22050', path_to_tmp_location]
+    # Convert original file to:
+    #  - mono (-ac 1)
+    #  - sample rate (audio samples / s) of 22050Hz (-ar 22050)
+    #  - constant bit rate (sample resolution) of 48kbps (-ab 48k)
+    avconv_command = ['avconv', '-i', path_to_original,
+                      '-ac', '1',
+                      '-ar', '22050',
+                      '-ab', '48k',
+                      path_to_tmp_location]
     _ = subprocess.check_output(avconv_command, stderr=subprocess.STDOUT)
 
     # Have to do this last because otherwise the mp3 hasn't yet been generated.
-    file_name = trunc(audio_file.case_name.lower(), 75) + '.mp3'
+    file_name = trunc(audio_file.case_name.lower(), 72) + '_cl.mp3'
     set_mp3_meta_data(audio_file, path_to_tmp_location)
 
-    audio_file.length = get_audio_file_length(path_to_tmp_location)
+    audio_file.duration = eyed3.load(path_to_tmp_location).info.time_secs
 
-    # Save the new file
     with open(path_to_tmp_location, 'r') as mp3:
         try:
             cf = ContentFile(mp3.read())
             audio_file.local_path_mp3.save(file_name, cf, save=False)
         except:
-            msg = "Unable to save mp3 to audio_file in scraper.tasks.process_audio_file for item: %s\n" \
-                  "Traceback:\n%s" % (audio_file.pk, traceback.format_exc())
+            msg = "Unable to save mp3 to audio_file in scraper.tasks.process_" \
+                  "audio_file for item: %s\nTraceback:\n%s" % \
+                  (audio_file.pk, traceback.format_exc())
             logger.critical(msg)
             ErrorLog(log_level='CRITICAL', court=audio_file.docket.court,
                      message=msg).save()
 
     audio_file.processing_complete = True
     audio_file.save()
-
-
-def duration_to_seconds(duration):
-    """Covert times to seconds.
-
-    Times might be like 00:23:23
-    """
-    hours, minutes, seconds = duration.split(':')
-    return int(hours) * 3600 + int(minutes) * 60 + int(seconds)
-
-
-def get_audio_file_length(path):
-    """Returns an estimate of the length of the audio file.
-
-    It turns out that getting an accurate length value for an audio file takes
-    a good amount of processing or needs to be in the ID3 tags. I've found the
-    ID3 tags to be simple to check, but sadly, quite inaccurate. As a result,
-    we use avconv's estimate of the length, which sniffs the length of a number
-    of MP3 frames and then gives a guess. Since our content is long, the number
-    of frames will be much shorter than the total, so our estimates may be
-    fairly far off.
-    """
-    duration_command = ['avprobe', path]
-    out = subprocess.Popen(
-        duration_command,
-        shell=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    ).communicate()[1]
-    duration_string = re.search('Duration: ([0-9:]*)', out).group(1)
-    return duration_to_seconds(duration_string)
-
-

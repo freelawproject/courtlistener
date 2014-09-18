@@ -15,6 +15,7 @@ class InvalidDocumentError(Exception):
 # Used to nuke null and control characters.
 null_map = dict.fromkeys(range(0, 10) + range(11, 13) + range(14, 32))
 
+
 class SearchDocument(object):
     def __init__(self, item):
         # Standard fields
@@ -81,6 +82,8 @@ class SearchAudioFile(object):
                 % item.pk)
         self.judge = item.judges
         self.docketNumber = item.docket_number
+        self.file_size_mp3 = item.local_path_mp3.size
+        self.duration = item.duration
         self.source = item.source
         self.download_url = item.download_url
         self.local_path = unicode(item.local_path_mp3)

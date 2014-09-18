@@ -126,6 +126,10 @@
             stored="true" multiValued="false" />
      <field name="local_path"            type="string"               indexed="false"
             stored="true" multiValued="false" />
+     <field name="file_size_mp3"         type="int"                  indexed="false"
+            stored="true" multiValued="false" />
+     <field name="duration"              type="int"                  indexed="false"
+            stored="true" multiValued="false" />
      <field name="source"                type="string"               indexed="false"
             stored="true" multiValued="false" />
 

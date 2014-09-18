@@ -83,11 +83,21 @@ def merge_form_with_courts(COURTS, search_form):
     Final value is like (note that order is significant):
     courts = {
         'federal': [
-            {'name': 'Eighth Circuit', 'id': 'ca8', 'checked': True, 'jurisdiction': 'F'},
+            {'name': 'Eighth Circuit',
+             'id': 'ca8',
+             'checked': True,
+             'jurisdiction': 'F',
+             'has_oral_argument_scraper': True,
+            },
             ...
         ],
         'district': [
-            {'name': 'D. Delaware', 'id': 'deld', 'checked' False, 'jurisdiction': 'FD'},
+            {'name': 'D. Delaware',
+             'id': 'deld',
+             'checked' False,
+             'jurisdiction': 'FD',
+             'has_oral_argument_scraper': False,
+            },
             ...
         ],
         'state': [
@@ -96,9 +106,10 @@ def merge_form_with_courts(COURTS, search_form):
         ...
     }
 
-    State courts are a special exception. For layout purposes, they get bundled by supreme court and then by hand.
+    State courts are a special exception. For layout purposes, they get
+    bundled by supreme court and then by hand. Yes, this means new state courts
+    requires manual adjustment here.
     """
-
     # Are any of the checkboxes checked?
     checked_statuses = [field.value() for field in search_form
                         if field.html_name.startswith('court_')]
@@ -153,8 +164,8 @@ def merge_form_with_courts(COURTS, search_form):
         elif court['tab'] == 'state':
             # State courts get bundled by supreme courts
             if court['jurisdiction'] == 'S':
-                # Whenever we hit a state supreme court, we append the previous bundle
-                # and start a new one.
+                # Whenever we hit a state supreme court, we append the
+                # previous bundle and start a new one.
                 if state_bundle:
                     state_bundles.append(state_bundle)
                 state_bundle = [court]
@@ -312,7 +323,7 @@ def build_main_query(cd, highlight='all', order_by=''):
                 })
             elif cd['source'] == 'oa':
                 main_params.update({
-                    'fl': ','.join(common_fl + ['docket_id', 'dateArgued']),
+                    'fl': ','.join(common_fl + ['docket_id', 'dateArgued', 'duration']),
                     'hl.fl': ','.join(common_hlfl),
                 })
             main_params.update({

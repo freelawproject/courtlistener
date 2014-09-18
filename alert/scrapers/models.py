@@ -22,7 +22,7 @@ class urlToHash(models.Model):
     )
 
     def __unicode__(self):
-        return self.url
+        return self.id
 
     class Meta:
         db_table = "urlToHash"

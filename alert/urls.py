@@ -1,38 +1,49 @@
 from tastypie.api import Api
-from alert.alerts.views import delete_alert, delete_alert_confirm, edit_alert_redirect
+from django.conf.urls import include, patterns, url
+from django.contrib import admin
+from django.views.generic import RedirectView
+
+from alert.alerts.views import delete_alert, delete_alert_confirm, \
+    edit_alert_redirect
 from alert.api.views import (
-    court_index, documentation_index, dump_index, rest_index, serve_or_gen_dump, serve_pagerank_file)
+    court_index, documentation_index, dump_index, rest_index,
+    serve_or_gen_dump, serve_pagerank_file)
+from alert.audio.feeds import AllJurisdictionsPodcast, JurisdictionPodcast, \
+    SearchPodcast
+from alert.audio.views import view_audio_file
 from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from alert.casepage.sitemap import sitemap_maker, flat_sitemap_maker
 from alert.casepage.views import (
-    view_opinion, view_opinion_citations, view_authorities, view_docket, serve_static_file, redirect_opinion_pages)
-from alert.donate.dwolla import process_dwolla_callback, process_dwolla_transaction_status_callback
+    view_opinion, view_opinion_citations, view_authorities, view_docket,
+    serve_static_file, redirect_opinion_pages)
+from alert.citations.feeds import CitedByFeed
+from alert.donate.dwolla import process_dwolla_callback, \
+    process_dwolla_transaction_status_callback
 from alert.donate.paypal import process_paypal_callback, donate_paypal_cancel
 from alert.donate.sitemap import donate_sitemap_maker
 from alert.donate.stripe_helpers import process_stripe_callback
 from alert.donate.views import view_donations, donate, donate_complete
-from alert.favorites.views import delete_favorite, edit_favorite, save_or_update_favorite
-from alert.feeds.views import all_courts_feed, cited_by_feed, court_feed, search_feed
-from alert.simple_pages.views import show_maintenance_warning
+from alert.favorites.views import delete_favorite, edit_favorite, \
+    save_or_update_favorite
 from alert.search import api
 from alert.search import api2
+from alert.search.feeds import SearchFeed, JurisdictionFeed, \
+    AllJurisdictionsFeed
 from alert.search.models import Court
 from alert.search.views import browser_warning, show_results, tools_page
 from alert.simple_pages.api import coverage_data
 from alert.userHandling.views import (
-    confirmEmail, deleteProfile, deleteProfileDone, emailConfirmSuccess, password_change, register, register_success,
+    confirmEmail, deleteProfile, deleteProfileDone, emailConfirmSuccess,
+    password_change, register, register_success,
     request_email_confirmation, view_favorites, view_alerts, view_settings)
 
-from django.conf.urls import include, patterns, url
-from django.contrib import admin
-from django.views.generic import RedirectView
 
 # for the flatfiles in the sitemap
 from django.contrib.auth.views import (
     login as signIn, logout as signOut, password_reset,
     password_reset_done, password_reset_confirm
 )
-from audio.views import view_audio_file
+
 
 pacer_codes = Court.objects.filter(in_use=True).values_list('pk', flat=True)
 mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html')
@@ -159,11 +170,14 @@ urlpatterns = patterns('',
         serve_or_gen_dump),
     (r'^api/bulk/external_pagerank/$', serve_pagerank_file),
 
-    # Feeds
-    (r'^feed/(search)/$', search_feed()),  # lacks URL capturing b/c it will use GET queries.
-    (r'^feed/court/all/$', all_courts_feed()),
-    (r'^feed/court/(?P<court>' + '|'.join(pacer_codes) + ')/$', court_feed()),
-    (r'^feed/(?P<doc_id>.*)/cited-by/$', cited_by_feed()),
+    # Feeds & podcasts
+    (r'^feed/(search)/$', SearchFeed()),  # lacks URL capturing b/c it will use GET queries.
+    (r'^feed/court/all/$', AllJurisdictionsFeed()),
+    (r'^feed/court/(?P<court>' + '|'.join(pacer_codes) + ')/$', JurisdictionFeed()),
+    (r'^feed/(?P<doc_id>.*)/cited-by/$', CitedByFeed()),
+    (r'^podcast/court/(?P<court>' + '|'.join(pacer_codes) + ')/$', JurisdictionPodcast()),
+    (r'^podcast/court/all/$', AllJurisdictionsPodcast()),
+    (r'^podcast/(search)/', SearchPodcast()),
 
     # Sitemaps
     (r'^sitemap\.xml$', sitemap_maker),

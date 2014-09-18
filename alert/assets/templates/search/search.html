@@ -12,10 +12,20 @@
 {% block head %}
     {% if not error %}
         {% if get_string %}
-            <link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?{{ get_string }}" />
+            <link rel="alternate"
+                  type="application/rss+xml"
+                  title="Atom Feed for These Search Results"
+                  href="/feed/search/?{{ get_string }}" />
         {% endif %}
     {% endif %}
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">
+    <link rel="alternate"
+          type="application/rss+xml"
+          title="Atom Feed For All Opinions"
+          href="/feed/court/all/">
+    <link rel="alternate"
+          type="application/rss+xml"
+          title="Podcast For All Oral Arguments"
+          href="/podcast/court/all/">
 {% endblock %}
 
 
@@ -243,7 +253,20 @@
         {% endif %}
 
         {% if results.paginator.count > 0 %}
-            <h2 id="result-count" class="bottom">{{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }}</h2>
+            <h2 id="result-count" class="bottom">
+                {{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }}
+                {% if search_form.source.value == 'o' %}
+                    <a href="/feed/search/?{{ get_string }}">
+                        <i class="gray fa fa-rss"
+                           title="Subscribe to a feed of these results"></i>
+                    </a>
+                {% elif search_form.source.value == 'oa' %}
+                    <a href="/podcast/search/?{{ get_string }}">
+                        <i class="gray fa fa-rss"
+                           title="Subscribe to a podcast of these results"></i>
+                    </a>
+                {% endif %}
+            </h2>
             <div id="result-order-chooser-placeholder">
                 {% if results.paginator.count > 0 %}
                     {% include "includes/order_by_dropdown.html" %}
@@ -280,7 +303,7 @@
                     <li>Our system is down and can't respond</li>
                     <li>Some other reason</li>
                 </ul>
-                <p>We log these errors and work to resolve them, but if you think we can benefit from your experience, don't hesitate to <a href="/contact/">let us know</a>! We value your feedback.</p>
+                <p>We log these errors and work to resolve them, but if you think we can benefit from your experience, don't hesitate to    <a href="/contact/">let us know</a>! We value your feedback.</p>
             {% endif %}
         {% endif %}
 
@@ -315,6 +338,4 @@
         {% endif %}
         {% include "includes/jurisdiction_picker_modal.html" %}
     </div>
-
-
 {% endblock %}

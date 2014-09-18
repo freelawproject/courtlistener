@@ -1,5 +1,6 @@
 {% load text_filters %}
 {% load humanize %}
+
 {% for result in results.object_list %}
 <article>
     <h3 class="bottom serif">
@@ -51,6 +52,12 @@
             <div class="inline nowrap">
                 <span class="meta-data-header">Docket Number:</span>
                 <span class="meta-data-value">{{ result.solr_highlights.docketNumber.0|safe }}</span>
+            </div>
+        {% endif %}
+        {% if request.GET.source == 'oa' %}
+            <div class="inline nowrap">
+                <span class="meta-data-header">Duration:</span>
+                <span class="meta-data-value">{{ result.duration|naturalduration }} ({{ result.duration }}s</span>
             </div>
         {% endif %}
     </div>

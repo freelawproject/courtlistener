@@ -38,8 +38,8 @@ INPUT_FORMATS = [
 ]
 
 # Query the DB so we can build up check boxes for each court in use.
-COURTS = Court.objects.filter(in_use=True)\
-    .values('pk', 'short_name', 'jurisdiction')
+COURTS = Court.objects.filter(in_use=True).values(
+    'pk', 'short_name', 'jurisdiction', 'has_oral_argument_scraper')
 
 
 def _clean_form(request, cd):

@@ -73,17 +73,40 @@ def coverage_graph(request):
         if 'L' in d['source']:
             count_lawbox += d['source__count']
 
-    courts_with_opinion_scrapers = Court.objects.filter(in_use=True, has_opinion_scraper=True)
-    courts_with_oral_argument_scrapers = Court.objects.filter(in_use=True, has_oral_argument_scraper=True)
-    return render_to_response('simple_pages/coverage_graph.html',
-                              {'sorted_courts': courts_json,
-                               'count_pro': count_pro,
-                               'count_lawbox': count_lawbox,
-                               'count_scraper': count_scraper,
-                               'courts_with_opinion_scrapers': courts_with_opinion_scrapers,
-                               'courts_with_oral_argument_scrapers': courts_with_oral_argument_scrapers,
-                               'private': False},
-                              RequestContext(request))
+    opinion_courts = Court.objects.filter(in_use=True, has_opinion_scraper=True)
+    oral_argument_courts = Court.objects.filter(in_use=True, has_oral_argument_scraper=True)
+    return render_to_response(
+        'simple_pages/coverage_graph.html',
+        {
+            'sorted_courts': courts_json,
+            'count_pro': count_pro,
+            'count_lawbox': count_lawbox,
+            'count_scraper': count_scraper,
+            'courts_with_opinion_scrapers': opinion_courts,
+            'courts_with_oral_argument_scrapers': oral_argument_courts,
+            'private': False
+        },
+        RequestContext(request))
+
+
+def feeds(request):
+    opinion_courts = Court.objects.filter(
+        in_use=True,
+        has_opinion_scraper=True
+    )
+    oral_argument_courts = Court.objects.filter(
+        in_use=True,
+        has_oral_argument_scraper=True
+    )
+    return render_to_response(
+        'simple_pages/feeds.html',
+        {
+            'opinion_courts': opinion_courts,
+            'oral_argument_courts': oral_argument_courts,
+            'private': False
+        },
+        RequestContext(request)
+    )
 
 
 @check_honeypot(field_name='skip_me_if_alive')

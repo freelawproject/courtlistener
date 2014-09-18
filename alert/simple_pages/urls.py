@@ -5,6 +5,7 @@ urlpatterns = patterns('simple_pages.views',
     (r'^about/$', 'about'),
     (r'^faq/$', 'faq'),
     (r'^coverage/$', 'coverage_graph'),
+    (r'^feeds/$', 'feeds'),
     (r'^contact/$', 'contact'),
     (r'^contact/thanks/$', 'contact_thanks'),
 
