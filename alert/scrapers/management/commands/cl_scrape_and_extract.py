@@ -1,3 +1,4 @@
+import random
 from alert.lib import magic
 from alert.lib.string_utils import trunc
 from alert.scrapers.models import ErrorLog
@@ -154,7 +155,7 @@ def get_binary_content(download_url, cookies):
     return '', r
 
 
-def scrape_court(site, full_crawl=False):
+def scrape_court(site, full_crawl=False, test=False):
     download_error = False
     # Get the court object early for logging
     # opinions.united_states.federal.ca9_u --> ca9
@@ -258,8 +259,16 @@ def scrape_court(site, full_crawl=False):
                 doc.citation = cite
                 doc.save(index=False)
 
-                # Extract the contents asynchronously.
-                extract_doc_content(doc.pk, callback=subtask(extract_by_ocr))
+                # Extract the contents now, and delay the citation finder for a
+                # random period of time (for performance).
+                random_delay = random.randint(0, 3600)
+                if test:
+                    random_delay = 0
+                extract_doc_content(
+                    doc.pk,
+                    callback=subtask(extract_by_ocr),
+                    citation_countdown=random_delay,
+                )
 
                 logger.info("Successfully added doc %s: %s" % (doc.pk, site.case_names[i]))
 

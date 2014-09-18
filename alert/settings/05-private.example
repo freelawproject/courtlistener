@@ -3,8 +3,8 @@
 ##################
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
-# DEBUG can be set to True on any machine, but this is used to tune down resource consumption (SOLR, queryset iterator
-# size, etc) on dev machines.
+# DEBUG can be set to True on any machine, but this is used to tune down
+# resource consumption (SOLR, queryset iterator size, etc) on dev machines.
 DEVELOPMENT = True
 
 ADMINS = (

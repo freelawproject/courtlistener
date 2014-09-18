@@ -131,7 +131,7 @@ def extract_from_wpd(doc, path, DEVNULL):
 
 
 @task
-def extract_doc_content(pk, callback=None):
+def extract_doc_content(pk, callback=None, citation_countdown=0):
     """
     Given a document, we extract it, sniffing its extension, then store its
     contents in the database.  Finally, we asynchronously find citations in
@@ -175,14 +175,17 @@ def extract_doc_content(pk, callback=None):
         return doc
 
     try:
-        doc.save(index=False)
+        if citation_countdown == 0:
+            doc.save(index=False)
+        else:
+            doc.save(index=True)
     except Exception, e:
         print "****Error saving text to the db for: %s****" % doc
         print traceback.format_exc()
         return doc
 
     # Identify and link citations within the document content
-    update_document_by_id.delay(doc.pk)
+    update_document_by_id.apply_async((doc.pk,), countdown=citation_countdown)
 
     return doc
 

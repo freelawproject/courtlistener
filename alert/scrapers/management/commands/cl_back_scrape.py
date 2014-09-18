@@ -1,7 +1,8 @@
 from django.core.management import BaseCommand, CommandError
-from alert.scrapers.management.commands.cl_scrape_and_extract import scrape_court
+from alert.scrapers.management.commands.cl_scrape_and_extract import \
+    scrape_court
 
-from juriscraper.GenericSite import logger
+from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import build_module_list
 
 import traceback
@@ -41,11 +42,13 @@ class Command(BaseCommand):
         logger.info("Using court_str: \"%s\"" % court_str)
 
         if court_str == 'ca4':
-            #start = date(1996, 1, 1)
+            # start = date(1996, 1, 1)
             #start = date(1998, 11, 23)
-            start  = date (1998, 11, 23)
+            start = date(1998, 11, 23)
             end = date(2010, 4, 1)
-            return self.site_yielder([i.date() for i in rrule(WEEKLY, dtstart=start, until=end)], mod)
+            return self.site_yielder(
+                [i.date() for i in rrule(WEEKLY, dtstart=start, until=end)],
+                mod)
         elif court_str == 'cafc':
             return self.site_yielder(range(0, 185), mod)
         elif court_str == 'fla':
@@ -65,7 +68,9 @@ class Command(BaseCommand):
         elif court_str in ['nd', 'ndctapp']:
             start = date(1996, 9, 1)
             end = date(2013, 6, 1)
-            return self.site_yielder([i.date() for i in rrule(MONTHLY, dtstart=start, until=end)], mod)
+            return self.site_yielder(
+                [i.date() for i in rrule(MONTHLY, dtstart=start, until=end)],
+                mod)
         elif court_str in ['nmctapp', 'nm']:
             return self.site_yielder(range(2009, 2013), mod)
         elif court_str == 'ohio':
@@ -120,15 +125,17 @@ class Command(BaseCommand):
         elif court_str == 'tex':
             start = date(1997, 10, 2)
             end = date(2013, 6, 5)
-            return self.site_yielder([i.date() for i in rrule(DAILY, dtstart=start, until=end)], mod)
+            return self.site_yielder(
+                [i.date() for i in rrule(DAILY, dtstart=start, until=end)],
+                mod)
         elif court_str == 'uscfc':
             return self.site_yielder(range(1, 4), mod)
         elif court_str == 'uscfc_u':
-            return self.site_yielder(range(1,2), mod)
+            return self.site_yielder(range(1, 2), mod)
         elif court_str == 'uscfc_vaccine':
             return self.site_yielder([1], mod)
         elif court_str == 'uscfc_vaccine_u':
-            return self.site_yielder(range(1,10), mod)
+            return self.site_yielder(range(1, 10), mod)
         elif 'wash' in court_str:
             return self.site_yielder([i.date() for i in rrule(
                 MONTHLY,
@@ -144,11 +151,13 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         court_id = options.get('court_id')
         if not court_id:
-            raise CommandError('You must specify a court as a package or module')
+            raise CommandError(
+                'You must specify a court as a package or module')
         else:
             module_strings = build_module_list(court_id)
             if not len(module_strings):
-                raise CommandError('Unable to import module or package. Aborting.')
+                raise CommandError(
+                    'Unable to import module or package. Aborting.')
 
             logger.info("Starting up the scraper.")
             num_courts = len(module_strings)
