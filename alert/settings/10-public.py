@@ -117,7 +117,7 @@ else:
     # Celery settings for production sites
     BROKER_URL = 'amqp://celery:%s@localhost:5672//celery' % CELERY_PASSWORD
     CELERY_RESULT_BACKEND = 'amqp'
-    CELERYD_CONCURRENCY = 24
+    CELERYD_CONCURRENCY = 18
 
 # Rate limits aren't ever used, so disable them across the board for better performance
 CELERY_DISABLE_RATE_LIMITS = True
