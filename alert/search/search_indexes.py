@@ -3,7 +3,7 @@ from datetime import time
 from django.core.urlresolvers import NoReverseMatch
 from django.template import Context
 from django.template import loader
-from alert.casepage.views import make_citation_string
+from alert.opinion_page.views import make_citation_string
 
 
 class InvalidDocumentError(Exception):

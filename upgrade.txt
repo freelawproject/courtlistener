@@ -69,6 +69,7 @@ We welcome a conversion of these notes to a better process using Fabric.
     - selecting order drop down has weirdness on OA page.
     - Do citation feeds redirect properly now that we're using the PK rather than an ascii conversion?
     - can't click tabs in the jurisdiction picker in opinions!
+    - add recent oral arguments to the homepage?
 
     - Scraper:
         + The scrapers for audio and opinions need to be finalized and tested.

@@ -7,7 +7,7 @@ execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
-from alert.casepage.views import make_citation_string
+from alert.opinion_page.views import make_citation_string
 from alert.citations import find_citations, match_citations
 from alert.search.models import Document, Citation
 from celery import task

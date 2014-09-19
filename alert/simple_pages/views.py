@@ -214,3 +214,19 @@ def validate_for_google2(request):
 
 def validate_for_wot(request):
     return HttpResponse('bcb982d1e23b7091d5cf4e46826c8fc0')
+
+
+def tools_page(request):
+    return render_to_response(
+        'tools.html',
+        {'private': False},
+        RequestContext(request)
+    )
+
+
+def browser_warning(request):
+    return render_to_response(
+        'browser_warning.html',
+        {'private': True},
+        RequestContext(request)
+    )

@@ -1,24 +1,27 @@
 import logging
 from datetime import datetime, timedelta
+
 from django.contrib.auth.models import User
 from django.db.models import Sum
 from django.utils.timezone import utc, make_aware
-from alert.alerts.forms import CreateAlertForm
-from alert.alerts.models import Alert
-from alert.lib import search_utils
-from alert.lib import sunburnt
-from alert.lib.bot_detector import is_bot
-from alert.search.forms import SearchForm, COURTS, _clean_form
-
-from alert import settings
 from django.contrib import messages
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.shortcuts import render_to_response, get_object_or_404
 from django.shortcuts import HttpResponseRedirect
 from django.template import RequestContext
 from django.views.decorators.cache import never_cache
+
+from alert.alerts.forms import CreateAlertForm
+from alert.alerts.models import Alert
+from alert.lib import search_utils
+from alert.lib import sunburnt
+from alert.lib.bot_detector import is_bot
+from alert.search.forms import SearchForm, COURTS, _clean_form
+from alert import settings
 from alert.search.models import Document
 from alert.stats import tally_stat, Stat
+from audio.models import Audio
+
 
 logger = logging.getLogger(__name__)
 
@@ -189,10 +192,13 @@ def show_results(request):
                 .filter(date_joined__gte=ten_days_ago).count()
             opinions_in_last_ten = Document.objects\
                 .filter(time_retrieved__gte=ten_days_ago).count()
+            oral_arguments_in_last_ten = Audio.objects\
+                .filter(time_retrieved__gte=ten_days_ago).count()
             render_dict.update({
                 'alerts_in_last_ten': alerts_in_last_ten,
                 'queries_in_last_ten': queries_in_last_ten,
                 'opinions_in_last_ten': opinions_in_last_ten,
+                'oral_arguments_in_last_ten': oral_arguments_in_last_ten,
                 'bulk_in_last_ten': bulk_in_last_ten,
                 'api_in_last_ten': api_in_last_ten,
                 'users_in_last_ten': users_in_last_ten,
@@ -232,19 +238,3 @@ def show_results(request):
                 render_dict,
                 RequestContext(request),
             )
-
-
-def tools_page(request):
-    return render_to_response(
-        'tools.html',
-        {'private': False},
-        RequestContext(request)
-    )
-
-
-def browser_warning(request):
-    return render_to_response(
-        'browser_warning.html',
-        {'private': True},
-        RequestContext(request)
-    )

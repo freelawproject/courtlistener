@@ -1,4 +1,4 @@
-from alert.casepage.views import make_citation_string
+from alert.opinion_page.views import make_citation_string
 from alert.search.models import Document
 from alert.favorites.forms import FavoriteForm
 from alert.favorites.models import Favorite

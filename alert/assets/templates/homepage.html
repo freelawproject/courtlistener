@@ -269,6 +269,11 @@
                 <div class="span-9 last"><p>Opinions added in last ten days.</p></div>
 
                 <div class="span-2 center">
+                    <span class="homepage-stat bold">{{ oral_arguments_in_last_ten|intcomma }}</span>
+                </div>
+                <div class="span-9 last"><p>Oral arguments added in last ten days.</p></div>
+
+                <div class="span-2 center">
                     <span class="homepage-stat bold">{{ queries_in_last_ten|intcomma }}</span>
                 </div>
                 <div class="span-9 last"><p>Number of queries made in last ten days.</p></div>
@@ -300,7 +305,7 @@
             </div>
 
             <div class="span-11 last">
-                <h3>Latest Cases&nbsp;<i class="gray fa fa-clock-o"></i></h3>
+                <h3>Latest Opinions&nbsp;<i class="gray fa fa-clock-o"></i></h3>
                 <p>We download opinions from many jurisdictions on an ongoing basis. Here are the most recent ones.
                 </p>
                 {% include "includes/search_result.html" with simple=True %}
