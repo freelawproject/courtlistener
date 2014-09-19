@@ -178,7 +178,7 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
         if citation_countdown == 0:
             doc.save(index=False)
         else:
-            doc.save(index=True)
+            doc.save(index=True, commit=False)
     except Exception, e:
         print "****Error saving text to the db for: %s****" % doc
         print traceback.format_exc()

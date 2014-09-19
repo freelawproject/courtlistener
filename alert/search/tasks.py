@@ -96,7 +96,7 @@ def add_or_update_doc(document_id, commit=True):
 
 
 @task
-def update_cite(citation_id):
+def update_cite(citation_id, commit=True):
     """If a citation and a document are both updated simultaneously, we will
     needlessly update the index twice. No easy way around it.
     """
@@ -105,4 +105,5 @@ def update_cite(citation_id):
     for doc in cite.parent_documents.all():
         search_doc = SearchDocument(doc)
         si.add(search_doc)
-    si.commit()
+    if commit:
+        si.commit()

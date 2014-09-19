@@ -1,6 +1,7 @@
 import random
 from alert.lib import magic
 from alert.lib.string_utils import trunc
+from alert.lib import sunburnt
 from alert.scrapers.models import ErrorLog
 from alert.scrapers.DupChecker import DupChecker
 from alert.search.models import Citation
@@ -8,6 +9,7 @@ from alert.search.models import Court
 from alert.search.models import Document
 
 from celery.task.sets import subtask
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
 from juriscraper.AbstractSite import logger
@@ -274,6 +276,10 @@ def scrape_court(site, full_crawl=False, test=False):
 
         # Update the hash if everything finishes properly.
         logger.info("%s: Successfully crawled." % site.court_id)
+
+        # Commit to solr at the end of the jurisdiction.
+        si = sunburnt.SolrInterface(settings.SOLR_URL, mode='w')
+        si.commit()
         if not download_error and not full_crawl:
             # Only update the hash if no errors occurred.
             dup_checker.update_site_hash(site.hash)
