@@ -5,7 +5,6 @@ from django.conf.urls import include, patterns, url
 from django.contrib import admin
 from django.views.generic import RedirectView
 
-
 pacer_codes = Court.objects.filter(in_use=True).values_list('pk', flat=True)
 
 admin.autodiscover()

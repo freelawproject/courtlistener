@@ -4,17 +4,22 @@ import os
 import time
 from django.utils.timezone import now
 from alert.audio.models import Audio
-from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core
+from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, \
+    swap_solr_core
 from alert.lib.string_utils import trunc
 from alert.lib import sunburnt
 from alert.scrapers.DupChecker import DupChecker
 from alert.scrapers.models import urlToHash, ErrorLog
 from alert.scrapers.management.commands.cl_scrape_opinions import get_extension
-from alert.scrapers.management.commands.cl_scrape_opinions import Command as OpinionCommand
-from alert.scrapers.management.commands.cl_scrape_oral_arguments import Command as OralArgCommand
-from alert.scrapers.management.commands.cl_report_scrape_status import calculate_counts, tally_errors
+from alert.scrapers.management.commands.cl_scrape_opinions import \
+    Command as OpinionCommand
+from alert.scrapers.management.commands.cl_scrape_oral_arguments import \
+    Command as OralArgCommand
+from alert.scrapers.management.commands.cl_report_scrape_status import \
+    calculate_counts, tally_errors
 from alert.scrapers.tasks import extract_from_txt
-from alert.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
+from alert.scrapers.test_assets import test_opinion_scraper, \
+    test_oral_arg_scraper
 from alert.search.models import Citation, Court, Document, Docket
 from alert import settings
 from celery.task.sets import subtask
@@ -71,7 +76,8 @@ class IngestionTest(TestCase):
         self.assertEqual(len(site.case_names), 2)
 
     def test_content_extraction(self):
-        """Do all of the supported mimetypes get extracted to text successfully, including OCR?"""
+        """Do all of the supported mimetypes get extracted to text
+        successfully, including OCR?"""
         site = test_opinion_scraper.Site().parse()
 
         test_strings = ['supreme',
@@ -81,7 +87,8 @@ class IngestionTest(TestCase):
                         'indiana',
                         'fidelity']
         for i in range(0, len(site.case_names)):
-            path = os.path.join(settings.INSTALL_ROOT, 'alert', site.download_urls[i])
+            path = os.path.join(settings.INSTALL_ROOT, 'alert',
+                                site.download_urls[i])
             with open(path) as f:
                 content = f.read()
                 cf = ContentFile(content)

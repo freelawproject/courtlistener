@@ -16,9 +16,9 @@ from alert.alerts.models import Alert
 from alert.lib import search_utils
 from alert.lib import sunburnt
 from alert.lib.bot_detector import is_bot
-from alert.search.forms import SearchForm, COURTS, _clean_form
+from alert.search.forms import SearchForm, _clean_form
 from alert import settings
-from alert.search.models import Document
+from alert.search.models import Document, Court
 from alert.stats import tally_stat, Stat
 from audio.models import Audio
 
@@ -49,8 +49,12 @@ def do_search(request, rows=20, order_by=None):
                     settings.SOLR_AUDIO_URL, mode='r')
                 status_facets = None
             results_si = conn.raw_query(**search_utils.build_main_query(cd))
+
+            courts = Court.objects.filter(in_use=True).values(
+                'pk', 'short_name', 'jurisdiction',
+                'has_oral_argument_scraper')
             courts, court_count_human, court_count = search_utils\
-                .merge_form_with_courts(COURTS, search_form)
+                .merge_form_with_courts(courts, search_form)
 
         except Exception, e:
             logger.warning("Error loading search page with request: %s" % request.GET)

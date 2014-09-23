@@ -54,9 +54,6 @@ We welcome a conversion of these notes to a better process using Fabric.
           slug are updated elsewhere?
     + Case_name and slugs need to be pulled from the correct places (opinions
       should pull from Citation and Dockets from Docket, for example).
-    - favorites cannot be created correctly for some reason
-    - Why doesn't the button in the admin site work? It should use
-      get_absolute_url of Document, but it fails weirdly.
     - Write some kind of script to handle matching up oral args with opinions
     + Make audio searchable?
     + Make sure the processing_complete flag is triggered properly.
@@ -64,19 +61,17 @@ We welcome a conversion of these notes to a better process using Fabric.
     - Make the audio page
     + Podcasts/Audio feeds
     - Audio alerts?
-    - Bulk files
-    - Sitemaps
+    + Sitemaps
     - selecting order drop down has weirdness on OA page.
     - Do citation feeds redirect properly now that we're using the PK rather than an ascii conversion?
     - can't click tabs in the jurisdiction picker in opinions!
     - add recent oral arguments to the homepage?
-
     - Scraper:
         + The scrapers for audio and opinions need to be finalized and tested.
-    - Atom feeds for audio
     - Rewrite bulk files and ensure that the save and delete routines of
       Document and Audio properly invalidates the bulk files if necessary.
-    - Alerts functionality?
+    - verify that serve_static_files works for audio stuff (analyze it's code
+      and such)
 
   API Changes:
    - /api/rest-info/ makes reference to a number of API calls that go to v1.
@@ -114,7 +109,29 @@ We welcome a conversion of these notes to a better process using Fabric.
                instance_dir='/usr/local/solr/example/solr/audio',
             )
   - Install the seal-rookery.
+  - Bulk files have been rewritten and require some new tweaks:
+        - Update cron to generate bulk files on the last day of each month,
+          using something like the following:
 
+              min hour 30 4,6,9,11        * manage.py cl_make_bulk_data
+              min hour 31 1,3,5,7,8,10,12 * manage.py cl_make_bulk_data
+              min hour 28 2               * manage.py cl_make_bulk_data
+
+        - Remove any old cron entries referencing dump_all_files.py
+        - Add a new directory at $INSTALL_ROOT/alert/assets/media/bulk-data to
+          contain the new bulk files when they are created, and symlink it from
+          /sata/.
+        - Generate the new bulk files by calling manage.py cl_make_bulk_data.
+        - Be sure that Apache is restarted so the new location is updated.
+        - Delete any old bulk files located at
+          $INSTALL_ROOT/alert/assets/media/dumps
+
+
+
+  Later:
+  - favorites cannot be created correctly for some reason
+  - Why doesn't the button in the admin site work? It should use
+    get_absolute_url of Document, but it fails weirdly.
 
 2014-06-18:
  - This update makes alert editing a lot more intuitive.

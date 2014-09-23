@@ -1,5 +1,3 @@
-from alert.audio.feeds import AllJurisdictionsPodcast, JurisdictionPodcast, \
-    SearchPodcast
 from alert.audio.views import view_audio_file
 from alert.audio.sitemap import oral_argument_sitemap_maker
 from alert.urls import pacer_codes
@@ -11,9 +9,9 @@ urlpatterns = patterns('',
 
     # Podcasts
     (r'^podcast/court/(?P<court>' + '|'.join(pacer_codes) + ')/$',
-     JurisdictionPodcast()),
-    (r'^podcast/court/all/$', AllJurisdictionsPodcast()),
-    (r'^podcast/(search)/', SearchPodcast()),
+     'JurisdictionPodcast()'),
+    (r'^podcast/court/all/$', 'AllJurisdictionsPodcast()'),
+    (r'^podcast/(search)/', 'SearchPodcast()'),
 
     # Sitemap
     (r'^sitemap-oral-arguments\.xml', oral_argument_sitemap_maker),

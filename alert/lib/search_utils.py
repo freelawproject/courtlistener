@@ -77,8 +77,8 @@ def make_stats_variable(solr_facet_values, search_form):
     return facets
 
 
-def merge_form_with_courts(COURTS, search_form):
-    """Merges the COURTS dict with the values from the search form.
+def merge_form_with_courts(courts, search_form):
+    """Merges the courts dict with the values from the search form.
 
     Final value is like (note that order is significant):
     courts = {
@@ -122,10 +122,10 @@ def merge_form_with_courts(COURTS, search_form):
 
     for field in search_form:
         if no_facets_selected:
-            for court in COURTS:
+            for court in courts:
                 court['checked'] = True
         else:
-            for court in COURTS:
+            for court in courts:
                 # We're merging two lists, so we have to do a nested loop
                 # to find the right value.
                 if 'court_%s' % court['pk'] == field.html_name:
@@ -143,7 +143,7 @@ def merge_form_with_courts(COURTS, search_form):
     b_bundle = []
     state_bundle = []
     state_bundles = []
-    for court in COURTS:
+    for court in courts:
         if court['jurisdiction'] == 'F':
             court['tab'] = 'federal'
         elif court['jurisdiction'] == 'FD':

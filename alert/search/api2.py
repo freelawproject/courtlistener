@@ -6,16 +6,18 @@ from alert import settings
 from alert.lib.search_utils import build_main_query
 from alert.lib.string_utils import filter_invalid_XML_chars
 from alert.lib.sunburnt import sunburnt, SolrError
-from alert.search.forms import SearchForm
-from alert.search.models import Citation, Court, Document, SOURCES, DOCUMENT_STATUSES
+from alert.search import forms
+from alert.search.models import Citation, Court, Docket, Document, \
+    SOURCES, DOCUMENT_STATUSES
+
 from alert.stats import tally_stat
 
 from django.core.cache import cache
 from lxml import etree
 from tastypie import fields, http
-from tastypie.authentication import BasicAuthentication, SessionAuthentication, MultiAuthentication
+from tastypie import authentication
 from tastypie.constants import ALL
-from tastypie.exceptions import BadRequest, TastypieError
+from tastypie.exceptions import BadRequest
 from tastypie.resources import ModelResource
 from tastypie.throttle import CacheThrottle
 
@@ -27,14 +29,16 @@ good_date_filters = good_time_filters[:-3]
 numerical_filters = ('exact', 'gte', 'gt', 'lte', 'lt', 'range',)
 
 
-class BasicAuthenticationWithUser(BasicAuthentication):
-    """Wraps the BasicAuthentication class, changing the get_identifier method to provide the username instead of
-    essentially nothing.
+class BasicAuthenticationWithUser(authentication.BasicAuthentication):
+    """Wraps the BasicAuthentication class, changing the get_identifier method
+    to provide the username instead of essentially nothing.
 
     Proposed this change in: https://github.com/toastdriven/django-tastypie/pull/1085/commits
     """
+
     def __init__(self, backend=None, realm='django-tastypie', **kwargs):
-        super(BasicAuthenticationWithUser, self).__init__(backend, realm, **kwargs)
+        super(BasicAuthenticationWithUser, self).__init__(backend, realm,
+                                                          **kwargs)
 
     def get_identifier(self, request):
         return request.META.get('REMOTE_USER', request.user.username)
@@ -50,9 +54,11 @@ class ModelResourceWithFieldsFilter(ModelResource):
         if isinstance(exception, SolrError):
             solr_status_code = exception[0]['status']
             error_xml = etree.fromstring(exception[1])
-            solr_msg = error_xml.xpath('//lst[@name = "error"]/str[@name = "msg"]/text()')[0]
+            solr_msg = error_xml.xpath(
+                '//lst[@name = "error"]/str[@name = "msg"]/text()')[0]
             data = {
-                'error_message': "SolrError raised while interpreting your query.",
+                'error_message': "SolrError raised while interpreting your "
+                                 "query.",
                 'solr_status_code': solr_status_code,
                 'solr_msg': solr_msg,
             }
@@ -62,14 +68,16 @@ class ModelResourceWithFieldsFilter(ModelResource):
                 response_class=http.HttpApplicationError
             )
         else:
-            return super(ModelResourceWithFieldsFilter, self)._handle_500(request, exception)
+            return super(ModelResourceWithFieldsFilter, self)._handle_500(
+                request, exception)
 
     def alter_list_data_to_serialize(self, request, data):
         data['meta']['request_uri'] = request.get_full_path()
         return data
 
     def full_dehydrate(self, bundle, *args, **kwargs):
-        bundle = super(ModelResourceWithFieldsFilter, self).full_dehydrate(bundle, *args, **kwargs)
+        bundle = super(ModelResourceWithFieldsFilter, self).full_dehydrate(
+            bundle, *args, **kwargs)
         # bundle.obj[0]._data['citeCount'] = 0
         fields = bundle.request.GET.get("fields", "")
         if fields:
@@ -90,7 +98,8 @@ class ModelResourceWithFieldsFilter(ModelResource):
     def dispatch(self, request_type, request, **kwargs):
         """Simple override here to tally stats before sending off the results."""
         tally_stat(self.tally_name)
-        return super(ModelResourceWithFieldsFilter, self).dispatch(request_type, request, **kwargs)
+        return super(ModelResourceWithFieldsFilter, self).dispatch(
+            request_type, request, **kwargs)
 
 
 class PerUserCacheThrottle(CacheThrottle):
@@ -121,10 +130,12 @@ class PerUserCacheThrottle(CacheThrottle):
 
         # Weed out anything older than the timeframe.
         minimum_time = int(time.time()) - int(self.timeframe)
-        times_accessed = [access for access in cache.get(key) if access >= minimum_time]
+        times_accessed = [access for access in cache.get(key) if
+                          access >= minimum_time]
         cache.set(key, times_accessed, self.expiration)
 
-        throttle_at = self.custom_throttles.get(identifier, int(self.throttle_at))
+        throttle_at = self.custom_throttles.get(identifier,
+                                                int(self.throttle_at))
         if len(times_accessed) >= throttle_at:
             # Throttle them.
             return True
@@ -135,8 +146,9 @@ class PerUserCacheThrottle(CacheThrottle):
 
 class CourtResource(ModelResourceWithFieldsFilter):
     class Meta:
-        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
-                                             SessionAuthentication())
+        authentication = authentication.MultiAuthentication(
+            BasicAuthenticationWithUser(realm="courtlistener.com"),
+            authentication.SessionAuthentication())
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'jurisdiction'
         queryset = Court.objects.exclude(jurisdiction='T')
@@ -156,19 +168,53 @@ class CourtResource(ModelResourceWithFieldsFilter):
             'end_date': good_date_filters,
             'jurisdictions': ALL,
         }
-        ordering = ['date_modified', 'start_date', 'end_date', 'position', 'jurisdiction']
+        ordering = ['date_modified', 'start_date', 'end_date', 'position',
+                    'jurisdiction']
+
+
+class DocketResource(ModelResourceWithFieldsFilter):
+    court = fields.ForeignKey(
+        CourtResource,
+        'court'
+    )
+
+    class Meta:
+        authentication = authentication.MultiAuthentication(
+            BasicAuthenticationWithUser(realm="courtlistener.com"),
+            authentication.SessionAuthentication())
+
+        throttle = PerUserCacheThrottle(throttle_at=1000)
+        resource_name = 'docket'
+        queryset = Docket.objects.all()
+        max_limit = 20
+        allowed_methods = ['get']
+        include_absolute_url = True
+        filtering = {
+            'id': ('exact',),
+            'date_modified': good_time_filters,
+            'court': ('exact',),
+            'date_blocked': good_date_filters,
+            'blocked': ALL,
+        }
+        ordering = ['date_modified', 'date_blocked']
 
 
 class CitationResource(ModelResourceWithFieldsFilter):
-    opinion_uris = fields.ToManyField('search.api.DocumentResource', 'parent_documents')
+    opinion_uris = fields.ToManyField('search.api.DocumentResource',
+                                      'parent_documents')
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
-                                             SessionAuthentication())
+        authentication = authentication.MultiAuthentication(
+            BasicAuthenticationWithUser(realm="courtlistener.com"),
+            authentication.SessionAuthentication())
         throttle = PerUserCacheThrottle(throttle_at=1000)
         queryset = Citation.objects.all()
         max_limit = 20
-        excludes = ['slug', ]
+        excludes = ['slug', ]  # Why?
+
+
+class OralArgumentResource(ModelResourceWithFieldsFilter):
+    pass
 
 
 class DocumentResource(ModelResourceWithFieldsFilter):
@@ -177,9 +223,9 @@ class DocumentResource(ModelResourceWithFieldsFilter):
         'citation',
         full=True
     )
-    court = fields.ForeignKey(
-        CourtResource,
-        'court'
+    docket = fields.ForeignKey(
+        DocketResource,
+        'docket'
     )
     html = fields.CharField(
         attribute='html',
@@ -213,15 +259,16 @@ class DocumentResource(ModelResourceWithFieldsFilter):
     )
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
-                                             SessionAuthentication())
+        authentication = authentication.MultiAuthentication(
+            BasicAuthenticationWithUser(realm="courtlistener.com"),
+            authentication.SessionAuthentication())
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'opinion'
-        queryset = Document.objects.all().select_related('docket__court__pk', 'citation')
+        queryset = Document.objects.all().select_related('docket', 'citation')
         max_limit = 20
         allowed_methods = ['get']
         include_absolute_url = True
-        excludes = ['is_stub_document', 'cases_cited',]
+        excludes = ['is_stub_document', 'cases_cited']
         filtering = {
             'id': ('exact',),
             'time_retrieved': good_time_filters,
@@ -236,7 +283,8 @@ class DocumentResource(ModelResourceWithFieldsFilter):
             'blocked': ALL,
             'extracted_by_ocr': ALL,
         }
-        ordering = ['time_retrieved', 'date_modified', 'date_filed', 'date_blocked']
+        ordering = ['time_retrieved', 'date_modified', 'date_filed',
+                    'date_blocked']
 
 
 class CitedByResource(ModelResourceWithFieldsFilter):
@@ -257,12 +305,15 @@ class CitedByResource(ModelResourceWithFieldsFilter):
     )
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
-                                             SessionAuthentication())
+        authentication = authentication.MultiAuthentication(
+            BasicAuthenticationWithUser(realm="courtlistener.com"),
+            authentication.SessionAuthentication())
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'cited-by'
         queryset = Document.objects.all()
-        excludes = ('is_stub_document', 'html', 'html_lawbox', 'html_with_citations', 'plain_text',)
+        excludes = (
+            'is_stub_document', 'html', 'html_lawbox', 'html_with_citations',
+            'plain_text',)
         include_absolute_url = True
         max_limit = 20
         list_allowed_methods = ['get']
@@ -274,8 +325,9 @@ class CitedByResource(ModelResourceWithFieldsFilter):
     def get_object_list(self, request):
         id = request.GET.get('id')
         if id:
-            return super(CitedByResource, self).get_object_list(request).filter(
-                pk=id)[0].citation.citing_opinions.all()
+            return \
+                super(CitedByResource, self).get_object_list(request).filter(
+                    pk=id)[0].citation.citing_opinions.all()
         else:
             # No ID field --> no results.
             return super(CitedByResource, self).get_object_list(request).none()
@@ -289,7 +341,8 @@ class CitedByResource(ModelResourceWithFieldsFilter):
         """
         return self.get_object_list(request)
 
-    def get_resource_uri(self, bundle_or_obj=None, url_name='api_dispatch_list'):
+    def get_resource_uri(self, bundle_or_obj=None,
+                         url_name='api_dispatch_list'):
         """Creates a URI like /api/v1/search/$id/
         """
         url_str = '/api/rest/%s/%s/%s/'
@@ -321,12 +374,15 @@ class CitesResource(ModelResourceWithFieldsFilter):
     )
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
-                                             SessionAuthentication())
+        authentication = authentication.MultiAuthentication(
+            BasicAuthenticationWithUser(realm="courtlistener.com"),
+            authentication.SessionAuthentication())
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'cites'
         queryset = Document.objects.all()
-        excludes = ('is_stub_document', 'html', 'html_lawbox', 'html_with_citations', 'plain_text',)
+        excludes = (
+            'is_stub_document', 'html', 'html_lawbox', 'html_with_citations',
+            'plain_text',)
         include_absolute_url = True
         max_limit = 20
         list_allowed_methods = ['get']
@@ -339,8 +395,9 @@ class CitesResource(ModelResourceWithFieldsFilter):
         """Get the citation associated with the document ID, then get all the items that it is cited by."""
         id = request.GET.get('id')
         if id:
-            cases_cited = super(CitesResource, self).get_object_list(request).filter(
-                pk=id)[0].cases_cited.all()
+            cases_cited = \
+                super(CitesResource, self).get_object_list(request).filter(
+                    pk=id)[0].cases_cited.all()
             docs = Document.objects.filter(citation__in=cases_cited)
             return docs
         else:
@@ -356,7 +413,8 @@ class CitesResource(ModelResourceWithFieldsFilter):
         """
         return self.get_object_list(request)
 
-    def get_resource_uri(self, bundle_or_obj=None, url_name='api_dispatch_list'):
+    def get_resource_uri(self, bundle_or_obj=None,
+                         url_name='api_dispatch_list'):
         """Creates a URI like /api/v1/search/$id/
         """
         url_str = '/api/rest/%s/%s/%s/'
@@ -372,6 +430,7 @@ class CitesResource(ModelResourceWithFieldsFilter):
 
 class SolrList(object):
     """This implements a yielding list object that fetches items as they are queried."""
+
     def __init__(self, main_query, offset, limit, length=None):
         super(SolrList, self).__init__()
         self.main_query = main_query
@@ -408,7 +467,8 @@ class SolrList(object):
 
         # Pull the text snippet up a level, where tastypie can find it
         for result in results_si.result.docs:
-            result['snippet'] = '&hellip;'.join(result['solr_highlights']['text'])
+            result['snippet'] = '&hellip;'.join(
+                result['solr_highlights']['text'])
 
         # Return the results as objects, not dicts.
         for result in results_si.result.docs:
@@ -515,8 +575,9 @@ class SearchResource(ModelResourceWithFieldsFilter):
     )
     source = fields.CharField(
         attribute='source',
-        help_text='the source of the document, one of: %s' % ', '.join(['%s (%s)' % (t[0], t[1]) for t in
-                                                                        SOURCES]),
+        help_text='the source of the document, one of: %s' % ', '.join(
+            ['%s (%s)' % (t[0], t[1]) for t in
+             SOURCES]),
         null=True,
     )
     snippet = fields.CharField(
@@ -526,8 +587,9 @@ class SearchResource(ModelResourceWithFieldsFilter):
     )
     status = fields.CharField(
         attribute='status',
-        help_text='The precedential status of document, one of: %s' % ', '.join([('stat_%s' % t[1]).replace(' ', '+')
-                                                                                 for t in DOCUMENT_STATUSES]),
+        help_text='The precedential status of document, one of: %s' % ', '.join(
+            [('stat_%s' % t[1]).replace(' ', '+')
+             for t in DOCUMENT_STATUSES]),
         null=True,
     )
     suit_nature = fields.CharField(
@@ -546,8 +608,9 @@ class SearchResource(ModelResourceWithFieldsFilter):
     )
 
     class Meta:
-        authentication = MultiAuthentication(BasicAuthenticationWithUser(realm="courtlistener.com"),
-                                             SessionAuthentication())
+        authentication = authentication.MultiAuthentication(
+            BasicAuthenticationWithUser(realm="courtlistener.com"),
+            authentication.SessionAuthentication())
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'search'
         max_limit = 20
@@ -574,7 +637,8 @@ class SearchResource(ModelResourceWithFieldsFilter):
             'score+desc',
         ]
 
-    def get_resource_uri(self, bundle_or_obj=None, url_name='api_dispatch_list'):
+    def get_resource_uri(self, bundle_or_obj=None,
+                         url_name='api_dispatch_list'):
         """Creates a URI like /api/v1/search/$id/
         """
         url_str = '/api/rest/%s/%s/%s/'
@@ -592,9 +656,10 @@ class SearchResource(ModelResourceWithFieldsFilter):
         try:
             main_query = build_main_query(kwargs['cd'], highlight='text')
         except KeyError:
-            sf = SearchForm({'q': "*:*"})
+            sf = forms.SearchForm({'q': "*:*"})
             if sf.is_valid():
-                main_query = build_main_query(sf.cleaned_data, highlight='text')
+                main_query = build_main_query(sf.cleaned_data,
+                                              highlight='text')
 
         main_query['caller'] = 'api_search'
         # Use a SolrList that has a couple of the normal functions built in.
@@ -606,23 +671,25 @@ class SearchResource(ModelResourceWithFieldsFilter):
         return sl
 
     def obj_get_list(self, bundle, **kwargs):
-        search_form = SearchForm(bundle.request.GET)
+        search_form = forms.SearchForm(bundle.request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
             if cd['q'] == '':
                 cd['q'] = '*:*'  # Get everything.
             return self.get_object_list(bundle.request, cd=cd)
         else:
-            BadRequest("Invalid resource lookup data provided. Unable to complete your query.")
+            BadRequest(
+                "Invalid resource lookup data provided. Unable to complete your query.")
 
     def obj_get(self, bundle, **kwargs):
-        search_form = SearchForm(bundle.request.GET)
+        search_form = forms.SearchForm(bundle.request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
             cd['q'] = 'id:%s' % kwargs['pk']
             return self.get_object_list(bundle.request, cd=cd)[0]
         else:
-            BadRequest("Invalid resource lookup data provided. Unable to complete your request.")
+            BadRequest(
+                "Invalid resource lookup data provided. Unable to complete your request.")
 
     def apply_sorting(self, obj_list, options=None):
         """Since we're not using Django Model sorting, we just want to use our own, which is already

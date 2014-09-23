@@ -1,8 +1,5 @@
 from alert.search import api
 from alert.search import api2
-from alert.search.feeds import SearchFeed, JurisdictionFeed, \
-    AllJurisdictionsFeed
-from alert.search.views import show_results
 from alert.urls import pacer_codes
 
 from django.conf.urls import patterns, include
@@ -26,16 +23,16 @@ v2_api.register(api2.CitedByResource(tally_name='search.api2.cited-by'))
 
 urlpatterns = patterns('',
     # Search pages
-    (r'^$', show_results),  # the home page!
+    (r'^$', 'alert.search.views.show_results'),  # the home page!
 
     # The API
     (r'^api/rest/', include(v1_api.urls)),
     (r'^api/rest/', include(v2_api.urls)),
 
     # Feeds & Podcasts
-    (r'^feed/(search)/$', SearchFeed()),
+    (r'^feed/(search)/$', 'SearchFeed()'),
     # lacks URL capturing b/c it will use GET queries.
-    (r'^feed/court/all/$', AllJurisdictionsFeed()),
+    (r'^feed/court/all/$', 'AllJurisdictionsFeed()'),
     (r'^feed/court/(?P<court>' + '|'.join(pacer_codes) + ')/$',
-     JurisdictionFeed()),
+     'JurisdictionFeed()'),
 )

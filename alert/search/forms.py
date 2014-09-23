@@ -37,10 +37,6 @@ INPUT_FORMATS = [
     '%Y/%m',     # '2006/10'
 ]
 
-# Query the DB so we can build up check boxes for each court in use.
-COURTS = Court.objects.filter(in_use=True).values(
-    'pk', 'short_name', 'jurisdiction', 'has_oral_argument_scraper')
-
 
 def _clean_form(request, cd):
     """Returns cleaned up values as a Form object.
@@ -62,7 +58,9 @@ def _clean_form(request, cd):
     mutable_get['order_by'] = cd['order_by']
     mutable_get['source'] = cd['source']
 
-    for court in COURTS:
+    courts = Court.objects.filter(in_use=True).values(
+        'pk', 'short_name', 'jurisdiction', 'has_oral_argument_scraper')
+    for court in courts:
         mutable_get['court_%s' % court['pk']] = cd['court_%s' % court['pk']]
 
     return SearchForm(mutable_get)
@@ -202,8 +200,9 @@ class SearchForm(forms.Form):
         names coming from the database, we need to interact directly with the
         fields dict.
         """
-
-        for court in COURTS:
+        courts = Court.objects.filter(in_use=True).values(
+            'pk', 'short_name', 'jurisdiction', 'has_oral_argument_scraper')
+        for court in courts:
             self.fields['court_' + court['pk']] = forms.BooleanField(
                 label=court['short_name'],
                 required=False,
