@@ -72,6 +72,8 @@ We welcome a conversion of these notes to a better process using Fabric.
       Document and Audio properly invalidates the bulk files if necessary.
     - verify that serve_static_files works for audio stuff (analyze it's code
       and such)
+    - Update the CL calendar to have bulk files generated at 3am on the last
+      day of every month.
 
   API Changes:
    - /api/rest-info/ makes reference to a number of API calls that go to v1.
