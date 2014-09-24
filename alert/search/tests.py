@@ -1,3 +1,4 @@
+import os
 from django.test import TestCase
 from django.test.client import Client
 import simplejson
@@ -195,7 +196,13 @@ class ApiTest(SolrTestCase):
         r = self.client.get('/api/rest/v1/search/?q=*:*&format=json')
         json_actual = simplejson.loads(r.content)
 
-        with open('search/test_assets/api_test_results.json', 'r') as f:
+        with open(os.path.join(
+                settings.INSTALL_ROOT,
+                'alert',
+                'search',
+                'test_assets',
+                'api_test_results.json'),
+             'r') as f:
             json_correct = simplejson.load(f)
 
         # Drop the timestamps and scores b/c they can differ

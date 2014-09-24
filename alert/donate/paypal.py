@@ -2,7 +2,6 @@ import logging
 import simplejson
 import requests
 from alert.donate.models import Donation
-from datetime import datetime
 from django.conf import settings
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response

@@ -106,8 +106,8 @@
     <div class="span-13 append-2">
         <h2>Support the Free Law Project</h2>
         {% if message %}
-            <div class="span-13 append-2 last">
-                <p class="bottom">{{ message }}</p>
+            <div class="span-13 last error">
+                <p class="bottom">{{ message|safe }}</p>
             </div>
         {% endif %}
         <form action="/donate/" method="post" id="donate-form">{% csrf_token %}

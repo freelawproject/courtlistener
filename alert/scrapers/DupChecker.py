@@ -65,7 +65,8 @@ class DupChecker(dict):
             # abort no matter what.
             return False
 
-    def should_we_continue_break_or_carry_on(self, current_date, next_date, lookup_value, lookup_by='sha1'):
+    def should_we_continue_break_or_carry_on(
+            self, current_date, next_date, lookup_value, lookup_by='sha1'):
         """Checks if a we have a document with identical content in the CL
         corpus by making a hash of the data and attempting to look that up.
         Depending on the result of that, we either CONTINUE to the next item,
@@ -92,8 +93,9 @@ class DupChecker(dict):
             logger.info('Duplicate found on date: %s, with lookup value: %s' % (current_date, lookup_value))
             self._increment(current_date)
 
-            # If the next date in the Site object is less than (before) the current date, we needn't continue
-            # because we should already have that item.
+            # If the next date in the Site object is less than (before) the
+            # current date, we needn't continue because we should already have
+            # that item.
             if next_date:
                 already_scraped_next_date = (next_date < current_date)
             else:
@@ -105,8 +107,8 @@ class DupChecker(dict):
                         # same case with different dates on a page.
                         return 'CONTINUE'
                     else:
-                        logger.info('Next case occurs prior to when we found a '
-                                    'duplicate. Court is up to date.')
+                        logger.info('Next case occurs prior to when we found '
+                                    'a duplicate. Court is up to date.')
                         return 'BREAK'
                 elif self.dup_count >= self.dup_threshold:
                     logger.info('Found %s duplicates in a row. Court is up to date.' % self.dup_count)

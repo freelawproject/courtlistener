@@ -58,6 +58,7 @@ def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
     # Create the charge on Stripe's servers
+
     try:
         charge = stripe.Charge.create(
             amount=int(cd_donation_form['amount']) * 100,  # amount in cents, watch yourself
@@ -65,14 +66,21 @@ def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
             card=stripe_token,
             description=cd_user_form['email'],
         )
-        result = "success"
+        response = {
+            'message': None,
+            'status': 0,  # Awaiting payment
+            'payment_id': charge.id,
+            'redirect': '/donate/stripe/complete',
+        }
     except stripe.CardError, e:
         logger.warn("Stripe was unable to process the payment: %s" % e)
-        result = "failure"
-        charge = None
+        response = {
+            'message': 'Oops, we had a problem processing your card: '
+                       '<strong>%s<strong>' %
+                       e.json_body['error']['message'],
+            'status': 1,  # ERROR
+            'payment_id': None,
+            'redirect': None,
+        }
 
-    response = {
-        'result': result,
-        'payment_id': charge.id,
-    }
     return response

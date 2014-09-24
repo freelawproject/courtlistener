@@ -90,21 +90,11 @@ def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form, 
                 'redirect': None,
             }
     elif cd_donation_form['payment_provider'] == 'cc':
-        response = process_stripe_payment(cd_donation_form, cd_user_form, stripe_token)
-        if response['result'] == 'success':
-            response = {
-                'message': None,
-                'status': 0,  # Awaiting payment
-                'payment_id': response['payment_id'],
-                'redirect': '/donate/stripe/complete'
-            }
-        else:
-            response = {
-                'message': 'We had an error processing your credit card. Please try another payment method.',
-                'status': 1,  # ERROR
-                'payment_id': None,
-                'redirect': None,
-            }
+        response = process_stripe_payment(
+            cd_donation_form,
+            cd_user_form,
+            stripe_token
+        )
     else:
         response = None
     return response
