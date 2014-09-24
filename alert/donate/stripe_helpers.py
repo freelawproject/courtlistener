@@ -72,7 +72,7 @@ def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
             'payment_id': charge.id,
             'redirect': '/donate/stripe/complete',
         }
-    except stripe.CardError, e:
+    except stripe.error.CardError, e:
         logger.warn("Stripe was unable to process the payment: %s" % e)
         response = {
             'message': 'Oops, we had a problem processing your card: '
