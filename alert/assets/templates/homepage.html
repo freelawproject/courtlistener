@@ -245,7 +245,38 @@
         <hr class="space">
         <hr class="space">
         <hr class="space">
-        <div class="span-24">
+        <div class="span-24 last">
+            <div class="span-11 append-2">
+                <h3>Latest Opinions&nbsp;<i class="gray fa fa-clock-o"></i></h3>
+                <p>We download opinions from many jurisdictions on an ongoing basis. Here are the most recent ones.
+                </p>
+                {% include "includes/search_result.html" with results=results source_override="o" simple=True %}
+                <div class="right">
+                    <hr class="space">
+                    <a href="/?order_by=dateFiled+desc">See all recent opinions&hellip;</a>
+                </div>
+            </div>
+
+            <div class="span-11 last">
+                <h3>Latest Oral Arguments&nbsp;<i class="gray fa fa-clock-o"></i>
+                </h3>
+
+                <p>We download oral arguments from many jurisdictions on an
+                    ongoing basis. Here are the most recent ones.
+                </p>
+                {% include "includes/search_result.html" with results=results_oa source_override="oa" simple=True %}
+                <div class="right">
+                    <hr class="space">
+                    <a href="/?order_by=dateArgued+desc&source=oa">See all recent
+                        oral arguments&hellip;</a>
+                </div>
+            </div>
+        </div>
+
+        <hr class="space">
+        <hr class="space">
+        <hr class="space">
+        <div class="span-24 last">
             {% comment %}
             <div class="span-7 append-1">
                 <h3>Learn About CourtListener&nbsp;<i class="gray fa fa-youtube-play"></i></h3>
@@ -254,65 +285,65 @@
             </div>
             {% endcomment %}
 
-            <div class="span-11 append-2">
+            <div class="span-11 append-2 last">
                 <h3>The Numbers&nbsp;<i class="gray fa fa-cogs"></i></h3>
 
                 <div class="span-2 center">
                     <span class="homepage-stat bold">{{ results.paginator.count|intcomma }}</span>
                 </div>
-                <div class="span-9 last"><p>Number of <a href="/?order_by=dateFiled+desc">precedential
+                <div class="span-9 last"><p>Number of <a
+                        href="/?order_by=dateFiled+desc">precedential
                     opinions</a> in CourtListener.</p></div>
 
                 <div class="span-2 center">
                     <span class="homepage-stat bold">{{ opinions_in_last_ten|intcomma }}</span>
                 </div>
-                <div class="span-9 last"><p>Opinions added in last ten days.</p></div>
+                <div class="span-9 last"><p>Opinions added in last ten
+                    days.</p></div>
 
                 <div class="span-2 center">
                     <span class="homepage-stat bold">{{ oral_arguments_in_last_ten|intcomma }}</span>
                 </div>
-                <div class="span-9 last"><p>Oral arguments added in last ten days.</p></div>
+                <div class="span-9 last"><p>Oral arguments added in last ten
+                    days.</p></div>
 
                 <div class="span-2 center">
                     <span class="homepage-stat bold">{{ queries_in_last_ten|intcomma }}</span>
                 </div>
-                <div class="span-9 last"><p>Number of queries made in last ten days.</p></div>
+                <div class="span-9 last"><p>Number of queries made in last ten
+                    days.</p></div>
 
                 <div class="span-2 center">
                     <span class="homepage-stat bold">{{ alerts_in_last_ten|intcomma }}</span>
                 </div>
-                <div class="span-9 last"><p>Number of <a href="/faq/#explain-alerts">alerts</a> sent in last ten days.</p></div>
+                <div class="span-9 last"><p>Number of <a
+                        href="/faq/#explain-alerts">alerts</a> sent in last ten
+                    days.</p></div>
 
                 {% if bulk_in_last_ten > 0 %}
                     <div class="span-2 center">
                         <span class="homepage-stat bold">{{ bulk_in_last_ten|intcomma }}</span>
                     </div>
-                    <div class="span-9 last"><p>Times the <a href="/api/bulk-info/">bulk data</a> has been downloaded
+                    <div class="span-9 last"><p>Times the <a
+                            href="/api/bulk-info/">bulk data</a> has been
+                        downloaded
                         in the last ten days.</p></div>
                 {% endif %}
 
                 <div class="span-2 center">
                     <span class="homepage-stat bold">{{ api_in_last_ten|intcomma }}</span>
                 </div>
-                <div class="span-9 last"><p><a href="/api/">API calls</a> made against our system in last ten days.</p></div>
+                <div class="span-9 last"><p><a href="/api/">API calls</a> made
+                    against our system in last ten days.</p></div>
 
                 {% if user.is_superuser %}
                     <div class="span-2 center">
                         <span class="homepage-stat bold">{{ users_in_last_ten|intcomma }}</span>
                     </div>
-                    <div class="span-9 last"><p>New users signed up in last ten days. <i class="gray fa fa-lock pointer" title="admin only"></i></p></div>
+                    <div class="span-9 last"><p>New users signed up in last ten
+                        days. <i class="gray fa fa-lock pointer"
+                                 title="admin only"></i></p></div>
                 {% endif %}
-            </div>
-
-            <div class="span-11 last">
-                <h3>Latest Opinions&nbsp;<i class="gray fa fa-clock-o"></i></h3>
-                <p>We download opinions from many jurisdictions on an ongoing basis. Here are the most recent ones.
-                </p>
-                {% include "includes/search_result.html" with simple=True %}
-                <div class="right">
-                    <hr class="space">
-                    <a href="/?order_by=dateFiled+desc">See all recent opinions&hellip;</a>
-                </div>
             </div>
         </div>
 

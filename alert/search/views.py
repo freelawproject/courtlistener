@@ -26,15 +26,17 @@ from audio.models import Audio
 logger = logging.getLogger(__name__)
 
 
-def do_search(request, rows=20, order_by=None):
+def do_search(request, rows=20, order_by=None, source=None):
 
     # Bind the search form.
     search_form = SearchForm(request.GET)
     if search_form.is_valid():
         cd = search_form.cleaned_data
+        # Allows an override by calling methods.
         if order_by:
-            # Allows an override by calling methods.
             cd['order_by'] = order_by
+        if source:
+            cd['source'] = source
         search_form = _clean_form(request, cd)
 
         try:
@@ -169,6 +171,9 @@ def show_results(request):
             # Load the render_dict with good results that can be shown in the
             # "Latest Cases" section
             render_dict.update(do_search(request, rows=5, order_by='dateFiled desc'))
+            # Get the results from the oral arguments as well
+            oa_dict = do_search(request, rows=5, order_by='dateArgued desc', source='oa')
+            render_dict.update({'results_oa': oa_dict['results']})
             # But give it a fresh form for the advanced search section
             render_dict.update({'search_form': SearchForm(request.GET)})
             ten_days_ago = make_aware(datetime.today() - timedelta(days=10), utc)

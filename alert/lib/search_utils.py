@@ -132,7 +132,7 @@ def merge_form_with_courts(courts, search_form):
                     court['checked'] = field.value()
 
     # Build the dict with jurisdiction keys and arrange courts into tabs
-    courts = {
+    court_tabs = {
         'federal': [],
         'district': [],
         'bankruptcy': [],
@@ -172,19 +172,19 @@ def merge_form_with_courts(courts, search_form):
             else:
                 state_bundle.append(court)
         else:
-            courts[court['tab']].append(court)
+            court_tabs[court['tab']].append(court)
     state_bundles.append(state_bundle)  # appends the final state bundle after the loop ends. Hack?
 
     # Put the bankruptcy bundles in the courts dict
-    courts['bankruptcy'].append(bap_bundle)
-    courts['bankruptcy'].append(b_bundle)
+    court_tabs['bankruptcy'].append(bap_bundle)
+    court_tabs['bankruptcy'].append(b_bundle)
 
     # Divide the state bundles into the correct partitions
-    courts['state'].append(state_bundles[:15])
-    courts['state'].append(state_bundles[15:34])
-    courts['state'].append(state_bundles[34:])
+    court_tabs['state'].append(state_bundles[:15])
+    court_tabs['state'].append(state_bundles[15:34])
+    court_tabs['state'].append(state_bundles[34:])
 
-    return courts, court_count_human, court_count
+    return court_tabs, court_count_human, court_count
 
 
 def make_fq(cd, field, key):
@@ -269,6 +269,7 @@ def build_main_query(cd, highlight='all', order_by=''):
     main_params = {
         'q': cd['q'] or '*:*',
         'sort': cd.get('order_by', order_by),
+        'caller': 'build_main_query',
     }
 
     if str(main_params['sort']).startswith('score') and \
