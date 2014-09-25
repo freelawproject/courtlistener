@@ -1,13 +1,12 @@
-import os
 import re
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
 from alert import settings
+from alert.lib.model_helpers import make_upload_path
 from alert.lib.string_utils import trunc
 from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils.text import slugify
-from django.utils.text import get_valid_filename
 from django.utils.encoding import smart_unicode
 
 
@@ -50,45 +49,6 @@ SOURCES = (
     ('M', 'manual input'),
     ('A', 'internet archive'),
 )
-
-
-def make_upload_path(instance, filename):
-    """Return a string like pdf/2010/08/13/foo_v._var.pdf, with the date set
-    as the date_filed for the case."""
-    # this code NOT cross platform. Use os.path.join or similar to fix.
-    mimetype = filename.split('.')[-1] + '/'
-
-    try:
-        path = mimetype + instance.date_filed.strftime("%Y/%m/%d/") + \
-            get_valid_filename(filename)
-    except AttributeError:
-        # The date is unknown for the case. Use today's date.
-        path = mimetype + instance.time_retrieved.strftime("%Y/%m/%d/") + \
-            get_valid_filename(filename)
-    return path
-
-
-def invalidate_dumps_by_date_and_court(date, court):
-    """Deletes dump files for a court and date
-
-    Receives court and date parameters, and then deletes any corresponding
-    dumps.
-    """
-    year, month, day = '%s' % date.year, '%02d' % date.month, '%02d' % date.day
-    courts = (court, 'all')
-    for court in courts:
-        try:
-            os.remove(os.path.join(settings.DUMP_DIR, year, court + '.xml.gz'))
-        except OSError:
-            pass
-        try:
-            os.remove(os.path.join(settings.DUMP_DIR, year, month, court + '.xml.gz'))
-        except OSError:
-            pass
-        try:
-            os.remove(os.path.join(settings.DUMP_DIR, year, month, day, court + '.xml.gz'))
-        except OSError:
-            pass
 
 
 class Docket(models.Model):
@@ -543,10 +503,6 @@ class Document(models.Model):
             from search.tasks import add_or_update_doc
             add_or_update_doc.delay(self.pk, commit)
 
-        # Delete the cached sitemaps and dumps if the item is blocked.
-        if self.blocked:
-            invalidate_dumps_by_date_and_court(self.date_filed, self.court_id)
-
     def delete(self, *args, **kwargs):
         """
         If the item is deleted, we need to update the caches that previously
@@ -557,10 +513,6 @@ class Document(models.Model):
         super(Document, self).delete(*args, **kwargs)
         from search.tasks import delete_item
         delete_item.delay(id_cache, settings.SOLR_OPINION_URL)
-
-        # Invalidate the sitemap and dump caches
-        if self.date_filed:
-            invalidate_dumps_by_date_and_court(self.date_filed, self.docket.court_id)
 
     class Meta:
         db_table = "Document"

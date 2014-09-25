@@ -68,7 +68,7 @@ We welcome a conversion of these notes to a better process using Fabric.
     + add recent oral arguments to the homepage?
     - Scraper:
         + The scrapers for audio and opinions need to be finalized and tested.
-    - Rewrite bulk files and ensure that the save and delete routines of
+    + Rewrite bulk files and ensure that the save and delete routines of
       Document and Audio properly invalidates the bulk files if necessary.
     - verify that serve_static_files works for audio stuff (analyze it's code
       and such)
