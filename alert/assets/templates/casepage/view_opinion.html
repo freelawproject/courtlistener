@@ -1,19 +1,12 @@
 {% extends "base.html" %}
 {% load text_filters %}
 
-{# Shown on case pages. #}
-
 {% block title %}{{ title }} - CourtListener.com{% endblock %}
 {% block description %}{{ title }}{% endblock %}
 {% block search-form %}{% endblock %}
 
 {% block head %}
-    {% if not error %}
-        {% if get_string %}
-            <link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?{{ get_string }}" />
-        {% endif %}
-        <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{doc|truncatewords:10}}" href="/feed/{{doc.pk|num_to_ascii}}/cited-by/">
-    {% endif %}
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{doc|truncatewords:10}}" href="/feed/{{doc.pk|num_to_ascii}}/cited-by/">
 {% endblock %}
 
 {% block footer-scripts %}
@@ -32,7 +25,7 @@
 
 
         {# show the admin tools if applicable #}
-        {% if user.is_superuser and doc %}
+        {% if user.is_superuser %}
             <div class="sidebar-section">
                 <h3><span>Admin</span></h3>
                 <p>
@@ -49,7 +42,7 @@
                 <h3 class="inline"><span>Your Notes</span></h3>
                 <p class="inline" data-toggle="modal" data-target="#modal-save-favorite">
                     (<a href="#favorite-editor">edit</a>)
-                     <i class="fa fa-pencil gray"></i>
+                     <i class="fa fa-pencil gray pointer"></i>
                 </p>
                 <p id="sidebar-notes-text">
                     {{ favorite_form.instance.notes|default:"(none)" }}
@@ -215,32 +208,36 @@
         {% endif %}
 
 
-        <h3>{{ court }}</h3>
+        <h3>{{ doc.docket.court }}</h3>
         <p class="bottom">
-            <strong>Date Filed:</strong>
-            {% if doc.date_filed %}
-                {{doc.date_filed|date:"F jS, Y"}}
-            {% else %}
-                Unknown Date
-            {% endif %}
+            <span class="meta-data-header">Filed:</span>
+            <span class="meta-data-value">
+                {% if doc.date_filed %}
+                    {{doc.date_filed|date:"F jS, Y"}}
+                {% else %}
+                    Unknown Date
+                {% endif %}
+            </span>
         </p>
         <p class="bottom">
-            <strong>Status: </strong>
-            {% if doc.precedential_status %}
-                {{doc.get_precedential_status_display}}
-            {% else %}
-                Unknown
-            {% endif %}
+            <span class="meta-data-header">Status:</span>
+            <span class="meta-data-value">
+                {% if doc.precedential_status %}
+                    {{doc.get_precedential_status_display}}
+                {% else %}
+                    Unknown
+                {% endif %}
+            </span>
         </p>
         <p class="bottom">
             {% if citation_string %}
-                <span class="meta-data-header">Citations: </span>
+                <span class="meta-data-header">Citations:</span>
                 <span class="meta-data-value">{{ citation_string }}</span>
             {% endif %}
         </p>
         <p class="bottom">
             {% if doc.citation.docket_number %}
-                <span class="meta-data-header">Docket Number: </span>
+                <span class="meta-data-header">Docket Number:</span>
                 <span class="meta-data-value">{{ doc.citation.docket_number }}</span>
             {% endif %}
         </p>
@@ -257,7 +254,9 @@
             {% endif %}
         </p>
         <p>
-            <strong title="SHA1 Hash of the binary or text">Fingerprint:</strong> {{ doc.sha1 }}
+            <span class="meta-data-header"
+                  title="SHA1 Hash of the binary or text">Fingerprint:</span>
+            <span class="meta-data-value">{{ doc.sha1 }}</span>
         </p>
         <br>
         {% if doc.extracted_by_ocr %}

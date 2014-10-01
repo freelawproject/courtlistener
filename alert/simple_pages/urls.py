@@ -3,9 +3,9 @@ from django.views.generic import RedirectView
 from alert.simple_pages.views import tools_page, validate_for_google, \
     validate_for_google2, validate_for_wot, validate_for_bing, robots, \
     advanced_search, contact_thanks, contact, feeds, coverage_graph, faq, about, \
-    browser_warning
+    browser_warning, serve_static_file
 
-
+mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html', 'mp3')
 urlpatterns = patterns('',
     # Footer stuff
     (r'^about/$', about),
@@ -14,6 +14,10 @@ urlpatterns = patterns('',
     (r'^feeds/$', feeds),
     (r'^contact/$', contact),
     (r'^contact/thanks/$', contact_thanks),
+
+    # Serve a static file
+    (r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$',
+     serve_static_file),
 
     # Advanced search page
     (r'^search/advanced-techniques/$', advanced_search),

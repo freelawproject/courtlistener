@@ -38,7 +38,6 @@ We welcome a conversion of these notes to a better process using Fabric.
    a number of fields from one database table to another.
  - New dependency for datadiff (sudo pip install datadiff==1.1.5)
  - New dependency for eyeD3 (sudo pip install --allow-external eyeD3 --allow-unverified eyeD3 eyeD3==0.7.4)
- - New dependency for avconv (how to install this?)
 
  TODO:
   - This change has a lot of changes to the database that need to be made,
@@ -59,6 +58,9 @@ We welcome a conversion of these notes to a better process using Fabric.
     + Make sure the processing_complete flag is triggered properly.
     - Test and tweak the jurisdiction picker.
     - Make the audio page
+        - Jplayer
+        - sharing links
+        - favorite saving/deleting/editing
     + Podcasts/Audio feeds
     - Audio alerts?
     + Sitemaps
@@ -74,6 +76,8 @@ We welcome a conversion of these notes to a better process using Fabric.
       and such)
     - Update the CL calendar to have bulk files generated at 3am on the last
       day of every month.
+    - favorites should work for alerts?
+    - robots.txt blocking for bulk files
 
   API Changes:
    - /api/rest-info/ makes reference to a number of API calls that go to v1.
@@ -86,6 +90,7 @@ We welcome a conversion of these notes to a better process using Fabric.
 
   Deployment:
   - Install new dependencies (see above)
+  - Install avconv: sudo apt-get install libav-tools
   - Flip the has_oral_argument_scraper flag to true on all correct courts and
     ensure that coverage page looks OK.
   - Update cron jobs to point to cl_scrape_opinions and cl_scrape_oral_arguments
@@ -110,7 +115,11 @@ We welcome a conversion of these notes to a better process using Fabric.
                schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf', 'audio_schema.xml'),
                instance_dir='/usr/local/solr/example/solr/audio',
             )
-  - Install the seal-rookery.
+  - Install the seal-rookery:
+
+      sudo git clone https://github.com/freelawproject/seal-rookery /usr/local/seal_rookery
+      sudo ln -s /usr/local/seal_rookery /usr/lib/python2.7/dist-packages/seal_rookery
+
   - Bulk files have been rewritten and require some new tweaks:
         - Update cron to generate bulk files on the last day of each month,
           using something like the following:

@@ -1,3 +1,6 @@
+# If you would like to crawl CourtListener, please contact us. We also have an
+# extensive REST API and provide bulk data.
+
 # Google, AOL, Bing, Yahoo!, DuckDuckGo
 # These support meta robots and x-robots-tag or are otherwise harmless (DDG)
 # Crawl everything except a few explicit blocks

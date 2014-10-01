@@ -1,12 +1,18 @@
 from django.core.validators import MaxLengthValidator
 from django.db import models
+from alert.audio.models import Audio
 from alert.search.models import Document
 
 
 class Favorite(models.Model):
     doc_id = models.ForeignKey(
         Document,
-        verbose_name='the document that is favorited'
+        verbose_name='the document that is favorited',
+    )
+    audio_id = models.ForeignKey(
+        Audio,
+        verbose_name='the audio file that is favorited',
+        null=True,
     )
     date_modified = models.DateTimeField(
         auto_now=True,

@@ -175,7 +175,7 @@ div.hopscotch-bubble .hopscotch-bubble-close {
     border-bottom-left-radius: 6px;
 }
 
-.pointer {
+.pointer, .cursor {
     cursor: pointer;
     cursor: hand;
 }

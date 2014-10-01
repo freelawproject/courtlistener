@@ -1,31 +1,25 @@
 from django.core.urlresolvers import reverse
-from alert import settings
-from alert.lib.bot_detector import is_bot
-from alert.lib import magic
+from django.core.exceptions import ObjectDoesNotExist
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.http import HttpResponseRedirect
+from django.shortcuts import render_to_response
+from django.shortcuts import get_object_or_404
+from django.template import RequestContext
+from django.views.decorators.cache import never_cache
+
 from alert.lib import search_utils
 from alert.lib.encode_decode import ascii_to_num
 from alert.lib.string_utils import trunc
 from alert.search.models import Document, Docket
 from alert.favorites.forms import FavoriteForm
 from alert.favorites.models import Favorite
-from django.core.exceptions import ObjectDoesNotExist
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.http import Http404, HttpResponseRedirect
-from django.http import HttpResponse
-from django.shortcuts import render_to_response
-from django.shortcuts import get_object_or_404
-from django.template import RequestContext
-from django.views.decorators.cache import never_cache
-
-import os
-from alert.stats import tally_stat
 
 
 def make_citation_string(doc):
     """Make a citation string, joined by commas
 
     This function creates a series of citations separated by commas that can be
-    listed as meta data for a document. The order of the items in this list
+    listed as meta data for an opinion. The order of the items in this list
     follows BlueBook order, so our citations aren't just willy nilly.
     """
     cites = [doc.citation.neutral_cite, doc.citation.federal_cite_one,
@@ -64,7 +58,6 @@ def view_opinion(request, pk, _):
     get_string = search_utils.make_get_string(request)
 
     try:
-        # Get the favorite, if possible
         fave = Favorite.objects.get(doc_id=doc.pk, users__user=request.user)
         favorite_form = FavoriteForm(instance=fave)
     except (ObjectDoesNotExist, TypeError):
@@ -85,7 +78,6 @@ def view_opinion(request, pk, _):
         {'title': title,
          'citation_string': citation_string,
          'doc': doc,
-         'court': doc.docket.court,
          'favorite_form': favorite_form,
          'get_string': get_string,
          'private': doc.blocked,
@@ -169,34 +161,3 @@ def redirect_opinion_pages(request, pk, slug):
     if request.META['QUERY_STRING']:
         path = '%s?%s' % (path, request.META['QUERY_STRING'])
     return HttpResponseRedirect(path)
-
-
-def serve_static_file(request, file_path=''):
-    """Sends a static file to a user.
-
-    This serves up the static case files such as the PDFs in a way that can be
-    blocked from search engines if necessary. We do four things:
-     - Look up the document associated with the filepath
-     - Check if it's blocked
-     - If blocked, we set the x-robots-tag HTTP header
-     - Serve up the file using Apache2's xsendfile
-    """
-    doc = get_object_or_404(Document, local_path=file_path)
-    file_name = file_path.split('/')[-1]
-    file_loc = os.path.join(settings.MEDIA_ROOT, file_path.encode('utf-8'))
-    try:
-        mimetype = magic.from_file(file_loc, mime=True)
-    except IOError:
-        raise Http404
-    response = HttpResponse()
-    if doc.blocked:
-        response['X-Robots-Tag'] = 'noindex, noodp, noarchive, noimageindex'
-    response['X-Sendfile'] = os.path.join(settings.MEDIA_ROOT,
-                                          file_path.encode('utf-8'))
-    response[
-        'Content-Disposition'] = 'attachment; filename="%s"' % file_name.encode(
-        'utf-8')
-    response['Content-Type'] = mimetype
-    if not is_bot(request):
-        tally_stat('case_page.static_file.served')
-    return response

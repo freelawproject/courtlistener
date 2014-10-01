@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+{% load text_filters %}
+
+{% block title %}{{ title }} - CourtListener.com{% endblock %}
+{% block description %}{{ title }}{% endblock %}
+{% block search-form %}{% endblock %}
+
+{% block head %}
+    <link type="text/css" href="{{ STATIC_URL }}skin/jplayer.blue.monday.css"
+          rel="stylesheet"/>
+{% endblock %}
+
+{% block footer-scripts %}
+    <script defer type="text/javascript"
+            src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+    <script defer type="text/javascript"
+            src="{{ STATIC_URL }}js/save-favorites.js"></script>
+    <script defer type="text/javascript"
+            src="{{ STATIC_URL }}js/jquery.jplayer.min.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $("#jquery_jplayer_1").jPlayer({
+                ready: function (event) {
+                    $(this).jPlayer("setMedia", {
+                        title: "{{ af.case_name }}",
+                        mp3: "/{{ af.local_path_mp3 }}"
+                    });
+                },
+                swfPath: "{{ STATIC_URL }}swf/Jplayer.swf"
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block sidebar %}
+    <div class="span-6 append-1" id="sidebar">
+        <div class="sidebar-section">
+            <h4>
+                <i class="fa fa-arrow-circle-o-left gray"></i>
+                <a href="/?{{ request.META.QUERY_STRING }}">Back to
+                    {% if get_string %}Search Results{% else %}Home
+                        Page{% endif %}</a>
+            </h4>
+        </div>
+
+
+        {# show the admin tools if applicable #}
+        {% if user.is_superuser %}
+            <div class="sidebar-section">
+                <h3><span>Admin</span></h3>
+                <p>
+                    <a href="/admin/search/docket/{{ af.docket_id }}/">Docket</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+                    <a href="/admin/audio/audio/{{ af.pk }}/">Audio File</a>
+                </p>
+            </div>
+        {% endif %}
+
+        {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
+        <div class="{% if not favorite_form.instance.audio_id %}hidden{% endif %} sidebar-section"
+             id="sidebar-notes">
+            <div>
+                <h3 class="inline"><span>Your Notes</span></h3>
+
+                <p class="inline" data-toggle="modal"
+                   data-target="#modal-save-favorite">
+                    (<a href="#favorite-editor">edit</a>)
+                    <i class="fa fa-pencil gray pointer"></i>
+                </p>
+
+                <p id="sidebar-notes-text">
+                    {{ favorite_form.instance.notes|default:"(none)" }}
+                </p>
+            </div>
+        </div>
+
+        {# Download original? #}
+        {% if af.download_url or af.local_path_mp3 %}
+            <div class="sidebar-section">
+                <h3><span>View Original</span></h3>
+                <p>
+                    {% if af.download_url %}
+                        <a href="{{ af.download_url }}" class="visitable">From
+                            the court</a>
+                    {% endif %}
+                    {% if af.download_url and af.local_path_mp3 %}
+                        &nbsp;&nbsp;|&nbsp;&nbsp;
+                    {% endif %}
+                    {% if af.local_path_mp3 %}
+                        <a href="/{{ af.local_path_mp3 }}" class="visitable">Our
+                            backup</a>
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
+
+        {# Show the social links using sprites #}
+        <div class="sidebar-section">
+            <h3 id="share-header"><span>Share this Oral Argument</span></h3>
+
+            <div>
+                <input type="text" readonly="readonly" id="copy-input"
+                       value="{{ request.build_absolute_uri }}"/>
+                <a href="mailto:?subject={{ title|urlencode }}%20at%20CourtListener.com&body={{ request.build_absolute_uri }}"
+                   title="Email this link to a friend" class="sprites"
+                   id="email_link_png"></a>
+                <a href="http://www.facebook.com/share.php?u={{ request.build_absolute_uri }}&t={{ title }} at CourtListener.com"
+                   target="_blank" title="Facebook" class="sprites"
+                   id="facebook_png"></a>
+                <a href="http://twitter.com/home?status={{ request.build_absolute_uri }}"
+                   target="_blank" title="Twitter" class="sprites"
+                   id="twitter_gif"></a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+
+{% block content %}
+    <article class="span-17 last">
+        <i id="favorites-star"
+           class="{% if favorite_form.instance.audio_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
+           data-toggle="modal"
+           data-target="#modal-save-favorite, #modal-logged-out"
+           title="Save this record as a favorite in your profile"></i>
+
+        <h2 class="inline">{{ af.case_name|safe|v_wrapper }}</h2>
+        {% if user.is_authenticated %}
+            {# Modal box for saving the favorite #}
+            <div id="modal-save-favorite" class="modal" role="dialog"
+                 aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        {% if favorite_form.instance.audio_id %}
+                            <h2>Edit This Favorite</h2>
+                        {% else %}
+                            <h2 id='save-favorite-title'>Save a Favorite</h2>
+                        {% endif %}
+                        <form action="" method="POST">{% csrf_token %}
+                            {{ favorite_form.audio_id }}
+                            <p class="bottom">
+                                <label for="id_name">Name</label>
+                                {% if favorite_form.name.errors %}
+                                    <br><span class="errortext">
+                                        {% for error in favorite_form.name.errors %}
+                                            {{ error|escape }}
+                                        {% endfor %}
+                                    </span>
+                                {% endif %}<br>
+                                {{ favorite_form.name }}
+                            </p>
+
+                            <p class="bottom">
+                                <label for="id_favorite_notes">Notes</label>
+                                {% if favorite_form.notes.errors %}
+                                    <br><span class="errortext">
+                                        {% for error in favorite_form.notes.errors %}
+                                            {{ error|escape }}
+                                        {% endfor %}
+                                    </span>
+                                {% endif %}
+                            </p>
+                            {{ favorite_form.notes }}
+                            <p class="top right"><span
+                                    id="characters-remaining"></span>
+                                characters remaining</p>
+
+                            <div id='favorites-bottom-section'>
+                                <p id="save-favorite-delete" class="bottom fake-link inline
+                                    {% if not favorite_form.instance.audio_id %}hidden{% endif %}"
+                                   tabindex="5">delete</p>
+
+                                <div id="favorites-buttons">
+                                    <button type="submit"
+                                            class="button title close-favorite-button"
+                                            name="closeFavorite"
+                                            id="closeFavorite" tabindex='4'>
+                                        Close
+                                    </button>
+                                    <button type="submit"
+                                            class="button title save-favorite-button"
+                                            name="saveFavorite"
+                                            id="saveFavorite" tabindex='3'>Save
+                                        favorite
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            {# user is not authenticated #}
+            <div id="modal-logged-out"
+                 class="modal"
+                 role="dialog"
+                 aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <h3 class="center bottom">
+                            <a href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}">
+                                Sign in or register to save a favorite.
+                            </a>
+                        </h3>
+
+                        <p class="center bottom">(click to dismiss)</p>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+
+        <h3>{{ af.docket.court }}</h3>
+
+        <p class="bottom">
+            <span class="meta-data-header">Date Argued:</span>
+            <span class="meta-data-value">
+                {% if af.date_argued %}
+                    {{ af.date_argued|date:"F jS, Y" }}
+                {% else %}
+                    Unknown Date
+                {% endif %}
+            </span>
+        </p>
+
+        {% if af.processing_complete %}
+        <p class="bottom">
+            <span class="meta-data-header">Duration:</span>
+            <span class="meta-data-value">{{ af.duration|naturalduration }}</span>
+        </p>
+        {% endif %}
+
+        <p class="bottom">
+            {% if af.docket_number %}
+                <span class="meta-data-header">Docket Number: </span>
+                <span class="meta-data-value">{{ af.docket_number }}</span>
+            {% endif %}
+        </p>
+
+        <p class="bottom">
+            {% if af.judges %}
+                <span class="meta-data-header">Judges:</span>
+                <span class="meta-data-value">{{ af.judges }}</span>
+            {% endif %}
+        </p>
+
+        <p>
+            <span class="meta-data-header"
+                  title="SHA1 Hash of the binary or text">Fingerprint:</span>
+            <span class="meta-data-value">{{ af.sha1 }}</span>
+        </p>
+        <br>
+        {% if not af.processing_complete %}
+            <div class="notice span-16 last">
+                <p class="bottom">This file has not yet completed processing on our server. Please try again in a few moments or if you prefer not to wait you may download the audio <a href="{{ af.download_url }}">directly from the court website</a>. Generally this process takes about thirty minutes.</p>
+            </div>
+        {% endif %}
+
+        <div id="jquery_jplayer_1" class="jp-jplayer"></div>
+        <div id="jp_container_1" class="jp-audio">
+            <div class="jp-type-single">
+                <div class="jp-gui jp-interface">
+                    <ul class="jp-controls">
+                        <li><a href="javascript:;" class="jp-play"
+                               tabindex="1">play</a></li>
+                        <li><a href="javascript:;" class="jp-pause"
+                               tabindex="1">pause</a></li>
+                        <li><a href="javascript:;" class="jp-stop"
+                               tabindex="1">stop</a></li>
+                        <li><a href="javascript:;" class="jp-mute" tabindex="1"
+                               title="mute">mute</a></li>
+                        <li><a href="javascript:;" class="jp-unmute"
+                               tabindex="1" title="unmute">unmute</a></li>
+                        <li><a href="javascript:;" class="jp-volume-max"
+                               tabindex="1" title="max volume">max volume</a>
+                        </li>
+                    </ul>
+                    <div class="jp-progress">
+                        <div class="jp-seek-bar">
+                            <div class="jp-play-bar"></div>
+                        </div>
+                    </div>
+                    <div class="jp-volume-bar">
+                        <div class="jp-volume-bar-value"></div>
+                    </div>
+                    <div class="jp-time-holder">
+                        <div class="jp-current-time"></div>
+                        <div class="jp-duration"></div>
+                        <ul class="jp-toggles">
+                            <li><a href="javascript:;" class="jp-repeat"
+                                   tabindex="1" title="repeat">repeat</a></li>
+                            <li><a href="javascript:;" class="jp-repeat-off"
+                                   tabindex="1" title="repeat off">repeat
+                                off</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="jp-details">
+                    <ul>
+                        <li><span class="jp-title"></span></li>
+                    </ul>
+                </div>
+                <div class="jp-no-solution">
+                    <span>Update Required</span>
+                    To play the media you will need to either update your
+                    browser to a recent version or update your <a
+                        href="http://get.adobe.com/flashplayer/"
+                        target="_blank">Flash plugin</a>.
+                </div>
+            </div>
+        </div>
+    </article>
+{% endblock %}

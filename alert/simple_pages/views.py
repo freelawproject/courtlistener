@@ -1,20 +1,26 @@
 import json
+import os
 
-from django.db.models import Count
-from django.shortcuts import render_to_response
-from django.template import RequestContext
+from django.conf import settings
 from django.core.mail import send_mail
-from django.http import HttpResponseRedirect
+from django.db.models import Count
+from django.http import HttpResponseRedirect, Http404
 from django.http import HttpResponse
+from django.shortcuts import render_to_response, get_object_or_404
+from django.template import RequestContext
 from django.template import loader, Context
 from django.views.decorators.cache import cache_page, never_cache
-from alert.lib import search_utils
-from alert.lib.sunburnt import sunburnt
 
-from alert.search.models import Court, Document
-from alert import settings
-from alert.simple_pages.forms import ContactForm
+from alert.audio.models import Audio
 from alert.custom_filters.decorators import check_honeypot
+from alert.lib import magic
+from alert.lib import search_utils
+from alert.lib.bot_detector import is_bot
+from alert.lib.sunburnt import sunburnt
+from alert.search.models import Court, Document
+from alert.simple_pages.forms import ContactForm
+from alert.stats import tally_stat
+
 
 
 def about(request):
@@ -28,7 +34,10 @@ def about(request):
 
 def faq(request):
     """Loads the FAQ page"""
-    scraped_court_count = Court.objects.filter(in_use=True, has_opinion_scraper=True).count()
+    scraped_court_count = Court.objects.filter(
+        in_use=True,
+        has_opinion_scraper=True
+    ).count()
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
     response = conn.raw_query(
         **search_utils.build_total_count_query()).execute()
@@ -51,7 +60,7 @@ def build_court_dicts(courts):
                     'short_name': u'All Courts'}]
     court_dicts.extend([{'pk': court.pk,
                          'short_name': court.full_name, }
-                         #'notes': court.notes}
+                        #'notes': court.notes}
                         for court in courts])
     return court_dicts
 
@@ -73,8 +82,12 @@ def coverage_graph(request):
         if 'L' in d['source']:
             count_lawbox += d['source__count']
 
-    opinion_courts = Court.objects.filter(in_use=True, has_opinion_scraper=True)
-    oral_argument_courts = Court.objects.filter(in_use=True, has_oral_argument_scraper=True)
+    opinion_courts = Court.objects.filter(
+        in_use=True,
+        has_opinion_scraper=True)
+    oral_argument_courts = Court.objects.filter(
+        in_use=True,
+        has_oral_argument_scraper=True)
     return render_to_response(
         'simple_pages/coverage_graph.html',
         {
@@ -115,8 +128,9 @@ def contact(
         template_path='simple_pages/contact_form.html',
         template_data={},
         initial={}):
-    """This is a fairly run-of-the-mill contact form, except that it can be overridden in various ways so that its
-    logic can be called from other functions.
+    """This is a fairly run-of-the-mill contact form, except that it can be
+    overridden in various ways so that its logic can be called from other
+    functions.
     """
 
     if request.method == 'POST':
@@ -133,11 +147,13 @@ def contact(
 
             # send the email to the MANAGERS
             send_mail(
-                'CourtListener message from "%s": %s' % (cd['name'], cd['subject']),
+                'CourtListener message from "%s": %s' % (cd['name'],
+                                                         cd['subject']),
                 cd['message'],
                 cd.get('email', 'noreply@example.com'),
                 email_addresses, )
-            # we must redirect after success to avoid problems with people using the refresh button.
+            # we must redirect after success to avoid problems with people
+            # using the refresh button.
             return HttpResponseRedirect('/contact/thanks/')
     else:
         # the form is loading for the first time
@@ -187,17 +203,16 @@ def show_maintenance_warning(request):
     https://plus.google.com/115984868678744352358/posts/Gas8vjZ5fmB
     """
     t = loader.get_template('simple_pages/maintenance.html')
-    return HttpResponseTemporaryUnavailable(t.render(Context({'private': True})))
+    return HttpResponseTemporaryUnavailable(
+        t.render(Context({'private': True})))
 
 
-@cache_page(60 * 60)
+@cache_page(60 * 60 * 12)  # 12 hours
 def robots(request):
     """Generate the robots.txt file"""
     response = HttpResponse(mimetype='text/plain')
     t = loader.get_template('simple_pages/robots.txt')
-    c = Context({})
-    response.write(t.render(c))
-    return response
+    return response.write(t.render(Context({})))
 
 
 def validate_for_bing(request):
@@ -230,3 +245,42 @@ def browser_warning(request):
         {'private': True},
         RequestContext(request)
     )
+
+
+def serve_static_file(request, file_path=''):
+    """Sends a static file to a user.
+
+    This serves up the static case files such as the PDFs in a way that can be
+    blocked from search engines if necessary. We do four things:
+     - Look up the document  or audio file associated with the filepath
+     - Check if it's blocked
+     - If blocked, we set the x-robots-tag HTTP header
+     - Serve up the file using Apache2's xsendfile
+    """
+    response = HttpResponse()
+    file_loc = os.path.join(settings.MEDIA_ROOT, file_path.encode('utf-8'))
+    if file_path.startswith('mp3'):
+        item = get_object_or_404(Audio, local_path_mp3=file_path)
+        mimetype = 'audio/mpeg'
+    else:
+        item = get_object_or_404(Document, local_path=file_path)
+        try:
+            mimetype = magic.from_file(file_loc, mime=True)
+        except IOError:
+            raise Http404
+
+    if item.blocked:
+        response['X-Robots-Tag'] = 'noindex, noodp, noarchive, noimageindex'
+
+    if settings.DEVELOPMENT:
+        # X-Sendfile will only confuse you in a dev env.
+        response.content = open(file_loc, 'r').read()
+    else:
+        response['X-Sendfile'] = file_loc
+    file_name = file_path.split('/')[-1]
+    response['Content-Disposition'] = 'attachment; filename="%s"' % \
+                                      file_name.encode('utf-8')
+    response['Content-Type'] = mimetype
+    if not is_bot(request):
+        tally_stat('case_page.static_file.served')
+    return response
