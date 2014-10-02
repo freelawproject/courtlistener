@@ -140,28 +140,7 @@
            data-target="#modal-save-favorite, #modal-logged-out"
            title="Save this record as a favorite in your profile"></i>
         <h2 class="inline">{{ doc.caption|safe|v_wrapper }}</h2>
-        {% if user.is_authenticated %}
-            {# Modal box for saving the favorite #}
-            {% include  "includes/favorites_modal.html" %}
-        {% else %}
-            {# user is not authenticated #}
-            <div id="modal-logged-out"
-                 class="modal"
-                 role="dialog"
-                 aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <h3 class="center bottom">
-                            <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}">
-                                Sign in or register to save a favorite.
-                            </a>
-                        </h3>
-                        <p class="center bottom">(click to dismiss)</p>
-                    </div>
-                </div>
-            </div>
-        {% endif %}
-
+        {% include "includes/favorites_modal.html" %}
 
         <h3>{{ doc.docket.court }}</h3>
         <p class="bottom">

@@ -140,6 +140,10 @@ div.hopscotch-bubble .hopscotch-bubble-close {
     color: gold;
 }
 
+.align-top {
+    vertical-align: top;
+}
+
 .left {
     float: left;
 }

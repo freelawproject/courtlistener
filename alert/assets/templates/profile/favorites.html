@@ -50,7 +50,8 @@
                     <tbody>
                         {% for favorite_form in favorite_forms %}
                             <tr id="favorite-row-{{ favorite_form.instance.id }}">
-                                <td id="name-{{ favorite_form.instance.id }}">
+                                <td id="name-{{ favorite_form.instance.id }}"
+                                    class="span-5">
                                     {% if favorite_form.instance.doc_id %}
                                         <i class="fa-file-text-o fa gray" title="Opinion"></i>
                                         <a href="{{ favorite_form.instance.doc_id.get_absolute_url }}">
@@ -66,7 +67,7 @@
                                 <td id="notes-{{ favorite_form.instance.id }}">
                                     {{ favorite_form.instance.notes|default:"(none)" }}
                                 </td>
-                                <td>
+                                <td class="align-top">
                                     <div data-toggle="modal"
                                          data-target="#modal-save-favorite">
                                         <p class="inline fake-link edit-favorite-trigger nowrap"
