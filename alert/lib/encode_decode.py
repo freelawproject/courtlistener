@@ -23,20 +23,3 @@ def ascii_to_num(string, alphabet=ALPHABET):
         raise Http404
 
     return num
-
-
-def num_to_ascii(num, alphabet=ALPHABET):
-    """Encode a number in Base X
-
-    `num`: The number to encode
-    """
-    if num <= 0:
-        return alphabet[0]
-    arr = []
-    base = len(alphabet)
-    while num:
-        rem = num % base
-        num //= base
-        arr.append(alphabet[rem])
-    arr.reverse()
-    return ''.join(arr)

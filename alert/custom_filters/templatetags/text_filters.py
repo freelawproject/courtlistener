@@ -4,7 +4,6 @@ from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
 
 import re
-from alert.lib import encode_decode
 
 register = Library()
 
@@ -66,16 +65,6 @@ def compress_whitespace(text, autoescape=None):
         esc = lambda x: x
     return mark_safe(' '.join(text.split()))
 
-
-@register.filter(needs_autoescape=True)
-@stringfilter
-def num_to_ascii(pk, autoescape=None):
-    """Convert a pk into a base 60 encoded string """
-    if autoescape:
-        esc = conditional_escape
-    else:
-        esc = lambda x: x
-    return mark_safe(encode_decode.num_to_ascii(int(pk)))
 
 
 @register.filter(needs_autoescape=True)
