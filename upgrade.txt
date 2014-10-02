@@ -68,16 +68,16 @@ We welcome a conversion of these notes to a better process using Fabric.
     - Do citation feeds redirect properly now that we're using the PK rather than an ascii conversion?
     - can't click tabs in the jurisdiction picker in opinions!
     + add recent oral arguments to the homepage?
-    - Scraper:
+    + Scraper:
         + The scrapers for audio and opinions need to be finalized and tested.
     + Rewrite bulk files and ensure that the save and delete routines of
       Document and Audio properly invalidates the bulk files if necessary.
-    - verify that serve_static_files works for audio stuff (analyze it's code
+    + verify that serve_static_files works for audio stuff (analyze it's code
       and such)
     - Update the CL calendar to have bulk files generated at 3am on the last
       day of every month.
-    - favorites should work for alerts?
-    - robots.txt blocking for bulk files
+    + favorites should work for alerts?
+    + robots.txt blocking for bulk files
 
   API Changes:
    - /api/rest-info/ makes reference to a number of API calls that go to v1.
