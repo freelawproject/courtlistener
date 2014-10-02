@@ -1,7 +1,7 @@
 from django.core.urlresolvers import reverse
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.http import HttpResponseRedirect
+from django.http import HttpResponsePermanentRedirect
 from django.shortcuts import render_to_response
 from django.shortcuts import get_object_or_404
 from django.template import RequestContext
@@ -160,4 +160,11 @@ def redirect_opinion_pages(request, pk, slug):
         path += 'cited-by/'
     if request.META['QUERY_STRING']:
         path = '%s?%s' % (path, request.META['QUERY_STRING'])
-    return HttpResponseRedirect(path)
+    return HttpResponsePermanentRedirect(path)
+
+
+def redirect_cited_by_feeds(request, pk):
+    pk = ascii_to_num(pk)
+    path = reverse('cited_by_feed', kwargs={'doc_id': pk})
+    return HttpResponsePermanentRedirect(path)
+

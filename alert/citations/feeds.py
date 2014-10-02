@@ -1,5 +1,4 @@
 import datetime
-from alert.lib.encode_decode import ascii_to_num, num_to_ascii
 from alert.lib.string_utils import trunc
 from alert.search.models import Document
 from django.contrib.syndication.views import Feed
@@ -13,13 +12,14 @@ class CitedByFeed(Feed):
 
     # get the court info from the URL
     def get_object(self, request, doc_id):
-        return get_object_or_404(Document, pk=ascii_to_num(doc_id))
+        return get_object_or_404(Document, pk=doc_id)
 
     def title(self, obj):
-        return "Cases citing %s, ordered by filing date" % trunc(str(obj.citation), 50)
+        return "Cases Citing %s, Ordered by Filing Date" % \
+               trunc(str(obj.citation.case_name), 50)
 
     def link(self, obj):
-        return '/feed/%s/cited-by/' % num_to_ascii(obj.pk)
+        return '/feed/%s/cited-by/' % obj.pk
 
     author_name = "CourtListener.com"
     author_email = "feeds@courtlistener.com"

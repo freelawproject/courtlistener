@@ -7,7 +7,7 @@
 {% block description %}{{ title }}{% endblock %}
 
 {% block head %}
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for opinions citing {{doc|truncatewords:10}}" href="/feed/{{doc.pk|num_to_ascii}}/cited-by/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for opinions citing {{doc.citation.case_name|truncatewords:10}}" href="/feed/{{ doc.pk }}/cited-by/">
 {% endblock %}
 
 {% block sidebar %}

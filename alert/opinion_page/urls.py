@@ -14,7 +14,8 @@ urlpatterns = patterns('',
     url(r'^docket/(\d*)/(.*)/$', view_docket, name="view_docket"),
 
     # Feeds
-    (r'^feed/(?P<doc_id>.*)/cited-by/$', CitedByFeed()),
+    url(r'^feed/(?P<doc_id>\d*)/cited-by/$', CitedByFeed(),
+        name='cited_by_feed'),
 
     # Sitemap
     (r'^sitemap-opinions\.xml', opinion_sitemap_maker),

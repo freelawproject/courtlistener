@@ -1,4 +1,5 @@
-from alert.opinion_page.views import redirect_opinion_pages
+from alert.opinion_page.views import redirect_opinion_pages, \
+    redirect_cited_by_feeds
 from alert.search.models import Court
 from alert.sitemap import index_sitemap_maker
 from django.conf.urls import include, patterns, url
@@ -40,19 +41,18 @@ urlpatterns += patterns(
     (r'^report/2012/$', RedirectView.as_view(
         url='https://www.ischool.berkeley.edu/files/student_projects/mcdonald_rustad_report.pdf')),
 
-    # Dump URLs changed 2013-11-07
+    # Dump URLs changed 2013-11-07 and updated 2014-10-02
     (r'^dump-info/$', RedirectView.as_view(url='/api/bulk-info/')),
-    (r'^dump-api/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
-     RedirectView.as_view(url='/api/bulk/%(court)s.xml.gz')),
-    (r'^dump-api/(?P<year>\d{4})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
-     RedirectView.as_view(url='/api/bulk/%(year)s/%(court)s.xml.gz')),
-    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
-     RedirectView.as_view(url='/api/bulk/%(year)s/%(month)s/%(court)s.xml.gz')),
-    (r'^dump-api/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
-     RedirectView.as_view(url='/api/bulk/%(year)s/%(month)s/%(day)s/%(court)s.xml.gz')),
+    (r'^dump-api/.*/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
+     RedirectView.as_view(url='/api/bulk-data/%(court)s.tar.gz')),
+
+    # Bulk data URLs updated 2014-10-02
+    (r'^api/bulk/.*/(?P<court>all|%s)\.xml.gz$' % "|".join(pacer_codes),
+     RedirectView.as_view(url='/api/bulk-data/%(court)s.tar.gz')),
 
     # Court stripped from the URL on 2014-09-30
     (r'^(?:%s)/(.*)/(.*)/authorities/$' % "|".join(pacer_codes), redirect_opinion_pages),
     (r'^(?:%s)/(.*)/(.*)/cited-by/$' % "|".join(pacer_codes), redirect_opinion_pages),
     (r'^(?:%s)/(.*)/(.*)/$' % "|".join(pacer_codes), redirect_opinion_pages),
+    (r'^feed/(.*)/cited-by/$', redirect_cited_by_feeds),
 )
