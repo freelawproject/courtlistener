@@ -6,8 +6,7 @@
     <h3 class="bottom serif">
         <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}" class="visitable">
             {{ result.solr_highlights.caseName.0|safe }}
-            ({% if result.docket.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}
-            &nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
+            ({% if result.docket.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{% if search_form.source.value == 'o' or source_override == 'o'%}{{ result.dateFiled|date:"Y" }}{% elif search_form.source.value == 'oa' or source_override == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
         </a>
     </h3>
 

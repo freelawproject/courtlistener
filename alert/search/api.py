@@ -631,7 +631,6 @@ class SearchResource(ModelResourceWithFieldsFilter):
         try:
             main_query = build_main_query(
                 kwargs['cd'],
-                'opinion',
                 highlight='text'
             )
         except KeyError:
@@ -639,7 +638,6 @@ class SearchResource(ModelResourceWithFieldsFilter):
             if sf.is_valid():
                 main_query = build_main_query(
                     sf.cleaned_data,
-                    'opinion',
                     highlight='text'
                 )
 
@@ -660,8 +658,8 @@ class SearchResource(ModelResourceWithFieldsFilter):
                 cd['q'] = '*:*'  # Get everything.
             return self.get_object_list(bundle.request, cd=cd)
         else:
-            BadRequest(
-                "Invalid resource lookup data provided. Unable to complete your query.")
+            BadRequest("Invalid resource lookup data provided. Unable to "
+                       "complete your query.")
 
     def obj_get(self, bundle, **kwargs):
         search_form = forms.SearchForm(bundle.request.GET)
@@ -670,8 +668,8 @@ class SearchResource(ModelResourceWithFieldsFilter):
             cd['q'] = 'id:%s' % kwargs['pk']
             return self.get_object_list(bundle.request, cd=cd)[0]
         else:
-            BadRequest(
-                "Invalid resource lookup data provided. Unable to complete your request.")
+            BadRequest("Invalid resource lookup data provided. Unable to "
+                       "complete your request.")
 
     def apply_sorting(self, obj_list, options=None):
         """Since we're not using Django Model sorting, we just want to use our own, which is already

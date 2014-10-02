@@ -56,15 +56,16 @@ We welcome a conversion of these notes to a better process using Fabric.
     - Write some kind of script to handle matching up oral args with opinions
     + Make audio searchable?
     + Make sure the processing_complete flag is triggered properly.
-    - Test and tweak the jurisdiction picker.
-    - Make the audio page
+    + Make the audio page
         + Jplayer
         + sharing links
         + favorite saving/deleting/editing
     + Podcasts/Audio feeds
-    - Audio alerts?
+    + Audio alerts
     + Sitemaps
-    - selecting order drop down has weirdness on OA page.
+    - Order drop down weirdness:
+        - selecting order drop down has weirdness on OA page.
+        - cannot change the drop down to newest first on o page.
     - Do citation feeds redirect properly now that we're using the PK rather than an ascii conversion?
     - can't click tabs in the jurisdiction picker in opinions!
     + add recent oral arguments to the homepage?

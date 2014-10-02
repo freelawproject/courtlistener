@@ -4,23 +4,28 @@ CourtListener.com
 {% comment %}
     # hits is a multidimensional array. Ugh.
     # it consists of alerts, paired with a list of documents, of the form:
-    # [[alert1, [doc1, doc2, doc3, doc4]], [alert2...]]
+    # [[alert1, source, [result1, result2, result3, result4]], [alert2...]]
 {% endcomment %}
 -------------------------------------------------------
 We have news regarding your alerts at CourtListener.com
 -------------------------------------------------------
 
-{% for alert, docs in hits %}{% for doc in docs %}{% if forloop.first %}Your {{alert.get_alertFrequency_display|lower}} alert -- {{alert.alertName}} -- had {{docs|length}} hit{{docs|pluralize}}:
+{% for alert, source, results in hits %}{% for result in results %}{% if forloop.first %}Your {{alert.get_alertFrequency_display|lower}} alert -- {{alert.alertName}} -- had {{results|length}} hit{{results|pluralize}}:
 -------------------------------------------------------
-Edit/delete this alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }}/{% endif %}
-{{forloop.counter}}. {{ doc.solr_highlights.caseName.0|safe|striptags }} ({% if doc.docket.court_id != 'scotus' %}{{doc.solr_highlights.court_citation_string.0|safe|striptags}} {% endif %}{{doc.dateFiled|date:"Y"}})
-Precedential Status: {{doc.status}}
- - View on our site: https://www.courtlistener.com{{doc.absolute_url}}
-{% if doc.download_url %} - Download original from the court: {{doc.download_url}}{% else %} - Download the original from our backup: {{ doc.local_path }}{% endif %}
-...{% for frag in doc.solr_highlights.text %}{{ frag|safe|striptags|underscore_to_space|compress_whitespace }}...{% endfor %}
+Edit / Delete this Alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }}/{% endif %}
+{{forloop.counter}}. {{ result.solr_highlights.caseName.0|safe|striptags }}
+ - View on our site: https://www.courtlistener.com{{result.absolute_url}}
+ - Download original from the court: {{result.download_url}}
+ - Download the original from our backup: https://www.courtlistener.com/{{ result.local_path }}
+{% if source == 'o' %}...{% for frag in result.solr_highlights.text %}{{ frag|safe|striptags|underscore_to_space|compress_whitespace }}...{% endfor %}{% endif %}
 {% empty %}{% if alert.sendNegativeAlert %}{# it's a negative alert with no hits. #}Your {{ alert.get_alertFrequency_display|lower}} alert -- {{alert.alertName}} -- had 0 hits.
 -------------------------------------------------------
+Edit / Delete this Alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }}/
+{% endif %}{% endfor %}
 
-
-{% endif %}{% endfor %}{% endfor %}
--- This alert brought to you by the non-profit Free Law Project. Donate here to support our work: https://www.courtlistener.com/donate/?referrer=email
+{% endfor %}
+************************
+This alert brought to you by the California non-profit Free Law Project:
+ - Blog: http://freelawproject.org
+ - Twitter: http://twitter.com/freelawproject
+ - Donate: https://www.courtlistener.com/donate/?referrer=pt-email
