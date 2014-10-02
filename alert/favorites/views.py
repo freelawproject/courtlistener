@@ -1,38 +1,45 @@
-from alert.opinion_page.views import make_citation_string
-from alert.search.models import Document
+from alert.audio.models import Audio
 from alert.favorites.forms import FavoriteForm
 from alert.favorites.models import Favorite
+from alert.search.models import Document
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
-from django.http import HttpResponse
-from django.shortcuts import HttpResponseRedirect
-from django.shortcuts import render_to_response
-from django.template import RequestContext
+from django.http import HttpResponse, Http404, HttpResponseServerError, \
+    HttpResponseNotAllowed
 from django.utils.datastructures import MultiValueDictKeyError
+
 
 @login_required
 def save_or_update_favorite(request):
     """Uses ajax to save or update a favorite.
 
     Receives a request as an argument, and then uses that plus POST data to
-    create or update a favorite in the database for a specific user. If the user
-    already has the document favorited, it updates the favorite with the new
-    information. If not, it creates a new favorite.
+    create or update a favorite in the database for a specific user. If the
+    user already has the document favorited, it updates the favorite with the
+    new information. If not, it creates a new favorite.
     """
     if request.is_ajax():
         # If it's an ajax request, gather the data from the form, save it to
         # the DB, and then return a success code.
-        try:
-            doc_id = request.POST['doc_id']
-        except:
-            return HttpResponse("Unknown doc_id")
-
-        doc = Document.objects.get(pk=doc_id)
-        try:
-            fave = Favorite.objects.get(doc_id=doc, users__user=request.user)
-        except ObjectDoesNotExist:
-            fave = Favorite()
+        audio_pk = request.POST.get('audio_id')
+        doc_pk = request.POST.get('doc_id')
+        if audio_pk and audio_pk != 'undefined':
+            af = Audio.objects.get(pk=audio_pk)
+            try:
+                fave = Favorite.objects.get(audio_id=af,
+                                            users__user=request.user)
+            except ObjectDoesNotExist:
+                fave = Favorite()
+        elif doc_pk and doc_pk != 'undefined':
+            doc = Document.objects.get(pk=doc_pk)
+            try:
+                fave = Favorite.objects.get(doc_id=doc,
+                                            users__user=request.user)
+            except ObjectDoesNotExist:
+                fave = Favorite()
+        else:
+            return Http404("Unknown document or audio id")
 
         f = FavoriteForm(request.POST, instance=fave)
         if f.is_valid():
@@ -43,53 +50,11 @@ def save_or_update_favorite(request):
             up.save()
         else:
             # Validation errors fail silently. Probably could be better.
-            HttpResponse("Failure. Form invalid")
+            return HttpResponseServerError("Failure. Form invalid")
 
         return HttpResponse("It worked")
     else:
-        return HttpResponse("Not an ajax request.")
-
-
-
-@login_required
-def edit_favorite(request, fave_id):
-    """Provide a form for the user to update alerts, or do so if submitted via
-    POST
-    """
-
-    try:
-        fave_id = int(fave_id)
-    except:
-        return HttpResponseRedirect('/')
-
-    try:
-        fave = Favorite.objects.get(id=fave_id, users__user=request.user)
-        doc = fave.doc_id
-        citation_string = make_citation_string(doc)
-    except ObjectDoesNotExist:
-        # User lacks access to this fave or it doesn't exist.
-        return HttpResponseRedirect('/')
-
-    if request.method == 'POST':
-        form = FavoriteForm(request.POST, instance=fave)
-        if form.is_valid():
-            form.save()
-            messages.add_message(request, messages.SUCCESS,
-                'Your favorite was saved successfully.')
-
-            # redirect to the alerts page
-            return HttpResponseRedirect('/profile/favorites/')
-
-    else:
-        # the form is loading for the first time
-        form = FavoriteForm(instance=fave)
-
-    return render_to_response('profile/edit_favorite.html',
-                              {'favorite_form': form,
-                               'doc': doc,
-                               'citation_string': citation_string,
-                               'private': False},
-                              RequestContext(request))
+        return HttpResponseNotAllowed("Not an ajax request.")
 
 
 @login_required
@@ -101,12 +66,24 @@ def delete_favorite(request):
     if request.is_ajax():
         # If it's an ajax request, gather the data from the form, save it to
         # the DB, and then return a success code.
-        try:
-            doc_id = request.POST['doc_id']
-        except:
-            return HttpResponse("Unknown doc_id")
-
-        fave = Favorite.objects.get(doc_id=doc_id, users__user=request.user)
+        audio_pk = request.POST.get('audio_id')
+        doc_pk = request.POST.get('doc_id')
+        if audio_pk and audio_pk != 'undefined':
+            af = Audio.objects.get(pk=audio_pk)
+            try:
+                fave = Favorite.objects.get(audio_id=af,
+                                            users__user=request.user)
+            except ObjectDoesNotExist:
+                fave = Favorite()
+        elif doc_pk and doc_pk != 'undefined':
+            doc = Document.objects.get(pk=doc_pk)
+            try:
+                fave = Favorite.objects.get(doc_id=doc,
+                                            users__user=request.user)
+            except ObjectDoesNotExist:
+                fave = Favorite()
+        else:
+            return Http404("Unknown document or audio id")
 
         # Finally, delete the favorite
         fave.delete()
@@ -115,7 +92,7 @@ def delete_favorite(request):
             if request.POST['message'] == "True":
                 # used on the profile page. True is a string, not a bool.
                 messages.add_message(request, messages.SUCCESS,
-                    'Your favorite was deleted successfully.')
+                                     'Your favorite was deleted successfully.')
         except MultiValueDictKeyError:
             # This happens if message isn't set.
             pass
@@ -123,5 +100,5 @@ def delete_favorite(request):
         return HttpResponse("It worked.")
 
     else:
-        return HttpResponse("Not an ajax request.")
+        return HttpResponseNotAllowed("Not an ajax request.")
 

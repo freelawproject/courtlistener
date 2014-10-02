@@ -8,11 +8,14 @@ class Favorite(models.Model):
     doc_id = models.ForeignKey(
         Document,
         verbose_name='the document that is favorited',
+        null=True,
+        blank=True,
     )
     audio_id = models.ForeignKey(
         Audio,
         verbose_name='the audio file that is favorited',
         null=True,
+        blank=True,
     )
     date_modified = models.DateTimeField(
         auto_now=True,

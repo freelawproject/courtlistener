@@ -22,7 +22,6 @@ from alert.simple_pages.forms import ContactForm
 from alert.stats import tally_stat
 
 
-
 def about(request):
     """Loads the about page"""
     return render_to_response(

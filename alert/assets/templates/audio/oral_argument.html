@@ -137,6 +137,7 @@
                         {% endif %}
                         <form action="" method="POST">{% csrf_token %}
                             {{ favorite_form.audio_id }}
+                            {{ favorite_form.doc_id }}
                             <p class="bottom">
                                 <label for="id_name">Name</label>
                                 {% if favorite_form.name.errors %}

@@ -58,9 +58,9 @@ We welcome a conversion of these notes to a better process using Fabric.
     + Make sure the processing_complete flag is triggered properly.
     - Test and tweak the jurisdiction picker.
     - Make the audio page
-        - Jplayer
-        - sharing links
-        - favorite saving/deleting/editing
+        + Jplayer
+        + sharing links
+        + favorite saving/deleting/editing
     + Podcasts/Audio feeds
     - Audio alerts?
     + Sitemaps
