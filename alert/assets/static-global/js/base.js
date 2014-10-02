@@ -14,8 +14,8 @@ $(document).ready(function() {
 
         // If the user is switching tabs, then make sure their ordering is
         // valid for the tab they're headed to.
+        var drop_down = $('#id_order_by');
         if (tab_switch){
-            var drop_down = $('#id_order_by');
             var value;
             if (drop_down.val() === 'dateFiled desc') {
                 value = 'dateArgued desc';
@@ -31,6 +31,9 @@ $(document).ready(function() {
             }
             var el = $('<input type="hidden" name="order_by" />').val(value);
             gathered = gathered.add(el);
+        } else {
+            // Not a tab switch; make sure to gather the element regardless.
+            gathered = gathered.add(drop_down);
         }
 
         // Add the input boxes that aren't empty
@@ -97,8 +100,6 @@ $(document).ready(function() {
     $('#search-form, ' +
       '#sidebar-search-form, ' +
       '.search-page #court-picker-search-form').submit(function (e) {
-        // Overrides the submit buttons so that they gather the correct
-        // form elements before submission.
         e.preventDefault();
 
         // Ensure that the correct value is set in the radio button (correct
@@ -116,6 +117,9 @@ $(document).ready(function() {
 
     $('#homepage #court-picker-search-form').submit(function(e){
         e.preventDefault();
+
+        // Indicate the count of selected jurisdictions when switching to
+        // advanced search page.
         $('#jurisdiction-count').text($(this).find('input:checked').length);
         $('#court-picker').modal('hide');
         showAdvancedHomepage();
@@ -132,9 +136,9 @@ $(document).ready(function() {
     });
 
 
-    ///////////////////
-    // Tab Switching //
-    ///////////////////
+    //////////////////////////
+    // Source Tab Switching //
+    //////////////////////////
     $('#source-switcher label:not(.selected) input[name=source]').click(function () {
         // Note that we can't do submit here, because that'd trigger a
         // switching of the the checked radio button, and nothing would happen.

@@ -63,9 +63,9 @@ We welcome a conversion of these notes to a better process using Fabric.
     + Podcasts/Audio feeds
     + Audio alerts
     + Sitemaps
-    - Order drop down weirdness:
-        - selecting order drop down has weirdness on OA page.
-        - cannot change the drop down to newest first on o page.
+    + Order drop down weirdness:
+        + selecting order drop down has weirdness on OA page.
+        + cannot change the drop down to newest first on o page.
     - Do citation feeds redirect properly now that we're using the PK rather than an ascii conversion?
     - can't click tabs in the jurisdiction picker in opinions!
     + add recent oral arguments to the homepage?
@@ -79,6 +79,7 @@ We welcome a conversion of these notes to a better process using Fabric.
       day of every month.
     + favorites should work for alerts?
     + robots.txt blocking for bulk files
+    - update the tour to show off oral args
 
   API Changes:
    - /api/rest-info/ makes reference to a number of API calls that go to v1.
