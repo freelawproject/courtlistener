@@ -9,7 +9,7 @@
                     <h2 class="inline">Select Jurisdictions</h2>
                     <p class="inline fake-link" id="check-all">Check All</p>
                     <p class="inline fake-link" id="clear-all">Clear All</p>
-                    {% if search_form.source.value == 'o' %}
+                    {% if search_form.source.value == 'o' or not request.GET.source %}
                         <p class="inline fake-link" id="check-current">Check Current Tab</p>
                         <p class="inline fake-link" id="clear-current">Clear Current Tab</p>
                     {% endif %}
@@ -21,7 +21,7 @@
                        autocomplete="off"/>
                 <ul class="nav nav-tabs" id="court-picker-tabs">
                     <li class="active"><a href="#tab-federal-appellate" data-toggle="tab">Federal Appellate</a></li>
-                    {%  if search_form.source.value != 'oa' %}
+                    {%  if search_form.source.value == 'o' or not request.GET.source %}
                         <li><a href="#tab-federal-district" data-toggle="tab">Federal District</a></li>
                         <li><a href="#tab-bankruptcy" data-toggle="tab">Bankruptcy</a></li>
                         <li><a href="#tab-state" data-toggle="tab">State</a></li>
@@ -35,7 +35,7 @@
                             {% for row in courts.federal|rows:4 %}
                                 <div class="span-5 {% if forloop.last %}last{% else %}append-1{% endif %}">
                                     {% for court in row %}
-                                        {% if search_form.source.value == 'o' %}
+                                        {% if search_form.source.value == 'o' or not request.GET.source %}
                                             <div class="sidebar-checkbox">
                                                 <input
                                                         id="id_{{ court.pk }}"
@@ -69,7 +69,7 @@
                             {% endfor %}
                         </div>
                     </div>
-                    {% if search_form.source == 'o' %}
+                    {% if search_form.source.value == 'o' or not request.GET.source %}
                         <div class="tab-pane" id="tab-federal-district">
                             <div class="span-23">
                                 {% for row in courts.district|rows:4 %}
