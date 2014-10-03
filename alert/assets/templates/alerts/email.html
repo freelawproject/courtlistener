@@ -19,7 +19,7 @@
 
         <hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 60%; height: .1em; margin: 0 0 1.45em; border: none;">
 
-        {% for alert, source, results in hits %}
+        {% for alert, type, results in hits %}
             {% for result in results %}
                 {% if forloop.first %}
                     <h2 style="font-size: 2em; font-weight: normal; font-family: inherit; color: #111; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;" class="alt bottom">
@@ -50,7 +50,7 @@
                         Our backup
                     </a>
                 </p>
-                {% if source == 'o' %}
+                {% if type == 'o' %}
                     <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
                         &hellip;{% for frag in result.solr_highlights.text %}
                            {{ frag|safe|underscore_to_space }}&hellip;

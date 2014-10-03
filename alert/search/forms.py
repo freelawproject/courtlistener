@@ -16,7 +16,7 @@ OPINION_ORDER_BY_CHOICES = (
     ('dateArgued asc',  'Oldest First'),
 )
 
-SOURCE_CHOICES = (
+TYPE_CHOICES = (
     ('o', 'Opinions'),
     ('oa', 'Oral Arguments'),
 )
@@ -56,7 +56,7 @@ def _clean_form(request, cd):
         mutable_get['filed_after'] = '%s-%02d-%02d' % \
                                      (after.year, after.month, after.day)
     mutable_get['order_by'] = cd['order_by']
-    mutable_get['source'] = cd['source']
+    mutable_get['type'] = cd['type']
 
     courts = Court.objects.filter(in_use=True).values(
         'pk', 'short_name', 'jurisdiction', 'has_oral_argument_scraper')
@@ -70,8 +70,8 @@ class SearchForm(forms.Form):
     #
     # Blended fields
     #
-    source = forms.ChoiceField(
-        choices=SOURCE_CHOICES,
+    type = forms.ChoiceField(
+        choices=TYPE_CHOICES,
         required=False,
         initial='o',
         widget=forms.RadioSelect(
@@ -273,20 +273,20 @@ class SearchForm(forms.Form):
 
     def clean_order_by(self):
         """Sets the default order_by value if one isn't provided by the user."""
-        if self.cleaned_data['source'] == 'o' or not \
-                self.cleaned_data['source']:
+        if self.cleaned_data['type'] == 'o' or not \
+                self.cleaned_data['type']:
             if not self.cleaned_data['order_by']:
                 return self.fields['order_by'].initial
-        elif self.cleaned_data['source'] == 'oa':
+        elif self.cleaned_data['type'] == 'oa':
             if not self.cleaned_data['order_by']:
                 return 'dateArgued desc'
         return self.cleaned_data['order_by']
 
-    def clean_source(self):
-        """Make sure that source has an initial value."""
-        if not self.cleaned_data['source']:
-            return self.fields['source'].initial
-        return self.cleaned_data['source']
+    def clean_type(self):
+        """Make sure that type has an initial value."""
+        if not self.cleaned_data['type']:
+            return self.fields['type'].initial
+        return self.cleaned_data['type']
 
     def clean(self):
         """

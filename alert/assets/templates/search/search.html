@@ -31,32 +31,32 @@
 
 {% block sidebar %}
     <div class="span-6 append-1 search-page" id="sidebar">
-        <div class="sidebar-section" id="source-switcher">
+        <div class="sidebar-section" id="type-switcher">
             <h3>
-                <label for="id_source_0" class="pointer
-                       {% if search_form.source.value == 'o' %}
+                <label for="id_type_0" class="pointer
+                       {% if search_form.type.value == 'o' %}
                             selected
                        {% endif %}">
-                    <input {% if search_form.source.value == 'o' %}
+                    <input {% if search_form.type.value == 'o' %}
                                 checked="checked"
                            {% endif %}
                            class="external-input hidden"
-                           id="id_source_0"
-                           name="source"
+                           id="id_type_0"
+                           name="type"
                            value="o"
                            type="radio">Opinions</label>
             </h3>
             <h3>
-                <label for="id_source_1" class="pointer
-                       {% if search_form.source.value == 'oa' %}
+                <label for="id_type_1" class="pointer
+                       {% if search_form.type.value == 'oa' %}
                            selected
                        {% endif %}">
-                    <input {% if search_form.source.value == 'oa' %}
+                    <input {% if search_form.type.value == 'oa' %}
                                checked="checked"
                            {% endif %}
                            class="external-input hidden"
-                           id="id_source_1"
-                           name="source"
+                           id="id_type_1"
+                           name="type"
                            value="oa"
                            type="radio">Oral Arguments</label>
             </h3>
@@ -90,7 +90,7 @@
 
                                 <p class="bottom span-6">{{ search_form.judge }}</p>
 
-                                {% if search_form.source.value == 'o' %}
+                                {% if search_form.type.value == 'o' %}
                                     <hr class="space">
                                     <h4 class="bottom">Precedential Status</h4>
                                     {% for status in status_facets %}
@@ -124,7 +124,7 @@
 
                                     <h4 class="bottom">Neutral Citation</h4>
                                     <p class="bottom">{{ search_form.neutral_cite }}</p>
-                                {% elif search_form.source.value == 'oa' %}
+                                {% elif search_form.type.value == 'oa' %}
                                     <h4 class="bottom">Argued After</h4>
                                     <p class="bottom span-6">{{ search_form.argued_after }}</p>
 
@@ -136,7 +136,7 @@
                                 <p class="bottom">{{ search_form.docket_number }}</p>
 
 
-                                {% if search_form.source.value == 'o' %}
+                                {% if search_form.type.value == 'o' %}
                                     <div class="span-5">
                                         {{ search_form.cited_gt }}
                                         {{ search_form.cited_lt }}
@@ -255,12 +255,12 @@
         {% if results.paginator.count > 0 %}
             <h2 id="result-count" class="bottom">
                 {{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }}
-                {% if search_form.source.value == 'o' %}
+                {% if search_form.type.value == 'o' %}
                     <a href="/feed/search/?{{ get_string }}">
                         <i class="gray fa fa-rss"
                            title="Subscribe to a feed of these results"></i>
                     </a>
-                {% elif search_form.source.value == 'oa' %}
+                {% elif search_form.type.value == 'oa' %}
                     <a href="/podcast/search/?{{ get_string }}">
                         <i class="gray fa fa-rss"
                            title="Subscribe to a podcast of these results"></i>

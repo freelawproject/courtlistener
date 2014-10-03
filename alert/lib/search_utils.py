@@ -273,7 +273,7 @@ def build_main_query(cd, highlight='all', order_by=''):
     }
 
     if str(main_params['sort']).startswith('score') and \
-            cd['source'] == 'o':
+            cd['type'] == 'o':
         main_params['boost'] = 'pagerank'
 
     # Give a boost on the case_name field if it's obviously a case_name query.
@@ -306,7 +306,7 @@ def build_main_query(cd, highlight='all', order_by=''):
             common_hlfl = ['text', 'caseName', 'judge', 'docketNumber',
                             'court_citation_string']
 
-            if cd['source'] == 'o':
+            if cd['type'] == 'o':
                 main_params.update({
                     'fl': ','.join(common_fl + ['status', 'dateFiled',
                                                  'citeCount']),
@@ -322,7 +322,7 @@ def build_main_query(cd, highlight='all', order_by=''):
                     'f.neutralCite.hl.alternateField': 'neutralCite',
                     'f.lexisCite.hl.alternateField': 'lexisCite',
                 })
-            elif cd['source'] == 'oa':
+            elif cd['type'] == 'oa':
                 main_params.update({
                     'fl': ','.join(common_fl + ['docket_id', 'dateArgued', 'duration']),
                     'hl.fl': ','.join(common_hlfl),
@@ -357,7 +357,7 @@ def build_main_query(cd, highlight='all', order_by=''):
     if cd['docket_number']:
         main_fq.append(make_fq(cd, 'docketNumber', 'docket_number'))
 
-    if cd['source'] == 'o':
+    if cd['type'] == 'o':
         if cd['citation']:
             main_fq.append(make_fq(cd, 'citation', 'citation'))
         if cd['neutral_cite']:
@@ -367,19 +367,19 @@ def build_main_query(cd, highlight='all', order_by=''):
         # Citation count
         cite_count_query = make_cite_count_query(cd)
         main_fq.append(cite_count_query)
-    elif cd['source'] == 'oa':
+    elif cd['type'] == 'oa':
         main_fq.append(make_date_query(cd['argued_before'], cd['argued_after']))
 
     # Facet filters
     selected_courts_string = get_selected_field_string(cd, 'court_')
-    if cd['source'] == 'o':
+    if cd['type'] == 'o':
         selected_stats_string = get_selected_field_string(cd, 'stat_')
         if len(selected_courts_string) + len(selected_stats_string) > 0:
             main_fq.extend([
                 '{!tag=dt}status_exact:(%s)' % selected_stats_string,
                 '{!tag=dt}court_exact:(%s)' % selected_courts_string
             ])
-    elif cd['source'] == 'oa':
+    elif cd['type'] == 'oa':
         if len(selected_courts_string) > 0:
             main_fq.extend([
                 '{!tag=dt}court_exact:(%s)' % selected_courts_string

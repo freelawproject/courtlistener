@@ -248,7 +248,7 @@
                 <h3>Latest Opinions&nbsp;<i class="gray fa fa-clock-o"></i></h3>
                 <p>We download opinions from many jurisdictions on an ongoing basis. Here are the most recent ones.
                 </p>
-                {% include "includes/search_result.html" with results=results source_override="o" simple=True %}
+                {% include "includes/search_result.html" with results=results type_override="o" simple=True %}
                 <div class="right">
                     <hr class="space">
                     <a href="/?order_by=dateFiled+desc">See all recent opinions&hellip;</a>
@@ -262,10 +262,10 @@
                 <p>We download oral arguments from many jurisdictions on an
                     ongoing basis. Here are the most recent ones.
                 </p>
-                {% include "includes/search_result.html" with results=results_oa source_override="oa" simple=True %}
+                {% include "includes/search_result.html" with results=results_oa type_override="oa" simple=True %}
                 <div class="right">
                     <hr class="space">
-                    <a href="/?order_by=dateArgued+desc&source=oa">See all recent
+                    <a href="/?order_by=dateArgued+desc&type=oa">See all recent
                         oral arguments&hellip;</a>
                 </div>
             </div>

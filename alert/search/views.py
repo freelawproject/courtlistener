@@ -26,7 +26,7 @@ from audio.models import Audio
 logger = logging.getLogger(__name__)
 
 
-def do_search(request, rows=20, order_by=None, source=None):
+def do_search(request, rows=20, order_by=None, type=None):
 
     # Bind the search form.
     search_form = SearchForm(request.GET)
@@ -35,18 +35,18 @@ def do_search(request, rows=20, order_by=None, source=None):
         # Allows an override by calling methods.
         if order_by:
             cd['order_by'] = order_by
-        if source:
-            cd['source'] = source
+        if type:
+            cd['type'] = type
         search_form = _clean_form(request, cd)
 
         try:
-            if cd['source'] == 'o':
+            if cd['type'] == 'o':
                 conn = sunburnt.SolrInterface(
                     settings.SOLR_OPINION_URL, mode='r')
                 stat_facet_fields = search_utils.place_facet_queries(cd, conn)
                 status_facets = search_utils.make_stats_variable(
                     stat_facet_fields, search_form)
-            elif cd['source'] == 'oa':
+            elif cd['type'] == 'oa':
                 conn = sunburnt.SolrInterface(
                     settings.SOLR_AUDIO_URL, mode='r')
                 status_facets = None
@@ -172,7 +172,7 @@ def show_results(request):
             # "Latest Cases" section
             render_dict.update(do_search(request, rows=5, order_by='dateFiled desc'))
             # Get the results from the oral arguments as well
-            oa_dict = do_search(request, rows=5, order_by='dateArgued desc', source='oa')
+            oa_dict = do_search(request, rows=5, order_by='dateArgued desc', type='oa')
             render_dict.update({'results_oa': oa_dict['results']})
             # But give it a fresh form for the advanced search section
             render_dict.update({'search_form': SearchForm(request.GET)})

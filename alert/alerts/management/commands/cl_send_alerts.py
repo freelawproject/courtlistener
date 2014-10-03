@@ -122,11 +122,11 @@ class Command(BaseCommand):
                     'hl.tag.post': '</strong></em>',
                     'caller': 'cl_send_alerts',
                 })
-                if cd['source'] == 'o':
+                if cd['type'] == 'o':
                     conn = sunburnt.SolrInterface(
                         settings.SOLR_OPINION_URL, mode='r'
                     )
-                elif cd['source'] == 'oa':
+                elif cd['type'] == 'oa':
                     conn = sunburnt.SolrInterface(
                         settings.SOLR_AUDIO_URL, mode='r'
                     )
@@ -148,7 +148,7 @@ class Command(BaseCommand):
         if self.verbosity >= 2:
             print "  The value of results is: %s" % results
 
-        return error, cd['source'], results,
+        return error, cd['type'], results,
 
     def emailer(self, ups, cut_off_date):
         """Send out an email to every user whose alert has a new hit for a
@@ -172,7 +172,7 @@ class Command(BaseCommand):
             hits = []
             # ...and iterate over their alerts.
             for alert in alerts:
-                error, source, results = self.run_query(alert, cut_off_date)
+                error, type, results = self.run_query(alert, cut_off_date)
                 if error:
                     continue
 
@@ -181,12 +181,12 @@ class Command(BaseCommand):
                 # [[alert1, [{hit1}, {hit2}, {hit3}]], [alert2, ...]]
                 try:
                     if len(results) > 0:
-                        hits.append([alert, source, results])
+                        hits.append([alert, type, results])
                         alert.lastHitDate = now()
                         alert.save()
                     elif len(results) == 0 and alert.sendNegativeAlert:
                         # if they want an alert even when no hits.
-                        hits.append([alert, source, None])
+                        hits.append([alert, type, None])
                         if self.verbosity >= 1:
                             print "  Sending results for negative alert '%s'" % \
                                   alert.alertName

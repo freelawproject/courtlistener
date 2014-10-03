@@ -6,12 +6,12 @@
     <h3 class="bottom serif">
         <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}" class="visitable">
             {{ result.solr_highlights.caseName.0|safe }}
-            ({% if result.docket.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{% if search_form.source.value == 'o' or source_override == 'o'%}{{ result.dateFiled|date:"Y" }}{% elif search_form.source.value == 'oa' or source_override == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
+            ({% if result.docket.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{% if search_form.type.value == 'o' or type_override == 'o'%}{{ result.dateFiled|date:"Y" }}{% elif search_form.type.value == 'oa' or type_override == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
         </a>
     </h3>
 
     <div class="bottom">
-        {% if search_form.source.value == 'o' or source_override == 'o' %}
+        {% if search_form.type.value == 'o' or type_override == 'o' %}
             <div class="inline nowrap">
                 <span class="meta-data-header">Date Filed:</span>
                 <time class="meta-data-value" datetime="{{ result.dateFiled|date:'Y-m-d' }}" pubdate>
@@ -22,7 +22,7 @@
                     {% endif %}
                 </time>
             </div>
-        {% elif search_form.source.value == 'oa' or source_override == 'oa' %}
+        {% elif search_form.type.value == 'oa' or type_override == 'oa' %}
             <div class="inline nowrap">
                 <span class="meta-data-header">Date Argued:</span>
                 <time class="meta-data-value"
@@ -35,7 +35,7 @@
                 </time>
             </div>
         {% endif %}
-        {% if search_form.source.value == 'o' or source_override == 'o' %}
+        {% if search_form.type.value == 'o' or type_override == 'o' %}
             <div class="inline nowrap">
                 <span class="meta-data-header">Status:</span>
                 <span class="meta-data-value">{{ result.status }}</span>
@@ -53,7 +53,7 @@
                 <span class="meta-data-value">{{ result.solr_highlights.docketNumber.0|safe }}</span>
             </div>
         {% endif %}
-        {% if search_form.source.value == 'oa' or source_override == 'oa' %}
+        {% if search_form.type.value == 'oa' or type_override == 'oa' %}
             <div class="inline nowrap">
                 <span class="meta-data-header">Duration:</span>
                 <span class="meta-data-value">{{ result.duration|naturalduration }} ({{ result.duration }}s</span>
@@ -67,7 +67,7 @@
                 <span class="meta-data-value">{{ result.solr_highlights.judge.0|safe }}</span>
             </div>
         {% endif %}
-        {% if search_form.source.value == 'o' or source_override == 'o' %}
+        {% if search_form.type.value == 'o' or type_override == 'o' %}
             {% if result.solr_highlights.suitNature.0 %}
                 <div class="inline nowrap">
                     <span class="meta-data-header">Nature of suit:</span>
@@ -80,7 +80,7 @@
             {% endif %}
         {% endif %}
     </div>
-    {% if search_form.source.value == 'o' or source_override == 'o' %}
+    {% if search_form.type.value == 'o' or type_override == 'o' %}
         {% if result.citeCount > 0 %}
             <div class="bottom" class="inline nowrap">
                 <span class="meta-data-value">
@@ -91,7 +91,7 @@
             </div>
         {% endif %}
     {% endif %}
-    {% if search_form.source.value == 'o' and simple != True %}
+    {% if search_form.type.value == 'o' and simple != True %}
         <p>
             {% if request.GET.q %}&hellip;{% endif %}{% for frag in result.solr_highlights.text %}
                 {{ frag|safe|underscore_to_space }}&hellip;

@@ -37,17 +37,17 @@ Sets up all the overrides or additional CSS that the site uses.
     transition: all 0.5s ease;
 }
 
-#source-switcher h3 {
+#type-switcher h3 {
     padding-bottom: 8px;
 }
-#source-switcher label{
+#type-switcher label{
     font-weight: normal;
 }
-#source-switcher .selected {
+#type-switcher .selected {
     border-bottom: 3px solid #ae0b0b;
     color: #111;
 }
-#source-switcher label {
+#type-switcher label {
     color: gray;
     text-decoration: none;
     border-bottom: none;

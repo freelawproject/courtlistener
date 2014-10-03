@@ -355,18 +355,18 @@ class SolrList(object):
     queried.
     """
 
-    def __init__(self, main_query, offset, limit, source, length=None):
+    def __init__(self, main_query, offset, limit, type, length=None):
         super(SolrList, self).__init__()
         self.main_query = main_query
         self.offset = offset
         self.limit = limit
         self.length = length
-        self.source = source
+        self.type = type
         self._item_cache = []
-        if self.source == 'o':
+        if self.type == 'o':
             self.conn = sunburnt.SolrInterface(
                 settings.SOLR_OPINION_URL, mode='r')
-        elif self.source == 'oa':
+        elif self.type == 'oa':
             self.conn = sunburnt.SolrInterface(
                 settings.SOLR_AUDIO_URL, mode='r')
 
@@ -630,7 +630,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
             main_query=main_query,
             offset=request.GET.get('offset', 0),
             limit=request.GET.get('limit', 20),
-            source=kwargs['cd']['source']
+            type=kwargs['cd']['type']
         )
         return sl
 

@@ -106,7 +106,7 @@ $(document).ready(function() {
         // is defined by the label that is .selected). This is needed because
         // the "wrong" value will be selected after a user presses the back
         // button in their browser.
-        $('#source-switcher .selected input').prop("checked", true);
+        $('#type-switcher .selected input').prop("checked", true);
 
         document.location = makeSearchPath(false);
     });
@@ -139,7 +139,7 @@ $(document).ready(function() {
     //////////////////////////
     // Source Tab Switching //
     //////////////////////////
-    $('#source-switcher label:not(.selected) input[name=source]').click(function () {
+    $('#type-switcher label:not(.selected) input[name=type]').click(function () {
         // Note that we can't do submit here, because that'd trigger a
         // switching of the the checked radio button, and nothing would happen.
         document.location = makeSearchPath(true);
@@ -285,7 +285,7 @@ $(document).ready(function() {
                     'jurisdiction, the Supreme Court.'
             },
             {//4
-                target: '#source-switcher',
+                target: '#type-switcher',
                 placement: 'right',
                 arrowOffset: 'top',
                 title: 'What are you Looking For?',

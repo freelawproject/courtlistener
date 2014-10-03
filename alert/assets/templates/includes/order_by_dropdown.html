@@ -10,7 +10,7 @@
                 {% if search_form.order_by.value == "score desc" %}
                     selected="selected"
                 {% endif %}>Relevance</option>
-    {% if request.GET.source == 'o' or not request.GET.source %}
+    {% if request.GET.type == 'o' or not request.GET.type %}
         <option value="dateFiled desc"
                 {% if search_form.order_by.value == "dateFiled desc" %}
                     selected="selected"
@@ -27,7 +27,7 @@
                 {% if search_form.order_by.value == "citeCount asc" %}
                     selected="selected"
                 {% endif %}>Least Cited First</option>
-    {% elif request.GET.source == 'oa' %}
+    {% elif request.GET.type == 'oa' %}
         <option value="dateArgued desc"
                 {% if search_form.order_by.value == "dateArgued desc" %}
                     selected="selected"
