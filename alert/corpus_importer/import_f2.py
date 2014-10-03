@@ -125,7 +125,7 @@ def exceptional_cleaner(caseName):
 
 
 def scrape_and_parse():
-    """Traverses the dumps from resource.org, and puts them in the DB.
+    """Traverses the bulk data from resource.org, and puts them in the DB.
 
     Probably lots of ways to go about this, but I think the easiest will be the following:
      - look at the index page of all volumes, and follow all the links it has.

@@ -157,8 +157,8 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = (os.path.join(INSTALL_ROOT, 'alert/assets/static-global/'),)
 STATIC_ROOT = os.path.join(INSTALL_ROOT, 'alert/assets/static/')  # This is where things get collected to
 
-# Where should the data dumps be stored?
-DUMP_DIR = os.path.join(INSTALL_ROOT, 'alert/assets/media/bulk-data/')
+# Where should the bulk data be stored?
+BULK_DATA_DIR = os.path.join(INSTALL_ROOT, 'alert/assets/media/bulk-data/')
 
 TEMPLATE_DIRS = (
     # Don't forget to use absolute paths, not relative paths.

@@ -1,5 +1,5 @@
 from alert.api.views import (
-    court_index, documentation_index, dump_index, rest_index,
+    court_index, documentation_index, bulk_data_index, rest_index,
     serve_pagerank_file, coverage_data
 )
 
@@ -11,7 +11,7 @@ urlpatterns = patterns('',
     (r'^api/$', documentation_index),
     (r'^api/jurisdictions/$', court_index),
     (r'^api/rest-info/$', rest_index),
-    (r'^api/bulk-info/$', dump_index),
+    (r'^api/bulk-info/$', bulk_data_index),
 
     # Pagerank file
     (r'^api/bulk/external_pagerank/$', serve_pagerank_file),

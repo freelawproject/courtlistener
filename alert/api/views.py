@@ -83,21 +83,21 @@ def documentation_index(request):
                               RequestContext(request))
 
 
-def dump_index(request):
+def bulk_data_index(request):
     """Shows an index page for the dumps."""
     courts = make_court_variable()
     court_count = len(courts)
     try:
-        dump_size = size(os.path.getsize(
-            os.path.join(settings.DUMP_DIR, 'all.xml.gz')))
+        bulk_data_size = size(os.path.getsize(
+            os.path.join(settings.BULK_DATA_DIR, 'all.xml.gz')))
     except os.error:
         # Happens when the file is inaccessible or doesn't exist. An estimate.
-        dump_size = 'about 13GB'
+        bulk_data_size = 'about 13GB'
     return render_to_response(
         'api/bulk-data.html',
         {'court_count': court_count,
          'courts': courts,
-         'dump_size': dump_size,
+         'bulk_data_size': bulk_data_size,
          'private': False},
         RequestContext(request)
     )
@@ -105,12 +105,12 @@ def dump_index(request):
 
 def serve_pagerank_file(request):
     """Find the pagerank file by interrogating Solr, then serve it up."""
-    file_loc = settings.DUMP_DIR + "external_pagerank"
+    file_loc = settings.BULK_DATA_DIR + "external_pagerank"
     file_name = file_loc.split('/')[-1]
     try:
         mimetype = magic.from_file(file_loc, mime=True)
     except IOError:
-        raise Http404('Unable to locate external_pagerank file in %s' % settings.DUMP_DIR)
+        raise Http404('Unable to locate external_pagerank file in %s' % settings.BULK_DATA_DIR)
     response = HttpResponse()
     response['X-Sendfile'] = os.path.join(file_loc)
     response['Content-Disposition'] = 'attachment; filename="%s"' % file_name.encode('utf-8')

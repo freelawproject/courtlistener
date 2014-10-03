@@ -48,10 +48,10 @@ class Command(BaseCommand):
         """Swap out new archives for the old."""
         self.stdout.write(' - Swapping in the new %s archives...\n'
                           % obj_type_str)
-        mkdir_p(os.path.join(settings.DUMP_DIR, '%s' % obj_type_str))
+        mkdir_p(os.path.join(settings.BULK_DATA_DIR, '%s' % obj_type_str))
         for f in os.listdir('/tmp/bulk/%s' % obj_type_str):
             shutil.move('/tmp/bulk/%s/%s' % (obj_type_str, f),
-                        os.path.join(settings.DUMP_DIR, '%s' % obj_type_str, f))
+                        os.path.join(settings.BULK_DATA_DIR, '%s' % obj_type_str, f))
 
     def make_archive(self, obj_type_str, obj_type, api_resource_obj):
         """Generate compressed archives containing the contents of an object

@@ -786,7 +786,7 @@ def main():
     parser.add_argument('-s', '--simulate', default=False, required=False, action='store_true',
                         help='Run the code in simulate mode, making no permanent changes.')
     parser.add_argument('-d', '--dir', type=readable_dir,
-                        help='The directory where the lawbox dump can be found.')
+                        help='The directory where the lawbox bulk data can be found.')
     parser.add_argument('-f', '--file', type=str, default="index.txt", required=False, dest="file_name",
                         help="The file that has all the URLs to import, one per line.")
     parser.add_argument('-l', '--line', type=int, default=1, required=False,
