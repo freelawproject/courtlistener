@@ -33,7 +33,7 @@
               Mercurial, RabbitMQ, requests, sunburnt, titlecase
         Display: Silk icons, Blueprint CSS
         Infrastructure: Apache2, Linux, Postgres, Solr
-  Source: https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/overview
+  Source: https://github.com/freelawproject/courtlistener/
 
 
 
