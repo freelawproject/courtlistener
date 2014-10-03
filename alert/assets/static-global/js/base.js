@@ -233,9 +233,11 @@ $(document).ready(function() {
                 placement: 'bottom',
                 xOffset: 'center',
                 arrowOffset: 'center',
-                title: 'Welcome to the tour!',
-                content: 'Broad queries can be a great way to start a research task. Our search box can understand ' +
-                    'everything you might expect...terms, concepts, citations, you name it.',
+                title: 'Welcome to the Tour!',
+                content: 'Broad queries can be a great way to start a ' +
+                    'research task. Our search box can understand ' +
+                    'everything you might expect...terms, concepts, ' +
+                    'citations, you name it.',
                 // If the advanced page is already shown, we skip to step 2.
                 onNext: function(){
                     if (!$('#advanced-search-starter').is(":visible")){
@@ -249,8 +251,9 @@ $(document).ready(function() {
                 xOffset: 'center',
                 arrowOffset: 'center',
                 nextOnTargetClick: true,
-                title: 'More power please!',
-                content: "If you are the kind of person that wants more power, you'll love the advanced search box. " +
+                title: 'More Power Please!',
+                content: "If you are the kind of person that wants more " +
+                    "power, you'll love the advanced search box. " +
                     "Click on \"Advanced Search\" to turn it on.",
                 onNext: function(){
                     showAdvancedHomepage();
@@ -261,48 +264,67 @@ $(document).ready(function() {
                 placement: 'right',
                 arrowOffset: 'center',
                 title: "Sophisticated Search",
-                content: "In the Advanced Search area, you can make sophisticated searches against many fields. " +
+                content: "In the Advanced Search area, you can make " +
+                    "sophisticated searches against many fields. " +
                     "Press \"Next\" and we'll make a query for you.",
                 multipage: true,
+                showPrevButton: false,
                 onNext: function(){
                     window.location = '/?q=roe+v.+wade&order_by=score+desc&stat_Precedential=on&court=scotus';
                 }
             },
             {//3
+                // This step will be skipped if on a dev machine with no
+                // results. Be not alarmed!
                 target: document.querySelector('.search-page article'),
                 placement: 'top',
                 arrowOffset: 'center',
                 title: 'Detailed Results',
-                content: 'Here you can see the results for the query "Roe v. Wade" sorted by relevance and filtered to ' +
-                    'only one jurisdiction, the Supreme Court.'
+                content: 'Here you can see the results for the query "Roe ' +
+                    'v. Wade" sorted by relevance and filtered to only one ' +
+                    'jurisdiction, the Supreme Court.'
             },
             {//4
+                target: '#source-switcher',
+                placement: 'right',
+                arrowOffset: 'top',
+                title: 'What are you Looking For?',
+                content: 'By default you\'ll get opinion results, but use ' +
+                    'this to work with oral arguments instead.'
+            },
+            {//5
                 target: '#create-alert-header',
                 placement: 'right',
                 arrowOffset: 'center',
-                title: 'Make alerts',
-                content: '<p>Once you have placed a query, you can create an alert. If there are ever any new results for ' +
-                    'your query, CourtListener will send you an email.</p> <p>Hit next to check out Roe v. Wade.</p>',
+                title: 'Make Alerts',
+                content: '<p>Once you have placed a query, you can create ' +
+                    'an alert. If there are ever any new results for your ' +
+                    'query, CourtListener will send you an email to keep ' +
+                    'you up to date.</p> <p>Hit next to check out <em>Roe ' +
+                    'v. Wade</em>.</p>',
                 multipage: true,
                 onNext: function(){
-                    window.location = '/scotus/yjn/roe-v-wade/';
+                    window.location = '/opinion/108713/roe-v-wade/';
                 }
             },
-            {//5
+            {//6
                 target: '#cited-by',
                 placement: 'right',
                 arrowOffset: 'center',
                 title: 'The Power of Citation',
-                content: 'Roe v. Wade has been cited hundreds of times since it was issued in 1973. Looking at these ' +
-                    'citations can be a good way to see related cases.'
+                content: 'Roe v. Wade has been cited hundreds of times since ' +
+                    'it was issued in 1973. Looking at these citations can ' +
+                    'be a good way to see related cases.'
             },
-            {//6
+            {//7
                 target: '#authorities',
                 placement: 'right',
                 arrowOffset: 'center',
                 title: 'Authorities',
-                content: '<p>The Authorities section lists all of the opinions that Roe v. Wade references. These can be ' +
-                    'thought of as the principles it rests on.</p><p>That\'s everything for now! Let us know if ' +
+                content: '<p>The Authorities section lists all of the ' +
+                    'opinions that Roe v. Wade references. These can be ' +
+                    'thought of as the principles it rests on.</p>' +
+                    '<p>That\'s everything for now! Let us know if ' +
                     'you have any questions.</p>',
                 onNext: function(){
                     hopscotch.endTour();
@@ -327,7 +349,7 @@ $(document).ready(function() {
     if (hopscotch.getState() === "feature-tour:3") {
         hopscotch.startTour(tour);
     }
-    if (hopscotch.getState() === "feature-tour:5") {
+    if (hopscotch.getState() === "feature-tour:6") {
         hopscotch.startTour(tour);
     }
 });
