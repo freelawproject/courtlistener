@@ -1,24 +1,18 @@
 import logging
-import re
-import time
 
 from alert import settings
+from alert.lib.api import DeprecatedModelResourceWithFieldsFilter, \
+    BasicAuthenticationWithUser, PerUserCacheThrottle
 from alert.lib.search_utils import build_main_query
-from alert.lib.string_utils import filter_invalid_XML_chars
-from alert.lib.sunburnt import sunburnt, SolrError
+from alert.lib.sunburnt import sunburnt
 from alert.search import forms
 from alert.search.models import Citation, Court, Document, SOURCES, \
     DOCUMENT_STATUSES
-from alert.stats import tally_stat
 
-from django.core.cache import cache
-from lxml import etree
-from tastypie import fields, http
+from tastypie import fields
 from tastypie import authentication
 from tastypie.constants import ALL
 from tastypie.exceptions import BadRequest
-from tastypie.resources import ModelResource
-from tastypie.throttle import CacheThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -28,123 +22,7 @@ good_date_filters = good_time_filters[:-3]
 numerical_filters = ('exact', 'gte', 'gt', 'lte', 'lt', 'range',)
 
 
-class BasicAuthenticationWithUser(authentication.BasicAuthentication):
-    """Wraps the BasicAuthentication class, changing the get_identifier method
-    to provide the username instead of essentially nothing.
-
-    Proposed this change in: https://github.com/toastdriven/django-tastypie/pull/1085/commits
-    """
-
-    def __init__(self, backend=None, realm='django-tastypie', **kwargs):
-        super(BasicAuthenticationWithUser, self).__init__(backend, realm,
-                                                          **kwargs)
-
-    def get_identifier(self, request):
-        return request.META.get('REMOTE_USER', request.user.username)
-
-
-class ModelResourceWithFieldsFilter(ModelResource):
-    def __init__(self, tally_name=None):
-        super(ModelResourceWithFieldsFilter, self).__init__()
-        self.tally_name = tally_name
-
-    def _handle_500(self, request, exception):
-        # Note that this will only be run if DEBUG=False
-        if isinstance(exception, SolrError):
-            solr_status_code = exception[0]['status']
-            error_xml = etree.fromstring(exception[1])
-            solr_msg = error_xml.xpath(
-                '//lst[@name = "error"]/str[@name = "msg"]/text()')[0]
-            data = {
-                'error_message': "SolrError raised while interpreting your query.",
-                'solr_status_code': solr_status_code,
-                'solr_msg': solr_msg,
-            }
-            return self.error_response(
-                request,
-                data,
-                response_class=http.HttpApplicationError
-            )
-        else:
-            return super(ModelResourceWithFieldsFilter, self)._handle_500(
-                request, exception)
-
-    def alter_list_data_to_serialize(self, request, data):
-        # Add a request_uri field
-        data['meta']['request_uri'] = request.get_full_path()
-
-        return data
-
-    def full_dehydrate(self, bundle, *args, **kwargs):
-        bundle = super(ModelResourceWithFieldsFilter, self).full_dehydrate(
-            bundle, *args, **kwargs)
-        # bundle.obj[0]._data['citeCount'] = 0
-        fields = bundle.request.GET.get("fields", "")
-        if fields:
-            fields_list = re.split(',|__', fields)
-            new_data = {}
-            for k in fields_list:
-                if k in bundle.data:
-                    new_data[k] = bundle.data[k]
-            bundle.data = new_data
-        return bundle
-
-    def dehydrate(self, bundle):
-        # Strip invalid XML chars before serializing
-        for k, v in bundle.data.iteritems():
-            bundle.data[k] = filter_invalid_XML_chars(v)
-        return bundle
-
-    def dispatch(self, request_type, request, **kwargs):
-        """Simple override here to tally stats before sending off the results."""
-        tally_stat(self.tally_name)
-        return super(ModelResourceWithFieldsFilter, self).dispatch(
-            request_type, request, **kwargs)
-
-
-class PerUserCacheThrottle(CacheThrottle):
-    """Sets up higher throttles for specific users"""
-    custom_throttles = {
-        'scout': 10000,
-        'scout_test': 10000,
-        'mlissner': 1e9,  # A billion because I made this.
-    }
-
-    def should_be_throttled(self, identifier, **kwargs):
-        """
-        Lightly edits the inherited method to add an additional check of the
-        `custom_throttles` variable.
-
-        Returns whether or not the user has exceeded their throttle limit.
-
-        Maintains a list of timestamps when the user accessed the api within
-        the cache.
-
-        Returns ``False`` if the user should NOT be throttled or ``True`` if
-        the user should be throttled.
-        """
-        key = self.convert_identifier_to_key(identifier)
-
-        # Make sure something is there.
-        cache.add(key, [])
-
-        # Weed out anything older than the timeframe.
-        minimum_time = int(time.time()) - int(self.timeframe)
-        times_accessed = [access for access in cache.get(key) if
-                          access >= minimum_time]
-        cache.set(key, times_accessed, self.expiration)
-
-        throttle_at = self.custom_throttles.get(identifier,
-                                                int(self.throttle_at))
-        if len(times_accessed) >= throttle_at:
-            # Throttle them.
-            return True
-
-        # Let them through.
-        return False
-
-
-class CourtResource(ModelResourceWithFieldsFilter):
+class CourtResource(DeprecatedModelResourceWithFieldsFilter):
     has_scraper = fields.BooleanField(
         attribute='has_opinion_scraper',
         help_text='Whether the jurisdiction has a scraper that obtains opinions automatically.'
@@ -177,7 +55,7 @@ class CourtResource(ModelResourceWithFieldsFilter):
         excludes = ['has_opinion_scraper', 'has_oral_argument_scraper']
 
 
-class CitationResource(ModelResourceWithFieldsFilter):
+class CitationResource(DeprecatedModelResourceWithFieldsFilter):
     opinion_uris = fields.ToManyField('search.api.DocumentResource',
                                       'parent_documents')
 
@@ -191,7 +69,7 @@ class CitationResource(ModelResourceWithFieldsFilter):
         excludes = ['slug', ]
 
 
-class DocumentResource(ModelResourceWithFieldsFilter):
+class DocumentResource(DeprecatedModelResourceWithFieldsFilter):
     citation = fields.ForeignKey(
         CitationResource,
         'citation',
@@ -262,7 +140,7 @@ class DocumentResource(ModelResourceWithFieldsFilter):
                     'date_blocked']
 
 
-class CitedByResource(ModelResourceWithFieldsFilter):
+class CitedByResource(DeprecatedModelResourceWithFieldsFilter):
     citation = fields.ForeignKey(
         CitationResource,
         'citation',
@@ -331,7 +209,7 @@ class CitedByResource(ModelResourceWithFieldsFilter):
             return ''
 
 
-class CitesResource(ModelResourceWithFieldsFilter):
+class CitesResource(DeprecatedModelResourceWithFieldsFilter):
     citation = fields.ForeignKey(
         CitationResource,
         'citation',
@@ -479,7 +357,7 @@ class SolrObject(object):
         return self._data
 
 
-class SearchResource(ModelResourceWithFieldsFilter):
+class SearchResource(DeprecatedModelResourceWithFieldsFilter):
     # Roses to the clever person that makes this introspect the model and removes all this code.
     absolute_url = fields.CharField(
         attribute='absolute_url',

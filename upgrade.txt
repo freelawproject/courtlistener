@@ -80,7 +80,8 @@ We welcome a conversion of these notes to a better process using Fabric.
       day of every month.
     + favorites should work for alerts?
     + robots.txt blocking for bulk files
-    - update the tour to show off oral args
+    + update the tour to show off oral args
+    - add docket information to opinion results
 
   API Changes:
    - /api/rest-info/ makes reference to a number of API calls that go to v1.
@@ -90,6 +91,12 @@ We welcome a conversion of these notes to a better process using Fabric.
      is a new field, has_oral_argument_scraper.
    - V2 needs to be updated to serve Docket objects.
    - V2 needs to support searching by oral args or opinions
+   - update search schema
+   - docket added as endpoint
+   - docket integrated into audio and document endpoints
+        - If docket is not integrated completely (if only a reference is
+          provided) need to figure out how dockets are provided in the bulk
+          data system.
 
   Deployment:
   - Install new dependencies (see above)
@@ -123,6 +130,8 @@ We welcome a conversion of these notes to a better process using Fabric.
       sudo git clone https://github.com/freelawproject/seal-rookery /usr/local/seal_rookery
       sudo ln -s /usr/local/seal_rookery /usr/lib/python2.7/dist-packages/seal_rookery
 
+  - absolute_urls have changed throughout, necessatating a complete re-index
+    for links in search results to work without redirects.
   - Bulk files have been rewritten and require some new tweaks:
         - Update cron to generate bulk files on the last day of each month,
           using something like the following:
@@ -140,12 +149,6 @@ We welcome a conversion of these notes to a better process using Fabric.
         - Delete any old bulk files located at
           $INSTALL_ROOT/alert/assets/media/dumps
 
-
-
-  Later:
-  - favorites cannot be created correctly for some reason
-  - Why doesn't the button in the admin site work? It should use
-    get_absolute_url of Document, but it fails weirdly.
 
 2014-06-18:
  - This update makes alert editing a lot more intuitive.

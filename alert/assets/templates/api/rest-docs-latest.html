@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}REST API - CourtListener.com{% endblock %}
+{% block title %}REST API, v2 - CourtListener.com{% endblock %}
 {% block search-form %}{% endblock %}
 
 {% block sidebar %}{% endblock %}
@@ -35,6 +35,11 @@
         </p>
         <img src="{{ STATIC_PREFIX }}png/schema-design.png" height="276" width="470">
 
+        <p class="alt">(A more detailed version of this diagram <a
+                href="http://lists.freelawproject.org/pipermail/dev/2014-September/000084.html">was
+            posted to our developer mailing list</a>.)
+        </p>
+
         <p>The basic ideas are:</p>
         <ul>
             <li>Each Audio file and each Document are associated with a Docket, and each Docket can have many Documents
@@ -50,6 +55,7 @@
         <p>
             This section explains general principles of the API and rules that apply to all of our RESTful endpoints.
         </p>
+
 
 
         <h4>Authentication</h4>
@@ -83,11 +89,12 @@
         </p>
 
 
+
         <h4>Serialization Formats</h4>
         <p>
             With the exception of the coverage endpoint (which is only available as JSON), requests may be serialized
             as JSON, JSONP, or XML, with JSON as the default. The format you wish to receive may be requested via the
-            HTTP Accept header or via the <code>format</code> GET parameter.
+            HTTP <code>Accept</code> header or via the <code>format</code> GET parameter.
         </p>
         <p>
             Note that because your browser prioritizes <code>application/xml</code> over <code>application/json</code>,
@@ -113,6 +120,7 @@
         </blockquote>
 
 
+
         <h4>Views, Pagination and Subset Selection</h4>
         <p>
             Each endpoint provides a list view, a detail view and a set view. The <em>list</em> view is what you see
@@ -133,6 +141,9 @@
         <p>
             Note that we use quotation marks in this query in order to escape shell interpretation of the semicolons.
         </p>
+
+
+
         <h4>Filtering</h4>
         <p>
             With the exception of the coverage endpoint, each endpoint can be filtered in various ways, as
@@ -146,20 +157,28 @@
             Field lookups can be used by appending them to a field with a double underscore as a separator (examples
             are below in the documentation for various endpoints).
         </p>
+
+
+
         <h4>Ordering</h4>
         <p>
             With the exception of the coverage endpoint, ordering can be done on fields defined in the <em>ordering</em>
             section of an endpoint's schema. Ordering is done using the <code>order_by</code> GET parameter, with
             descending ordering available by prepending the minus sign (e.g. <code>order_by=-date_modified</code>).
             However, because the <em>search</em> endpoint uses Solr for its backend, ordering is instead done using
-            the <code>asc</code> and <code>desc</code>, as described in detail below.
+            the <code>asc</code> and <code>desc</code>, as described in detail below. This allows the URLs used for
+            the search endpoint to match those used in front-end queries.
         </p>
+
+
+
         <h4>Field Selection</h4>
         <p>
             To save bandwidth and speed up your queries, fields can be limited by using the <code>fields</code> GET
-            parameter with a comma-separated list of fields you wish to receive. For example, if you wish to only
-            receive the <code>resource_uri</code> and <code>absolute_url</code> fields from the <code>document</code>
-            endpoint you could do so with:
+            parameter with a comma-separated list of fields you wish to receive.
+        </p>
+        <p>For example, if you wish to only receive the <code>resource_uri</code> and <code>absolute_url</code>
+            fields from the <code>document</code> endpoint you could do so with:
         </p>
         <blockquote>
             <code>curl https://www.courtlistener.com/api/rest/v2/document/?<strong>fields=absolute_url,resource_uri</strong></code>
@@ -175,9 +194,11 @@
             <code>curl https://www.courtlistener.com/api/rest/v2/document/?<strong>fields=citation__federal_cite_one</strong></code>
         </blockquote>
         <p>
-            Using the <code>fields</code> parameter in these ways could save you time and bandwidth if you are making
+            Using the <code>fields</code> parameter in these ways could save us time and bandwidth if you are making
             many requests.
         </p>
+
+
 
         <h4>Limitations</h4>
         <p>
@@ -194,12 +215,15 @@
             <code>curl https://www.courtlistener.com/api/rest/v2/jurisdiction/?<strong>limit=50</strong></code>
         </blockquote>
 
-        <h4>Date Formats</h4>
 
+
+        <h4>Date Formats</h4>
         <p>
             As <a href="http://xkcd.com/1179/">required</a>, all date formats are set to
             <a href="http://en.wikipedia.org/wiki/ISO_8601">ISO-8601 format</a>.
         </p>
+
+
 
         <h4>The <code>absolute_url</code> Field</h4>
         <p>
@@ -222,15 +246,20 @@
                 "opinion" indicates that you have gotten an opinion as your result.
             </li>
             <li>
-                <strong>$numeric-id</strong>: This is a numreic representation of the ID for the document. This value
-                increments as we add content to the system.
+                <strong>$numeric-id</strong>: This is a numeric representation of the ID for the document. This value
+                increments as we add content to the system. Note that due to deletions and modifications the numeric
+                IDs are not guaranteed to be purely sequential &ndash; IDs will be missing.
             </li>
             <li>
-                <strong>$name-of-the-case</strong>: This is the "slug" of the document, and generally mirrors its
-                case name. This value can change if we clean up a case name, but provided it is not omitted completely,
-                this part of the URL can be any value without ever affecting the page that is loaded.
+                <strong>$name-of-the-case</strong>: This is the "<a
+                    href="https://en.wikipedia.org/wiki/Slug_%28publishing%29">slug</a>" of the document, and
+                generally mirrors its case name. This value can change if we clean up a case name, but provided
+                it is not omitted completely, this part of the URL can be any value without ever affecting the
+                page that is loaded.
             </li>
         </ol>
+
+
 
         <h4>IDs and SHA1 Sums</h4>
         <p>
@@ -242,8 +271,8 @@
             <code>curl https://www.courtlistener.com/api/rest/v2/<strong>document</strong>/111170/</code>
         </blockquote>
         <p>
-            Returns <em><a href="/opinion/111170/strickland-v-washington/">Strickland v. Washington</a></em>. But this does
-            not:
+            Returns <em><a href="/opinion/111170/strickland-v-washington/">Strickland v. Washington</a></em>. But this
+            does not:
         </p>
         <blockquote>
             <code>curl https://www.courtlistener.com/api/rest/v2/<strong>citation</strong>/111170/</code>
@@ -257,16 +286,19 @@
             <code>https://www.courtlistener.com/api/rest/v2/search/?q=a2daab35251795fc2621c6ac46b6031c95a4e0ba</code>
         </blockquote>
 
+
+
         <h4>Upgrades and Fixes</h4>
         <p>
             Like the rest of the CourtListener platform, this API and its documentation are
-            <a href="https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/src/tip/alert/search/api.py?at=default">open
-            source</a>. If it lacks functionality that you desire or if you find
-            <a href="https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/src/tip/alert/assets/templates/api/rest-docs.html?at=default">these
+            <a href="https://github.com/freelawproject/courtlistener/tree/master/alert/search/api2.py">open
+                source</a>. If it lacks functionality that you desire or if you find
+            <a href="https://github.com/freelawproject/courtlistener/tree/master/alert/assets/templates/api">these
             notes</a> lacking, pull requests providing improvements are very welcome. Just get in touch in
             <a href="http://lists.freelawproject.org/cgi-bin/mailman/listinfo/dev">our developer forum</a> to discuss
-            your ideas or, hey, go ahead and send us a pull request.
+            your ideas or, if it's a quick thing, just go ahead and send us a pull request.
         </p>
+
 
 
         <h3 id="document-endpoint">/api/rest/v2/document/</h3>
@@ -317,6 +349,20 @@
         </p>
 
 
+
+        <h3 id="audio-endpoint">/api/rest/v2/audio/</h3>
+        <p>
+            The <code>audio</code> endpoint is modeled after the <code>document</code> endpoint and has very similar behavior, except
+            instead of serving documents, it currently serves oral arguments and may later serve other similar audio files. As with the
+            document endpoint, it can be filtered and ordered by various fields as described in its <a
+                href="/api/rest/v2/audio/schema/">schema document</a>.
+        </p>
+        <p>
+            Aside from these few notes, the <code>audio</code> endpoint should be very familiar and should have no surprises.
+        </p>
+
+
+
         <h3 id='cites-endpoint'>/api/rest/v2/cites/ <span class="alt bold">and</span> /api/rest/v2/cited-by/</h3>
         <p>
             These endpoints provide interfaces into the citation graph that CourtListener provides between documents.
@@ -325,10 +371,10 @@
             thought of as compliments, though the results can be dramatically different. For example, a very important
             document, <em><a href="/opinion/111170/strickland-v-washington/">Strickland v.
             Washington</a></em>, has been cited thousands of times (<code>cited-by</code>), however no document cites
-            thousands of other documents.
+            thousands of other documents (looking in the database, it appears the limit is around 400 authorities).
         </p>
         <p>
-            These endpoints only provide limited functionality. They cannot be filtered or ordered, and they do not
+            These endpoints only provide limited functionality. They cannot be filtered or ordered and they do not
             provide a detail or set view. To use these endpoints, provide the ID of the document you wish to
             analyze, like so:
         </p>
@@ -343,9 +389,11 @@
             The <code>id</code> parameter is required.
         </p>
 
+
+
         <h3 id="citation-endpoint">/api/rest/v2/citation/</h3>
         <p>
-            This endpoint is integrated into the <code>/document/</code> endpoint and is also available individually.
+            This endpoint is integrated into the <code>document</code> endpoint and is also available individually.
             This endpoint provides each of the many citations that an opinion can have. Since opinions are often included
             in several written reporters, there are fields in this model for numerous
             <a href="http://legalresearchprinciples.pbworks.com/w/page/16129937/Parallel%20Citations">parallel
@@ -377,8 +425,9 @@
             recommend the <a href="#search-endpoint">search endpoint</a>. For instance, when you know a citation and
             want to see what information we have about it, try something like:
             <a href="https://www.courtlistener.com/api/rest/v2/search/?citation=101 U.S. 99">https://www.courtlistener.com/api/rest/v2/search/?citation=101 U.S. 99</a>.
-
         </p>
+
+
 
         <h3 id="jurisdiction-endpoint">/api/rest/v2/jurisdiction/</h3>
         <p>
@@ -390,10 +439,16 @@
             <a href="/api/rest/v2/jurisdiction/schema/">schema</a>. Brief descriptions of the fields can be found there
             as well.
         </p>
+        <p>
+            Over time this endpoint will contain more and more information about jurisdictions such as the address
+            of the courthouses and other such information. We welcome contributions in this area.
+        </p>
+
+
 
         <h3 id="search-endpoint">/api/rest/v2/search/</h3>
         <p>
-            This endpoint allows you to query our search engine along the same lines as is possible in our front end.
+            This endpoint allows you to query our search engine in a similar manner as is possible in our front end.
             Because this endpoint does not use the Django models directly, this endpoint is quite different than the
             others. Several differences should be noted.
         </p>
@@ -401,19 +456,31 @@
             First, the fields and results from this endpoint are slightly different than those in the other endpoints.
             For example, instead of using a minus sign to flip ordering, it uses <code>asc</code> and <code>desc</code>.
             And instead of the <code>court</code> field returning a reference to the <code>jurisdiction</code> endpoint,
-            it provides the name of the jurisdiction where the document was issued. (See
-            <a href="/api/rest/v2/search/schema/">the schema</a> and the notes below for all of the ordering options
+            it provides the name of the jurisdiction where the document was issued. (See <a
+                href="/api/rest/v2/search/schema/">the schema</a> and the notes below for all of the ordering options
             and field information).
         </p>
         <p>
-            Similarly, since this endpoint hits against a Solr search index instead of a database, the filtering works
-            slightly differently. To filter on this endpoint, we recommend identifying an effective query on the front
-            end that generates the results you desire. Using that query (and variations thereof), it is possible to
-            easily apply it to this endpoint.
+            A peculiarity of this endpoint is that, like the front end, it serves both <code>audio</code> and
+            <code>document</code> results, depending on the value of the <code>type</code> argument. These results have
+            many overlapping fields, so, for example if you get back the field <code>download_url</code> and the
+            <code>type</code> is set to <code>o</code> (opinions):
+        </p>
+        <blockquote>
+            <code>curl https://www.courtlistener.com/api/rest/v2/search/?<strong>type=o</strong></code>
+        </blockquote>
+        <p>
+            &hellip;<code>download_url</code> will represent the location the opinion was downloaded from. Conversely, if
+            <code>type</code> is set to <code>oa</code> (oral arguments), the <code>download_url</code> will represent
+            the location the <em>audio file</em> was downlaoded from, instead. This can be confusing, however, remember
+            that the <code>type</code> field defaults to <code>o</code>, and that the fields that overlap should make sense
+            for all result types.
         </p>
         <p>
-            Finally, note that like the front end, only precedential results are returned by default. See below for an
-            example that returns non-precedential results as well.
+            Another difference to bear in mind when working with this endpoint is that since it hits against a Solr
+            search index instead of a database, the filtering works slightly differently. To filter on this endpoint, we
+            recommend identifying an effective query on the front end that generates the results you desire and then using
+            that query (and variations thereof) to query the API.
         </p>
         <p>
             When examining the <em>filtering</em> section of the schema, note that fields have been labeled as follows:
@@ -458,14 +525,19 @@
             </dd>
         </dl>
         <p>
-            Three fields warrant special explanation:
+            Finally, note that like the front end, when the <code>type</code> is set to <code>o</code> (the default), only
+            precedential results are returned by default. See below for an example that also returns non-precedential results.
+        </p>
+        <p>
+            Four fields in the search results require special explanation:
         </p>
         <dl>
             <dt><code>resource_uri</code></dt>
             <dd>
                 Because this endpoint is designed to help find documents, once you've found the ones you want, we provide
                 a <code>resource_uri</code> that directs you back to the <code>document</code> endpoint, which has all of
-                the best meta data. This is in contrast to any of the other endpoints.
+                the best meta data. This is in contrast to any of the other endpoints, but follows the pattern of searching
+                for results and selecting them to examine the details.
             </dd>
             <dt><code>snippet</code></dt>
             <dd>
@@ -494,6 +566,7 @@
         </dl>
 
 
+
         <h3 id="coverage-endpoint">/api/rest/v2/coverage/</h3>
         <p>
             Unlike the other endpoints in this API, the coverage endpoint is not based on the tastypie API framework. As
@@ -504,8 +577,8 @@
         </p>
         <p>
             To receive jurisdiction counts by year, simply provide the jurisdiction ID you wish to query or the special
-            keyword, "all", which returns counts for all jurisdictions. For example, this provides annual counts for the Ninth
-            Circuit of Appeals (<code>ca9</code>):
+            keyword, "all", which returns counts for all jurisdictions. For example, this provides annual counts for the
+            Ninth Circuit of Appeals (<code>ca9</code>):
         </p>
         <blockquote>
             <code>curl https://www.courtlistener.com/api/rest/v2/coverage/ca9/</code>
@@ -563,15 +636,14 @@
             <h3><span>CiteGeist Scores</span></h3>
 
             <p>If you are interested in the CiteGeist score for each opinion, it is now available via our
-                <a href="/api/bulk-info/#citegeist">
-                    bulk data API</a>.
+                <a href="/api/bulk-info/#citegeist">bulk data API</a>.
             </p>
         </div>
 
         <div class="span-9 last sidebar-section">
             <h3><span>Maintenance Schedule</span></h3>
             <p>
-                We regularly perform bulk tasks on our servers and have
+                We regularly perform bulk tasks on our servers and maintain
                 <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a
                 public calendar</a> for tracking them. If you intend to do bulk crawling of our API, please be mindful
                 of this schedule.

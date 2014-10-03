@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}REST API - CourtListener.com{% endblock %}
+{% block title %}REST API, v1 - CourtListener.com{% endblock %}
 {% block search-form %}{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
 {% block content %}
     <div class="span-13 append-2">
-        <h2 id="about">REST API V1</h2>
+        <h2 id="about">REST API &ndash; V1</h2>
         <div class="notice span-13 last">
             <p class="bottom">These notes are for an outdated version of the API. Please use the <a
                     href="/api/rest-info/">latest
@@ -38,10 +38,12 @@
         </p>
 
 
+
         <h3>Overview of Endpoints</h3>
         <p>
             This section explains general principles of the API and rules that apply to all of our RESTful endpoints.
         </p>
+
 
 
         <h4>Authentication</h4>
@@ -75,11 +77,12 @@
         </p>
 
 
+
         <h4>Serialization Formats</h4>
         <p>
             With the exception of the coverage endpoint (which is only available as JSON), requests may be serialized
             as JSON, JSONP, or XML, with JSON as the default. The format you wish to receive may be requested via the
-            HTTP Accept header or via the <code>format</code> GET parameter.
+            HTTP <code>Accept</code> header or via the <code>format</code> GET parameter.
         </p>
         <p>
             Note that because your browser prioritizes <code>application/xml</code> over <code>application/json</code>,
@@ -105,6 +108,7 @@
         </blockquote>
 
 
+
         <h4>Views, Pagination and Subset Selection</h4>
         <p>
             Each endpoint provides a list view, a detail view and a set view. The <em>list</em> view is what you see
@@ -125,6 +129,9 @@
         <p>
             Note that we use quotation marks in this query in order to escape shell interpretation of the semicolons.
         </p>
+
+
+
         <h4>Filtering</h4>
         <p>
             With the exception of the coverage endpoint, each endpoint can be filtered in various ways, as
@@ -138,14 +145,21 @@
             Field lookups can be used by appending them to a field with a double underscore as a separator (examples
             are below in the documentation for various endpoints).
         </p>
+
+
+
         <h4>Ordering</h4>
         <p>
             With the exception of the coverage endpoint, ordering can be done on fields defined in the <em>ordering</em>
             section of an endpoint's schema. Ordering is done using the <code>order_by</code> GET parameter, with
             descending ordering available by prepending the minus sign (e.g. <code>order_by=-date_modified</code>).
             However, because the <em>search</em> endpoint uses Solr for its backend, ordering is instead done using
-            the <code>asc</code> and <code>desc</code>, as described in detail below.
+            the <code>asc</code> and <code>desc</code>, as described in detail below. This allows the URLs used for
+            the search endpoint to match those used in front-end queries.
         </p>
+
+
+
         <h4>Field Selection</h4>
         <p>
             To save bandwidth and speed up your queries, fields can be limited by using the <code>fields</code> GET
@@ -171,6 +185,8 @@
             many requests.
         </p>
 
+
+
         <h4>Limitations</h4>
         <p>
             At present, this API is throttled to 1,000 queries per endpoint per user per hour, while we learn where our
@@ -186,46 +202,61 @@
             <code>curl https://www.courtlistener.com/api/rest/v1/jurisdiction/?<strong>limit=50</strong></code>
         </blockquote>
 
-        <h4>Date Formats</h4>
 
+
+        <h4>Date Formats</h4>
         <p>
             As <a href="http://xkcd.com/1179/">required</a>, all date formats are set to
             <a href="http://en.wikipedia.org/wiki/ISO_8601">ISO-8601 format</a>.
         </p>
 
+
+
         <h4>The <code>absolute_url</code> Field</h4>
         <p>
-            The <code>absolute_url</code> field shows the URL where a resource can be seen live on the site. It is
+            The <code>absolute_url</code> field shows the URL where a resource
+            can be seen live on the site. It is
             absolute in the sense that it should never change.
         </p>
+
         <p>
-            In some cases you might only have a URL, and you might want to look up the item in the API. <code>
+            In some cases you might only have a URL, and you might want to look
+            up the item in the API. <code>
             absolute_url</code>s generally look like this:
         </p>
         <blockquote>
-            <code>/scotus/z3J/strickland-v-washington/</code>
+            <code>/$document-type/$numeric-id/$name-of-the-case/</code>
         </blockquote>
         <p>
             There are three sections:
         </p>
         <ol>
             <li>
-                <strong>scotus</strong>: This is the ID of the jurisdiction where the opinion was written, and it can
-                be <a href="/api/rest/v1/jurisdiction/scotus/">easily queried</a> in our <code>jurisdiction</code> API.
+                <strong>$document-type</strong>: This is the type of document
+                that has been returned, for example,
+                "opinion" indicates that you have gotten an opinion as your
+                result.
             </li>
             <li>
-                <strong>z3j</strong>: This is an ascii representation of the ID for the opinion. To decode this to the
-                item's ID, we have
-                <a href="https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/src/tip/alert/lib/encode_decode.py?at=default">
-                    a simple Python function</a>. This value increments in a logical manner, but we leave out some of
-                the more ambiguous ascii characters.
+                <strong>$numeric-id</strong>: This is a numeric representation
+                of the ID for the document. This value
+                increments as we add content to the system. Note that due to
+                deletions and modifications the numeric
+                IDs are not guaranteed to be purely sequential &ndash; IDs will
+                be missing.
             </li>
             <li>
-                <strong>strickland-v-washington</strong>: This is the "slug" of the opinion, and generally mirrors its
-                case name. This value can change if we clean up a case name, but provided it is not omitted, this part
-                of the URL can be any value without ever affecting the page that is loaded.
+                <strong>$name-of-the-case</strong>: This is the "<a
+                    href="https://en.wikipedia.org/wiki/Slug_%28publishing%29">slug</a>"
+                of the document, and
+                generally mirrors its case name. This value can change if we
+                clean up a case name, but provided
+                it is not omitted completely, this part of the URL can be any
+                value without ever affecting the
+                page that is loaded.
             </li>
         </ol>
+
 
         <h4>IDs and SHA1 Sums</h4>
         <p>
@@ -237,8 +268,8 @@
             <code>curl https://www.courtlistener.com/api/rest/v1/<strong>opinion</strong>/111170/</code>
         </blockquote>
         <p>
-            Returns <em><a href="/scotus/z3J/strickland-v-washington/">Strickland v. Washington</a></em>. But this does
-            not:
+            Returns <em><a href="/opinion/111170/strickland-v-washington/">Strickland v. Washington</a></em>. But this
+            does not:
         </p>
         <blockquote>
             <code>curl https://www.courtlistener.com/api/rest/v1/<strong>citation</strong>/111170/</code>
@@ -252,16 +283,19 @@
             <code>https://www.courtlistener.com/api/rest/v1/search/?q=a2daab35251795fc2621c6ac46b6031c95a4e0ba</code>
         </blockquote>
 
+
+
         <h4>Upgrades and Fixes</h4>
         <p>
             Like the rest of the CourtListener platform, this API and its documentation are
-            <a href="https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/src/tip/alert/search/api.py?at=default">open
-            source</a>. If it lacks functionality that you desire or if you find
-            <a href="https://bitbucket.org/mlissner/search-and-awareness-platform-courtlistener/src/tip/alert/assets/templates/api/rest-docs.html?at=default">these
+            <a href="https://github.com/freelawproject/courtlistener/tree/master/alert/search/api.py">open
+                source</a>. If it lacks functionality that you desire or if you find
+            <a href="https://github.com/freelawproject/courtlistener/tree/master/alert/assets/templates/api">these
             notes</a> lacking, pull requests providing improvements are very welcome. Just get in touch in
             <a href="http://lists.freelawproject.org/cgi-bin/mailman/listinfo/dev">our developer forum</a> to discuss
             your ideas or, hey, go ahead and send us a pull request.
         </p>
+
 
 
         <h3 id="opinion-endpoint">/api/rest/v1/opinion/</h3>
@@ -453,7 +487,7 @@
             </dd>
         </dl>
         <p>
-            Three fields warrant special explanation:
+            Four fields warrant special explanation:
         </p>
         <dl>
             <dt><code>resource_uri</code></dt>

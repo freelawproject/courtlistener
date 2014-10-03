@@ -77,8 +77,8 @@ class DeprecatedModelResourceWithFieldsFilter(ModelResourceWithFieldsFilter):
         super(DeprecatedModelResourceWithFieldsFilter, self).__init__(tally_name=tally_name)
 
     def alter_list_data_to_serialize(self, request, data):
-        # Add a request_uri field
-        data['meta']['status'] = 'This endpoint is deprecated. Please upgrade to a newer version of the API.'
+        data['meta']['status'] = 'This endpoint is deprecated. Please ' \
+                                 'upgrade to the newest version of the API.'
 
         return super(DeprecatedModelResourceWithFieldsFilter, self).alter_list_data_to_serialize(request, data)
 

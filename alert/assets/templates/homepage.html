@@ -10,25 +10,25 @@
 {% block main-nav %}{% endblock %}
 
 {% block footer-scripts %}
-<script type="text/javascript">
-    $(document).ready(function () {
-        $('#id_q').focus();
-    });
-    // Initialize popovers (required because they're "opt-in for performance reasons")
-    $("[data-toggle='popover']").popover();
-</script>
-<script type="application/ld+json">
-    {
-      "@context": "http://schema.org",
-      "@type": "WebSite",
-      "url": "https://www.courtlistener.com/",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://www.courtlistener.com/?q={search_term}",
-        "query-input": "required name=search_term"
-      }
-    }
-</script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $('#id_q').focus();
+        });
+        // Initialize popovers (required because they're "opt-in for performance reasons")
+        $("[data-toggle='popover']").popover();
+    </script>
+    <script type="application/ld+json">
+        {
+          "@context": "http://schema.org",
+          "@type": "WebSite",
+          "url": "https://www.courtlistener.com/",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://www.courtlistener.com/?q={search_term}",
+            "query-input": "required name=search_term"
+          }
+        }
+    </script>
 {% endblock %}
 
 {% block logo %}
@@ -284,7 +284,7 @@
             {% endcomment %}
 
             <div class="span-11 append-2 last">
-                <h3>The Numbers&nbsp;<i class="gray fa fa-cogs"></i></h3>
+                <h3>The Numbers&nbsp;<i class="gray fa fa-pie-chart"></i></h3>
 
                 <div class="span-2 center">
                     <span class="homepage-stat bold">{{ results.paginator.count|intcomma }}</span>
