@@ -355,7 +355,7 @@ class SolrList(object):
     queried.
     """
 
-    def __init__(self, main_query, offset, limit, type, length=None):
+    def __init__(self, main_query, offset, limit, type=None, length=None):
         super(SolrList, self).__init__()
         self.main_query = main_query
         self.offset = offset
@@ -497,7 +497,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
     )
     download_url = fields.CharField(
         attribute='download_url',
-        help_text='The URL on the court website where the document was '
+        help_text='The URL on the court website where the item was '
                   'originally scraped',
         null=True,
     )
@@ -509,7 +509,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
     )
     id = fields.CharField(
         attribute='id',
-        help_text='The primary key for an opinion.',
+        help_text='The primary key for an item.',
     )
     judge = fields.CharField(
         attribute='judge',
@@ -615,23 +615,27 @@ class SearchResource(ModelResourceWithFieldsFilter):
 
     def get_object_list(self, request=None, **kwargs):
         """Performs the Solr work."""
+        main_query = {'caller': 'api_search'}
         try:
-            main_query = build_main_query(kwargs['cd'],
-                                          highlight='text')
+            main_query.update(build_main_query(kwargs['cd'],
+                                               highlight='text'))
+            sl = SolrList(
+                main_query=main_query,
+                offset=request.GET.get('offset', 0),
+                limit=request.GET.get('limit', 20),
+                type=kwargs['cd']['type']
+            )
         except KeyError:
             sf = forms.SearchForm({'q': "*:*"})
             if sf.is_valid():
-                main_query = build_main_query(sf.cleaned_data,
-                                              highlight='text')
+                main_query.update(build_main_query(sf.cleaned_data,
+                                                   highlight='text'))
+            sl = SolrList(
+                main_query=main_query,
+                offset=request.GET.get('offset', 0),
+                limit=request.GET.get('limit', 20),
+            )
 
-        main_query['caller'] = 'api_search'
-        # Use a SolrList that has a couple of the normal functions built in.
-        sl = SolrList(
-            main_query=main_query,
-            offset=request.GET.get('offset', 0),
-            limit=request.GET.get('limit', 20),
-            type=kwargs['cd']['type']
-        )
         return sl
 
     def obj_get_list(self, bundle, **kwargs):

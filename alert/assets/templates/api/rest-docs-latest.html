@@ -449,8 +449,8 @@
         <h3 id="search-endpoint">/api/rest/v2/search/</h3>
         <p>
             This endpoint allows you to query our search engine in a similar manner as is possible in our front end.
-            Because this endpoint does not use the Django models directly, this endpoint is quite different than the
-            others. Several differences should be noted.
+            Because this endpoint does not use the Django models directly, this endpoint is quite different than any
+            other. Several differences should be noted.
         </p>
         <p>
             First, the fields and results from this endpoint are slightly different than those in the other endpoints.
@@ -463,24 +463,23 @@
         <p>
             A peculiarity of this endpoint is that, like the front end, it serves both <code>audio</code> and
             <code>document</code> results, depending on the value of the <code>type</code> argument. These results have
-            many overlapping fields, so, for example if you get back the field <code>download_url</code> and the
-            <code>type</code> is set to <code>o</code> (opinions):
+            many overlapping fields, so, for example, if you get back the field <code>download_url</code> and the
+            <code>type</code> is set to the letter <code>o</code> (meaning opinions)&hellip;
         </p>
         <blockquote>
             <code>curl https://www.courtlistener.com/api/rest/v2/search/?<strong>type=o</strong></code>
         </blockquote>
         <p>
             &hellip;<code>download_url</code> will represent the location the opinion was downloaded from. Conversely, if
-            <code>type</code> is set to <code>oa</code> (oral arguments), the <code>download_url</code> will represent
-            the location the <em>audio file</em> was downlaoded from, instead. This can be confusing, however, remember
-            that the <code>type</code> field defaults to <code>o</code>, and that the fields that overlap should make sense
-            for all result types.
+            <code>type</code> is set to the letters <code>oa</code> (oral arguments), the <code>download_url</code> will
+            represent the location the <em>audio file</em> was downlaoded from, instead. This can be confusing, however,
+            remember that the <code>type</code> field defaults to <code>o</code>, and that the fields that overlap should
+            make sense for all result types.
         </p>
         <p>
-            Another difference to bear in mind when working with this endpoint is that since it hits against a Solr
-            search index instead of a database, the filtering works slightly differently. To filter on this endpoint, we
-            recommend identifying an effective query on the front end that generates the results you desire and then using
-            that query (and variations thereof) to query the API.
+            Because this endpoint hits against a Solr search index instead of a database, the filtering works slightly
+            differently. To filter on this endpoint, we recommend identifying an effective query on the front end that
+            generates the results you desire and then using that query (and variations thereof) to query the API.
         </p>
         <p>
             When examining the <em>filtering</em> section of the schema, note that fields have been labeled as follows:
@@ -620,6 +619,9 @@
                 </table>
             </div>
         </div>
+
+
+
 
         <div class="span-9 last sidebar-section">
             <h3><span>Powered By</span></h3>
