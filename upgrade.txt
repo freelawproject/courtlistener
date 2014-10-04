@@ -81,7 +81,9 @@ We welcome a conversion of these notes to a better process using Fabric.
     + favorites should work for alerts?
     + robots.txt blocking for bulk files
     + update the tour to show off oral args
-    - add docket information to opinion results
+    - add docket information to opinion results & verify bulk data
+    - fix search schema
+        - add test
 
   API Changes:
    - /api/rest-info/ makes reference to a number of API calls that go to v1.

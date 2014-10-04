@@ -7,7 +7,7 @@ import errno
 
 from alert.lib.db_tools import queryset_generator
 from alert.lib.timer import print_timing
-from alert.search.models import Court, Document
+from alert.search.models import Court, Document, Docket
 from django.core.management import BaseCommand
 from django.conf import settings
 from audio.models import Audio
@@ -24,6 +24,11 @@ def mkdir_p(path):
             raise
 
 
+def deepgetattr(obj, attr):
+    """Recurse through an attribute chain to get the ultimate value."""
+    return reduce(getattr, attr.split('.'), obj)
+
+
 class Command(BaseCommand):
     help = 'Create the bulk files for all jurisdictions and for "all".'
 
@@ -36,24 +41,31 @@ class Command(BaseCommand):
         from alert.search import api2
         self.stdout.write('Starting bulk file creation...\n')
         arg_tuples = (
-            ('opinion', Document, api2.DocumentResource),
-            ('oral-argument', Audio, api2.OralArgumentResource),
+            ('document', Document, 'docket.court_id', api2.DocumentResource),
+            ('audio', Audio, 'docket.court_id', api2.AudioResource),
+            ('docket', Docket, 'court_id', api2.DocketResource),
+            ('jurisdiction', Court, 'pk', api2.CourtResource),
         )
-        for obj_type_str, obj_type, api_resource_obj in arg_tuples:
-            self.make_archive(obj_type_str, obj_type, api_resource_obj)
+        for obj_type_str, obj_type, court_attr, api_resource_obj in arg_tuples:
+            self.make_archive(
+                obj_type_str,
+                obj_type,
+                court_attr,
+                api_resource_obj
+            )
             self.swap_archives(obj_type_str)
         self.stdout.write('Done.\n\n')
 
     def swap_archives(self, obj_type_str):
         """Swap out new archives for the old."""
-        self.stdout.write(' - Swapping in the new %s archives...\n'
+        self.stdout.write('   - Swapping in the new %s archives...\n'
                           % obj_type_str)
         mkdir_p(os.path.join(settings.BULK_DATA_DIR, '%s' % obj_type_str))
         for f in os.listdir('/tmp/bulk/%s' % obj_type_str):
             shutil.move('/tmp/bulk/%s/%s' % (obj_type_str, f),
                         os.path.join(settings.BULK_DATA_DIR, '%s' % obj_type_str, f))
 
-    def make_archive(self, obj_type_str, obj_type, api_resource_obj):
+    def make_archive(self, obj_type_str, obj_type, court_attr, api_resource_obj):
         """Generate compressed archives containing the contents of an object
         database.
 
@@ -112,7 +124,10 @@ class Command(BaseCommand):
         # Make the archives
         qs = obj_type.objects.all()
         item_resource = api_resource_obj()
-        item_list = queryset_generator(qs)
+        if type(qs[0].pk) == int:
+            item_list = queryset_generator(qs)
+        else:
+            item_list = qs
         for item in item_list:
             json_str = item_resource.serialize(
                 None,
@@ -127,7 +142,7 @@ class Command(BaseCommand):
             tarinfo.mtime = time.mktime(item.date_modified.timetuple())
             tarinfo.type = tarfile.REGTYPE
 
-            tar_files[item.docket.court_id].addfile(
+            tar_files[deepgetattr(item, court_attr)].addfile(
                 tarinfo, StringIO.StringIO(json_str))
             tar_files['all'].addfile(
                 tarinfo, StringIO.StringIO(json_str))
@@ -137,4 +152,4 @@ class Command(BaseCommand):
             tar_files[court.pk].close()
         tar_files['all'].close()
 
-        self.stdout.write(' - all %s bulk files created.\n' % obj_type_str)
+        self.stdout.write('   - all %s bulk files created.\n' % obj_type_str)
