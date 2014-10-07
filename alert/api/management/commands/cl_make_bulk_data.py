@@ -41,6 +41,8 @@ class Command(BaseCommand):
         from alert.search import api2
         self.stdout.write('Starting bulk file creation...\n')
         arg_tuples = (
+            ('cited-by', Document, 'docket.court_id', api2.CitedByResource),
+            ('cites', Document, 'docket.court_id', api2.CitationResource),
             ('document', Document, 'docket.court_id', api2.DocumentResource),
             ('audio', Audio, 'docket.court_id', api2.AudioResource),
             ('docket', Docket, 'court_id', api2.DocketResource),

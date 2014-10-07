@@ -81,24 +81,30 @@ We welcome a conversion of these notes to a better process using Fabric.
     + favorites should work for alerts?
     + robots.txt blocking for bulk files
     + update the tour to show off oral args
-    - add docket information to opinion results & verify bulk data
-    - fix search schema
+    + add docket information to opinion results & verify bulk data
+    + fix search schema
         - add test
+    - make citing, cited-by endpoints in bulk.
+    - check the sign out button - make sure it doesn't fail miserably.
 
   API Changes:
-   - /api/rest-info/ makes reference to a number of API calls that go to v1.
+   + /api/rest-info/ makes reference to a number of API calls that go to v1.
      These should go to v2 instead and some solution should be found for
      versioning the rest documentation.
-   - In v2, the has_scraper field is now renamed has_opinion_scraper, and there
+   + In v2, the has_scraper field is now renamed has_opinion_scraper, and there
      is a new field, has_oral_argument_scraper.
-   - V2 needs to be updated to serve Docket objects.
-   - V2 needs to support searching by oral args or opinions
-   - update search schema
-   - docket added as endpoint
-   - docket integrated into audio and document endpoints
-        - If docket is not integrated completely (if only a reference is
+   + V2 needs to be updated to serve Docket objects.
+   + V2 needs to support searching by oral args or opinions
+   + update search schema
+   + docket added as endpoint
+   + docket integrated into audio and document endpoints
+        + If docket is not integrated completely (if only a reference is
           provided) need to figure out how dockets are provided in the bulk
           data system.
+   - v1 cited by and citing don't seem to work
+   - v2 paginating on cited-by and citing doesn't work. v1 may or may not work.
+   - pagination isn't a solution for bulk files
+   -
 
   Deployment:
   - Install new dependencies (see above)

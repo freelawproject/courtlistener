@@ -6,6 +6,7 @@ from tastypie import http
 from tastypie.authentication import BasicAuthentication
 from tastypie.resources import ModelResource
 from tastypie.throttle import CacheThrottle
+
 from alert import settings
 from alert.lib.string_utils import filter_invalid_XML_chars
 from alert.lib.sunburnt import SolrError, sunburnt
@@ -137,15 +138,24 @@ class PerUserCacheThrottle(CacheThrottle):
 
 
 class SolrList(object):
-    """This implements a yielding list object that fetches items as they are queried."""
-    def __init__(self, main_query, offset, limit, length=None):
+    """This implements a yielding list object that fetches items as they are
+    queried.
+    """
+
+    def __init__(self, main_query, offset, limit, type=None, length=None):
         super(SolrList, self).__init__()
         self.main_query = main_query
         self.offset = offset
         self.limit = limit
         self.length = length
+        self.type = type
         self._item_cache = []
-        self.conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
+        if self.type == 'o':
+            self.conn = sunburnt.SolrInterface(
+                settings.SOLR_OPINION_URL, mode='r')
+        elif self.type == 'oa':
+            self.conn = sunburnt.SolrInterface(
+                settings.SOLR_AUDIO_URL, mode='r')
 
     def __len__(self):
         """Tastypie's paginator takes the len() of the item for its work."""
@@ -174,7 +184,8 @@ class SolrList(object):
 
         # Pull the text snippet up a level, where tastypie can find it
         for result in results_si.result.docs:
-            result['snippet'] = '&hellip;'.join(result['solr_highlights']['text'])
+            result['snippet'] = '&hellip;'.join(
+                result['solr_highlights']['text'])
 
         # Return the results as objects, not dicts.
         for result in results_si.result.docs:
@@ -195,7 +206,9 @@ class SolrList(object):
                 return []
 
     def append(self, p_object):
-        """Lightly override the append method so we get items duplicated in our cache."""
+        """Lightly override the append method so we get items duplicated in
+        our cache.
+        """
         self._item_cache.append(p_object)
 
 

@@ -148,13 +148,14 @@ class CitedByResource(DeprecatedModelResourceWithFieldsFilter):
     )
     court = fields.ForeignKey(
         CourtResource,
-        'court'
+        'docket.court_id'
     )
     date_modified = fields.DateTimeField(
         attribute='date_modified',
         null=True,
         default='1750-01-01T00:00:00Z',
-        help_text='The last moment when the item was modified. A value  in year 1750 indicates the value is unknown'
+        help_text='The last moment when the item was modified. A value  in '
+                  'year 1750 indicates the value is unknown'
     )
 
     class Meta:
@@ -186,8 +187,9 @@ class CitedByResource(DeprecatedModelResourceWithFieldsFilter):
             return super(CitedByResource, self).get_object_list(request).none()
 
     def apply_filters(self, request, applicable_filters):
-        """The inherited method would attempt to apply filters, but filtering is only turned on so we can slip
-        the id parameter through. If this function is not overridden and nixed, it attempts normal Django
+        """The inherited method would attempt to apply filters, but filtering
+        is only turned on so we can slip the id parameter through. If this
+        function is not overridden and nixed, it attempts normal Django
         filtering, which crashes.
 
         Thus, do nothing here.

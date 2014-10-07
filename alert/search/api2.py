@@ -1,11 +1,9 @@
 import logging
 
-from alert import settings
 from alert.audio.models import Audio
 from alert.lib.api import ModelResourceWithFieldsFilter, \
-    BasicAuthenticationWithUser, PerUserCacheThrottle
+    BasicAuthenticationWithUser, PerUserCacheThrottle, SolrList
 from alert.lib.search_utils import build_main_query
-from alert.lib.sunburnt import sunburnt
 from alert.search import forms
 from alert.search.models import Citation, Court, Docket, Document, \
     SOURCES, DOCUMENT_STATUSES
@@ -204,21 +202,16 @@ class DocumentResource(ModelResourceWithFieldsFilter):
 
 
 class CitedByResource(ModelResourceWithFieldsFilter):
-    citation = fields.ForeignKey(
-        CitationResource,
-        'citation',
-        full=True
-    )
-    court = fields.ForeignKey(
-        CourtResource,
-        'court'
-    )
     date_modified = fields.DateTimeField(
         attribute='date_modified',
         null=True,
         default='1750-01-01T00:00:00Z',
         help_text='The last moment when the item was modified. A value in '
                   'year 1750 indicates the value is unknown'
+    )
+    docket = fields.ForeignKey(
+        DocketResource,
+        'docket'
     )
 
     class Meta:
@@ -228,9 +221,12 @@ class CitedByResource(ModelResourceWithFieldsFilter):
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'cited-by'
         queryset = Document.objects.all()
-        excludes = (
-            'is_stub_document', 'html', 'html_lawbox', 'html_with_citations',
-            'plain_text',)
+        fields = (
+            'absolute_url',
+            'citation_count',
+            'id',
+            'time_retrieved',
+        )
         include_absolute_url = True
         max_limit = 20
         list_allowed_methods = ['get']
@@ -266,8 +262,8 @@ class CitedByResource(ModelResourceWithFieldsFilter):
         url_str = '/api/rest/%s/%s/%s/'
         if bundle_or_obj:
             return url_str % (
-                self.api_name,
-                'opinion',
+                'v2',
+                'document',
                 bundle_or_obj.obj.id,
             )
         else:
@@ -275,14 +271,9 @@ class CitedByResource(ModelResourceWithFieldsFilter):
 
 
 class CitesResource(ModelResourceWithFieldsFilter):
-    citation = fields.ForeignKey(
-        CitationResource,
-        'citation',
-        full=True
-    )
-    court = fields.ForeignKey(
+    docket = fields.ForeignKey(
         CourtResource,
-        'court'
+        'docket'
     )
     date_modified = fields.DateTimeField(
         attribute='date_modified',
@@ -299,9 +290,12 @@ class CitesResource(ModelResourceWithFieldsFilter):
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'cites'
         queryset = Document.objects.all()
-        excludes = (
-            'is_stub_document', 'html', 'html_lawbox', 'html_with_citations',
-            'plain_text',)
+        fields = (
+            'absolute_url',
+            'citation_count',
+            'id',
+            'time_retrieved',
+        )
         include_absolute_url = True
         max_limit = 20
         list_allowed_methods = ['get']
@@ -342,98 +336,12 @@ class CitesResource(ModelResourceWithFieldsFilter):
         url_str = '/api/rest/%s/%s/%s/'
         if bundle_or_obj:
             return url_str % (
-                self.api_name,
-                'opinion',
+                'v2',
+                'document',
                 bundle_or_obj.obj.id,
             )
         else:
             return ''
-
-
-class SolrList(object):
-    """This implements a yielding list object that fetches items as they are
-    queried.
-    """
-
-    def __init__(self, main_query, offset, limit, type=None, length=None):
-        super(SolrList, self).__init__()
-        self.main_query = main_query
-        self.offset = offset
-        self.limit = limit
-        self.length = length
-        self.type = type
-        self._item_cache = []
-        if self.type == 'o':
-            self.conn = sunburnt.SolrInterface(
-                settings.SOLR_OPINION_URL, mode='r')
-        elif self.type == 'oa':
-            self.conn = sunburnt.SolrInterface(
-                settings.SOLR_AUDIO_URL, mode='r')
-
-    def __len__(self):
-        """Tastypie's paginator takes the len() of the item for its work."""
-        if self.length is None:
-            mq = self.main_query.copy()  # local copy for manipulation
-            mq['rows'] = 0  # For performance, we just want the count
-            mq['caller'] = 'api_search_count'
-            r = self.conn.raw_query(**mq).execute()
-            self.length = r.result.numFound
-        return self.length
-
-    def __iter__(self):
-        for item in range(0, self.length):
-            if self._item_cache[item]:
-                yield self._item_cache[item]
-            else:
-                yield self.__getitem__(item)
-
-    def __getitem__(self, item):
-        self.main_query['start'] = self.offset
-        results_si = self.conn.raw_query(**self.main_query).execute()
-
-        # Set the length if it's not yet set.
-        if self.length is None:
-            self.length = results_si.result.numFound
-
-        # Pull the text snippet up a level, where tastypie can find it
-        for result in results_si.result.docs:
-            result['snippet'] = '&hellip;'.join(
-                result['solr_highlights']['text'])
-
-        # Return the results as objects, not dicts.
-        for result in results_si.result.docs:
-            self._item_cache.append(SolrObject(initial=result))
-
-        # Now, assuming our _item_cache is all set, we just get the item.
-        if isinstance(item, slice):
-            s = slice(item.start - int(self.offset),
-                      item.stop - int(self.offset),
-                      item.step)
-            return self._item_cache[s]
-        else:
-            # Not slicing.
-            try:
-                return self._item_cache[item]
-            except IndexError:
-                # No results!
-                return []
-
-    def append(self, p_object):
-        """Lightly override the append method so we get items duplicated in
-        our cache.
-        """
-        self._item_cache.append(p_object)
-
-
-class SolrObject(object):
-    def __init__(self, initial=None):
-        self.__dict__['_data'] = initial or {}
-
-    def __getattr__(self, key):
-        return self._data.get(key, None)
-
-    def to_dict(self):
-        return self._data
 
 
 class SearchResource(ModelResourceWithFieldsFilter):
