@@ -4,7 +4,6 @@ from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
 
 import re
-from alert.lib import encode_decode
 
 register = Library()
 
@@ -67,12 +66,24 @@ def compress_whitespace(text, autoescape=None):
     return mark_safe(' '.join(text.split()))
 
 
+
 @register.filter(needs_autoescape=True)
 @stringfilter
-def num_to_ascii(pk, autoescape=None):
-    """Convert a pk into a base 60 encoded string """
+def naturalduration(seconds, autoescape=None):
+    """Convert a duration in seconds to a duration in hours, minutes, seconds.
+
+    For example:
+        61 --> 1:01
+        3602 --> 1:00:02
+    """
+    seconds = int(seconds)
     if autoescape:
         esc = conditional_escape
     else:
         esc = lambda x: x
-    return mark_safe(encode_decode.num_to_ascii(int(pk)))
+
+    hours = seconds / 3600
+    minutes = seconds % 3600 / 60
+    seconds = seconds % 3600 % 60
+    time_str = '%02d:%02d:%02d' % (hours, minutes, seconds)
+    return mark_safe(time_str.lstrip('0:'))

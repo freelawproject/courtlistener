@@ -7,7 +7,7 @@ execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
-from alert.casepage.views import make_citation_string
+from alert.opinion_page.views import make_citation_string
 from alert.citations import find_citations, match_citations
 from alert.search.models import Document, Citation
 from celery import task
@@ -38,25 +38,6 @@ def create_cited_html(document, citations):
             inner_html = re.sub(citation.as_regex(), repl, inner_html)
         new_html = u'<pre class="inline">%s</pre>' % inner_html
     return new_html.encode('utf-8')
-
-
-def create_stub(citations):
-    """Creates a stub document with the bare minimum of meta data."""
-    cite = Citation()
-    # Add the dict of citations to the object as its attributes.
-    citations_as_dict = map_citations_to_models(citations)
-    for k, v in citations_as_dict.iteritems():
-        setattr(cite, k, v)
-    # TODO: We can use the court information in the citation here. Failure to do so will mean that our URLs will later
-    #       change -- something we wish to avoid.
-    stub_doc = Document(
-        is_stub_document=True,
-        sha1='!',
-        court=None,
-        citation=cite,
-    )
-    stub_doc.save(index=False)
-    return stub_doc
 
 
 @task

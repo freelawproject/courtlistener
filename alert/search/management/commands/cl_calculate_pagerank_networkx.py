@@ -118,11 +118,11 @@ class Command(BaseCommand):
         reload_pagerank_external_file_cache()
 
         if verbosity >= 1:
-            sys.stdout.write('Copying pagerank file to %s, for bulk downloading...\n' % settings.DUMP_DIR)
-        shutil.copy(self.RESULT_FILE_PATH, settings.DUMP_DIR)
+            sys.stdout.write('Copying pagerank file to %s, for bulk downloading...\n' % settings.BULK_DATA_DIR)
+        shutil.copy(self.RESULT_FILE_PATH, settings.BULK_DATA_DIR)
         if chown:
             user_info = pwd.getpwnam('www-data')
-            os.chown(settings.DUMP_DIR + 'external_pagerank', user_info.pw_uid, user_info.pw_gid)
+            os.chown(settings.BULK_DATA_DIR + 'external_pagerank', user_info.pw_uid, user_info.pw_gid)
 
     def handle(self, *args, **options):
         self.do_pagerank(verbosity=int(options.get('verbosity', 1)))

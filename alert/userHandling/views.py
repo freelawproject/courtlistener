@@ -20,7 +20,9 @@ from alert.stats import tally_stat
 from alert.userHandling.forms import ProfileForm, UserForm, UserCreationFormExtended, EmailConfirmationForm
 from alert.userHandling.models import UserProfile
 from alert.custom_filters.decorators import check_honeypot
+from alert.favorites.models import Favorite
 from datetime import timedelta
+from favorites.forms import FavoriteForm
 
 
 logger = logging.getLogger(__name__)
@@ -37,7 +39,14 @@ def view_alerts(request):
 @login_required
 @never_cache
 def view_favorites(request):
-    return render_to_response('profile/favorites.html', {'private': True},
+    favorites = Favorite.objects.filter(users__user=request.user).order_by('pk')
+    favorite_forms = []
+    for favorite in favorites:
+        favorite_forms.append(FavoriteForm(instance=favorite))
+    return render_to_response('profile/favorites.html',
+                              {'private': True,
+                               'favorite_forms': favorite_forms,
+                               'blank_favorite_form': FavoriteForm()},
                               RequestContext(request))
 
 

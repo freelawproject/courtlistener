@@ -37,6 +37,21 @@ Sets up all the overrides or additional CSS that the site uses.
     transition: all 0.5s ease;
 }
 
+#type-switcher h3 {
+    padding-bottom: 8px;
+}
+#type-switcher label{
+    font-weight: normal;
+}
+#type-switcher .selected {
+    border-bottom: 3px solid #ae0b0b;
+    color: #111;
+}
+#type-switcher label {
+    color: gray;
+    text-decoration: none;
+    border-bottom: none;
+}
 
 .header {
     float: left;
@@ -125,6 +140,10 @@ div.hopscotch-bubble .hopscotch-bubble-close {
     color: gold;
 }
 
+.align-top {
+    vertical-align: top;
+}
+
 .left {
     float: left;
 }
@@ -160,7 +179,7 @@ div.hopscotch-bubble .hopscotch-bubble-close {
     border-bottom-left-radius: 6px;
 }
 
-.pointer {
+.pointer, .cursor {
     cursor: pointer;
     cursor: hand;
 }

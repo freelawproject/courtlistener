@@ -7,9 +7,13 @@
 {% block content %}
     <div class="span-24 last">
         <h2>APIs and Bulk Data</h2>
-        <p>We currently have two free APIs available to developers using our platform. If you are interested in obtaining large quantities of our data,
-            we recommend using our <a href="/api/bulk-info/">bulk API</a>, which provides compressed XML files of our entire collection. If you wish
-            to query our data programatically, we recommend using our <a href="/api/rest-info/">REST APIs</a>.
+        <p>We currently have two free APIs available to developers using our
+            platform. If you are interested in obtaining large quantities of
+            our data, we recommend using our <a href="/api/bulk-info/">bulk
+                API</a>, which provides compressed JSON files of our entire
+            collection, by jurisdiction. If you wish to query our data
+            programatically, we recommend using our <a
+                    href="/api/rest-info/">REST APIs</a>.
         </p>
         <hr class="space">
         <div class="span-11 append-2 center">
@@ -72,20 +76,20 @@
             in our data (though they remain in our search engine).
             As you work with this data, please be cognizant of the privacy and safety
             issues involved with public-facing legal documents. This impacts real people
-            with privacy issues such as informants in jail, people with stalkers, and
-            foreign citizens with rejected asylum requests.</p>
+            with privacy issues such as jailed informants, women avoiding stalkers,
+            foreign citizens with rejected asylum requests, children who were named
+            incidentally in a case about their parent's wrongdoings, etc.</p>
 
-        <p>If you wish to respect the privacy wishes of the parties involved,
+        <p>If you intend to respect the privacy wishes of the parties involved,
             there is a field for each case, "<strong>blocked</strong>," which
-            describes whether we have blocked search engines from indexing the case.
-            The simple thing for you to do is to continue blocking
+            describes whether we have blocked search engines from indexing the
+            case. The simple thing for you to do is to continue blocking
             such cases.</p>
 
-        <p>
-            For our approach to blocking, please see our <a href="/removal/">removal
+        <p>For our approach to blocking, please see our <a href="/removal/">removal
             policy</a>. For our technical approach, please see the blog entries below. If
             you believe Robots.txt prevents a URL from appearing in search results,
-            please be sure to check these out (it might not work as you expect):
+            please be sure to check these out (it likely does not work as you expect):
         </p>
         <ul>
             <li>
@@ -125,7 +129,7 @@
         <div class="span-8 last">
             <h3 id="copyright">Copyright</h3>
             <p>
-                Our dumps are free of known copyright restrictions.<br />
+                Our bulk data is free of known copyright restrictions.<br />
                 <a rel="license" href="http://creativecommons.org/publicdomain/mark/1.0/">
                     <img src="https://i.creativecommons.org/p/mark/1.0/88x31.png" alt="Public Domain Mark" height="31" width="88"/>
                 </a>

@@ -27,23 +27,137 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 
 2014-06-20:
- - This is a very large upgrade and brings the concept of the "Case" into CourtListener. After this point, we will have
-   both opinions and oral arguments for the first time, with the result being that we need some kind of container that
-   we can hold them in. A new class has been added to search.models called "Case" to hold this kind of information.
- - When upgrading to this version, everything will completely break until your database is updated. I recommend enabling
-   the maintenance mode URL if you wish to avoid chaos.
- - The database upgrade for this version will take some time, as we are moving a number of fields from one database
-   table to another.
+ - This is a very large upgrade and brings the concept of the "Case" into
+   CourtListener. After this point, we will have both opinions and oral
+   arguments for the first time, with the result being that we need some kind
+   of container that we can hold them in. A new class has been added to
+   search.models called "Docket" to hold this kind of information.
+ - When upgrading to this version, everything will completely break until your
+   database is updated. I recommend enabling the maintenance mode URL if you
+   wish to avoid chaos.
+ - The database upgrade for this version will take some time, as we are moving
+   a number of fields from one database table to another.
+ - New dependency for datadiff (sudo pip install datadiff==1.1.5)
+ - New dependency for eyeD3 (sudo pip install --allow-external eyeD3 --allow-unverified eyeD3 eyeD3==0.7.4)
 
  TODO:
-  - A new flag was added to the Court for has_oral_argument_scraper. We should add the corresponding information to the
-    coverage page.
-  - API 1.1 will need to be released.
-  - When a Case object is saved, it should check if the "name" attribute has changed. If so, it needs to update the
-    search index and slug.
+  - This change has a lot of changes to the database that need to be made,
+    including:
+    + Add has_oral_argument_scraper to Court and rename has_scraper to
+      has_opinion_scraper:
+        + Check coverage page to make sure that it shows up properly when there
+          are 1 or more oral-arg scrapers
+        + update api.py so it continues returning has_scraper with the correct
+          values
+    + Create Docket table
+        + Make sure that the Docket object gets updated when the case-name or
+          slug are updated elsewhere?
+    + Case_name and slugs need to be pulled from the correct places (opinions
+      should pull from Citation and Dockets from Docket, for example).
+    - Write some kind of script to handle matching up oral args with opinions
+    + Make audio searchable?
+    + Make sure the processing_complete flag is triggered properly.
+    + Make the audio page
+        + Jplayer
+        + sharing links
+        + favorite saving/deleting/editing
+    + Podcasts/Audio feeds
+    + Audio alerts
+    + Sitemaps
+    + Order drop down weirdness:
+        + selecting order drop down has weirdness on OA page.
+        + cannot change the drop down to newest first on o page.
+    + Do citation feeds redirect properly now that we're using the PK rather
+      than an ascii conversion?
+    + can't click tabs in the jurisdiction picker in opinions!
+    + add recent oral arguments to the homepage?
+    + Scraper:
+        + The scrapers for audio and opinions need to be finalized and tested.
+    + Rewrite bulk files and ensure that the save and delete routines of
+      Document and Audio properly invalidates the bulk files if necessary.
+    + verify that serve_static_files works for audio stuff (analyze it's code
+      and such)
+    - Update the CL calendar to have bulk files generated at 3am on the last
+      day of every month.
+    + favorites should work for alerts?
+    + robots.txt blocking for bulk files
+    + update the tour to show off oral args
+    + add docket information to opinion results & verify bulk data
+    + fix search schema
+        - add test
+    - make citing, cited-by endpoints in bulk.
+    - check the sign out button - make sure it doesn't fail miserably.
 
- API breakages:
-  - The has_scraper field is now renamed has_opinion_scraper, and there is a new field, has_oral_argument_scraper.
+  API Changes:
+   + /api/rest-info/ makes reference to a number of API calls that go to v1.
+     These should go to v2 instead and some solution should be found for
+     versioning the rest documentation.
+   + In v2, the has_scraper field is now renamed has_opinion_scraper, and there
+     is a new field, has_oral_argument_scraper.
+   + V2 needs to be updated to serve Docket objects.
+   + V2 needs to support searching by oral args or opinions
+   + update search schema
+   + docket added as endpoint
+   + docket integrated into audio and document endpoints
+        + If docket is not integrated completely (if only a reference is
+          provided) need to figure out how dockets are provided in the bulk
+          data system.
+   - v1 cited by and citing don't seem to work
+   - v2 paginating on cited-by and citing doesn't work. v1 may or may not work.
+   - pagination isn't a solution for bulk files
+   -
+
+  Deployment:
+  - Install new dependencies (see above)
+  - Install avconv: sudo apt-get install libav-tools
+  - Flip the has_oral_argument_scraper flag to true on all correct courts and
+    ensure that coverage page looks OK.
+  - Update cron jobs to point to cl_scrape_opinions and cl_scrape_oral_arguments
+  - Database changes (need detail here).
+  - Add a new core to Solr (paths below may need changing to correspond with
+    the location of your current configurations):
+
+        1. Create a new configuration directory based on our current one:
+
+           % sudo cp -r /usr/local/solr/example/solr/collection1 /usr/local/solr/example/solr/audio
+           % source /etc/courtlistener
+           % sudo ln -s -f $INSTALL_ROOT/Solr/conf/audio_schema.xml /usr/local/solr/example/solr/audio/conf/schema.xml
+
+        2. Create the new core in Python:
+
+            from alert.lib.solr_core_admin import create_solr_core
+            from alert import settings
+            import os
+            create_solr_core(
+               core_name='audio',
+               data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data_audio'),
+               schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf', 'audio_schema.xml'),
+               instance_dir='/usr/local/solr/example/solr/audio',
+            )
+  - Install the seal-rookery:
+
+      sudo git clone https://github.com/freelawproject/seal-rookery /usr/local/seal_rookery
+      sudo ln -s /usr/local/seal_rookery /usr/lib/python2.7/dist-packages/seal_rookery
+
+  - absolute_urls have changed throughout, necessatating a complete re-index
+    for links in search results to work without redirects.
+  - Bulk files have been rewritten and require some new tweaks:
+        - Update cron to generate bulk files on the last day of each month,
+          using something like the following:
+
+              min hour 30 4,6,9,11        * manage.py cl_make_bulk_data
+              min hour 31 1,3,5,7,8,10,12 * manage.py cl_make_bulk_data
+              min hour 28 2               * manage.py cl_make_bulk_data
+
+        - Remove any old cron entries referencing dump_all_files.py
+        - Add a new directory at $INSTALL_ROOT/alert/assets/media/bulk-data to
+          contain the new bulk files when they are created, and symlink it from
+          /sata/.
+        - Generate the new bulk files by calling manage.py cl_make_bulk_data.
+        - Be sure that Apache is restarted so the new location is updated.
+        - Delete any old bulk files located at
+          $INSTALL_ROOT/alert/assets/media/dumps
+
 
 2014-06-18:
  - This update makes alert editing a lot more intuitive.
@@ -216,7 +330,7 @@ We welcome a conversion of these notes to a better process using Fabric.
 
      http://stackoverflow.com/questions/8677504/setting-environment-variable-globally-without-restarting-ubuntu/18388854#18388854
 
- - Hundreds of new courts have been added to initial_data.json and will be installed automatically, but there are some
+ - Hundreds of new courts have been added to court_data.json and will be installed automatically, but there are some
    conflicts with the current courts that need to be fixed first. To do that, in a Python shell run:
 
         from search.models import Court
@@ -397,7 +511,3 @@ We welcome a conversion of these notes to a better process using Fabric.
 
  - The scrape_and_extract.py script has been converted to the cl_scrape_and_extract management command. It is API
    compatible in terms of args, but any jobs calling the script will need to be updated.
-
-
-
-

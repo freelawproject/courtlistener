@@ -1,4 +1,5 @@
 import os
+from datadiff import diff
 from django.test import TestCase
 from django.test.client import Client
 import simplejson
@@ -7,8 +8,8 @@ import time
 
 from alert.lib import sunburnt
 from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core, get_data_dir_location
-from alert.search.models import Citation, Court, Document
-from alert.scrapers.test_assets import test_scraper
+from alert.search.models import Citation, Court, Document, Docket
+from alert.scrapers.test_assets import test_opinion_scraper
 from alert import settings
 from alert.search.management.commands.cl_calculate_pagerank_networkx import Command
 from datetime import date
@@ -17,6 +18,32 @@ from datetime import date
 class SetupException(Exception):
     def __init__(self, message):
         Exception.__init__(self, message)
+
+
+class DocketUpdateSignalTest(TestCase):
+    fixtures = ['test_court.json']
+
+    def test_updating_the_docket_when_the_citation_case_name_changes(self):
+        """Makes sure that the docket changes when the citation does."""
+        court = Court.objects.get(pk='test')
+
+        original_case_name = u'original case name'
+        new_case_name = u'new case name'
+        cite = Citation(case_name=original_case_name)
+        cite.save(index=False)
+        docket = Docket(
+            case_name=original_case_name,
+            court=court,
+        )
+        docket.save()
+        Document(
+            citation=cite,
+            docket=docket,
+        ).save(index=False)
+        cite.case_name = new_case_name
+        cite.save(index=False)
+        changed_docket = Docket.objects.get(pk=docket.pk)
+        self.assertEqual(changed_docket.case_name, new_case_name)
 
 
 class SolrTestCase(TestCase):
@@ -33,24 +60,33 @@ class SolrTestCase(TestCase):
         self.core_name = '%s.test-%s' % (self.__module__, time.time())
         create_solr_core(self.core_name)
         swap_solr_core('collection1', self.core_name)
-        self.si = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
+        self.si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='rw')
 
         # Add two documents to the index, but don't extract their contents
-        self.site = test_scraper.Site().parse()
+        self.site = test_opinion_scraper.Site().parse()
         cite_counts = (4, 6)
         for i in range(0, 2):
-            cite = Citation(case_name=self.site.case_names[i],
-                            docket_number=self.site.docket_numbers[i],
-                            neutral_cite=self.site.neutral_citations[i],
-                            federal_cite_one=self.site.west_citations[i])
+            cite = Citation(
+                case_name=self.site.case_names[i],
+                docket_number=self.site.docket_numbers[i],
+                neutral_cite=self.site.neutral_citations[i],
+                federal_cite_one=self.site.west_citations[i],
+            )
             cite.save(index=False)
-            self.doc = Document(date_filed=self.site.case_dates[i],
-                                court=self.court,
-                                citation=cite,
-                                precedential_status=self.site.precedential_statuses[i],
-                                citation_count=cite_counts[i],
-                                nature_of_suit=self.site.nature_of_suit[i],
-                                judges=self.site.judges[i])
+            docket = Docket(
+                case_name=self.site.case_names[i],
+                court=self.court,
+            )
+            docket.save()
+            self.doc = Document(
+                date_filed=self.site.case_dates[i],
+                citation=cite,
+                docket=docket,
+                precedential_status=self.site.precedential_statuses[i],
+                citation_count=cite_counts[i],
+                nature_of_suit=self.site.nature_of_suit[i],
+                judges=self.site.judges[i],
+            )
             self.doc.save()
 
         self.expected_num_results = 2
@@ -191,51 +227,79 @@ class ApiTest(SolrTestCase):
 
     def test_api_meta_data(self):
         """Does the content of the search API have the right meta data?"""
-        # Log in our fake user that we created with the fixture
         self.client.login(username='pandora', password='password')
-        r = self.client.get('/api/rest/v1/search/?q=*:*&format=json')
-        json_actual = simplejson.loads(r.content)
+        api_versions = ['v1', 'v2']
+        api_endpoint_parameters = {
+            'search': '?q=*:*&format=json',
+            'jurisdiction': '?format=json',
+        }
+        for v in api_versions:
+            for endpoint, params in api_endpoint_parameters.iteritems():
+                r = self.client.get('/api/rest/%s/%s/%s' % (v, endpoint, params))
+                json_actual = simplejson.loads(r.content)
 
-        with open(os.path.join(
+            with open(os.path.join(
                 settings.INSTALL_ROOT,
                 'alert',
                 'search',
                 'test_assets',
-                'api_test_results.json'),
-             'r') as f:
-            json_correct = simplejson.load(f)
+                'api_%s_%s_test_results.json' % (v, endpoint)),
+                    'r') as f:
+                json_correct = simplejson.load(f)
 
-        # Drop the timestamps and scores b/c they can differ
-        for j in [json_actual, json_correct]:
-            for o in j['objects']:
-                o['timestamp'] = None
-                o['score'] = None
-
-        self.assertEqual(
-            json_actual,
-            json_correct,
-            msg="Response from search API did not match expected results."
-        )
+                if endpoint == 'search':
+                    # Drop the timestamps and scores b/c they can differ
+                    for j in [json_actual, json_correct]:
+                        for o in j['objects']:
+                            o['timestamp'] = None
+                            o['score'] = None
+                elif endpoint == 'jurisdiction':
+                    # Drop any non-testing jurisdiction, cause they change
+                    # over time
+                    objects = []
+                    for court in json_actual['objects']:
+                        if court['id'] == 'test':
+                            court['date_modified'] = None
+                            objects.append(court)
+                            json_actual['objects'] = objects
+                            break
+                    json_actual['meta']['total_count'] = 1
+                msg = "Response from search API did not match expected results (api version: %s, endpoint: %s):\n%s" % (
+                    v,
+                    endpoint,
+                    diff(json_actual,
+                         json_correct,
+                         fromfile='actual',
+                         tofile='correct')
+                )
+                self.assertEqual(
+                    json_actual,
+                    json_correct,
+                    msg=msg,
+                )
 
     def test_api_result_count(self):
         """Do we get back the number of results we expect in the meta data and in 'objects'?"""
         self.client.login(username='pandora', password='password')
-        r = self.client.get('/api/rest/v1/search/?q=*:*&format=json')
-        json = simplejson.loads(r.content)
-        # Test the meta data
-        self.assertEqual(self.expected_num_results,
-                         json['meta']['total_count'],
-                         msg="Metadata result count does not match:\n"
-                             "  Got:\t%s\n"
-                             "  Expected:\t%s\n" % (json['meta']['total_count'],
-                                                    self.expected_num_results,))
-        # Test the actual data
-        num_actual_results = len(json['objects'])
-        self.assertEqual(self.expected_num_results,
-                         num_actual_results,
-                         msg="Actual number of results varies from expected number:\n"
-                             "  Got:\t%s\n"
-                             "  Expected:\t%s\n" % (num_actual_results, self.expected_num_results))
+        api_versions = ['v1', 'v2']
+        for v in api_versions:
+            r = self.client.get('/api/rest/%s/search/?q=*:*&format=json' % v)
+            json = simplejson.loads(r.content)
+            # Test the meta data
+            self.assertEqual(self.expected_num_results,
+                             json['meta']['total_count'],
+                             msg="Metadata result count does not match (api version: '%s'):\n"
+                                 "  Got:\t%s\n"
+                                 "  Expected:\t%s\n" % (v,
+                                                        json['meta']['total_count'],
+                                                        self.expected_num_results,))
+            # Test the actual data
+            num_actual_results = len(json['objects'])
+            self.assertEqual(self.expected_num_results,
+                             num_actual_results,
+                             msg="Actual number of results varies from expected number (api version: '%s'):\n"
+                                 "  Got:\t%s\n"
+                                 "  Expected:\t%s\n" % (v, num_actual_results, self.expected_num_results))
 
     def test_api_able_to_login(self):
         """Can we login properly?"""
@@ -257,16 +321,28 @@ class PagerankTest(TestCase):
         # Set up some handy variables
         self.court = Court.objects.get(pk='test')
 
-        #create 3 documents with their citations
+        #create 3 documents with their citations and dockets
         c1, c2, c3 = Citation(case_name=u"c1"), Citation(case_name=u"c2"), Citation(case_name=u"c3")
         c1.save(index=False)
         c2.save(index=False)
         c3.save(index=False)
+        docket1 = Docket(
+            case_name=u"c1",
+            court=self.court,
+        )
+        docket2 = Docket(
+            case_name=u"c2",
+            court=self.court,
+        )
+        docket3 = Docket(
+            case_name=u"c3",
+            court=self.court,
+        )
         d1, d2, d3 = Document(date_filed=date.today()), Document(date_filed=date.today()), Document(date_filed=date.today())
         d1.citation, d2.citation, d3.citation = c1, c2, c3
+        d1.docket, d2.docket, d3.docket = docket1, docket2, docket3
         doc_list = [d1, d2, d3]
         for d in doc_list:
-            d.court = self.court
             d.citation.save(index=False)
             d.save(index=False)
 
@@ -304,5 +380,7 @@ class PagerankTest(TestCase):
         for key, value in answers.iteritems():
             self.assertTrue(
                 (abs(pr_values_from_file[key]) - value) < 0.0001,
-                msg="The answer for item %s was %s when it should have been %s" % (key, answers['1'], pr_values_from_file['1'])
+                msg="The answer for item %s was %s when it should have been "
+                    "%s" % (key, pr_values_from_file[key],
+                            answers[key], )
             )

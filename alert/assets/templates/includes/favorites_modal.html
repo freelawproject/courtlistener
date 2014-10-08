@@ -1,0 +1,84 @@
+{% if user.is_authenticated %}
+    {# Modal box for saving the favorite #}
+    <div id="modal-save-favorite"
+         class="modal"
+         role="dialog"
+         aria-hidden="true"
+         data-id="{{ favorite_form.instance.id }}">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                {% if favorite_form.instance.id or edit %}
+                    <h2 id="save-favorite-title">Edit This Favorite</h2>
+                {% else %}
+                    <h2 id="save-favorite-title">Save Favorite</h2>
+                {% endif %}
+                <form action="" method="POST">{% csrf_token %}
+                    {{ favorite_form.doc_id }}
+                    {{ favorite_form.audio_id }}
+                    <p class="bottom">
+                        <label for="id_name">Name</label>
+                        {% if favorite_form.name.errors %}
+                            <br><span class="errortext">
+                                            {% for error in favorite_form.name.errors %}
+                                                {{ error|escape }}
+                                            {% endfor %}
+                                        </span>
+                        {% endif %}<br>
+                        {{ favorite_form.name }}
+                    </p>
+
+                    <p class="bottom">
+                        <label for="id_favorite_notes">Notes</label>
+                        {% if favorite_form.notes.errors %}
+                            <br><span class="errortext">
+                                            {% for error in favorite_form.notes.errors %}
+                                                {{ error|escape }}
+                                            {% endfor %}
+                                        </span>
+                        {% endif %}
+                    </p>
+                    {{ favorite_form.notes }}
+                    <p class="top right"><span id="characters-remaining"></span>
+                        characters remaining</p>
+
+                    <div id='favorites-bottom-section'>
+                        <p id="save-favorite-delete" class="bottom fake-link inline
+                            {% if not favorite_form.instance.id and not edit %}hidden{% endif %}"
+                           tabindex="5">Delete</p>
+
+                        <div id="favorites-buttons">
+                            <button type="submit"
+                                    class="button title close-favorite-button"
+                                    name="closeFavorite"
+                                    id="closeFavorite"
+                                    tabindex='4'>Cancel</button>
+                            <button type="submit"
+                                    class="button title save-favorite-button"
+                                    name="saveFavorite"
+                                    id="saveFavorite"
+                                    tabindex='3'>Save</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% else %}
+    {# user is not authenticated #}
+    <div id="modal-logged-out"
+         class="modal"
+         role="dialog"
+         aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <h3 class="center bottom">
+                    <a href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}">
+                        Sign in or register to save a favorite.
+                    </a>
+                </h3>
+
+                <p class="center bottom">(click to dismiss)</p>
+            </div>
+        </div>
+    </div>
+{% endif %}

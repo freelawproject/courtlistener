@@ -1,0 +1,40 @@
+{% comment %}
+ Two tricks:
+    1. Ensure that the correct option is selected at all times.
+    2. Hide the options that don't apply to different tabs.
+{% endcomment %}
+
+<select class="external-input span-5" id="id_order_by" name="order_by"
+        tabindex="9">
+        <option value="score desc"
+                {% if search_form.order_by.value == "score desc" %}
+                    selected="selected"
+                {% endif %}>Relevance</option>
+    {% if request.GET.type == 'o' or not request.GET.type %}
+        <option value="dateFiled desc"
+                {% if search_form.order_by.value == "dateFiled desc" %}
+                    selected="selected"
+                {% endif %}>Newest First</option>
+        <option value="dateFiled asc"
+                {% if search_form.order_by.value == "dateFiled asc" %}
+                    selected="selected"
+                {% endif %}>Oldest First</option>
+        <option value="citeCount desc"
+                {% if search_form.order_by.value == "citeCount desc" %}
+                    selected="selected"
+                {% endif %}>Most Cited First</option>
+        <option value="citeCount asc"
+                {% if search_form.order_by.value == "citeCount asc" %}
+                    selected="selected"
+                {% endif %}>Least Cited First</option>
+    {% elif request.GET.type == 'oa' %}
+        <option value="dateArgued desc"
+                {% if search_form.order_by.value == "dateArgued desc" %}
+                    selected="selected"
+                {% endif %}>Newest First</option>
+        <option value="dateArgued asc"
+                {% if search_form.order_by.value == "dateArgued asc" %}
+                    selected="selected"
+                {% endif %}>Oldest First</option>
+    {% endif %}
+</select>

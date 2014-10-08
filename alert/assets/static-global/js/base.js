@@ -2,9 +2,9 @@ $(document).ready(function() {
     var cited_gt = $('#id_cited_gt');
     var cited_lt = $('#id_cited_lt');
 
-    function makeSearchPath(){
+    function makeSearchPath(tab_switch){
         // Empty the sliders if they are both at their max
-        if (cited_gt.val() == 0 && cited_lt.val() == 15000) {
+        if (cited_gt.val() == 0 && cited_lt.val() == 20000) {
             cited_gt.val("");
             cited_lt.val("");
         }
@@ -12,10 +12,38 @@ $(document).ready(function() {
         // Gather all form fields that are necessary
         var gathered = $();
 
+        // If the user is switching tabs, then make sure their ordering is
+        // valid for the tab they're headed to.
+        var drop_down = $('#id_order_by');
+        if (tab_switch){
+            var value;
+            if (drop_down.val() === 'dateFiled desc') {
+                value = 'dateArgued desc';
+            } else if (drop_down.val() === 'dateFiled asc') {
+                value = 'dateArgued asc';
+            } else if (drop_down.val() === 'dateArgued desc') {
+                value = 'dateFiled desc';
+            } else if (drop_down.val() === 'dateArgued asc') {
+                value = 'dateFiled asc';
+            } else {
+                // Restore the default.
+                value = 'score desc';
+            }
+            var el = $('<input type="hidden" name="order_by" />').val(value);
+            gathered = gathered.add(el);
+        } else {
+            // Not a tab switch; make sure to gather the element regardless.
+            gathered = gathered.add(drop_down);
+        }
+
         // Add the input boxes that aren't empty
-        gathered = gathered.add($('.external-input:not([type=checkbox])').filter(function () {
+        var selector = '.external-input[type=text]';
+        gathered = gathered.add($(selector).filter(function () {
             return this.value != "";
         }));
+
+        // Add selected radio buttons
+        gathered = gathered.add($('.external-input[type=radio]:checked'));
 
         // Add the court checkboxes that are selected as a single input element
         var checked_courts = $('.court-checkbox:checked');
@@ -31,13 +59,16 @@ $(document).ready(function() {
                 name: 'court'
             });
         }
-
         gathered = gathered.add(el);
 
         if ($('.status-checkbox:checked').length <= $('.status-checkbox').length) {
             // Add the status checkboxes that are selected
             gathered = gathered.add($('.status-checkbox:checked'));
         }
+
+        // Remove any inputs that are direct children of the form. These are
+        // pernicious leftovers caused by the evils of the back button.
+        $("#search-form > input").remove();
 
         gathered.each(function () {
             // Make and submit a hidden input element for all gathered fields
@@ -66,15 +97,29 @@ $(document).ready(function() {
     ///////////////////////
     // Search submission //
     ///////////////////////
-    $('#search-form, #sidebar-search-form, .search-page #court-picker-search-form').submit(function (e) {
-        // Overrides the submit buttons so that they gather the correct
-        // form elements before submission.
+    $('#search-form, ' +
+      '#sidebar-search-form, ' +
+      '.search-page #court-picker-search-form').submit(function (e) {
         e.preventDefault();
-        document.location = makeSearchPath();
+
+        // Ensure that the correct value is set in the radio button (correct
+        // is defined by the label that is .selected). This is needed because
+        // the "wrong" value will be selected after a user presses the back
+        // button in their browser.
+        $('#type-switcher .selected input').prop("checked", true);
+
+        document.location = makeSearchPath(false);
+    });
+
+    $('#id_order_by').change(function () {
+        $('#search-form').submit();
     });
 
     $('#homepage #court-picker-search-form').submit(function(e){
         e.preventDefault();
+
+        // Indicate the count of selected jurisdictions when switching to
+        // advanced search page.
         $('#jurisdiction-count').text($(this).find('input:checked').length);
         $('#court-picker').modal('hide');
         showAdvancedHomepage();
@@ -87,7 +132,17 @@ $(document).ready(function() {
                 'background-color': 'transparent',
                 'font-weight': 'normal'
             })
-        }, 1000);
+        }, 1500);
+    });
+
+
+    //////////////////////////
+    // Source Tab Switching //
+    //////////////////////////
+    $('#type-switcher label:not(.selected) input[name=type]').click(function () {
+        // Note that we can't do submit here, because that'd trigger a
+        // switching of the the checked radio button, and nothing would happen.
+        document.location = makeSearchPath(true);
     });
 
 
@@ -98,20 +153,20 @@ $(document).ready(function() {
         cited_gt.val(0);
     }
     if (cited_lt.val() == ""){
-        cited_lt.val(15000);
+        cited_lt.val(20000);
     }
     $(function() {
         // Load up the slider in the UI
         $("#slider-range").slider({
             range: true,
             min: 0,
-            max: 15000,
+            max: 20000,
             step: 10,
             values: [cited_gt.val(),
                      cited_lt.val()],
             slide: function(event, ui) {
                 // Update the text
-                if (ui.values[0] == 0 && ui.values[1] == 15000){
+                if (ui.values[0] == 0 && ui.values[1] == 20000){
                     $('#citation-count').text("(Any)");
                 } else {
                     $("#citation-count").text( "(" + ui.values[0] + " - " + ui.values[1] + ")");
@@ -121,9 +176,10 @@ $(document).ready(function() {
             }
         });
     });
-    if (cited_gt.val() != 0 || cited_lt.val() != 15000) {
+    if (cited_gt.val() != 0 || cited_lt.val() != 20000) {
         $('#citation-count').text("(" + $("#id_cited_gt").val() + " - " + $("#id_cited_lt").val() + ")")
     }
+
 
     //////////////////
     // Court Picker //
@@ -158,6 +214,13 @@ $(document).ready(function() {
         $("#modal-court-picker .tab-pane.active input").prop('checked', false);
     });
 
+
+    ////////////////
+    // Auto Focus //
+    ////////////////
+    $('.auto-focus:first').focus();
+
+
     //////////
     // Tour //
     //////////
@@ -170,9 +233,11 @@ $(document).ready(function() {
                 placement: 'bottom',
                 xOffset: 'center',
                 arrowOffset: 'center',
-                title: 'Welcome to the tour!',
-                content: 'Broad queries can be a great way to start a research task. Our search box can understand ' +
-                    'everything you might expect...terms, concepts, citations, you name it.',
+                title: 'Welcome to the Tour!',
+                content: 'Broad queries can be a great way to start a ' +
+                    'research task. Our search box can understand ' +
+                    'everything you might expect...terms, concepts, ' +
+                    'citations, you name it.',
                 // If the advanced page is already shown, we skip to step 2.
                 onNext: function(){
                     if (!$('#advanced-search-starter').is(":visible")){
@@ -186,8 +251,9 @@ $(document).ready(function() {
                 xOffset: 'center',
                 arrowOffset: 'center',
                 nextOnTargetClick: true,
-                title: 'More power please!',
-                content: "If you are the kind of person that wants more power, you'll love the advanced search box. " +
+                title: 'More Power Please!',
+                content: "If you are the kind of person that wants more " +
+                    "power, you'll love the advanced search box. " +
                     "Click on \"Advanced Search\" to turn it on.",
                 onNext: function(){
                     showAdvancedHomepage();
@@ -198,48 +264,67 @@ $(document).ready(function() {
                 placement: 'right',
                 arrowOffset: 'center',
                 title: "Sophisticated Search",
-                content: "In the Advanced Search area, you can make sophisticated searches against many fields. " +
+                content: "In the Advanced Search area, you can make " +
+                    "sophisticated searches against many fields. " +
                     "Press \"Next\" and we'll make a query for you.",
                 multipage: true,
+                showPrevButton: false,
                 onNext: function(){
                     window.location = '/?q=roe+v.+wade&order_by=score+desc&stat_Precedential=on&court=scotus';
                 }
             },
             {//3
+                // This step will be skipped if on a dev machine with no
+                // results. Be not alarmed!
                 target: document.querySelector('.search-page article'),
                 placement: 'top',
                 arrowOffset: 'center',
                 title: 'Detailed Results',
-                content: 'Here you can see the results for the query "Roe v. Wade" sorted by relevance and filtered to ' +
-                    'only one jurisdiction, the Supreme Court.'
+                content: 'Here you can see the results for the query "Roe ' +
+                    'v. Wade" sorted by relevance and filtered to only one ' +
+                    'jurisdiction, the Supreme Court.'
             },
             {//4
+                target: '#type-switcher',
+                placement: 'right',
+                arrowOffset: 'top',
+                title: 'What are you Looking For?',
+                content: 'By default you\'ll get opinion results, but use ' +
+                    'this to work with oral arguments instead.'
+            },
+            {//5
                 target: '#create-alert-header',
                 placement: 'right',
                 arrowOffset: 'center',
-                title: 'Make alerts',
-                content: '<p>Once you have placed a query, you can create an alert. If there are ever any new results for ' +
-                    'your query, CourtListener will send you an email.</p> <p>Hit next to check out Roe v. Wade.</p>',
+                title: 'Make Alerts',
+                content: '<p>Once you have placed a query, you can create ' +
+                    'an alert. If there are ever any new results for your ' +
+                    'query, CourtListener will send you an email to keep ' +
+                    'you up to date.</p> <p>Hit next to check out <em>Roe ' +
+                    'v. Wade</em>.</p>',
                 multipage: true,
                 onNext: function(){
-                    window.location = '/scotus/yjn/roe-v-wade/';
+                    window.location = '/opinion/108713/roe-v-wade/';
                 }
             },
-            {//5
+            {//6
                 target: '#cited-by',
                 placement: 'right',
                 arrowOffset: 'center',
                 title: 'The Power of Citation',
-                content: 'Roe v. Wade has been cited hundreds of times since it was issued in 1973. Looking at these ' +
-                    'citations can be a good way to see related cases.'
+                content: 'Roe v. Wade has been cited hundreds of times since ' +
+                    'it was issued in 1973. Looking at these citations can ' +
+                    'be a good way to see related cases.'
             },
-            {//6
+            {//7
                 target: '#authorities',
                 placement: 'right',
                 arrowOffset: 'center',
                 title: 'Authorities',
-                content: '<p>The Authorities section lists all of the opinions that Roe v. Wade references. These can be ' +
-                    'thought of as the principles it rests on.</p><p>That\'s everything for now! Let us know if ' +
+                content: '<p>The Authorities section lists all of the ' +
+                    'opinions that Roe v. Wade references. These can be ' +
+                    'thought of as the principles it rests on.</p>' +
+                    '<p>That\'s everything for now! Let us know if ' +
                     'you have any questions.</p>',
                 onNext: function(){
                     hopscotch.endTour();
@@ -264,7 +349,7 @@ $(document).ready(function() {
     if (hopscotch.getState() === "feature-tour:3") {
         hopscotch.startTour(tour);
     }
-    if (hopscotch.getState() === "feature-tour:5") {
+    if (hopscotch.getState() === "feature-tour:6") {
         hopscotch.startTour(tour);
     }
 });

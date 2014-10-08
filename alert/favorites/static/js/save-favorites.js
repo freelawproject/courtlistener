@@ -24,12 +24,17 @@ $(document).ready(function() {
 $(function() {
     $("#saveFavorite").click(function() {
         // validate and process form here
-        var csrf   = $("input[name=csrfmiddlewaretoken]").val();
-        var doc_id = $("input#id_doc_id").val();
-        var name   = $("input#save-favorite-name-field").val();
-        var notes  = $("textarea#save-favorite-notes-field").val();
-
-        var dataString = 'csrf='+ csrf + '&doc_id=' + doc_id + '&notes=' + notes + '&name=' + name;
+        var csrf     = $("input[name=csrfmiddlewaretoken]").val();
+        var favorite_id = $("#modal-save-favorite").data("id");
+        var doc_id   = $("input#id_doc_id").val();
+        var audio_id = $("input#id_audio_id").val();
+        var name     = $("input#save-favorite-name-field").val();
+        var notes    = $("textarea#save-favorite-notes-field").val();
+        var dataString = 'csrf=' + csrf +
+                         '&doc_id=' + doc_id +
+                         '&audio_id=' + audio_id +
+                         '&notes=' + notes +
+                         '&name=' + name;
         //alert (dataString);
         $.ajax({
             type: "POST",
@@ -43,15 +48,18 @@ $(function() {
                 $('#favorites-star').removeClass('gray fa-star-o bold');
                 $('#favorites-star').addClass('gold fa-star');
 
-                // Add the new favorites info to the sidebar.
+                // Add the new favorites info to the sidebar and favorites page.
                 if (notes == ''){
                     notes = '(none)';
                 }
-                $('#sidebar-notes-text').text(notes);
+                $('#sidebar-notes-text, #notes-' + favorite_id).text(notes);
                 $('#sidebar-notes').show();
+                $("#name-" + favorite_id + " a").text(name);
+                $("#data-store-" + favorite_id).data("name", name);
+                $("#data-store-" + favorite_id).data("notes", notes);
 
                 $('#save-favorite-delete').removeClass('hidden');
-                $('#save-favorite-title').text('Edit/delete this favorite');
+                $('#save-favorite-title').text('Edit This favorite');
             }
         });
         return false;
@@ -60,9 +68,13 @@ $(function() {
     $("#save-favorite-delete").click(function() {
         // Send a post that deletes the favorite from the DB, and if successful
         // remove the notes from the sidebar; toggle the star icon.
-        var csrf   = $("input[name=csrfmiddlewaretoken]").val();
-        var doc_id = $("input#id_doc_id").val();
-        var dataString = 'csrf=' + csrf + '&doc_id=' + doc_id;
+        var csrf        = $("input[name=csrfmiddlewaretoken]").val();
+        var favorite_id = $("#modal-save-favorite").data("id");
+        var doc_id      = $("input#id_doc_id").val();
+        var audio_id    = $("input#id_audio_id").val();
+        var dataString = 'csrf=' + csrf +
+                         '&doc_id=' + doc_id +
+                         '&audio_id=' + audio_id;
         $.ajax({
             type: "POST",
             url: "/favorite/delete/",
@@ -77,11 +89,18 @@ $(function() {
                 // Hide the sidebar
                 $('#sidebar-notes').hide();
 
-                // Hide the delete button again
-                $('#save-favorite-delete').addClass('hidden');
+                // Hide the row on the faves page
+                var fave_row = $('#favorite-row-' + favorite_id);
+                if (fave_row.length > 0){
+                    // It's a favorites page
+                    fave_row.hide();
+                } else {
+                    // Hide the delete button again
+                    $('#save-favorite-delete').addClass('hidden');
 
-                // Update the title in the modal box
-                $('#save-favorite-title').text('Save a favorite');
+                    // Update the title in the modal box
+                    $('#save-favorite-title').text('Save a favorite');
+                }
             }
         });
         return false;

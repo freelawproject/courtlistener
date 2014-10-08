@@ -34,7 +34,7 @@ def cleaner(simulate=False, verbose=False):
      - Match a regex for the funky date pattern
 
     """
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='rw')
     q = {
         'q': 'argued',
         'fl': 'id,text,source',

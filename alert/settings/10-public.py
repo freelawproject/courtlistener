@@ -64,14 +64,15 @@ INSTALLED_APPS = [
     'south',
     'tastypie',
     'alerts',
+    'audio',
     'api',
-    'casepage',
     'citations',
     'corpus_importer',
     'custom_filters',
     'donate',
     'favorites',
     'lib',
+    'opinion_page',
     'scrapers',
     'search',
     'simple_pages',
@@ -96,8 +97,9 @@ MESSAGE_TAGS = {
 ########
 # Solr #
 ########
-SOLR_URL = 'http://127.0.0.1:8983/solr/collection1'
-#SOLR_URL = 'http://127.0.0.1:8983/solr/swap_core'
+SOLR_OPINION_URL = 'http://127.0.0.1:8983/solr/collection1'
+#SOLR_OPINION_URL = 'http://127.0.0.1:8983/solr/swap_core'
+SOLR_AUDIO_URL = 'http://127.0.0.1:8983/solr/audio'
 # Used by Solr's init script
 if DEVELOPMENT:
     SOLR_XMX = '500M'
@@ -138,7 +140,7 @@ DEFAULT_FROM_EMAIL = 'CourtListener <noreply@courtlistener.com>'
 # SEO #
 #######
 SITEMAP_PING_URLS = (
-    'http://search.yahooapis.com/SiteExplorerService/V1/ping',
+    #'http://search.yahooapis.com/SiteExplorerService/V1/ping',  # Broke: 2014-06-30
     'http://www.google.com/webmasters/tools/ping',
     'http://www.bing.com/webmaster/ping.aspx',
 )
@@ -153,8 +155,8 @@ STATICFILES_DIRS = (os.path.join(INSTALL_ROOT, 'alert/assets/static-global/'),)
 # This is where things get collected to
 STATIC_ROOT = os.path.join(INSTALL_ROOT, 'alert/assets/static/')
 
-# Where should the data dumps be stored?
-DUMP_DIR = os.path.join(INSTALL_ROOT, 'alert/assets/media/dumps/')
+# Where should the bulk data be stored?
+BULK_DATA_DIR = os.path.join(INSTALL_ROOT, 'alert/assets/media/bulk-data/')
 
 TEMPLATE_DIRS = (
     # Don't forget to use absolute paths, not relative paths.

@@ -14,7 +14,7 @@ from alert.search.models import Document
 from optparse import OptionParser
 
 
-conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
 
 def cleaner(simulate=False, verbose=True):
     """Fix cases that have mojibake as a result of pdffactory 3.51."""

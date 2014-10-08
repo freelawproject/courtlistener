@@ -12,40 +12,64 @@
 {% block head %}
     {% if not error %}
         {% if get_string %}
-            <link rel="alternate" type="application/rss+xml" title="CourtListener.com search atom feed" href="/feed/search/?{{ get_string }}" />
+            <link rel="alternate"
+                  type="application/rss+xml"
+                  title="Atom Feed for These Search Results"
+                  href="/feed/search/?{{ get_string }}" />
         {% endif %}
     {% endif %}
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for all courts" href="/feed/court/all/">
-{% endblock %}
-
-{% block footer-scripts %}
-    <script type="text/javascript">
-       $(document).ready(function() {
-           $('.auto-focus:first').focus();
-           $('#id_order_by').change(function() {
-               // Makes the sort drop down work when changed.
-               $('#search-form').submit();
-           });
-           $('#id_order_by').appendTo('#result-order-chooser-placeholder');
-           {% if results.paginator.count == 0 %}
-               {# Hide the ordering drop down if no results #}
-               $('#id_order_by').hide();
-           {% endif %}
-       });
-    </script>
+    <link rel="alternate"
+          type="application/rss+xml"
+          title="Atom Feed For All Opinions"
+          href="/feed/court/all/">
+    <link rel="alternate"
+          type="application/rss+xml"
+          title="Podcast For All Oral Arguments"
+          href="/podcast/court/all/">
 {% endblock %}
 
 
 {% block sidebar %}
     <div class="span-6 append-1 search-page" id="sidebar">
+        <div class="sidebar-section" id="type-switcher">
+            <h3>
+                <label for="id_type_0" class="pointer
+                       {% if search_form.type.value == 'o' %}
+                            selected
+                       {% endif %}">
+                    <input {% if search_form.type.value == 'o' %}
+                                checked="checked"
+                           {% endif %}
+                           class="external-input hidden"
+                           id="id_type_0"
+                           name="type"
+                           value="o"
+                           type="radio">Opinions</label>
+            </h3>
+            <h3>
+                <label for="id_type_1" class="pointer
+                       {% if search_form.type.value == 'oa' %}
+                           selected
+                       {% endif %}">
+                    <input {% if search_form.type.value == 'oa' %}
+                               checked="checked"
+                           {% endif %}
+                           class="external-input hidden"
+                           id="id_type_1"
+                           name="type"
+                           value="oa"
+                           type="radio">Oral Arguments</label>
+            </h3>
+        </div>
+
         {% if not error %}
+        <hr>
         <div class="sidebar-section">
             <h3><span>Refine Your Query</span></h3>
             <form action="/" method="get" id="sidebar-search-form">
                 <div id="sidebar-facet-placeholder">
                     {% if not error %}
                         <div id="extra-search-fields">
-                            {{ search_form.order_by }}
                             <div id="extra-sidebar-fields">
                                 {#  Modal is at bottom of results, so it loads last. #}
                                 <div class="pointer"
@@ -65,50 +89,62 @@
                                 <h4 class="bottom">Judge</h4>
 
                                 <p class="bottom span-6">{{ search_form.judge }}</p>
-                                <hr class="space">
-                                <h4 class="bottom">Precedential Status</h4>
-                                {% for status in status_facets %}
-                                    <div class="sidebar-checkbox">
-                                        <input
-                                                id="id_{{ status.1 }}"
-                                                type="checkbox"
-                                                name="{{ status.1 }}"
-                                                class="external-input status-checkbox left"
-                                                {% if status.3 %}checked="checked"{% endif %}>
-                                        <label
-                                                for="id_{{ status.1 }}"
-                                                class="pointer {% if status.2 == 0 %}gray{% endif %}">
-                                            <div>{{ status.0 }}&nbsp;<span
-                                                    class="gray small">({{ status.2|intcomma }})</span></div>
-                                        </label>
-                                    </div>
-                                {% endfor %}
-                                <hr class="space">
-                                <h4 class="bottom">Filed After</h4>
 
-                                <p class="bottom span-6">{{ search_form.filed_after }}</p>
-                                <h4 class="bottom">Filed Before</h4>
+                                {% if search_form.type.value == 'o' %}
+                                    <hr class="space">
+                                    <h4 class="bottom">Precedential Status</h4>
+                                    {% for status in status_facets %}
+                                        <div class="sidebar-checkbox">
+                                            <input
+                                                    id="id_{{ status.1 }}"
+                                                    type="checkbox"
+                                                    name="{{ status.1 }}"
+                                                    class="external-input status-checkbox left"
+                                                    {% if status.3 %}checked="checked"{% endif %}>
+                                            <label
+                                                    for="id_{{ status.1 }}"
+                                                    class="pointer {% if status.2 == 0 %}gray{% endif %}">
+                                                <div>{{ status.0 }}&nbsp;<span
+                                                        class="gray small">({{ status.2|intcomma }})</span></div>
+                                            </label>
+                                        </div>
+                                    {% endfor %}
+                                    <hr class="space">
 
-                                <p class="bottom span-6">{{ search_form.filed_before }}</p>
+                                    <h4 class="bottom">Filed After</h4>
+                                    <p class="bottom span-6">{{ search_form.filed_after }}</p>
 
-                                <hr class="space">
-                                <h4 class="bottom">Citation</h4>
+                                    <h4 class="bottom">Filed Before</h4>
+                                    <p class="bottom span-6">{{ search_form.filed_before }}</p>
 
-                                <p class="bottom">{{ search_form.citation }}</p>
-                                <h4 class="bottom">Neutral Citation</h4>
+                                    <hr class="space">
 
-                                <p class="bottom">{{ search_form.neutral_cite }}</p>
+                                    <h4 class="bottom">Citation</h4>
+                                    <p class="bottom">{{ search_form.citation }}</p>
+
+                                    <h4 class="bottom">Neutral Citation</h4>
+                                    <p class="bottom">{{ search_form.neutral_cite }}</p>
+                                {% elif search_form.type.value == 'oa' %}
+                                    <h4 class="bottom">Argued After</h4>
+                                    <p class="bottom span-6">{{ search_form.argued_after }}</p>
+
+                                    <h4 class="bottom">Argued Before</h4>
+                                    <p class="bottom span-6">{{ search_form.argued_before }}</p>
+                                {% endif %}
+
                                 <h4 class="bottom">Docket Number</h4>
-
                                 <p class="bottom">{{ search_form.docket_number }}</p>
 
-                                <div class="span-5">
-                                    {{ search_form.cited_gt }}
-                                    {{ search_form.cited_lt }}
-                                    <h4 class="bottom inline">Citation Count</h4>
-                                    <span type="text" id="citation-count" class="gray small bottom">(Any)</span>
-                                </div>
-                                <div id="slider-range" class="span-5 bottom"></div>
+
+                                {% if search_form.type.value == 'o' %}
+                                    <div class="span-5">
+                                        {{ search_form.cited_gt }}
+                                        {{ search_form.cited_lt }}
+                                        <h4 class="bottom inline">Citation Count</h4>
+                                        <span type="text" id="citation-count" class="gray small bottom">(Any)</span>
+                                    </div>
+                                    <div id="slider-range" class="span-5 bottom"></div>
+                                {% endif %}
 
                                 <button type="submit"
                                         class="button title span-5"
@@ -217,8 +253,25 @@
         {% endif %}
 
         {% if results.paginator.count > 0 %}
-            <h2 id="result-count" class="bottom">{{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }}</h2>
-            <div id="result-order-chooser-placeholder"></div>
+            <h2 id="result-count" class="bottom">
+                {{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }}
+                {% if search_form.type.value == 'o' %}
+                    <a href="/feed/search/?{{ get_string }}">
+                        <i class="gray fa fa-rss"
+                           title="Subscribe to a feed of these results"></i>
+                    </a>
+                {% elif search_form.type.value == 'oa' %}
+                    <a href="/podcast/search/?{{ get_string }}">
+                        <i class="gray fa fa-rss"
+                           title="Subscribe to a podcast of these results"></i>
+                    </a>
+                {% endif %}
+            </h2>
+            <div id="result-order-chooser-placeholder">
+                {% if results.paginator.count > 0 %}
+                    {% include "includes/order_by_dropdown.html" %}
+                {% endif %}
+            </div>
             <span class="small gray span-17 last top">{{ results.object_list.QTime }}ms</span>
             <hr class="space"/>
             {% include "includes/search_result.html" %}
@@ -250,7 +303,7 @@
                     <li>Our system is down and can't respond</li>
                     <li>Some other reason</li>
                 </ul>
-                <p>We log these errors and work to resolve them, but if you think we can benefit from your experience, don't hesitate to <a href="/contact/">let us know</a>! We value your feedback.</p>
+                <p>We log these errors and work to resolve them, but if you think we can benefit from your experience, don't hesitate to    <a href="/contact/">let us know</a>! We value your feedback.</p>
             {% endif %}
         {% endif %}
 
@@ -285,6 +338,4 @@
         {% endif %}
         {% include "includes/jurisdiction_picker_modal.html" %}
     </div>
-
-
 {% endblock %}

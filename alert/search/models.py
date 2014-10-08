@@ -1,13 +1,14 @@
 import re
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 from alert import settings
+from alert.lib.model_helpers import make_upload_path
 from alert.lib.string_utils import trunc
-from alert.lib.encode_decode import num_to_ascii
-
-from django.utils.text import slugify
-from django.utils.text import get_valid_filename
-from django.utils.encoding import smart_unicode
+from django.core.urlresolvers import reverse
 from django.db import models
-import os
+from django.utils.text import slugify
+from django.utils.encoding import smart_unicode
+
 
 # changes here need to be mirrored in the coverage page view and Solr configs
 # Note that spaces cannot be used in the keys, or else the SearchForm won't work
@@ -37,7 +38,7 @@ DOCUMENT_STATUSES = (
     ('Unknown', 'Unknown Status'),
 )
 
-DOCUMENT_SOURCES = (
+SOURCES = (
     ('C', 'court website'),
     ('R', 'resource.org'),
     ('CR', 'court website merged with resource.org'),
@@ -49,43 +50,55 @@ DOCUMENT_SOURCES = (
     ('A', 'internet archive'),
 )
 
-def make_upload_path(instance, filename):
-    """Return a string like pdf/2010/08/13/foo_v._var.pdf, with the date set
-    as the date_filed for the case."""
-    # this code NOT cross platform. Use os.path.join or similar to fix.
-    mimetype = filename.split('.')[-1] + '/'
 
-    try:
-        path = mimetype + instance.date_filed.strftime("%Y/%m/%d/") + \
-            get_valid_filename(filename)
-    except AttributeError:
-        # The date is unknown for the case. Use today's date.
-        path = mimetype + instance.time_retrieved.strftime("%Y/%m/%d/") + \
-            get_valid_filename(filename)
-    return path
+class Docket(models.Model):
+    """A class to sit above Documents and Audio files and link them together"""
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified. A value in year 1750 indicates the value is unknown",
+        auto_now=True,
+        editable=False,
+        db_index=True,
+        null=True,
+    )
+    court = models.ForeignKey(
+        'Court',
+        help_text="The court where the docket was filed",
+        db_index=True,
+        null=True
+    )
+    case_name = models.TextField(
+        help_text="The full name of the case",
+        blank=True
+    )
+    slug = models.SlugField(
+        help_text="URL that the document should map to (the slug)",
+        max_length=50,
+        null=True
+    )
+    date_blocked = models.DateField(
+        help_text="The date that this opinion was blocked from indexing by search engines",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    blocked = models.BooleanField(
+        help_text="Whether a document should be blocked from indexing by search engines",
+        db_index=True,
+        default=False
+    )
 
+    def __unicode__(self):
+        if self.case_name:
+            return smart_unicode('%s: %s' % (self.pk, self.case_name))
+        else:
+            return str(self.pk)
 
-def invalidate_dumps_by_date_and_court(date, court):
-    """Deletes dump files for a court and date
+    def save(self, *args, **kwargs):
+        self.slug = trunc(slugify(self.case_name), 50)
+        super(Docket, self).save(*args, **kwargs)
 
-    Receives court and date parameters, and then deletes any corresponding
-    dumps.
-    """
-    year, month, day = '%s' % date.year, '%02d' % date.month, '%02d' % date.day
-    courts = (court, 'all')
-    for court in courts:
-        try:
-            os.remove(os.path.join(settings.DUMP_DIR, year, court + '.xml.gz'))
-        except OSError:
-            pass
-        try:
-            os.remove(os.path.join(settings.DUMP_DIR, year, month, court + '.xml.gz'))
-        except OSError:
-            pass
-        try:
-            os.remove(os.path.join(settings.DUMP_DIR, year, month, day, court + '.xml.gz'))
-        except OSError:
-            pass
+    def get_absolute_url(self):
+        return reverse('view_docket', args=[self.pk, self.slug])
 
 
 class Court(models.Model):
@@ -107,8 +120,12 @@ class Court(models.Model):
         help_text='Whether this jurisdiction is in use in CourtListener -- increasingly True',
         default=False
     )
-    has_scraper = models.BooleanField(
+    has_opinion_scraper = models.BooleanField(
         help_text='Whether the jurisdiction has a scraper that obtains opinions automatically.',
+        default=False,
+    )
+    has_oral_argument_scraper = models.BooleanField(
+        help_text='Whather the jurisdiction has a scraper that obtains oral arguments automatically.',
         default=False,
     )
     position = models.FloatField(
@@ -256,13 +273,10 @@ class Citation(models.Model):
 
     def save(self, index=True, *args, **kwargs):
         """
-        create the URL from the case name, but only if this is the first
-        time it has been saved.
+        Note that there is a pre_save receiver below.
         """
         created = self.pk is None
-        if created:
-            # it's the first time it has been saved; generate the slug stuff
-            self.slug = trunc(slugify(self.case_name), 50)
+        self.slug = trunc(slugify(self.case_name), 50)
         super(Citation, self).save(*args, **kwargs)
 
         # We only do this on update, not creation
@@ -281,6 +295,32 @@ class Citation(models.Model):
         db_table = "Citation"
 
 
+@receiver(pre_save, sender=Citation)
+def update_dockets_if_citation_case_name_changed(sender, instance, **kwargs):
+    """Updates the docket.case_name field for all associated Dockets when the
+    Citation.case_name field changes.
+
+     - From http://stackoverflow.com/a/7934958/64911.
+
+    There are a few alternative ways to implement this that don't hit the database
+    an extra time (as this one does). However, those solutions are longer and more
+    controversial, so I chose this one based on the fact that we rarely change
+    objects once they are saved and the performance penalty is probably acceptable.
+    """
+    try:
+        cite = Citation.objects.get(pk=instance.pk)
+    except Citation.DoesNotExist:
+        # Object is new
+        pass
+    else:
+        if not cite.case_name == instance.case_name:
+            # Update the associated dockets
+            for d in cite.parent_documents.all():
+                d.docket.case_name = instance.case_name
+                d.docket.slug = trunc(slugify(instance.case_name), 50)
+                d.docket.save()
+
+
 class Document(models.Model):
     """A class representing a single court opinion.
 
@@ -293,7 +333,7 @@ class Document(models.Model):
         db_index=True
     )
     date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified. A value  in year 1750 indicates the value is unknown",
+        help_text="The last moment when the item was modified. A value in year 1750 indicates the value is unknown",
         auto_now=True,
         editable=False,
         db_index=True,
@@ -306,9 +346,9 @@ class Document(models.Model):
         db_index=True
     )
     source = models.CharField(
-        help_text="the source of the document, one of: %s" % ', '.join(['%s (%s)' % (t[0], t[1]) for t in DOCUMENT_SOURCES]),
+        help_text="the source of the document, one of: %s" % ', '.join(['%s (%s)' % (t[0], t[1]) for t in SOURCES]),
         max_length=3,
-        choices=DOCUMENT_SOURCES,
+        choices=SOURCES,
         blank=True
     )
     sha1 = models.CharField(
@@ -316,16 +356,17 @@ class Document(models.Model):
         max_length=40,
         db_index=True
     )
-    court = models.ForeignKey(
-        Court,
-        help_text="The court where the document was filed",
-        db_index=True,
-        null=True
-    )
     citation = models.ForeignKey(
         Citation,
         help_text="The citation object for the document",
         related_name="parent_documents",
+        blank=True,
+        null=True
+    )
+    docket = models.ForeignKey(
+        Docket,
+        help_text="The docket that the document is a part of",
+        related_name="documents",
         blank=True,
         null=True
     )
@@ -371,13 +412,13 @@ class Document(models.Model):
     )
     cases_cited = models.ManyToManyField(
         Citation,
-        help_text="Cases cited by this opinion",
-        related_name="citing_cases",
+        help_text="Opinions cited by this opinion",
+        related_name="citing_opinions",
         null=True,
         blank=True
     )
     citation_count = models.IntegerField(
-        help_text='The number of times this document is cited by other cases',
+        help_text='The number of times this document is cited by other opinion',
         default=0,
         db_index=True,
     )
@@ -412,7 +453,7 @@ class Document(models.Model):
     @property
     def caption(self):
         """Make a proper caption"""
-        caption = self.citation.case_name
+        caption = self.docket.case_name
         if self.citation.neutral_cite:
             caption += ", %s" % self.citation.neutral_cite
             return caption  # neutral cites lack the parentheses, so we're done here.
@@ -436,8 +477,8 @@ class Document(models.Model):
         elif self.citation.docket_number:
             caption += ", %s" % self.citation.docket_number
         caption += ' ('
-        if self.court.citation_string != 'SCOTUS':
-            caption += re.sub(' ', '&nbsp;', self.court.citation_string)
+        if self.docket.court.citation_string != 'SCOTUS':
+            caption += re.sub(' ', '&nbsp;', self.docket.court.citation_string)
             caption += '&nbsp;'
         caption += '%s)' % self.date_filed.isoformat().split('-')[0]  # b/c strftime f's up before 1900.
         return caption
@@ -448,30 +489,19 @@ class Document(models.Model):
         else:
             return str(self.pk)
 
-    @models.permalink
-    def get_absolute_url(self, slug=True):
-        return ('view_case',
-                [str(self.court_id),
-                 num_to_ascii(self.pk),
-                 self.citation.slug])
+    def get_absolute_url(self):
+        return reverse('view_case', args=[self.pk, self.citation.slug])
 
     def save(self, index=True, commit=True, *args, **kwargs):
         """
         If the value of blocked changed to True, invalidate the caches
         where that value was stored. Google can later pick it up properly.
         """
-        # Run the standard save function.
         super(Document, self).save(*args, **kwargs)
 
-        # Update the search index.
         if index:
-            # Import is here to avoid looped import problem
             from search.tasks import add_or_update_doc
             add_or_update_doc.delay(self.pk, commit)
-
-        # Delete the cached sitemaps and dumps if the item is blocked.
-        if self.blocked:
-            invalidate_dumps_by_date_and_court(self.date_filed, self.court_id)
 
     def delete(self, *args, **kwargs):
         """
@@ -479,20 +509,10 @@ class Document(models.Model):
         contained it. Note that this doesn't get called when an entire queryset
         is deleted, but that should be OK.
         """
-        # Get the ID for later use
-        doc_id_was = self.pk
-
-        # Delete the item from the DB.
+        id_cache = self.pk
         super(Document, self).delete(*args, **kwargs)
-
-        # Update the search index.
-        # Import is here to avoid looped import problem
-        from search.tasks import delete_doc
-        delete_doc.delay(doc_id_was)
-
-        # Invalidate the sitemap and dump caches
-        if self.date_filed:
-            invalidate_dumps_by_date_and_court(self.date_filed, self.court_id)
+        from search.tasks import delete_item
+        delete_item.delay(id_cache, settings.SOLR_OPINION_URL)
 
     class Meta:
         db_table = "Document"

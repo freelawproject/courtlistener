@@ -2,12 +2,10 @@ from django.core.mail import EmailMultiAlternatives
 from django.core.management.base import BaseCommand
 from django.db.models import Sum
 from django.template import loader, Context
-from optparse import make_option
 from django.utils.timezone import now
 from alert.search.models import Document, Court
 from alert.stats import Stat
 from alert.userHandling.models import UserProfile
-from datetime import date
 from datetime import timedelta
 
 

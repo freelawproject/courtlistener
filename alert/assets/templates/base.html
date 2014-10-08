@@ -19,14 +19,16 @@
         <meta name="msapplication-starturl" content="https://www.courtlistener.com"/>
         <meta name="msapplication-navbutton-color" content="#6683B7"/>
 
-        <link href="//netdna.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
         <script src="{{ STATIC_PREFIX }}js/modernizr-2.0.6.min.js"></script>
         {% block privacy %}
             {% if private %}
                 <meta name="robots" content="noindex, noodp, noarchive, noimageindex" />
             {% elif private == None %}
-                <!-- This bit of invalid HTML is to give you a loud warning. -->
-                <h1>You did not supply the "private" variable to your template.</h1>
+                <!-- This bit of invalid HTML is to give developers a loud warning. -->
+                <h1>You did not supply the "private" variable to your template.
+                    Please indicate if it is True or False to remove this
+                    awful message.</h1>
             {% endif %}
         {% endblock %}
         <title>{% block title %}CourtListener.com{% endblock %}</title>
@@ -132,6 +134,10 @@
                             <a href="/api/">APIs and Bulk Data</a>
                         </div>
                         <div class="footer-item">
+                            <a href="/feeds/">Feeds &amp; Podcasts</a>
+                            <i class="gray fa fa-rss"></i>
+                        </div>
+                        <div class="footer-item">
                             <a href="/api/jurisdictions/">Jurisdictions</a>
                         </div>
                     </div>
@@ -165,6 +171,7 @@
                                  width="227">
                         </a>
                     </div>
+                    <hr class="space">
                     <div class="span-24 last gray" id="by-line">
                         <p>CourtListener is sponsored by the non-profit <a href="http://freelawproject.org">Free Law Project</a>.</p>
                     </div>
