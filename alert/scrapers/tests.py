@@ -231,7 +231,7 @@ class DupcheckerTest(TestCase):
     def test_abort_on_unchanged_court_website(self):
         """Similar to the above, but we create a url2hash object before
         checking if it exists."""
-        site = test_scraper.Site()
+        site = test_opinion_scraper.Site()
         site.hash = 'this is a dummy hash code string'
         for dup_checker in self.dup_checkers:
             urlToHash(url=site.url, SHA1=site.hash).save()

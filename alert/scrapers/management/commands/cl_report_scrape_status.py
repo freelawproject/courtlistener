@@ -107,7 +107,7 @@ def send_report(report, subject, debug=True):
     connection.close()
 
 
-def _tally_errors():
+def tally_errors():
     """Look at the error db and gather the latest errors from it"""
     yesterday = now() - timedelta(days=1)
     cts_critical = Court.objects \
@@ -146,7 +146,7 @@ def generate_report():
 
     """
     most_recent_opinions, recently_dying_courts = calculate_counts()
-    errors = _tally_errors()
+    errors = tally_errors()
 
     html_template = loader.get_template('scrapers/report.html')
     c = Context({

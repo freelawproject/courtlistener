@@ -355,6 +355,9 @@ def set_mp3_meta_data(audio_obj, mp3_path):
     except AttributeError:
         # Unknown court in Seal Rookery.
         has_seal = False
+    except KeyError:
+        # Unknown court altogether (perhaps a test?)
+        has_seal = False
 
     flp_image_frames = [
         3,   # "Front Cover". Complete list at eyed3/id3/frames.py

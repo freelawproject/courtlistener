@@ -47,14 +47,14 @@ class DocketUpdateSignalTest(TestCase):
 
 
 class SolrTestCase(TestCase):
-    """A generic class that contains the setUp and tearDown functions for inheriting children.
+    """A generic class that contains the setUp and tearDown functions for
+    inheriting children.
     """
     fixtures = ['test_court.json']
 
     def setUp(self):
         # Set up some handy variables
         self.court = Court.objects.get(pk='test')
-        self.client = Client()
 
         # Set up a testing core in Solr and swap it in
         self.core_name = '%s.test-%s' % (self.__module__, time.time())
