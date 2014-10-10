@@ -5,9 +5,9 @@
 
 {% block footer-scripts %}
     <script type="text/javascript">
-	    $(document).ready(function() {
-		    $('.auto-focus:first').focus();
-	    });
+        $(document).ready(function() {
+            $('.auto-focus:first').focus();
+        });
      </script>
 {% endblock %}
 
@@ -15,14 +15,12 @@
 {% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="span-24 last">
-        <hr class="space">
-        <hr class="space">
+    <div class="col-xs-12">
         <div class="prepend-8 span-8 last">
             <div class="box round">
                 <h2>Register a new account</h2>
                 {% if form.errors %}
-                    <div class="span-6 error">
+                    <div class="error">
                         <p class="bottom">There were errors with your submission.</p>
                     </div>
                 {% endif %}
@@ -101,6 +99,4 @@
             </div>
         </div>
     </div>
-    <hr class="space">
-    <hr class="space">
 {% endblock %}

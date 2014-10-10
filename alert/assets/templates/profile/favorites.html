@@ -25,7 +25,7 @@
 {% endblock %}
 
 {% block content %}
-    <div class="span-24 last">
+    <div class="col-xs-12">
         <div class="span-24 last">
             {% if messages %}
                 <div class="span-17 last">
@@ -39,59 +39,60 @@
             {% endif %}
         </div>
         {% if user.profile.favorite.all %}
-            <div class="span-24 last">
-                <table class="settings-table">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th colspan="2">Notes</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for favorite_form in favorite_forms %}
-                            <tr id="favorite-row-{{ favorite_form.instance.id }}">
-                                <td id="name-{{ favorite_form.instance.id }}"
-                                    class="span-5">
-                                    {% if favorite_form.instance.doc_id %}
-                                        <i class="fa-file-text-o fa gray" title="Opinion"></i>
-                                        <a href="{{ favorite_form.instance.doc_id.get_absolute_url }}">
-                                            {{favorite_form.instance.name }}
-                                        </a>
-                                    {% else %}
-                                        <i class="fa-volume-up fa grey" title="Oral Argument"></i>
-                                        <a href="{{ favorite_form.instance.audio_id.get_absolute_url }}">
-                                            {{ favorite_form.instance.name }}
-                                        </a>
-                                    {% endif %}
-                                </td>
-                                <td id="notes-{{ favorite_form.instance.id }}">
-                                    {{ favorite_form.instance.notes|default:"(none)" }}
-                                </td>
-                                <td class="align-top">
-                                    <div data-toggle="modal"
-                                         data-target="#modal-save-favorite">
-                                        <p class="inline fake-link edit-favorite-trigger nowrap"
-                                           data-id="{{ favorite_form.instance.id }}">Edit / Delete
-                                           <i class="fa fa-pencil gray"></i>
-                                        </p>
-
-                                        <div id="data-store-{{ favorite_form.instance.id }}"
-                                             class="hidden"
-                                             data-doc_id="{{ favorite_form.instance.doc_id.pk|default_if_none:"" }}"
-                                             data-audio_id="{{ favorite_form.instance.audio_id.pk|default_if_none:"" }}"
-                                             data-name="{{ favorite_form.instance.name|default_if_none:"" }}"
-                                             data-notes="{{ favorite_form.instance.notes|default_if_none:"" }}">
-
-                                        </div>
-                                    </div>
-                                </td>
+            <div class="row">
+                <div class="table-responsive">
+                    <table class="table settings-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th colspan="2">Notes</th>
                             </tr>
-                        {% endfor %}
+                        </thead>
+                        <tbody>
+                            {% for favorite_form in favorite_forms %}
+                                <tr id="favorite-row-{{ favorite_form.instance.id }}">
+                                    <td id="name-{{ favorite_form.instance.id }}">
+                                        {% if favorite_form.instance.doc_id %}
+                                            <i class="fa-file-text-o fa gray" title="Opinion"></i>
+                                            <a href="{{ favorite_form.instance.doc_id.get_absolute_url }}">
+                                                {{favorite_form.instance.name }}
+                                            </a>
+                                        {% else %}
+                                            <i class="fa-volume-up fa grey" title="Oral Argument"></i>
+                                            <a href="{{ favorite_form.instance.audio_id.get_absolute_url }}">
+                                                {{ favorite_form.instance.name }}
+                                            </a>
+                                        {% endif %}
+                                    </td>
+                                    <td id="notes-{{ favorite_form.instance.id }}">
+                                        {{ favorite_form.instance.notes|default:"(none)" }}
+                                    </td>
+                                    <td class="align-top">
+                                        <div data-toggle="modal"
+                                             data-target="#modal-save-favorite">
+                                            <p class="inline fake-link edit-favorite-trigger nowrap"
+                                               data-id="{{ favorite_form.instance.id }}">Edit / Delete
+                                               <i class="fa fa-pencil gray"></i>
+                                            </p>
 
-                       {# modal & data storage #}
-                       {% include "includes/favorites_modal.html" with favorite_form=blank_favorite_form edit=True%}
-                    </tbody>
-                </table>
+                                            <div id="data-store-{{ favorite_form.instance.id }}"
+                                                 class="hidden"
+                                                 data-doc_id="{{ favorite_form.instance.doc_id.pk|default_if_none:"" }}"
+                                                 data-audio_id="{{ favorite_form.instance.audio_id.pk|default_if_none:"" }}"
+                                                 data-name="{{ favorite_form.instance.name|default_if_none:"" }}"
+                                                 data-notes="{{ favorite_form.instance.notes|default_if_none:"" }}">
+
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+
+                           {# modal & data storage #}
+                           {% include "includes/favorites_modal.html" with favorite_form=blank_favorite_form edit=True%}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         {% else %}
             <h3>You have not saved any favorites.</h3>

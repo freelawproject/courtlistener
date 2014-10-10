@@ -6,7 +6,7 @@
 {% block nav-account %}active{% endblock %}
 
 {% block content %}
-    <div class="span-24 last">
+    <div class="col-xs-12">
         {# if their email address was just changed, tell them.#}
         {% if messages %}
             <div class="span-17 last">
@@ -30,7 +30,7 @@
         {% endif %}
     </div>
 
-    <div class="span-24 last">
+    <div class="col-xs-12">
         <form action="" method="post">{% csrf_token %}
             <div class="span-24 last">
                 <p class="span-4">

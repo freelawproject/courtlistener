@@ -7,22 +7,19 @@
 {% block nav-alerts %}active{% endblock %}
 
 {% block content %}
-    <div class="span-24 last">
-        <div class="span-24 last">
-            {% if messages %}
-                <div class="span-17 last">
-                    <div class="span-10">
-                        {% for message in messages %}
-                            <p class="bottom {{message.tags}}">{{message|safe}}</p>
-                        {% endfor %}
-                    </div>
-                    <div class="span-6 last">&nbsp;</div>
-                </div>
-            {% endif %}
-        </div>
-        {% if user.profile.alert.all %}
-            <div class="span-24 last">
-                <table class="settings-table">
+    <div class="col-sm-12">
+        {% if messages %}
+            <div class="com-sm-6">
+                {% for message in messages %}
+                    <p class="bottom {{message.tags}}">{{message|safe}}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+    {% if user.profile.alert.all %}
+        <div class="col-sm-12">
+            <div class="table-responsive">
+                <table class="table settings-table">
                     <thead>
                         <tr>
                             <th>Query&nbsp;name</th>
@@ -53,11 +50,11 @@
                     </tbody>
                 </table>
             </div>
-        {% else %}
-            <h3>You have not made any alerts.</h3>
-            <form action="/" method="get">
-                <button type="submit" class="button">Make new alert</button>
-            </form>
-        {% endif %}
-    </div>
+        </div>
+    {% else %}
+        <h3>You have not made any alerts.</h3>
+        <form action="/" method="get">
+            <button type="submit" class="button">Make new alert</button>
+        </form>
+    {% endif %}
 {% endblock %}
