@@ -41,8 +41,6 @@ We welcome a conversion of these notes to a better process using Fabric.
  - New dependency for eyeD3 (sudo pip install --allow-external eyeD3 --allow-unverified eyeD3 eyeD3==0.7.4)
 
  QA BUGS:
-  - http://127.0.0.1:8000/feed/court/scotus/ &
-    http://127.0.0.1:8000/podcast/court/ca1/ & --> Crash ('str' object is not callable)
   - Cannot create MP3's on old OS versions.
 
  TODO:

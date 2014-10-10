@@ -1,5 +1,7 @@
 from alert.search import api
 from alert.search import api2
+from alert.search.feeds import JurisdictionFeed, AllJurisdictionsFeed, \
+    SearchFeed
 from alert.urls import pacer_codes
 
 from django.conf.urls import patterns, include
@@ -32,9 +34,9 @@ urlpatterns = patterns('',
     (r'^api/rest/', include(v2_api.urls)),
 
     # Feeds & Podcasts
-    (r'^feed/(search)/$', 'SearchFeed()'),
+    (r'^feed/(search)/$', SearchFeed()),
     # lacks URL capturing b/c it will use GET queries.
-    (r'^feed/court/all/$', 'AllJurisdictionsFeed()'),
+    (r'^feed/court/all/$', AllJurisdictionsFeed()),
     (r'^feed/court/(?P<court>' + '|'.join(pacer_codes) + ')/$',
-     'JurisdictionFeed()'),
+     JurisdictionFeed()),
 )
