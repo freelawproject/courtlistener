@@ -103,11 +103,11 @@
 {% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="span-13 append-2">
+    <div class="col-sm-7">
         <h2>Support the Free Law Project</h2>
         {% if message %}
-            <div class="span-13 last error">
-                <p class="bottom">{{ message|safe }}</p>
+            <div class="span-13 append-2 last">
+                <p class="bottom">{{ message }}</p>
             </div>
         {% endif %}
         <form action="/donate/" method="post" id="donate-form">{% csrf_token %}
@@ -138,7 +138,6 @@
                 </div>
             </div>
 
-            <hr class="space">
             <div id="how-donate">
                 <h3>How would you like to donate?</h3>
                 {% if donation_form.payment_provider.errors %}
@@ -323,7 +322,7 @@
         </div>
     </div>
 
-    <div class="span-9 last">
+    <div class="col-sm-5">
         <h3>The Big Goals</h3>
         <p>CourtListener is a project of the Free Law Project. Free Law Project is a California non-profit public
             benefit corporation whose purposes are to:</p>
@@ -336,7 +335,6 @@
         <p>Free Law Project is pursuing recognition as a 501(c)(3) non-profite organization. For more information,
             check out the Free Law Project <a href="http://freelawproject.org">Blog</a> and
             <a href="http://freelawproject.org/about/">About</a> page.</p>
-        <hr class="space">
 
 
         <h3 id="testimonials">What People Are Saying</h3>
