@@ -8,7 +8,7 @@
 {% block sidebar %}{% endblock sidebar %}
 
 {% block content %}
-    <div class="span-24 last">
+    <div class="col-xs-12">
         {% if user.is_superuser %}
             <p class="float-right"><a
                     href="/admin/search/docket/{{ docket.pk }}/">Edit&nbsp;Docket&nbsp;<i

@@ -15,7 +15,7 @@
 {% endblock %}
 
 {% block sidebar %}
-    <div class="span-6 append-1" id="sidebar">
+    <div class="col-sm-3" id="sidebar">
         <div class="sidebar-section">
             <h4>
                 <i class="fa fa-arrow-circle-o-left gray"></i>
@@ -133,7 +133,7 @@
 
 
 {% block content %}
-    <article class="span-17 last">
+    <article class="col-sm-9">
         <i id="favorites-star"
            class="{% if favorite_form.instance.doc_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
            data-toggle="modal"
@@ -194,10 +194,10 @@
         </p>
         <br>
         {% if doc.extracted_by_ocr %}
-            <div class="notice span-17 last">
+            <div class="notice col-sm-12">
                 <p class="bottom">The text of this document was obtained by analyzing a scanned
                 document provided by the court. As a result it may have typos, and you may prefer
-                reading <a href="/{{doc.local_path}}" class="visitable">the original</a>.</p>
+                reading the original.</p>
             </div>
             <div class="clearfix"></div>
         {% endif %}

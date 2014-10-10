@@ -7,7 +7,7 @@
 {% block description %}Table of Authorities for {{ title }}{% endblock %}
 
 {% block sidebar %}
-    <div class="span-6 append-1" id="sidebar">
+    <div class="col-sm-3" id="sidebar">
         <div class="sidebar-section">
             <h4 class="bottom">
                 <i class="fa fa-arrow-circle-o-left gray"></i>
@@ -18,7 +18,7 @@
 {% endblock sidebar %}
 
 {% block content %}
-    <div class="span-17 last">
+    <div class="col-sm-9">
         <h2>
             {{ doc.caption|safe|v_wrapper }}
         </h2>
