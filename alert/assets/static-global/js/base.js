@@ -86,7 +86,7 @@ $(document).ready(function() {
     //////////////
     function showAdvancedHomepage() {
         $('#homepage #advanced-search-starter, #homepage #search-container td > i').hide();
-        $('#homepage #advanced-search-inputs').show("fast");
+        $('#homepage #advanced-search-inputs').show("fast").removeClass("hidden");
         $("#main-query-box").addClass('wide');
         $('#id_q').focus();
     }
