@@ -6,7 +6,7 @@
 {% block search-form %}{% endblock %}
 
 {% block sidebar %}
-    <div class="span-6 append-1" id="sidebar">
+    <div class="col-sm-3" id="sidebar">
         <h3 class="bottom">Removal Requests</h3>
         <p>If you are concerned about your case appearing on this site,
             please see our <a href="/removal/">removal policy</a>.</p>
@@ -36,7 +36,7 @@
 {% endblock %}
 
 {% block content %}
-    <div class="span-17 last">
+    <div class="col-sm-9">
         <h2>Contact Us</h2>
 
         {% if form.errors %}
