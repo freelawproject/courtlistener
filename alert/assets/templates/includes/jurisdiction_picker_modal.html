@@ -14,9 +14,7 @@
                         <p class="inline fake-link" id="clear-current">Clear Current Tab</p>
                     {% endif %}
                 </div>
-                <hr class="space">
-
-
+                <label class="sr-only" for="court-filter">Select Jurisdictions by Typing</label>
                 <input id="court-filter" class="left span-6" type="text" placeholder="Select Jurisdictions by Typing"
                        autocomplete="off"/>
                 <ul class="nav nav-tabs" id="court-picker-tabs">
@@ -31,9 +29,9 @@
 
                 <div class="tab-content">
                     <div class="tab-pane active" id="tab-federal-appellate">
-                        <div class="span-23">
+                        <div class="row">
                             {% for row in courts.federal|rows:4 %}
-                                <div class="span-5 {% if forloop.last %}last{% else %}append-1{% endif %}">
+                                <div class="col-sm-3">
                                     {% for court in row %}
                                         {% if search_form.type.value == 'o' or not request.GET.type %}
                                             <div class="sidebar-checkbox">
@@ -71,9 +69,9 @@
                     </div>
                     {% if search_form.type.value == 'o' or not request.GET.type %}
                         <div class="tab-pane" id="tab-federal-district">
-                            <div class="span-23">
+                            <div class="row">
                                 {% for row in courts.district|rows:4 %}
-                                    <div class="span-5 {% if forloop.last %}last{% else %}append-1{% endif %}">
+                                    <div class="col-sm-3">
                                         {% for court in row %}
                                             <div class="sidebar-checkbox">
                                                 <input
@@ -95,18 +93,16 @@
                         </div>
                         <div class="tab-pane" id="tab-bankruptcy">
                             {% for bank_bundle in courts.bankruptcy %}
-                                <div class="span-23">
-                                    <h4 class="bottom inline">
-                                        {% if forloop.counter == 1 %}
-                                            Bankruptcy Appellate Panels
-                                        {% else %}
-                                            Bankruptcy District Courts
-                                        {% endif %}
-                                    </h4>
-                                </div>
-                                <div class="span-23">
+                                <h4 class="bottom inline">
+                                    {% if forloop.counter == 1 %}
+                                        Bankruptcy Appellate Panels
+                                    {% else %}
+                                        Bankruptcy District Courts
+                                    {% endif %}
+                                </h4>
+                                <div class="row">
                                     {% for row in bank_bundle|rows:4 %}
-                                        <div class="span-5 {% if forloop.last %}last{% else %}append-1{% endif %}">
+                                        <div class="col-sm-3">
                                             {% for court in row %}
                                                 <div class="sidebar-checkbox">
                                                     <input
@@ -125,13 +121,12 @@
                                         </div>
                                     {% endfor %}
                                 </div>
-                                <hr class="space">
                             {% endfor %}
                         </div>
                         <div class="tab-pane" id="tab-state">
-                            <div class="span-23">
+                            <div class="row">
                                 {% for col_bundle in courts.state %}
-                                    <div class="span-7 {% if forloop.last %}last{% else %}append-1{% endif %}">
+                                    <div class="col-sm-4">
                                         {% for court_bundle in col_bundle %}
                                             {% for court in court_bundle %}
                                                 <div class="sidebar-checkbox {% if court.jurisdiction == 'SA' or court.jurisdiction == 'SS' %}appeals-court{% endif %}">
@@ -154,9 +149,9 @@
                             </div>
                         </div>
                         <div class="tab-pane" id="tab-special">
-                            <div class="span-23">
+                            <div class="row">
                                 {% for row in courts.special|rows:3 %}
-                                    <div class="span-7 {% if forloop.last %}last{% else %}append-1{% endif %}">
+                                    <div class="col-sm-4">
                                         {% for court in row %}
                                             <div class="sidebar-checkbox">
                                                 <input

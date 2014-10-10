@@ -1,50 +1,42 @@
 <div id="searchform">
-    <form action="/" method="get" id="search-form">
-        <div id="search-container">
-            <table>
-                <tbody>
-                    <tr>
-                        <td>
-                            <input class="{% if count == 0 or error %}auto-focus{% endif %} wide-title"
-                                   value="{{ search_form.q.value|default:'' }}"
-                                   name="q"
-                                   id="id_q"
-                                   autocomplete="off"
-                                   type="text"
-                                   tabindex="5">
-                        </td>
-                        <td>
-                            <button type="submit"
-                                    class="button title span-3"
-                                    name="search"
-                                    id="search-button"
-                                    tabindex="6"><i class="fa fa-search"></i>&nbsp;Search
-                            </button>
-                        </td>
-                        {% if homepage %}
-                            <td data-container="body"
-                                data-toggle="popover"
-                                data-placement="top"
-                                data-content="Select Jurisdictions"
-                                data-trigger="hover"
-                                class="pointer">
-                                <i class="fa fa-university fa-2x fa-fw gray"
-                                   data-toggle="modal"
-                                   data-target="#court-picker"></i>
-                            </td>
-                        {% endif %}
-                    </tr>
-                    {% if not homepage %}
-                        <tr>
-                            <td colspan="2">
-                                <div class="left">
-                                    <a href="/search/advanced-techniques/" id="advanced" tabindex="8">Query Help</a>
-                                </div>
-                            </td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
+    <form action="/" method="get" id="search-form" class="form-inline" role="form">
+        <div id="search-container" class="text-center">
+            <label class="sr-only" for="id_q">Search</label>
+            <div class="input-group">
+                <input class="{% if count == 0 or error %}auto-focus{% endif %} wide-title form-control"
+                       value="{{ search_form.q.value|default:'' }}"
+                       name="q"
+                       id="id_q"
+                       autocomplete="off"
+                       type="text"
+                       tabindex="5">
+                <span class="input-group-btn">
+                    <button type="submit"
+                            class="btn btn-primary"
+                            name="search"
+                            id="search-button"
+                            tabindex="6"><i class="fa fa-search"></i>&nbsp;Search
+                    </button>
+                </span>
+            </div>
+            {% if homepage %}
+                <div data-container="body"
+                     data-toggle="popover"
+                     data-placement="top"
+                     data-content="Select Jurisdictions"
+                     data-trigger="hover"
+                     class="pointer form-group">
+                    <i class="fa fa-university fa-2x fa-fw gray"
+                       data-toggle="modal"
+                       data-target="#court-picker"></i>
+                </div>
+            {% endif %}
+            {% if not homepage %}
+                <br/>
+                <div class="left">
+                    <a href="/search/advanced-techniques/" id="advanced" tabindex="8">Query Help</a>
+                </div>
+            {% endif %}
         </div>
     </form>
 </div>
