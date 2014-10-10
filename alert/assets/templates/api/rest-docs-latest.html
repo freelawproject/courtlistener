@@ -6,7 +6,7 @@
 {% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="span-13 append-2">
+    <div class="col-sm-7">
         <h2 id="about">REST API &ndash; V2</h2>
         <p>For developers that wish to have a more granular API for our data, we provide a RESTful API
             based on the <a href="http://django-tastypie.readthedocs.org/en/latest/">tastypie toolkit</a>.
@@ -33,7 +33,7 @@
         <p>The following representation of our database should be instructive when thinking about how these endpoints
             work together:
         </p>
-        <img src="{{ STATIC_PREFIX }}png/schema-design.png" height="276" width="470">
+        <img src="{{ STATIC_PREFIX }}png/schema-design.png" height="276" width="470" class="img-responsive">
 
         <p class="alt">(A more detailed version of this diagram <a
                 href="http://lists.freelawproject.org/pipermail/dev/2014-September/000084.html">was
@@ -586,8 +586,8 @@
 
 
 
-    <div class="span-9 last">
-        <div class="span-9 last sidebar-section">
+    <div class="col-sm-5">
+        <div class="sidebar-section">
             <h3><span>Available Jurisdictions</span></h3>
             <p>
                 We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs.
@@ -623,7 +623,7 @@
 
 
 
-        <div class="span-9 last sidebar-section">
+        <div class="sidebar-section">
             <h3><span>Powered By</span></h3>
             <p>
                 If you are interested, we have a variety of <a href="http://freelawproject.org/about/assets/">"Powered
@@ -634,7 +634,7 @@
             </a>
         </div>
 
-        <div class="span-9 last sidebar-section">
+        <div class="sidebar-section">
             <h3><span>CiteGeist Scores</span></h3>
 
             <p>If you are interested in the CiteGeist score for each opinion, it is now available via our
@@ -642,7 +642,7 @@
             </p>
         </div>
 
-        <div class="span-9 last sidebar-section">
+        <div class="sidebar-section">
             <h3><span>Maintenance Schedule</span></h3>
             <p>
                 We regularly perform bulk tasks on our servers and maintain
@@ -652,7 +652,7 @@
             </p>
         </div>
 
-        <div class="span-9 last sidebar-section">
+        <div class="sidebar-section">
             <h3><span>Browser Tools</span></h3>
             <p>
                 Several tools are available to help view JSON in your browser. If you are using Firefox, check out
@@ -661,7 +661,7 @@
             </p>
         </div>
 
-        <div class="span-9 last sidebar-section">
+        <div class="sidebar-section">
             <h3><span>Deprecated API Documentation</span></h3>
             <p>If you are using an old version of the API and are looking for the notes for that version, please see:
 
@@ -671,7 +671,7 @@
             </ul>
         </div>
 
-        <div class="span-9 last sidebar-section">
+        <div class="sidebar-section">
             <h3 id="copyright"><span>Copyright</span></h3>
             <p>
                 Our data is free of known copyright restrictions.<br />
