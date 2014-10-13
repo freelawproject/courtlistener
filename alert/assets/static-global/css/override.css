@@ -6,6 +6,10 @@ Sets up all the overrides or additional CSS that the site uses.
     padding: 0 15px;
 }
 
+.bottom {
+    margin-bottom:0;
+    padding-bottom:0;
+}
 
 /* Some good stuff from h4pl.com */
 ::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
@@ -25,34 +29,34 @@ Sets up all the overrides or additional CSS that the site uses.
 }
 
 @media(max-width:767px){
-    #homepage #main-query-box {
-        width: 400px;
+    #homepage #main-query-box #id_q {
+        width: 250px;
     }
-    #homepage #main-query-box.wide {
-        width: 713px;
+    #homepage #main-query-box.wide #id_q {
+        width: 250px;
     }
 }
 @media(min-width:768px){
-    #homepage #main-query-box {
-        width: 500px;
+    #homepage #main-query-box #id_q {
+        width: 400px;
     }
-    #homepage #main-query-box.wide {
-        width: 700px;
+    #homepage #main-query-box.wide #id_q {
+        width: 580px;
     }
 }
 @media(min-width:992px){
-    #homepage #main-query-box {
+    #homepage #main-query-box #id_q {
         width: 600px;
     }
-    #homepage #main-query-box.wide {
+    #homepage #main-query-box.wide #id_q {
         width: 900px;
     }
 }
 @media(min-width:1200px){
-    #homepage #main-query-box {
+    #homepage #main-query-box #id_q {
         width: 800px;
     }
-    #homepage #main-query-box.wide {
+    #homepage #main-query-box.wide #id_q {
         width: 1000px;
     }
 }
@@ -158,7 +162,7 @@ div.hopscotch-bubble .hopscotch-bubble-close {
 
 /* General class shortcuts */
 .inline {
-    /*display: inline;*/
+    display: inline;
 }
 
 .bold {
@@ -320,6 +324,14 @@ nav ul li:last-child {
 
 /* New case view styling, including citations */
 #default-text pre, .citation {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-weight: inherit;
+    font-style: inherit;
+    font-size: 100%;
+    font-family: "andale mono","lucida console",monospace;
+    vertical-align: baseline;
     white-space: pre;
 }
 
