@@ -3,7 +3,7 @@ Sets up all the overrides or additional CSS that the site uses.
 ---------------------------------------------------------------------------*/
 
 .navbar-brand {
-    padding: 0 15px;
+    padding: 6px 15px;
 }
 
 .bottom {
@@ -35,8 +35,15 @@ Sets up all the overrides or additional CSS that the site uses.
     #homepage #main-query-box.wide #id_q {
         width: 250px;
     }
+    .headshot {
+        height: 135px;
+        width: 135px;
+    }
 }
 @media(min-width:768px){
+    #homepage #main-query-box {
+        margin-top: 3em;
+    }
     #homepage #main-query-box #id_q {
         width: 400px;
     }
