@@ -310,7 +310,7 @@ html.lt8>body p code {*white-space:normal;}
 */
 
 /* From fancy-type.css */
-.alt {
+/*.alt {
   color: #666;
   font-family: "Warnock Pro", "Book Antiqua", Georgia, serif;
   font-style: italic;
@@ -325,7 +325,7 @@ html.lt8>body p code {*white-space:normal;}
   line-height:1%;
   font-weight:bold;
   padding:0 2px;
-}
+}*/
 
 
 /* --------------------------------------------------------------
@@ -371,7 +371,7 @@ button[type] {
 }
 */
 /* Button colors */
-button:hover, a.button:hover{
+/*button:hover, a.button:hover{
   background-color:#dff4ff;
   border:1px solid #c2e1ef;
   color:#336699;
@@ -381,4 +381,4 @@ a.button:active{
   border:1px solid #6299c5;
   color:#fff;
 }
-
+*/

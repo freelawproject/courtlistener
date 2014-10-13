@@ -20,6 +20,34 @@ Sets up all the overrides or additional CSS that the site uses.
 ::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 ::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 
+/* From fancy-type.css */
+.alt {
+  color: #666;
+  font-family: "Warnock Pro", "Book Antiqua", Georgia, serif;
+  font-style: italic;
+  font-weight: normal;
+}
+
+.caps {
+  font-variant: small-caps;
+  letter-spacing: 1px;
+  text-transform: lowercase;
+  font-size:1.2em;
+  line-height:1%;
+  font-weight:bold;
+  padding:0 2px;
+}
+
+button:hover, a.button:hover{
+  background-color:#dff4ff;
+  border:1px solid #c2e1ef;
+  color:#336699;
+}
+a.button:active{
+  background-color:#6299c5;
+  border:1px solid #6299c5;
+  color:#fff;
+}
 
 #homepage #main-query-box {
     margin: 0 auto;
