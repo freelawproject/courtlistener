@@ -26,15 +26,12 @@
 
 {% block content %}
     <div class="col-xs-12">
-        <div class="span-24 last">
+        <div class="row">
             {% if messages %}
-                <div class="span-17 last">
-                    <div class="span-10">
-                        {% for message in messages %}
-                            <p class="bottom {{message.tags}}">{{message|safe}}</p>
-                        {% endfor %}
-                    </div>
-                    <div class="span-6 last">&nbsp;</div>
+                <div class="col-xs-12">
+                    {% for message in messages %}
+                        <p class="bottom {{message.tags}}">{{message|safe}}</p>
+                    {% endfor %}
                 </div>
             {% endif %}
         </div>

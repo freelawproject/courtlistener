@@ -43,7 +43,7 @@
     });
 
     // Set up the "Other" box so we don't have to do it via Django.
-    $(".radio-list li:last-child label").after("<input id=\"id_amount_other\" class=\"span-2\" type=\"text\" name=\"amount_other\"></input>");
+    $(".radio-list li:last-child label").after("<input id=\"id_amount_other\" class=\"\" type=\"text\" name=\"amount_other\"></input>");
     $("#id_amount_other").click(function(){
         // Make the "Other amount" input box select the "Other" radio input.
         $(".radio-list li:last-child input[type=radio]").prop('checked', true);
@@ -106,7 +106,7 @@
     <div class="col-sm-7">
         <h2>Support the Free Law Project</h2>
         {% if message %}
-            <div class="span-13 append-2 last">
+            <div class="">
                 <p class="bottom">{{ message }}</p>
             </div>
         {% endif %}

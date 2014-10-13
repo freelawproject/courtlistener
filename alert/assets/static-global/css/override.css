@@ -35,7 +35,7 @@ Sets up all the overrides or additional CSS that the site uses.
     #homepage #main-query-box.wide #id_q {
         width: 250px;
     }
-    .headshot {
+    .headshot { /* shrink photos on about page for phone size*/
         height: 135px;
         width: 135px;
     }
