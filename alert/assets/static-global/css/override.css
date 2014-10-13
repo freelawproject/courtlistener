@@ -1,6 +1,12 @@
 /* --------------------------------------------------------------------------
 Sets up all the overrides or additional CSS that the site uses.
 ---------------------------------------------------------------------------*/
+
+.navbar-brand {
+    padding: 0 15px;
+}
+
+
 /* Some good stuff from h4pl.com */
 ::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 ::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
@@ -8,7 +14,6 @@ Sets up all the overrides or additional CSS that the site uses.
 
 #homepage #main-query-box {
     margin: 0 auto;
-    /*width: 713px;*/
     -webkit-transition : all 0.5 s ease;
     -moz-transition: all 0.5s ease;
     -o-transition: all 0.5s ease;
@@ -16,8 +21,40 @@ Sets up all the overrides or additional CSS that the site uses.
 }
 
 #homepage #main-query-box.wide {
-    /*width: 950px;*/
     margin: 0;
+}
+
+@media(max-width:767px){
+    #homepage #main-query-box {
+        width: 400px;
+    }
+    #homepage #main-query-box.wide {
+        width: 713px;
+    }
+}
+@media(min-width:768px){
+    #homepage #main-query-box {
+        width: 500px;
+    }
+    #homepage #main-query-box.wide {
+        width: 700px;
+    }
+}
+@media(min-width:992px){
+    #homepage #main-query-box {
+        width: 600px;
+    }
+    #homepage #main-query-box.wide {
+        width: 900px;
+    }
+}
+@media(min-width:1200px){
+    #homepage #main-query-box {
+        width: 800px;
+    }
+    #homepage #main-query-box.wide {
+        width: 1000px;
+    }
 }
 
 #homepage #main-query-box.wide #id_q {

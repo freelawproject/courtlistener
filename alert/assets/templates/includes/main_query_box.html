@@ -3,7 +3,7 @@
         <div id="search-container" class="text-center">
             <label class="sr-only" for="id_q">Search</label>
             <div class="input-group">
-                <input class="{% if count == 0 or error %}auto-focus{% endif %} wide-title form-control"
+                <input class="{% if count == 0 or error %}auto-focus {% endif %}wide-title form-control"
                        value="{{ search_form.q.value|default:'' }}"
                        name="q"
                        id="id_q"
