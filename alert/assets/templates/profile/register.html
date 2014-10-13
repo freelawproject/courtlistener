@@ -16,8 +16,9 @@
 
 {% block content %}
     <div class="col-xs-12">
-        <div class="prepend-8 span-8 last">
-            <div class="box round">
+        <div class="row">
+            <div class="col-sm-4">&nbsp;</div>
+            <div class="col-sm-4 box round">
                 <h2>Register a new account</h2>
                 {% if form.errors %}
                     <div class="error">
@@ -36,7 +37,7 @@
                                 {% endfor %}
                             </span>
                         {% endif %}<br>
-                        <input id="id_username" type="text" name="username" maxlength="30" class="auto-focus span-7">
+                        <input id="id_username" type="text" name="username" maxlength="30" class="auto-focus">
                     </p>
                     <p>
                         <label for="id_email">Email address*</label>
@@ -47,7 +48,7 @@
                                 {% endfor %}
                             </span>
                         {% endif %}<br>
-                        <input type="text" maxlength="75" name="email" id="id_email" class="span-7">
+                        <input type="text" maxlength="75" name="email" id="id_email">
                     </p>
                     <p>
                         <label for="id_password1">Enter password*</label>
@@ -58,7 +59,7 @@
                                 {% endfor %}
                             </span>
                         {% endif %}<br>
-                        <input type="password" id="id_password1" name="password1" class="span-7">
+                        <input type="password" id="id_password1" name="password1">
                     </p>
                     <p>
                         <label for="id_password2">Re-enter password*</label>
@@ -69,7 +70,7 @@
                                 {% endfor %}
                             </span>
                         {% endif %}<br>
-                        <input type="password" id="id_password2" name="password2" class="span-7">
+                        <input type="password" id="id_password2" name="password2">
                     </p>
                     <p>
                         <label for="id_first_name">First name</label>
@@ -80,7 +81,7 @@
                                 {% endfor %}
                             </span>
                         {% endif %}<br>
-                        <input type="text" maxlength="30" name="first_name" id="id_first_name" class="span-7">
+                        <input type="text" maxlength="30" name="first_name" id="id_first_name">
                     </p>
                     <p>
                         <label for="id_last_name">Last name</label>
@@ -91,7 +92,7 @@
                                 {% endfor %}
                             </span>
                         {% endif %}<br>
-                        <input type="text" maxlength="30" name="last_name" id="id_last_name" class="span-7">
+                        <input type="text" maxlength="30" name="last_name" id="id_last_name">
                     </p>
                     <button type="submit" class="button" name="register">Register</button>
                     <p><a href="/reset-password/">Forgot username/password?</a></p>
