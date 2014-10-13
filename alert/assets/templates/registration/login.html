@@ -18,7 +18,7 @@
         <div class="box round">
             {% block h2 %}<h2>Sign in</h2>{% endblock %}
             {% if form.errors %}
-                <div class="error">
+                <div class="bg-danger">
                     {%  for error in form.non_field_errors %}
                     <p class="bottom">{{ error|safe }}</p>
                     {% endfor %}
@@ -37,7 +37,7 @@
 
                 </p>
                 <input type="hidden" name="next" value="{{ next|escape }}">
-                <button type="submit" class="button last">Sign In</button>
+                <button type="submit" class="button">Sign In</button>
             </form>
             <p class="bottom"><a href="/reset-password/">Forgot username/password?</a></p>
             <p><a href="/register/">Need to register?</a></p>

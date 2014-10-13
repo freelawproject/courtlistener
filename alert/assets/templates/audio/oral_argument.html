@@ -167,7 +167,7 @@
         </p>
         <br>
         {% if not af.processing_complete %}
-            <div class="notice col-xs-12">
+            <div class="col-xs-12 bg-warning">
                 <p class="bottom">This file has not yet completed processing on our server. Please try again in a few moments or if you prefer not to wait you may download the audio <a href="{{ af.download_url }}">directly from the court website</a>. Generally this process takes about thirty minutes.</p>
             </div>
         {% endif %}

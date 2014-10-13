@@ -11,6 +11,11 @@ Sets up all the overrides or additional CSS that the site uses.
     padding-bottom:0;
 }
 
+.top {
+    margin-top:0;
+    padding-top:0;
+}
+
 /* Some good stuff from h4pl.com */
 ::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 ::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
@@ -203,7 +208,7 @@ div.hopscotch-bubble .hopscotch-bubble-close {
     text-align: right;
 }
 
-.float-right {
+.float-right { /* replace with text-right? */
     float: right;
 }
 
@@ -547,8 +552,12 @@ a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
     cursor: hand;
 }
 
-/* errors */
-.error a, .notice a, .success a {
+/* These have some special casing for Oregon cases. */
+a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {color:#000;}
+a:not([name="TOP"]) {color:#009;text-decoration:underline;}
+
+/* errors - replaced with bg-danger, bg-warning, bg-success*/
+/*.error a, .notice a, .success a {
     text-decoration: underline;
 }
 .error a:focus, .error a:hover {
@@ -559,7 +568,7 @@ a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
 }
 .errortext {
     color: #8a1f11;
-}
+}*/
 
 
 /* Display cases from Resources.org neatly */
