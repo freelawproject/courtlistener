@@ -5,32 +5,47 @@
         <form id="court-picker-search-form" method="get" action="/">
             <div class="modal-content">
                 <div class="row">
-                    <span class="close float-right pointer" data-dismiss="modal" aria-hidden="true">&times;</span>
-                    <h2 class="inline">Select Jurisdictions</h2>
-                    <ul class="nav">
-                        <li class="inline fake-link" id="check-all">Check All</li>
-                        <li class="inline fake-link" id="clear-all">Clear All</li>
-                        {% if search_form.type.value == 'o' or not request.GET.type %}
-                            <li class="inline fake-link" id="check-current">Check Current Tab</li>
-                            <li class="inline fake-link" id="clear-current">Clear Current Tab</li>
-                        {% endif %}
-                    </ul>
+                    <div class="col-xs-1 col-xs-push-11">
+                        <span class="close float-right pointer" data-dismiss="modal" aria-hidden="true">&times;</span>
+                    </div>
+                    <div class="col-sm-11 col-xs-pull-11">
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <h2 class="inline">Select Jurisdictions</h2>
+                            </div>
+                            <div class="col-sm-6">
+                                <ul class="nav nav-justified">
+                                    <li class="inline fake-link" id="check-all">Check All</li>
+                                    <li class="inline fake-link" id="clear-all">Clear All</li>
+                                    {% if search_form.type.value == 'o' or not request.GET.type %}
+                                        <li class="inline fake-link" id="check-current">Check Current Tab</li>
+                                        <li class="inline fake-link" id="clear-current">Clear Current Tab</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="input-group">
-                    <label class="sr-only" for="court-filter">Select Jurisdictions by Typing</label>
-                    <input id="court-filter" class="form-control" type="text" placeholder="Select Jurisdictions by Typing"
-                           autocomplete="off"/>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <div class="input-group">
+                            <label class="sr-only" for="court-filter">Select Jurisdictions by Typing</label>
+                            <input id="court-filter" class="form-control" type="text" placeholder="Select Jurisdictions by Typing"
+                                autocomplete="off"/>
+                        </div>
+                    </div>
+                    <div class="col-sm-9">
+                        <ul class="nav nav-tabs" id="court-picker-tabs">
+                            <li class="active"><a href="#tab-federal-appellate" data-toggle="tab">Federal Appellate</a></li>
+                            {%  if search_form.type.value == 'o' or not request.GET.type %}
+                                <li><a href="#tab-federal-district" data-toggle="tab">Federal District</a></li>
+                                <li><a href="#tab-bankruptcy" data-toggle="tab">Bankruptcy</a></li>
+                                <li><a href="#tab-state" data-toggle="tab">State</a></li>
+                                <li><a href="#tab-special" data-toggle="tab">Special</a></li>
+                            {% endif %}
+                        </ul>
+                    </div>
                 </div>
-                <ul class="nav nav-tabs" id="court-picker-tabs">
-                    <li class="active"><a href="#tab-federal-appellate" data-toggle="tab">Federal Appellate</a></li>
-                    {%  if search_form.type.value == 'o' or not request.GET.type %}
-                        <li><a href="#tab-federal-district" data-toggle="tab">Federal District</a></li>
-                        <li><a href="#tab-bankruptcy" data-toggle="tab">Bankruptcy</a></li>
-                        <li><a href="#tab-state" data-toggle="tab">State</a></li>
-                        <li><a href="#tab-special" data-toggle="tab">Special</a></li>
-                    {% endif %}
-                </ul>
-
                 <div class="tab-content">
                     <div class="tab-pane active" id="tab-federal-appellate">
                         <div class="row">

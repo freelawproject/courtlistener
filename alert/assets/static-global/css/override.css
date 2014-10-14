@@ -106,9 +106,9 @@ a.button:active{
 }
 
 #homepage #advanced-search-starter h3 {
-    margin: 0 auto;
+    /*margin: 0 auto;*/
     /*width: 200px;*/
-    padding: 1em;
+    /*padding: 1em;*/
 }
 
 #homepage #jurisdiction-count {
