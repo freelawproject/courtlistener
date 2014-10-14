@@ -75,6 +75,11 @@ a.button:active{
     #homepage #main-query-box .input-group-btn {
         width: auto;
     }
+    #homepage #main-query-box .form-group {
+        display: inline-block;
+        margin-bottom: 0px;
+        vertical-align: middle;
+    }
     .headshot { /* shrink photos on about page for phone size*/
         height: 135px;
         width: 135px;
