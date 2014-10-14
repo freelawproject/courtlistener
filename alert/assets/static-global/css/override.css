@@ -713,7 +713,8 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 }
 
 #modal-court-picker {
-    width: 934px;
+    width: 95%;
+    max-width: 950px;
 }
 #modal-court-picker p.inline {
     margin-left: 10px;
