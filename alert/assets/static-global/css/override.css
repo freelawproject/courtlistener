@@ -68,6 +68,13 @@ a.button:active{
     #homepage #main-query-box.wide #id_q {
         width: 250px;
     }
+    #homepage #main-query-box .input-group {
+        display: inline-table;
+        vertical-align: middle;
+    }
+    #homepage #main-query-box .input-group-btn {
+        width: auto;
+    }
     .headshot { /* shrink photos on about page for phone size*/
         height: 135px;
         width: 135px;
@@ -89,7 +96,7 @@ a.button:active{
         width: 600px;
     }
     #homepage #main-query-box.wide #id_q {
-        width: 900px;
+        width: 800px;
     }
 }
 @media(min-width:1200px){
