@@ -502,9 +502,15 @@ div.sidebar-checkbox input {
 input.court-checkbox, input.status-checkbox {
     top: 0;
 }
+
+input.citation-count-input {
+    width: 6em;
+}
+
 #citation-count {
     float: right;
 }
+
 #slider-range {
     margin: 0.5em;
 }

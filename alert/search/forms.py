@@ -181,7 +181,7 @@ class SearchForm(forms.Form):
         required=False,
         initial=0,
         widget=forms.TextInput(
-            attrs={'class': 'external-input',
+            attrs={'class': 'external-input citation-count-input',
                    'autocomplete': 'off'}
         )
     )
@@ -189,7 +189,7 @@ class SearchForm(forms.Form):
         required=False,
         initial=20000,
         widget=forms.TextInput(
-            attrs={'class': 'external-input',
+            attrs={'class': 'external-input citation-count-input',
                    'autocomplete': 'off'}
         )
     )

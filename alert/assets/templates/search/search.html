@@ -133,8 +133,8 @@
 
                                 {% if search_form.type.value == 'o' %}
                                     <h4 class="bottom inline">Citation Count</h4>
-                                    <p class="bottom">{{ search_form.cited_gt }}</p>
-                                    <p class="bottom">{{ search_form.cited_lt }}</p>
+                                    <p class="bottom">minimum: {{ search_form.cited_gt }}</p>
+                                    <p class="bottom">maximum: {{ search_form.cited_lt }}</p>
                                 {% endif %}
 
                                 <button type="submit"
