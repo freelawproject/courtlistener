@@ -149,6 +149,7 @@ $(document).ready(function() {
     ////////////
     // Slider //
     ////////////
+    /*
     if (cited_gt.val() == "") {
         cited_gt.val(0);
     }
@@ -179,7 +180,7 @@ $(document).ready(function() {
     if (cited_gt.val() != 0 || cited_lt.val() != 20000) {
         $('#citation-count').text("(" + $("#id_cited_gt").val() + " - " + $("#id_cited_lt").val() + ")")
     }
-
+    */
 
     //////////////////
     // Court Picker //

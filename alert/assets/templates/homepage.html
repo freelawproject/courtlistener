@@ -148,10 +148,17 @@
                         {{ search_form.filed_before }}
                     </div>
                     <div class="col-sm-4">
-                        <h4 class="bottom inline">Citation Count</h4>
-                        {{ search_form.cited_gt }}
-                        {{ search_form.cited_lt }}
-                        <span type="text" id="citation-count" class="gray small bottom">(Any)</span>
+                        <h4 class="bottom">Citation Count</h4>
+                        <div class="row">
+                            <div class="col-xs-6">
+                                <h5 class="bottom">minimum</h5>
+                                {{ search_form.cited_gt }}
+                            </div>
+                            <div class="col-xs-6">
+                                <h5 class="bottom">maximum</h5>
+                                {{ search_form.cited_lt }}
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="row">

@@ -180,15 +180,17 @@ class SearchForm(forms.Form):
     cited_gt = forms.CharField(
         required=False,
         initial=0,
-        widget=forms.HiddenInput(
-            attrs={'class': 'external-input'}
+        widget=forms.TextInput(
+            attrs={'class': 'external-input',
+                   'autocomplete': 'off'}
         )
     )
     cited_lt = forms.CharField(
         required=False,
         initial=20000,
-        widget=forms.HiddenInput(
-            attrs={'class': 'external-input'}
+        widget=forms.TextInput(
+            attrs={'class': 'external-input',
+                   'autocomplete': 'off'}
         )
     )
 

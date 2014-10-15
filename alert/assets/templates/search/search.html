@@ -132,13 +132,9 @@
 
 
                                 {% if search_form.type.value == 'o' %}
-                                    <div class="">
-                                        {{ search_form.cited_gt }}
-                                        {{ search_form.cited_lt }}
-                                        <h4 class="bottom inline">Citation Count</h4>
-                                        <span type="text" id="citation-count" class="gray small bottom">(Any)</span>
-                                    </div>
-                                    <div id="slider-range" class="bottom"></div>
+                                    <h4 class="bottom inline">Citation Count</h4>
+                                    <p class="bottom">{{ search_form.cited_gt }}</p>
+                                    <p class="bottom">{{ search_form.cited_lt }}</p>
                                 {% endif %}
 
                                 <button type="submit"
