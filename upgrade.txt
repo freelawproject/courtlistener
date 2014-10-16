@@ -42,6 +42,12 @@ We welcome a conversion of these notes to a better process using Fabric.
 
  QA BUGS:
   - Cannot create MP3's on old OS versions.
+  + Podcasts fail
+  + Signout does weird things for Jason.
+  - Do the migrations work properly? Complete an audit.
+  - What tests do the new APIs need? Every endpoint needs at least one point
+    in all versions.
+  -
 
  TODO:
   - This change has a lot of changes to the database that need to be made,
