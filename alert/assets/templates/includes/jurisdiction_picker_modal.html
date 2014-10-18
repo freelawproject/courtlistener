@@ -15,11 +15,11 @@
                             </div>
                             <div class="col-sm-6">
                                 <div class="btn-group btn-group-xs">
-                                     <button type="button" class="btn btn-default fake-link" id="check-all">Check All</button>
-                                     <button type="button" class="btn btn-default fake-link" id="clear-all">Clear All</button>
+                                     <button type="button" class="btn btn-default" id="check-all">Check All</button>
+                                     <button type="button" class="btn btn-default" id="clear-all">Clear All</button>
                                     {% if search_form.type.value == 'o' or not request.GET.type %}
-                                        <button type="button" class="btn btn-default fake-link" id="check-current">Check Current Tab</button>
-                                        <button type="button" class="btn btn-default fake-link" id="clear-current">Clear Current Tab</button>
+                                        <button type="button" class="btn btn-default" id="check-current">Check Current Tab</button>
+                                        <button type="button" class="btn btn-default" id="clear-current">Clear Current Tab</button>
                                     {% endif %}
                                 </div>
                             </div>

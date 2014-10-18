@@ -16,6 +16,10 @@ Sets up all the overrides or additional CSS that the site uses.
     padding-top:0;
 }
 
+.large {
+    font-size: 21px;
+}
+
 /* Some good stuff from h4pl.com */
 ::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 ::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
@@ -588,6 +592,8 @@ a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
     color: #000099;
     text-decoration: underline;
 }
+
+/*
 .fake-link {
     color: #009;
 }
@@ -597,6 +603,7 @@ a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
     cursor: pointer;
     cursor: hand;
 }
+*/
 
 /* These have some special casing for Oregon cases. */
 a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {color:#000;}

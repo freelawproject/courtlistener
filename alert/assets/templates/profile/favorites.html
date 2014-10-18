@@ -11,7 +11,8 @@
             src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
     <script type="text/javascript">
         $(document).ready(function(){
-            $(".edit-favorite-trigger").click(function () {
+            $(".edit-favorite-trigger").click(function (event) {
+                event.preventDefault();
                 var pk = $(this).data("id");
                 var ds = $("#data-store-" + pk);
                 $("#id_doc_id").val(ds.data("doc_id"));
@@ -67,10 +68,10 @@
                                     <td class="align-top">
                                         <div data-toggle="modal"
                                              data-target="#modal-save-favorite">
-                                            <p class="inline fake-link edit-favorite-trigger nowrap"
+                                            <a class="inline edit-favorite-trigger nowrap"
                                                data-id="{{ favorite_form.instance.id }}">Edit / Delete
                                                <i class="fa fa-pencil gray"></i>
-                                            </p>
+                                            </a>
 
                                             <div id="data-store-{{ favorite_form.instance.id }}"
                                                  class="hidden"

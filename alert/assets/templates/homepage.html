@@ -76,8 +76,8 @@
 {% block content %}
     <div id="homepage" class="col-xs-12">
 
-    <h2 class="text-center bottom">Search millions of opinions by case name, topic, or citation.</h2>
-    <h3 class="text-center gray">{{ court_count }} Jurisdictions. Sponsored by the Non-Profit Free Law Project.</h3>
+    <p class="text-center large bottom">Search millions of opinions by case name, topic, or citation.</p>
+    <p class="text-center large gray">{{ court_count }} Jurisdictions. Sponsored by the Non-Profit Free Law Project.</p>
 
     <div class="row" id="main-query-box">
         {% include "includes/main_query_box.html" with homepage=True %}
@@ -185,8 +185,8 @@
     {# Jurisdiction modal is at the bottom so it loads last #}
 
     <div id="advanced-search-starter" class="row">
-        <h2 class="text-center alt gray bottom">&ndash; or &ndash;</h2>
-        <h3 class="text-center fake-link">Advanced Search</h3>
+        <p class="text-center large alt gray bottom">&ndash; or &ndash;</p>
+        <a class="text-center large">Advanced Search</a>
     </div>
 
     <div class="row">

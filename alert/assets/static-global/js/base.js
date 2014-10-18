@@ -334,7 +334,8 @@ $(document).ready(function() {
         ]
     };
 
-    $('#tour-link').click(function () {
+    $('#tour-link').click(function (event) {
+        event.preventDefault();
         var loc = location.pathname + location.search;
         if (loc !== '/') {
             sessionStorage.setItem("hopscotch.tour.state", 'feature-tour:0');
