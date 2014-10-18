@@ -90,7 +90,8 @@ $(document).ready(function() {
         $("#main-query-box").addClass('wide');
         $('#id_q').focus();
     }
-    $('#homepage #advanced-search-starter h3').click(function () {
+    $('#homepage #advanced-search-starter a').click(function (event) {
+        event.preventDefault();
         showAdvancedHomepage();
     });
 
