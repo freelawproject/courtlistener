@@ -41,13 +41,12 @@ We welcome a conversion of these notes to a better process using Fabric.
  - New dependency for eyeD3 (sudo pip install --allow-external eyeD3 --allow-unverified eyeD3 eyeD3==0.7.4)
 
  QA BUGS:
-  - Cannot create MP3's on old OS versions.
+  + Cannot create MP3's on old OS versions.
   + Podcasts fail
   + Signout does weird things for Jason.
   - Do the migrations work properly? Complete an audit.
   - What tests do the new APIs need? Every endpoint needs at least one point
     in all versions.
-  -
 
  TODO:
   - This change has a lot of changes to the database that need to be made,
@@ -95,7 +94,6 @@ We welcome a conversion of these notes to a better process using Fabric.
     + fix search schema
         - add test
     - make citing, cited-by endpoints in bulk.
-    - check the sign out button - make sure it doesn't fail miserably.
 
   API Changes:
    + /api/rest-info/ makes reference to a number of API calls that go to v1.
@@ -113,8 +111,8 @@ We welcome a conversion of these notes to a better process using Fabric.
           data system.
    - v1 cited by and citing don't seem to work
    - v2 paginating on cited-by and citing doesn't work. v1 may or may not work.
-   - pagination isn't a solution for bulk files
-   -
+   + pagination isn't a solution for bulk files
+
 
   Deployment:
   - Install new dependencies (see above)
@@ -157,12 +155,16 @@ We welcome a conversion of these notes to a better process using Fabric.
               min hour 30 4,6,9,11        * manage.py cl_make_bulk_data
               min hour 31 1,3,5,7,8,10,12 * manage.py cl_make_bulk_data
               min hour 28 2               * manage.py cl_make_bulk_data
+              min hour 30 4,6,9,11        * manage.py cl_make_citation_graph_bulk_data
+              min hour 31 1,3,5,7,8,10,12 * manage.py cl_make_citation_graph_bulk_data
+              min hour 28 2               * manage.py cl_make_citation_graph_bulk_data
 
         - Remove any old cron entries referencing dump_all_files.py
         - Add a new directory at $INSTALL_ROOT/alert/assets/media/bulk-data to
           contain the new bulk files when they are created, and symlink it from
           /sata/.
-        - Generate the new bulk files by calling manage.py cl_make_bulk_data.
+        - Generate the new bulk files by calling manage.py cl_make_bulk_data
+          and manage.py cl_make_citation_graph_bulk_data.
         - Be sure that Apache is restarted so the new location is updated.
         - Delete any old bulk files located at
           $INSTALL_ROOT/alert/assets/media/dumps

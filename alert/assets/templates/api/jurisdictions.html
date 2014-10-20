@@ -39,9 +39,6 @@
                 <th title="The date the court was abolished, if applicable">
                     End&nbsp;Date
                 </th>
-                <th title="Whether the court is in use in CourtListener">
-                    In&nbsp;Use
-                </th>
                 <th title="When this row was last modified in our database">
                     Modified
                 </th>
@@ -66,7 +63,6 @@
                     <td>{{ court.citation_string }}</td>
                     <td>{{ court.start_date|date:"Y-m-d"|default:"Unknown" }}</td>
                     <td>{{ court.end_date|date:"Y-m-d"|default:"Unknown" }}</td>
-                    <td>{{ court.in_use|yesno|title }}</td>
                     <td>{{ court.date_modified|date:"c"|slice:"16"|default:"None yet" }}</td>
                 </tr>
             {% endfor %}

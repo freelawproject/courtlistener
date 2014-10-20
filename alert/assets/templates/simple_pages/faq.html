@@ -13,7 +13,6 @@
 
     <div class="span-9 append-2">
         <h3 class="bottom">General</h3>
-
         <p>
             <a href="#who-and-what">What is this site? Who runs it?</a><br>
             <a href="#contact">How do I contact you?</a>
@@ -21,17 +20,17 @@
 
 
         <h3 class="bottom">Features</h3>
-
         <p>
             <a href="#why-use">Why should I use this site (and not something else)?</a><br>
             <a href="#how-different">What makes this site different from other sites that put legal documents
                 online?</a><br>
             <a href="#explain-alerts">What are alerts and how do they work?</a><br>
-            <a href="#explain-citations">How do you identify citations?</a>
+            <a href="#explain-citations">How do you identify citations?</a><br>
+            <a href="#oral-args">How do you get the oral arguments you have?</a>
         </p>
 
-        <h3 class="bottom">Coverage and Content</h3>
 
+        <h3 class="bottom">Coverage and Content</h3>
         <p>
             <a href="#what-coverage-exists">What is your coverage of legal materials and how comprehensive is
                 it?</a><br>
@@ -45,23 +44,23 @@
             <a href="#explain-fingerprint">What is the "fingerprint" of the document?</a>
         </p>
 
-        <h3 class="bottom">Contributions</h3>
 
+        <h3 class="bottom">Contributions</h3>
         <p>
             <a href="#kinds-of-help">What kinds of help do you need?</a><br>
             <a href="#how-supported">How is the project supported?</a><br>
             <a href="#can-i-contribute">Can I contribute to the project somehow?</a>
         </p>
 
-        <h3 class="bottom">Past and Future</h3>
 
+        <h3 class="bottom">Past and Future</h3>
         <p>
             <a href="#orgin-story">What's the history of CourtListener?</a><br>
             <a href="#future">What plans or features are in the works?</a>
         </p>
 
-        <h3 class="bottom">Something Else?</h3>
 
+        <h3 class="bottom">Something Else?</h3>
         <p>
             <a href="#other">Do you have a question that's not answered here?</a>
         </p>
@@ -74,9 +73,9 @@
     {% endif %}
 
 
+
     <h3 id="general">General</h3>
     <h4 id="who-and-what">What is this site? Who runs it?</h4>
-
     <p>CourtListener is a legal research website currently containing <a
             href="/coverage/">{{ total_opinion_count|intcomma }}</a> legal opinions from federal and state courts.
         CourtListener is operated by the non-profit <a
@@ -87,8 +86,8 @@
         downloads that enable academic researchers to study our collection.
     </p>
 
-    <h4 id="contact">How do I contact you?</h4>
 
+    <h4 id="contact">How do I contact you?</h4>
     <p>We can be contacted via the address on our <a href="/contact/">contact form</a>, or via email at
         <a href="mailto:info@freelawproject.org">info@freelawproject.org</a>. If you require a secure channel when
         contacting us, please use the PGP key listed
@@ -96,9 +95,9 @@
     </p>
 
 
+
     <h3 id="features">Features</h3>
     <h4 id="why-use">Why should I use this site (and not something else)?</h4>
-
     <p>While Free Law Project seeks to put the entirety of United States case law online, for the
         public, for free, we have not reached that goal yet. So, we hope you find what you are looking
         for here, but if not, you should absolutely use other sites too! Other no-cost sites include
@@ -134,6 +133,7 @@
         last people who ever have to attempt to collect the entirety of United States case law. Everyone who comes after
         can build upon this effort.</p>
 
+
     <h4 id="explain-alerts">What are alerts and how do they work?</h4>
     <p>You can sign up to receive free daily, weekly or monthly email alerts for any search query that interests you.
         When a new opinion matches your search, you'll get an email alert at about 5:30 Pacific time. Get started
@@ -150,6 +150,16 @@
         documents in our collection that appear to match the citation we use what we call "reverse matching"
         to try to resolve the citation. The case name from each potential match is searched in the original document
         and if there is only one match, then that becomes the linked citation.</p>
+
+    <h4 id="oral-args">How do you get the oral arguments that you have?</h4>
+    <p>We get oral arguments by looking at court websites on approximately an
+        hourly basis. We currently only check the sites listed on our <a
+            href="/coverage/#scraped-jurisdictions">coverage page</a>. Once we
+        have downloaded an oral argument, we convert it to an MP3, downsample
+        the audio for faster downloading, and add album art for your MP3
+        player. When the file is ready, it is added to the site and it becomes
+        available in search results, podcasts and bulk data.</p>
+
 
     <h3 id="coverage-and-content">Coverage and Content</h3>
     <h4 id="what-coverage-exists">What is your coverage of legal materials and how comprehensive is

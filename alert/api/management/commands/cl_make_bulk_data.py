@@ -1,16 +1,33 @@
+import errno
 import StringIO
 import os
+
 import shutil
 import tarfile
 import time
-import errno
+
+from django.core.management import BaseCommand
+from django.conf import settings
 
 from alert.lib.db_tools import queryset_generator
 from alert.lib.timer import print_timing
 from alert.search.models import Court, Document, Docket
-from django.core.management import BaseCommand
-from django.conf import settings
 from audio.models import Audio
+
+
+def deepgetattr(obj, attr):
+    """Recurse through an attribute chain to get the ultimate value."""
+    return reduce(getattr, attr.split('.'), obj)
+
+
+def swap_archives(obj_type_str):
+    """Swap out new archives for the old."""
+    mkdir_p(os.path.join(settings.BULK_DATA_DIR, '%s' % obj_type_str))
+    for f in os.listdir('/tmp/bulk/%s' % obj_type_str):
+        shutil.move(
+            '/tmp/bulk/%s/%s' % (obj_type_str, f),
+            os.path.join(settings.BULK_DATA_DIR, '%s' % obj_type_str, f)
+        )
 
 
 def mkdir_p(path):
@@ -24,11 +41,6 @@ def mkdir_p(path):
             raise
 
 
-def deepgetattr(obj, attr):
-    """Recurse through an attribute chain to get the ultimate value."""
-    return reduce(getattr, attr.split('.'), obj)
-
-
 class Command(BaseCommand):
     help = 'Create the bulk files for all jurisdictions and for "all".'
 
@@ -40,9 +52,9 @@ class Command(BaseCommand):
         """We can't wrap the handle() function, but we can wrap this one."""
         from alert.search import api2
         self.stdout.write('Starting bulk file creation...\n')
+
+        # Make the main bulk files
         arg_tuples = (
-            ('cited-by', Document, 'docket.court_id', api2.CitedByResource),
-            ('cites', Document, 'docket.court_id', api2.CitationResource),
             ('document', Document, 'docket.court_id', api2.DocumentResource),
             ('audio', Audio, 'docket.court_id', api2.AudioResource),
             ('docket', Docket, 'court_id', api2.DocketResource),
@@ -55,17 +67,16 @@ class Command(BaseCommand):
                 court_attr,
                 api_resource_obj
             )
-            self.swap_archives(obj_type_str)
-        self.stdout.write('Done.\n\n')
+            self.stdout.write('   - Swapping in the new %s archives...\n'
+                              % obj_type_str)
+            swap_archives(obj_type_str)
 
-    def swap_archives(self, obj_type_str):
-        """Swap out new archives for the old."""
-        self.stdout.write('   - Swapping in the new %s archives...\n'
-                          % obj_type_str)
-        mkdir_p(os.path.join(settings.BULK_DATA_DIR, '%s' % obj_type_str))
-        for f in os.listdir('/tmp/bulk/%s' % obj_type_str):
-            shutil.move('/tmp/bulk/%s/%s' % (obj_type_str, f),
-                        os.path.join(settings.BULK_DATA_DIR, '%s' % obj_type_str, f))
+        # Make the citation bulk data
+        self.make_citation_data()
+        self.stdout.write("   - Swapping in the new citation archives...\n")
+        swap_archives('citation')
+
+        self.stdout.write('Done.\n\n')
 
     def make_archive(self, obj_type_str, obj_type, court_attr, api_resource_obj):
         """Generate compressed archives containing the contents of an object
@@ -155,3 +166,26 @@ class Command(BaseCommand):
         tar_files['all'].close()
 
         self.stdout.write('   - all %s bulk files created.\n' % obj_type_str)
+
+    def make_citation_data(self):
+        """Because citations are paginated and because as of this moment there
+        are 11M citations in the database, we cannot provide users with a bulk
+        data file containing the complete objects for every citation.
+
+        Instead of doing that, we dump our citation table with a shell command,
+        which provides people with compact and reasonable data they can import.
+        """
+        mkdir_p('/tmp/bulk/citation')
+        self.stdout.write(" - Creating bulk data CSV for citations...\n")
+        self.stdout.write(
+            '   - Copying the Document_cases_cited table to disk...\n')
+
+        # This command calls the psql COPY command and requests that it dump
+        # the document_id and citation_id columns from the Document_cases_cited
+        # table to disk as a compressed CSV.
+        os.system(
+            '''psql -c "COPY \\"Document_cases_cited\\" (document_id, citation_id) to stdout DELIMITER ',' CSV HEADER" -d courtlistener --username django | gzip > /tmp/bulk/citation/all.csv.gz'''
+        )
+        self.stdout.write('   - Table created successfully.\n')
+
+

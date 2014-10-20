@@ -16,7 +16,7 @@ def view_audio_file(request, pk, _):
     We also test if the item is a favorite and send data as such.
     """
     af = get_object_or_404(Audio, pk=pk)
-    title = trunc(af.case_name, 100)
+    title = "Oral Argument for " + trunc(af.case_name, 100)
     get_string = search_utils.make_get_string(request)
 
     try:
