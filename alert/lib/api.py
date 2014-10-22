@@ -81,12 +81,15 @@ class DeprecatedModelResourceWithFieldsFilter(ModelResourceWithFieldsFilter):
         data['meta']['status'] = 'This endpoint is deprecated. Please ' \
                                  'upgrade to the newest version of the API.'
 
-        return super(DeprecatedModelResourceWithFieldsFilter, self).alter_list_data_to_serialize(request, data)
+        return super(
+            DeprecatedModelResourceWithFieldsFilter,
+            self
+        ).alter_list_data_to_serialize(request, data)
 
 
 class BasicAuthenticationWithUser(BasicAuthentication):
-    """Wraps the BasicAuthentication class, changing the get_identifier method to provide the username instead of
-    essentially nothing.
+    """Wraps the BasicAuthentication class, changing the get_identifier method
+    to provide the username instead of essentially nothing.
 
     Proposed this change in: https://github.com/toastdriven/django-tastypie/pull/1085/commits
     """

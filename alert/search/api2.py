@@ -2,7 +2,8 @@ import logging
 
 from alert.audio.models import Audio
 from alert.lib.api import ModelResourceWithFieldsFilter, \
-    BasicAuthenticationWithUser, PerUserCacheThrottle, SolrList
+    BasicAuthenticationWithUser, PerUserCacheThrottle, SolrList, \
+    good_time_filters, numerical_filters, good_date_filters
 from alert.lib.search_utils import build_main_query
 from alert.search import forms
 from alert.search.models import Citation, Court, Docket, Document, \
@@ -14,11 +15,6 @@ from tastypie.exceptions import BadRequest
 
 
 logger = logging.getLogger(__name__)
-
-good_time_filters = ('exact', 'gte', 'gt', 'lte', 'lt', 'range',
-                     'year', 'month', 'day', 'hour', 'minute', 'second',)
-good_date_filters = good_time_filters[:-3]
-numerical_filters = ('exact', 'gte', 'gt', 'lte', 'lt', 'range',)
 
 
 class JurisdictionResource(ModelResourceWithFieldsFilter):
