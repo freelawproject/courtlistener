@@ -100,29 +100,3 @@ class SolrTestCase(TestCase):
         swap_solr_core(self.core_name_audio, 'audio')
         delete_solr_core(self.core_name_opinion)
         delete_solr_core(self.core_name_audio)
-
-
-class SolrAudioTestCase(TestCase):
-    # TODO: This class can be removed and replaced by the class above.
-    fixtures = ['test_court.json']
-
-    def setUp(self):
-        # Create Solr cores for audio and swap it in
-        self.core_name = '%s.test-%s' % (self.__module__, time.time())
-        create_solr_core(
-            self.core_name,
-            schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-                                'audio_schema.xml'),
-            instance_dir='/usr/local/solr/example/solr/audio',
-        )
-        swap_solr_core('audio', self.core_name)
-        self.si = sunburnt.SolrInterface(settings.SOLR_AUDIO_URL, mode='rw')
-
-        # Uses the scraper framework to add a few items to the DB.
-        site = test_oral_arg_scraper.Site().parse()
-        OralArgCommand().scrape_court(site, full_crawl=True)
-
-    def tearDown(self):
-        Audio.objects.all().delete()
-        swap_solr_core(self.core_name, 'audio')
-        delete_solr_core(self.core_name)

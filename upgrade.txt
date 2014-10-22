@@ -45,7 +45,7 @@ We welcome a conversion of these notes to a better process using Fabric.
   + Podcasts fail
   + Signout does weird things for Jason.
   - Do the migrations work properly? Complete an audit.
-  - What tests do the new APIs need? Every endpoint needs at least one point
+  + What tests do the new APIs need? Every endpoint needs at least one point
     in all versions.
 
  TODO:

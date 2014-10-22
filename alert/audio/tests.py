@@ -1,8 +1,8 @@
-from alert.lib.test_helpers import SolrAudioTestCase
+from alert.lib.test_helpers import SolrTestCase
 from lxml import etree
 
 
-class PodcastTest(SolrAudioTestCase):
+class PodcastTest(SolrTestCase):
     def test_do_podcasts_have_good_content(self):
         """Can we simply load the podcast page?"""
         response = self.client.get('/podcast/court/test/')
