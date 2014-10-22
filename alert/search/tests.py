@@ -1,17 +1,21 @@
 import os
+import shutil
 import simplejson
-from datetime import date
+import time
 
+from collections import OrderedDict
+from datetime import date
 from datadiff import diff
 from django.test import TestCase
 from django.test.client import Client
+from django.test.utils import override_settings
 from lxml import html
 
 from alert.lib.solr_core_admin import (get_data_dir_location)
-from alert.lib.test_helpers import SolrOpinionTestCase
+from alert.lib.test_helpers import SolrTestCase
 from alert.search.models import Citation, Court, Document, Docket
 from alert import settings
-from alert.search.management.commands.cl_calculate_pagerank_networkx import\
+from alert.search.management.commands.cl_calculate_pagerank_networkx import \
     Command
 
 
@@ -46,7 +50,7 @@ class DocketUpdateSignalTest(TestCase):
         self.assertEqual(changed_docket.case_name, new_case_name)
 
 
-class SearchTest(SolrOpinionTestCase):
+class SearchTest(SolrTestCase):
     def test_a_simple_text_query(self):
         """Does typing into the main query box work?"""
         response = self.client.get('/', {'q': 'supreme'})
@@ -140,13 +144,18 @@ class SearchTest(SolrOpinionTestCase):
         """Can the results be re-ordered by citation count?"""
         response = self.client.get('/', {'q': '*:*',
                                          'order_by': 'citeCount desc'})
-        self.assertTrue(response.content.index('Disclosure') < response.content.index('Tarrant'),
-                        msg="'Disclosure' should come BEFORE 'Tarrant' when "
-                            "ordered by descending citeCount.")
-        response = self.client.get('/', {'q': '*:*', 'order_by': 'citeCount asc'})
-        self.assertTrue(response.content.index('Disclosure') > response.content.index('Tarrant'),
-                        msg="'Disclosure' should come AFTER 'Tarrant' when "
-                            "ordered by ascending citeCount.")
+        self.assertTrue(
+            response.content.index('Disclosure') < response.content.index(
+                'Tarrant'),
+            msg="'Disclosure' should come BEFORE 'Tarrant' when "
+                "ordered by descending citeCount.")
+        response = self.client.get('/',
+                                   {'q': '*:*', 'order_by': 'citeCount asc'})
+        self.assertTrue(
+            response.content.index('Disclosure') > response.content.index(
+                'Tarrant'),
+            msg="'Disclosure' should come AFTER 'Tarrant' when "
+                "ordered by ascending citeCount.")
 
     def test_homepage(self):
         """Is the homepage loaded when no GET parameters are provided?"""
@@ -197,62 +206,110 @@ class AlertTest(TestCase):
         self.client.logout()
 
 
-class ApiTest(SolrOpinionTestCase):
+@override_settings(MEDIA_ROOT='/tmp/%s' % time.time())
+class ApiTest(SolrTestCase):
     fixtures = ['test_court.json', 'authtest_data.json']
+
+    def tearDown(self):
+        """For these tests we change MEDIA_ROOT so we have a safe place to put
+        files as we save them. We need to delete this location once the tests
+        finish.
+        """
+        super(ApiTest, self).tearDown()
+        try:
+            shutil.rmtree(self.settings().wrapped.MEDIA_ROOT)
+        except OSError:
+            print "WARNING: Unable to delete %s. This probably means your " \
+                  "/tmp directory is getting junked up." % settings.MEDIA_ROOT
+
+    def strip_varying_data(self, endpoint,  actual, correct):
+        """A number of metadata fields vary each time the tests are run and
+        thus must be stripped so as to not cause issues.
+        """
+        if endpoint in ('audio', 'cited-by', 'cites', 'docket', 'document',
+                        'opinion'):
+            for j in (actual, correct,):
+                for o in j['objects']:
+                    if 'time_retrieved' in o:
+                        # Not all objects have this field
+                        o['time_retrieved'] = None
+                    o['date_modified'] = None
+        elif endpoint == 'search':
+            # Drop the timestamps and scores b/c they can differ
+            for j in (actual, correct):
+                for o in j['objects']:
+                    o['timestamp'] = None
+                    o['score'] = None
+        elif endpoint == 'jurisdiction':
+            # Drop any non-testing jurisdiction, cause they change over time
+            objects = []
+            for court in actual['objects']:
+                if court['id'] == 'test':
+                    court['date_modified'] = None
+                    objects.append(court)
+                    actual['objects'] = objects
+                    break
+            actual['meta']['total_count'] = 1
+        return actual, correct
 
     def test_api_meta_data(self):
         """Does the content of the search API have the right meta data?"""
         self.client.login(username='pandora', password='password')
-        api_versions = ['v1', 'v2']
-        api_endpoint_parameters = {
-            'search': '?q=*:*&format=json',
-            'jurisdiction': '?format=json',
+        api_endpoints = {
+            'audio': {'params': '', 'api_versions': ('v2',)},
+            'citation': {'params': '', 'api_versions': ('v1', 'v2',)},
+            'cited-by': {'params': '&id=1', 'api_versions': ('v1', 'v2',)},
+            'cites': {'params': '&id=1', 'api_versions': ('v1', 'v2',)},
+            'docket': {'params': '', 'api_versions': ('v2',)},
+            # opinion --> document in v2.
+            'opinion': {'params': '', 'api_versions': ('v1',)},
+            'document': {'params': '', 'api_versions': ('v2',)},
+            'jurisdiction': {'params': '', 'api_versions': ('v1', 'v2',)},
+            'search': {'params': '', 'api_versions': ('v1', 'v2',)},
         }
-        for v in api_versions:
-            for endpoint, params in api_endpoint_parameters.iteritems():
-                r = self.client.get('/api/rest/%s/%s/%s' % (v, endpoint, params))
-                json_actual = simplejson.loads(r.content)
+        # Alphabetical ordering makes the tests run consistently
+        api_endpoints_ordered = OrderedDict(sorted(
+            api_endpoints.items(),
+            key=lambda t: t[0])
+        )
 
-            with open(os.path.join(
-                settings.INSTALL_ROOT,
-                'alert',
-                'search',
-                'test_assets',
-                'api_%s_%s_test_results.json' % (v, endpoint)),
-                    'r') as f:
-                json_correct = simplejson.load(f)
+        for endpoint, endpoint_dict in api_endpoints_ordered.iteritems():
+            for v in endpoint_dict['api_versions']:
+                r = self.client.get('/api/rest/%s/%s/?format=json%s' %
+                                    (v, endpoint, endpoint_dict['params']))
+                actual = simplejson.loads(r.content)
 
-                if endpoint == 'search':
-                    # Drop the timestamps and scores b/c they can differ
-                    for j in [json_actual, json_correct]:
-                        for o in j['objects']:
-                            o['timestamp'] = None
-                            o['score'] = None
-                elif endpoint == 'jurisdiction':
-                    # Drop any non-testing jurisdiction, cause they change
-                    # over time
-                    objects = []
-                    for court in json_actual['objects']:
-                        if court['id'] == 'test':
-                            court['date_modified'] = None
-                            objects.append(court)
-                            json_actual['objects'] = objects
-                            break
-                    json_actual['meta']['total_count'] = 1
-                msg = "Response from search API did not match expected results " \
-                      "(api version: %s, endpoint: %s):\n%s" % (
-                    v,
-                    endpoint,
-                    diff(json_actual,
-                         json_correct,
-                         fromfile='actual',
-                         tofile='correct')
-                )
-                self.assertEqual(
-                    json_actual,
-                    json_correct,
-                    msg=msg,
-                )
+                with open(
+                        os.path.join(
+                            settings.INSTALL_ROOT,
+                            'alert',
+                            'search',
+                            'test_assets',
+                            'api_%s_%s_test_results.json' % (v, endpoint)
+                        ),
+                        'r') as f:
+                    correct = simplejson.load(f)
+
+                    actual, correct = self.strip_varying_data(
+                        endpoint,
+                        actual,
+                        correct
+                    )
+
+                    msg = "Response from API did not match expected " \
+                          "results (api version: %s, endpoint: %s):\n%s" % (
+                              v,
+                              endpoint,
+                              diff(actual,
+                                   correct,
+                                   fromfile='actual',
+                                   tofile='correct')
+                          )
+                    self.assertEqual(
+                        actual,
+                        correct,
+                        msg=msg,
+                    )
 
     def test_api_result_count(self):
         """Do we get back the number of results we expect in the meta data and
@@ -263,24 +320,26 @@ class ApiTest(SolrOpinionTestCase):
             r = self.client.get('/api/rest/%s/search/?q=*:*&format=json' % v)
             json = simplejson.loads(r.content)
             # Test the meta data
-            self.assertEqual(self.expected_num_results,
-                             json['meta']['total_count'],
-                             msg="Metadata result count does not match (api "
-                                 "version: '%s'):\n"
-                                 "  Got:\t%s\n"
-                                 "  Expected:\t%s\n" %
-                                 (v, json['meta']['total_count'],
-                                  self.expected_num_results,))
+            self.assertEqual(
+                self.expected_num_results_opinion,
+                json['meta']['total_count'],
+                msg="Metadata count does not match (api version: '%s'):\n"
+                    "  Got:\t%s\n"
+                    "  Expected:\t%s\n" %
+                    (v, json['meta']['total_count'],
+                     self.expected_num_results_opinion,)
+            )
             # Test the actual data
             num_actual_results = len(json['objects'])
-            self.assertEqual(self.expected_num_results,
-                             num_actual_results,
-                             msg="Actual number of results varies from "
-                                 "expected number (api version: '%s'):\n"
-                                 "  Got:\t%s\n"
-                                 "  Expected:\t%s\n" %
-                                 (v, num_actual_results,
-                                  self.expected_num_results))
+            self.assertEqual(
+                self.expected_num_results_opinion,
+                num_actual_results,
+                msg="Actual number of results varies from expected number "
+                    "(api version: '%s'):\n"
+                    "  Got:\t%s\n"
+                    "  Expected:\t%s\n" %
+                    (v, num_actual_results,
+                     self.expected_num_results_opinion))
 
     def test_api_able_to_login(self):
         """Can we login properly?"""
@@ -293,7 +352,7 @@ class ApiTest(SolrOpinionTestCase):
                             "  Password:\t%s\n" % (username, password))
 
 
-class FeedTest(SolrOpinionTestCase):
+class FeedTest(SolrTestCase):
     def test_jurisdiction_feed(self):
         """Can we simply load the jurisdiction feed?"""
         response = self.client.get('/feed/court/test/')
@@ -326,8 +385,9 @@ class PagerankTest(TestCase):
         # Set up some handy variables
         self.court = Court.objects.get(pk='test')
 
-        #create 3 documents with their citations and dockets
-        c1, c2, c3 = Citation(case_name=u"c1"), Citation(case_name=u"c2"), Citation(case_name=u"c3")
+        # create 3 documents with their citations and dockets
+        c1, c2, c3 = Citation(case_name=u"c1"), Citation(
+            case_name=u"c2"), Citation(case_name=u"c3")
         c1.save(index=False)
         c2.save(index=False)
         c3.save(index=False)
@@ -343,7 +403,8 @@ class PagerankTest(TestCase):
             case_name=u"c3",
             court=self.court,
         )
-        d1, d2, d3 = Document(date_filed=date.today()), Document(date_filed=date.today()), Document(date_filed=date.today())
+        d1, d2, d3 = Document(date_filed=date.today()), Document(
+            date_filed=date.today()), Document(date_filed=date.today())
         d1.citation, d2.citation, d3.citation = c1, c2, c3
         d1.docket, d2.docket, d3.docket = docket1, docket2, docket3
         doc_list = [d1, d2, d3]

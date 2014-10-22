@@ -22,10 +22,11 @@ good_date_filters = good_time_filters[:-3]
 numerical_filters = ('exact', 'gte', 'gt', 'lte', 'lt', 'range',)
 
 
-class CourtResource(DeprecatedModelResourceWithFieldsFilter):
+class JurisdictionResource(DeprecatedModelResourceWithFieldsFilter):
     has_scraper = fields.BooleanField(
         attribute='has_opinion_scraper',
-        help_text='Whether the jurisdiction has a scraper that obtains opinions automatically.'
+        help_text='Whether the jurisdiction has a scraper that obtains '
+                  'opinions automatically.'
     )
 
     class Meta:
@@ -56,8 +57,10 @@ class CourtResource(DeprecatedModelResourceWithFieldsFilter):
 
 
 class CitationResource(DeprecatedModelResourceWithFieldsFilter):
-    opinion_uris = fields.ToManyField('search.api.DocumentResource',
-                                      'parent_documents')
+    opinion_uris = fields.ToManyField(
+        'search.api.DocumentResource',
+        'parent_documents'
+    )
 
     class Meta:
         authentication = authentication.MultiAuthentication(
@@ -76,8 +79,8 @@ class DocumentResource(DeprecatedModelResourceWithFieldsFilter):
         full=True
     )
     court = fields.ForeignKey(
-        CourtResource,
-        'court'
+        JurisdictionResource,
+        'docket__court'
     )
     html = fields.CharField(
         attribute='html',
@@ -95,19 +98,22 @@ class DocumentResource(DeprecatedModelResourceWithFieldsFilter):
         attribute='html_with_citations',
         use_in='detail',
         null=True,
-        help_text="HTML of the document with citation links and other post-processed markup added",
+        help_text="HTML of the document with citation links and other "
+                  "post-processed markup added",
     )
     plain_text = fields.CharField(
         attribute='plain_text',
         use_in='detail',
         null=True,
-        help_text="Plain text of the document after extraction using pdftotext, wpd2txt, etc.",
+        help_text="Plain text of the document after extraction using "
+                  "pdftotext, wpd2txt, etc.",
     )
     date_modified = fields.DateTimeField(
         attribute='date_modified',
         null=True,
         default='1750-01-01T00:00:00Z',
-        help_text='The last moment when the item was modified. A value  in year 1750 indicates the value is unknown'
+        help_text='The last moment when the item was modified. A value  in '
+                  'year 1750 indicates the value is unknown'
     )
 
     class Meta:
@@ -144,11 +150,11 @@ class CitedByResource(DeprecatedModelResourceWithFieldsFilter):
     citation = fields.ForeignKey(
         CitationResource,
         'citation',
-        full=True
+        full=True,
     )
     court = fields.ForeignKey(
-        CourtResource,
-        'docket.court_id'
+        JurisdictionResource,
+        'docket__court'
     )
     date_modified = fields.DateTimeField(
         attribute='date_modified',
@@ -165,9 +171,8 @@ class CitedByResource(DeprecatedModelResourceWithFieldsFilter):
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'cited-by'
         queryset = Document.objects.all()
-        excludes = (
-            'is_stub_document', 'html', 'html_lawbox', 'html_with_citations',
-            'plain_text',)
+        excludes = ('is_stub_document', 'html', 'html_lawbox',
+                    'html_with_citations', 'plain_text',)
         include_absolute_url = True
         max_limit = 20
         list_allowed_methods = ['get']
@@ -218,14 +223,15 @@ class CitesResource(DeprecatedModelResourceWithFieldsFilter):
         full=True
     )
     court = fields.ForeignKey(
-        CourtResource,
-        'court'
+        JurisdictionResource,
+        'docket__court'
     )
     date_modified = fields.DateTimeField(
         attribute='date_modified',
         null=True,
         default='1750-01-01T00:00:00Z',
-        help_text='The last moment when the item was modified. A value  in year 1750 indicates the value is unknown'
+        help_text='The last moment when the item was modified. A value  in '
+                  'year 1750 indicates the value is unknown'
     )
 
     class Meta:
@@ -237,7 +243,8 @@ class CitesResource(DeprecatedModelResourceWithFieldsFilter):
         queryset = Document.objects.all()
         excludes = (
             'is_stub_document', 'html', 'html_lawbox', 'html_with_citations',
-            'plain_text',)
+            'plain_text',
+        )
         include_absolute_url = True
         max_limit = 20
         list_allowed_methods = ['get']
@@ -247,7 +254,9 @@ class CitesResource(DeprecatedModelResourceWithFieldsFilter):
         }
 
     def get_object_list(self, request):
-        """Get the citation associated with the document ID, then get all the items that it is cited by."""
+        """Get the citation associated with the document ID, then get all the
+        items that it is cited by.
+        """
         id = request.GET.get('id')
         if id:
             cases_cited = \
@@ -260,8 +269,9 @@ class CitesResource(DeprecatedModelResourceWithFieldsFilter):
             return super(CitesResource, self).get_object_list(request).none()
 
     def apply_filters(self, request, applicable_filters):
-        """The inherited method would attempt to apply filters, but filtering is only turned on so we can slip
-        the id parameter through. If this function is not overridden and nixed, it attempts normal Django
+        """The inherited method would attempt to apply filters, but filtering
+        is only turned on so we can slip the id parameter through. If this
+        function is not overridden and nixed, it attempts normal Django
         filtering, which crashes.
 
         Thus, do nothing here.
@@ -360,7 +370,8 @@ class SolrObject(object):
 
 
 class SearchResource(DeprecatedModelResourceWithFieldsFilter):
-    # Roses to the clever person that makes this introspect the model and removes all this code.
+    # Roses to the clever person that makes this introspect the model and
+    # removes all this code.
     absolute_url = fields.CharField(
         attribute='absolute_url',
         help_text="The URL on CourtListener for the item.",
@@ -552,8 +563,8 @@ class SearchResource(DeprecatedModelResourceWithFieldsFilter):
                        "complete your request.")
 
     def apply_sorting(self, obj_list, options=None):
-        """Since we're not using Django Model sorting, we just want to use our own, which is already
-        passed into the search form anyway.
+        """Since we're not using Django Model sorting, we just want to use our
+        own, which is already passed into the search form anyway.
 
         Thus: Do nothing here.
         """

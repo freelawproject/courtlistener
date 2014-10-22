@@ -58,7 +58,7 @@ class Command(BaseCommand):
             ('document', Document, 'docket.court_id', api2.DocumentResource),
             ('audio', Audio, 'docket.court_id', api2.AudioResource),
             ('docket', Docket, 'court_id', api2.DocketResource),
-            ('jurisdiction', Court, 'pk', api2.CourtResource),
+            ('jurisdiction', Court, 'pk', api2.JurisdictionResource),
         )
         for obj_type_str, obj_type, court_attr, api_resource_obj in arg_tuples:
             self.make_archive(

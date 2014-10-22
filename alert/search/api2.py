@@ -21,7 +21,7 @@ good_date_filters = good_time_filters[:-3]
 numerical_filters = ('exact', 'gte', 'gt', 'lte', 'lt', 'range',)
 
 
-class CourtResource(ModelResourceWithFieldsFilter):
+class JurisdictionResource(ModelResourceWithFieldsFilter):
     class Meta:
         authentication = authentication.MultiAuthentication(
             BasicAuthenticationWithUser(realm="courtlistener.com"),
@@ -51,10 +51,10 @@ class CourtResource(ModelResourceWithFieldsFilter):
 
 class DocketResource(ModelResourceWithFieldsFilter):
     court = fields.ForeignKey(
-        CourtResource,
+        JurisdictionResource,
         'court'
     )
-    opinion_uris = fields.ToManyField(
+    document_uris = fields.ToManyField(
         'search.api2.DocumentResource',
         'documents'
     )
@@ -137,7 +137,11 @@ class DocumentResource(ModelResourceWithFieldsFilter):
     )
     docket = fields.ForeignKey(
         DocketResource,
-        'docket'
+        'docket',
+    )
+    court = fields.ForeignKey(
+        JurisdictionResource,
+        'docket__court',
     )
     html = fields.CharField(
         attribute='html',
@@ -202,6 +206,11 @@ class DocumentResource(ModelResourceWithFieldsFilter):
 
 
 class CitedByResource(ModelResourceWithFieldsFilter):
+    citation = fields.ForeignKey(
+        CitationResource,
+        'citation',
+        full=True,
+    )
     date_modified = fields.DateTimeField(
         attribute='date_modified',
         null=True,
@@ -213,6 +222,10 @@ class CitedByResource(ModelResourceWithFieldsFilter):
         DocketResource,
         'docket'
     )
+    court = fields.ForeignKey(
+        JurisdictionResource,
+        'docket__court',
+    )
 
     class Meta:
         authentication = authentication.MultiAuthentication(
@@ -221,12 +234,8 @@ class CitedByResource(ModelResourceWithFieldsFilter):
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'cited-by'
         queryset = Document.objects.all()
-        fields = (
-            'absolute_url',
-            'citation_count',
-            'id',
-            'time_retrieved',
-        )
+        excludes = ('is_stub_document', 'html', 'html_lawbox',
+                    'html_with_citations', 'plain_text')
         include_absolute_url = True
         max_limit = 20
         list_allowed_methods = ['get']
@@ -272,8 +281,17 @@ class CitedByResource(ModelResourceWithFieldsFilter):
 
 class CitesResource(ModelResourceWithFieldsFilter):
     docket = fields.ForeignKey(
-        CourtResource,
-        'docket'
+        DocketResource,
+        'docket',
+    )
+    court = fields.ForeignKey(
+        JurisdictionResource,
+        'docket__court',
+    )
+    citation = fields.ForeignKey(
+        CitationResource,
+        'citation',
+        full=True,
     )
     date_modified = fields.DateTimeField(
         attribute='date_modified',
@@ -290,11 +308,9 @@ class CitesResource(ModelResourceWithFieldsFilter):
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'cites'
         queryset = Document.objects.all()
-        fields = (
-            'absolute_url',
-            'citation_count',
-            'id',
-            'time_retrieved',
+        excludes = (
+            'is_stub_document', 'html', 'html_lawbox', 'html_with_citations',
+            'plain_text',
         )
         include_absolute_url = True
         max_limit = 20
