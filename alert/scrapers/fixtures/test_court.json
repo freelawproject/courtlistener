@@ -13,7 +13,9 @@
             "position": 0.0,
             "start_date": "2013-06-13",
             "has_opinion_scraper": true,
-            "has_oral_argument_scraper": false
+            "has_oral_argument_scraper": false,
+            "notes": "",
+            "date_modified": "2013-08-14T16:46:30Z"
         }
     }
 ]

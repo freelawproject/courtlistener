@@ -6,7 +6,7 @@ from alert.lib import sunburnt
 from alert.lib.solr_core_admin import create_solr_core, swap_solr_core, \
     delete_solr_core
 from alert.scrapers.management.commands.cl_scrape_oral_arguments import \
-    Command as OralArgCommand
+    Command
 from alert.scrapers.test_assets import test_opinion_scraper, \
     test_oral_arg_scraper
 from alert.search.models import Court, Citation, Docket, Document
@@ -88,7 +88,7 @@ class SolrTestCase(TestCase):
 
         # Scrape the audio "site" and add its contents
         site = test_oral_arg_scraper.Site().parse()
-        OralArgCommand().scrape_court(site, full_crawl=True)
+        Command().scrape_court(site, full_crawl=True)
 
         self.expected_num_results_opinion = 3
         self.expected_num_results_audio = 2
