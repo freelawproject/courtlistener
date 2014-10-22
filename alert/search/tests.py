@@ -311,6 +311,59 @@ class ApiTest(SolrTestCase):
                         msg=msg,
                     )
 
+    def test_api_pagination(self):
+        """Do the cited-by and cites endpoints paginate properly?"""
+        self.client.login(username='pandora', password='password')
+
+        r = self.client.get('/api/rest/v2/cites/?id=1')
+        json_no_offset_no_limit = simplejson.loads(r.content)
+        self.assertEqual(
+            len(json_no_offset_no_limit['objects']),
+            2,
+            msg="Did not get the expected result count on the cites endpoint."
+        )
+
+        # Offset 1.
+        r = self.client.get('/api/rest/v2/cites/?id=1&offset=1')
+        json_offset_1 = simplejson.loads(r.content)
+
+        # Do we get back one fewer results with the offset?
+        self.assertEqual(
+            len(json_offset_1['objects']),
+            len(json_no_offset_no_limit['objects']) - 1
+        )
+
+        # Does the first item of the offset query match the second in the query
+        # with no offset?
+        self.assertEqual(
+            json_offset_1['objects'][0]['absolute_url'],
+            json_no_offset_no_limit['objects'][1]['absolute_url'],
+        )
+
+        # (1) Does the first item in a query limited to one result match the
+        # first item in an unlimited query, and (2) does the first item in a
+        # query limited to one result and offset by one match the second item
+        # in an unlimited query?
+        r = self.client.get('/api/rest/v2/cites/?id=1&limit=1')
+        json_limit_1 = simplejson.loads(r.content)
+        r = self.client.get('/api/rest/v2/cites/?id=1&limit=1&offset=1')
+        json_limit_1_offset_1 = simplejson.loads(r.content)
+        self.assertEqual(
+            json_limit_1['objects'][0]['absolute_url'],
+            json_no_offset_no_limit['objects'][0]['absolute_url']
+        )
+        self.assertEqual(
+            json_limit_1_offset_1['objects'][0]['absolute_url'],
+            json_no_offset_no_limit['objects'][1]['absolute_url']
+        )
+
+        # Are the results of a limit 1 and an offset 1 different?
+        self.assertNotEqual(
+            json_limit_1['objects'][0]['absolute_url'],
+            json_limit_1_offset_1['objects'][0]['absolute_url']
+        )
+
+
     def test_api_result_count(self):
         """Do we get back the number of results we expect in the meta data and
         in 'objects'?"""
@@ -361,8 +414,8 @@ class FeedTest(SolrTestCase):
                              "feed")
         html_tree = html.fromstring(response.content)
         node_tests = (
-            ('//feed/entry', 2),
-            ('//feed/entry/title', 2),
+            ('//feed/entry', 3),
+            ('//feed/entry/title', 3),
         )
         for test, count in node_tests:
             node_count = len(html_tree.xpath(test))

@@ -93,7 +93,7 @@ We welcome a conversion of these notes to a better process using Fabric.
     + add docket information to opinion results & verify bulk data
     + fix search schema
         - add test
-    - make citing, cited-by endpoints in bulk.
+    + make citing, cited-by endpoints in bulk.
 
   API Changes:
    + /api/rest-info/ makes reference to a number of API calls that go to v1.
@@ -109,8 +109,8 @@ We welcome a conversion of these notes to a better process using Fabric.
         + If docket is not integrated completely (if only a reference is
           provided) need to figure out how dockets are provided in the bulk
           data system.
-   - v1 cited by and citing don't seem to work
-   - v2 paginating on cited-by and citing doesn't work. v1 may or may not work.
+   + v1 cited by and citing don't seem to work
+   + v2 paginating on cited-by and citing doesn't work. v1 may or may not work.
    + pagination isn't a solution for bulk files
 
 
