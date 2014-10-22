@@ -13,7 +13,6 @@ from django.conf import settings
 from alert.lib import sunburnt
 from alert.lib.string_diff import find_confidences, gen_diff_ratio, get_cosine_similarity
 import datetime
-from datetime import date
 import re
 
 DEBUG = True

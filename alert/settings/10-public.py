@@ -81,8 +81,9 @@ INSTALLED_APPS = [
 ]
 
 
-# This is where the @login_required decorator redirects. By default it's /accounts/login.
-# Also where users are redirected after they login. Default: /account/profile
+# This is where the @login_required decorator redirects. By default it's
+# /accounts/login. Also where users are redirected after they login. Default:
+# /account/profile
 LOGIN_URL = "/sign-in/"
 LOGIN_REDIRECT_URL = "/"
 

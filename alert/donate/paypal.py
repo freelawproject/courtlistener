@@ -34,7 +34,8 @@ def get_paypal_access_token():
     if r.status_code == 200:
         logger.info("Got paypal token successfully.")
     else:
-        logger.critical("Problem getting paypal token status_code was: %s, with content: %s" % (r.status_code, r.content))
+        logger.critical("Problem getting paypal token status_code was: %s, "
+                        "with content: %s" % (r.status_code, r.content))
     return simplejson.loads(r.content).get('access_token')
 
 
@@ -42,16 +43,20 @@ def get_paypal_access_token():
 def process_paypal_callback(request):
     """Process the GET request that PayPal uses.
 
-    After a transaction is completed, PayPal sends the user back to a page on our site. This could be our "Thanks" page,
-    but since that page is seen by all the payment providers, instead this is an intermediate page, where we grab the
-    correct things from the URL, process the item, and then shuttle the user off to the normal "Thanks" page.
+    After a transaction is completed, PayPal sends the user back to a page on
+    our site. This could be our "Thanks" page, but since that page is seen by
+    all the payment providers, instead this is an intermediate page, where we
+    grab the correct things from the URL, process the item, and then shuttle
+    the user off to the normal "Thanks" page.
 
-    The other providers do this via a POST rather than a GET, so that's why this one is a bit of an oddball.
+    The other providers do this via a POST rather than a GET, so that's why
+    this one is a bit of an oddball.
     """
     access_token = get_paypal_access_token()
     d = Donation.objects.get(transaction_id=request.GET['token'])
     r = requests.post(
-        '%s/v1/payments/payment/%s/execute/' % (settings.PAYPAL_ENDPOINT, d.payment_id),
+        '%s/v1/payments/payment/%s/execute/' % (settings.PAYPAL_ENDPOINT,
+                                                d.payment_id),
         headers={
             'Content-Type': 'application/json',
             'Authorization': 'Bearer %s' % access_token
@@ -65,8 +70,8 @@ def process_paypal_callback(request):
         from alert.donate.views import send_thank_you_email
         send_thank_you_email(d)
     else:
-        logger.critical("Unable to execute PayPal transaction. Status code %s with data: %s" %
-                        (r.status_code, r.content))
+        logger.critical("Unable to execute PayPal transaction. Status code %s "
+                        "with data: %s" % (r.status_code, r.content))
         d.status = 1
         d.save()
     # Finally, show them the thank you page
