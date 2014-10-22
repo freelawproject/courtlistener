@@ -527,7 +527,7 @@ class SearchResource(ModelResourceWithFieldsFilter):
         if bundle_or_obj:
             return url_str % (
                 self.api_name,
-                'opinion',
+                'document',
                 bundle_or_obj.obj.id,
             )
         else:

@@ -161,20 +161,7 @@ class ReportScrapeStatusTest(TestCase):
     fixtures = ['test_court.json']
 
     def setUp(self):
-        # Add a document today, within the last week and two weeks ago (within 30 days)
-        today = now()
-        five_days_ago = now() - timedelta(days=5)
-        fourteen_days_ago = now() - timedelta(days=14)
-
         court = Court.objects.get(pk='test')
-        case_name = u'In Re Gaby and Jalal'
-        docket = Docket(case_name=case_name, court=court)
-        docket.save()
-        cite = Citation(case_name=case_name)
-        cite.save()
-        Document(date_filed=today, citation=cite, docket=docket).save()
-        Document(date_filed=five_days_ago, citation=cite, docket=docket).save()
-        Document(date_filed=fourteen_days_ago, citation=cite, docket=docket).save()
 
         # Make some errors that we can tally
         ErrorLog(log_level='WARNING',
@@ -184,17 +171,13 @@ class ReportScrapeStatusTest(TestCase):
                  court=court,
                  message="test_msg").save()
 
-    def test_calculating_counts(self):
-        counts, _, _ = calculate_counts()
-        self.assertEqual(counts['test'],
-                         [3, 2, 1],
-                         msg="Did not get expected counts. Instead got: %s" % counts['test'])
-
     def test_tallying_errors(self):
-        errors, _ = tally_errors()
-        self.assertEqual(errors['test'],
-                         [1, 1],
-                         msg="Did not get expected error counts. Instead got: %s" % errors['test'])
+        errors = tally_errors()
+        self.assertEqual(
+            errors['test'],
+            [1, 1],
+            msg="Did not get expected error counts. Instead got: %s" %
+                errors['test'])
 
 
 class DupcheckerTest(TestCase):
@@ -234,7 +217,7 @@ class DupcheckerTest(TestCase):
         site = test_opinion_scraper.Site()
         site.hash = 'this is a dummy hash code string'
         for dup_checker in self.dup_checkers:
-            urlToHash(url=site.url, SHA1=site.hash).save()
+            urlToHash(id=site.url, SHA1=site.hash).save()
             abort = dup_checker.abort_by_url_hash(site.url, site.hash)
             if dup_checker.full_crawl:
                 self.assertFalse(

@@ -400,17 +400,16 @@ class SearchResource(DeprecatedModelResourceWithFieldsFilter):
         max_limit = 20
         include_absolute_url = True
         allowed_methods = ['get']
-        search_field = ('search',)
         filtering = {
-            'q': search_field,
-            'case_name': search_field,
-            'judge': search_field,
+            'q': ('search',),
+            'case_name': ('search',),
+            'judge': ('search',),
             'stat_': ('boolean',),
             'filed_after': ('date', ),
             'filed_before': ('date',),
-            'citation': search_field,
-            'neutral_cite': search_field,
-            'docket_number': search_field,
+            'citation': ('search',),
+            'neutral_cite': ('search',),
+            'docket_number': ('search',),
             'cited_gt': ('int',),
             'cited_lt': ('int',),
             'court': ('csv',),
@@ -437,26 +436,27 @@ class SearchResource(DeprecatedModelResourceWithFieldsFilter):
 
     def get_object_list(self, request=None, **kwargs):
         """Performs the Solr work."""
+        main_query = {'caller': 'api_search'}
         try:
-            main_query = build_main_query(
-                kwargs['cd'],
-                highlight='text'
+            main_query.update(build_main_query(kwargs['cd'],
+                                               highlight='text'))
+            sl = SolrList(
+                main_query=main_query,
+                offset=request.GET.get('offset', 0),
+                limit=request.GET.get('limit', 20),
+                type=kwargs['cd']['type']
             )
         except KeyError:
             sf = forms.SearchForm({'q': "*:*"})
             if sf.is_valid():
-                main_query = build_main_query(
-                    sf.cleaned_data,
-                    highlight='text'
-                )
+                main_query.update(build_main_query(sf.cleaned_data,
+                                                   highlight='text'))
+            sl = SolrList(
+                main_query=main_query,
+                offset=request.GET.get('offset', 0),
+                limit=request.GET.get('limit', 20),
+            )
 
-        main_query['caller'] = 'api_search'
-        # Use a SolrList that has a couple of the normal functions built in.
-        sl = SolrList(
-            main_query=main_query,
-            offset=request.GET.get('offset', 0),
-            limit=request.GET.get('limit', 20)
-        )
         return sl
 
     def obj_get_list(self, bundle, **kwargs):
