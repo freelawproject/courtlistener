@@ -72,14 +72,14 @@
         donor_info.show("fast");
         check_info.hide();
         cc_info.hide();
-        payment_price.text("PayPal charges us 2.9% + 30¢ on all donations.")
+        payment_price.text("PayPal charges us 2.2% + 30¢ on all donations.")
     });
     $("#id_payment_provider_2").click(function(){
         // Credit Card
         donor_info.show("fast");
         check_info.hide();
         cc_info.show();
-        payment_price.text("We are charged 2.9% + 30¢ on all donations.")
+        payment_price.text("We are charged 2.9% + 30¢ on all credit card donations.")
     });
     $("#id_payment_provider_3").click(function(){
         // Check
@@ -314,10 +314,13 @@
 
         </div>
         <div id="check-info">
-            <p>To pay by check, simply make out a check to the "Free Law Project", and send it to the address on our
-            <a href="/contact/">contact page</a>.</p>
-
-            <p>We cannot accept starter checks, unnumbered checks or non-personalized checks.</p>
+            <p>To pay by check, simply make out a check to the "Free Law
+                Project", and send it to the address on our <a
+                        href="/contact/">contact page</a>.
+            </p>
+            <p>We cannot accept starter checks, unnumbered checks or
+                non-personalized checks.
+            </p>
 
             <p>Thanks so much for your donation.</p>
         </div>
@@ -325,37 +328,46 @@
 
     <div class="span-9 last">
         <h3>The Big Goals</h3>
-        <p>CourtListener is a project of the Free Law Project. Free Law Project is a California non-profit public
-            benefit corporation whose purposes are to:</p>
+        <p>CourtListener is a project of the Free Law Project. Free Law Project
+            is a federally-recognized 501(c)(3) public charity and a California
+            non-profit public benefit corporation whose purposes are to:
+        </p>
         <ul>
             <li>Create powerful tools for legal research</li>
-            <li>Provide free, public and permanent access to primary legal materials</li>
-            <li>Foster an open ecosystem for legal research and development</li>
-            <li>Support academic research on related technologies and legal systems</li>
+            <li>Provide free, public and permanent access to primary legal
+                materials</li>
+            <li>Foster an open ecosystem for legal research and
+                development</li>
+            <li>Support academic research on related technologies and legal
+                systems</li>
         </ul>
-        <p>Free Law Project is pursuing recognition as a 501(c)(3) non-profite organization. For more information,
-            check out the Free Law Project <a href="http://freelawproject.org">Blog</a> and
-            <a href="http://freelawproject.org/about/">About</a> page.</p>
+        <p>For more information, check out the Free Law Project <a
+                href="http://freelawproject.org">Blog</a> and <a
+                href="http://freelawproject.org/about/">About</a> page.
+        </p>
         <hr class="space">
 
 
         <h3 id="testimonials">What People Are Saying</h3>
         <div class="box round">
-            <p>"Your site gave me the needed shot in the arm, the boost of energy I needed to again aggressively pursue my
-                case.
+            <p>"Your site gave me the needed shot in the arm, the boost of
+                energy I needed to again aggressively pursue my case.
             </p>
-            <p>"It is so very difficult to find the information in depth that you are providing. There are also no words to
-                express my gratitude for your undertaking."
+            <p>"It is so very difficult to find the information in depth that
+                you are providing. There are also no words to express my
+                gratitude for your undertaking."
             </p>
             <p class="right bottom">&ndash;Linda</p>
         </div>
         <div class="box round">
-            <p class="bottom">"This is a great site and I'm recommending it to my students."
+            <p class="bottom">"This is a great site and I'm recommending it to
+                my students."
             </p>
             <p class="right bottom">&ndash;Pam</p>
         </div>
         <div class="box round">
-            <p class="bottom">"CourtListener is a worthy project to contribute to on every level."
+            <p class="bottom">"CourtListener is a worthy project to contribute
+                to on every level."
             </p>
             <p class="right bottom">&ndash;<a href="http://sunlightfoundation.com/blog/2012/10/12/law-via-the-internet/">Sunlight Foundation Blog</a></p>
         </div>
@@ -363,12 +375,17 @@
 
 
         <h3>Data Donation</h3>
-        <p>We happily accept data donations from a variety of sources. If you are interested in sharing data
-            with us that is free from copyright restrictions, please get in touch on our
-            <a href="/contact/">contact form</a> or simply send the data on a USB drive to the address on the
-            contact page.</p>
-        <p>We are not interested in copyrighted data, as it is a liability for the work we do. If you are at all
-            uncertain about this aspect of your data, please refrain from sending it to us.</p>
-
+        <p>We happily accept data donations from a variety of sources. If you
+            are interested in sharing data with us that is free from copyright
+            restrictions, please get in touch on our <a
+                    href="/contact/">contact form</a> or simply send the data
+            on a USB drive to the address on the <a href="/contact/">contact
+                page</a>.
+        </p>
+        <p>We are not interested in copyrighted data, as it is a liability for
+            the work we do. If you are at all uncertain about this aspect of
+            your data, please refrain from sending it to us or get in touch for
+            further discussion.
+        </p>
     </div>
 {% endblock %}
