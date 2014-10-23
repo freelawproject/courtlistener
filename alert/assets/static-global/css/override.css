@@ -704,11 +704,13 @@ blockquote span.star-pagination::after {
 
 /* End lawbox display CSS */
 
+/*
 input.wide-title {
     width: 390px;
     padding: 5px;
     font-size:1.5em;
 }
+*/
 
 /* Disabled button formatting */
 button[disabled]:active, button[disabled]:hover, button[disabled] {
