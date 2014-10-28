@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from south.db import db
 from south.v2 import DataMigration
 
 
@@ -13,10 +14,14 @@ class Migration(DataMigration):
                 slug=doc.citation.slug,
                 blocked=doc.blocked,
                 date_blocked=doc.date_blocked,
+
             )
             docket.save()
             doc.docket = docket
             doc.save()
+
+        # Deleting field 'Document.court'
+        db.delete_column('Document', 'court_id')
 
     def backwards(self, orm):
         for doc in orm.Document.objects.all().iterator():
@@ -24,6 +29,12 @@ class Migration(DataMigration):
             docket.delete()
             doc.docket = None
             doc.save()
+
+        # Adding field 'Document.court'
+        db.add_column('Document', 'court',
+                      self.gf('django.db.models.fields.related.ForeignKey')(
+                          to=orm['search.Court'], null=True),
+                      keep_default=False)
 
     models = {
         u'search.citation': {

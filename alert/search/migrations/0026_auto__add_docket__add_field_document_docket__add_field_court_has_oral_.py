@@ -25,8 +25,7 @@ class Migration(SchemaMigration):
                       self.gf('django.db.models.fields.related.ForeignKey')(blank=True, related_name='documents', null=True, to=orm['search.Docket']),
                       keep_default=False)
 
-        # Deleting field 'Document.court'
-        db.delete_column('Document', 'court_id')
+
 
     def backwards(self, orm):
         # Deleting model 'Docket'
@@ -34,11 +33,6 @@ class Migration(SchemaMigration):
 
         # Deleting field 'Document.docket'
         db.delete_column('Document', 'docket_id')
-
-        # Adding field 'Document.court'
-        db.add_column('Document', 'court',
-                      self.gf('django.db.models.fields.related.ForeignKey')(to=orm['search.Court'], null=True),
-                      keep_default=False)
 
 
     models = {
