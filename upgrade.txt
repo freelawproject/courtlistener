@@ -2,7 +2,7 @@ This file contains notes for upgrades when special instructions are necessary.
 In general, simply doing:
 
 # Get the latest code
-git fetch
+git pull
 
 # Gather any new static files
 manage.py collectstatic
@@ -56,7 +56,9 @@ We welcome a conversion of these notes to a better process using Fabric.
   - Flush any background tasks with countdowns in the celery queue by following
     the notes here: https://stackoverflow.com/questions/26535719/
   - Stop Celery
-  - Pull the code and enable maintenance mode if on a live system.
+  - Pull the code and the maintenance mode will be enabled.
+  - Restart apache to enable the new code and clear its caches:
+        - cl; sudo touch apache/django.wsgi
   - Database changes
         - manage.py migrate
   - Add a new core to Solr (paths below may need changing to correspond with
