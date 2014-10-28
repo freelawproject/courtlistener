@@ -20,21 +20,12 @@ class Migration(DataMigration):
             doc.docket = docket
             doc.save()
 
-        # Deleting field 'Document.court'
-        db.delete_column('Document', 'court_id')
-
     def backwards(self, orm):
         for doc in orm.Document.objects.all().iterator():
             docket = doc.docket
             docket.delete()
             doc.docket = None
             doc.save()
-
-        # Adding field 'Document.court'
-        db.add_column('Document', 'court',
-                      self.gf('django.db.models.fields.related.ForeignKey')(
-                          to=orm['search.Court'], null=True),
-                      keep_default=False)
 
     models = {
         u'search.citation': {
@@ -110,6 +101,7 @@ class Migration(DataMigration):
                          {'blank': 'True', 'related_name': "'parent_documents'", 'null': 'True',
                           'to': u"orm['search.Citation']"}),
             'citation_count': ('django.db.models.fields.IntegerField', [], {'default': '0', 'db_index': 'True'}),
+            'court': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['search.Court']", 'null': 'True'}),
             'date_blocked': (
                 'django.db.models.fields.DateField', [], {'db_index': 'True', 'null': 'True', 'blank': 'True'}),
             'date_filed': (
