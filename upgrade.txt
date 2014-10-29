@@ -61,7 +61,6 @@ We welcome a conversion of these notes to a better process using Fabric.
         - cl; sudo touch apache/django.wsgi
   - Database changes
         - manage.py migrate search --delete-ghost-migrations
-        - manage.py migrate audio
         - manage.py migrate
   - Add a new core to Solr (paths below may need changing to correspond with
     the location of your current configurations):
