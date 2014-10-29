@@ -20,10 +20,10 @@ from alert.stats import tally_stat
 from alert.userHandling.forms import ProfileForm, UserForm, UserCreationFormExtended, EmailConfirmationForm
 from alert.userHandling.models import UserProfile
 from alert.custom_filters.decorators import check_honeypot
+from alert.favorites.forms import FavoriteForm
 from alert.favorites.models import Favorite
+from alert.lib import search_utils
 from datetime import timedelta
-from favorites.forms import FavoriteForm
-
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +31,19 @@ logger = logging.getLogger(__name__)
 @login_required
 @never_cache
 def view_alerts(request):
-    return render_to_response('profile/alerts.html',
-                              {'private': True},
-                              RequestContext(request))
+    alerts = request.user.profile.alert.all()
+    for a in alerts:
+        alert_dict = search_utils.get_string_to_dict(a.alertText)
+        if alert_dict.get('type') == 'oa':
+            a.type = 'oa'
+        else:
+            a.type = 'o'
+    return render_to_response(
+        'profile/alerts.html',
+        {'alerts': alerts,
+         'private': True},
+        RequestContext(request)
+    )
 
 
 @login_required

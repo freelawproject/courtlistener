@@ -20,43 +20,58 @@
                 </div>
             {% endif %}
         </div>
-        {% if user.profile.alert.all %}
-            <div class="span-24 last">
-                <table class="settings-table">
-                    <thead>
-                        <tr>
-                            <th>Query&nbsp;name</th>
-                            <th>Frequency</th>
-                            <th>Last&nbsp;hit</th>
-                            <th colspan="3">RSS</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for alert in user.profile.alert.all %}
-                        <tr>
-                            <td>
-                                <p class="bottom" title="{{alert.alertName}}">
-                                    <a href="/?{{alert.alertText}}">{{ alert.alertName|capfirst|truncatewords:"6" }}</a>
-                                </p>
-                            </td>
-                            <td>{{ alert.get_alertFrequency_display }}</td>
-                            <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"Never" }}</td>
-                            <td>
-                                <a href="/feed/search/?{{ alert.alertText }}">
-                                    <img src="{{  STATIC_URL }}png/atom-feed.png" alt="atom icon" height="12px" width="12px">
+        {% if alerts %}
+        <div class="span-24 last">
+            <table class="settings-table">
+                <thead>
+                    <tr>
+                        <th>Query&nbsp;name</th>
+                        <th>Frequency</th>
+                        <th>Last&nbsp;hit</th>
+                        <th colspan="3">RSS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in alerts %}
+                    <tr>
+                        <td>
+                            <p class="bottom">
+                                {% if alert.type == 'o' %}
+                                <i class="fa-file-text-o fa gray"
+                                   title="Opinion Alert"></i>
+                                {% elif alert.type == 'oa' %}
+                                <i class="fa-volume-up fa gray"
+                                   title="Oral Argument Alert"></i>
+                                {% endif %}
+                                <a href="/?{{alert.alertText}}">{{ alert.alertName }}</a>
+                            </p>
+                        </td>
+                        <td>{{ alert.get_alertFrequency_display }}</td>
+                        <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"Never" }}</td>
+                        <td>
+                            {% if alert.type == 'o' %}
+                                <a href="/feed/search/?{{ alert.alertText }}"
+                                   title="Atom feed for this alert">
+                                    <i class="fa fa-rss gray"></i>
                                 </a>
-                            </td>
-                            <td><a href="/?{{ alert.alertText }}&edit_alert={{ alert.pk }}">edit</a></td>
-                            <td><a href="/alert/delete/confirm/{{ alert.pk }}">delete&hellip;</a></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                            {% elif alert.type == 'oa' %}
+                                <a href="/podcast/search/?{{ alert.alertText }}"
+                                   title="Podcast for this alert">
+                                    <i class="fa fa-rss gray"></i>
+                                </a>
+                            {% endif %}
+                        </td>
+                        <td><a href="/?{{ alert.alertText }}&edit_alert={{ alert.pk }}">edit</a></td>
+                        <td><a href="/alert/delete/confirm/{{ alert.pk }}">delete&hellip;</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% else %}
             <h3>You have not made any alerts.</h3>
             <form action="/" method="get">
-                <button type="submit" class="button">Make new alert</button>
+                <button type="submit" class="button">Make New Alert</button>
             </form>
         {% endif %}
     </div>

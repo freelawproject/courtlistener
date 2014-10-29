@@ -697,17 +697,20 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 }
 
 /* Tables on settings pages */
+.settings-table {
+    border-collapse: collapse;
+}
 .settings-table th {
     border-width: 0px 0px 1px 0px;
     border-style: solid;
     border-color: gray;
 }
-.settings-table td {
+.settings-table tr {
     border-width: 0px 0px 1px 0px;
     border-style: dotted;
     border-color: gray;
 }
-.settings-table tr:last-child td {
+.settings-table tr:last-child {
     border-width: 0px;
 }
 .settings-table tbody tr:hover {
