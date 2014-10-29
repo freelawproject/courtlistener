@@ -86,15 +86,23 @@ We welcome a conversion of these notes to a better process using Fabric.
   - Turn maintenance mode back off.
   - Re-start celery
   - Re-enable scrapers and kick off the oral argument scrapers
-  - Flip the has_oral_argument_scraper flag to true on all correct courts and
-    ensure that coverage page looks OK.
+  - Flip the has_oral_argument_scraper flag to true on all correct courts.
   - absolute_urls have changed throughout, necessitating a complete re-index
-    for links in search results to work without redirects.
-        - Create a swap core
-        - Populate the swap core
-        - Swap in the swap core
-        - Test it!
-        - Delete (Unload) the original core
+    for links in search results to work without redirects. We can re-index in
+    a background core and then swap it in using the following commands:
+
+        >>> create_solr_core(
+            core_name='swap_core',
+            data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data_swap'),
+            schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf', 'schema.xml'),
+        )
+
+        % screen
+        % manage.py cl_update_index --update --everything --optimize --solr-url http://127.0.0.1:8983/solr/swap_core --type opinions --traceback
+
+        >>> swap_solr_core('collection1', 'swap_core')
+        >>> delete_solr_core('swap_core', delete_data_dir=True)
+
   - Bulk files have been rewritten and require some new tweaks:
         - Update cron to generate bulk files on the last day of each month,
           using something like the following:
