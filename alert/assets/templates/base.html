@@ -33,21 +33,22 @@
     {% endblock %}
     <title>{% block title %}CourtListener.com{% endblock %}</title>
     {% block head %}{% endblock %}
-    <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/bootstrap.css" type="text/css"
-          media="screen, projection">
+    {% if settings.DEBUG %}
+        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/bootstrap.css"
+              type="text/css"
+              media="screen, projection">
+    {% else %}
+        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/bootstrap.min.css"
+              type="text/css"
+              media="screen, projection">
+    {% endif %}
     <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/hopscotch.css" type="text/css"
           media="screen, projection">
-    <!--
-    <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/style.css" type="text/css"
-          media="screen, projection">
-    -->
     <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/override.css" type="text/css"
           media="screen, projection">
-    <!--
-            <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/jquery-ui-1.10.3.custom.css" type="text/css"
-                  media="screen, projection">
-    <script src="//maxcdn.bootstrapcdn.com/bootlint/0.3.0/bootlint.min.js"></script>
-    -->
+    {% if settings.DEBUG %}
+        <script src="//maxcdn.bootstrapcdn.com/bootlint/0.3.0/bootlint.min.js"></script>
+    {% endif %}
 </head>
 
 <body>
@@ -139,57 +140,61 @@
         {% block footer %}
             <div class="col-sm-8">
                 <div class="row">
-                    <div class="col-sm-3">
-                        <div class="footer-item">
-                            <a href="/about/">About</a>
+                    <div class="col-xs-6">
+                        <div class="col-sm-6">
+                            <div class="footer-item">
+                                <a href="/about/">About</a>
+                            </div>
+                            <div class="footer-item">
+                                <a href="/faq/">FAQ</a>
+                            </div>
+                            <div class="footer-item">
+                                <a href="" id="tour-link">Tour</a>
+                            </div>
                         </div>
-                        <div class="footer-item">
-                            <a href="/faq/">FAQ</a>
-                        </div>
-                        <div class="footer-item">
-                            <a href="" id="tour-link">Tour</a>
+
+                        <div class="col-sm-6">
+                            <div class="footer-item">
+                                <a href="/coverage/">Coverage</a>
+                            </div>
+                            <div class="footer-item">
+                                <a href="/api/">APIs and Bulk Data</a>
+                            </div>
+                            <div class="footer-item">
+                                <a href="/feeds/">Feeds &amp; Podcasts</a>
+                                <i class="gray fa fa-rss"></i>
+                            </div>
+                            <div class="footer-item">
+                                <a href="/api/jurisdictions/">Jurisdictions</a>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="col-sm-3">
-                        <div class="footer-item">
-                            <a href="/coverage/">Coverage</a>
+                    <div class="col-xs-6">
+                        <div class="col-sm-6">
+                            <div class="footer-item">
+                                <a href="http://freelawproject.org">Blog</a>
+                            </div>
+                            <div class="footer-item">
+                                <a href="/contact/">Contact Us</a>
+                            </div>
+                            <div class="footer-item">
+                                <a href="/contribute/">Contribute</a>
+                            </div>
                         </div>
-                        <div class="footer-item">
-                            <a href="/api/">APIs and Bulk Data</a>
-                        </div>
-                        <div class="footer-item">
-                            <a href="/feeds/">Feeds &amp; Podcasts</a>
-                            <i class="gray fa fa-rss"></i>
-                        </div>
-                        <div class="footer-item">
-                            <a href="/api/jurisdictions/">Jurisdictions</a>
-                        </div>
-                    </div>
 
-                    <div class="col-sm-3">
-                        <div class="footer-item">
-                            <a href="http://freelawproject.org">Blog</a>
-                        </div>
-                        <div class="footer-item">
-                            <a href="/contact/">Contact Us</a>
-                        </div>
-                        <div class="footer-item">
-                            <a href="/contribute/">Contribute</a>
-                        </div>
-                    </div>
-
-                    <div class="col-sm-3">
-                        <div class="footer-item">
-                            <a href="/terms/">Terms &amp; Privacy</a>
-                        </div>
-                        <div class="footer-item">
-                            <a href="/removal/">Removal</a>
+                        <div class="col-sm-6">
+                            <div class="footer-item">
+                                <a href="/terms/">Terms &amp; Privacy</a>
+                            </div>
+                            <div class="footer-item">
+                                <a href="/removal/">Removal</a>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-sm-4">
+            <div class="col-sm-4 text-right">
                 <a href="/donate/?referrer=footer-button">
                     <img src="{{ STATIC_PREFIX }}png/donate-button.png"
                          alt="Donate to support our work"
@@ -226,10 +231,17 @@
     </div>
 {% endblock %}
 
-<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
-<script>window.jQuery || document.write('<script src="{{ STATIC_PREFIX }}js/jquery-1.11.1.min.js"><\/script>')</script>
-<script type="text/javascript" src="{{ STATIC_PREFIX }}js/jquery-ui-1.10.3.custom.min.js"></script>
-<script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.js"></script>
+{% if settings.DEBUG %}
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.js"></script>
+    <script>window.jQuery || document.write('<script src="{{ STATIC_PREFIX }}js/jquery-1.11.1.js"><\/script>')</script>
+    <script type="text/javascript" src="{{ STATIC_PREFIX }}js/jquery-ui-1.10.3.custom.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.js"></script>
+{% else %}
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="{{ STATIC_PREFIX }}js/jquery-1.11.1.min.js"><\/script>')</script>
+    <script type="text/javascript" src="{{ STATIC_PREFIX }}js/jquery-ui-1.10.3.custom.min.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.min.js"></script>
+{% endif %}
 <script type="text/javascript" src="{{ STATIC_URL }}js/hopscotch.js"></script>
 <script type="text/javascript" src="{{ STATIC_URL }}js/base.js"></script>
 

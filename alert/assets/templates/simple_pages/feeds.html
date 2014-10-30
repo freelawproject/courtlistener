@@ -68,7 +68,7 @@
         <div class="row">
             {% for row in opinion_courts|rows:3 %}
                 <div class="col-sm-4">
-                    <ul>
+                    <ul {% if not forloop.last %}class="bottom"{% endif %}>
                         {% for court in row %}
                             <li>
                                 <a href="/feed/court/{{ court.pk }}/">{{ court }}</a>
@@ -90,7 +90,7 @@
         <div class="row">
             {% for row in oral_argument_courts|rows:3 %}
                 <div class="col-sm-4">
-                    <ul>
+                    <ul {% if not forloop.last %}class="bottom"{% endif %}>
                         {% for court in row %}
                             <li>
                                 <a href="/podcast/court/{{ court.pk }}/">{{ court }}</a>

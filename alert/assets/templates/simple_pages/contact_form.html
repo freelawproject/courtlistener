@@ -5,38 +5,10 @@
 
 {% block search-form %}{% endblock %}
 
-{% block sidebar %}
-    <div class="col-sm-3" id="sidebar">
-        <h3 class="bottom">Removal Requests</h3>
-        <p>If you are concerned about your case appearing on this site,
-            please see our <a href="/removal/">removal policy</a>.</p>
-        <br>
-
-        <h3 class="bottom">Twitter</h3>
-        <p>For quick updates and announcements, follow <a href="https://twitter.com/courtlistener">@courtlistener</a> on Twitter.</p>
-        <br>
-
-        <h3 class="bottom">Blog</h3>
-        <p>Follow <a href="http://freelawproject.org">The Free Law Blog</a>
-            to see our latest announcements and press releases.</p>
-        <br>
-
-        <h3 class="bottom">Discussion Forum</h3>
-        <p>To talk about CourtListener <a href="http://lists.freelawproject.org/cgi-bin/mailman/listinfo/dev">visit our forum</a>
-        where you can discus the site with others.</p>
-        <br>
-
-        <h3 class="bottom">Mail</h3>
-        <p>School of Information<br>
-        University of California, Berkeley<br>
-        Attn: Brian Carver<br>
-        102 South Hall<br>
-        Berkeley, CA 94720-4600</p>
-    </div>
-{% endblock %}
+{% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="col-sm-9">
+    <div class="col-sm-9 col-sm-push-3" id="sidebar">
         <h2>Contact Us</h2>
 
         {% if form.errors %}
@@ -58,6 +30,7 @@
                 {% endif %}<br>
                 {{ form.name }}
             </p>
+
             <p>
                 <label for="id_email">Email (optional)</label>
                 {% if form.email.errors %}
@@ -69,6 +42,7 @@
                 {% endif %}<br>
                 {{ form.email }}
             </p>
+
             <p>
                 <label for="id_subject">Subject</label>
                 {% if form.subject.errors %}
@@ -80,6 +54,7 @@
                 {% endif %}<br>
                 {{ form.subject }}
             </p>
+
             <p>
                 <label for="id_message">Message</label>
                 {% if form.message.errors %}
@@ -91,7 +66,45 @@
                 {% endif %}<br>
                 {{ form.message }}
             </p>
-          <button type="submit" class="button">Send Message</button>
+            <button type="submit" class="button">Send Message</button>
         </form>
+    </div>
+
+
+    <div class="col-sm-3 col-sm-pull-9">
+        <h3 class="bottom">Removal Requests</h3>
+
+        <p>If you are concerned about your case appearing on this site,
+            please see our <a href="/removal/">removal policy</a>.</p>
+        <br>
+
+        <h3 class="bottom">Twitter</h3>
+
+        <p>For quick updates and announcements, follow <a
+                href="https://twitter.com/courtlistener">@courtlistener</a> on
+            Twitter.</p>
+        <br>
+
+        <h3 class="bottom">Blog</h3>
+
+        <p>Follow <a href="http://freelawproject.org">The Free Law Blog</a>
+            to see our latest announcements and press releases.</p>
+        <br>
+
+        <h3 class="bottom">Discussion Forum</h3>
+
+        <p>To talk about CourtListener <a
+                href="http://lists.freelawproject.org/cgi-bin/mailman/listinfo/dev">visit
+            our forum</a>
+            where you can discus the site with others.</p>
+        <br>
+
+        <h3 class="bottom">Mail</h3>
+
+        <p>School of Information<br>
+            University of California, Berkeley<br>
+            Attn: Brian Carver<br>
+            102 South Hall<br>
+            Berkeley, CA 94720-4600</p>
     </div>
 {% endblock %}

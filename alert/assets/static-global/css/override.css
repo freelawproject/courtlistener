@@ -161,8 +161,9 @@ footer {
 }
 
 .footer-item {
-    margin-bottom: 0.2em;
+    margin-bottom: 0.4em;
     font-size: 110%;
+    line-height: 1.2em;
 }
 
 #by-line a {
@@ -579,6 +580,21 @@ input.citation-count-input {
     margin-left: 5px;
 }
 
+/* Special case for Oregon, which has a name attr with a value of TOP. */
+a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
+    color: #000099;
+    text-decoration: underline;
+}
+
+/* These have some special casing for Oregon cases. */
+a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
+    color: #000;
+}
+
+a:not([name="TOP"]) {
+    color: #009;
+    text-decoration: underline;
+}
 
 /* link formatting */
 a:link, a:visited {
@@ -586,11 +602,6 @@ a:link, a:visited {
 }
 a:visited.visitable {
     color: #9d11b3;
-}
-/* Special case for Oregon, which has a name attr with a value of TOP. */
-a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
-    color: #000099;
-    text-decoration: underline;
 }
 
 /*
@@ -605,9 +616,7 @@ a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
 }
 */
 
-/* These have some special casing for Oregon cases. */
-a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {color:#000;}
-a:not([name="TOP"]) {color:#009;text-decoration:underline;}
+
 
 /* errors - replaced with bg-danger, bg-warning, bg-success*/
 /*.error a, .notice a, .success a {

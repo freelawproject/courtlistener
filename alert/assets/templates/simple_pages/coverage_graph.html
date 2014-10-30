@@ -72,7 +72,7 @@
             <div class="row">
                 {% for row in courts_with_opinion_scrapers|rows:3 %}
                     <div class="col-sm-4">
-                        <ul>
+                        <ul class="{% if not forloop.last %}bottom{% endif %}">
                             {% for court in row %}
                                 <li>
                                     <a href="/?q=&court_{{ court.pk }}=on&order_by=dateFiled+desc">{{ court }}</a>
@@ -88,7 +88,7 @@
                 <div class="row">
                     {% for row in courts_with_oral_argument_scrapers|rows:3 %}
                         <div class="col-sm-4">
-                            <ul>
+                            <ul class="{% if not forloop.last %}bottom{% endif %}">
                                 {% for court in row %}
                                     <li>
                                         <a href="/?q=&court_{{ court.pk }}=on&order_by=dateFiled+desc&type=oral-argument">{{ court }}</a>
