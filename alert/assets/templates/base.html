@@ -3,54 +3,69 @@
 <!--[if IE 7]>    <html class="no-js ie7 lt8 oldie" lang="en"> <![endif]-->
 <!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en"> <![endif]-->
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en"> <!--<![endif]-->
-    <head>
-        <meta charset="utf-8"/>
-        <meta http-equiv="Content-Language" content="en"/>
-        <meta name="language" content="en_us"/>
-        <meta name="description" content="{% block description %}Create alerts, search for and browse the latest court
-                                          opinions. Updated automatically with the latest court documents. An initiative
-                                          of the Free Law Project.{% endblock %}"/>
-        <link rel="author" href="/humans.txt" type="text/plain"/>
+<head>
+    <meta charset="utf-8"/>
+    <meta http-equiv="Content-Language" content="en"/>
+    <meta name="language" content="en_us"/>
+    <meta name="description" content="{% block description %}Create alerts, search for and browse the latest court
+        opinions. Updated automatically with the latest court documents. An initiative
+        of the Free Law Project.{% endblock %}"/>
+    <link rel="author" href="/humans.txt" type="text/plain"/>
 
-        <meta name="viewport" content="width=device-width,initial-scale=1"/>
-        <link rel="search" type="application/opensearchdescription+xml" title="CourtListener" href="{{ STATIC_PREFIX }}xml/opensearch.xml" />
-        <meta name="application-name" content="CourtListener"/>
-        <meta name="msapplication-tooltip" content="Create alerts, search for and browse the latest court opinions."/>
-        <meta name="msapplication-starturl" content="https://www.courtlistener.com"/>
-        <meta name="msapplication-navbutton-color" content="#6683B7"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <link rel="search" type="application/opensearchdescription+xml" title="CourtListener" href="{{ STATIC_PREFIX }}xml/opensearch.xml" />
+    <meta name="application-name" content="CourtListener"/>
+    <meta name="msapplication-tooltip" content="Create alerts, search for and browse the latest court opinions."/>
+    <meta name="msapplication-starturl" content="https://www.courtlistener.com"/>
+    <meta name="msapplication-navbutton-color" content="#6683B7"/>
 
-        <link href="//netdna.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
-        <script src="{{ STATIC_PREFIX }}js/modernizr-2.0.6.min.js"></script>
-        {% block privacy %}
-            {% if private %}
-                <meta name="robots" content="noindex, noodp, noarchive, noimageindex" />
-            {% elif private == None %}
-                <!-- This bit of invalid HTML is to give developers a loud warning. -->
-                <h1>You did not supply the "private" variable to your template.
-                    Please indicate if it is True or False to remove this
-                    awful message.</h1>
-            {% endif %}
-        {% endblock %}
-        <title>{% block title %}CourtListener.com{% endblock %}</title>
-        {% block head %}{% endblock %}
-        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/bootstrap.css" type="text/css"
+    <link href="//netdna.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="{{ STATIC_PREFIX }}js/modernizr-2.0.6.min.js"></script>
+    {% block privacy %}
+        {% if private %}
+            <meta name="robots" content="noindex, noodp, noarchive, noimageindex" />
+        {% elif private == None %}
+            <!-- This bit of invalid HTML is to give developers a loud warning. -->
+            <h1>You did not supply the "private" variable to your template.
+                Please indicate if it is True or False to remove this
+                awful message.</h1>
+        {% endif %}
+    {% endblock %}
+    <title>{% block title %}CourtListener.com{% endblock %}</title>
+    {% block head %}{% endblock %}
+    {% if settings.DEBUG %}
+        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/bootstrap.css"
+              type="text/css"
               media="screen, projection">
-        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/hopscotch.css" type="text/css"
+    {% else %}
+        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/bootstrap.min.css"
+              type="text/css"
               media="screen, projection">
-        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/style.css" type="text/css"
-              media="screen, projection">
-        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/override.css" type="text/css"
-              media="screen, projection">
-        <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/jquery-ui-1.10.3.custom.css" type="text/css"
-              media="screen, projection">
-    </head>
+    {% endif %}
+    <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/hopscotch.css" type="text/css"
+          media="screen, projection">
+    <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/override.css" type="text/css"
+          media="screen, projection">
+    {% if settings.DEBUG %}
+        <script src="//maxcdn.bootstrapcdn.com/bootlint/0.3.0/bootlint.min.js"></script>
+    {% endif %}
+</head>
 
-    <body>
-        <div class="container round-bottom">
-            {% block header %}
-                <header class="header-container span-24">
-                    <div class="span-7 header" id="header">
-                        <a href="/" tabindex="1">
+<body>
+<div class="container round-bottom">
+    <header class="row">
+        {% block header %}
+            <!-- Static navbar -->
+            <div class="navbar navbar-default" role="navigation">
+                <div class="container-fluid">
+                    <div class="navbar-header">
+                        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target=".navbar-collapse">
+                            <span class="sr-only">Toggle navigation</span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </button>
+                        <a class="navbar-brand" href="/" tabindex="1">
                             {% block logo %}
                                 <img src="{{ STATIC_PREFIX }}png/logo.png"
                                      alt="CourtListener logo"
@@ -58,179 +73,201 @@
                                      height="28"/>
                             {% endblock %}
                         </a>
-
+                    </div>
+                    <div class="navbar-collapse collapse">
                         {% block main-nav %}
                             {% if user.is_authenticated %}
-                                <nav>
-                                    <ul>
-                                        <li><a href="/profile/alerts/" tabindex="2">Alerts</a></li>
-                                        <li><a href="/profile/favorites/" tabindex="3">Favorites</a></li>
-                                        <li><a href="/profile/" tabindex="4">Profile</a></li>
-                                        <li><a href="/sign-out/" tabindex="5">Sign out</a></li>
-                                    </ul>
-                                </nav>
+                                <ul class="nav navbar-nav">
+                                    <li><a href="/profile/alerts/" tabindex="2">Alerts</a></li>
+                                    <li><a href="/profile/favorites/" tabindex="3">Favorites</a></li>
+                                    <li><a href="/profile/" tabindex="4">Profile</a></li>
+                                    <li><a href="/sign-out/" tabindex="5">Sign out</a></li>
+                                    <li class="dropdown">
+                                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">Dropdown <span class="caret"></span></a>
+                                        <ul class="dropdown-menu" role="menu">
+                                            <li><a href="#">Action</a></li>
+                                            <li><a href="#">Another action</a></li>
+                                            <li><a href="#">Something else here</a></li>
+                                            <li class="divider"></li>
+                                            <li class="dropdown-header">Nav header</li>
+                                            <li><a href="#">Separated link</a></li>
+                                            <li><a href="#">One more separated link</a></li>
+                                        </ul>
+                                    </li>
+                                </ul>
                             {% else %}
-                                <nav>
-                                    <ul>
-                                        <li><a href="/about/" tabindex="2">About</a></li>
-                                        <li><a href="/coverage/" tabindex="3">Coverage</a></li>
-                                        {% if request.path != "/sign-out/" %}
-                                            <li>
-                                                <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}" tabindex="4">
-                                                    Sign in / Register
-                                                </a>
-                                            </li>
-                                        {% else %}
-                                            <li><a href="{% url "sign-in" %}" tabindex="4">Sign in / Register</a></li>
-                                        {% endif %}
-                                    </ul>
-                                </nav>
+                                <ul class="nav navbar-nav">
+                                    <li><a href="/about/" tabindex="2">About</a></li>
+                                    <li><a href="/coverage/" tabindex="3">Coverage</a></li>
+                                    {% if request.path != "/sign-out/" %}
+                                        <li>
+                                            <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}" tabindex="4">
+                                                Sign in / Register
+                                            </a>
+                                        </li>
+                                    {% else %}
+                                        <li><a href="{% url "sign-in" %}" tabindex="4">Sign in / Register</a></li>
+                                    {% endif %}
+                                </ul>
                             {% endif %}
                         {% endblock %}
-                    </div>
+                        <ul class="nav navbar-nav navbar-right">
+                            {% block search-form %}
+                                {% include "includes/main_query_box.html" with homepage=False %}
+                            {% endblock %}
+                            {% block sign-in %}{% endblock %}
+                        </ul>
+                    </div><!--/.nav-collapse -->
+                </div><!--/.container-fluid -->
+            </div><!-- navbar -->
+        {% endblock %}
+    </header>
 
-                    {% block search-form %}
-                        {% include "includes/main_query_box.html" with homepage=False %}
-                    {% endblock %}
-
-                    {% block sign-in %}{% endblock %}
-                </header>
-                <hr class="space">
-                <hr class="space">
-            {% endblock %}
-
-            <div class="content">
-                {% block sidebar %}
-                    <div class="span-6 append-1" id="sidebar"></div>
-                {% endblock %}
-
-                {# for the settings pages #}
-                {% block nav %}{% endblock %}
-
-                {% block content %}
-                    <p>Your content seems to be missing! This is never good.</p>
-                {% endblock %}
-            </div>
-
-            {% block footer %}
-                <footer class="span-24">
-                    <div class="span-4">
-                        <div class="footer-item">
-                            <a href="/about/">About</a>
-                        </div>
-                        <div class="footer-item">
-                            <a href="/faq/">FAQ</a>
-                        </div>
-                        <div class="footer-item">
-                            <p class="fake-link" id="tour-link">Tour</p>
-                        </div>
-                    </div>
-
-                    <div class="span-4">
-                        <div class="footer-item">
-                            <a href="/coverage/">Coverage</a>
-                        </div>
-                        <div class="footer-item">
-                            <a href="/api/">APIs and Bulk Data</a>
-                        </div>
-                        <div class="footer-item">
-                            <a href="/feeds/">Feeds &amp; Podcasts</a>
-                            <i class="gray fa fa-rss"></i>
-                        </div>
-                        <div class="footer-item">
-                            <a href="/api/jurisdictions/">Jurisdictions</a>
-                        </div>
-                    </div>
-
-                    <div class="span-4">
-                        <div class="footer-item">
-                            <a href="http://freelawproject.org">Blog</a>
-                        </div>
-                        <div class="footer-item">
-                            <a href="/contact/">Contact Us</a>
-                        </div>
-                        <div class="footer-item">
-                            <a href="/contribute/">Contribute</a>
-                        </div>
-                    </div>
-
-                    <div class="span-4">
-                        <div class="footer-item">
-                            <a href="/terms/">Terms &amp; Privacy</a>
-                        </div>
-                        <div class="footer-item">
-                            <a href="/removal/">Removal</a>
-                        </div>
-                    </div>
-
-                    <div class="span-8 last right">
-                        <a href="/donate/?referrer=footer-button">
-                            <img src="{{ STATIC_PREFIX }}png/donate-button.png"
-                                 alt="Donate to support our work"
-                                 height="75"
-                                 width="227">
-                        </a>
-                    </div>
-                    <hr class="space">
-                    <div class="span-24 last gray" id="by-line">
-                        <p>CourtListener is sponsored by the non-profit <a href="http://freelawproject.org">Free Law Project</a>.</p>
-                    </div>
-                </footer>
-             {% endblock %}
-        </div>
-
-        {% block social %}
-            <div id="social-container">
-                <a href="https://twitter.com/courtlistener" class="fa-stack fa-lg">
-                    <i class="fa fa-circle fa-stack-2x gray"></i>
-                    <i class="fa fa-twitter fa-stack-1x fa-inverse"></i>
-                </a>
-                <a href="https://www.facebook.com/freelawproject" class="fa-stack fa-lg">
-                    <i class="fa fa-circle fa-stack-2x gray"></i>
-                    <i class="fa fa-facebook fa-stack-1x fa-inverse"></i>
-                </a>
-                <a href="https://www.linkedin.com/company/free-law-project" class="fa-stack fa-lg">
-                    <i class="fa fa-circle fa-stack-2x gray"></i>
-                    <i class="fa fa-linkedin fa-stack-1x fa-inverse"></i>
-                </a>
-                <a href="https://plus.google.com/u/0/b/101318679730088826987/101318679730088826987/about"
-                   class="fa-stack fa-lg">
-                    <i class="fa fa-circle fa-stack-2x gray"></i>
-                    <i class="fa fa-google-plus fa-stack-1x fa-inverse"></i>
-                </a>
-            </div>
+    <div class="row content">
+        {% block sidebar %}
+            <div class="col-sm-3" id="sidebar"></div>
         {% endblock %}
 
-        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
-        <script>window.jQuery || document.write('<script src="{{ STATIC_PREFIX }}js/jquery-1.11.1.min.js"><\/script>')</script>
-        <script type="text/javascript" src="{{ STATIC_PREFIX }}js/jquery-ui-1.10.3.custom.min.js"></script>
-        <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.min.js"></script>
-        <script type="text/javascript" src="{{ STATIC_URL }}js/hopscotch.js"></script>
-        <script type="text/javascript" src="{{ STATIC_URL }}js/base.js"></script>
+        {# for the settings pages #}
+        {% block nav %}{% endblock %}
 
-        {# Allows your own scripts in the footer. #}
-        {% block footer-scripts %}{% endblock %}
+        {% block content %}
+            <p>Your content seems to be missing! This is never good.</p>
+        {% endblock %}
+    </div>
 
-        {% if not user.is_superuser  %}
-            <!-- Piwik -->
-            <script type="text/javascript">
-                Modernizr.load({
-                    load: 'https://www.courtlistener.com/piwik/piwik.js',
-                    complete: function () {
-                        try {
-                            var piwikTracker = Piwik.getTracker('https://www.courtlistener.com/piwik/piwik.php', 1);
-                            piwikTracker.trackPageView();
-                            piwikTracker.enableLinkTracking();
-                        } catch (err) {
-                        }
-                    }
-                });
-            </script><noscript><p><img src="https://www.courtlistener.com/piwik/piwik.php?idsite=1" style="border:0" alt=""/></p></noscript>
-            <!-- End Piwik Tag -->
-        {% endif %}
-        <!--[if lt IE 8 ]>
-		    <script src="//ajax.googleapis.com/ajax/libs/chrome-frame/1.0.3/CFInstall.min.js"></script>
-		    <script>window.attachEvent('onload',function(){CFInstall.check({mode:'inline', url:'/bad-browser/', cssText: 'width: 100%; height: 200px;' })})</script>
-	    <![endif]-->
-    </body>
+    <footer class="row">
+        {% block footer %}
+            <div class="col-sm-8">
+                <div class="row">
+                    <div class="col-xs-6">
+                        <div class="col-sm-6">
+                            <div class="footer-item">
+                                <a href="/about/">About</a>
+                            </div>
+                            <div class="footer-item">
+                                <a href="/faq/">FAQ</a>
+                            </div>
+                            <div class="footer-item">
+                                <a href="" id="tour-link">Tour</a>
+                            </div>
+                        </div>
+
+                        <div class="col-sm-6">
+                            <div class="footer-item">
+                                <a href="/coverage/">Coverage</a>
+                            </div>
+                            <div class="footer-item">
+                                <a href="/api/">APIs and Bulk Data</a>
+                            </div>
+                            <div class="footer-item">
+                                <a href="/feeds/">Feeds &amp; Podcasts</a>
+                                <i class="gray fa fa-rss"></i>
+                            </div>
+                            <div class="footer-item">
+                                <a href="/api/jurisdictions/">Jurisdictions</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xs-6">
+                        <div class="col-sm-6">
+                            <div class="footer-item">
+                                <a href="http://freelawproject.org">Blog</a>
+                            </div>
+                            <div class="footer-item">
+                                <a href="/contact/">Contact Us</a>
+                            </div>
+                            <div class="footer-item">
+                                <a href="/contribute/">Contribute</a>
+                            </div>
+                        </div>
+
+                        <div class="col-sm-6">
+                            <div class="footer-item">
+                                <a href="/terms/">Terms &amp; Privacy</a>
+                            </div>
+                            <div class="footer-item">
+                                <a href="/removal/">Removal</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-4 text-right">
+                <a href="/donate/?referrer=footer-button">
+                    <img src="{{ STATIC_PREFIX }}png/donate-button.png"
+                         alt="Donate to support our work"
+                         height="75"
+                         width="227">
+                </a>
+            </div>
+            <div class="col-sm-12" id="by-line">
+                <p>CourtListener is sponsored by the non-profit <a href="http://freelawproject.org">Free Law Project</a>.</p>
+            </div>
+        {% endblock %}
+    </footer>
+</div>
+
+{% block social %}
+    <div class="text-center" id="social-container">
+        <a href="https://twitter.com/courtlistener" class="fa-stack fa-lg">
+            <i class="fa fa-circle fa-stack-2x gray"></i>
+            <i class="fa fa-twitter fa-stack-1x fa-inverse"></i>
+        </a>
+        <a href="https://www.facebook.com/freelawproject" class="fa-stack fa-lg">
+            <i class="fa fa-circle fa-stack-2x gray"></i>
+            <i class="fa fa-facebook fa-stack-1x fa-inverse"></i>
+        </a>
+        <a href="https://www.linkedin.com/company/free-law-project" class="fa-stack fa-lg">
+            <i class="fa fa-circle fa-stack-2x gray"></i>
+            <i class="fa fa-linkedin fa-stack-1x fa-inverse"></i>
+        </a>
+        <a href="https://plus.google.com/u/0/b/101318679730088826987/101318679730088826987/about"
+           class="fa-stack fa-lg">
+            <i class="fa fa-circle fa-stack-2x gray"></i>
+            <i class="fa fa-google-plus fa-stack-1x fa-inverse"></i>
+        </a>
+    </div>
+{% endblock %}
+
+{% if settings.DEBUG %}
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.js"></script>
+    <script>window.jQuery || document.write('<script src="{{ STATIC_PREFIX }}js/jquery-1.11.1.js"><\/script>')</script>
+    <script type="text/javascript" src="{{ STATIC_PREFIX }}js/jquery-ui-1.10.3.custom.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.js"></script>
+{% else %}
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="{{ STATIC_PREFIX }}js/jquery-1.11.1.min.js"><\/script>')</script>
+    <script type="text/javascript" src="{{ STATIC_PREFIX }}js/jquery-ui-1.10.3.custom.min.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.min.js"></script>
+{% endif %}
+<script type="text/javascript" src="{{ STATIC_URL }}js/hopscotch.js"></script>
+<script type="text/javascript" src="{{ STATIC_URL }}js/base.js"></script>
+
+{# Allows your own scripts in the footer. #}
+{% block footer-scripts %}{% endblock %}
+
+{% if not user.is_superuser  %}
+    <!-- Piwik -->
+    <script type="text/javascript">
+        Modernizr.load({
+            load: 'https://www.courtlistener.com/piwik/piwik.js',
+            complete: function () {
+                try {
+                    var piwikTracker = Piwik.getTracker('https://www.courtlistener.com/piwik/piwik.php', 1);
+                    piwikTracker.trackPageView();
+                    piwikTracker.enableLinkTracking();
+                } catch (err) {
+                }
+            }
+        });
+    </script><noscript><p><img src="https://www.courtlistener.com/piwik/piwik.php?idsite=1" style="border:0" alt=""/></p></noscript>
+    <!-- End Piwik Tag -->
+{% endif %}
+<!--[if lt IE 8 ]>
+    <script src="//ajax.googleapis.com/ajax/libs/chrome-frame/1.0.3/CFInstall.min.js"></script>
+    <script>window.attachEvent('onload',function(){CFInstall.check({mode:'inline', url:'/bad-browser/', cssText: 'width: 100%; height: 200px;' })})</script>
+<![endif]-->
+</body>
 </html>

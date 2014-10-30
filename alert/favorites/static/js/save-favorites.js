@@ -1,6 +1,6 @@
 $(document).ready(function() {
-    $("#closeFavorite").click(function (e) {
-        e.preventDefault();
+    $("#closeFavorite").click(function (event) {
+        event.preventDefault();
         $("#modal-save-favorite").modal('hide');
     });
     $("#modal-logged-out").click(function () {
@@ -65,7 +65,8 @@ $(function() {
         return false;
     });
 
-    $("#save-favorite-delete").click(function() {
+    $("#save-favorite-delete").click(function(event) {
+        event.preventDefault();
         // Send a post that deletes the favorite from the DB, and if successful
         // remove the notes from the sidebar; toggle the star icon.
         var csrf        = $("input[name=csrfmiddlewaretoken]").val();

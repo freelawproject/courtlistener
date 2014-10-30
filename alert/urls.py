@@ -1,10 +1,12 @@
 from alert.opinion_page.views import redirect_opinion_pages, \
     redirect_cited_by_feeds
 from alert.search.models import Court
+from alert.simple_pages.views import show_maintenance_warning
 from alert.sitemap import index_sitemap_maker
 from django.conf.urls import include, patterns, url
 from django.contrib import admin
 from django.views.generic import RedirectView
+
 
 pacer_codes = Court.objects.filter(in_use=True).values_list('pk', flat=True)
 

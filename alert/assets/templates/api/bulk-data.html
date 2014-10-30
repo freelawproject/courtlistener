@@ -6,7 +6,7 @@
 {% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="span-13 append-2">
+    <div class="col-sm-7">
         <h2 id="about">Bulk Data</h2>
         <p>For hackers, legal analysts and anybody else that might want
             them, we provide bulk files containing all of our data. Several
@@ -16,6 +16,117 @@
             and, Jurisdictions).
         </p>
 
+
+        <h3 id="bulk-data">Bulk Data Files</h3>
+        <p>
+            Two types of bulk file are available for each core data type in
+            CourtListener. The first is a bulk file containing everything in
+            the system for that type of data. The second is a
+            jurisdiction-based file that only has the content for a certain
+            jurisdiction. In general, the scheme for the bulk files is as
+            follows:
+        </p>
+        <blockquote>
+            <code>https://www.courtlistener.com/api/bulk-data/<strong>$data-type</strong>/<strong>$jurisdiction</strong>.tar.gz</code>
+        </blockquote>
+        <p>Some examples:</p>
+        <dl>
+            <dt>All documents (opinions) from the First Circuit of Appeals
+                (ca1):
+            </dt>
+            <dd>
+                <blockquote>
+                    <code>
+                        <a href="/api/bulk-data/document/ca1.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>document</strong>/<strong>ca1</strong>.tar.gz</a>
+                    </code>
+                </blockquote>
+            </dd>
+            <dt>All audio files (oral arguments) from the Second Circuit of
+                Appeals (ca2):
+            </dt>
+            <dd>
+                <blockquote>
+                    <code>
+                        <a href="/api/bulk-data/audio/ca2.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>audio</strong>/<strong>ca2</strong>.tar.gz</a>
+                    </code>
+                </blockquote>
+            </dd>
+            <dt>All documents (opinions) from all jurisdictions:</dt>
+            <dd>
+                <blockquote>
+                    <code>
+                        <a href="/api/bulk-data/document/all.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>document</strong>/<strong>all</strong>.tar.gz</a>
+                    </code>
+                </blockquote>
+            </dd>
+            <dt>All dockets from all jurisdictions:</dt>
+            <dd>
+                <blockquote>
+                    <code>
+                        <a href="/api/bulk-data/docket/all.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>docket</strong>/<strong>all</strong>.tar.gz</a>
+                    </code>
+                </blockquote>
+            </dd>
+            <dt>All jurisdiction data:</dt>
+            <dd>
+                <blockquote>
+                    <code>
+                        <a href="/api/bulk-data/jurisdiction/all.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>jurisdiction</strong>/<strong>all</strong>.tar.gz</a>
+                    </code>
+                </blockquote>
+            </dd>
+        </dl>
+        <p>
+            Currently, you can download bulk data files for for following
+            object types:
+        </p>
+        <ul>
+            <li>Opinions: <code>document</code></li>
+            <li>Oral Arguments: <code>audio</code></li>
+            <li>Dockets: <code>docket</code></li>
+            <li>Jurisdictions: <code>jurisdiction</code></li>
+        </ul>
+        <p>
+            These files are generated using the <a href="/api/rest-info/">REST
+            API</a> and follow the schemas described there. The files inside
+            the tar archives have names corresponding to the ID of each item,
+            and are formatted as JSON. If you wish to see a sample file, we
+            advise selecting a small or secretive jurisdiction (such as the
+            FISA court) and using that to get an idea of what the bulk files
+            contain.
+        </p>
+        <p>A list of all current jurisdictions is on the right and we regularly
+            add new jurisdictions. To monitor for new jurisdictions, you may
+            want to look at the <a
+                    href="/api/rest-info/#jurisdiction-endpoint">Jurisdiction
+                endpoint</a> of the REST API.
+        </p>
+
+
+        <h3 id="citation-data">Citation Bulk Data File</h3>
+        <p>
+            A new file that is available in the latest updates to our bulk
+            data system is a CSV that contains all of the citations
+            relationships between opinions in our database. This file currently
+            has more than eleven million lines, one per citation.
+        </p>
+        <p>
+            This file can be obtained in a similar manner to the core data
+            types, by downloading the file that's available at:
+        </p>
+        <blockquote>
+            <code>
+                <a href="/api/bulk-data/citation/all.csv.gz">https://www.courtlistener.com/api/bulk-data/citation/all.csv.gz</a>
+            </code>
+        </blockquote>
+        <p>
+            The format of the file is two columns: <code>document_id</code> and
+            <code>citation_id</code>. The first column is the document that
+            references the <em>citation object</em> for the second. A document
+            can be looked up for a citation object using the
+            <code>citation</code> REST endpoint, or using the
+            <code>document</code> bulk data file.
+        </p>
 
 
         <h3 id="citegeist">The CiteGeist Bulk Data File</h3>
@@ -43,77 +154,7 @@
         </p>
 
 
-
-        <h3 id="bulk-data">Bulk Data Files</h3>
-        <p>
-            Two types of bulk file are available for each type of content in
-            CourtListener. The first is a bulk file containing everything in
-            the system for that type of data. The second is a
-            jurisdiction-based file that only has the content for a certain
-            jurisdiction. In general, the scheme for the bulk files is as
-            follows:
-        </p>
-        <blockquote>
-            <code>https://www.courtlistener.com/api/bulk-data/<strong>$data-type</strong>/<strong>$jurisdiction</strong>.tar.gz</code>
-        </blockquote>
-        <p>Some examples:</p>
-        <dl>
-            <dt>All documents (opinions) from the First Circuit of Appeals (ca1):</dt>
-            <dd>
-                <a href="/api/bulk-data/document/ca1.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>document</strong>/<strong>ca1</strong>.tar.gz</a>
-            </dd>
-            <dt>All audio files (oral arguments) from the Second Circuit of Appeals (ca2):
-            </dt>
-            <dd>
-                <a href="/api/bulk-data/audio/ca2.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>audio</strong>/<strong>ca2</strong>.tar.gz</a>
-            </dd>
-            <dt>All documents (opinions) from all jurisdictions:</dt>
-            <dd>
-                <a href="/api/bulk-data/document/all.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>document</strong>/<strong>all</strong>.tar.gz</a>
-            </dd>
-            <dt>All dockets from all jurisdictions:</dt>
-            <dd>
-                <a href="/api/bulk-data/docket/all.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>docket</strong>/<strong>all</strong>.tar.gz</a>
-            </dd>
-            <dt>All jurisdiction data:</dt>
-            <dd>
-                <a href="/api/bulk-data/jurisdiction/all.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>jurisdiction</strong>/<strong>all</strong>.tar.gz</a>
-            </dd>
-        </dl>
-        <p>
-            Currently, you can download bulk data files for for following object types:
-        </p>
-        <ul>
-            <li>Opinions: <code>document</code></li>
-            <li>Oral Arguments: <code>audio</code></li>
-            <li>Dockets: <code>docket</code></li>
-            <li>Jurisdictions: <code>jurisdiction</code></li>
-            <li>Authorites: <code>cites</code></li>
-            <li>Citations to opinions: <code>cited-by</code></li>
-        </ul>
-        <p>A list of all current jurisdictions is on the right and we regularly
-            add new jurisdictions. To monitor for new jurisdictions, you may
-            want to look at the <a
-                    href="/api/rest-info/#jurisdiction-endpoint">Jurisdiction
-                endpoint</a> of the REST API.
-        </p>
-
-
-
-        <h4>What To Expect in the Bulk Files</h4>
-        <p>
-            These files are generated using the <a href="/api/rest-info/">REST
-            API</a> and follow the schemas described there. The files inside
-            the tar archives have names corresponding to the ID of each item,
-            and are formatted as JSON. If you wish to see a sample file, we
-            advise selecting a small or secretive jurisdiction (such as the
-            FISA court) and using that to get an idea of what the bulk files
-            contain.
-        </p>
-
-
-
-        <h4>Generation Times</h4>
+        <h3>Generation Times</h3>
         <p>
             As can be seen on the public <a
                 href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">CourtListener
@@ -137,8 +178,9 @@
             your work and are able, we ask that you seriously consider how
             much they might cost otherwise and consider making a
             <a href="/donate/">donation</a> in a similar amount. Free Law
-            Project is a California non-profit and we rely on your support to
-            survive.
+            Project is a federally-recognized 501(c)(3) public charity and a
+            California non-profit public benefit corporation. We rely
+            on your support to survive.
         </p>
 
 
@@ -163,8 +205,8 @@
             in the fall of 2014.
         </p>
     </div>
-    <div class="span-9 last">
-        <div class="span-9 last sidebar-section">
+    <div class="col-sm-5">
+        <div class="sidebar-section">
             <h3><span>Available Jurisdictions</span></h3>
 
             <p>
@@ -178,7 +220,7 @@
                 available jurisdictions.</p>
 
             <div id="scrollable-jurisdictions">
-                <table class="settings-table">
+                <table class="table settings-table">
                     <thead>
                     <tr>
                         <th>Name</th>
@@ -206,7 +248,7 @@
                 </table>
             </div>
         </div>
-        <div class="span-9 last sidebar-section">
+        <div class="sidebar-section">
             <h3 id="copyright"><span>Copyright</span></h3>
 
             <p>

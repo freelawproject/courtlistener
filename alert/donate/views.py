@@ -28,17 +28,29 @@ def view_donations(request):
 def send_thank_you_email(donation):
     profile = donation.userprofile_set.all()[0]
     email_subject = 'Thanks for your donation to the Free Law Project!'
-    email_body = ('Hello %s,\n\nThanks for your donation of $%0.2f to the Free Law Project. We are currently using '
-                  'donations like yours for a variety of important projects that would never exist without your '
-                  'help.\n\n'
-                  'We are currently a California non-profit corporation, and we hope to soon receive recognition '
-                  'as a federally recognized 501(c)(3) non-profit. Our EIN is %s.\n\n'
-                  'If you have any questions about your donation, please don\'t hesitate to get in touch.\n\n'
+    email_body = ('Hello %s,\n\nThanks for your donation of $%0.2f to the Free '
+                  'Law Project. We are currently using donations like yours '
+                  'for a variety of important projects that would never exist '
+                  'without your help.\n\n'
+
+                  'We are a federally-recognized 501(c)(3) public charity '
+                  'and a California non-profit public benefit corporation. '
+                  'Our EIN is %s.\n\n'
+
+                  'If you have any questions about your donation, please '
+                  'don\'t hesitate to get in touch.\n\n'
+
                   'Thanks again,\n\n'
                   'Michael Lissner and Brian Carver\n'
                   'Founders of Free Law Project\n'
-                  'http://freelawproject.org/contact/') % (profile.user.first_name, donation.amount, settings.EIN, )
-    send_mail(email_subject, email_body, 'Free Law Project <donate@freelawproject.org>', [profile.user.email])
+                  'http://freelawproject.org/contact/') % \
+                 (profile.user.first_name, donation.amount, settings.EIN, )
+    send_mail(
+        email_subject,
+        email_body,
+        'Free Law Project <donate@freelawproject.org>',
+        [profile.user.email]
+    )
 
 
 def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form, stripe_token):

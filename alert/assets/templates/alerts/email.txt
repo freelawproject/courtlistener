@@ -25,7 +25,7 @@ Edit / Delete this Alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }
 
 {% endfor %}
 ************************
-This alert brought to you by the California non-profit Free Law Project:
+This alert brought to you by the non-profit Free Law Project:
  - Blog: http://freelawproject.org
  - Twitter: http://twitter.com/freelawproject
  - Donate: https://www.courtlistener.com/donate/?referrer=pt-email

@@ -15,8 +15,9 @@ logger = logging.getLogger(__name__)
 @csrf_exempt
 def process_stripe_callback(request):
     if request.method == 'POST':
-        # Stripe hits us with a callback, and their security model is for us to use the ID from that to hit their API.
-        # It's analogous to when you get a random call and you call them back to make sure it's legit.
+        # Stripe hits us with a callback, and their security model is for us
+        # to use the ID from that to hit their API. It's analogous to when you
+        # get a random call and you call them back to make sure it's legit.
         event_id = simplejson.loads(request.body)['id']
         # Now use the API to call back.
         stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -50,15 +51,16 @@ def process_stripe_callback(request):
             d.save()
         return HttpResponse('<h1>200: OK</h1>')
     else:
-        return HttpResponseNotAllowed('<h1>405: This is a callback endpoint for a payment provider. Only POST methods '
-                                      'are allowed.</h1>')
+        return HttpResponseNotAllowed(
+            '<h1>405: This is a callback endpoint for a payment provider. Only '
+            'POST methods are allowed.</h1>'
+        )
 
 
 def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
     # Create the charge on Stripe's servers
-
     try:
         charge = stripe.Charge.create(
             amount=int(cd_donation_form['amount']) * 100,  # amount in cents, watch yourself

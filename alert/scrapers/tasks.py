@@ -204,15 +204,6 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
     return doc
 
 
-def convert_to_tiff(path, tmp_file_prefix):
-    image_magick_command = ['convert', '-depth', '4', '-density', '300',
-                            '-background', 'white', '+matte', path,
-                            '%s.tiff' % tmp_file_prefix]
-    magick_out = subprocess.check_output(image_magick_command,
-                                         stderr=subprocess.STDOUT)
-    return magick_out
-
-
 def convert_to_pngs(path, tmp_file_prefix):
     image_magick_command = ['convert', '-depth', '4', '-density', '300',
                             '-background', 'white', '+matte', path,
@@ -241,68 +232,45 @@ def convert_to_txt(tmp_file_prefix, image_type):
 def extract_by_ocr(path):
     """Extract the contents of a PDF using OCR
 
-    Convert the PDF to a tiff, then perform OCR on the tiff using Tesseract.
+    Convert the PDF to a collection of png's, then perform OCR using Tesseract.
     Take the contents and the exit code and return them to the caller.
     """
     content = ''
     success = False
-    image_type = 'tiffs'
     try:
-        # The logic here is to try doing OCR with tiffs, and to fall back to
-        # pngs if necessary. Depending on how each step goes, we either
-        # proceed or abort.
         tmp_file_prefix = os.path.join('/tmp', str(time.time()))
-        fail_msg = "Unable to extract the content from this file. Please try" \
-                   " reading the original."
+        fail_msg = ("Unable to extract the content from this file. Please try "
+                    "reading the original.")
         try:
-            convert_to_tiff(path, tmp_file_prefix)
+            convert_to_pngs(path, tmp_file_prefix)
         except subprocess.CalledProcessError:
-            try:
-                convert_to_pngs(path, tmp_file_prefix)
-                image_type = 'pngs'
-            except subprocess.CalledProcessError:
-                content = fail_msg
-                success = False
+            content = fail_msg
+            success = False
 
         try:
-            convert_to_txt(tmp_file_prefix, image_type)
+            convert_to_txt(tmp_file_prefix, image_type='pngs')
         except subprocess.CalledProcessError:
-            if image_type == 'tiffs':
-                # We haven't tried pngs yet, try them.
-                try:
-                    convert_to_pngs(path, tmp_file_prefix)
-                    image_type = 'pngs'
-                except subprocess.CalledProcessError:
-                    # All is lost.
-                    content = fail_msg
-                    success = False
-                try:
-                    convert_to_txt(tmp_file_prefix, image_type)
-                except subprocess.CalledProcessError:
-                    # All is lost.
-                    content = fail_msg
-                    success = False
+            # All is lost.
+            content = fail_msg
+            success = False
 
         try:
-            if image_type == 'tiffs':
-                content = open('%s.txt' % tmp_file_prefix).read()
-            elif image_type == 'pngs':
-                for txt_file in sorted(glob.glob('%s*' % tmp_file_prefix)):
-                    if 'txt' in txt_file:
-                        content += open(txt_file).read()
+            for txt_file in sorted(glob.glob('%s*' % tmp_file_prefix)):
+                if 'txt' in txt_file:
+                    content += open(txt_file).read()
             success = True
         except IOError:
             print ("OCR was unable to finish due to not having a txt file "
                    "created. This usually happens when Tesseract cannot "
-                   "ingest the tiff file at: %s" % path)
+                   "ingest the tiff file created for the pdf at: %s" % path)
             content = fail_msg
             success = False
 
     finally:
         # Remove tmp_file and the text file
-        for suffix in ['.tiff', '.txt']:
+        for f in glob.glob('%s*' % tmp_file_prefix):
             try:
-                os.remove(tmp_file_prefix + suffix)
+                os.remove(f)
             except OSError:
                 pass
 

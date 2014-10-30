@@ -34,13 +34,13 @@ def calculate_counts():
     thirty_days_ago = now() - timedelta(days=30)
     thirty_five_days_ago = now() - timedelta(days=35)
     cts_more_than_30_days = Court.objects \
-        .filter(document__date_filed__gt=thirty_days_ago) \
-        .annotate(count=Count('document__pk')) \
+        .filter(docket__documents__date_filed__gt=thirty_days_ago) \
+        .annotate(count=Count('docket__documents__pk')) \
         .values('pk', 'count')
 
     # Needed because annotation calls above don't return courts with no new
     # opinions
-    all_active_courts = Court.objects.filter(has_scraper=True) \
+    all_active_courts = Court.objects.filter(has_opinion_scraper=True) \
         .values_list('pk', flat=True).order_by('position')
 
     # Reformat the results into dicts...

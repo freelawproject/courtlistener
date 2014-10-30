@@ -10,8 +10,6 @@ class Migration(SchemaMigration):
     def forwards(self, orm):
         # Deleting field 'urlToHash.url'
         db.delete_column('urlToHash', 'url')
-        db.rename_column('urlToHash', 'hashUUID', 'id')
-
 
         # Changing field 'urlToHash.id'
         db.alter_column('urlToHash', 'id', self.gf('django.db.models.fields.CharField')(max_length=5000, primary_key=True))
@@ -25,8 +23,6 @@ class Migration(SchemaMigration):
 
         # Changing field 'urlToHash.id'
         db.alter_column('urlToHash', u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True))
-
-        db.rename_column('urlToHash', 'id', 'hashUUID')
 
     models = {
         u'scrapers.errorlog': {

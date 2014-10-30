@@ -6,7 +6,7 @@
 {% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="span-13 append-2">
+    <div class="col-sm-7">
         <h2 id="about">REST API &ndash; V2</h2>
         <p>For developers that wish to have a more granular API for our data, we provide a RESTful API
             based on the <a href="http://django-tastypie.readthedocs.org/en/latest/">tastypie toolkit</a>.
@@ -25,15 +25,17 @@
         </ol>
 
         <p>
-            These endpoints can be used in combination to make sophisticated queries against our database or our
-            search engine and are described in detail below. With the exception of the coverage endpoint, each of these
-            have schema documents associated with them that can be found by appending "schema" to their location (e.g.
+            These endpoints can be used in combination to make sophisticated
+            queries against our database or our search engine and are
+            described in detail below. With the exception of the coverage
+            endpoint, each of these have schema documents associated with them
+            that can be found by appending "schema" to their location (e.g.
             <a href="/api/rest/v2/document/schema/">/api/rest/v2/document/schema/</a>).
         </p>
-        <p>The following representation of our database should be instructive when thinking about how these endpoints
-            work together:
+        <p>The following representation of our database should be instructive
+            when thinking about how these endpoints work together:
         </p>
-        <img src="{{ STATIC_PREFIX }}png/schema-design.png" height="276" width="470">
+        <img src="{{ STATIC_PREFIX }}png/schema-design.png" height="276" width="470" class="img-responsive">
 
         <p class="alt">(A more detailed version of this diagram <a
                 href="http://lists.freelawproject.org/pipermail/dev/2014-September/000084.html">was
@@ -42,13 +44,21 @@
 
         <p>The basic ideas are:</p>
         <ul>
-            <li>Each Audio file and each Document are associated with a Docket, and each Docket can have many Documents
-                or Audio files associated with it (sometimes thousands).</li>
-            <li>Each Docket is associated with a single jurisdiction. Generally, this is the court where the dispute
-                was litigated.
+            <li>Each Audio file and each Document are associated with a Docket,
+                and each Docket can have many Documents or Audio files
+                associated with it (sometimes thousands).
             </li>
-            <li>Each Document, if it is an Opinion, has an associated Citation object.</li>
-            <li>Different Documents cite different Citations, forming a many to many relationship (cases_cited).</li>
+            <li>Each Docket is associated with a single jurisdiction.
+                Generally, this is the court where the dispute was litigated.
+                If the case moves between jurisdictions, each jurisdiction has
+                its own docket.
+            </li>
+            <li>Each Document, if it is an Opinion, has an associated Citation
+                object.
+            </li>
+            <li>Different Documents cite different Citations, forming a many to
+                many relationship (cases_cited).
+            </li>
         </ul>
 
         <h3>Overview of Endpoints</h3>
@@ -194,8 +204,9 @@
             <code>curl https://www.courtlistener.com/api/rest/v2/document/?<strong>fields=citation__federal_cite_one</strong></code>
         </blockquote>
         <p>
-            Using the <code>fields</code> parameter in these ways could save us time and bandwidth if you are making
-            many requests.
+            Using the <code>fields</code> parameter in these ways could save
+            both of us time and bandwidth if you are making many requests.
+            Please consider using this parameter for your requests.
         </p>
 
 
@@ -219,16 +230,20 @@
 
         <h4>Date Formats</h4>
         <p>
-            As <a href="http://xkcd.com/1179/">required</a>, all date formats are set to
-            <a href="http://en.wikipedia.org/wiki/ISO_8601">ISO-8601 format</a>.
+            As <a href="http://xkcd.com/1179/">required by influential comic
+            strips</a>, all date formats are set to <a
+                href="http://en.wikipedia.org/wiki/ISO_8601">ISO-8601
+            format</a>.
         </p>
 
 
 
         <h4>The <code>absolute_url</code> Field</h4>
         <p>
-            The <code>absolute_url</code> field shows the URL where a resource can be seen live on the site. It is
-            absolute in the sense that it should never change.
+            The <code>absolute_url</code> field shows the URL where a resource
+            can be seen live on the site. It is absolute in the sense that it
+            should never change and will always be backwards compatible if
+            changes are ever needed (as in the upgrade to v2 of this API).
         </p>
         <p>
             In some cases you might only have a URL, and you might want to look up the item in the API. <code>
@@ -252,10 +267,13 @@
             </li>
             <li>
                 <strong>$name-of-the-case</strong>: This is the "<a
-                    href="https://en.wikipedia.org/wiki/Slug_%28publishing%29">slug</a>" of the document, and
-                generally mirrors its case name. This value can change if we clean up a case name, but provided
-                it is not omitted completely, this part of the URL can be any value without ever affecting the
-                page that is loaded.
+                    href="https://en.wikipedia.org/wiki/Slug_%28publishing%29">slug</a>"
+                of the document, and generally mirrors its case name. This
+                value can change if we clean up a case name, but provided it is
+                not omitted completely, this part of the URL can be any value
+                without ever affecting the page that is loaded. Put another
+                way, we load pages based on the <code>$numeric-id</code> and
+                <code>$document-type</code>, not by the name of the case.
             </li>
         </ol>
 
@@ -278,13 +296,18 @@
             <code>curl https://www.courtlistener.com/api/rest/v2/<strong>citation</strong>/111170/</code>
         </blockquote>
         <p>
-            In addition to this, each document has a globally unique
-            <code><a href="https://en.wikipedia.org/wiki/SHA-1">SHA1</a></code> sum that can be queried using the search
-            endpoint:
+            Even though though they have the same ID. Each document and audio
+            file also has a globally unique <code><a
+                href="https://en.wikipedia.org/wiki/SHA-1">SHA1</a></code> sum
+            that can be queried using the search endpoint:
         </p>
         <blockquote>
             <code>https://www.courtlistener.com/api/rest/v2/search/?q=a2daab35251795fc2621c6ac46b6031c95a4e0ba</code>
         </blockquote>
+        <p>
+            To get audio results, also set the type parameter to
+            <code>oa</code>, for oral arguments.
+        </p>
 
 
 
@@ -326,8 +349,10 @@
             <li><code>time_retrieved</code>: The date and time the document was added to our system.</li>
         </ul>
         <p>
-            For the full list of filtering fields, see the <em>filtering</em> section of the
-            <a href="/api/rest/v2/document/schema/">schema document</a>.
+            For the full list of filtering fields, see the <em>filtering</em>
+            section of the <a
+                href="/api/rest/v2/document/schema/?format=json">schema
+            document</a>.
         </p>
         <p>
             As mentioned above, in the schema document you will find that each filtering field provides a list of
@@ -355,7 +380,7 @@
             The <code>audio</code> endpoint is modeled after the <code>document</code> endpoint and has very similar behavior, except
             instead of serving documents, it currently serves oral arguments and may later serve other similar audio files. As with the
             document endpoint, it can be filtered and ordered by various fields as described in its <a
-                href="/api/rest/v2/audio/schema/">schema document</a>.
+                href="/api/rest/v2/audio/schema/?format=json">schema document</a>.
         </p>
         <p>
             Aside from these few notes, the <code>audio</code> endpoint should be very familiar and should have no surprises.
@@ -417,7 +442,7 @@
         </p>
         <p>
             All of the filtering, ordering and field lookups described above can be used on this endpoint, as described
-            in its <a href="/api/rest/v2/citation/schema/">schema</a>. This endpoint also provides a field called
+            in its <a href="/api/rest/v2/citation/schema/?format=json">schema</a>. This endpoint also provides a field called
             <code>opinion_uris</code>, which references the parent opinion for a citation.
         </p>
         <p>
@@ -440,8 +465,10 @@
             as well.
         </p>
         <p>
-            Over time this endpoint will contain more and more information about jurisdictions such as the address
-            of the courthouses and other such information. We welcome contributions in this area.
+            Over time this endpoint will contain more and more information
+            about jurisdictions such as the address of the courthouses and
+            other such information. We welcome data contributions in this area
+            as much of this information will need to be gathered manually.
         </p>
 
 
@@ -453,11 +480,14 @@
             other. Several differences should be noted.
         </p>
         <p>
-            First, the fields and results from this endpoint are slightly different than those in the other endpoints.
-            For example, instead of using a minus sign to flip ordering, it uses <code>asc</code> and <code>desc</code>.
-            And instead of the <code>court</code> field returning a reference to the <code>jurisdiction</code> endpoint,
-            it provides the name of the jurisdiction where the document was issued. (See <a
-                href="/api/rest/v2/search/schema/">the schema</a> and the notes below for all of the ordering options
+            First, the fields and results from this endpoint are slightly
+            different than those in the other endpoints. For example, instead
+            of using a minus sign to flip ordering, it uses <code>asc</code>
+            and <code>desc</code>. And instead of the <code>court</code> field
+            returning a reference to the <code>jurisdiction</code> endpoint,
+            it provides the name of the jurisdiction where the document was
+            issued. (See <a href="/api/rest/v2/search/schema/?format=json">the
+            schema</a> and the notes below for all of the ordering options
             and field information).
         </p>
         <p>
@@ -470,19 +500,27 @@
             <code>curl https://www.courtlistener.com/api/rest/v2/search/?<strong>type=o</strong></code>
         </blockquote>
         <p>
-            &hellip;<code>download_url</code> will represent the location the opinion was downloaded from. Conversely, if
-            <code>type</code> is set to the letters <code>oa</code> (oral arguments), the <code>download_url</code> will
-            represent the location the <em>audio file</em> was downlaoded from, instead. This can be confusing, however,
-            remember that the <code>type</code> field defaults to <code>o</code>, and that the fields that overlap should
-            make sense for all result types.
+            &hellip;<code>download_url</code> will represent the location the
+            opinion was downloaded from. Conversely, if <code>type</code> is
+            set to the letters <code>oa</code> (meaning oral arguments), the
+            <code>download_url</code> will represent the location the <em>audio
+            file</em> was downloaded from, instead. This can be confusing,
+            however, remember that the <code>type</code> field defaults to
+            <code>o</code>, and that the fields that overlap should make sense
+            for all result types.
         </p>
         <p>
-            Because this endpoint hits against a Solr search index instead of a database, the filtering works slightly
-            differently. To filter on this endpoint, we recommend identifying an effective query on the front end that
-            generates the results you desire and then using that query (and variations thereof) to query the API.
+            Because this endpoint hits against a Solr search index instead of a
+            database, the filtering works differently. To filter on this
+            endpoint, we recommend identifying an effective query on the front
+            end that generates the results you desire and then using that query
+            (and variations thereof) to query the API. On the backend, the same
+            code serves both the API and the front end.
         </p>
         <p>
-            When examining the <em>filtering</em> section of the schema, note that fields have been labeled as follows:
+            When examining the <em>filtering</em> section of <a
+                href="/api/rest/v2/search/schema/?format=json">the schema</a>,
+            note that fields have been labeled as follows:
         </p>
         <dl>
             <dt>search</dt>
@@ -568,16 +606,22 @@
 
         <h3 id="coverage-endpoint">/api/rest/v2/coverage/</h3>
         <p>
-            Unlike the other endpoints in this API, the coverage endpoint is not based on the tastypie API framework. As
-            a result it is much simpler, only providing data in a very specific manner, serialized as JSON. In the
-            future we expect to expand this API to provide faceting along additional fields, but at present it simply
-            provides jurisdiction counts by year for any requested jurisdiction. This API does not require
+            Unlike the other endpoints in this API, the coverage endpoint is
+            not based on the <a
+                href="http://django-tastypie.readthedocs.org/en/latest/">tastypie
+            API framework</a>. As a result it is much simpler, only providing
+            data in a very specific manner, serialized as JSON. In the future
+            we expect to expand this API to provide faceting along additional
+            fields, but at present it simply provides jurisdiction counts by
+            year for any requested jurisdiction. This API does not require
             authentication and is what powers our live <a href="/coverage/">coverage page</a>.
         </p>
         <p>
-            To receive jurisdiction counts by year, simply provide the jurisdiction ID you wish to query or the special
-            keyword, "all", which returns counts for all jurisdictions. For example, this provides annual counts for the
-            Ninth Circuit of Appeals (<code>ca9</code>):
+            To receive jurisdiction counts by year, simply provide the
+            jurisdiction ID you wish to query or the special keyword,
+            <code>all</code>, which returns counts for all jurisdictions. For
+            example, this provides annual counts for the Ninth Circuit of
+            Appeals (<code>ca9</code>):
         </p>
         <blockquote>
             <code>curl https://www.courtlistener.com/api/rest/v2/coverage/ca9/</code>
@@ -586,8 +630,8 @@
 
 
 
-    <div class="span-9 last">
-        <div class="span-9 last sidebar-section">
+    <div class="col-sm-5">
+        <div class="sidebar-section">
             <h3><span>Available Jurisdictions</span></h3>
             <p>
                 We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs.
@@ -595,7 +639,7 @@
             </p>
             <p>Below is a cheat sheet listing the abbreviations for all available jurisdictions.</p>
             <div id="scrollable-jurisdictions">
-                <table class="settings-table">
+                <table class="table settings-table">
                     <thead>
                         <tr>
                             <th>Name</th>
@@ -623,7 +667,7 @@
 
 
 
-        <div class="span-9 last sidebar-section">
+        <div class="sidebar-section">
             <h3><span>Powered By</span></h3>
             <p>
                 If you are interested, we have a variety of <a href="http://freelawproject.org/about/assets/">"Powered
@@ -634,7 +678,7 @@
             </a>
         </div>
 
-        <div class="span-9 last sidebar-section">
+        <div class="sidebar-section">
             <h3><span>CiteGeist Scores</span></h3>
 
             <p>If you are interested in the CiteGeist score for each opinion, it is now available via our
@@ -642,7 +686,7 @@
             </p>
         </div>
 
-        <div class="span-9 last sidebar-section">
+        <div class="sidebar-section">
             <h3><span>Maintenance Schedule</span></h3>
             <p>
                 We regularly perform bulk tasks on our servers and maintain
@@ -652,7 +696,7 @@
             </p>
         </div>
 
-        <div class="span-9 last sidebar-section">
+        <div class="sidebar-section">
             <h3><span>Browser Tools</span></h3>
             <p>
                 Several tools are available to help view JSON in your browser. If you are using Firefox, check out
@@ -661,7 +705,7 @@
             </p>
         </div>
 
-        <div class="span-9 last sidebar-section">
+        <div class="sidebar-section">
             <h3><span>Deprecated API Documentation</span></h3>
             <p>If you are using an old version of the API and are looking for the notes for that version, please see:
 
@@ -671,7 +715,7 @@
             </ul>
         </div>
 
-        <div class="span-9 last sidebar-section">
+        <div class="sidebar-section">
             <h3 id="copyright"><span>Copyright</span></h3>
             <p>
                 Our data is free of known copyright restrictions.<br />

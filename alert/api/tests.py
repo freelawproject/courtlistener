@@ -1,8 +1,12 @@
 from datetime import timedelta
 from django.test import TestCase
 from django.utils.timezone import now
+
+from alert.api.management.commands.cl_make_bulk_data import Command
 from alert.search.models import Docket, Citation, Court, Document
-from api.management.commands.cl_make_bulk_data import Command
+from alert.scrapers.management.commands.cl_scrape_oral_arguments import \
+    Command as OralArgumentCommand
+from alert.scrapers.test_assets import test_oral_arg_scraper
 
 
 class BulkDataTest(TestCase):
@@ -25,9 +29,15 @@ class BulkDataTest(TestCase):
         )
         self.doc.save(index=False)
 
+        # Scrape the audio "site" and add its contents
+        site = test_oral_arg_scraper.Site().parse()
+        OralArgumentCommand().scrape_court(site, full_crawl=True)
+
     def tearDown(self):
-        self.doc.delete()
+        Document.objects.all().delete()
+        Docket.objects.all().delete()
+        Citation.objects.all().delete()
 
     def test_make_all_bulk_files(self):
         """Can we successfully generate all bulk files?"""
-        Command.do_everything()
+        Command().execute()

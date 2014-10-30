@@ -13,7 +13,7 @@
 {% endblock %}
 
 {% block content %}
-    <div class="span-24 last">
+    <div class="col-xs-12">
         <h2 id="background">Feeds &amp; Podcasts&nbsp;<i class="gray fa fa-rss"></i></h2>
         <p>We have a number of <a
                 href="https://en.wikipedia.org/wiki/RSS">feeds</a> and <a
@@ -29,12 +29,11 @@
             We are able to add and support more feeds as we receive <a
                     href="/donate/?referrer=feeds">support</a> from you.</p>
 
-        <hr class="space">
-        <div class="span-24 last">
-            <div class="span-11 append-2">
+        <div class="row">
+            <div class="col-sm-6">
                 <h3 id="search-feeds">Search Feeds</h3>
                 <p>As you use the search engine, a feed or podcast is generated for
-                    every search that you do. For opinions, you can subscribe to these
+                    every search that you do. For opinions, tou can subscribe to these
                     feeds using a URL like:</p>
                 <blockquote>
                     <code>https://www.courtlistener.com/feed/search/?q=your-query</code>
@@ -47,7 +46,7 @@
                     always do, and then use the subscribe button in your browser to
                     identify the correct link.</p>
             </div>
-            <div class="span-11 last">
+            <div class="col-sm-6">
                 <h3 id="cited-by-feeds">Feeds for New Citations</h3>
                 <p>As we add items to our collection, we regularly discover new
                     citations to existing opinions. If you wish to stay up to date
@@ -62,15 +61,14 @@
             </div>
         </div>
 
-        <hr class="space">
         <h3 id="opinion-feeds">Jurisdiction Feeds for Opinions</h3>
         <p>At present, the jurisdictions below get opinions as they are
             published on court websites. Subscribing to the feeds listed below
             will provide you with the latest opinions as they are written.</p>
-        <div class="span-24">
+        <div class="row">
             {% for row in opinion_courts|rows:3 %}
-                <div class="span-8 {% if forloop.last %}last{% endif %}">
-                    <ul>
+                <div class="col-sm-4">
+                    <ul {% if not forloop.last %}class="bottom"{% endif %}>
                         {% for court in row %}
                             <li>
                                 <a href="/feed/court/{{ court.pk }}/">{{ court }}</a>
@@ -89,10 +87,10 @@
             posted on the court websites. Subscribing to these podcasts will
             ensure that you stay up to date with the latest oral arguments as
             they are posted.</p>
-        <div class="span-24">
+        <div class="row">
             {% for row in oral_argument_courts|rows:3 %}
-                <div class="span-8 {% if forloop.last %}last{% endif %}">
-                    <ul>
+                <div class="col-sm-4">
+                    <ul {% if not forloop.last %}class="bottom"{% endif %}>
                         {% for court in row %}
                             <li>
                                 <a href="/podcast/court/{{ court.pk }}/">{{ court }}</a>

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from south.db import db
 from south.v2 import DataMigration
 
 
@@ -99,6 +100,7 @@ class Migration(DataMigration):
                          {'blank': 'True', 'related_name': "'parent_documents'", 'null': 'True',
                           'to': u"orm['search.Citation']"}),
             'citation_count': ('django.db.models.fields.IntegerField', [], {'default': '0', 'db_index': 'True'}),
+            'court': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['search.Court']", 'null': 'True'}),
             'date_blocked': (
                 'django.db.models.fields.DateField', [], {'db_index': 'True', 'null': 'True', 'blank': 'True'}),
             'date_filed': (

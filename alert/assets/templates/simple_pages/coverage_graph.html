@@ -23,18 +23,21 @@
 {% endblock %}
 
 {% block content %}
-    <div class="span-24 last">
-        <h3 class="bottom span-10" id="graph-header"></h3>
-
-        <div id="nav" class="float-right span-12 last">
-            <select class="bottom top float-right"></select>
+    <div class="col-xs-12">
+        <div class="row">
+            <div class="col-sm-6">
+                <h3 class="bottom" id="graph-header"></h3>
+            </div>
+            <div class="col-sm-6">
+                <div id="nav" class="text-right">
+                    <select class="bottom top float-right"></select>
+                </div>
+            </div>
         </div>
 
         <div id="graph"></div>
 
         <div>
-            <hr class="space">
-            <hr class="space">
             <h4 class="bottom">General Notes</h4>
 
             <p>Charts indicate the number of cases that we have in our database for
@@ -66,10 +69,10 @@
                 note that we do not yet have realtime coverage for all of the courts on CourtListener. The courts
                 for which we currently can provide realtime coverage and alerts are:
             </p>
-            <div class="span-24">
+            <div class="row">
                 {% for row in courts_with_opinion_scrapers|rows:3 %}
-                    <div class="span-8 {% if forloop.last %}last{% endif %}">
-                        <ul>
+                    <div class="col-sm-4">
+                        <ul class="{% if not forloop.last %}bottom{% endif %}">
                             {% for court in row %}
                                 <li>
                                     <a href="/?q=&court_{{ court.pk }}=on&order_by=dateFiled+desc">{{ court }}</a>
@@ -82,10 +85,10 @@
             {% if courts_with_oral_argument_scrapers.count > 0 %}
                 <p>In addition, we provide realtime coverage of oral arguments for the following courts, downloading
                     the latesst oral arguments at the end of each day:</p>
-                <div class="span-24">
+                <div class="row">
                     {% for row in courts_with_oral_argument_scrapers|rows:3 %}
-                        <div class="span-8 {% if forloop.last %}last{% endif %}">
-                            <ul>
+                        <div class="col-sm-4">
+                            <ul class="{% if not forloop.last %}bottom{% endif %}">
                                 {% for court in row %}
                                     <li>
                                         <a href="/?q=&court_{{ court.pk }}=on&order_by=dateFiled+desc&type=oral-argument">{{ court }}</a>
@@ -97,7 +100,7 @@
                 </div>
             {% endif %}
 
-            <p>These lists continue to grow as we receive <a href="/donate/?referrer=coverage">support</a> and <a href="/contact/">requests</a>
+            <p>This list continues to grow as we receive <a href="/donate/?referrer=coverage">support</a> and <a href="/contact/">requests</a>
                 for additional jurisdictions. Your support helps make this project possible.
             </p>
         </div>

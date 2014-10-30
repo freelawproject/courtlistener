@@ -1,14 +1,60 @@
 /* --------------------------------------------------------------------------
 Sets up all the overrides or additional CSS that the site uses.
 ---------------------------------------------------------------------------*/
+
+.navbar-brand {
+    padding: 6px 15px;
+}
+
+.bottom {
+    margin-bottom:0;
+    padding-bottom:0;
+}
+
+.top {
+    margin-top:0;
+    padding-top:0;
+}
+
+.large {
+    font-size: 21px;
+}
+
 /* Some good stuff from h4pl.com */
 ::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 ::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 
+/* From fancy-type.css */
+.alt {
+  color: #666;
+  font-family: "Warnock Pro", "Book Antiqua", Georgia, serif;
+  font-style: italic;
+  font-weight: normal;
+}
+
+.caps {
+  font-variant: small-caps;
+  letter-spacing: 1px;
+  text-transform: lowercase;
+  font-size:1.2em;
+  line-height:1%;
+  font-weight:bold;
+  padding:0 2px;
+}
+
+button:hover, a.button:hover{
+  background-color:#dff4ff;
+  border:1px solid #c2e1ef;
+  color:#336699;
+}
+a.button:active{
+  background-color:#6299c5;
+  border:1px solid #6299c5;
+  color:#fff;
+}
 
 #homepage #main-query-box {
     margin: 0 auto;
-    width: 713px;
     -webkit-transition : all 0.5 s ease;
     -moz-transition: all 0.5s ease;
     -o-transition: all 0.5s ease;
@@ -16,18 +62,69 @@ Sets up all the overrides or additional CSS that the site uses.
 }
 
 #homepage #main-query-box.wide {
-    width: 950px;
     margin: 0;
 }
 
+@media(max-width:767px){
+    #homepage #main-query-box #id_q {
+        width: 250px;
+    }
+    #homepage #main-query-box.wide #id_q {
+        width: 250px;
+    }
+    #homepage #main-query-box .input-group {
+        display: inline-table;
+        vertical-align: middle;
+    }
+    #homepage #main-query-box .input-group-btn {
+        width: auto;
+    }
+    #homepage #main-query-box .form-group {
+        display: inline-block;
+        margin-bottom: 0px;
+        vertical-align: middle;
+    }
+    .headshot { /* shrink photos on about page for phone size*/
+        height: 135px;
+        width: 135px;
+    }
+}
+@media(min-width:768px){
+    #homepage #main-query-box {
+        margin-top: 3em;
+    }
+    #homepage #main-query-box #id_q {
+        width: 400px;
+    }
+    #homepage #main-query-box.wide #id_q {
+        width: 580px;
+    }
+}
+@media(min-width:992px){
+    #homepage #main-query-box #id_q {
+        width: 600px;
+    }
+    #homepage #main-query-box.wide #id_q {
+        width: 800px;
+    }
+}
+@media(min-width:1200px){
+    #homepage #main-query-box #id_q {
+        width: 800px;
+    }
+    #homepage #main-query-box.wide #id_q {
+        width: 1000px;
+    }
+}
+
 #homepage #main-query-box.wide #id_q {
-    width: 830px;
+    /*width: 830px;*/
 }
 
 #homepage #advanced-search-starter h3 {
-    margin: 0 auto;
-    width: 200px;
-    padding: 1em;
+    /*margin: 0 auto;*/
+    /*width: 200px;*/
+    /*padding: 1em;*/
 }
 
 #homepage #jurisdiction-count {
@@ -52,11 +149,11 @@ Sets up all the overrides or additional CSS that the site uses.
     text-decoration: none;
     border-bottom: none;
 }
-
+/*
 .header {
     float: left;
 }
-
+*/
 footer {
     padding-top: 2em;
     margin-top: 4em;
@@ -64,8 +161,9 @@ footer {
 }
 
 .footer-item {
-    margin-bottom: 0.2em;
+    margin-bottom: 0.4em;
     font-size: 110%;
+    line-height: 1.2em;
 }
 
 #by-line a {
@@ -76,7 +174,7 @@ footer {
 #social-container {
     display: block;
     background: none;
-    width: 200px;
+    /*width: 200px; */
     margin: 2em auto;
 }
 
@@ -129,8 +227,8 @@ div.hopscotch-bubble .hopscotch-bubble-close {
 }
 
 .striken {
-	text-decoration: line-through;
-	color: gray;
+    text-decoration: line-through;
+    color: gray;
 }
 
 .gray, .grey {
@@ -155,7 +253,7 @@ div.hopscotch-bubble .hopscotch-bubble-close {
     text-align: right;
 }
 
-.float-right {
+.float-right { /* replace with text-right? */
     float: right;
 }
 
@@ -207,15 +305,16 @@ mark {
 body {
     background-color: #E9E8E8;
 }
+
 .container {
-    padding: 20px 0px 0px 0px;
+    /*padding: 20px 0px 0px 0px; */
     background-color: white;
     border-left: 1px solid #c2c2c2;
     border-bottom: 1px solid #c2c2c2;
     border-right: 1px solid #c2c2c2;
-    width: 1010px;
+    /*width: 1010px; */
 }
-
+/*
 .content, footer, header {
     padding-left: 30px;
     padding-right: 30px;
@@ -240,15 +339,15 @@ nav ul li {
 nav ul li:last-child {
     padding: 0;
 }
+*/
+/*#search-container table{*/
+    /*width: auto;*/
+    /*margin-bottom: auto;*/
+/*}*/
 
-#search-container table{
-    width: auto;
-    margin-bottom: auto;
-}
-
-#search-container td{
-    padding: 0px;
-}
+/*#search-container td{*/
+    /*padding: 0px;*/
+/*}*/
 
 #id_q {
     border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
@@ -256,20 +355,20 @@ nav ul li:last-child {
     border-width: 1px 0px 1px 1px;
     margin: 0px;
     font-size: 16px;
-    height: 20px;
-    width: 549px;
+    /*height: 20px;*/
+    /*width: 549px;*/
     -webkit-transition: all 0.5s ease;
     -moz-transition: all 0.5s ease;
     -o-transition: all 0.5s ease;
     transition: all 0.5s ease;
 }
 
-#search-button {
-    height: 32px;
-    padding: 4px 10px;
-    margin: 0px;
-    border-color: #a6a6a6;
-}
+/*#search-button {*/
+    /*height: 32px;*/
+    /*padding: 4px 10px;*/
+    /*margin: 0px;*/
+    /*border-color: #a6a6a6;*/
+/*}*/
 
 #advanced {
     color: black;
@@ -282,6 +381,15 @@ nav ul li:last-child {
 
 /* New case view styling, including citations */
 #default-text pre, .citation {
+    background-color: transparent;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-weight: inherit;
+    font-style: inherit;
+    font-size: 100%;
+    font-family: "andale mono","lucida console",monospace;
+    vertical-align: baseline;
     white-space: pre;
 }
 
@@ -322,40 +430,41 @@ div.shown ul {
 }
 
 /* Button formatting */
-a.button, button, .ui-button-text {
-    border-color: #a6a6a6;
-    background-color: #6683B7;
-    color: white;
-    letter-spacing: 0.5px;
-}
-button.small {
-    padding: 2px 8px 2px 5px;
-    font-size: 90%;
-}
+/*a.button, button, .ui-button-text {*/
+    /*border-color: #a6a6a6;*/
+    /*background-color: #6683B7;*/
+    /*color: white;*/
+    /*letter-spacing: 0.5px;*/
+/*}*/
+/*button.small {*/
+    /*padding: 2px 8px 2px 5px;*/
+    /*font-size: 90%;*/
+/*}*/
+
 input.bottom {
     margin-bottom: 0px;
 }
 
-.ui-state-active .ui-button-text,
-.ui-state-hover .ui-button-text,
-.ui-state-focus .ui-button-text {
-    background-color: #7896D0;
-    color: #eeeeee;
-}
+/*.ui-state-active .ui-button-text,*/
+/*.ui-state-hover .ui-button-text,*/
+/*.ui-state-focus .ui-button-text {*/
+    /*background-color: #7896D0;*/
+    /*color: #eeeeee;*/
+/*}*/
 
-.ui-state-active, .ui-state-hover, .ui-state-focus {
-    border-color: transparent;
-}
+/*.ui-state-active, .ui-state-hover, .ui-state-focus {*/
+    /*border-color: transparent;*/
+/*}*/
 
-button:hover, a.button:hover {
-  background-color: #7896D0;
-  border:1px solid gray;
-  color: #eeeeee;
-}
-a.button:active {
-  background-color: #7896D0;
-  color: #eeeeee;
-}
+/*button:hover, a.button:hover {*/
+  /*background-color: #7896D0;*/
+  /*border:1px solid gray;*/
+  /*color: #eeeeee;*/
+/*}*/
+/*a.button:active {*/
+  /*background-color: #7896D0;*/
+  /*color: #eeeeee;*/
+/*}*/
 
 #sidebar {
     margin-top: 6px;
@@ -398,9 +507,15 @@ div.sidebar-checkbox input {
 input.court-checkbox, input.status-checkbox {
     top: 0;
 }
+
+input.citation-count-input {
+    width: 6em;
+}
+
 #citation-count {
     float: right;
 }
+
 #slider-range {
     margin: 0.5em;
 }
@@ -434,13 +549,13 @@ input.court-checkbox, input.status-checkbox {
     width: 200px;
 }
 #pagination-center {
-	margin: auto;
-	text-align: center;
+    margin: auto;
+    text-align: center;
 }
 #pagination-right {
-	float: right;
-	width: 200px;
-	text-align: right;
+    float: right;
+    width: 200px;
+    text-align: right;
 }
 
 /* Donations page */
@@ -465,6 +580,21 @@ input.court-checkbox, input.status-checkbox {
     margin-left: 5px;
 }
 
+/* Special case for Oregon, which has a name attr with a value of TOP. */
+a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
+    color: #000099;
+    text-decoration: underline;
+}
+
+/* These have some special casing for Oregon cases. */
+a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
+    color: #000;
+}
+
+a:not([name="TOP"]) {
+    color: #009;
+    text-decoration: underline;
+}
 
 /* link formatting */
 a:link, a:visited {
@@ -473,11 +603,8 @@ a:link, a:visited {
 a:visited.visitable {
     color: #9d11b3;
 }
-/* Special case for Oregon, which has a name attr with a value of TOP. */
-a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
-    color: #000099;
-    text-decoration: underline;
-}
+
+/*
 .fake-link {
     color: #009;
 }
@@ -487,9 +614,12 @@ a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
     cursor: pointer;
     cursor: hand;
 }
+*/
 
-/* errors */
-.error a, .notice a, .success a {
+
+
+/* errors - replaced with bg-danger, bg-warning, bg-success*/
+/*.error a, .notice a, .success a {
     text-decoration: underline;
 }
 .error a:focus, .error a:hover {
@@ -500,7 +630,7 @@ a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
 }
 .errortext {
     color: #8a1f11;
-}
+}*/
 
 
 /* Display cases from Resources.org neatly */
@@ -583,11 +713,13 @@ blockquote span.star-pagination::after {
 
 /* End lawbox display CSS */
 
+/*
 input.wide-title {
     width: 390px;
     padding: 5px;
     font-size:1.5em;
 }
+*/
 
 /* Disabled button formatting */
 button[disabled]:active, button[disabled]:hover, button[disabled] {
@@ -617,7 +749,8 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 }
 
 #modal-court-picker {
-    width: 934px;
+    width: 95%;
+    max-width: 950px;
 }
 #modal-court-picker p.inline {
     margin-left: 10px;
@@ -697,17 +830,20 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 }
 
 /* Tables on settings pages */
+.settings-table {
+    border-collapse: collapse;
+}
 .settings-table th {
     border-width: 0px 0px 1px 0px;
     border-style: solid;
     border-color: gray;
 }
-.settings-table td {
+.settings-table tr {
     border-width: 0px 0px 1px 0px;
     border-style: dotted;
     border-color: gray;
 }
-.settings-table tr:last-child td {
+.settings-table tr:last-child {
     border-width: 0px;
 }
 .settings-table tbody tr:hover {
@@ -757,34 +893,34 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 }
 #delicious_png {
     height               : 16px;
-	width                : 16px;
-	background-position  : -16px -16px;
+    width                : 16px;
+    background-position  : -16px -16px;
     margin: .7em 2px 0px 2px;
 }
 #delicious_png:hover {
-	background-position  : -16px 0px;
+    background-position  : -16px 0px;
 }
 #digg_png {
-	height               : 14px;
-	width                : 16px;
-	background-position  : -32px -14px;
+    height               : 14px;
+    width                : 16px;
+    background-position  : -32px -14px;
     margin: .7em 2px 0px 2px;
 }
 #digg_png:hover {
-	background-position  : -32px 0px;
+    background-position  : -32px 0px;
 }
 #email_link_png {
-	height               : 16px;
-	width                : 16px;
-	background-position  : -48px -16px;
+    height               : 16px;
+    width                : 16px;
+    background-position  : -48px -16px;
     margin: .7em 2px 0px 2px;
 }
 #email_link_png:hover {
-	background-position  : -48px 0px;
+    background-position  : -48px 0px;
 }
 #facebook_png {
     height               : 16px;
-	width                : 16px;
+    width                : 16px;
     background-position  : -82px -16px;
     margin: .7em 2px 0px 2px;
 }
@@ -792,22 +928,22 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     background-position  : -82px 0px;
 }
 #reddit_png {
-	height               : 18px;
-	width                : 18px;
-	background-position  : -64px -18px;
+    height               : 18px;
+    width                : 18px;
+    background-position  : -64px -18px;
     margin: .7em 2px 0px 2px;
 }
 #reddit_png:hover {
-	background-position  : -64px 0px;
+    background-position  : -64px 0px;
 }
 #twitter_gif {
-	height               : 16px;
-	width                : 16px;
-	background-position  : -98px -16px;
+    height               : 16px;
+    width                : 16px;
+    background-position  : -98px -16px;
     margin: 0.7em 2px 0px 2px;
 }
 #twitter_gif:hover {
-	background-position  : -98px 0px;
+    background-position  : -98px 0px;
 }
 #favorites-star {
     font-size: 1.5em;

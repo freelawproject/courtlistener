@@ -5,6 +5,7 @@
         "offset": 0,
         "previous": null,
         "request_uri": "/api/rest/v1/jurisdiction/?format=json",
+        "status": "This endpoint is deprecated. Please upgrade to the newest version of the API.",
         "total_count": 1
     },
     "objects": [

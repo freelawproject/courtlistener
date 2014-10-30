@@ -1,0 +1,51 @@
+{"meta": {
+    "limit": 20,
+    "next": null,
+    "offset": 0,
+    "previous": null,
+    "request_uri": "/api/rest/v2/audio/?format=json",
+    "total_count": 2
+}, "objects": [
+    {
+        "absolute_url": "/audio/2/ander-v-leo/",
+        "blocked": false,
+        "case_name": "Ander v. Leo",
+        "date_argued": "2014-06-09",
+        "date_blocked": null,
+        "date_modified": "2014-10-21T19:55:20.393779",
+        "docket": "/api/rest/v2/docket/5/",
+        "docket_number": "239=239283",
+        "download_url": "scrapers/test_assets/2.mp3",
+        "duration": 15,
+        "id": 2,
+        "judges": "",
+        "local_path_mp3": "mp3/2014/06/09/ander_v._leo_cl.mp3",
+        "local_path_original_file": "mp3/2014/06/09/ander_v._leo.mp3",
+        "processing_complete": true,
+        "resource_uri": "/api/rest/v2/audio/2/",
+        "sha1": "34046093c40440b3315be06120c8cf792483aa2c",
+        "source": "C",
+        "time_retrieved": "2014-10-21T19:55:19.808690"
+    },
+    {
+        "absolute_url": "/audio/1/jeremy-v-julian/",
+        "blocked": false,
+        "case_name": "Jeremy v. Julian",
+        "date_argued": "2014-06-10",
+        "date_blocked": null,
+        "date_modified": "2014-10-21T19:55:19.646240",
+        "docket": "/api/rest/v2/docket/4/",
+        "docket_number": "23-232388",
+        "download_url": "scrapers/test_assets/1.wma",
+        "duration": 60,
+        "id": 1,
+        "judges": "",
+        "local_path_mp3": "mp3/2014/06/10/jeremy_v._julian_cl.mp3",
+        "local_path_original_file": "wma/2014/06/10/jeremy_v._julian.wma",
+        "processing_complete": true,
+        "resource_uri": "/api/rest/v2/audio/1/",
+        "sha1": "36f369385530a49150cc0aa1e91c1ba76e3d7f12",
+        "source": "C",
+        "time_retrieved": "2014-10-21T19:55:18.454460"
+    }
+]}
