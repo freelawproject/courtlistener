@@ -12,15 +12,12 @@ class ProfileForm(ModelForm):
     STATE_CHOICES.insert(0, ('', '---------'))
     state = USStateField(
         widget=forms.Select(
-            choices=STATE_CHOICES,
-            attrs={'class': 'span-5'}
+            choices=STATE_CHOICES
         ),
         required=False,
     )
     zip_code = USZipCodeField(
-        widget=forms.TextInput(
-            attrs={'class': 'span-4'}
-        ),
+        widget=forms.TextInput(),
         required=False,
     )
 
@@ -38,31 +35,20 @@ class ProfileForm(ModelForm):
             'plaintext_preferred',
         )
         widgets = {
-            'employer': forms.TextInput(
-                attrs={'class': 'span-9'}
-            ),
+            'employer': forms.TextInput(),
             'barmembership': forms.SelectMultiple(
-                attrs={'class': 'span-9',
-                       'size': '8'}
+                attrs={'size': '8'}
             ),
-            'address1': forms.TextInput(
-                attrs={'class': 'span-9'}
-            ),
-            'address2': forms.TextInput(
-                attrs={'class': 'span-9'}
-            ),
-            'city': forms.TextInput(
-                attrs={'class': 'span-9'}
-            ),
+            'address1': forms.TextInput(),
+            'address2': forms.TextInput(),
+            'city': forms.TextInput(),
         }
 
 
 class UserForm(ModelForm):
     email = forms.EmailField(
         required=True,
-        widget=forms.TextInput(
-            attrs={'class': 'span-9'}
-        )
+        widget=forms.TextInput()
     )
 
     class Meta:
@@ -73,12 +59,8 @@ class UserForm(ModelForm):
             'email',
         )
         widgets = {
-            'first_name': forms.TextInput(
-                attrs={'class': 'span-4'}
-            ),
-            'last_name': forms.TextInput(
-                attrs={'class': 'span-5'}
-            ),
+            'first_name': forms.TextInput(),
+            'last_name': forms.TextInput(),
         }
 
 

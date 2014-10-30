@@ -6,8 +6,8 @@
 {% block search-form %}{% endblock %}
 
 {% block content %}
-    <div class="span-4">&nbsp;</div>
-    <div class="span-16 append-4 last">
+    <div class="col-sm-2">&nbsp;</div>
+    <div class="col-sm-8">
         {% if error == 'User Cancelled' %}
             <h2>Donation Cancelled</h2>
             <p>It appears you have cancelled the donation you were about to make. Your support means the world to us.</p>
@@ -38,4 +38,5 @@
             <p><strong>Thanks again from the Free Law Team.</strong></p>
         {% endif %}
     </div>
+    <div class="col-sm-2">&nbsp;</div>
 {% endblock %}

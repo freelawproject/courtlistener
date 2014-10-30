@@ -5,7 +5,7 @@
 {% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="span-9 append-2">
+    <div class="col-sm-5">
         <h2 id="the-site">About</h2>
 
         <p>Started in 2010, CourtListener is a core project of the <a
@@ -31,8 +31,6 @@
             acquire more cases, please <a href="/contact/">get in touch</a>.
         </p>
 
-
-        <hr class="space">
         <h3 id="contribute">You Make CourtListener.</h3>
         <p>CourtListener is a community project and we enthusiastically welcome
             contributions. There are many ways to contribute, which are
@@ -67,30 +65,28 @@
         </p>
     </div>
 
-
-    <div class="span-13 last">
+    <div class="col-sm-7">
         <h2 id="Team">Team</h2>
-        <div class="span-7">
-            <img src="{{ STATIC_URL }}jpeg/brian.jpeg" height="270" width="270">
-        </div>
-        <div class="span-6 last">
-            <p>Brian W. Carver is the Co-Founder of the non-profit <a
-                    href="http://freelawproject.org">Free Law Project</a>, and
-                an Assistant Professor at the <a
-                        href="http://ischool.berkeley.edu">University of
-                California, Berkeley School of Information</a>. He researches
-                and teaches about intellectual property law and cyberlaw and is
-                also engaged in efforts to increase the public's access to the
-                law.
-            </p>
+        <div class="media">
+            <img class="pull-left media-object headshot" src="{{ STATIC_URL }}jpeg/brian.jpeg" height="270" width="270" alt="Photo of Brian W. Carver">
+            <div class="media-body">
+                <h4 class="media-heading">Brian W. Carver</h4>
+                <p>Brian W. Carver is the Co-Founder of the non-profit <a
+                        href="http://freelawproject.org">Free Law Project</a>,
+                    and an Assistant Professor at the <a
+                            href="http://ischool.berkeley.edu">University of
+                        California, Berkeley School of Information</a>. He
+                    researches and teaches about intellectual property law and
+                    cyberlaw and is also engaged in efforts to increase the
+                    public's access to the law.
+                </p>
+            </div>
         </div>
 
-        <hr class="space">
-        <div class="span-13 last">
-            <div class="span-7">
-                <img src="{{ STATIC_URL }}jpeg/mike.jpeg" height="270" width="270">
-            </div>
-            <div class="span-6 last">
+        <div class="media">
+            <img class="pull-left media-object headshot" src="{{ STATIC_URL }}jpeg/mike.jpeg" height="270" width="270" alt="Photo of Michael Lissner">
+            <div class="media-body">
+                <h4 class="media-heading">Michael Lissner</h4>
                 <p>Michael Lissner is the Lead Developer and Co-Founder of the
                     non-profit <a href="http://freelawproject.org">Free Law
                         Project</a>. Before founding the Free Law Project, he

@@ -1,18 +1,19 @@
 {% extends "base.html" %}
 
-{% block privacy %}{% endblock %}
-{% block title %}Page not found (404) - CourtListener.com{% endblock %}
+{% block title %}Tools - CourtListener.com{% endblock %}
+
+{% block head %}
+    <script type="text/javascript" src="{{ STATIC_URL }}js/addOpenSearch.js"></script>
+    <link rel="search" type="application/opensearchdescription+xml" title="CourtListener" href="{{ STATIC_URL }}xml/opensearch.xml">
+{% endblock %}
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="span-17 last">
-        <h2>Sorry, that page does not exist...</h2>
-        <p>You've got a few options:</p>
-        <ul>
-            <li>Return <a href="/">home</a>, where you can start fresh</li>
-            <li><a href="/contact/">Let us know</a> it's missing, so we can fix things</li>
-            <li><a href="/contribute/#bugs">File a bug</a>, if you think it's something we should fix</li>
-        </ul>
-        <p>Sorry about this. If you continue having problems, please do let us know.</p>
+    <div class="col-xs-12">
+        <h2>Search tools for Firefox, Chrome and Internet Explorer</h2>
+        <p>If you are interested in using our search engine in your browser, we have a plugin that will help.</p>
+        <p>Simply click below to install.</p>
+        <button type="submit" class="button title" name="install plugin" onClick="addOpenSearch();return false">Install Plugin</button>
     </div>
 {% endblock %}
-

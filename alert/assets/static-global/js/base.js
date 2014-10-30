@@ -86,11 +86,12 @@ $(document).ready(function() {
     //////////////
     function showAdvancedHomepage() {
         $('#homepage #advanced-search-starter, #homepage #search-container td > i').hide();
-        $('#homepage #advanced-search-inputs').show("fast");
+        $('#homepage #advanced-search-inputs').show("fast").removeClass("hidden");
         $("#main-query-box").addClass('wide');
         $('#id_q').focus();
     }
-    $('#homepage #advanced-search-starter h3').click(function () {
+    $('#homepage #advanced-search-starter a').click(function (event) {
+        event.preventDefault();
         showAdvancedHomepage();
     });
 
@@ -149,6 +150,7 @@ $(document).ready(function() {
     ////////////
     // Slider //
     ////////////
+    /*
     if (cited_gt.val() == "") {
         cited_gt.val(0);
     }
@@ -179,7 +181,7 @@ $(document).ready(function() {
     if (cited_gt.val() != 0 || cited_lt.val() != 20000) {
         $('#citation-count').text("(" + $("#id_cited_gt").val() + " - " + $("#id_cited_lt").val() + ")")
     }
-
+    */
 
     //////////////////
     // Court Picker //
@@ -333,7 +335,8 @@ $(document).ready(function() {
         ]
     };
 
-    $('#tour-link').click(function () {
+    $('#tour-link').click(function (event) {
+        event.preventDefault();
         var loc = location.pathname + location.search;
         if (loc !== '/') {
             sessionStorage.setItem("hopscotch.tour.state", 'feature-tour:0');

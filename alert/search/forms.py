@@ -85,7 +85,7 @@ class SearchForm(forms.Form):
         required=False,
         initial='',
         widget=forms.TextInput(
-            attrs={'class': 'span-5 external-input',
+            attrs={'class': 'external-input',
                    'autocomplete': 'off',
                    'tabindex': '10'}
         )
@@ -94,7 +94,7 @@ class SearchForm(forms.Form):
         required=False,
         initial='',
         widget=forms.TextInput(
-            attrs={'class': 'span-5 external-input',
+            attrs={'class': 'external-input',
                    'autocomplete': 'off',
                    'tabindex': '11'}
         )
@@ -106,7 +106,7 @@ class SearchForm(forms.Form):
     docket_number = forms.CharField(
         required=False,
         widget=forms.TextInput(
-            attrs={'class': 'span-5 external-input',
+            attrs={'class': 'external-input',
                    'autocomplete': 'off'}
         )
     )
@@ -119,7 +119,7 @@ class SearchForm(forms.Form):
         input_formats=INPUT_FORMATS,
         widget=forms.TextInput(
             attrs={'placeholder': 'YYYY-MM-DD',
-                   'class': 'span-3 external-input',
+                   'class': 'external-input',
                    'autocomplete': 'off'}
         )
     )
@@ -128,7 +128,7 @@ class SearchForm(forms.Form):
         input_formats=INPUT_FORMATS,
         widget=forms.TextInput(
             attrs={'placeholder': 'YYYY-MM-DD',
-                   'class': 'span-3 external-input',
+                   'class': 'external-input',
                    'autocomplete': 'off'}
         )
     )
@@ -141,7 +141,7 @@ class SearchForm(forms.Form):
         required=False,
         initial='score desc',
         widget=forms.Select(
-            attrs={'class': 'external-input span-5',
+            attrs={'class': 'external-input',
                    'tabindex': '9'}
         )
     )
@@ -150,7 +150,7 @@ class SearchForm(forms.Form):
         input_formats=INPUT_FORMATS,
         widget=forms.TextInput(
             attrs={'placeholder': 'YYYY-MM-DD',
-                   'class': 'span-3 external-input',
+                   'class': 'external-input',
                    'autocomplete': 'off'}
         )
     )
@@ -159,36 +159,38 @@ class SearchForm(forms.Form):
         input_formats=INPUT_FORMATS,
         widget=forms.TextInput(
             attrs={'placeholder': 'YYYY-MM-DD',
-                   'class': 'span-3 external-input',
+                   'class': 'external-input',
                    'autocomplete': 'off'}
         )
     )
     citation = forms.CharField(
         required=False,
         widget=forms.TextInput(
-            attrs={'class': 'span-5 external-input',
+            attrs={'class': 'external-input',
                    'autocomplete': 'off'}
         )
     )
     neutral_cite = forms.CharField(
         required=False,
         widget=forms.TextInput(
-            attrs={'class': 'span-5 external-input',
+            attrs={'class': 'external-input',
                    'autocomplete': 'off'}
         )
     )
     cited_gt = forms.CharField(
         required=False,
         initial=0,
-        widget=forms.HiddenInput(
-            attrs={'class': 'external-input'}
+        widget=forms.TextInput(
+            attrs={'class': 'external-input citation-count-input',
+                   'autocomplete': 'off'}
         )
     )
     cited_lt = forms.CharField(
         required=False,
         initial=20000,
-        widget=forms.HiddenInput(
-            attrs={'class': 'external-input'}
+        widget=forms.TextInput(
+            attrs={'class': 'external-input citation-count-input',
+                   'autocomplete': 'off'}
         )
     )
 

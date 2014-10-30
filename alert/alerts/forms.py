@@ -14,5 +14,5 @@ class CreateAlertForm(ModelForm):
         )
         widgets = {
             'alertText': HiddenInput(),
-            'alertName': TextInput(attrs={'class': 'span-5'})
+            'alertName': TextInput()
         }

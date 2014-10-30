@@ -33,7 +33,7 @@
 {% endblock %}
 
 {% block sidebar %}
-    <div class="span-6 append-1" id="sidebar">
+    <div class="col-sm-3" id="sidebar">
         <div class="sidebar-section">
             <h4>
                 <i class="fa fa-arrow-circle-o-left gray"></i>
@@ -116,7 +116,7 @@
 
 
 {% block content %}
-    <article class="span-17 last">
+    <article class="col-sm-9">
         <i id="favorites-star"
            class="{% if favorite_form.instance.audio_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
            data-toggle="modal"
@@ -167,7 +167,7 @@
         </p>
         <br>
         {% if not af.processing_complete %}
-            <div class="notice span-16 last">
+            <div class="col-xs-12 bg-warning">
                 <p class="bottom">This file has not yet completed processing on our server. Please try again in a few moments or if you prefer not to wait you may download the audio <a href="{{ af.download_url }}">directly from the court website</a>. Generally this process takes about thirty minutes.</p>
             </div>
         {% endif %}

@@ -30,7 +30,7 @@
 
 
 {% block sidebar %}
-    <div class="span-6 append-1 search-page" id="sidebar">
+    <div class="col-sm-3 search-page" id="sidebar">
         <div class="sidebar-section" id="type-switcher">
             <h3>
                 <label for="id_type_0" class="pointer
@@ -82,16 +82,14 @@
                                     <p class="bottom"><span id="jurisdiction-count">{{ court_count_human }}</span>
                                         jurisdictions selected</p>
                                 </div>
-                                <hr class="space">
                                 <h4 class="bottom">Case Name</h4>
 
-                                <p class="bottom span-6">{{ search_form.case_name }}</p>
+                                <p class="bottom">{{ search_form.case_name }}</p>
                                 <h4 class="bottom">Judge</h4>
 
-                                <p class="bottom span-6">{{ search_form.judge }}</p>
+                                <p class="bottom">{{ search_form.judge }}</p>
 
                                 {% if search_form.type.value == 'o' %}
-                                    <hr class="space">
                                     <h4 class="bottom">Precedential Status</h4>
                                     {% for status in status_facets %}
                                         <div class="sidebar-checkbox">
@@ -109,15 +107,12 @@
                                             </label>
                                         </div>
                                     {% endfor %}
-                                    <hr class="space">
 
                                     <h4 class="bottom">Filed After</h4>
-                                    <p class="bottom span-6">{{ search_form.filed_after }}</p>
+                                    <p class="bottom">{{ search_form.filed_after }}</p>
 
                                     <h4 class="bottom">Filed Before</h4>
-                                    <p class="bottom span-6">{{ search_form.filed_before }}</p>
-
-                                    <hr class="space">
+                                    <p class="bottom">{{ search_form.filed_before }}</p>
 
                                     <h4 class="bottom">Citation</h4>
                                     <p class="bottom">{{ search_form.citation }}</p>
@@ -126,10 +121,10 @@
                                     <p class="bottom">{{ search_form.neutral_cite }}</p>
                                 {% elif search_form.type.value == 'oa' %}
                                     <h4 class="bottom">Argued After</h4>
-                                    <p class="bottom span-6">{{ search_form.argued_after }}</p>
+                                    <p class="bottom">{{ search_form.argued_after }}</p>
 
                                     <h4 class="bottom">Argued Before</h4>
-                                    <p class="bottom span-6">{{ search_form.argued_before }}</p>
+                                    <p class="bottom">{{ search_form.argued_before }}</p>
                                 {% endif %}
 
                                 <h4 class="bottom">Docket Number</h4>
@@ -137,24 +132,19 @@
 
 
                                 {% if search_form.type.value == 'o' %}
-                                    <div class="span-5">
-                                        {{ search_form.cited_gt }}
-                                        {{ search_form.cited_lt }}
-                                        <h4 class="bottom inline">Citation Count</h4>
-                                        <span type="text" id="citation-count" class="gray small bottom">(Any)</span>
-                                    </div>
-                                    <div id="slider-range" class="span-5 bottom"></div>
+                                    <h4 class="bottom inline">Citation Count</h4>
+                                    <p class="bottom">minimum: {{ search_form.cited_gt }}</p>
+                                    <p class="bottom">maximum: {{ search_form.cited_lt }}</p>
                                 {% endif %}
 
                                 <button type="submit"
-                                        class="button title span-5"
+                                        class="btn title"
                                         name="search"><i class="fa fa-search"></i>&nbsp;Search
                                 </button>
                             </div>
                         </div>
                     {% endif %}
                 </div>
-              <hr class="space">
             </form>
         </div>
 
@@ -173,7 +163,7 @@
                     {% endif %}
                     <form action="" method="post">{% csrf_token %}
                         {{ alert_form.alertText }}
-                        <p class="span-6 append-1">
+                        <p>
                             <label for="id_alertName">Give the alert a name</label>
                             {% if alert_form.alertName.errors %}
                                 <br><span class="errortext">
@@ -207,8 +197,8 @@
                                    value="{{ request.GET.edit_alert }}"
                                    name="edit_alert">
                         {% endif %}
-                        <button type="submit" class="button title span-5" name="alertSave">
-                            {% if request.GET.edit_alert %}Save Changes{% else %}Create Alert{% endif %}
+                        <button type="submit" class="btn title" name="alertSave">
+                            {% if request.GET.edit_alert %}Edit Alert{% else %}Create Alert{% endif %}
                         </button>
                         <p class="gray">Some jurisdictions do not yet support alerts. Check
                             <a href="/coverage/#scraped-jurisdictions">our list</a> to be
@@ -229,25 +219,25 @@
 
 
 {% block content %}
-    <div class="span-17 last search-page">
+    <div class="col-sm-9 search-page">
         {% if messages %}
-            <div class="span-17 last">
+            <div>
                 {% for message in messages %}
                     <p class="bottom {{message.tags}}">{{message|safe}}</p>
                 {% endfor %}
             </div>
         {% endif %}
         {% if alert_form.errors %}
-            <div class="span-16 last error">
+            <div class="bg-danger">
                 <p class="bottom">There was an error creating your alert. Please <a href="#create-alert-header">see
                     below</a>.</p>
             </div>
         {% endif %}
         {% if request.GET.edit_alert %}
-            <div class="span-16 last notice">
-                <p class="bottom span-15">You are currently editing your alert,
-                    "<strong>{{ alert_form.alertName.value }}</strong>". To save changes, press "Save Changes", below.</p>
-                <p class="bottom span-1 last right"><a href="?{{ get_string_sans_alert }}"><i
+            <div class="row bg-warning">
+                <p class="col-sm-6">You are currently editing your alert,
+                    "<strong>{{ alert_form.alertName.value }}</strong>".</p>
+                <p class="col-sm-6 bottom text-right"><a href="?{{ get_string_sans_alert }}"><i
                         class="gray fa fa-times" title="Cancel editing and redo the search"></i></a></p>
             </div>
         {% endif %}
@@ -272,8 +262,7 @@
                     {% include "includes/order_by_dropdown.html" %}
                 {% endif %}
             </div>
-            <span class="small gray span-17 last top">{{ results.object_list.QTime }}ms</span>
-            <hr class="space"/>
+            <span class="small gray top">{{ results.object_list.QTime }}ms</span>
             {% include "includes/search_result.html" %}
         {% else %}
             {% if not error %}
@@ -308,7 +297,7 @@
         {% endif %}
 
         {% if results.has_previous or results.has_next %}
-            <div class="box">
+            <div class="well">
                 <div id="pagination-left">
                     {% if results.has_previous %}
                         <h3 class="bottom arrow-left-before">

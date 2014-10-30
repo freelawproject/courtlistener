@@ -6,34 +6,30 @@
 {% block nav-account %}active{% endblock %}
 
 {% block content %}
-    <div class="span-24 last">
+    <div class="col-xs-12">
         {# if their email address was just changed, tell them.#}
         {% if messages %}
-            <div class="span-17 last">
-                <div class="span-10">
-                    {% for message in messages %}
-                        <p class="bottom {{message.tags}}">{{message|safe}}</p>
-                    {% endfor %}
-                </div>
-                <div class="span-6 last">&nbsp;</div>
+            <div>
+                {% for message in messages %}
+                    <p class="bottom {{message.tags}}">{{message|safe}}</p>
+                {% endfor %}
             </div>
         {% endif %}
 
 
         {% if user_form.errors or profile_form.errors %}
-            <div class="span-17 last">
-                <div class="span-10">
+            <div class="row">
+                <div class="col-sm-6">
                     <p class="bottom error">There were errors with your submission.</p>
                 </div>
-                <div class="span-6 last">&nbsp;</div>
             </div>
         {% endif %}
     </div>
 
-    <div class="span-24 last">
+    <div class="col-xs-12">
         <form action="" method="post">{% csrf_token %}
-            <div class="span-24 last">
-                <p class="span-4">
+            <div class="row">
+                <p class="col-sm-6">
                     <label for="id_first_name">First Name</label>
                     {% if user_form.first_name.errors %}
                         <span class="errortext">
@@ -44,7 +40,7 @@
                     {% endif %}<br>
                     {{ user_form.first_name }}
                 </p>
-                <p class="span-5">
+                <p class="col-sm-6">
                     <label for="id_last_name">Last Name</label>
                     {% if user_form.last_name.errors %}
                         <span class="errortext">
@@ -56,7 +52,7 @@
                     {{ user_form.last_name }}
                 </p>
             </div>
-            <p class="span-24 last">
+            <p>
                 <label for="id_email">Email*</label>
                 {% if user_form.email.errors %}
                     <span class="errortext">
@@ -77,7 +73,7 @@
                     </a>
                 {% endif %}
             </p>
-            <p class="span-24 last">
+            <p>
                 <label for="id_employer">Employer</label>
                 {% if profile_form.employer.errors %}
                     <span class="errortext">
@@ -88,7 +84,7 @@
                 {% endif %}<br>
                 {{ profile_form.employer }}
             </p>
-            <p class="span-24 last">
+            <p>
                 <label for="id_barmembership">Bar Memberships (hold control to select more than one)</label>
                 {% if profile_form.barmembership.errors %}
                     <span class="errortext">
@@ -99,7 +95,7 @@
                 {% endif %}<br>
                 {{ profile_form.barmembership }}
             </p>
-            <p class="span-24 last">
+            <p>
                 <label for="id_address1">Mailing Address 1</label>
                 {% if profile_form.address1.errors %}
                     <span class="errortext">
@@ -110,7 +106,7 @@
                 {% endif %}<br>
                 {{ profile_form.address1 }}
             </p>
-            <p class="span-24 last">
+            <p>
                 <label for="id_address2">Mailing Address 2</label>
                 {% if profile_form.address1.errors %}
                     <span class="errortext">
@@ -121,7 +117,7 @@
                 {% endif %}<br>
                 {{ profile_form.address2 }}
             </p>
-            <p class="span-24 last">
+            <p>
                 <label for="id_city">City</label>
                 {% if profile_form.city.errors %}
                     <span class="errortext">
@@ -132,8 +128,8 @@
                 {% endif %}<br>
                 {{ profile_form.city }}
             </p>
-            <div class="span-24 last bottom">
-                <p class="span-5 bottom">
+            <div class="row">
+                <p class="col-sm-7 bottom">
                     <label for="id_state">State</label>
                     {% if profile_form.state.errors %}
                         <span class="errortext">
@@ -144,7 +140,7 @@
                     {% endif %}<br>
                     {{ profile_form.state }}
                 </p>
-                <p class="span-4 bottom">
+                <p class="col-sm-5 bottom">
                     <label for="id_zip_code">Zip</label>
                     {% if profile_form.zip_code.errors %}
                         <span class="errortext">
@@ -156,7 +152,7 @@
                     {{ profile_form.zip_code }}
                 </p>
             </div>
-            <p class="span-24 last bottom">
+            <p class="">
                 {{ profile_form.plaintext_preferred }}
                 <label for="id_plaintext_preferred">I prefer plain text emails</label>
                 {% if profile_form.plaintext_preferred.errors %}
@@ -168,7 +164,7 @@
                 {% endif %}
 
             </p>
-            <p class="span-24 last">
+            <p class="">
                 {{ profile_form.wants_newsletter }}
                 <label for="id_wants_newsletter">Send me the monthly newsletter</label>
                 {% if profile_form.wants_newsletter.errors %}

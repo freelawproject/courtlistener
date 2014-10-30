@@ -43,7 +43,7 @@
     });
 
     // Set up the "Other" box so we don't have to do it via Django.
-    $(".radio-list li:last-child label").after("<input id=\"id_amount_other\" class=\"span-2\" type=\"text\" name=\"amount_other\"></input>");
+    $(".radio-list li:last-child label").after("<input id=\"id_amount_other\" type=\"text\" name=\"amount_other\"></input>");
     $("#id_amount_other").click(function(){
         // Make the "Other amount" input box select the "Other" radio input.
         $(".radio-list li:last-child input[type=radio]").prop('checked', true);
@@ -103,10 +103,10 @@
 {% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="span-13 append-2">
+    <div class="col-sm-7">
         <h2>Support the Free Law Project</h2>
         {% if message %}
-            <div class="span-13 last error">
+            <div class="error">
                 <p class="bottom">{{ message|safe }}</p>
             </div>
         {% endif %}
@@ -124,7 +124,7 @@
                     {% endfor %}
                 </span>
             {% endif %}
-            <div class="span-13 append-2 last box round" id="how-much-donate">
+            <div class="box round" id="how-much-donate">
                 <h3>How much would you like to contribute?</h3>
                 {% if donation_form.amount.errors %}
                     <span class="errortext">
@@ -138,7 +138,6 @@
                 </div>
             </div>
 
-            <hr class="space">
             <div id="how-donate">
                 <h3>How would you like to donate?</h3>
                 {% if donation_form.payment_provider.errors %}
@@ -158,8 +157,8 @@
             </div>
 
             <div id="donor-info">
-                <div class="span-13 append-2 bottom">
-                    <p class="span-4 bottom">
+                <div class="row">
+                    <p class="col-sm-6">
                         <label for="id_first_name">First Name</label>
                         {% if user_form.first_name.errors %}
                             <span class="errortext">
@@ -170,7 +169,7 @@
                         {% endif %}<br>
                         {{ user_form.first_name }}
                     </p>
-                    <p class="span-5 bottom">
+                    <p class="col-sm-6">
                         <label for="id_last_name">Last Name</label>
                         {% if user_form.last_name.errors %}
                             <span class="errortext">
@@ -182,7 +181,7 @@
                         {{ user_form.last_name }}
                     </p>
                 </div>
-                <p class="span-13 append-2 last bottom">
+                <p class="bottom">
                     <label for="id_address1">Mailing Address 1</label>
                     {% if profile_form.address1.errors %}
                         <span class="errortext">
@@ -193,7 +192,7 @@
                     {% endif %}<br>
                     {{ profile_form.address1 }}
                 </p>
-                <p class="span-13 append-2 last bottom">
+                <p class="bottom">
                     <label for="id_address2">Mailing Address 2</label>
                     {% if profile_form.address1.errors %}
                         <span class="errortext">
@@ -204,7 +203,7 @@
                     {% endif %}<br>
                     {{ profile_form.address2 }}
                 </p>
-                <p class="span-13 append-2 last bottom">
+                <p class="bottom">
                     <label for="id_city">City</label>
                     {% if profile_form.city.errors %}
                         <span class="errortext">
@@ -215,8 +214,8 @@
                     {% endif %}<br>
                     {{ profile_form.city }}
                 </p>
-                <div class="span-13 append-2 bottom">
-                    <p class="span-5 bottom">
+                <div class="row">
+                    <p class="col-sm-7 bottom">
                         <label for="id_state">State</label>
                         {% if profile_form.state.errors %}
                             <span class="errortext">
@@ -227,7 +226,7 @@
                         {% endif %}<br>
                         {{ profile_form.state }}
                     </p>
-                    <p class="span-4 bottom">
+                    <p class="col-sm-5 bottom">
                         <label for="id_zip_code">Zip</label>
                         {% if profile_form.zip_code.errors %}
                             <span class="errortext">
@@ -239,7 +238,7 @@
                         {{ profile_form.zip_code }}
                     </p>
                 </div>
-                <p class="span-13 append-2 last bottom">
+                <p class="bottom">
                     <label for="id_email">E-Mail Address</label>
                     {% if user_form.email.errors %}
                         <span class="errortext">
@@ -253,7 +252,6 @@
                     {% if request.user.email %}
                         <input type="text"
                                disabled=""
-                               class="span-9"
                                value="{{ request.user.email }}"
                                maxlength="75">
                         <input type="hidden"
@@ -261,8 +259,7 @@
                                name="email"
                                value="{{ request.user.email }}">
                     {% else %}
-                        <input class="span-9"
-                               id="id_email"
+                        <input id="id_email"
                                name="email"
                                value="{{ user_form.email.value|default_if_none:"" }}"
                                maxlength="75"
@@ -270,22 +267,22 @@
                     {% endif %}
                 </p>
 
-                <div id="cc-info" class="span-13 append-2">
+                <div id="cc-info" class="row">
                     <!-- Stripe's custom form, sans name attributes -->
                     <p class="bottom"><span class="payment-errors errortext"></span></p>
-                    <p class="span-4">
+                    <p class="col-sm-5">
                         <label>
                             <span>Card Number</span>
-                            <input class="span-4" type="text" size="20" data-stripe="number"/>
+                            <input type="text" size="20" data-stripe="number"/>
                         </label>
                     </p>
-                    <p class="span-2">
+                    <p class="col-sm-3">
                         <label>
                             <span>CVC</span>
-                            <input class="span-2" type="text" size="4" data-stripe="cvc"/>
+                            <input type="text" size="4" data-stripe="cvc"/>
                         </label>
                     </p>
-                    <div class="span-4 append-3 last">
+                    <div class="col-sm-4">
                         <label>
                             <span>Expiration</span>
                         </label>
@@ -304,7 +301,6 @@
                 <div {% if profile_form.wants_newsletter.value %}class="hidden"{% endif %}>
                     {{ profile_form.wants_newsletter }}{{ profile_form.wants_newsletter.label_tag }}
                 </div>
-                <hr class="space">
                 {{ donation_form.referrer }}
                 <button type="submit"
                         class="button title"
@@ -326,7 +322,7 @@
         </div>
     </div>
 
-    <div class="span-9 last">
+    <div class="col-sm-5">
         <h3>The Big Goals</h3>
         <p>CourtListener is a project of the Free Law Project. Free Law Project
             is a federally-recognized 501(c)(3) public charity and a California
@@ -345,7 +341,6 @@
                 href="http://freelawproject.org">Blog</a> and <a
                 href="http://freelawproject.org/about/">About</a> page.
         </p>
-        <hr class="space">
 
 
         <h3 id="testimonials">What People Are Saying</h3>

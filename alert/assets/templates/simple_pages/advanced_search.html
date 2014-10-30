@@ -4,10 +4,10 @@
 {% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="span-17 append-2">
+    <div class="col-sm-9">
         <h2>Advanced Query Techniques</h2>
 
-        <p class="top">CourtListener supports highly advanced Boolean queries. These allow you to build a complex search
+        <p>CourtListener supports highly advanced Boolean queries. These allow you to build a complex search
             that can be run across our entire corpus.</p>
 
         <p>At present, the following Boolean connectors are supported:</p>
@@ -116,7 +116,7 @@
         <p>If you would like assistance crafting a query, <a href="/contact/">let us know</a>. We can sometimes help.
         </p>
     </div>
-    <div class="span-5 last">
+    <div class="col-sm-3">
         {% include "includes/operators_quick_list.html" %}
     </div>
 {% endblock %}
