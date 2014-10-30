@@ -14,7 +14,6 @@ class Migration(DataMigration):
                 slug=doc.citation.slug,
                 blocked=doc.blocked,
                 date_blocked=doc.date_blocked,
-
             )
             docket.save()
             doc.docket = docket
