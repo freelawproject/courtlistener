@@ -121,6 +121,13 @@ def feeds(request):
     )
 
 
+def contribute(request):
+    return render_to_response(
+        'simple_pages/contribute.html',
+        {'private': False},
+    )
+
+
 @check_honeypot(field_name='skip_me_if_alive')
 def contact(
         request,
@@ -199,6 +206,22 @@ def advanced_search(request):
         RequestContext(request)
     )
 
+
+def old_terms(request, v):
+    return render_to_response(
+        'simple_pages/terms/%s.html' % v,
+        {'title': 'Archived Terms and Policies, v%s - CourtListener.com' % v,
+         'private': True},
+        RequestContext(request),
+    )
+
+
+def latest_terms(request):
+    return render_to_response(
+        'simple_pages/terms/latest.html',
+        {'private': False},
+        RequestContext(request),
+    )
 
 class HttpResponseTemporaryUnavailable(HttpResponse):
     status_code = 503
