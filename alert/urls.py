@@ -19,7 +19,7 @@ urlpatterns = patterns('',
 
     # Maintenance and SOPA/PIPA mode! Must be here so it intercepts any other
     # urls.
-    (r'/*', show_maintenance_warning),
+    #(r'/*', show_maintenance_warning),
 
     url('', include('alert.audio.urls')),
     url('', include('alert.opinion_page.urls')),

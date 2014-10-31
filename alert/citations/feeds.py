@@ -32,7 +32,7 @@ class CitedByFeed(Feed):
         return item.get_absolute_url()
 
     def item_author_name(self, item):
-        return item.court
+        return item.docket.court
 
     def item_pubdate(self, item):
         return datetime.datetime.combine(item.date_filed, datetime.time())

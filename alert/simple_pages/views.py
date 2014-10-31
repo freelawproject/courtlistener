@@ -220,7 +220,8 @@ def robots(request):
     """Generate the robots.txt file"""
     response = HttpResponse(mimetype='text/plain')
     t = loader.get_template('simple_pages/robots.txt')
-    return response.write(t.render(Context({})))
+    response.write(t.render(Context({})))
+    return response
 
 
 def validate_for_bing(request):
