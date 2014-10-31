@@ -3,15 +3,18 @@ from django.views.generic import RedirectView
 from alert.simple_pages.views import tools_page, validate_for_google, \
     validate_for_google2, validate_for_wot, validate_for_bing, robots, \
     advanced_search, contact_thanks, contact, feeds, coverage_graph, faq, about, \
-    browser_warning, serve_static_file
+    browser_warning, serve_static_file, old_terms, latest_terms, contribute
 
 mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html', 'mp3')
+
+
 urlpatterns = patterns('',
     # Footer stuff
     (r'^about/$', about),
     (r'^faq/$', faq),
     (r'^coverage/$', coverage_graph),
     (r'^feeds/$', feeds),
+    (r'^contribute/$', contribute),
     (r'^contact/$', contact),
     (r'^contact/thanks/$', contact_thanks),
 
@@ -22,12 +25,15 @@ urlpatterns = patterns('',
     # Advanced search page
     (r'^search/advanced-techniques/$', advanced_search),
 
-    # Robots
-    (r'^robots.txt$', robots),
+    (r'^terms/v/(\d{1,2})/$', old_terms),
+    (r'^terms/$', latest_terms),
 
     # Randoms
     (r'^tools/$', tools_page),
     (r'^bad-browser/$', browser_warning),
+
+    # Robots
+    (r'^robots.txt$', robots),
 
     # SEO-related stuff
     (r'^BingSiteAuth.xml$', validate_for_bing),
