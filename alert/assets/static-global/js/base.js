@@ -238,7 +238,7 @@ $(document).ready(function() {
                 title: 'Welcome to the Tour!',
                 content: 'Broad queries can be a great way to start a ' +
                     'research task. Our search box can understand ' +
-                    'everything you might expect%hellip; terms, concepts, ' +
+                    'everything you might expect&hellip; terms, concepts, ' +
                     'citations, you name it.',
                 // If the advanced page is already shown, we skip to step 2.
                 onNext: function(){
