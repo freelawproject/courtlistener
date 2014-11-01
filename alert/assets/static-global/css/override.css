@@ -135,7 +135,7 @@ a.button:active{
 }
 
 #type-switcher h3 {
-    padding-bottom: 8px;
+    margin-bottom: 2px;
 }
 #type-switcher label{
     font-weight: normal;
