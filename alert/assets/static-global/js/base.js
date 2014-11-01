@@ -259,7 +259,8 @@ $(document).ready(function() {
                     "Click on \"Advanced Search\" to turn it on.",
                 onNext: function(){
                     showAdvancedHomepage();
-                }
+                },
+                delay: 250 // let advanced search area get exposed.
             },
             {//2
                 target: "#extra-sidebar-fields",
