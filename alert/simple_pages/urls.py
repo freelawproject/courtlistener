@@ -43,10 +43,13 @@ urlpatterns = patterns('',
 
     # Favicon, touch icons, etc.
     (r'^favicon\.ico$',
-     RedirectView.as_view(url='/static/ico/favicon.ico', permanent=True)),
+     RedirectView.as_view(
+         url='/static/ico/favicon.ico',
+         permanent=True)),
     (r'^apple-touch-icon\.png$',
-     RedirectView.as_view(url='/static/png/apple-touch-icon.png',
-                          permanent=True)),
+     RedirectView.as_view(
+         url='/static/png/apple-touch-icon.png',
+         permanent=True)),
     (r'^apple-touch-icon-57x57-precomposed\.png$',
      RedirectView.as_view(
          url='/static/png/apple-touch-icon-57x57-precomposed.png',
@@ -60,15 +63,18 @@ urlpatterns = patterns('',
          url='/static/png/apple-touch-icon-114x114-precomposed.png',
          permanent=True)),
     (r'^apple-touch-icon-precomposed\.png$',
-     RedirectView.as_view(url='/static/png/apple-touch-icon-precomposed.png',
-                          permanent=True)),
-    # hopscotch
+     RedirectView.as_view(
+         url='/static/png/apple-touch-icon-precomposed.png',
+         permanent=True)),
+    # hopscotch http://127.0.0.1:8000/static/img/sprite-green.png
     (r'^static/img/sprite-green\.png$',
-     RedirectView.as_view(url='/static/png/sprite-green.png',
-                          permanent=True)),
+     RedirectView.as_view(
+         url='/static/png/sprite-green.png',
+         permanent=True)),
     (r'^static/img/sprite-orange\.png$',
-     RedirectView.as_view(url='/static/png/sprite-orange.png',
-                          permanent=True)),
+     RedirectView.as_view(
+         url='/static/png/sprite-orange.png',
+         permanent=True)),
 )
 
 
