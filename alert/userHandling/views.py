@@ -6,7 +6,6 @@ import re
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import PasswordChangeForm
 from django.core.mail import send_mail
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
@@ -17,7 +16,8 @@ from django.views.decorators.debug import sensitive_post_parameters, sensitive_v
 
 from alert import settings
 from alert.stats import tally_stat
-from alert.userHandling.forms import ProfileForm, UserForm, UserCreationFormExtended, EmailConfirmationForm
+from alert.userHandling.forms import ProfileForm, UserForm, UserCreationFormExtended, EmailConfirmationForm, \
+    CustomPasswordChangeForm
 from alert.userHandling.models import UserProfile
 from alert.custom_filters.decorators import check_honeypot
 from alert.favorites.forms import FavoriteForm
@@ -374,14 +374,14 @@ def emailConfirmSuccess(request):
 @never_cache
 def password_change(request):
     if request.method == "POST":
-        form = PasswordChangeForm(user=request.user, data=request.POST)
+        form = CustomPasswordChangeForm(user=request.user, data=request.POST)
         if form.is_valid():
             form.save()
             messages.add_message(request, messages.SUCCESS,
                                  'Your password was changed successfully.')
             return HttpResponseRedirect('/profile/password/change/')
     else:
-        form = PasswordChangeForm(user=request.user)
+        form = CustomPasswordChangeForm(user=request.user)
     return render_to_response('profile/password_form.html',
                               {'form': form, 'private': False},
                               RequestContext(request))

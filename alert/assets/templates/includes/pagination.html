@@ -1,0 +1,33 @@
+{% load humanize %}
+
+{% if results.has_previous or results.has_next %}
+    <div class="well">
+        <div class="row">
+            <div class="col-xs-2">
+                {% if results.has_previous %}
+                    <div class="large text-left">
+                        <i class="gray fa fa-caret-left"></i>
+                        <a href="?{{ get_string }}page={{ results.previous_page_number }}" rel="prev">
+                            Previous
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="col-xs-8">
+                <div class="text-center large">
+                    Page {{ results.number|intcomma }} of {{ results.paginator.num_pages|intcomma }}
+                </div>
+            </div>
+            <div class="col-xs-2">
+                {% if results.has_next %}
+                    <div class="large text-right">
+                        <a href="?{{ get_string }}page={{ results.next_page_number }}" rel="next">
+                            Next
+                        </a>
+                        <i class="gray fa fa-caret-right"></i>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endif %}
