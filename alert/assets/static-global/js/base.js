@@ -259,8 +259,7 @@ $(document).ready(function() {
                     "Click on \"Advanced Search\" to turn it on.",
                 onNext: function(){
                     showAdvancedHomepage();
-                },
-                delay: 250 // let advanced search area get exposed.
+                }
             },
             {//2
                 target: "#extra-sidebar-fields",
@@ -274,7 +273,8 @@ $(document).ready(function() {
                 showPrevButton: false,
                 onNext: function(){
                     window.location = '/?q=roe+v.+wade&order_by=score+desc&stat_Precedential=on&court=scotus';
-                }
+                },
+                delay: 250 // let advanced search area get exposed.
             },
             {//3
                 // This step will be skipped if on a dev machine with no
