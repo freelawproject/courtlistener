@@ -285,7 +285,8 @@ $(document).ready(function() {
                 title: 'Detailed Results',
                 content: 'Here you can see the results for the query "Roe ' +
                     'v. Wade" sorted by relevance and filtered to only one ' +
-                    'jurisdiction, the Supreme Court.'
+                    'jurisdiction, the Supreme Court.',
+                showPrevButton: false,
             },
             {//4
                 target: '#type-switcher',
