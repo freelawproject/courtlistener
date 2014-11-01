@@ -62,6 +62,13 @@ urlpatterns = patterns('',
     (r'^apple-touch-icon-precomposed\.png$',
      RedirectView.as_view(url='/static/png/apple-touch-icon-precomposed.png',
                           permanent=True)),
+    # hopscotch
+    (r'^static/img/sprite-green\.png$',
+     RedirectView.as_view(url='/static/png/sprite-green.png',
+                          permanent=True)),
+    (r'^static/img/sprite-orange\.png$',
+     RedirectView.as_view(url='/static/png/sprite-orange.png',
+                          permanent=True)),
 )
 
 
