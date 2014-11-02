@@ -44,12 +44,12 @@ Sets up all the overrides or additional CSS that the site uses.
 
 button:hover, a.button:hover{
   background-color:#dff4ff;
-  border:1px solid #c2e1ef;
+/*  border:1px solid #c2e1ef; */
   color:#336699;
 }
 a.button:active{
   background-color:#6299c5;
-  border:1px solid #6299c5;
+/* border:1px solid #6299c5; */
   color:#fff;
 }
 
@@ -529,11 +529,6 @@ input.citation-count-input {
     margin: 0.5em;
 }
 
-#payment-provider-radio input[type="radio"] {
-    position: absolute;
-    top: auto;
-}
-
 /* Results page */
 #id_q:focus{
     outline-style: none;
@@ -576,6 +571,13 @@ input.citation-count-input {
 #how-much-donate-choices {
     padding-left: 2em;
 }
+
+/*
+#payment-provider-radio input[type="radio"] {
+    position: absolute;
+    top: auto;
+}
+*/
 
 #cc-month-field {
     width: 29px;

@@ -59,29 +59,29 @@
     check_info.hide();
     cc_info.hide();
 
-    $("#payment-provider-radio").buttonset();
-    $("#id_payment_provider_0").click(function(){
+/*    $("#payment-provider-radio").buttonset(); */
+    $("#id_payment_provider_0").parent("label").click(function(){
         // Dwolla
         donor_info.show("fast");
         check_info.hide();
         cc_info.hide();
         payment_price.text("Dwolla charges us 25¢ for any donation over $10.")
     });
-    $("#id_payment_provider_1").click(function(){
+    $("#id_payment_provider_1").parent("label").click(function(){
         // PayPal
         donor_info.show("fast");
         check_info.hide();
         cc_info.hide();
         payment_price.text("PayPal charges us 2.2% + 30¢ on all donations.")
     });
-    $("#id_payment_provider_2").click(function(){
+    $("#id_payment_provider_2").parent("label").click(function(){
         // Credit Card
         donor_info.show("fast");
         check_info.hide();
         cc_info.show();
         payment_price.text("We are charged 2.9% + 30¢ on all credit card donations.")
     });
-    $("#id_payment_provider_3").click(function(){
+    $("#id_payment_provider_3").parent("label").click(function(){
         // Check
         donor_info.hide();
         check_info.show("fast");
@@ -147,11 +147,19 @@
                         {% endfor %}
                     </span>
                 {% endif %}
-                <div id="payment-provider-radio">
-                    <input type="radio" id="id_payment_provider_0" value="dwolla" name="payment_provider" /><label for="id_payment_provider_0">Dwolla</label>
-                    <input type="radio" id="id_payment_provider_1" value="paypal" name="payment_provider" /><label for="id_payment_provider_1">PayPal</label>
-                    <input type="radio" id="id_payment_provider_2" value="cc" name="payment_provider" /><label for="id_payment_provider_2">Credit Card</label>
-                    <input type="radio" id="id_payment_provider_3" value="check" name="payment_provider" /><label for="id_payment_provider_3">Check</label>
+                <div id="payment-provider-radio" class="btn-group" data-toggle="buttons">
+                    <label for="id_payment_provider_0" class="btn btn-default active">
+                        <input type="radio" id="id_payment_provider_0" value="dwolla" name="payment_provider" />Dwolla
+                    </label>
+                    <label for="id_payment_provider_1" class="btn btn-default">
+                        <input type="radio" id="id_payment_provider_1" value="paypal" name="payment_provider" />PayPal
+                    </label>
+                    <label for="id_payment_provider_2" class="btn btn-default">
+                        <input type="radio" id="id_payment_provider_2" value="cc" name="payment_provider" />Credit Card
+                    </label>
+                    <label for="id_payment_provider_3" class="btn btn-default">
+                        <input type="radio" id="id_payment_provider_3" value="check" name="payment_provider" />Check
+                    </label>
                 </div>
                 <p class="small gray" id="payment-price">&nbsp;</p>
             </div>
@@ -303,9 +311,9 @@
                 </div>
                 {{ donation_form.referrer }}
                 <button type="submit"
-                        class="button title"
+                        class="btn btn-primary"
                         name="donate"
-                        id="donate-button right">Donate to the Free Law Project</button>
+                        id="donate-button">Donate to the Free Law Project</button>
             </form>
 
         </div>
