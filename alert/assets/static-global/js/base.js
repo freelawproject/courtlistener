@@ -337,7 +337,7 @@ $(document).ready(function() {
         ]
     };
 
-    $('#tour-link').click(function (event) {
+    $('.tour-link').click(function (event) {
         event.preventDefault();
         var loc = location.pathname + location.search;
         if (loc !== '/') {
