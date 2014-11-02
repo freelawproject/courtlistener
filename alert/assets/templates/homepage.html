@@ -67,8 +67,10 @@
         </form>
     {% else %}
         <div class="navbar-right">
-            <a href="/profile/">Profile&nbsp;<i class="gray fa fa-user"></i></a>
-            <a href="/sign-out">Sign Out&nbsp;<i class="gray fa fa-sign-out"></i></a>
+            <ul class="nav navbar-nav">
+                <li><a href="/profile/">Profile&nbsp;<i class="gray fa fa-user"></i></a></li>
+                <li><a href="/sign-out">Sign Out&nbsp;<i class="gray fa fa-sign-out"></i></a></li>
+            </ul>
         </div>
     {% endif %}
 {% endblock %}
