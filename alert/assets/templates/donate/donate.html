@@ -110,7 +110,7 @@
                 <p class="bottom">{{ message|safe }}</p>
             </div>
         {% endif %}
-        <form action="/donate/" method="post" id="donate-form">{% csrf_token %}
+        <form role="form" action="/donate/" method="post" id="donate-form">{% csrf_token %}
             {% if donation_form.non_field_errors or user_form.non_field_errors or profile_form.non_field_errors %}
                 <span class="errortext">
                     {% for error in donation_form.non_field_errors %}
@@ -166,30 +166,34 @@
 
             <div id="donor-info">
                 <div class="row">
-                    <p class="col-sm-6">
-                        <label for="id_first_name">First Name</label>
-                        {% if user_form.first_name.errors %}
-                            <span class="errortext">
-                            {% for error in user_form.first_name.errors %}
-                                {{ error|escape }}
-                            {% endfor %}
-                        </span>
-                        {% endif %}<br>
-                        {{ user_form.first_name }}
-                    </p>
-                    <p class="col-sm-6">
-                        <label for="id_last_name">Last Name</label>
-                        {% if user_form.last_name.errors %}
-                            <span class="errortext">
-                            {% for error in user_form.last_name.errors %}
-                                {{ error|escape }}
-                            {% endfor %}
-                        </span>
-                        {% endif %}<br>
-                        {{ user_form.last_name }}
-                    </p>
+                    <div class="col-sm-6">
+                        <div class="form-group">
+                            <label for="id_first_name">First Name</label>
+                            {{ user_form.first_name }}
+                            {% if user_form.first_name.errors %}
+                                <p class="help-block errortext">
+                                {% for error in user_form.first_name.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                                </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="form-group">
+                            <label for="id_last_name">Last Name</label>
+                            {{ user_form.last_name }}
+                            {% if user_form.last_name.errors %}
+                                <p class="errortext">
+                                {% for error in user_form.last_name.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                                </p>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
-                <p class="bottom">
+                <div class="form-group">
                     <label for="id_address1">Mailing Address 1</label>
                     {% if profile_form.address1.errors %}
                         <span class="errortext">
@@ -199,8 +203,8 @@
                         </span>
                     {% endif %}<br>
                     {{ profile_form.address1 }}
-                </p>
-                <p class="bottom">
+                </div>
+                <div class="form-group">
                     <label for="id_address2">Mailing Address 2</label>
                     {% if profile_form.address1.errors %}
                         <span class="errortext">
@@ -210,41 +214,45 @@
                         </span>
                     {% endif %}<br>
                     {{ profile_form.address2 }}
-                </p>
-                <p class="bottom">
+                </div>
+                <div class="form-group">
                     <label for="id_city">City</label>
                     {% if profile_form.city.errors %}
                         <span class="errortext">
-                                {% for error in profile_form.city.errors %}
-                                    {{ error|escape }}
-                                {% endfor %}
-                            </span>
+                            {% for error in profile_form.city.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </span>
                     {% endif %}<br>
                     {{ profile_form.city }}
-                </p>
+                </div>
                 <div class="row">
-                    <p class="col-sm-7 bottom">
-                        <label for="id_state">State</label>
-                        {% if profile_form.state.errors %}
-                            <span class="errortext">
-                                {% for error in profile_form.state.errors %}
-                                    {{ error|escape }}
-                                {% endfor %}
-                            </span>
-                        {% endif %}<br>
-                        {{ profile_form.state }}
-                    </p>
-                    <p class="col-sm-5 bottom">
-                        <label for="id_zip_code">Zip</label>
-                        {% if profile_form.zip_code.errors %}
-                            <span class="errortext">
-                                {% for error in profile_form.zip_code.errors %}
-                                    {{ error|escape }}
-                                {% endfor %}
-                            </span>
-                        {% endif %}<br>
-                        {{ profile_form.zip_code }}
-                    </p>
+                    <div class="col-sm-7">
+                        <div class="form-group">
+                            <label for="id_state">State</label>
+                            {{ profile_form.state }}
+                            {% if profile_form.state.errors %}
+                                <p class="errortext">
+                                    {% for error in profile_form.state.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-sm-5">
+                        <div class="form-group">
+                            <label for="id_zip_code">Zip</label>
+                            {{ profile_form.zip_code }}
+                            {% if profile_form.zip_code.errors %}
+                                <p class="errortext">
+                                    {% for error in profile_form.zip_code.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
+                                </p>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
                 <p class="bottom">
                     <label for="id_email">E-Mail Address</label>

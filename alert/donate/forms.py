@@ -47,11 +47,12 @@ class ProfileForm(ModelForm):
     STATE_CHOICES.insert(0, ('', '---------'))
     state = USStateField(
         widget=forms.Select(
-            choices=STATE_CHOICES
+            choices=STATE_CHOICES,
+            attrs={'class': 'form-control'}
         )
     )
     zip_code = USZipCodeField(
-        widget=forms.TextInput()
+        widget=forms.TextInput(attrs={'class': 'form-control'})
     )
 
     class Meta:
@@ -65,9 +66,10 @@ class ProfileForm(ModelForm):
             'wants_newsletter',
         )
         widgets = {
-            'address1': forms.TextInput(),
-            'address2': forms.TextInput(),
-            'city': forms.TextInput(),
+            'address1': forms.TextInput(attrs={'class': 'form-control'}),
+            'address2': forms.TextInput(attrs={'class': 'form-control'}),
+            'city': forms.TextInput(attrs={'class': 'form-control'}),
+            'zip_code': forms.TextInput(attrs={'class': 'form-control'})
         }
 
     def __init__(self, *args, **kwargs):
@@ -86,8 +88,8 @@ class UserForm(ModelForm):
             'email',
         )
         widgets = {
-            'first_name': forms.TextInput(),
-            'last_name': forms.TextInput()
+            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control'})
         }
 
     def __init__(self, *args, **kwargs):
