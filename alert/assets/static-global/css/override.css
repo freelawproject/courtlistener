@@ -90,14 +90,23 @@ a.button:active{
     }
 }
 @media(min-width:768px){
-    #homepage #main-query-box {
-        margin-top: 3em;
-    }
     #homepage #main-query-box #id_q {
         width: 400px;
     }
     #homepage #main-query-box.wide #id_q {
         width: 580px;
+    }
+    #homepage #above-main-query {
+        margin-top: 6em;
+    }
+    #homepage #main-query-box {
+        margin-top: 2em;
+    }
+    #homepage #advanced-search-starter {
+        margin-bottom: 6em;
+    }
+    #homepage #advanced-search-starter p {
+        margin-top: 2em;
     }
 }
 @media(min-width:992px){
