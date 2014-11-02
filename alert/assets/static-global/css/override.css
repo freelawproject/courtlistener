@@ -106,7 +106,7 @@ a.button:active{
         margin-bottom: 6em;
     }
     #homepage #advanced-search-starter p {
-        margin-top: 2em;
+        margin-top: 0.75em;
     }
 }
 @media(min-width:992px){
