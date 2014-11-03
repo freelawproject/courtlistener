@@ -67,8 +67,10 @@
         </form>
     {% else %}
         <div class="navbar-right">
-            <a href="/profile/">Profile&nbsp;<i class="gray fa fa-user"></i></a>
-            <a href="/sign-out">Sign Out&nbsp;<i class="gray fa fa-sign-out"></i></a>
+            <ul class="nav navbar-nav">
+                <li><a href="/profile/">Profile&nbsp;<i class="gray fa fa-user"></i></a></li>
+                <li><a href="/sign-out">Sign Out&nbsp;<i class="gray fa fa-sign-out"></i></a></li>
+            </ul>
         </div>
     {% endif %}
 {% endblock %}
@@ -76,110 +78,110 @@
 {% block content %}
     <div id="homepage" class="col-xs-12">
 
-    <p class="text-center large bottom">Search millions of opinions by case name, topic, or citation.</p>
-    <p class="text-center large gray">{{ court_count }} Jurisdictions. Sponsored by the Non-Profit Free Law Project.</p>
+    <div id="above-main-query">
+        <p class="text-center large bottom">Search millions of opinions by case name, topic, or citation.</p>
+        <p class="text-center large gray">{{ court_count }} Jurisdictions. Sponsored by the Non-Profit Free Law Project.</p>
+    </div>
 
     <div class="row" id="main-query-box">
         {% include "includes/main_query_box.html" with homepage=True %}
     </div>
 
     <div id="advanced-search-inputs" class="hidden row">
-        <div id="extra-sidebar-fields">
-            {#  Modal is at bottom of results, so it loads last. #}
-            <div class="col-sm-9">
-                <div class="row">
-                    <div class="col-sm-8">
-                        <div class="row">
-                            <div class="col-sm-6">
-                                <div class="pointer"
-                                     data-toggle="modal"
-                                     data-target="#court-picker">
-                                    <h4 class="bottom">
-                                        Select Jurisdictions <i class="gray fa fa-external-link"></i>
-                                    </h4>
+        {#  Modal is at bottom of results, so it loads last. #}
+        <div id="extra-sidebar-fields" class="col-sm-9">
+            <div class="row">
+                <div class="col-sm-8">
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <div class="pointer"
+                                 data-toggle="modal"
+                                 data-target="#court-picker">
+                                <h4 class="bottom">
+                                    Select Jurisdictions <i class="gray fa fa-external-link"></i>
+                                </h4>
 
-                                    <p class="bottom"><span id="jurisdiction-count">{{ court_count }}</span>
-                                        jurisdictions selected</p>
-                                </div>
-                            </div>
-                            <div class="col-sm-6">
-                                <h4 class="bottom">Result Ordering</h4>
-                                {{ search_form.order_by }}
+                                <p class="bottom"><span id="jurisdiction-count">{{ court_count }}</span>
+                                    jurisdictions selected</p>
                             </div>
                         </div>
-                        <div class="row">
-                            <div class="col-sm-6">
-                                <h4 class="bottom">Case Name</h4>
-                                {{ search_form.case_name }}
-                            </div>
-                            <div class="col-sm-6">
-                                <h4 class="bottom">Judge</h4>
-                                {{ search_form.judge }}
-                            </div>
+                        <div class="col-sm-6">
+                            <h4 class="bottom">Result Ordering</h4>
+                            {{ search_form.order_by }}
                         </div>
                     </div>
-                    <div class="col-sm-4">
-                        <h4 class="bottom">Precedential Status</h4>
-                        {% for status in status_facets %}
-                            <div class="sidebar-checkbox">
-                                <input
-                                        id="id_{{ status.1 }}"
-                                        type="checkbox"
-                                        name="{{ status.1 }}"
-                                        class="external-input status-checkbox left"
-                                        {% if status.3 %}checked="checked"{% endif %}>
-                                <label
-                                        for="id_{{ status.1 }}"
-                                        class="pointer {% if status.2 == 0 %}gray{% endif %}">
-                                    <div>{{ status.0 }}&nbsp;<span
-                                            class="gray small">({{ status.2|intcomma }})</span></div>
-                                </label>
-                            </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-sm-4">
-                        <h4 class="bottom">Filed After</h4>
-                        {{ search_form.filed_after }}
-                    </div>
-                    <div class="col-sm-4">
-                        <h4 class="bottom">Filed Before</h4>
-                        {{ search_form.filed_before }}
-                    </div>
-                    <div class="col-sm-4">
-                        <h4 class="bottom">Citation Count</h4>
-                        <div class="row">
-                            <div class="col-xs-6">
-                                <h5 class="bottom">minimum</h5>
-                                {{ search_form.cited_gt }}
-                            </div>
-                            <div class="col-xs-6">
-                                <h5 class="bottom">maximum</h5>
-                                {{ search_form.cited_lt }}
-                            </div>
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <h4 class="bottom">Case Name</h4>
+                            {{ search_form.case_name }}
+                        </div>
+                        <div class="col-sm-6">
+                            <h4 class="bottom">Judge</h4>
+                            {{ search_form.judge }}
                         </div>
                     </div>
                 </div>
-                <div class="row">
-                    <div class="col-sm-4">
-                        <h4 class="bottom">Citation</h4>
-                        {{ search_form.citation }}
-                    </div>
-                    <div class="col-sm-4">
-                        <h4 class="bottom">Neutral Citation</h4>
-                        {{ search_form.neutral_cite }}
-                    </div>
-                    <div class="col-sm-4">
-                        <h4 class="bottom">Docket Number</h4>
-                        {{ search_form.docket_number }}
+                <div class="col-sm-4">
+                    <h4 class="bottom">Precedential Status</h4>
+                    {% for status in status_facets %}
+                        <div class="sidebar-checkbox">
+                            <input
+                                    id="id_{{ status.1 }}"
+                                    type="checkbox"
+                                    name="{{ status.1 }}"
+                                    class="external-input status-checkbox left"
+                                    {% if status.3 %}checked="checked"{% endif %}>
+                            <label
+                                    for="id_{{ status.1 }}"
+                                    class="pointer {% if status.2 == 0 %}gray{% endif %}">
+                                <div>{{ status.0 }}&nbsp;<span
+                                        class="gray small">({{ status.2|intcomma }})</span></div>
+                            </label>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-4">
+                    <h4 class="bottom">Filed After</h4>
+                    {{ search_form.filed_after }}
+                </div>
+                <div class="col-sm-4">
+                    <h4 class="bottom">Filed Before</h4>
+                    {{ search_form.filed_before }}
+                </div>
+                <div class="col-sm-4">
+                    <h4 class="bottom">Citation Count</h4>
+                    <div class="row">
+                        <div class="col-xs-6">
+                            <h5 class="bottom">minimum</h5>
+                            {{ search_form.cited_gt }}
+                        </div>
+                        <div class="col-xs-6">
+                            <h5 class="bottom">maximum</h5>
+                            {{ search_form.cited_lt }}
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-sm-3">
-                {% include "includes/operators_quick_list.html" %}
-                <a class="text-right" href="/search/advanced-techniques/">More details&hellip;</a>
+            <div class="row">
+                <div class="col-sm-4">
+                    <h4 class="bottom">Citation</h4>
+                    {{ search_form.citation }}
+                </div>
+                <div class="col-sm-4">
+                    <h4 class="bottom">Neutral Citation</h4>
+                    {{ search_form.neutral_cite }}
+                </div>
+                <div class="col-sm-4">
+                    <h4 class="bottom">Docket Number</h4>
+                    {{ search_form.docket_number }}
+                </div>
             </div>
+        </div>
+        <div class="col-sm-3">
+            {% include "includes/operators_quick_list.html" %}
+            <a class="text-right" href="/search/advanced-techniques/">More details&hellip;</a>
         </div>
     </div>
     {# Jurisdiction modal is at the bottom so it loads last #}

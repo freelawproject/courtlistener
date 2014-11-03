@@ -78,26 +78,21 @@
                         {% block main-nav %}
                             {% if user.is_authenticated %}
                                 <ul class="nav navbar-nav">
-                                    <li><a href="/profile/alerts/" tabindex="2">Alerts</a></li>
-                                    <li><a href="/profile/favorites/" tabindex="3">Favorites</a></li>
-                                    <li><a href="/profile/" tabindex="4">Profile</a></li>
-                                    <li><a href="/sign-out/" tabindex="5">Sign out</a></li>
                                     <li class="dropdown">
-                                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">Dropdown <span class="caret"></span></a>
+                                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
                                         <ul class="dropdown-menu" role="menu">
-                                            <li><a href="#">Action</a></li>
-                                            <li><a href="#">Another action</a></li>
-                                            <li><a href="#">Something else here</a></li>
-                                            <li class="divider"></li>
-                                            <li class="dropdown-header">Nav header</li>
-                                            <li><a href="#">Separated link</a></li>
-                                            <li><a href="#">One more separated link</a></li>
+                                            <li><a href="/profile/alerts/" tabindex="2">Alerts</a></li>
+                                            <li><a href="/profile/favorites/" tabindex="3">Favorites</a></li>
+                                            <li><a href="/profile/" tabindex="4">Profile</a></li>
+                                            <li><a href="/sign-out/" tabindex="5">Sign out</a></li>
                                         </ul>
                                     </li>
+                                    <li><a href="/sign-out">Sign Out&nbsp;<i class="gray fa fa-sign-out"></i></a></li>
                                 </ul>
                             {% else %}
                                 <ul class="nav navbar-nav">
                                     <li><a href="/about/" tabindex="2">About</a></li>
+                                    <li><a href="" class="tour-link">Tour</a></li>
                                     <li><a href="/coverage/" tabindex="3">Coverage</a></li>
                                     {% if request.path != "/sign-out/" %}
                                         <li>
@@ -149,7 +144,7 @@
                                 <a href="/faq/">FAQ</a>
                             </div>
                             <div class="footer-item">
-                                <a href="" id="tour-link">Tour</a>
+                                <a href="" class="tour-link">Tour</a>
                             </div>
                         </div>
 

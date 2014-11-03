@@ -32,7 +32,7 @@
 {% block sidebar %}
     <div class="col-sm-3 search-page" id="sidebar">
         <div class="sidebar-section" id="type-switcher">
-            <h3>
+            <h3 class="bottom">
                 <label for="id_type_0" class="pointer
                        {% if search_form.type.value == 'o' %}
                             selected
@@ -46,7 +46,7 @@
                            value="o"
                            type="radio">Opinions</label>
             </h3>
-            <h3>
+            <h3 class="top">
                 <label for="id_type_1" class="pointer
                        {% if search_form.type.value == 'oa' %}
                            selected
@@ -243,26 +243,32 @@
         {% endif %}
 
         {% if results.paginator.count > 0 %}
-            <h2 id="result-count" class="bottom">
-                {{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }}
-                {% if search_form.type.value == 'o' %}
-                    <a href="/feed/search/?{{ get_string }}">
-                        <i class="gray fa fa-rss"
-                           title="Subscribe to a feed of these results"></i>
-                    </a>
-                {% elif search_form.type.value == 'oa' %}
-                    <a href="/podcast/search/?{{ get_string }}">
-                        <i class="gray fa fa-rss"
-                           title="Subscribe to a podcast of these results"></i>
-                    </a>
-                {% endif %}
-            </h2>
-            <div id="result-order-chooser-placeholder">
-                {% if results.paginator.count > 0 %}
-                    {% include "includes/order_by_dropdown.html" %}
-                {% endif %}
+            <div class="row">
+                <div class="col-sm-6">
+                    <h2 id="result-count" class="bottom">
+                        {{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }}
+                        {% if search_form.type.value == 'o' %}
+                            <a href="/feed/search/?{{ get_string }}">
+                                <i class="gray fa fa-rss"
+                                   title="Subscribe to a feed of these results"></i>
+                            </a>
+                        {% elif search_form.type.value == 'oa' %}
+                            <a href="/podcast/search/?{{ get_string }}">
+                                <i class="gray fa fa-rss"
+                                   title="Subscribe to a podcast of these results"></i>
+                            </a>
+                        {% endif %}
+                    </h2>
+                    <span class="small gray top">{{ results.object_list.QTime }}ms</span>
+                </div>
+                <div class="col-sm-6">
+                    <div id="result-order-chooser-placeholder">
+                        {% if results.paginator.count > 0 %}
+                            {% include "includes/order_by_dropdown.html" %}
+                        {% endif %}
+                    </div>
+                </div>
             </div>
-            <span class="small gray top">{{ results.object_list.QTime }}ms</span>
             {% include "includes/search_result.html" %}
         {% else %}
             {% if not error %}

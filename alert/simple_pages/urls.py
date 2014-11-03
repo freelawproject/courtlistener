@@ -43,10 +43,13 @@ urlpatterns = patterns('',
 
     # Favicon, touch icons, etc.
     (r'^favicon\.ico$',
-     RedirectView.as_view(url='/static/ico/favicon.ico', permanent=True)),
+     RedirectView.as_view(
+         url='/static/ico/favicon.ico',
+         permanent=True)),
     (r'^apple-touch-icon\.png$',
-     RedirectView.as_view(url='/static/png/apple-touch-icon.png',
-                          permanent=True)),
+     RedirectView.as_view(
+         url='/static/png/apple-touch-icon.png',
+         permanent=True)),
     (r'^apple-touch-icon-57x57-precomposed\.png$',
      RedirectView.as_view(
          url='/static/png/apple-touch-icon-57x57-precomposed.png',
@@ -60,8 +63,9 @@ urlpatterns = patterns('',
          url='/static/png/apple-touch-icon-114x114-precomposed.png',
          permanent=True)),
     (r'^apple-touch-icon-precomposed\.png$',
-     RedirectView.as_view(url='/static/png/apple-touch-icon-precomposed.png',
-                          permanent=True)),
+     RedirectView.as_view(
+         url='/static/png/apple-touch-icon-precomposed.png',
+         permanent=True)),
 )
 
 

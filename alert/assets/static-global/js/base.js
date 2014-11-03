@@ -238,7 +238,7 @@ $(document).ready(function() {
                 title: 'Welcome to the Tour!',
                 content: 'Broad queries can be a great way to start a ' +
                     'research task. Our search box can understand ' +
-                    'everything you might expect...terms, concepts, ' +
+                    'everything you might expect&hellip; terms, concepts, ' +
                     'citations, you name it.',
                 // If the advanced page is already shown, we skip to step 2.
                 onNext: function(){
@@ -273,7 +273,8 @@ $(document).ready(function() {
                 showPrevButton: false,
                 onNext: function(){
                     window.location = '/?q=roe+v.+wade&order_by=score+desc&stat_Precedential=on&court=scotus';
-                }
+                },
+                delay: 250 // let advanced search area get exposed.
             },
             {//3
                 // This step will be skipped if on a dev machine with no
@@ -284,7 +285,8 @@ $(document).ready(function() {
                 title: 'Detailed Results',
                 content: 'Here you can see the results for the query "Roe ' +
                     'v. Wade" sorted by relevance and filtered to only one ' +
-                    'jurisdiction, the Supreme Court.'
+                    'jurisdiction, the Supreme Court.',
+                showPrevButton: false,
             },
             {//4
                 target: '#type-switcher',
@@ -335,7 +337,7 @@ $(document).ready(function() {
         ]
     };
 
-    $('#tour-link').click(function (event) {
+    $('.tour-link').click(function (event) {
         event.preventDefault();
         var loc = location.pathname + location.search;
         if (loc !== '/') {

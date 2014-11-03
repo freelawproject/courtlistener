@@ -44,12 +44,12 @@ Sets up all the overrides or additional CSS that the site uses.
 
 button:hover, a.button:hover{
   background-color:#dff4ff;
-  border:1px solid #c2e1ef;
+/*  border:1px solid #c2e1ef; */
   color:#336699;
 }
 a.button:active{
   background-color:#6299c5;
-  border:1px solid #6299c5;
+/* border:1px solid #6299c5; */
   color:#fff;
 }
 
@@ -90,14 +90,23 @@ a.button:active{
     }
 }
 @media(min-width:768px){
-    #homepage #main-query-box {
-        margin-top: 3em;
-    }
     #homepage #main-query-box #id_q {
         width: 400px;
     }
     #homepage #main-query-box.wide #id_q {
         width: 580px;
+    }
+    #homepage #above-main-query {
+        margin-top: 6em;
+    }
+    #homepage #main-query-box {
+        margin-top: 2em;
+    }
+    #homepage #advanced-search-starter {
+        margin-bottom: 6em;
+    }
+    #homepage #advanced-search-starter p {
+        margin-top: 0.75em;
     }
 }
 @media(min-width:992px){
@@ -135,7 +144,7 @@ a.button:active{
 }
 
 #type-switcher h3 {
-    padding-bottom: 8px;
+    margin-bottom: 2px;
 }
 #type-switcher label{
     font-weight: normal;
@@ -190,13 +199,13 @@ div.hopscotch-bubble .hopscotch-bubble-content {
     margin: 0;
 }
 
+/*
 div.hopscotch-bubble .hopscotch-bubble-close {
     background: none;
     text-indent: 0;
     top: -6px;
 }
-
-
+*/
 
 .settings-nav-item a,
 .settings-nav-item a:hover,
@@ -520,11 +529,6 @@ input.citation-count-input {
     margin: 0.5em;
 }
 
-#payment-provider-radio input[type="radio"] {
-    position: absolute;
-    top: auto;
-}
-
 /* Results page */
 #id_q:focus{
     outline-style: none;
@@ -535,9 +539,11 @@ input.citation-count-input {
 #new-search-chooser {
     float: right;
 }
+/*
 #result-count {
     float: left;
 }
+*/
 .search-page #id_order_by {
     float: right;
 }
@@ -568,13 +574,20 @@ input.citation-count-input {
     padding-left: 2em;
 }
 
+/*
+#payment-provider-radio input[type="radio"] {
+    position: absolute;
+    top: auto;
+}
+*/
+/*
 #cc-month-field {
     width: 29px;
 }
 #cc-year-field {
     width: 67px;
 }
-
+*/
 #unconfirmed-email-warning{
     margin-top: 9px;
     margin-left: 5px;
