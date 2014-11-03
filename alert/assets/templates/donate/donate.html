@@ -318,11 +318,15 @@
                     </div>
                 </div>
                 <div id="annual-reminder" class="checkbox">
-                    {{ donation_form.send_annual_reminder }}{{ donation_form.send_annual_reminder.label_tag }}
+                    <label for="{{ donation_form.send_annual_reminder.id_for_label }}">
+                        {{ donation_form.send_annual_reminder }} {{ donation_form.send_annual_reminder.label }}
+                    </label>
                 </div>
                 {# Only show the newsletter question to people who aren't getting it already (this is not an opportunity to opt out). #}
                 <div class="checkbox" {% if profile_form.wants_newsletter.value %}class="hidden"{% endif %}>
-                    {{ profile_form.wants_newsletter }}{{ profile_form.wants_newsletter.label_tag }}
+                    <label for="{{ profile_form.wants_newsletter.id_for_label }}">
+                        {{ profile_form.wants_newsletter }} {{ profile_form.wants_newsletter.label }}
+                    </label>
                 </div>
                 {{ donation_form.referrer }}
                 <button type="submit"
