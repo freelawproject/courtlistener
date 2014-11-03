@@ -16,7 +16,7 @@ class CitedByFeed(Feed):
 
     def title(self, obj):
         return "Cases Citing %s, Ordered by Filing Date" % \
-               trunc(str(obj.citation.case_name), 50)
+               trunc(obj.citation.case_name, 50)
 
     def link(self, obj):
         return '/feed/%s/cited-by/' % obj.pk

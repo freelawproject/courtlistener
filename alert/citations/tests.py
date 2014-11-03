@@ -6,7 +6,7 @@ from alert.citations.reporter_tokenizer import tokenize
 from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, \
     swap_solr_core
 from alert.lib.test_helpers import CitationTest
-from alert.search.models import Court, Docket
+from alert.search.models import Court, Docket, Document
 from alert.search import models
 from citations.tasks import update_document
 from django.test import TestCase
@@ -237,3 +237,19 @@ class CitationFeedTest(CitationTest):
         """Can we load the cited-by feed without it crashing?"""
         r = self.client.get('/feed/2/cited-by/')
         self.assertEqual(r.status_code, 200)
+
+    def test_unicode_content(self):
+        """Does the citation feed continue working even when we have a unicode
+        case name?
+        """
+        cite = Document.objects.get(pk=1).citation
+        orig_case_name = cite.case_name
+        new_case_name = u'MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & CO., \u2014'
+        cite.case_name = new_case_name
+        cite.save()
+
+        r = self.client.get('/feed/1/cited-by/')
+        self.assertEqual(r.status_code, 200)
+
+        cite.case_name = orig_case_name
+        cite.save()
