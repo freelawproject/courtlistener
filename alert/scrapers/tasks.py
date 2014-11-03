@@ -20,7 +20,6 @@ from citations.tasks import update_document_by_id
 from django.core.files.base import ContentFile
 from django.utils.encoding import smart_text, DjangoUnicodeDecodeError
 from django.utils.timezone import now
-from juriscraper.AbstractSite import logger
 from lxml.html.clean import Cleaner
 from lxml.etree import XMLSyntaxError
 from seal_rookery import seals_data, seals_root
@@ -391,9 +390,9 @@ def process_audio_file(pk):
             msg = "Unable to save mp3 to audio_file in scraper.tasks.process_" \
                   "audio_file for item: %s\nTraceback:\n%s" % \
                   (audio_file.pk, traceback.format_exc())
-            logger.critical(msg)
             ErrorLog(log_level='CRITICAL', court=audio_file.docket.court,
                      message=msg).save()
 
     audio_file.processing_complete = True
     audio_file.save()
+    os.remove(path_to_tmp_location)
