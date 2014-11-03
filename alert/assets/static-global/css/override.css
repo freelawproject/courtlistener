@@ -539,9 +539,11 @@ input.citation-count-input {
 #new-search-chooser {
     float: right;
 }
+/*
 #result-count {
     float: left;
 }
+*/
 .search-page #id_order_by {
     float: right;
 }
