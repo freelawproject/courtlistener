@@ -5,7 +5,7 @@ In general, simply doing:
 git pull
 
 # Gather any new static files
-manage.py collectstatic
+manage.py collectstatic (sudo -u www-data ./manage.py collectstatic)
 
 (enter yes, when prompted)
 
@@ -110,22 +110,19 @@ We welcome a conversion of these notes to a better process using Fabric.
               min hour 30 4,6,9,11        * manage.py cl_make_bulk_data
               min hour 31 1,3,5,7,8,10,12 * manage.py cl_make_bulk_data
               min hour 28 2               * manage.py cl_make_bulk_data
-              min hour 30 4,6,9,11        * manage.py cl_make_citation_graph_bulk_data
-              min hour 31 1,3,5,7,8,10,12 * manage.py cl_make_citation_graph_bulk_data
-              min hour 28 2               * manage.py cl_make_citation_graph_bulk_data
 
         - Remove any old cron entries referencing dump_all_files.py
         - Add a new directory at $INSTALL_ROOT/alert/assets/media/bulk-data to
           contain the new bulk files when they are created, and symlink it from
           /sata/.
-        - Generate the new bulk files by calling manage.py cl_make_bulk_data
-          and manage.py cl_make_citation_graph_bulk_data.
+        - Generate the new bulk files by calling manage.py cl_make_bulk_data.
         - Be sure that Apache is restarted so the new location is updated.
         - Delete any old bulk files located at
           $INSTALL_ROOT/alert/assets/media/dumps
   - Update cron jobs to point to cl_scrape_opinions and cl_scrape_oral_arguments
   - Update the CL calendar to have bulk files generated at 3am on the last day
     of every month.
+  - Add symlinks for the new data types so we don't fill the SSDs
 
 2014-06-18:
  - This update makes alert editing a lot more intuitive.
