@@ -4,7 +4,6 @@ import simplejson
 import time
 
 from collections import OrderedDict
-from datetime import date
 from datadiff import diff
 from django.test import TestCase
 from django.test.client import Client
@@ -12,7 +11,7 @@ from django.test.utils import override_settings
 from lxml import html
 
 from alert.lib.solr_core_admin import (get_data_dir_location)
-from alert.lib.test_helpers import SolrTestCase
+from alert.lib.test_helpers import CitationTest, SolrTestCase
 from alert.search.models import Citation, Court, Document, Docket
 from alert import settings
 from alert.search.management.commands.cl_calculate_pagerank_networkx import \
@@ -454,57 +453,12 @@ class FeedTest(SolrTestCase):
             )
 
 
-class PagerankTest(TestCase):
-    fixtures = ['test_court.json']
-
+class PagerankTest(CitationTest):
     def test_pagerank_calculation(self):
         """Create a few Documents and fake citation relation among them, then
         run the pagerank algorithm. Check whether this simple case can get the
         correct result.
         """
-        # Set up some handy variables
-        self.court = Court.objects.get(pk='test')
-
-        # create 3 documents with their citations and dockets
-        c1, c2, c3 = Citation(case_name=u"c1"), Citation(
-            case_name=u"c2"), Citation(case_name=u"c3")
-        c1.save(index=False)
-        c2.save(index=False)
-        c3.save(index=False)
-        docket1 = Docket(
-            case_name=u"c1",
-            court=self.court,
-        )
-        docket2 = Docket(
-            case_name=u"c2",
-            court=self.court,
-        )
-        docket3 = Docket(
-            case_name=u"c3",
-            court=self.court,
-        )
-        d1, d2, d3 = Document(date_filed=date.today()), Document(
-            date_filed=date.today()), Document(date_filed=date.today())
-        d1.citation, d2.citation, d3.citation = c1, c2, c3
-        d1.docket, d2.docket, d3.docket = docket1, docket2, docket3
-        doc_list = [d1, d2, d3]
-        for d in doc_list:
-            d.citation.save(index=False)
-            d.save(index=False)
-
-        #create simple citing relation: 1 cites 2 and 3; 2 cites 3; 3 cites 1;
-        d1.cases_cited.add(d2.citation)
-        d2.citation_count += 1
-        d2.cases_cited.add(d3.citation)
-        d3.citation_count += 1
-        d3.cases_cited.add(d1.citation)
-        d1.citation_count += 1
-        d1.cases_cited.add(d3.citation)
-        d3.citation_count += 1
-        d1.save(index=False)
-        d2.save(index=False)
-        d3.save(index=False)
-
         #calculate pagerank of these 3 document
         comm = Command()
         self.verbosity = 1

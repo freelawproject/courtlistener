@@ -1,5 +1,6 @@
 import os
 import time
+from datetime import date
 from django.test import TestCase
 from alert.audio.models import Audio
 from alert.lib import sunburnt
@@ -100,3 +101,59 @@ class SolrTestCase(TestCase):
         swap_solr_core(self.core_name_audio, 'audio')
         delete_solr_core(self.core_name_opinion)
         delete_solr_core(self.core_name_audio)
+
+
+class CitationTest(TestCase):
+    """A simple class that abstracts out the creation and tear down of a few
+    items with a simple citation relationship.
+    """
+    fixtures = ['test_court.json']
+
+    def setUp(self):
+        self.court = Court.objects.get(pk='test')
+
+        # create 3 documents with their citations and dockets
+        c1, c2, c3 = Citation(case_name=u"c1"), Citation(
+            case_name=u"c2"), Citation(case_name=u"c3")
+        c1.save(index=False)
+        c2.save(index=False)
+        c3.save(index=False)
+        docket1 = Docket(
+            case_name=u"c1",
+            court=self.court,
+        )
+        docket2 = Docket(
+            case_name=u"c2",
+            court=self.court,
+        )
+        docket3 = Docket(
+            case_name=u"c3",
+            court=self.court,
+        )
+        docket1.save()
+        docket2.save()
+        docket3.save()
+        d1, d2, d3 = Document(date_filed=date.today()), Document(
+            date_filed=date.today()), Document(date_filed=date.today())
+        d1.citation, d2.citation, d3.citation = c1, c2, c3
+        d1.docket, d2.docket, d3.docket = docket1, docket2, docket3
+        doc_list = [d1, d2, d3]
+        for d in doc_list:
+            d.citation.save(index=False)
+            d.save(index=False)
+
+        # create simple citing relation: 1 cites 2 and 3; 2 cites 3; 3 cites 1;
+        d1.cases_cited.add(d2.citation)
+        d2.citation_count += 1
+        d2.cases_cited.add(d3.citation)
+        d3.citation_count += 1
+        d3.cases_cited.add(d1.citation)
+        d1.citation_count += 1
+        d1.cases_cited.add(d3.citation)
+        d3.citation_count += 1
+        d1.save(index=False)
+        d2.save(index=False)
+        d3.save(index=False)
+
+    def tearDown(self):
+        Document.objects.all().delete()

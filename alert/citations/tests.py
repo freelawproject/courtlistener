@@ -3,7 +3,9 @@ from alert.citations.constants import REPORTERS, VARIATIONS_ONLY, EDITIONS
 from alert.citations.find_citations import get_citations, is_date_in_reporter
 from alert.citations import find_citations
 from alert.citations.reporter_tokenizer import tokenize
-from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, swap_solr_core
+from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, \
+    swap_solr_core
+from alert.lib.test_helpers import CitationTest
 from alert.search.models import Court, Docket
 from alert.search import models
 from citations.tasks import update_document
@@ -226,3 +228,12 @@ class ConstantsTest(TestCase):
             for variation in variations:
                 self.assertIn(EDITIONS[variation], REPORTERS.keys(),
                               msg="Could not map variation to a valid reporter: %s" % variation)
+
+
+class CitationFeedTest(CitationTest):
+    fixtures = ['test_court.json']
+
+    def test_basic_cited_by_feed(self):
+        """Can we load the cited-by feed without it crashing?"""
+        r = self.client.get('/feed/2/cited-by/')
+        self.assertEqual(r.status_code, 200)
