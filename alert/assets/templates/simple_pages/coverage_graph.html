@@ -91,7 +91,7 @@
                             <ul class="{% if not forloop.last %}bottom{% endif %}">
                                 {% for court in row %}
                                     <li>
-                                        <a href="/?q=&court_{{ court.pk }}=on&order_by=dateFiled+desc&type=oral-argument">{{ court }}</a>
+                                        <a href="/?q=&court_{{ court.pk }}=on&order_by=dateArgued+desc&type=oa">{{ court }}</a>
                                     </li>
                                 {% endfor %}
                             </ul>
