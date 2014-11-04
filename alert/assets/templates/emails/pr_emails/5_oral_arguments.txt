@@ -1,4 +1,3 @@
-
 Hi,
 
 We’re very excited to announce today that CourtListener is currently in the process of rolling out support for Oral Argument audio. This is a feature that we’ve wanted for at least four years — our name is CourtListener, after all — and one that will bring a raft of new features to the project. We already have about 500 oral arguments on the site, and we’ve got many more we’re we’ll be adding over the coming weeks.
@@ -28,3 +27,4 @@ Founders, FLP
 
 -----------
 If you wish to unsubscribe from these newsletters, just reply and we'll take you right off.
+
