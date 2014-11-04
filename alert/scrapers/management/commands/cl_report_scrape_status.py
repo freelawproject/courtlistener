@@ -59,8 +59,8 @@ def calculate_counts():
         if cts_more_than_30_days.get(court, 0) == 0:
             # No results in newer than 35 days. Get date of most recent
             # item.
-            date_filed = Document.objects.filter(court_id=court).order_by(
-                '-date_filed')[0].date_filed
+            date_filed = Document.objects.filter(docket__court_id=court)\
+                .order_by('-date_filed')[0].date_filed
             try:
                 mod = __import__(
                     mod_dict[court],

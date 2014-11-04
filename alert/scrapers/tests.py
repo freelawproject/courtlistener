@@ -10,13 +10,15 @@ from alert.lib.string_utils import trunc
 from alert.lib import sunburnt
 from alert.scrapers.DupChecker import DupChecker
 from alert.scrapers.models import urlToHash, ErrorLog
+from alert.scrapers.management.commands.cl_report_scrape_status import \
+    generate_report
 from alert.scrapers.management.commands.cl_scrape_opinions import get_extension
 from alert.scrapers.management.commands.cl_scrape_opinions import \
     Command as OpinionCommand
 from alert.scrapers.management.commands.cl_scrape_oral_arguments import \
     Command as OralArgCommand
 from alert.scrapers.management.commands.cl_report_scrape_status import \
-    calculate_counts, tally_errors
+    tally_errors
 from alert.scrapers.tasks import extract_from_txt
 from alert.scrapers.test_assets import test_opinion_scraper, \
     test_oral_arg_scraper
@@ -26,6 +28,7 @@ from celery.task.sets import subtask
 from datetime import timedelta
 from django.core.files.base import ContentFile
 from django.test import TestCase
+from lib.test_helpers import CitationTest
 from scrapers.tasks import extract_doc_content
 from scrapers.tasks import extract_by_ocr
 
@@ -166,18 +169,16 @@ class ExtractionTest(TestCase):
                       "Issue extracting/encoding text from file at: %s" % path)
 
 
-class ReportScrapeStatusTest(TestCase):
-    fixtures = ['test_court.json']
-
+class ReportScrapeStatusTest(CitationTest):
     def setUp(self):
-        court = Court.objects.get(pk='test')
+        super(ReportScrapeStatusTest, self).setUp()
 
         # Make some errors that we can tally
         ErrorLog(log_level='WARNING',
-                 court=court,
+                 court=self.court,
                  message="test_msg").save()
         ErrorLog(log_level='CRITICAL',
-                 court=court,
+                 court=self.court,
                  message="test_msg").save()
 
     def test_tallying_errors(self):
@@ -187,6 +188,11 @@ class ReportScrapeStatusTest(TestCase):
             [1, 1],
             msg="Did not get expected error counts. Instead got: %s" %
                 errors['test'])
+
+    def test_simple_report_generation(self):
+        """Without doing the hard work of creating and checking for actual
+        errors, can we at least generate the report?"""
+        generate_report()
 
 
 class DupcheckerTest(TestCase):
