@@ -97,7 +97,8 @@ def update_document(document, index=True):
         if DEBUG >= 3:
             print document.html_with_citations
 
-    # Update Solr if requested. In some cases we do it at the end for performance reasons.
+    # Update Solr if requested. In some cases we do it at the end for
+    # performance reasons.
     document.save(index=index)
     if DEBUG >= 1:
         citation_matches = sum(matched_citations)

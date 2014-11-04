@@ -121,7 +121,11 @@ class IngestionTest(TestCase):
     def test_solr_ingestion_and_deletion(self):
         """Do items get added to the Solr index when they are ingested?"""
         site = test_opinion_scraper.Site().parse()
-        path = os.path.join(settings.INSTALL_ROOT, 'alert', site.download_urls[0])  # a simple PDF
+        path = os.path.join(
+            settings.INSTALL_ROOT,
+            'alert',
+            site.download_urls[0]
+        )  # a simple PDF
         with open(path) as f:
             content = f.read()
             cf = ContentFile(content)
@@ -141,7 +145,12 @@ class IngestionTest(TestCase):
         file_name = trunc(site.case_names[0].lower(), 75) + extension
         doc.local_path.save(file_name, cf, save=False)
         doc.save(index=False)
+
+        # Extract content and then find citations. Once complete, commit the
+        # changes.
         extract_doc_content(doc.pk, callback=subtask(extract_by_ocr))
+        self.si.commit()
+
         response = self.si.raw_query(**{'q': 'supreme', 'caller': 'scraper_test',}).execute()
         count = response.result.numFound
         self.assertEqual(count, 1, "There were %s items found when there should have been 1" % count)

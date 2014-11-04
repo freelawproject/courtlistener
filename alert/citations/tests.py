@@ -1,17 +1,19 @@
 import time
+from datetime import date
+
 from alert.citations.constants import REPORTERS, VARIATIONS_ONLY, EDITIONS
 from alert.citations.find_citations import get_citations, is_date_in_reporter
 from alert.citations import find_citations
 from alert.citations.reporter_tokenizer import tokenize
+from alert.lib import sunburnt
 from alert.lib.solr_core_admin import create_solr_core, delete_solr_core, \
     swap_solr_core
 from alert.lib.test_helpers import CitationTest
 from alert.search.models import Court, Docket, Document
 from alert.search import models
 from citations.tasks import update_document
+from django.conf import settings
 from django.test import TestCase
-
-from datetime import date
 
 
 class CiteTest(TestCase):
@@ -157,15 +159,18 @@ class MatchingTest(TestCase):
         create_solr_core(self.core_name)
         swap_solr_core('collection1', self.core_name)
 
-        # Set up a handy court object
+        # Set up some handy variables
         self.court = Court.objects.get(pk='test')
+        self.si_opinion = sunburnt.SolrInterface(
+            settings.SOLR_OPINION_URL, mode='rw')
 
     def tearDown(self):
         swap_solr_core(self.core_name, 'collection1')
         delete_solr_core(self.core_name)
 
     def test_citation_matching(self):
-        """Creates a few documents that contain specific citations, then attempts to find and match those citations.
+        """Creates a few documents that contain specific citations, then
+        attempts to find and match those citations.
 
         This becomes a bit of an integration test, which is likely fine.
         """
@@ -198,13 +203,18 @@ class MatchingTest(TestCase):
             citation=c2,
             plain_text=u"1 Yeates 1"
         )
-        d2.save(index=False)
+        d2.save(index=True)
+
+        # Do a commit, or else citations can't be found in the index.
+        self.si_opinion.commit()
         update_document(d2)  # Updates d1's citation count in a Celery task
-        d1 = models.Document.objects.get(pk=1)  # needed, since d1 would otherwise be cached.
+        d1 = models.Document.objects.get(pk=1)  # cache-bust d1
+
         self.assertEqual(
             d1.citation_count,
             1,
-            msg=u"d1 was not updated by a citation found in d2. Count was: %s" % d1.citation_count
+            msg=u"d1 was not updated by a citation found in d2. Count was: %s"
+                % d1.citation_count
         )
         d1.delete()
         d2.delete()

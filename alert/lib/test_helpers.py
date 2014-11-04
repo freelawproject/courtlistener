@@ -93,6 +93,8 @@ class SolrTestCase(TestCase):
 
         self.expected_num_results_opinion = 3
         self.expected_num_results_audio = 2
+        self.si_opinion.commit()
+        self.si_audio.commit()
 
     def tearDown(self):
         Document.objects.all().delete()
