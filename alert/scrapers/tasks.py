@@ -189,9 +189,13 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
 
     try:
         if citation_countdown == 0:
+            # No waiting around. Save to the database now, but don't bother
+            # with the index yet because citations are being done imminently.
             doc.save(index=False)
         else:
-            doc.save(index=True, commit=False)
+            # Save to the index now, citations come later, commit comes
+            # according to schedule
+            doc.save(index=True)
     except Exception, e:
         print "****Error saving text to the db for: %s****" % doc
         print traceback.format_exc()

@@ -115,7 +115,7 @@ class Audio(models.Model):
     def get_absolute_url(self):
         return reverse('view_audio_file', args=[self.pk, self.docket.slug])
 
-    def save(self, index=True, commit=True, *args, **kwargs):
+    def save(self, index=True, force_commit=False, *args, **kwargs):
         """
         Overrides the normal save method, but provides integration with the
         bulk files and with Solr indexing.
@@ -126,7 +126,7 @@ class Audio(models.Model):
         super(Audio, self).save(*args, **kwargs)
         if index:
             from search.tasks import add_or_update_audio_file
-            add_or_update_audio_file.delay(self.pk, commit)
+            add_or_update_audio_file.delay(self.pk, force_commit)
 
     def delete(self, *args, **kwargs):
         """

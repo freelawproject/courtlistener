@@ -50,7 +50,7 @@ def cleaner(simulate=False, verbose=False):
                 print "  - Updating with new value."
             if not simulate:
                 doc.court_id = correct_court
-                doc.save(index=True, commit=False)
+                doc.save(index=True, force_commit=False)
 
     # Do one big commit at the end
     conn.commit()

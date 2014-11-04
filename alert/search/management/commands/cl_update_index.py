@@ -69,6 +69,11 @@ class Command(BaseCommand):
                     default=False,
                     help=('Run the optimize command against the current index '
                           'after any updates or deletions are completed.')),
+        make_option('--do-commit',
+                    action='store_true',
+                    dest='do_commit',
+                    default=False,
+                    help='Performs a simple commit and nothing more.'),
         make_option('--everything',
                     action='store_true',
                     dest='everything',
@@ -258,6 +263,11 @@ class Command(BaseCommand):
         self.si.optimize()
         self.stdout.write('done.\n')
 
+    def commit(self):
+        """Runs a simple commit command.
+        """
+        self.si.commit()
+
     def handle(self, *args, **options):
         self.verbosity = int(options.get('verbosity', 1))
         if options.get('solr_url'):
@@ -277,7 +287,6 @@ class Command(BaseCommand):
             self.stderr.write('Unable to parse --type argument. See help for '
                               'details.')
             exit(1)
-
 
         if options.get('datetime'):
             try:
@@ -341,13 +350,14 @@ class Command(BaseCommand):
                                   'delete.\n')
                 sys.exit(1)
 
-        elif not any([options.get('update_mode'),
-                      options.get('delete_mode'),
-                      options.get('optimize_mode')]):
-            self.stderr.write('Error: You must specify whether you wish to '
-                              'update, delete, or optimize your index.\n')
-            sys.exit(1)
+        elif options.get('do_commit'):
+            self.commit()
 
-        if options.get('optimize_mode'):
+        elif options.get('optimize_mode'):
             self.optimize()
-            sys.exit(0)
+
+        else:
+            self.stderr.write('Error: You must specify whether you wish to '
+                              'update, delete, commit, or optimize your '
+                              'index.\n')
+            sys.exit(1)

@@ -84,25 +84,25 @@ def delete_item(pk, solr_url):
     si.commit()
 
 @task
-def add_or_update_doc(pk, commit=True):
+def add_or_update_doc(pk, force_commit=True):
     """Updates the document in the index. Called by Document save function.
     """
     si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='w')
     try:
         si.add(SearchDocument(Document.objects.get(pk=pk)))
-        if commit:
+        if force_commit:
             si.commit()
     except SolrError, exc:
         add_or_update_doc.retry(exc=exc, countdown=30)
 
 @task
-def add_or_update_audio_file(pk, commit=True):
+def add_or_update_audio_file(pk, force_commit=True):
     """Updates the document in the index. Called by Document save function.
     """
     si = sunburnt.SolrInterface(settings.SOLR_AUDIO_URL, mode='w')
     try:
         si.add(SearchAudioFile(Audio.objects.get(pk=pk)))
-        if commit:
+        if force_commit:
             si.commit()
     except SolrError, exc:
         add_or_update_audio_file.retry(exc=exc, countdown=30)

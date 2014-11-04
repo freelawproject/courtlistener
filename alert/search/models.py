@@ -492,21 +492,15 @@ class Document(models.Model):
     def get_absolute_url(self):
         return reverse('view_case', args=[self.pk, self.citation.slug])
 
-    def save(self, index=True, commit=True, *args, **kwargs):
-        """
-        If the value of blocked changed to True, invalidate the caches
-        where that value was stored. Google can later pick it up properly.
-        """
+    def save(self, index=True, force_commit=False, *args, **kwargs):
         super(Document, self).save(*args, **kwargs)
-
         if index:
             from search.tasks import add_or_update_doc
-            add_or_update_doc.delay(self.pk, commit)
+            add_or_update_doc.delay(self.pk, force_commit)
 
     def delete(self, *args, **kwargs):
         """
-        If the item is deleted, we need to update the caches that previously
-        contained it. Note that this doesn't get called when an entire queryset
+        Note that this doesn't get called when an entire queryset
         is deleted, but that should be OK.
         """
         id_cache = self.pk

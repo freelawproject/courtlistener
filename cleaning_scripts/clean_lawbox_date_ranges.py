@@ -87,7 +87,7 @@ def cleaner(simulate=False, verbose=False):
                 print "  - Updating with new date."
             if not simulate:
                 doc.date_filed = new_date
-                doc.save(index=True, commit=False)
+                doc.save(index=True, force_commit=False)
 
     # Do one big commit at the end
     conn.commit()

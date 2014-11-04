@@ -1,5 +1,5 @@
 import hashlib
-import os
+import random
 import traceback
 
 from alert.audio.models import Audio
@@ -116,7 +116,11 @@ class Command(cl_scrape_opinions.Command):
                         continue
 
                     self.save_everything(docket, audio_file)
-                    process_audio_file.delay(audio_file.pk)
+                    random_delay = random.randint(0, 3600)
+                    process_audio_file.apply_async(
+                        (audio_file.pk,),
+                        countdown=random_delay
+                    )
 
                     logger.info("Successfully added audio file %s: %s" % (audio_file.pk, site.case_names[i]))
 

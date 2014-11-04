@@ -41,7 +41,9 @@ def create_cited_html(document, citations):
 
 
 @task
-def update_document(document, index=True, commit=True):
+def update_document(document, index=True):
+    """Get the citations for an item and save it and add it to the index if
+    requested."""
     DEBUG = 0
     if DEBUG >= 1:
         print "%s at https://www.courtlistener.com/admin/search/citation/%s/" % \
@@ -96,7 +98,7 @@ def update_document(document, index=True, commit=True):
             print document.html_with_citations
 
     # Update Solr if requested. In some cases we do it at the end for performance reasons.
-    document.save(index=index, commit=commit)
+    document.save(index=index)
     if DEBUG >= 1:
         citation_matches = sum(matched_citations)
         name_matches = len(matched_citations) - citation_matches

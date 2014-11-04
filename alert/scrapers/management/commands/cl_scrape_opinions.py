@@ -1,6 +1,7 @@
 import hashlib
 import mimetypes
 import os
+import random
 import signal
 import sys
 import requests
@@ -9,6 +10,7 @@ import traceback
 
 from alert.lib import magic
 from alert.lib.string_utils import trunc
+from alert.lib import sunburnt
 from alert.scrapers.models import ErrorLog
 from alert.scrapers.DupChecker import DupChecker
 from alert.search.models import Citation, Docket
@@ -324,7 +326,12 @@ class Command(BaseCommand):
 
                     # Save everything, but don't update Solr index yet
                     self.save_everything(cite, docket, doc, index=False)
-                    extract_doc_content(doc.pk, callback=subtask(extract_by_ocr))
+                    random_delay = random.randint(0, 3600)
+                    extract_doc_content.delay(
+                        doc.pk,
+                        callback=subtask(extract_by_ocr),
+                        citation_countdown=random_delay
+                    )
 
                     logger.info("Successfully added doc {pk}: {name}".format(
                         pk=doc.pk,
@@ -336,6 +343,7 @@ class Command(BaseCommand):
             if not download_error and not full_crawl:
                 # Only update the hash if no errors occurred.
                 dup_checker.update_site_hash(site.hash)
+
 
     def parse_and_scrape_site(self, mod, full_crawl):
         site = mod.Site().parse()
