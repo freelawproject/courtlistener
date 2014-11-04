@@ -97,32 +97,38 @@
                             <div class="pointer"
                                  data-toggle="modal"
                                  data-target="#court-picker">
-                                <h4 class="bottom">
+                                <label>
                                     Select Jurisdictions <i class="gray fa fa-external-link"></i>
-                                </h4>
+                                </label>
 
                                 <p class="bottom"><span id="jurisdiction-count">{{ court_count }}</span>
                                     jurisdictions selected</p>
                             </div>
                         </div>
                         <div class="col-sm-6">
-                            <h4 class="bottom">Result Ordering</h4>
-                            {{ search_form.order_by }}
+                            <div class="form-group">
+                                {{ search_form.order_by.label_tag }}
+                                {{ search_form.order_by }}
+                            </div>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-sm-6">
-                            <h4 class="bottom">Case Name</h4>
-                            {{ search_form.case_name }}
+                            <div class="form-group">
+                                {{ search_form.case_name.label_tag }}
+                                {{ search_form.case_name }}
+                            </div>
                         </div>
                         <div class="col-sm-6">
-                            <h4 class="bottom">Judge</h4>
-                            {{ search_form.judge }}
+                            <div class="form-group">
+                                {{ search_form.judge.label_tag }}
+                                {{ search_form.judge }}
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-sm-4">
-                    <h4 class="bottom">Precedential Status</h4>
+                    <label>Precedential Status</label>
                     {% for status in status_facets %}
                         <div class="sidebar-checkbox">
                             <input
@@ -143,39 +149,52 @@
             </div>
             <div class="row">
                 <div class="col-sm-4">
-                    <h4 class="bottom">Filed After</h4>
-                    {{ search_form.filed_after }}
+                    <div class="form-group">
+                        {{ search_form.filed_after.label_tag }}
+                        {{ search_form.filed_after }}
+                    </div>
                 </div>
                 <div class="col-sm-4">
-                    <h4 class="bottom">Filed Before</h4>
-                    {{ search_form.filed_before }}
+                    <div class="form-group">
+                        {{ search_form.filed_before.label_tag }}
+                        {{ search_form.filed_before }}
+                    </div>
                 </div>
                 <div class="col-sm-4">
-                    <h4 class="bottom">Citation Count</h4>
                     <div class="row">
                         <div class="col-xs-6">
-                            <h5 class="bottom">minimum</h5>
-                            {{ search_form.cited_gt }}
+                            <div class="form-group">
+                                {{ search_form.cited_gt.label_tag }}
+                                {{ search_form.cited_gt }}
+                            </div>
                         </div>
                         <div class="col-xs-6">
-                            <h5 class="bottom">maximum</h5>
-                            {{ search_form.cited_lt }}
+                            <div class="form-group">
+                                {{ search_form.cited_lt.label_tag }}
+                                {{ search_form.cited_lt }}
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="row">
                 <div class="col-sm-4">
-                    <h4 class="bottom">Citation</h4>
-                    {{ search_form.citation }}
+                    <div class="form-group">
+                        {{ search_form.citation.label_tag }}
+                        {{ search_form.citation }}
+                    </div>
                 </div>
                 <div class="col-sm-4">
-                    <h4 class="bottom">Neutral Citation</h4>
-                    {{ search_form.neutral_cite }}
+                    <div class="form-group">
+                        {{ search_form.neutral_cite.label_tag }}
+                        {{ search_form.neutral_cite }}
+                    </div>
                 </div>
                 <div class="col-sm-4">
-                    <h4 class="bottom">Docket Number</h4>
-                    {{ search_form.docket_number }}
+                    <div class="form-group">
+                        {{ search_form.docket_number.label_tag }}
+                        {{ search_form.docket_number }}
+                    </div>
                 </div>
             </div>
         </div>
@@ -187,7 +206,7 @@
     {# Jurisdiction modal is at the bottom so it loads last #}
 
     <div id="advanced-search-starter" class="row">
-        <p class="text-center large alt gray bottom">&ndash; or &ndash;</p>
+        <p class="text-center large alt gray top bottom">&ndash; or &ndash;</p>
         <p class="text-center large">
             <a href="#">Advanced Search</a>
         </p>

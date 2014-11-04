@@ -6,20 +6,6 @@ Sets up all the overrides or additional CSS that the site uses.
     padding: 6px 15px;
 }
 
-.bottom {
-    margin-bottom:0;
-    padding-bottom:0;
-}
-
-.top {
-    margin-top:0;
-    padding-top:0;
-}
-
-.large {
-    font-size: 21px;
-}
-
 /* Some good stuff from h4pl.com */
 ::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 ::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
@@ -61,10 +47,6 @@ a.button:active{
     transition: all 0.5s ease;
 }
 
-#homepage #main-query-box.wide {
-    margin: 0;
-}
-
 @media(max-width:767px){
     #homepage #main-query-box #id_q {
         width: 250px;
@@ -100,12 +82,13 @@ a.button:active{
         margin-top: 6em;
     }
     #homepage #main-query-box {
+        margin-bottom: 2em;
         margin-top: 2em;
     }
     #homepage #advanced-search-starter {
         margin-bottom: 6em;
     }
-    #homepage #advanced-search-starter p {
+    #homepage #advanced-search-starter p:not(:first-child) {
         margin-top: 0.75em;
     }
 }
@@ -134,6 +117,20 @@ a.button:active{
     /*margin: 0 auto;*/
     /*width: 200px;*/
     /*padding: 1em;*/
+}
+
+.bottom {
+    margin-bottom:0;
+    padding-bottom:0;
+}
+
+.top {
+    margin-top:0;
+    padding-top:0;
+}
+
+.large {
+    font-size: 21px;
 }
 
 #homepage #jurisdiction-count {
@@ -515,10 +512,6 @@ div.sidebar-checkbox input {
 
 input.court-checkbox, input.status-checkbox {
     top: 0;
-}
-
-input.citation-count-input {
-    width: 6em;
 }
 
 #citation-count {
