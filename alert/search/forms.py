@@ -75,7 +75,7 @@ class SearchForm(forms.Form):
         required=False,
         initial='o',
         widget=forms.RadioSelect(
-            attrs={'class': 'external-input'}
+            attrs={'class': 'external-input form-control'}
         )
     )
     q = forms.CharField(
@@ -83,9 +83,10 @@ class SearchForm(forms.Form):
     )
     case_name = forms.CharField(
         required=False,
+        label='Case Name',
         initial='',
         widget=forms.TextInput(
-            attrs={'class': 'external-input',
+            attrs={'class': 'external-input form-control',
                    'autocomplete': 'off',
                    'tabindex': '10'}
         )
@@ -94,7 +95,7 @@ class SearchForm(forms.Form):
         required=False,
         initial='',
         widget=forms.TextInput(
-            attrs={'class': 'external-input',
+            attrs={'class': 'external-input form-control',
                    'autocomplete': 'off',
                    'tabindex': '11'}
         )
@@ -105,8 +106,9 @@ class SearchForm(forms.Form):
     )
     docket_number = forms.CharField(
         required=False,
+        label='Docket Number',
         widget=forms.TextInput(
-            attrs={'class': 'external-input',
+            attrs={'class': 'external-input form-control',
                    'autocomplete': 'off'}
         )
     )
@@ -119,7 +121,7 @@ class SearchForm(forms.Form):
         input_formats=INPUT_FORMATS,
         widget=forms.TextInput(
             attrs={'placeholder': 'YYYY-MM-DD',
-                   'class': 'external-input',
+                   'class': 'external-input form-control',
                    'autocomplete': 'off'}
         )
     )
@@ -128,7 +130,7 @@ class SearchForm(forms.Form):
         input_formats=INPUT_FORMATS,
         widget=forms.TextInput(
             attrs={'placeholder': 'YYYY-MM-DD',
-                   'class': 'external-input',
+                   'class': 'external-input form-control',
                    'autocomplete': 'off'}
         )
     )
@@ -139,57 +141,63 @@ class SearchForm(forms.Form):
     order_by = forms.ChoiceField(
         choices=OPINION_ORDER_BY_CHOICES,
         required=False,
+        label='Result Ordering',
         initial='score desc',
         widget=forms.Select(
-            attrs={'class': 'external-input',
+            attrs={'class': 'external-input form-control',
                    'tabindex': '9'}
         )
     )
     filed_after = FloorDateField(
         required=False,
+        label='Filed After',
         input_formats=INPUT_FORMATS,
         widget=forms.TextInput(
             attrs={'placeholder': 'YYYY-MM-DD',
-                   'class': 'external-input',
+                   'class': 'external-input form-control',
                    'autocomplete': 'off'}
         )
     )
     filed_before = CeilingDateField(
         required=False,
+        label='Filed Before',
         input_formats=INPUT_FORMATS,
         widget=forms.TextInput(
             attrs={'placeholder': 'YYYY-MM-DD',
-                   'class': 'external-input',
+                   'class': 'external-input form-control',
                    'autocomplete': 'off'}
         )
     )
     citation = forms.CharField(
         required=False,
         widget=forms.TextInput(
-            attrs={'class': 'external-input',
+            attrs={'class': 'external-input form-control',
                    'autocomplete': 'off'}
         )
     )
     neutral_cite = forms.CharField(
         required=False,
+        label='Neutral Citation',
         widget=forms.TextInput(
-            attrs={'class': 'external-input',
+            attrs={'class': 'external-input form-control',
                    'autocomplete': 'off'}
         )
     )
     cited_gt = forms.CharField(
         required=False,
+        label='Min Cites',
         initial=0,
         widget=forms.TextInput(
-            attrs={'class': 'external-input citation-count-input',
+            attrs={'class': 'external-input form-control',
                    'autocomplete': 'off'}
         )
     )
     cited_lt = forms.CharField(
         required=False,
+        label='Max Cites',
         initial=20000,
         widget=forms.TextInput(
-            attrs={'class': 'external-input citation-count-input',
+            attrs={'class': 'external-input form-control',
                    'autocomplete': 'off'}
         )
     )
