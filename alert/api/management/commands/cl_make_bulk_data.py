@@ -5,14 +5,16 @@ import os
 import shutil
 import tarfile
 import time
+import datetime
 
 from django.core.management import BaseCommand
 from django.conf import settings
+from django.utils.timezone import now
 
+from alert.audio.models import Audio
 from alert.lib.db_tools import queryset_generator
 from alert.lib.timer import print_timing
 from alert.search.models import Court, Document, Docket
-from audio.models import Audio
 
 
 def deepgetattr(obj, attr):
@@ -26,8 +28,34 @@ def swap_archives(obj_type_str):
     for f in os.listdir('/tmp/bulk/%s' % obj_type_str):
         shutil.move(
             '/tmp/bulk/%s/%s' % (obj_type_str, f),
-            os.path.join(settings.BULK_DATA_DIR, '%s' % obj_type_str, f)
+            os.path.join(settings.BULK_DATA_DIR, obj_type_str, f)
         )
+
+
+def copy_old_archives_to_tmp(obj_type_string):
+    """Copy last month's archives into /tmp so that they can be worked on.
+
+    Return True if a copy was successful. Else, return False.
+    """
+    # Destination must not exist. Thus deleting as first step.
+    shutil.rmtree(
+        os.path.join('/tmp/bulk', obj_type_string),
+        ignore_errors=True,
+    )
+    try:
+        shutil.copytree(
+            os.path.join(settings.BULK_DATA_DIR, obj_type_string),
+            os.path.join('/tmp/bulk', obj_type_string),
+        )
+        successful_copy = True
+    except shutil.Error, e:
+        print "   - Shutil Warning: Error copying old bulk files to tmp: %s" % e
+        successful_copy = False
+    except OSError, e:
+        print "   - OS Warning: Error copying old bulk files to tmp: %s" % e
+        successful_copy = False
+
+    return successful_copy
 
 
 def mkdir_p(path):
@@ -60,13 +88,33 @@ class Command(BaseCommand):
             ('docket', Docket, 'court_id', api2.DocketResource),
             ('jurisdiction', Court, 'pk', api2.JurisdictionResource),
         )
+        courts = Court.objects.all()
         for obj_type_str, obj_type, court_attr, api_resource_obj in arg_tuples:
+            self.stdout.write(
+                ' - Attempting to copy the old %s archives to /tmp...\n'
+                % obj_type_str
+            )
+            successful_copy = copy_old_archives_to_tmp(obj_type_str)
+
+            if successful_copy:
+                self.stdout.write(
+                    '   - Success. Creating %s bulk %s files incrementally...\n' %
+                    (len(courts), obj_type_str)
+                )
+            else:
+                self.stdout.write(
+                    '   - Failure. Creating %s bulk %s files from scratch...\n' %
+                    (len(courts), obj_type_str)
+                )
             self.make_archive(
                 obj_type_str,
                 obj_type,
                 court_attr,
-                api_resource_obj
+                api_resource_obj,
+                courts,
+                successful_copy,
             )
+
             self.stdout.write('   - Swapping in the new %s archives...\n'
                               % obj_type_str)
             swap_archives(obj_type_str)
@@ -78,7 +126,8 @@ class Command(BaseCommand):
 
         self.stdout.write('Done.\n\n')
 
-    def make_archive(self, obj_type_str, obj_type, court_attr, api_resource_obj):
+    def make_archive(self, obj_type_str, obj_type, court_attr,
+                     api_resource_obj, courts, successful_copy):
         """Generate compressed archives containing the contents of an object
         database.
 
@@ -114,13 +163,13 @@ class Command(BaseCommand):
             2.7's json implementation is already written in C. Not sure how to
             remove the gazillion copy's that are happening.
         """
-        courts = Court.objects.all()
-        self.stdout.write(' - Creating %s bulk %s files '
-                          'simultaneously...\n' % (len(courts), obj_type_str))
-
+        # Make this directory. If doing incremental, it will already exist and
+        # this will have no affect. If doing from scratch this will create the
+        # needed directories.
         mkdir_p('/tmp/bulk/%s' % obj_type_str)
 
-        # Open a gzip'ed tar file for every court
+        # Open a gzip'ed tar file for every court. By now we should already
+        # have moved everything into place, if there were old bulk files.
         tar_files = {}
         for court in courts:
             tar_files[court.pk] = tarfile.open(
@@ -134,8 +183,12 @@ class Command(BaseCommand):
             compresslevel=3,
         )
 
-        # Make the archives
-        qs = obj_type.objects.all()
+        # Make the archives with updates from the last 32 days.
+        if successful_copy:
+            thirty_two_days_ago = now() - datetime.timedelta(days=32)
+            qs = obj_type.objects.filter(date_modified__gt=thirty_two_days_ago)
+        else:
+            qs = obj_type.objects.all()
         item_resource = api_resource_obj()
         if type(qs[0].pk) == int:
             item_list = queryset_generator(qs)
@@ -187,5 +240,3 @@ class Command(BaseCommand):
             '''psql -c "COPY \\"Document_cases_cited\\" (document_id, citation_id) to stdout DELIMITER ',' CSV HEADER" -d courtlistener --username django | gzip > /tmp/bulk/citation/all.csv.gz'''
         )
         self.stdout.write('   - Table created successfully.\n')
-
-
