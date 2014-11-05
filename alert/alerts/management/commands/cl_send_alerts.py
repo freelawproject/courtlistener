@@ -153,10 +153,6 @@ class Command(BaseCommand):
     def emailer(self, ups, cut_off_date):
         """Send out an email to every user whose alert has a new hit for a
         rate.
-
-        , and
-        iterate over them. For each of their alerts that has a hit, build up an
-        email that contains all the hits.
         """
 
         # for each user with a daily, weekly or monthly alert...
