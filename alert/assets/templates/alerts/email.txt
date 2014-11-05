@@ -13,7 +13,7 @@ We have news regarding your alerts at CourtListener.com
 {% for alert, type, results in hits %}{% for result in results %}{% if forloop.first %}Your {{alert.get_alertFrequency_display|lower}} alert -- {{alert.alertName}} -- had {{results|length}} hit{{results|pluralize}}:
 -------------------------------------------------------
 Edit / Delete this Alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }}/{% endif %}
-{{forloop.counter}}. {{ result.solr_highlights.caseName.0|safe|striptags }}
+{{forloop.counter}}. {{ result.solr_highlights.caseName.0|safe|striptags }} ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{% if type == 'o' %}{{ result.dateFiled|date:"Y" }}{% elif type == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
  - View on our site: https://www.courtlistener.com{{result.absolute_url}}
  - Download original from the court: {{result.download_url}}
  - Download the original from our backup: https://www.courtlistener.com/{{ result.local_path }}
