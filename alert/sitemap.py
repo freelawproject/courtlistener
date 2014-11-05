@@ -5,7 +5,7 @@ from django.views.decorators.cache import never_cache
 from alert.lib import sunburnt
 
 
-items_per_sitemap = 2
+items_per_sitemap = 250
 
 @never_cache
 def index_sitemap_maker(request):
