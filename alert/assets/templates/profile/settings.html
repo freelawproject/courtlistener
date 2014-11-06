@@ -29,7 +29,7 @@
     <div class="col-xs-12">
         <form action="" method="post">{% csrf_token %}
             <div class="row">
-                <p class="col-sm-6">
+                <div class="col-sm-6">
                     <div class="form-group">
                         <label for="id_first_name">First Name</label>
                         {{ user_form.first_name }}
@@ -41,8 +41,8 @@
                             </p>
                         {% endif %}
                     </div>
-                </p>
-                <p class="col-sm-6">
+                </div>
+                <div class="col-sm-6">
                     <div class="form-group">
                         <label for="id_last_name">Last Name</label>
                         {{ user_form.last_name }}
@@ -54,7 +54,7 @@
                         </p>
                         {% endif %}
                     </div>
-                </p>
+                </div>
             </div>
             <div class="form-group">
                 <label for="id_email">Email*</label>
@@ -183,7 +183,7 @@
                 {% endif %}
             </div>
             <input type="hidden" value="{{user.username}}" name="user" id="id_user">
-            <button type="submit" class="button">Save</button>
+            <button type="submit" class="btn btn-primary">Save</button>
             <a href="/profile/delete">Delete my account</a> {# part of the form so that it lines up nicely. #}
         </form>
     </div>
