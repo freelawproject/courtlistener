@@ -4,26 +4,24 @@
 
 {% block nav %}
     <div class="col-xs-12">
-        <div class="well">
-            <ul class="nav nav-pills nav-justified">
-                <li class="{% block nav-alerts %}inactive{% endblock %}"><a href="/profile/alerts/">Alerts</a></li>
-                <li class="{% block nav-favorites %}inactive{% endblock %}">
-                    <a href="/profile/favorites/"><i class="gold fa fa-star"></i>&nbsp;Favorites</a>
-                </li>
-                <li class="{% block nav-donations %}inactive{% endblock %}"><a href="/profile/donations/">Donations</a></li>
-                <li class="{% block nav-account %}inactive{% endblock %}">
-                    <a href="/profile/settings/">Account
-                        {% if not request.user.profile.email_confirmed %}
-                            <img src="/static/png/exclamation.png"
-                                 width="16"
-                                 height="16"
-                                 alt="Your email address is not confirmed."
-                                 id="unconfirmed-email-warning-nav"/>
-                        {% endif %}
-                    </a>
-                </li>
-                <li class="{% block nav-password %}inactive{% endblock %}"><a href="/profile/password/change">Password</a></li>
-            </ul>
-        </div>
+        <ul class="nav nav-pills nav-justified">
+            <li class="{% block nav-alerts %}inactive{% endblock %}"><a href="/profile/alerts/">Alerts</a></li>
+            <li class="{% block nav-favorites %}inactive{% endblock %}">
+                <a href="/profile/favorites/"><i class="gold fa fa-star"></i>&nbsp;Favorites</a>
+            </li>
+            <li class="{% block nav-donations %}inactive{% endblock %}"><a href="/profile/donations/">Donations</a></li>
+            <li class="{% block nav-account %}inactive{% endblock %}">
+                <a href="/profile/settings/">Account
+                    {% if not request.user.profile.email_confirmed %}
+                        <img src="/static/png/exclamation.png"
+                             width="16"
+                             height="16"
+                             alt="Your email address is not confirmed."
+                             id="unconfirmed-email-warning-nav"/>
+                    {% endif %}
+                </a>
+            </li>
+            <li class="{% block nav-password %}inactive{% endblock %}"><a href="/profile/password/change">Password</a></li>
+        </ul>
     </div>
 {% endblock %}
