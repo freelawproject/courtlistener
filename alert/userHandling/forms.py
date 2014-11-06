@@ -43,8 +43,8 @@ class ProfileForm(ModelForm):
             'address1': forms.TextInput(attrs={'class': 'form-control'}),
             'address2': forms.TextInput(attrs={'class': 'form-control'}),
             'city': forms.TextInput(attrs={'class': 'form-control'}),
-            'wants_newsletter': forms.TextInput(attrs={'class': 'form-control'}),
-            'plaintext_preferred': forms.TextInput(attrs={'class': 'form-control'}),
+    #        'wants_newsletter': forms.TextInput(attrs={'class': 'form-control'}),
+    #        'plaintext_preferred': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
 
@@ -83,4 +83,4 @@ class UserCreationFormExtended(UserCreationForm):
 
 
 class EmailConfirmationForm(forms.Form):
-    email = forms.EmailField(attrs={'class': 'form-control'})
+    email = forms.EmailField()
