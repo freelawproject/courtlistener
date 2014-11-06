@@ -29,9 +29,11 @@ Sets up all the overrides or additional CSS that the site uses.
 }
 
 button:hover, a.button:hover{
+/*
   background-color:#dff4ff;
-/*  border:1px solid #c2e1ef; */
+  border:1px solid #c2e1ef;
   color:#336699;
+*/
 }
 a.button:active{
   background-color:#6299c5;
