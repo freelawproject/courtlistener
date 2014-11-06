@@ -26,26 +26,18 @@
                         </div>
                     </div>
                 </div>
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="input-group">
-                            <label class="sr-only" for="court-filter">Select Jurisdictions by Typing</label>
-                            <input id="court-filter" class="form-control" type="text" placeholder="Select Jurisdictions by Typing"
-                                autocomplete="off"/>
-                        </div>
-                    </div>
-                    <div class="col-md-8">
-                        <ul class="nav nav-tabs" id="court-picker-tabs">
-                            <li class="active"><a href="#tab-federal-appellate" data-toggle="tab">Federal Appellate</a></li>
-                            {%  if search_form.type.value == 'o' or not request.GET.type %}
-                                <li><a href="#tab-federal-district" data-toggle="tab">Federal District</a></li>
-                                <li><a href="#tab-bankruptcy" data-toggle="tab">Bankruptcy</a></li>
-                                <li><a href="#tab-state" data-toggle="tab">State</a></li>
-                                <li><a href="#tab-special" data-toggle="tab">Special</a></li>
-                            {% endif %}
-                        </ul>
-                    </div>
-                </div>
+                <label class="sr-only" for="court-filter">Select Jurisdictions by Typing</label>
+                <input id="court-filter" type="text" placeholder="Select Jurisdictions by Typing"
+                    autocomplete="off"/>
+                <ul class="nav nav-tabs" id="court-picker-tabs">
+                    <li class="active"><a href="#tab-federal-appellate" data-toggle="tab">Federal Appellate</a></li>
+                    {%  if search_form.type.value == 'o' or not request.GET.type %}
+                        <li><a href="#tab-federal-district" data-toggle="tab">Federal District</a></li>
+                        <li><a href="#tab-bankruptcy" data-toggle="tab">Bankruptcy</a></li>
+                        <li><a href="#tab-state" data-toggle="tab">State</a></li>
+                        <li><a href="#tab-special" data-toggle="tab">Special</a></li>
+                    {% endif %}
+                </ul>
                 <div class="tab-content">
                     <div class="tab-pane active" id="tab-federal-appellate">
                         <div class="row">
