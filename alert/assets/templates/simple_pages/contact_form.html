@@ -19,54 +19,54 @@
 
         <form action="" method="post">{% csrf_token %}
             {% render_honeypot_field "skip_me_if_alive" %}
-            <p>
+            <div class="form-group">
                 <label for="id_name">Name</label>
+                {{ form.name }}
                 {% if form.name.errors %}
-                    <span class="errortext">
+                    <p class="help-block errortext">
                         {% for error in form.name.errors %}
                             {{ error|escape }}
                         {% endfor %}
-                    </span>
-                {% endif %}<br>
-                {{ form.name }}
-            </p>
+                    </p>
+                {% endif %}
+            </div>
 
-            <p>
+            <div class="form-group">
                 <label for="id_email">Email (optional)</label>
+                {{ form.email }}
                 {% if form.email.errors %}
-                    <span class="errortext">
+                    <p class="help-block errortext">
                         {% for error in form.email.errors %}
                             {{ error|escape }}
                         {% endfor %}
-                    </span>
-                {% endif %}<br>
-                {{ form.email }}
-            </p>
+                    </p>
+                {% endif %}
+            </div>
 
-            <p>
+            <div class="form-group">
                 <label for="id_subject">Subject</label>
+                {{ form.subject }}
                 {% if form.subject.errors %}
-                    <span class="errortext">
+                    <p class="help-block errortext">
                         {% for error in form.subject.errors %}
                             {{ error|escape }}
                         {% endfor %}
-                    </span>
-                {% endif %}<br>
-                {{ form.subject }}
-            </p>
+                    </p>
+                {% endif %}
+            </div>
 
-            <p>
+            <div class="form-group">
                 <label for="id_message">Message</label>
+                {{ form.message }}
                 {% if form.message.errors %}
-                    <span class="errortext">
+                    <p class="help-block errortext">
                         {% for error in form.message.errors %}
                             {{ error|escape }}
                         {% endfor %}
-                    </span>
-                {% endif %}<br>
-                {{ form.message }}
-            </p>
-            <button type="submit" class="button">Send Message</button>
+                    </p>
+                {% endif %}
+            </div>
+            <button type="submit" class="btn btn-primary">Send Message</button>
         </form>
     </div>
 
