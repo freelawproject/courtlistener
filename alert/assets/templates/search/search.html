@@ -75,11 +75,11 @@
                                 <div class="pointer"
                                      data-toggle="modal"
                                      data-target="#court-picker">
-                                    <label>
+                                    <label class="bottom">
                                         Select Jurisdictions <i class="gray fa fa-external-link"></i>
                                     </label>
 
-                                    <p class="bottom"><span id="jurisdiction-count">{{ court_count_human }}</span>
+                                    <p class="top"><span id="jurisdiction-count">{{ court_count_human }}</span>
                                         jurisdictions selected</p>
                                 </div>
 
@@ -149,13 +149,23 @@
                                 </div>
 
                                 {% if search_form.type.value == 'o' %}
-                                    <h4 class="bottom inline">Citation Count</h4>
-                                    <p class="bottom">minimum: {{ search_form.cited_gt }}</p>
-                                    <p class="bottom">maximum: {{ search_form.cited_lt }}</p>
+                                    <div class="row">
+                                        <div class="col-xs-6">
+                                            <div class="form-group">
+                                                {{ search_form.cited_gt.label_tag }}
+                                                {{ search_form.cited_gt }}
+                                            </div>
+                                        </div>
+                                        <div class="col-xs-6">
+                                            <div class="form-group">
+                                                {{ search_form.cited_lt.label_tag }}
+                                                {{ search_form.cited_lt }}
+                                            </div>
+                                        </div>
+                                    </div>
                                 {% endif %}
-
                                 <button type="submit"
-                                        class="btn btn-default title"
+                                        class="btn btn-primary title"
                                         name="search"><i class="fa fa-search"></i>&nbsp;Search
                                 </button>
                             </div>
@@ -180,33 +190,33 @@
                     {% endif %}
                     <form action="" method="post">{% csrf_token %}
                         {{ alert_form.alertText }}
-                        <p>
+                        <div class="form-group">
                             <label for="id_alertName">Give the alert a name</label>
+                            {{ alert_form.alertName }}
                             {% if alert_form.alertName.errors %}
-                                <br><span class="errortext">
+                                <p class="errortext">
                                     {% for error in alert_form.alertName.errors %}
                                         {{ error|escape }}
                                     {% endfor %}
-                                </span>
+                                </p>
                             {% endif %}
-                            {{ alert_form.alertName }}
-                        </p>
-                        <p>
+                        </div>
+                        <div class="form-group">
                             <label for="id_alertFrequency">How often should we notify you?</label>
+                            {{ alert_form.alertFrequency }}
                             {% if alert_form.alertFrequency.errors %}
                                 <br><span class="errortext">
                                     {% for error in alert_form.alertFrequency.errors %}
                                         {{ error|escape }}
                                     {% endfor %}
                                 </span>
-                            {% endif %}<br>
-                            {{ alert_form.alertFrequency }}
-                        </p>
-                        <p>
-                            {{ alert_form.sendNegativeAlert }}
-                            <label for="id_sendNegativeAlert">Send me an email even if there are no new hits</label>
-                            <br>
-                        </p>
+                            {% endif %}
+                        </div>
+                        <div class="checkbox">
+                            <label for="id_sendNegativeAlert">
+                                {{ alert_form.sendNegativeAlert }} Send me an email even if there are no new hits
+                            </label>
+                        </div>
                         {% if request.GET.edit_alert %}
                             {# Used when editing an alert. Because it has class external-input it will get gathered by the JS#}
                             <input class="external-input"
@@ -214,13 +224,13 @@
                                    value="{{ request.GET.edit_alert }}"
                                    name="edit_alert">
                         {% endif %}
-                        <button type="submit" class="btn btn-default title" name="alertSave">
+                        <button type="submit" class="btn btn-primary title" name="alertSave">
                             {% if request.GET.edit_alert %}Edit Alert{% else %}Create Alert{% endif %}
                         </button>
-                        <p class="gray">Some jurisdictions do not yet support alerts. Check
-                            <a href="/coverage/#scraped-jurisdictions">our list</a> to be
-                            sure your query is supported.</p>
                     </form>
+                    <p class="gray">Some jurisdictions do not yet support alerts. Check
+                        <a href="/coverage/#scraped-jurisdictions">our list</a> to be
+                        sure your query is supported.</p>
                 {% else %}
                     <p>To create an alert, place a query.</p>
                 {% endif %}
@@ -319,35 +329,8 @@
             {% endif %}
         {% endif %}
 
-        {% if results.has_previous or results.has_next %}
-            <div class="well">
-                <div id="pagination-left">
-                    {% if results.has_previous %}
-                        <h3 class="bottom arrow-left-before">
-                            <a href="?{{ get_string }}page={{ results.previous_page_number }}" rel="prev">
-                                Previous
-                            </a>
-                        </h3>
-                    {% else %}
-                        &nbsp;
-                    {% endif %}
-                </div>
-                <div id="pagination-right">
-                    {% if results.has_next %}
-                        <h3 class="bottom arrow-right-after">
-                            <a href="?{{ get_string }}page={{ results.next_page_number }}" rel="next">Next</a>
-                        </h3>
-                    {% else %}
-                        &nbsp;
-                    {% endif %}
-                </div>
-                <div id="pagination-center">
-                    <h3 class="bottom">
-                        Page {{ results.number }} of {{ results.paginator.num_pages }}
-                    </h3>
-                </div>
-            </div>
-        {% endif %}
+        {% include "includes/pagination.html" %}
+
         {% include "includes/jurisdiction_picker_modal.html" %}
     </div>
 {% endblock %}

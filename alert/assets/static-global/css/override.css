@@ -74,6 +74,9 @@ a.button:active{
     }
 }
 @media(min-width:768px){
+    #id_q {
+        width: 258px;
+    }
     #homepage #main-query-box #id_q {
         width: 400px;
     }
@@ -95,6 +98,9 @@ a.button:active{
     }
 }
 @media(min-width:992px){
+    #id_q {
+        width: 400px;
+    }
     #homepage #main-query-box #id_q {
         width: 600px;
     }

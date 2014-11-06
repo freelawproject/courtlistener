@@ -55,35 +55,6 @@
                 </ul>
         </div>
 
-        {# Pagination #}
-        {% if citing_opinions.has_previous or citing_opinions.has_next %}
-            <div class="box">
-                <div id="pagination-left">
-                    {% if citing_opinions.has_previous %}
-                        <h3 class="bottom arrow-left-before">
-                            <a href="?page={{ citing_opinions.previous_page_number }}" rel="prev">
-                                Previous
-                            </a>
-                        </h3>
-                    {% else %}
-                        &nbsp;
-                    {% endif %}
-                </div>
-                <div id="pagination-right">
-                    {% if citing_opinions.has_next %}
-                        <h3 class="bottom arrow-right-after">
-                            <a href="?page={{ citing_opinions.next_page_number }}" rel="next">Next</a>
-                        </h3>
-                    {% else %}
-                        &nbsp;
-                    {% endif %}
-                </div>
-                <div id="pagination-center">
-                    <h3 class="bottom">
-                        Page {{ citing_opinions.number }} of {{ citing_opinions.paginator.num_pages }}
-                    </h3>
-                </div>
-            </div>
-        {% endif %}
+        {% include "includes/pagination.html" with results=citing_opinions %}
     </div>
 {% endblock %}
