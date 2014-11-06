@@ -48,6 +48,7 @@ SOURCES = (
     ('LCR', 'lawbox merged with court and resource.org'),
     ('M', 'manual input'),
     ('A', 'internet archive'),
+    ('H', 'brad heath archive'),
 )
 
 
