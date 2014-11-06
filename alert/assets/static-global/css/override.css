@@ -29,9 +29,11 @@ Sets up all the overrides or additional CSS that the site uses.
 }
 
 button:hover, a.button:hover{
+/*
   background-color:#dff4ff;
-/*  border:1px solid #c2e1ef; */
+  border:1px solid #c2e1ef;
   color:#336699;
+*/
 }
 a.button:active{
   background-color:#6299c5;
@@ -776,6 +778,11 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 #modal-court-picker #tab-state .appeals-court {
     /* Indent appeals courts in the state tab. */
     margin-left: 15px;
+}
+
+#court-filter {
+    float: left;
+    width: 218px;
 }
 
 #court-picker-tabs {
