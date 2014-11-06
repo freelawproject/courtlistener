@@ -1,5 +1,7 @@
 import errno
 import StringIO
+import glob
+import gzip
 import os
 
 import shutil
@@ -23,39 +25,33 @@ def deepgetattr(obj, attr):
 
 
 def swap_archives(obj_type_str):
-    """Swap out new archives for the old."""
+    """Swap out new archives clobbering the old, if present"""
     mkdir_p(os.path.join(settings.BULK_DATA_DIR, '%s' % obj_type_str))
-    for f in os.listdir('/tmp/bulk/%s' % obj_type_str):
+    path_to_gz_files = os.path.join(settings.BULK_DATA_DIR, 'tmp',
+                                    obj_type_str, '*.tar.gz')
+    for f in glob.glob(path_to_gz_files):
         shutil.move(
-            '/tmp/bulk/%s/%s' % (obj_type_str, f),
-            os.path.join(settings.BULK_DATA_DIR, obj_type_str, f)
+            f,
+            os.path.join(
+                settings.BULK_DATA_DIR,
+                obj_type_str,
+                os.path.basename(f)
+            )
         )
 
 
-def copy_old_archives_to_tmp(obj_type_string):
-    """Copy last month's archives into /tmp so that they can be worked on.
-
-    Return True if a copy was successful. Else, return False.
+def compress_all_archives(obj_type_str):
+    """Compresses all the archives in place. Once ready, they are moved to
+    the correct location.
     """
-    # Destination must not exist. Thus deleting as first step.
-    shutil.rmtree(
-        os.path.join('/tmp/bulk', obj_type_string),
-        ignore_errors=True,
-    )
-    try:
-        shutil.copytree(
-            os.path.join(settings.BULK_DATA_DIR, obj_type_string),
-            os.path.join('/tmp/bulk', obj_type_string),
-        )
-        successful_copy = True
-    except shutil.Error, e:
-        print "   - Shutil Warning: Error copying old bulk files to tmp: %s" % e
-        successful_copy = False
-    except OSError, e:
-        print "   - OS Warning: Error copying old bulk files to tmp: %s" % e
-        successful_copy = False
-
-    return successful_copy
+    path_to_tars = os.path.join(
+        settings.BULK_DATA_DIR, 'tmp', obj_type_str, '*.tar')
+    for tar_path in glob.glob(path_to_tars):
+        tar_file_in = open(tar_path, 'rb')
+        gz_out = gzip.open('%s.gz' % tar_path, 'wb')
+        gz_out.writelines(tar_file_in)
+        gz_out.close()
+        tar_file_in.close()
 
 
 def mkdir_p(path):
@@ -67,6 +63,16 @@ def mkdir_p(path):
             pass
         else:
             raise
+
+
+def test_if_old_bulk_files_exist(obj_type_str):
+    path_to_bulk_files = os.path.join(settings.BULK_DATA_DIR, 'tmp',
+                                      obj_type_str, '*')
+    if glob.glob(path_to_bulk_files):
+        # Some stuff was in there!
+        return True
+    else:
+        return False
 
 
 class Command(BaseCommand):
@@ -91,32 +97,25 @@ class Command(BaseCommand):
         courts = Court.objects.all()
         for obj_type_str, obj_type, court_attr, api_resource_obj in arg_tuples:
             self.stdout.write(
-                ' - Attempting to copy the old %s archives to /tmp...\n'
-                % obj_type_str
+                ' - Creating %s bulk %s files as uncompressed tars...\n' %
+                (len(courts), obj_type_str)
             )
-            successful_copy = copy_old_archives_to_tmp(obj_type_str)
-
-            if successful_copy:
-                self.stdout.write(
-                    '   - Success. Creating %s bulk %s files incrementally...\n' %
-                    (len(courts), obj_type_str)
-                )
-            else:
-                self.stdout.write(
-                    '   - Failure. Creating %s bulk %s files from scratch...\n' %
-                    (len(courts), obj_type_str)
-                )
             self.make_archive(
                 obj_type_str,
                 obj_type,
                 court_attr,
                 api_resource_obj,
                 courts,
-                successful_copy,
             )
+            self.stdout.write(
+                '   - Compressing all %s files...\n' % obj_type_str
+            )
+            compress_all_archives(obj_type_str)
 
-            self.stdout.write('   - Swapping in the new %s archives...\n'
-                              % obj_type_str)
+            self.stdout.write(
+                '   - Swapping in the new %s archives...\n'
+                % obj_type_str
+            )
             swap_archives(obj_type_str)
 
         # Make the citation bulk data
@@ -127,7 +126,7 @@ class Command(BaseCommand):
         self.stdout.write('Done.\n\n')
 
     def make_archive(self, obj_type_str, obj_type, court_attr,
-                     api_resource_obj, courts, successful_copy):
+                     api_resource_obj, courts):
         """Generate compressed archives containing the contents of an object
         database.
 
@@ -166,25 +165,28 @@ class Command(BaseCommand):
         # Make this directory. If doing incremental, it will already exist and
         # this will have no affect. If doing from scratch this will create the
         # needed directories.
-        mkdir_p('/tmp/bulk/%s' % obj_type_str)
+        mkdir_p(os.path.join(settings.BULK_DATA_DIR, 'tmp', obj_type_str))
 
-        # Open a gzip'ed tar file for every court. By now we should already
-        # have moved everything into place, if there were old bulk files.
+        # Are there already bulk files?
+        incremental = test_if_old_bulk_files_exist(obj_type_str)
+
+        # Open a tar file for every court. If the old files exist, we will use
+        # them automatically.
         tar_files = {}
         for court in courts:
             tar_files[court.pk] = tarfile.open(
-                '/tmp/bulk/%s/%s.tar.gz' % (obj_type_str, court.pk),
-                mode='w:gz',
-                compresslevel=1,
+                os.path.join(settings.BULK_DATA_DIR, 'tmp', obj_type_str,
+                             '%s.tar' % court.pk),
+                mode='a',
             )
         tar_files['all'] = tarfile.open(
-            '/tmp/bulk/%s/all.tar.gz' % obj_type_str,
-            mode='w:gz',
-            compresslevel=3,
+            os.path.join(settings.BULK_DATA_DIR, 'tmp', obj_type_str,
+                         'all.tar'),
+            mode='a',
         )
 
         # Make the archives with updates from the last 32 days.
-        if successful_copy:
+        if incremental:
             thirty_two_days_ago = now() - datetime.timedelta(days=32)
             qs = obj_type.objects.filter(date_modified__gt=thirty_two_days_ago)
         else:
@@ -213,7 +215,7 @@ class Command(BaseCommand):
             tar_files['all'].addfile(
                 tarinfo, StringIO.StringIO(json_str))
 
-        # Close off all the gzip'ed tar files
+        # Close off all the tar files
         for court in courts:
             tar_files[court.pk].close()
         tar_files['all'].close()
