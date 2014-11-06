@@ -24,8 +24,12 @@ def view_audio_file(request, pk, _):
         favorite_form = FavoriteForm(instance=fave)
     except (ObjectDoesNotExist, TypeError):
         # Not favorited or anonymous user
-        favorite_form = FavoriteForm(initial={'audio_id': af.pk,
-                                              'name': af.docket.case_name})
+        favorite_form = FavoriteForm(
+            initial={
+                'audio_id': af.pk,
+                'name': trunc(af.docket.case_name, 100, ellipsis='...'),
+            }
+        )
 
     return render_to_response(
         'audio/oral_argument.html',
