@@ -62,8 +62,12 @@ def view_opinion(request, pk, _):
         favorite_form = FavoriteForm(instance=fave)
     except (ObjectDoesNotExist, TypeError):
         # Not favorited or anonymous user
-        favorite_form = FavoriteForm(initial={'doc_id': doc.pk,
-                                              'name': doc.citation.case_name})
+        favorite_form = FavoriteForm(
+            initial={
+                'doc_id': doc.pk,
+                'name': trunc(doc.citation.case_name, 100, ellipsis='...'),
+            }
+        )
 
     # get most influential opinions that cite this opinion
     cited_by_trunc = doc.citation.citing_opinions.select_related(
