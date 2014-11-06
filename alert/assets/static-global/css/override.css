@@ -780,6 +780,11 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     margin-left: 15px;
 }
 
+#court-filter {
+    float: left;
+    width: 218px;
+}
+
 #court-picker-tabs {
     text-align: right;
 }
