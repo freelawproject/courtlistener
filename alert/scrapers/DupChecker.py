@@ -63,10 +63,14 @@ class DupChecker(dict):
             # If it's a full crawl, we don't care about the hash. We do not abort no matter what.
             return False
 
-    def should_we_continue_break_or_carry_on(self, object_type, current_date, next_date, lookup_value, lookup_by='sha1'):
-        """Checks if a we have a document with identical content in the CL corpus by making a hash of the data and
-        attempting to look that up. Depending on the result of that, we either CONTINUE to the next item, we CARRY_ON
-        with adding this item to the DB or we BREAK from the court entirely.
+    def should_we_continue_break_or_carry_on(self, object_type, current_date,
+                                             next_date, lookup_value,
+                                             lookup_by='sha1'):
+        """Checks if a we have a document with identical content in the CL
+        corpus by making a hash of the data and attempting to look that up.
+        Depending on the result of that, we either CONTINUE to the next item,
+        we CARRY_ON with adding this item to the DB or we BREAK from the court
+        entirely.
 
         Following logic applies:
          - if we have the item already

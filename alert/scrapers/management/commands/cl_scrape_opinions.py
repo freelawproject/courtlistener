@@ -143,7 +143,8 @@ def get_binary_content(download_url, cookies, method='GET'):
             s = requests.session()
             headers = {'User-Agent': 'CourtListener'}
             cookies = normalize_cookies(cookies)
-            logger.info("Using cookies: %s" % cookies)
+            if cookies:
+                logger.info("Using cookies: %s" % cookies)
             try:
                 r = s.get(download_url,
                           headers=headers,
