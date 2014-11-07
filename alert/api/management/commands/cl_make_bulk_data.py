@@ -25,10 +25,10 @@ def deepgetattr(obj, attr):
 
 
 def swap_archives(obj_type_str):
-    """Swap out new archives clobbering the old, if present"""
+    """Swap out new archives, clobbering the old, if present"""
     mkdir_p(os.path.join(settings.BULK_DATA_DIR, '%s' % obj_type_str))
     path_to_gz_files = os.path.join(settings.BULK_DATA_DIR, 'tmp',
-                                    obj_type_str, '*.tar.gz')
+                                    obj_type_str, '*.tar*')
     for f in glob.glob(path_to_gz_files):
         shutil.move(
             f,
@@ -54,6 +54,43 @@ def compress_all_archives(obj_type_str):
         tar_file_in.close()
 
 
+def tar_and_compress_all_json_files(obj_type_str, courts):
+    """Create gz-compressed archives using the JSON on disk."""
+    for court in courts:
+        tar = tarfile.open(
+            os.path.join(
+                settings.BULK_DATA_DIR,
+                'tmp',
+                obj_type_str,
+                '%s.tar.gz' % court.pk),
+            "w:gz", compresslevel=6)
+        for name in glob.glob(os.path.join(
+                settings.BULK_DATA_DIR,
+                'tmp',
+                obj_type_str,
+                court.pk,
+                "*.json")):
+            tar.add(name, arcname=os.path.basename(name))
+        tar.close()
+
+    # Make the all.tar.gz file by tarring up the other files.
+    tar = tarfile.open(
+        os.path.join(
+            settings.BULK_DATA_DIR,
+            'tmp',
+            obj_type_str,
+            'all.tar'),
+        "w")
+    for court in courts:
+        targz = os.path.join(
+            settings.BULK_DATA_DIR,
+            'tmp',
+            obj_type_str,
+            "%s.tar.gz" % court.pk)
+        tar.add(targz, arcname=os.path.basename(targz))
+    tar.close()
+
+
 def mkdir_p(path):
     """Makes a directory path, but doesn't crash if the path already exists."""
     try:
@@ -66,6 +103,9 @@ def mkdir_p(path):
 
 
 def test_if_old_bulk_files_exist(obj_type_str):
+    """We assume that if there are directories here, then the system has run
+    previously.
+    """
     path_to_bulk_files = os.path.join(settings.BULK_DATA_DIR, 'tmp',
                                       obj_type_str, '*')
     if glob.glob(path_to_bulk_files):
@@ -97,25 +137,19 @@ class Command(BaseCommand):
         courts = Court.objects.all()
         for obj_type_str, obj_type, court_attr, api_resource_obj in arg_tuples:
             self.stdout.write(
-                ' - Creating %s bulk %s files as uncompressed tars...\n' %
-                (len(courts), obj_type_str)
-            )
-            self.make_archive(
-                obj_type_str,
-                obj_type,
-                court_attr,
-                api_resource_obj,
-                courts,
-            )
+                ' - Creating %s bulk %s files...\n' %
+                (len(courts), obj_type_str))
+            self.write_json_to_disk(obj_type_str, obj_type, court_attr,
+                                    api_resource_obj, courts)
+
             self.stdout.write(
-                '   - Compressing all %s files...\n' % obj_type_str
-            )
-            compress_all_archives(obj_type_str)
+                '   - Tarring and compressing all %s files...\n' %
+                obj_type_str)
+            tar_and_compress_all_json_files(obj_type_str, courts)
 
             self.stdout.write(
                 '   - Swapping in the new %s archives...\n'
-                % obj_type_str
-            )
+                % obj_type_str)
             swap_archives(obj_type_str)
 
         # Make the citation bulk data
@@ -124,6 +158,64 @@ class Command(BaseCommand):
         swap_archives('citation')
 
         self.stdout.write('Done.\n\n')
+
+    def write_json_to_disk(self, obj_type_str, obj_type, court_attr,
+                           api_resource_obj, courts):
+        """Write all items to disk as json files inside directories named by
+        jurisdiction.
+
+        The main trick is that we identify if we are creating a bulk archive
+        from scratch. If so, we iterate over everything. If not, we only
+        iterate over items that have been modified in the last 32 days because
+        it's assumed that the bulk files are generated once per month.
+        """
+        # Are there already bulk files?
+        incremental = test_if_old_bulk_files_exist(obj_type_str)
+
+        # Create a directory for every jurisdiction, if they don't already
+        # exist. This does not clobber.
+        for court in courts:
+            mkdir_p(os.path.join(
+                settings.BULK_DATA_DIR,
+                'tmp',
+                obj_type_str,
+                court.pk,
+            ))
+
+        if incremental:
+            # Make the archives with updates from the last 32 days.
+            self.stdout.write(
+                "   - Using incremental mode...\n")
+            thirty_two_days_ago = now() - datetime.timedelta(days=32)
+            qs = obj_type.objects.filter(date_modified__gt=thirty_two_days_ago)
+        else:
+            qs = obj_type.objects.all()
+        item_resource = api_resource_obj()
+        if type(qs[0].pk) == int:
+            item_list = queryset_generator(qs)
+        else:
+            item_list = qs
+        i = 0
+        for item in item_list:
+            json_str = item_resource.serialize(
+                None,
+                item_resource.full_dehydrate(
+                    item_resource.build_bundle(obj=item)),
+                'application/json',
+            ).encode('utf-8')
+
+            with open(os.path.join(
+                settings.BULK_DATA_DIR,
+                'tmp',
+                obj_type_str,
+                deepgetattr(item, court_attr),
+                '%s.json' % item.pk), 'wb') as f:
+                f.write(json_str)
+            i += 1
+
+        self.stdout.write('   - all %s %s json files created.\n' %
+                          (i, obj_type_str))
+
 
     def make_archive(self, obj_type_str, obj_type, court_attr,
                      api_resource_obj, courts):
