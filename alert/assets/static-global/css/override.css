@@ -180,6 +180,10 @@ footer {
     line-height: 1.2em;
 }
 
+#by-line {
+    margin: 1em 0;
+}
+
 #by-line a {
     color: gray;
     text-decoration: underline;
