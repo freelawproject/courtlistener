@@ -52,7 +52,7 @@ class ProfileForm(ModelForm):
 class UserForm(ModelForm):
     email = forms.EmailField(
         required=True,
-        widget=forms.TextInput()
+        widget=forms.TextInput(attrs={'class': 'form-control'})
     )
 
     class Meta:
