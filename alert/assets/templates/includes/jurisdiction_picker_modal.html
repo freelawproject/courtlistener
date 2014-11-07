@@ -45,30 +45,26 @@
                                 <div class="col-sm-3">
                                     {% for court in row %}
                                         {% if search_form.type.value == 'o' or not request.GET.type %}
-                                            <div class="sidebar-checkbox">
-                                                <input
+                                            <div class="checkbox">
+                                                <label for="id_{{ court.pk }}">
+                                                    <input
                                                         id="id_{{ court.pk }}"
                                                         name="{{ court.pk }}"
                                                         {% if court.checked %}checked="checked"{% endif %}
                                                         type="checkbox"
-                                                        class="external-input court-checkbox left">
-                                                <label
-                                                        for="id_{{ court.pk }}"
-                                                        class="pointer">
+                                                        class="external-input court-checkbox">
                                                     {{ court.short_name }}
                                                 </label>
                                             </div>
                                         {% elif search_form.type.value == 'oa' and court.has_oral_argument_scraper %}
-                                            <div class="sidebar-checkbox">
+                                            <div class="checkbox">
+                                                <label for="id_{{ court.pk }}">
                                                 <input
                                                         id="id_{{ court.pk }}"
                                                         name="{{ court.pk }}"
                                                         {% if court.checked %}checked="checked"{% endif %}
                                                         type="checkbox"
-                                                        class="external-input court-checkbox left">
-                                                <label
-                                                        for="id_{{ court.pk }}"
-                                                        class="pointer">
+                                                        class="external-input court-checkbox">
                                                     {{ court.short_name }}
                                                 </label>
                                             </div>
@@ -84,16 +80,14 @@
                                 {% for row in courts.district|rows:4 %}
                                     <div class="col-sm-3">
                                         {% for court in row %}
-                                            <div class="sidebar-checkbox">
+                                            <div class="checkbox">
+                                                <label for="id_{{ court.pk }}">
                                                 <input
                                                         id="id_{{ court.pk }}"
                                                         name="{{ court.pk }}"
                                                         {% if court.checked %}checked="checked"{% endif %}
                                                         type="checkbox"
-                                                        class="external-input court-checkbox left">
-                                                <label
-                                                        for="id_{{ court.pk }}"
-                                                        class="pointer">
+                                                        class="external-input court-checkbox">
                                                     {{ court.short_name }}
                                                 </label>
                                             </div>
@@ -115,16 +109,14 @@
                                     {% for row in bank_bundle|rows:4 %}
                                         <div class="col-sm-3">
                                             {% for court in row %}
-                                                <div class="sidebar-checkbox">
+                                                <div class="checkbox">
+                                                    <label for="id_{{ court.pk }}">
                                                     <input
                                                             id="id_{{ court.pk }}"
                                                             name="{{ court.pk }}"
                                                             {% if court.checked %}checked="checked"{% endif %}
                                                             type="checkbox"
-                                                            class="external-input court-checkbox left">
-                                                    <label
-                                                            for="id_{{ court.pk }}"
-                                                            class="pointer">
+                                                            class="external-input court-checkbox">
                                                         {{ court.short_name }}
                                                     </label>
                                                 </div>
@@ -140,16 +132,14 @@
                                     <div class="col-sm-4">
                                         {% for court_bundle in col_bundle %}
                                             {% for court in court_bundle %}
-                                                <div class="sidebar-checkbox {% if court.jurisdiction == 'SA' or court.jurisdiction == 'SS' %}appeals-court{% endif %}">
+                                                <div class="checkbox {% if court.jurisdiction == 'SA' or court.jurisdiction == 'SS' %}appeals-court{% endif %}">
+                                                    <label for="id_{{ court.pk }}">
                                                     <input
                                                             id="id_{{ court.pk }}"
                                                             name="{{ court.pk }}"
                                                             {% if court.checked %}checked="checked"{% endif %}
                                                             type="checkbox"
-                                                            class="external-input court-checkbox left">
-                                                    <label
-                                                            for="id_{{ court.pk }}"
-                                                            class="pointer">
+                                                            class="external-input court-checkbox">
                                                         {{ court.short_name }}
                                                     </label>
                                                 </div>
@@ -164,16 +154,14 @@
                                 {% for row in courts.special|rows:3 %}
                                     <div class="col-sm-4">
                                         {% for court in row %}
-                                            <div class="sidebar-checkbox">
+                                            <div class="checkbox">
+                                                <label for="id_{{ court.pk }}">
                                                 <input
                                                         id="id_{{ court.pk }}"
                                                         name="{{ court.pk }}"
                                                         {% if court.checked %}checked="checked"{% endif %}
                                                         type="checkbox"
-                                                        class="external-input court-checkbox left">
-                                                <label
-                                                        for="id_{{ court.pk }}"
-                                                        class="pointer">
+                                                        class="external-input court-checkbox">
                                                     {{ court.short_name }}
                                                 </label>
                                             </div>
