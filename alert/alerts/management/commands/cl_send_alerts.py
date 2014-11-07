@@ -107,13 +107,16 @@ class Command(BaseCommand):
                 del data['filed_before']
             except KeyError:
                 pass
-            data['filed_after'] = cut_off_date
             data['order_by'] = 'score desc'
             if self.verbosity >= 1:
                 print "  Data sent to SearchForm is: %s" % data
             search_form = SearchForm(data)
             if search_form.is_valid():
                 cd = search_form.cleaned_data
+                if cd['type'] == 'o':
+                    cd['filed_after'] = cut_off_date
+                elif cd['type'] == 'oa':
+                    cd['argued_after'] = cut_off_date
                 main_params = search_utils.build_main_query(cd)
                 main_params.update({
                     'rows': '20',
