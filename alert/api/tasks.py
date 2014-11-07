@@ -56,7 +56,7 @@ def tar_and_compress_all_json_files(obj_type_str, courts):
                 'tmp',
                 obj_type_str,
                 '%s.tar.gz' % court.pk),
-            "w:gz", compresslevel=6)
+            "w:gz", compresslevel=3)
         for name in glob.glob(os.path.join(
                 settings.BULK_DATA_DIR,
                 'tmp',
