@@ -20,38 +20,32 @@
             {% endif %}
         </div>
         {% if user.profile.donation.all %}
-            <div class="row">
-                <div class="table-responsive">
-                    <table class="table settings-table">
-                        <thead>
-                            <tr>
-                                <th>Amount</th>
-                                <th>Date</th>
-                                <th>Via</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for donation in user.profile.donation.all %}
-                            <tr>
-                                <td>${{ donation.amount }}</td>
-                                <td>{{ donation.date_created|date:"D, n/j/Y" }}</td>
-                                <td>{{ donation.get_payment_provider_display }}</td>
-                                <td>{{ donation.get_status_display }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                <div class="row">
-                    <div class="col-sm-12">
-                        <h3>Thanks for your support!</h3>
-                        <p>Your support <em>truly</em> makes a difference. If you would like to change a donation or if you
-                            have questions please get in touch with us at <a href="mailto:donate@freelawproject.org">donate@freelawproject.org</a>.
-                            We'd be happy to hear from you.</p>
-                    </div>
-                </div>
+            <div class="table-responsive">
+                <table class="table settings-table">
+                    <thead>
+                        <tr>
+                            <th>Amount</th>
+                            <th>Date</th>
+                            <th>Via</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for donation in user.profile.donation.all %}
+                        <tr>
+                            <td>${{ donation.amount }}</td>
+                            <td>{{ donation.date_created|date:"D, n/j/Y" }}</td>
+                            <td>{{ donation.get_payment_provider_display }}</td>
+                            <td>{{ donation.get_status_display }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
+            <h3>Thanks for your support!</h3>
+            <p>Your support <em>truly</em> makes a difference. If you would like to change a donation or if you
+                have questions please get in touch with us at <a href="mailto:donate@freelawproject.org">donate@freelawproject.org</a>.
+                We'd be happy to hear from you.</p>
         {% else %}
             <div class="row">
                 <div class="col-sm-12">
