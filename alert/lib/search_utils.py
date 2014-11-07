@@ -204,7 +204,7 @@ def make_fq(cd, field, key):
     return fq
 
 
-def make_date_query(before, after):
+def make_date_query(query_field, before, after):
     """Given the cleaned data from a form, return a valid Solr fq string"""
     if any([before, after]):
         if hasattr(after, 'strftime'):
@@ -218,7 +218,7 @@ def make_date_query(before, after):
     else:
         # No date filters were requested
         return ""
-    return 'dateFiled:%s' % date_filter
+    return '%s:%s' % (query_field, date_filter)
 
 
 def make_cite_count_query(cd):
@@ -364,13 +364,15 @@ def build_main_query(cd, highlight='all', order_by=''):
             main_fq.append(make_fq(cd, 'citation', 'citation'))
         if cd['neutral_cite']:
             main_fq.append(make_fq(cd, 'neutralCite', 'neutral_cite'))
-        main_fq.append(make_date_query(cd['filed_before'], cd['filed_after']))
+        main_fq.append(make_date_query('dateFiled', cd['filed_before'],
+                                       cd['filed_after']))
 
         # Citation count
         cite_count_query = make_cite_count_query(cd)
         main_fq.append(cite_count_query)
     elif cd['type'] == 'oa':
-        main_fq.append(make_date_query(cd['argued_before'], cd['argued_after']))
+        main_fq.append(make_date_query('dateArgued', cd['argued_before'],
+                                       cd['argued_after']))
 
     # Facet filters
     selected_courts_string = get_selected_field_string(cd, 'court_')
@@ -427,7 +429,7 @@ def place_facet_queries(cd, conn=sunburnt.SolrInterface(settings.SOLR_OPINION_UR
     if cd['neutral_cite']:
         fq.append(make_fq(cd, 'neutralCite', 'neutral_cite'))
 
-    fq.append(make_date_query(cd['filed_before'], cd['filed_after']))
+    fq.append(make_date_query('dateFiled', cd['filed_before'], cd['filed_after']))
     fq.append(make_cite_count_query(cd))
 
     # Faceting

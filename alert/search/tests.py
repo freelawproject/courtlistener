@@ -183,6 +183,14 @@ class SearchTest(SolrTestCase):
                 "jurisdiction."
         )
 
+    def test_oa_date_argued_filtering(self):
+        r = self.client.get('/', {'type': 'oa', 'argued_after': '2014-10-01'})
+        self.assertNotIn(
+            "deadly",
+            r.content,
+            msg="Got a deadly error when doing a Date Argued filter."
+        )
+
     def test_homepage(self):
         """Is the homepage loaded when no GET parameters are provided?"""
         response = self.client.get('/')
