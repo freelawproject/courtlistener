@@ -1,8 +1,4 @@
-/*eslint-env browser */
-/*global $, Modernizr, hopscotch */
-
 $(document).ready(function() {
-    'use strict';
     var cited_gt = $('#id_cited_gt');
     var cited_lt = $('#id_cited_lt');
 
