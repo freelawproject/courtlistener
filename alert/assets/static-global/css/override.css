@@ -18,7 +18,7 @@ Sets up all the overrides or additional CSS that the site uses.
   font-weight: normal;
 }
 
-.caps {
+.caps { /* not used by courtlistener code, is this used by data*/
   font-variant: small-caps;
   letter-spacing: 1px;
   text-transform: lowercase;
@@ -42,7 +42,7 @@ a.button:active{
 }
 
 #homepage #main-query-box {
-    margin: 0 auto;
+    /* margin: 0 auto; */
     -webkit-transition : all 0.5 s ease;
     -moz-transition: all 0.5s ease;
     -o-transition: all 0.5s ease;
@@ -65,7 +65,7 @@ a.button:active{
     }
     #homepage #main-query-box .form-group {
         display: inline-block;
-        margin-bottom: 0px;
+        margin-bottom: 0;
         vertical-align: middle;
     }
     .headshot { /* shrink photos on about page for phone size*/
@@ -371,7 +371,7 @@ nav ul li:last-child {
     border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
     border-style: solid none solid solid;
     border-width: 1px 0px 1px 1px;
-    margin: 0px;
+    margin: 0;
     font-size: 16px;
     /*height: 20px;*/
     /*width: 549px;*/
@@ -460,7 +460,7 @@ div.shown ul {
 /*}*/
 
 input.bottom {
-    margin-bottom: 0px;
+    margin-bottom: 0;
 }
 
 /*.ui-state-active .ui-button-text,*/
@@ -539,7 +539,7 @@ input.court-checkbox, input.status-checkbox {
     outline-style: none;
 }
 #search-button {
-    left: 0px;
+    left: 0;
 }
 #new-search-chooser {
     float: right;
@@ -677,7 +677,7 @@ a:visited.visitable {
     position: relative;
     margin-left: 2em;
     margin-right: 2em;
-    margin-top: 0em;
+    margin-top: 0;
 }
 #resource-org-text p.parties {
     text-align: center;
@@ -721,7 +721,7 @@ span.star-pagination::after {
     left: -1em;
     font-size: 1em;
     color: #8a1f11;
-    width: 0px;
+    width: 0;
 }
 
 blockquote span.star-pagination::after {
@@ -867,7 +867,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     border-color: gray;
 }
 .settings-table tr:last-child {
-    border-width: 0px;
+    border-width: 0;
 }
 .settings-table tbody tr:hover {
     background-color: #f0f0f0;
