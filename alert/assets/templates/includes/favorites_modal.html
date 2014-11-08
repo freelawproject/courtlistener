@@ -15,31 +15,33 @@
                 <form action="" method="POST">{% csrf_token %}
                     {{ favorite_form.doc_id }}
                     {{ favorite_form.audio_id }}
-                    <p class="bottom">
+                    <div class="form-group">
                         <label for="id_name">Name</label>
-                        {% if favorite_form.name.errors %}
-                            <br><span class="errortext">
-                                            {% for error in favorite_form.name.errors %}
-                                                {{ error|escape }}
-                                            {% endfor %}
-                                        </span>
-                        {% endif %}<br>
                         {{ favorite_form.name }}
-                    </p>
-
-                    <p class="bottom">
-                        <label for="id_favorite_notes">Notes</label>
-                        {% if favorite_form.notes.errors %}
-                            <br><span class="errortext">
-                                            {% for error in favorite_form.notes.errors %}
-                                                {{ error|escape }}
-                                            {% endfor %}
-                                        </span>
+                        {% if favorite_form.name.errors %}
+                            <p class="help-block errortext">
+                                {% for error in favorite_form.name.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </p>
                         {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="id_favorite_notes">Notes</label>
+                        {{ favorite_form.notes }}
+                        {% if favorite_form.notes.errors %}
+                            <p class="help-block errortext">
+                                {% for error in favorite_form.notes.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </p>
+                        {% endif %}
+                    </div>
+                    <p class="top right">
+                        <span id="characters-remaining"></span>
+                        characters remaining
                     </p>
-                    {{ favorite_form.notes }}
-                    <p class="top right"><span id="characters-remaining"></span>
-                        characters remaining</p>
 
                     <div id='favorites-bottom-section'>
                         <a id="save-favorite-delete" class="bottom inline
@@ -48,12 +50,12 @@
 
                         <div id="favorites-buttons">
                             <button type="submit"
-                                    class="button title close-favorite-button"
+                                    class="btn btn-default title close-favorite-button"
                                     name="closeFavorite"
                                     id="closeFavorite"
                                     tabindex='4'>Cancel</button>
                             <button type="submit"
-                                    class="button title save-favorite-button"
+                                    class="btn btn-primary title save-favorite-button"
                                     name="saveFavorite"
                                     id="saveFavorite"
                                     tabindex='3'>Save</button>

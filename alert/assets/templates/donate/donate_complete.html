@@ -13,7 +13,7 @@
             <p>It appears you have cancelled the donation you were about to make. Your support means the world to us.</p>
             <p>Would you like to try again, or just go back to the homepage?</p>
             <form action="/donate/" method="get" class="inline">
-                <button type="submit" class="button">Try Donating Again</button>
+                <button type="submit" class="btn btn-default">Try Donating Again</button>
                 &nbsp;&nbsp;<a href="/">Go to the homepage</a>
             </form>
         {% elif error == 'Insufficient Funds' %}
@@ -25,7 +25,7 @@
                 possibly via PayPal, Check or Credit Card?</p>
             <p>Would you like to try again?</p>
             <form action="/donate/" method="get" class="inline">
-                <button type="submit" class="button">Try Donating Again</button>
+                <button type="submit" class="btn btn-default">Try Donating Again</button>
                 &nbsp;&nbsp;<a href="/">I give up, take me to the homepage</a>
             </form>
         {% else %}
