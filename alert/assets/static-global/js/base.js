@@ -1,8 +1,12 @@
+/*eslint-env browser */
+/*global $, Modernizr, hopscotch */
+
 $(document).ready(function() {
+    'use strict';
     var cited_gt = $('#id_cited_gt');
     var cited_lt = $('#id_cited_lt');
 
-    function makeSearchPath(tab_switch){
+    function makeSearchPath(tab_switch) {
         // Empty the sliders if they are both at their max
         if (cited_gt.val() == 0 && cited_lt.val() == 20000) {
             cited_gt.val("");
@@ -78,7 +82,7 @@ $(document).ready(function() {
                 .appendTo('#search-form');
         });
         var path = '/?' + $('#search-form').serialize();
-        return path
+        return path;
     }
 
     //////////////
@@ -132,7 +136,7 @@ $(document).ready(function() {
             $('#jurisdiction-count').css({
                 'background-color': 'transparent',
                 'font-weight': 'normal'
-            })
+            });
         }, 1500);
     });
 
@@ -262,10 +266,10 @@ $(document).ready(function() {
                 }
             },
             {//2
-                target: "#extra-sidebar-fields",
+                target: '#extra-sidebar-fields',
                 placement: 'right',
                 arrowOffset: 'center',
-                title: "Sophisticated Search",
+                title: 'Sophisticated Search',
                 content: "In the Advanced Search area, you can make " +
                     "sophisticated searches against many fields. " +
                     "Press \"Next\" and we'll make a query for you.",
@@ -286,7 +290,7 @@ $(document).ready(function() {
                 content: 'Here you can see the results for the query "Roe ' +
                     'v. Wade" sorted by relevance and filtered to only one ' +
                     'jurisdiction, the Supreme Court.',
-                showPrevButton: false,
+                showPrevButton: false
             },
             {//4
                 target: '#type-switcher',
@@ -364,5 +368,7 @@ Modernizr.load({
     // Sets up HTML5 input placeholders in browsers that don't support them.
     test: Modernizr.placeholder,
     nope: '/static/js/placeholder-1.8.6.min.js',
-    complete: function () { $('input, textarea').placeholder(); }
+    complete: function () {
+        $('input, textarea').placeholder();
+    }
 });
