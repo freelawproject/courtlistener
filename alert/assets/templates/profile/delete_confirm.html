@@ -11,8 +11,8 @@
         <h3>Are you sure you want to do this?</h3>
 
         <form action="/alert/delete/{{alert_id}}/" method="post" class="inline">{% csrf_token %}
-        <button type="submit" class="button">Yes, please delete this alert</button></form>&nbsp;&nbsp;
+        <button type="submit" class="btn btn-default">Yes, please delete this alert</button></form>&nbsp;&nbsp;
         <form action="/profile/alerts/" method="post" class="inline">{% csrf_token %}
-        <button type="submit" class="button">No, please take me back to my alerts</button></form>
+        <button type="submit" class="btn btn-default">No, please take me back to my alerts</button></form>
     </div>
 {% endblock %}
