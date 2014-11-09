@@ -1,12 +1,17 @@
-$(document).ready(function() {
-    var cited_gt = $('#id_cited_gt');
-    var cited_lt = $('#id_cited_lt');
+/*eslint-env browser */
+/*global $, Modernizr, hopscotch */
 
-    function makeSearchPath(tab_switch) {
+$(document).ready(function() {
+    // 'use strict'; // uncomment later on after full cleanup
+    var citedGreaterThan = $('#id_cited_gt');
+    var citedLessThan = $('#id_cited_lt');
+
+    function makeSearchPath(tabSwitch) {
         // Empty the sliders if they are both at their max
-        if (cited_gt.val() == 0 && cited_lt.val() == 20000) {
-            cited_gt.val("");
-            cited_lt.val("");
+        if (citedGreaterThan.val() === 0 && citedLessThan.val() === 20000) {
+        // see https://github.com/freelawproject/courtlistener/issues/303
+            citedGreaterThan.val('');
+            citedLessThan.val('');
         }
 
         // Gather all form fields that are necessary
@@ -14,48 +19,53 @@ $(document).ready(function() {
 
         // If the user is switching tabs, then make sure their ordering is
         // valid for the tab they're headed to.
-        var drop_down = $('#id_order_by');
-        if (tab_switch){
+        var dropDown = $('#id_order_by');
+        if (tabSwitch){
             var value;
-            if (drop_down.val() === 'dateFiled desc') {
-                value = 'dateArgued desc';
-            } else if (drop_down.val() === 'dateFiled asc') {
-                value = 'dateArgued asc';
-            } else if (drop_down.val() === 'dateArgued desc') {
-                value = 'dateFiled desc';
-            } else if (drop_down.val() === 'dateArgued asc') {
-                value = 'dateFiled asc';
-            } else {
-                // Restore the default.
-                value = 'score desc';
+            switch (dropDown.val()) {
+                case 'dateFiled desc':
+                    value = 'dateArgued desc';
+                    break;
+                case 'dateFiled asc':
+                    value = 'dateArgued asc';
+                    break;
+                case 'dateArgued desc':
+                    value = 'dateFiled desc';
+                    break;
+                case 'dateArgued asc':
+                    value = 'dateFiled asc';
+                    break;
+                default:
+                    value = 'score desc';
+                    break;
             }
             var el = $('<input type="hidden" name="order_by" />').val(value);
             gathered = gathered.add(el);
         } else {
             // Not a tab switch; make sure to gather the element regardless.
-            gathered = gathered.add(drop_down);
+            gathered = gathered.add(dropDown);
         }
 
         // Add the input boxes that aren't empty
         var selector = '.external-input[type=text]';
         gathered = gathered.add($(selector).filter(function () {
-            return this.value != "";
+            return this.value !== '';
         }));
 
         // Add selected radio buttons
         gathered = gathered.add($('.external-input[type=radio]:checked'));
 
         // Add the court checkboxes that are selected as a single input element
-        var checked_courts = $('.court-checkbox:checked');
-        if (checked_courts.length != $('.court-checkbox').length) {
+        var checkedCourts = $('.court-checkbox:checked');
+        if (checkedCourts.length !== $('.court-checkbox').length) {
             // Only do this if all courts aren't checked to keep URLs short.
             var values = [];
-            for (var i = 0; i < checked_courts.length; i++) {
-                values.push(checked_courts[i].id.split('_')[1]);
+            for (var i = 0; i < checkedCourts.length; i++) {
+                values.push(checkedCourts[i].id.split('_')[1]);
             }
-            var court_str = values.join(" ");
+            var courtString = values.join(' ');
             var el = jQuery('<input/>', {
-                value: court_str,
+                value: courtString,
                 name: 'court'
             });
         }
@@ -68,7 +78,7 @@ $(document).ready(function() {
 
         // Remove any inputs that are direct children of the form. These are
         // pernicious leftovers caused by the evils of the back button.
-        $("#search-form > input").remove();
+        $('#search-form > input').remove();
 
         gathered.each(function () {
             // Make and submit a hidden input element for all gathered fields
@@ -86,8 +96,8 @@ $(document).ready(function() {
     //////////////
     function showAdvancedHomepage() {
         $('#homepage #advanced-search-starter, #homepage #search-container td > i').hide();
-        $('#homepage #advanced-search-inputs').show("fast").removeClass("hidden");
-        $("#main-query-box").addClass('wide');
+        $('#homepage #advanced-search-inputs').show('fast').removeClass('hidden');
+        $('#main-query-box').addClass('wide');
         $('#id_q').focus();
     }
     $('#homepage #advanced-search-starter a').click(function (event) {
@@ -107,7 +117,7 @@ $(document).ready(function() {
         // is defined by the label that is .selected). This is needed because
         // the "wrong" value will be selected after a user presses the back
         // button in their browser.
-        $('#type-switcher .selected input').prop("checked", true);
+        $('#type-switcher .selected input').prop('checked', true);
 
         document.location = makeSearchPath(false);
     });
@@ -187,16 +197,16 @@ $(document).ready(function() {
     // Court Picker //
     //////////////////
     function listFilter(list, input) {
-        var checkbox_sections = list.find('.sidebar-checkbox');
+        var checkboxSections = list.find('.sidebar-checkbox');
         function filter() {
-            var regex = new RegExp('\\b' + this.value, "i");
-            var $els = checkbox_sections.filter(function () {
+            var regex = new RegExp('\\b' + this.value, 'i');
+            var $els = checkboxSections.filter(function () {
                 return regex.test($(this).find('label').text());
             });
-            checkbox_sections.not($els).find('input').prop('checked', false);
+            checkboxSections.not($els).find('input').prop('checked', false);
             $els.find('input').prop('checked', true);
         }
-        input.keyup(filter).change(filter)
+        input.keyup(filter).change(filter);
     }
     jQuery(function ($) {
         listFilter($('.tab-content'), $('#court-filter'));
@@ -204,16 +214,16 @@ $(document).ready(function() {
 
     // Check/clear the tab/everything
     $('#check-all').click(function() {
-        $("#modal-court-picker .tab-pane input").prop('checked', true);
+        $('#modal-court-picker .tab-pane input').prop('checked', true);
     });
     $('#clear-all').click(function () {
-        $("#modal-court-picker .tab-pane input").prop('checked', false);
+        $('#modal-court-picker .tab-pane input').prop('checked', false);
     });
     $('#check-current').click(function () {
-        $("#modal-court-picker .tab-pane.active input").prop('checked', true);
+        $('#modal-court-picker .tab-pane.active input').prop('checked', true);
     });
     $('#clear-current').click(function () {
-        $("#modal-court-picker .tab-pane.active input").prop('checked', false);
+        $('#modal-court-picker .tab-pane.active input').prop('checked', false);
     });
 
 
@@ -227,7 +237,7 @@ $(document).ready(function() {
     // Tour //
     //////////
     var tour = {
-        id: "feature-tour",
+        id: 'feature-tour',
         showPrevButton: true,
         steps: [
             {//0
@@ -242,7 +252,7 @@ $(document).ready(function() {
                     'citations, you name it.',
                 // If the advanced page is already shown, we skip to step 2.
                 onNext: function(){
-                    if (!$('#advanced-search-starter').is(":visible")){
+                    if (!$('#advanced-search-starter').is(':visible')){
                         hopscotch.showStep(2);
                     }
                 }
@@ -254,9 +264,9 @@ $(document).ready(function() {
                 arrowOffset: 'center',
                 nextOnTargetClick: true,
                 title: 'More Power Please!',
-                content: "If you are the kind of person that wants more " +
-                    "power, you'll love the advanced search box. " +
-                    "Click on \"Advanced Search\" to turn it on.",
+                content: 'If you are the kind of person that wants more ' +
+                    'power, you\'ll love the advanced search box. ' +
+                    'Click on \"Advanced Search\" to turn it on.',
                 onNext: function(){
                     showAdvancedHomepage();
                 }
@@ -266,9 +276,9 @@ $(document).ready(function() {
                 placement: 'right',
                 arrowOffset: 'center',
                 title: 'Sophisticated Search',
-                content: "In the Advanced Search area, you can make " +
-                    "sophisticated searches against many fields. " +
-                    "Press \"Next\" and we'll make a query for you.",
+                content: 'In the Advanced Search area, you can make ' +
+                    'sophisticated searches against many fields. ' +
+                    'Press \"Next\" and we\'ll make a query for you.',
                 multipage: true,
                 showPrevButton: false,
                 onNext: function(){
@@ -341,20 +351,20 @@ $(document).ready(function() {
         event.preventDefault();
         var loc = location.pathname + location.search;
         if (loc !== '/') {
-            sessionStorage.setItem("hopscotch.tour.state", 'feature-tour:0');
+            sessionStorage.setItem('hopscotch.tour.state', 'feature-tour:0');
             window.location = '/';
         } else {
             hopscotch.startTour(tour, 0);
         }
     });
     // Start it automatically for certain steps.
-    if (hopscotch.getState() === "feature-tour:0") {
+    if (hopscotch.getState() === 'feature-tour:0') {
         hopscotch.startTour(tour);
     }
-    if (hopscotch.getState() === "feature-tour:3") {
+    if (hopscotch.getState() === 'feature-tour:3') {
         hopscotch.startTour(tour);
     }
-    if (hopscotch.getState() === "feature-tour:6") {
+    if (hopscotch.getState() === 'feature-tour:6') {
         hopscotch.startTour(tour);
     }
 });
