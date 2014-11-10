@@ -196,21 +196,18 @@ $(document).ready(function() {
     //////////////////
     // Court Picker //
     //////////////////
-    function listFilter(list, input) {
-        var checkboxSections = list.find('.sidebar-checkbox');
-        function filter() {
-            var regex = new RegExp('\\b' + this.value, 'i');
-            var $els = checkboxSections.filter(function () {
+    function courtFilter () {
+        var tabs = $('.tab-content'),
+            checkboxes = tabs.find('.checkbox'),
+            regex = new RegExp('\\b' + this.value, 'i'),
+            matches = checkboxes.filter(function () {
                 return regex.test($(this).find('label').text());
             });
-            checkboxSections.not($els).find('input').prop('checked', false);
-            $els.find('input').prop('checked', true);
-        }
-        input.keyup(filter).change(filter);
+        checkboxes.not(matches).find('input').prop('checked', false);
+        matches.find('input').prop('checked', true);
     }
-    jQuery(function ($) {
-        listFilter($('.tab-content'), $('#court-filter'));
-    });
+
+    $('#court-filter').keyup(courtFilter).change(courtFilter);
 
     // Check/clear the tab/everything
     $('#check-all').click(function() {
