@@ -130,7 +130,11 @@
                 <div class="col-sm-4">
                     <label>Precedential Status</label>
                     {% for status in status_facets %}
-                        <div class="sidebar-checkbox">
+                        {% if forloop.counter == 4 %}
+                            <a id="show-all-statuses"
+                               class="cursor">Show All Statuses&hellip;</a>
+                        {% endif %}
+                        <div class="sidebar-checkbox status-item{% if forloop.counter >= 4 %} hidden{% endif %}">
                             <input
                                     id="id_{{ status.1 }}"
                                     type="checkbox"

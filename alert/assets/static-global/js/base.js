@@ -104,6 +104,11 @@ $(document).ready(function() {
         event.preventDefault();
         showAdvancedHomepage();
     });
+    $('#show-all-statuses').click(function (event) {
+        event.preventDefault();
+        $('.status-item').removeClass('hidden');
+        $('#show-all-statuses').addClass('hidden');
+    });
 
     ///////////////////////
     // Search submission //
