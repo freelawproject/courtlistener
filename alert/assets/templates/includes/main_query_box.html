@@ -1,4 +1,4 @@
-<div id="searchform">
+<div id="searchform-{% if homepage %}homepage{% else %}navbar{% endif %}">
     <form action="/" method="get" id="search-form" class="form-inline" role="form">
         <div id="search-container" {% if homepage %}class="text-center"{% endif %}>
             <label class="sr-only" for="id_q">Search</label>

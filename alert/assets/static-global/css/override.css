@@ -10,7 +10,6 @@ Sets up all the overrides or additional CSS that the site uses.
 ::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 ::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 
-/* From fancy-type.css */
 .alt {
   color: #666;
   font-family: "Warnock Pro", "Book Antiqua", Georgia, serif;
@@ -28,13 +27,6 @@ Sets up all the overrides or additional CSS that the site uses.
   padding:0 2px;
 }
 
-button:hover, a.button:hover{
-/*
-  background-color:#dff4ff;
-  border:1px solid #c2e1ef;
-  color:#336699;
-*/
-}
 a.button:active{
   background-color:#6299c5;
 /* border:1px solid #6299c5; */
@@ -130,6 +122,9 @@ a.button:active{
     padding-top:0;
 }
 
+.x-large {
+    font-size: 25px;
+}
 .large {
     font-size: 21px;
 }
@@ -156,11 +151,7 @@ a.button:active{
     text-decoration: none;
     border-bottom: none;
 }
-/*
-.header {
-    float: left;
-}
-*/
+
 footer {
     padding-top: 2em;
     margin-top: 4em;
@@ -272,15 +263,6 @@ div.hopscotch-bubble .hopscotch-bubble-close {
     white-space: nowrap;
 }
 
-.hidden {
-    display: none;
-}
-
-.round {
-    -webkit-border-radius: 6px;
-    border-radius: 6px;
-}
-
 .round-bottom {
     -webkit-border-bottom-right-radius: 6px;
     -webkit-border-bottom-left-radius: 6px;
@@ -299,8 +281,8 @@ mark {
 }
 
 .radio-list ul {
-    /* Django creates radio items as a list, but they need to be wrapped in a div with class "radio-list" then this
-       style will make them look normal */
+    /* Django creates radio items as a list, but they need to be wrapped in a
+       div with class "radio-list" then this style will make them look normal */
     list-style-type: none;
     padding-left: 0;
 }
@@ -311,46 +293,17 @@ mark {
 .placeholder{ color: #aaa; }
 
 
-
 /* layout */
 body {
     background-color: #E9E8E8;
 }
 
 .container {
-    /*padding: 20px 0px 0px 0px; */
     background-color: white;
     border-left: 1px solid #c2c2c2;
     border-bottom: 1px solid #c2c2c2;
     border-right: 1px solid #c2c2c2;
-    /*width: 1010px; */
 }
-/*
-.content, footer, header {
-    padding-left: 30px;
-    padding-right: 30px;
-}
-
-nav {
-    padding-bottom: 3em;
-}
-
-nav ul {
-    display: inline;
-    padding: 0;
-}
-
-nav ul li {
-    list-style: none outside none;
-    padding: 0em 0.7em 0em 0.0em;
-    white-space: nowrap;
-    text-align: center;
-    display: inline;
-}
-nav ul li:last-child {
-    padding: 0;
-}
-*/
 
 #id_q {
     border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
@@ -363,7 +316,7 @@ nav ul li:last-child {
     -o-transition: all 0.5s ease;
     transition: all 0.5s ease;
 }
-#search-container .input-group {
+#searchform-navbar #search-container .input-group {
     padding: 14px 0 0 0;
 }
 
