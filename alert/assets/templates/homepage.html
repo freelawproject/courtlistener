@@ -39,39 +39,22 @@
 {% endblock %}
 
 {% block sign-in %}
-    {% if not user.is_authenticated %}
-        <form action="/sign-in/" method="post" class="navbar-form form-inline navbar-right" role="form">{% csrf_token %}
-            <a href="/register/" class="small">Want to sign up?</a>
-            <a href="/reset-password/" class="small">Need help?</a>
-            <div class="form-group form-group-sm">
-                <label for="username" class="sr-only">Username</label>
-                <input type="text"
-                       name="username"
-                       value=""
-                       id="username"
-                       placeholder="User Name"
-                       class="form-control"
-                       tabindex="2">
-            </div>
-            <div class="form-group form-group-sm">
-                <label for="password" class="sr-only">Password</label>
-                <input type="password"
-                       name="password"
-                       value=""
-                       id="password"
-                       placeholder="Password"
-                       class="form-control"
-                       tabindex="3">
-            </div>
-            <button type="submit" class="btn btn-default btn-sm" tabindex="4">Sign In</button>
-        </form>
-    {% else %}
+    {% if user.is_authenticated %}
         <div class="navbar-right">
             <ul class="nav navbar-nav">
-                <li><a href="/profile/">Profile&nbsp;<i class="gray fa fa-user"></i></a></li>
-                <li><a href="/sign-out">Sign Out&nbsp;<i class="gray fa fa-sign-out"></i></a></li>
+                <li><a href="/profile/">Profile&nbsp;<i
+                        class="gray fa fa-user"></i></a></li>
+                <li><a href="/sign-out">Sign Out&nbsp;<i
+                        class="gray fa fa-sign-out"></i></a></li>
             </ul>
         </div>
+    {% else %}
+        <a href="{% url "sign-in" %}"
+           class="btn btn-default btn-sm navbar-btn"
+           tabindex="4">Sign In</a>
+        <a href="{% url "register" %}"
+           class="btn btn-default btn-sm navbar-btn"
+           tabindex="4">Register</a>
     {% endif %}
 {% endblock %}
 

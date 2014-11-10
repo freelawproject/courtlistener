@@ -1,6 +1,6 @@
 <div id="searchform">
     <form action="/" method="get" id="search-form" class="form-inline" role="form">
-        <div id="search-container" class="text-center">
+        <div id="search-container" {% if homepage %}class="text-center"{% endif %}>
             <label class="sr-only" for="id_q">Search</label>
             <div class="input-group{% if not homepage %} input-sm{% endif %}">
                 <input class="{% if count == 0 or error %}auto-focus {% endif %}form-control"
@@ -33,7 +33,7 @@
             {% endif %}
             {% if not homepage %}
                 <br/>
-                <div class="left">
+                <div class="right">
                     <a href="/search/advanced-techniques/" id="advanced" tabindex="8">Query Help</a>
                 </div>
             {% endif %}

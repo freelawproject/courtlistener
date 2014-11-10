@@ -69,8 +69,8 @@
                             {% block logo %}
                                 <img src="{{ STATIC_PREFIX }}png/logo.png"
                                      alt="CourtListener logo"
-                                     width="252"
-                                     height="28"/>
+                                     width="260"
+                                     height="29"/>
                             {% endblock %}
                         </a>
                     </div>
@@ -78,22 +78,26 @@
                         {% block main-nav %}
                             {% if user.is_authenticated %}
                                 <ul class="nav navbar-nav">
+                                    <li><a href="/about/" tabindex="2">About</a></li>
+                                    <li><a href="/faq/" tabindex="3">FAQ</a></li>
+                                    <li><a href="/coverage/" tabindex="4">Coverage</a></li>
                                     <li class="dropdown">
                                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
                                         <ul class="dropdown-menu" role="menu">
-                                            <li><a href="/profile/alerts/" tabindex="2">Alerts</a></li>
-                                            <li><a href="/profile/favorites/" tabindex="3">Favorites</a></li>
-                                            <li><a href="/profile/donations/">Donations</a></li>
-                                            <li><a href="/profile/" tabindex="4">Account</a></li>
-                                            <li><a href="/sign-out/" tabindex="5">Sign out</a></li>
+                                            <li><a href="/profile/alerts/" tabindex="5">Alerts</a></li>
+                                            <li><a href="/profile/favorites/" tabindex="6">Favorites</a></li>
+                                            <li><a href="/profile/donations/" tabindex="7">Donations</a></li>
+                                            <li><a href="/profile/" tabindex="7">Account</a></li>
+                                            <li><a href="/sign-out/" tabindex="8">Sign out</a></li>
                                         </ul>
                                     </li>
                                 </ul>
                             {% else %}
                                 <ul class="nav navbar-nav">
                                     <li><a href="/about/" tabindex="2">About</a></li>
-                                    <li><a href="" class="tour-link">Tour</a></li>
-                                    <li><a href="/coverage/" tabindex="3">Coverage</a></li>
+                                    <li><a href="/faq/" tabindex="3">FAQ</a></li>
+                                    <li><a href="" class="tour-link" tabindex="4">Tour</a></li>
+                                    <li><a href="/coverage/" tabindex="4">Coverage</a></li>
                                     {% if request.path != "/sign-out/" %}
                                         <li>
                                             <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}" tabindex="4">
@@ -101,7 +105,7 @@
                                             </a>
                                         </li>
                                     {% else %}
-                                        <li><a href="{% url "sign-in" %}" tabindex="4">Sign in / Register</a></li>
+                                        <li><a href="{% url "sign-in" %}" tabindex="5">Sign in / Register</a></li>
                                     {% endif %}
                                 </ul>
                             {% endif %}
