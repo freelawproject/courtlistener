@@ -304,7 +304,7 @@ $(document).ready(function() {
                 arrowOffset: 'top',
                 title: 'What are you Looking For?',
                 content: 'By default you\'ll get opinion results, but use ' +
-                    'this to work with oral arguments instead.'
+                    'this to research and listen to oral arguments instead.'
             },
             {//5
                 target: '#create-alert-header',

@@ -598,25 +598,23 @@ input.court-checkbox, input.status-checkbox {
     margin-left: 5px;
 }
 
-/* Special case for Oregon, which has a name attr with a value of TOP. */
-a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
-    color: #000099;
-    text-decoration: underline;
-}
+/* Special case for Oregon, which has a name attr with a value of TOP on
+   content that isn't a link. See example here:
+   http://www.publications.ojd.state.or.us/docs/S054822.htm#TOP
 
-/* These have some special casing for Oregon cases. */
-a:not([name="TOP"]):focus, a:not([name="TOP"]):hover {
-    color: #000;
-}
-
-a:not([name="TOP"]) {
-    color: #009;
-    text-decoration: underline;
-}
-
-/* link formatting */
-a:link, a:visited {
+   Idea here is to simply ignore the anchor element.
+*/
+a[name="TOP"]:focus, a[name="TOP"]:hover, a[name="TOP"] {
     text-decoration: none;
+    color: #333;
+}
+
+a:focus, a:hover {
+    color: #009;
+}
+
+a {
+    color: #009;
 }
 a:visited.visitable {
     color: #9d11b3;
