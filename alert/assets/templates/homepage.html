@@ -42,8 +42,16 @@
     {% if user.is_authenticated %}
         <div class="navbar-right">
             <ul class="nav navbar-nav">
-                <li><a href="/profile/">Profile&nbsp;<i
-                        class="gray fa fa-user"></i></a></li>
+                <li class="dropdown">
+                    <a href="#" class="dropdown-toggle" data-toggle="dropdown">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
+                    <ul class="dropdown-menu" role="menu">
+                        <li><a href="/profile/alerts/" tabindex="5">Alerts</a></li>
+                        <li><a href="/profile/favorites/" tabindex="6">Favorites</a></li>
+                        <li><a href="/profile/donations/" tabindex="7">Donations</a></li>
+                        <li><a href="/profile/" tabindex="7">Account</a></li>
+                        <li><a href="/sign-out/" tabindex="8">Sign out</a></li>
+                    </ul>
+                </li>
                 <li><a href="/sign-out">Sign Out&nbsp;<i
                         class="gray fa fa-sign-out"></i></a></li>
             </ul>
