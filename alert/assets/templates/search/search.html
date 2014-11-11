@@ -31,6 +31,9 @@
 
 {% block sidebar %}
     <div class="col-sm-3 search-page" id="sidebar">
+        <div class="sidebar-section visible-xs">
+            <a href="#search-results">Jump to Results</a>
+        </div>
         <div class="sidebar-section" id="type-switcher">
             <h3 class="bottom">
                 <label for="id_type_0" class="pointer
@@ -258,32 +261,32 @@
 
 
 {% block content %}
-    <div class="col-sm-9 search-page">
+    <div id="search-results" class="col-sm-9 search-page">
         {% if messages %}
-            <div class="alert {{message.tags}}" role="alert">
-                {% for message in messages %}
+            {% for message in messages %}
+                <div class="alert {{message.tags}}" role="alert">
                     <p>{{message|safe}}</p>
-                {% endfor %}
-            </div>
+                </div>
+            {% endfor %}
         {% endif %}
         {% if alert_form.errors %}
-            <div class="alert {{message.tags}}" role="alert">
-                <p>There was an error creating your alert. Please
+            <div class="alert alert-danger" role="alert">
+                <p class="bottom">There was an error creating your alert. Please
                     <a href="#create-alert-header">see below</a>.
                 </p>
             </div>
         {% endif %}
         {% if request.GET.edit_alert %}
-            <div class="alert {{message.tags}}" role="alert">
+            <div class="alert alert-warning" role="alert">
                 <div class="row">
                     <div class="col-sm-6">
-                        <p>You are currently editing your alert,
+                        <p class="bottom">You are currently editing your alert,
                         "<strong>{{ alert_form.alertName.value }}</strong>".</p>
                     </div>
                     <div class="col-sm-6 text-right">
-                        <button href="?{{ get_string_sans_alert }}">
+                        <a class="btn btn-default btn-sm" href="?{{ get_string_sans_alert }}">
                             Cancel editing and redo the search
-                        </button>
+                        </a>
                     </div>
                 </div>
             </div>
