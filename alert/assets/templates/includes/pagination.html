@@ -6,8 +6,9 @@
             <div class="col-xs-2">
                 {% if results.has_previous %}
                     <div class="large text-left">
-                        <i class="gray fa fa-caret-left"></i>
-                        <a href="?{{ get_string }}page={{ results.previous_page_number }}" rel="prev">
+                        <i class="gray fa fa-caret-left inline">
+                        </i>&nbsp;<a href="?{{ get_string }}page={{ results.previous_page_number }}"
+                                     rel="prev">
                             Previous
                         </a>
                     </div>
@@ -23,8 +24,7 @@
                     <div class="large text-right">
                         <a href="?{{ get_string }}page={{ results.next_page_number }}" rel="next">
                             Next
-                        </a>
-                        <i class="gray fa fa-caret-right"></i>
+                        </a>&nbsp;<i class="gray fa fa-caret-right inline"></i>
                     </div>
                 {% endif %}
             </div>
