@@ -7,7 +7,6 @@
 User-agent: Googlebot
 Disallow: /robots.txt
 Disallow: /assets/
-Disallow: /api/rest/v1/
 Disallow: /api/bulk-data/
 
 User-agent: bingbot
