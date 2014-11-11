@@ -161,7 +161,7 @@ a.button:active{
     border-bottom: none;
 }
 
-footer {
+.container > footer {
     padding-top: 2em;
     margin-top: 4em;
     border-top: 1px solid #dddddd;
