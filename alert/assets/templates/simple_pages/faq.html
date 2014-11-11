@@ -68,8 +68,10 @@
 
     <div class="col-sm-7">
     {% if form.errors %}
-        <p class="bottom error">There were errors with your submission. See <a href="#other">below</a> for details.
-        </p>
+        <div class="alert alert-danger">
+            <p class="bottom">There were errors with your submission. See <a
+                    href="#other">below</a> for details.</p>
+        </div>
     {% endif %}
 
 
@@ -308,7 +310,7 @@
             <label for="id_name">Name</label>
             {{ form.name }}
             {% if form.name.errors %}
-                <p class="help-block errortext">
+                <p class="help-block">
                     {% for error in form.name.errors %}
                         {{ error|escape }}
                     {% endfor %}
@@ -320,7 +322,7 @@
             <label for="id_email">Email (Optional)</label>
             {{ form.email }}
             {% if form.email.errors %}
-                <p class="help-block errortext">
+                <p class="help-block">
                     {% for error in form.email.errors %}
                         {{ error|escape }}
                     {% endfor %}
@@ -334,7 +336,7 @@
             <label for="id_message">Message</label>
             {{ form.message }}
             {% if form.message.errors %}
-                <p class="help-block errortext">
+                <p class="help-block">
                     {% for error in form.message.errors %}
                         {{ error|escape }}
                     {% endfor %}

@@ -772,6 +772,10 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     background-color: #8a1f11;
 }
 
+.help-block {
+    color: #8a1f11;
+}
+
 /* Charts */
 #charts {
     display: inline-block;
