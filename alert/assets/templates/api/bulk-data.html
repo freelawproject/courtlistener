@@ -20,14 +20,14 @@
         <h3 id="bulk-data">Bulk Data Files</h3>
         <p>
             Two types of bulk file are available for each core data type in
-            CourtListener. The first is a bulk file containing everything in
-            the system for that type of data. The second is a
-            jurisdiction-based file that only has the content for a certain
-            jurisdiction. In general, the scheme for the bulk files is as
-            follows:
+            CourtListener. The first is a gzip-compressed bulk file containing
+            everything in the system for that type of data in a specific
+            jurisdiction. The second is a tar file of all the jurisdictional
+            gzip archives for a requested type of data. In general, the scheme
+            for the bulk files is as follows:
         </p>
         <blockquote>
-            <code>https://www.courtlistener.com/api/bulk-data/<strong>$data-type</strong>/<strong>$jurisdiction</strong>.tar.gz</code>
+            <code>https://www.courtlistener.com/api/bulk-data/<strong>$data-type</strong>/<strong>$jurisdiction</strong>.tar(.gz)?</code>
         </blockquote>
         <p>Some examples:</p>
         <dl>
@@ -55,7 +55,7 @@
             <dd>
                 <blockquote>
                     <code>
-                        <a href="/api/bulk-data/document/all.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>document</strong>/<strong>all</strong>.tar.gz</a>
+                        <a href="/api/bulk-data/document/all.tar">https://www.courtlistener.com/api/bulk-data/<strong>document</strong>/<strong>all</strong>.tar</a>
                     </code>
                 </blockquote>
             </dd>
@@ -63,7 +63,7 @@
             <dd>
                 <blockquote>
                     <code>
-                        <a href="/api/bulk-data/docket/all.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>docket</strong>/<strong>all</strong>.tar.gz</a>
+                        <a href="/api/bulk-data/docket/all.tar">https://www.courtlistener.com/api/bulk-data/<strong>docket</strong>/<strong>all</strong>.tar</a>
                     </code>
                 </blockquote>
             </dd>
@@ -71,7 +71,7 @@
             <dd>
                 <blockquote>
                     <code>
-                        <a href="/api/bulk-data/jurisdiction/all.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>jurisdiction</strong>/<strong>all</strong>.tar.gz</a>
+                        <a href="/api/bulk-data/jurisdiction/all.tar">https://www.courtlistener.com/api/bulk-data/<strong>jurisdiction</strong>/<strong>all</strong>.tar</a>
                     </code>
                 </blockquote>
             </dd>
