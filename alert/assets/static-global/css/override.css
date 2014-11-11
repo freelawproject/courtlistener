@@ -792,6 +792,13 @@ div.hopscotch-bubble .hopscotch-bubble-number {
     padding: 0;
 }
 
+div.hopscotch-bubble .hopscotch-nav-button.next,
+div.hopscotch-bubble .hopscotch-nav-button.next:hover,
+div.hopscotch-bubble .hopscotch-nav-button.prev,
+div.hopscotch-bubble .hopscotch-nav-button.prev:hover {
+    background-image: none;
+}
+
 /* Highlights images that need height/width */
 img:not([width]):not([height]) {
   border: 2px solid red !important;
