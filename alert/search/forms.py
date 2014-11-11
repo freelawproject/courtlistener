@@ -119,6 +119,7 @@ class SearchForm(forms.Form):
     argued_after = FloorDateField(
         required=False,
         input_formats=INPUT_FORMATS,
+        label="Argued After",
         widget=forms.TextInput(
             attrs={'placeholder': 'YYYY-MM-DD',
                    'class': 'external-input form-control',
@@ -128,6 +129,7 @@ class SearchForm(forms.Form):
     argued_before = CeilingDateField(
         required=False,
         input_formats=INPUT_FORMATS,
+        label="Argued Before",
         widget=forms.TextInput(
             attrs={'placeholder': 'YYYY-MM-DD',
                    'class': 'external-input form-control',

@@ -63,24 +63,23 @@
         </div>
 
         {% if not error %}
-        <hr>
         <div class="sidebar-section">
-            <h3>Refine Your Query</h3>
+            <h3><span>Refine Your Query</span></h3>
             <form action="/" method="get" id="sidebar-search-form">
                 <div id="sidebar-facet-placeholder">
                     {% if not error %}
                         <div id="extra-search-fields">
                             <div id="extra-sidebar-fields">
                                 {#  Modal is at bottom of results, so it loads last. #}
-                                <div class="pointer"
+                                <div class="cursor v-offset-below-2"
                                      data-toggle="modal"
                                      data-target="#court-picker">
-                                    <label class="bottom">
+                                    <label class="bottom cursor">
                                         Select Jurisdictions <i class="gray fa fa-external-link"></i>
                                     </label>
 
                                     <p class="top"><span id="jurisdiction-count">{{ court_count_human }}</span>
-                                        jurisdictions selected</p>
+                                        Jurisdictions Selected</p>
                                 </div>
 
                                 <div class="form-group">
@@ -94,32 +93,39 @@
                                 </div>
 
                                 {% if search_form.type.value == 'o' %}
-                                    <label>Precedential Status</label>
-                                    {% for status in status_facets %}
-                                        <div class="sidebar-checkbox">
-                                            <input
-                                                    id="id_{{ status.1 }}"
-                                                    type="checkbox"
-                                                    name="{{ status.1 }}"
-                                                    class="external-input status-checkbox left"
-                                                    {% if status.3 %}checked="checked"{% endif %}>
-                                            <label
-                                                    for="id_{{ status.1 }}"
-                                                    class="pointer {% if status.2 == 0 %}gray{% endif %}">
-                                                <div>{{ status.0 }}&nbsp;<span
-                                                        class="gray small">({{ status.2|intcomma }})</span></div>
-                                            </label>
-                                        </div>
-                                    {% endfor %}
-
-                                    <div class="form-group">
-                                        {{ search_form.filed_after.label_tag }}
-                                        {{ search_form.filed_after }}
+                                    <div class="v-offset-below-2">
+                                        <label>Precedential Status</label>
+                                        {% for status in status_facets %}
+                                            <div class="sidebar-checkbox">
+                                                <input
+                                                        id="id_{{ status.1 }}"
+                                                        type="checkbox"
+                                                        name="{{ status.1 }}"
+                                                        class="external-input status-checkbox left"
+                                                        {% if status.3 %}checked="checked"{% endif %}>
+                                                <label
+                                                        for="id_{{ status.1 }}"
+                                                        class="pointer {% if status.2 == 0 %}gray{% endif %}">
+                                                    <div>{{ status.0 }}&nbsp;<span
+                                                            class="gray small">({{ status.2|intcomma }})</span></div>
+                                                </label>
+                                            </div>
+                                        {% endfor %}
                                     </div>
 
-                                    <div class="form-group">
-                                        {{ search_form.filed_before.label_tag }}
-                                        {{ search_form.filed_before }}
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                {{ search_form.filed_after.label_tag }}
+                                                {{ search_form.filed_after }}
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                {{ search_form.filed_before.label_tag }}
+                                                {{ search_form.filed_before }}
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div class="form-group">
@@ -133,13 +139,19 @@
                                     </div>
 
                                 {% elif search_form.type.value == 'oa' %}
-                                    <div class="form-group">
-                                        {{ search_form.argued_after.label_tag }}
-                                        {{ search_form.argued_after }}
-                                    </div>
-                                    <div class="form-group">
-                                        {{ search_form.argued_before.label_tag }}
-                                        {{ search_form.argued_before }}
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                {{ search_form.argued_after.label_tag }}
+                                                {{ search_form.argued_after }}
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                {{ search_form.argued_before.label_tag }}
+                                                {{ search_form.argued_before }}
+                                            </div>
+                                        </div>
                                     </div>
                                 {% endif %}
 
@@ -286,7 +298,7 @@
                             </a>
                         {% endif %}
                     </h2>
-                    <span class="small gray top">{{ results.object_list.QTime }}ms</span>
+                    <span class="small gray top">{{ results.object_list.QTime|intcomma }}ms</span>
                 </div>
                 <div class="col-sm-6">
                     <div id="result-order-chooser-placeholder">
