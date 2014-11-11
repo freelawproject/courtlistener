@@ -4,8 +4,7 @@
     2. Hide the options that don't apply to different tabs.
 {% endcomment %}
 
-<select class="external-input v-offset-above-2" id="id_order_by" name="order_by"
-        tabindex="9">
+<select class="external-input v-offset-above-2" id="id_order_by" name="order_by">
         <option value="score desc"
                 {% if search_form.order_by.value == "score desc" %}
                     selected="selected"

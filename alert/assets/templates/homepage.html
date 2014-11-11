@@ -45,11 +45,11 @@
                 <li class="dropdown">
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
                     <ul class="dropdown-menu" role="menu">
-                        <li><a href="/profile/alerts/" tabindex="5">Alerts</a></li>
-                        <li><a href="/profile/favorites/" tabindex="6">Favorites</a></li>
-                        <li><a href="/profile/donations/" tabindex="7">Donations</a></li>
-                        <li><a href="/profile/" tabindex="7">Account</a></li>
-                        <li><a href="/sign-out/" tabindex="8">Sign out</a></li>
+                        <li><a href="/profile/alerts/">Alerts</a></li>
+                        <li><a href="/profile/favorites/">Favorites</a></li>
+                        <li><a href="/profile/donations/">Donations</a></li>
+                        <li><a href="/profile/">Account</a></li>
+                        <li><a href="/sign-out/">Sign out</a></li>
                     </ul>
                 </li>
                 <li><a href="/sign-out">Sign Out&nbsp;<i
@@ -58,11 +58,9 @@
         </div>
     {% else %}
         <a href="{% url "sign-in" %}"
-           class="btn btn-default btn-sm navbar-btn"
-           tabindex="4">Sign In</a>
+           class="btn btn-default btn-sm navbar-btn">Sign In</a>
         <a href="{% url "register" %}"
-           class="btn btn-default btn-sm navbar-btn"
-           tabindex="4">Register</a>
+           class="btn btn-default btn-sm navbar-btn">Register</a>
     {% endif %}
 {% endblock %}
 

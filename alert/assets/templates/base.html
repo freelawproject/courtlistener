@@ -65,7 +65,7 @@
                             <span class="icon-bar"></span>
                             <span class="icon-bar"></span>
                         </button>
-                        <a class="navbar-brand" href="/" tabindex="1">
+                        <a class="navbar-brand" href="/"margin-bottom>
                             {% block logo %}
                                 <img src="{{ STATIC_PREFIX }}png/logo.png"
                                      alt="CourtListener logo"
@@ -78,34 +78,34 @@
                         {% block main-nav %}
                             {% if user.is_authenticated %}
                                 <ul class="nav navbar-nav">
-                                    <li><a href="/about/" tabindex="2">About</a></li>
-                                    <li><a href="/faq/" tabindex="3">FAQ</a></li>
-                                    <li><a href="/coverage/" tabindex="4">Coverage</a></li>
+                                    <li><a href="/about/">About</a></li>
+                                    <li><a href="/faq/">FAQ</a></li>
+                                    <li><a href="/coverage/">Coverage</a></li>
                                     <li class="dropdown">
                                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
                                         <ul class="dropdown-menu" role="menu">
-                                            <li><a href="/profile/alerts/" tabindex="5">Alerts</a></li>
-                                            <li><a href="/profile/favorites/" tabindex="6">Favorites</a></li>
-                                            <li><a href="/profile/donations/" tabindex="7">Donations</a></li>
-                                            <li><a href="/profile/" tabindex="7">Account</a></li>
-                                            <li><a href="/sign-out/" tabindex="8">Sign out</a></li>
+                                            <li><a href="/profile/alerts/">Alerts</a></li>
+                                            <li><a href="/profile/favorites/">Favorites</a></li>
+                                            <li><a href="/profile/donations/">Donations</a></li>
+                                            <li><a href="/profile/">Account</a></li>
+                                            <li><a href="/sign-out/">Sign out</a></li>
                                         </ul>
                                     </li>
                                 </ul>
                             {% else %}
                                 <ul class="nav navbar-nav">
-                                    <li><a href="/about/" tabindex="2">About</a></li>
-                                    <li><a href="/faq/" tabindex="3">FAQ</a></li>
-                                    <li><a href="" class="tour-link" tabindex="4">Tour</a></li>
-                                    <li><a href="/coverage/" tabindex="4">Coverage</a></li>
+                                    <li><a href="/about/">About</a></li>
+                                    <li><a href="/faq/">FAQ</a></li>
+                                    <li><a href="" class="tour-link">Tour</a></li>
+                                    <li><a href="/coverage/">Coverage</a></li>
                                     {% if request.path != "/sign-out/" %}
                                         <li>
-                                            <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}" tabindex="4">
+                                            <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}">
                                                 Sign in / Register
                                             </a>
                                         </li>
                                     {% else %}
-                                        <li><a href="{% url "sign-in" %}" tabindex="5">Sign in / Register</a></li>
+                                        <li><a href="{% url "sign-in" %}">Sign in / Register</a></li>
                                     {% endif %}
                                 </ul>
                             {% endif %}
