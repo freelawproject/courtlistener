@@ -768,6 +768,22 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     margin-right: 0.5em;
 }
 
+.badge-red {
+    background-color: #8a1f11;
+}
+
+/* Charts */
+#charts {
+    display: inline-block;
+    margin: 0px 5px 5px 5px;
+}
+#graph {
+    height: 400px;
+}
+#graph table {
+    width: 20%;
+}
+
 /* Highlights images that need height/width */
 img:not([width]):not([height]) {
   border: 2px solid red !important;
