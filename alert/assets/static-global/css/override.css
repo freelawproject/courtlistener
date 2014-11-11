@@ -67,6 +67,9 @@ a.button:active{
         height: 135px;
         width: 135px;
     }
+    #court-picker-tabs {
+        padding-top: 15px;
+    }
 }
 @media(min-width:768px){
     #id_q {
@@ -87,6 +90,10 @@ a.button:active{
     #homepage #advanced-search-starter p:not(:first-child) {
         margin-top: 0.75em;
     }
+    #court-picker-tabs {
+        text-align: right;
+    }
+
 }
 @media(min-width:992px){
     #id_q {
@@ -705,10 +712,6 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 #court-filter {
     float: left;
     width: 218px;
-}
-
-#court-picker-tabs {
-    text-align: right;
 }
 
 #modal-court-picker #court-picker-tabs li {
