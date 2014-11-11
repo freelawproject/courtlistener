@@ -93,24 +93,7 @@
             </div>
         {% endif %}
 
-        {# Show the social links using sprites #}
-        <div class="sidebar-section">
-            <h3 id="share-header"><span>Share this Oral Argument</span></h3>
-
-            <div>
-                <input type="text" readonly="readonly" id="copy-input"
-                       value="{{ request.build_absolute_uri }}"/>
-                <a href="mailto:?subject={{ title|urlencode }}%20at%20CourtListener.com&body={{ request.build_absolute_uri }}"
-                   title="Email this link to a friend" class="sprites"
-                   id="email_link_png"></a>
-                <a href="http://www.facebook.com/share.php?u={{ request.build_absolute_uri }}&t={{ title }} at CourtListener.com"
-                   target="_blank" title="Facebook" class="sprites"
-                   id="facebook_png"></a>
-                <a href="http://twitter.com/home?status={{ request.build_absolute_uri }}"
-                   target="_blank" title="Twitter" class="sprites"
-                   id="twitter_gif"></a>
-            </div>
-        </div>
+        {% include "includes/social_links.html" with title_type="Oral Argument" %}
     </div>
 {% endblock %}
 
