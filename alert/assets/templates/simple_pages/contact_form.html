@@ -8,11 +8,11 @@
 {% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="col-sm-9 col-sm-push-3" id="sidebar">
+    <div class="col-sm-9 col-md-6 col-sm-push-3" id="sidebar">
         <h2>Contact Us</h2>
 
         {% if form.errors %}
-            <div class="bg-danger">
+            <div class="alert alert-danger">
                 <p class="bottom">There were errors with your submission.</p>
             </div>
         {% endif %}
@@ -23,7 +23,7 @@
                 <label for="id_name">Name</label>
                 {{ form.name }}
                 {% if form.name.errors %}
-                    <p class="help-block errortext">
+                    <p class="help-block">
                         {% for error in form.name.errors %}
                             {{ error|escape }}
                         {% endfor %}
@@ -35,7 +35,7 @@
                 <label for="id_email">Email (optional)</label>
                 {{ form.email }}
                 {% if form.email.errors %}
-                    <p class="help-block errortext">
+                    <p class="help-block">
                         {% for error in form.email.errors %}
                             {{ error|escape }}
                         {% endfor %}
@@ -47,7 +47,7 @@
                 <label for="id_subject">Subject</label>
                 {{ form.subject }}
                 {% if form.subject.errors %}
-                    <p class="help-block errortext">
+                    <p class="help-block">
                         {% for error in form.subject.errors %}
                             {{ error|escape }}
                         {% endfor %}
@@ -59,7 +59,7 @@
                 <label for="id_message">Message</label>
                 {{ form.message }}
                 {% if form.message.errors %}
-                    <p class="help-block errortext">
+                    <p class="help-block">
                         {% for error in form.message.errors %}
                             {{ error|escape }}
                         {% endfor %}
@@ -71,7 +71,7 @@
     </div>
 
 
-    <div class="col-sm-3 col-sm-pull-9">
+    <div class="col-sm-3 col-sm-pull-9 col-md-pull-6">
         <h3 class="bottom">Removal Requests</h3>
 
         <p>If you are concerned about your case appearing on this site,
@@ -107,4 +107,5 @@
             102 South Hall<br>
             Berkeley, CA 94720-4600</p>
     </div>
+    <div class="col-sm-3"></div>
 {% endblock %}
