@@ -280,6 +280,22 @@ mark {
     background-color: #ffffbf;
 }
 
+/* For adding vertical whitespace */
+.v-offset-above-1 { margin-top: 10px; }
+.v-offset-above-2 { margin-top: 20px; }
+.v-offset-above-3 { margin-top: 40px; }
+.v-offset-above-4 { margin-top: 60px; }
+.v-offset-above-5 { margin-top: 80px; }
+.v-offset-above-6 { margin-top: 100px; }
+.v-offset-above-7 { margin-top: 150px; }
+.v-offset-below-1 { margin-bottom: 10px; }
+.v-offset-below-2 { margin-bottom: 20px; }
+.v-offset-below-3 { margin-bottom: 40px; }
+.v-offset-below-4 { margin-bottom: 60px; }
+.v-offset-below-5 { margin-bottom: 80px; }
+.v-offset-below-6 { margin-bottom: 100px; }
+.v-offset-below-7 { margin-bottom: 150px; }
+
 .radio-list ul {
     /* Django creates radio items as a list, but they need to be wrapped in a
        div with class "radio-list" then this style will make them look normal */
@@ -379,42 +395,9 @@ div.shown ul {
     font-size: 1.2em;
 }
 
-/* Button formatting */
-/*a.button, button, .ui-button-text {*/
-    /*border-color: #a6a6a6;*/
-    /*background-color: #6683B7;*/
-    /*color: white;*/
-    /*letter-spacing: 0.5px;*/
-/*}*/
-/*button.small {*/
-    /*padding: 2px 8px 2px 5px;*/
-    /*font-size: 90%;*/
-/*}*/
-
 input.bottom {
     margin-bottom: 0;
 }
-
-/*.ui-state-active .ui-button-text,*/
-/*.ui-state-hover .ui-button-text,*/
-/*.ui-state-focus .ui-button-text {*/
-    /*background-color: #7896D0;*/
-    /*color: #eeeeee;*/
-/*}*/
-
-/*.ui-state-active, .ui-state-hover, .ui-state-focus {*/
-    /*border-color: transparent;*/
-/*}*/
-
-/*button:hover, a.button:hover {*/
-  /*background-color: #7896D0;*/
-  /*border:1px solid gray;*/
-  /*color: #eeeeee;*/
-/*}*/
-/*a.button:active {*/
-  /*background-color: #7896D0;*/
-  /*color: #eeeeee;*/
-/*}*/
 
 #sidebar {
     margin-top: 6px;
@@ -731,7 +714,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     float: none;
     display: inline-block;
 }
-#court-picker-tabs > li a {
+.nav-tabs a {
     text-transform: uppercase;
 }
 #modal-save-favorite .modal-dialog {
@@ -743,22 +726,6 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 #modal-save-favorite textarea, #modal-save-favorite input {
     width: 390px !important;
 }
-
-/*
-#modal-save-favorite, #modal-logged-out {
-    z-index: 10;
-    top: -10px;
-    left: 10px;
-    position: absolute;
-    background: white;
-}
-
-#modal-logged-out {
-    top: -10px;
-    left: 10px;
-    padding: 2em;
-}
-*/
 #save-favorite-text-area {
     height: auto;
 }

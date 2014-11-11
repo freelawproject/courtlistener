@@ -3,25 +3,21 @@
 {% block sidebar %}{% endblock %}
 
 {% block nav %}
-    <div class="col-xs-12">
-        <ul class="nav nav-pills nav-justified">
-            <li class="{% block nav-alerts %}inactive{% endblock %}"><a href="/profile/alerts/">Alerts</a></li>
+    <div class="col-xs-12 v-offset-below-2 v-offset-above-3">
+        <ul class="nav nav-tabs nav-justified">
+            <li class="{% block nav-alerts %}inactive{% endblock %}">
+                <a href="/profile/alerts/"><i class="fa fa-bell-o gray"></i>&nbsp;Alerts</a></li>
             <li class="{% block nav-favorites %}inactive{% endblock %}">
-                <a href="/profile/favorites/"><i class="gold fa fa-star"></i>&nbsp;Favorites</a>
+                <a href="/profile/favorites/"><i class="fa fa-star-o gray"></i>&nbsp;Favorites</a>
             </li>
-            <li class="{% block nav-donations %}inactive{% endblock %}"><a href="/profile/donations/">Donations</a></li>
+            <li class="{% block nav-donations %}inactive{% endblock %}">
+                <a href="/profile/donations/"><i class="fa fa-money gray"></i>&nbsp;Donations</a></li>
             <li class="{% block nav-account %}inactive{% endblock %}">
-                <a href="/profile/settings/">Account
-                    {% if not request.user.profile.email_confirmed %}
-                        <img src="/static/png/exclamation.png"
-                             width="16"
-                             height="16"
-                             alt="Your email address is not confirmed."
-                             id="unconfirmed-email-warning-nav"/>
-                    {% endif %}
-                </a>
+                <a href="/profile/settings/"><i class="fa fa-user gray"></i>&nbsp;Account</a>
             </li>
-            <li class="{% block nav-password %}inactive{% endblock %}"><a href="/profile/password/change">Password</a></li>
+            <li class="{% block nav-password %}inactive{% endblock %}">
+                <a href="/profile/password/change"><i class="fa fa-lock gray"></i>&nbsp;Password</a>
+            </li>
         </ul>
     </div>
 {% endblock %}

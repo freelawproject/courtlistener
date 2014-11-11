@@ -60,16 +60,6 @@
             <div class="form-group">
                 <label for="id_email">Email*</label>
                 {{ user_form.email }}
-                {% if not request.user.profile.email_confirmed %}
-                    <a href="/email-confirmation/request/">
-                        <img src="/static/png/exclamation.png"
-                             width="16"
-                             height="16"
-                             title="Your email address is not confirmed."
-                             alt="Your email address is not confirmed."
-                             id="unconfirmed-email-warning"/>
-                    </a>
-                {% endif %}
                 {% if user_form.email.errors %}
                     <span class="errortext">
                         {% for error in user_form.email.errors %}
@@ -172,7 +162,7 @@
                     </span>
                 {% endif %}
             </div>
-            <div class="form-group">
+            <div class="form-group v-offset-below-4">
                 {{ profile_form.wants_newsletter }}
                 <label for="id_wants_newsletter">Send me the monthly newsletter</label>
                 {% if profile_form.wants_newsletter.errors %}
@@ -184,8 +174,8 @@
                 {% endif %}
             </div>
             <input type="hidden" value="{{user.username}}" name="user" id="id_user">
-            <button type="submit" class="btn btn-primary">Save</button>
-            <a href="/profile/delete">Delete my account</a> {# part of the form so that it lines up nicely. #}
+            <button type="submit" class="btn btn-primary float-right">Save Changes</button>
+            <a href="/profile/delete">Delete My Account&hellip;</a>
         </form>
     </div>
     <div class="col-sm-3"></div>

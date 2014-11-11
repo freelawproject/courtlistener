@@ -8,16 +8,16 @@
 
 {% block content %}
     <div class="col-xs-12">
-        {% if messages %}
-            <div class="com-sm-6">
-                {% for message in messages %}
-                    <p class="bottom {{message.tags}}">{{message|safe}}</p>
-                {% endfor %}
-            </div>
-        {% endif %}
-    </div>
-    {% if user.profile.alert.all %}
-        <div class="col-xs-12">
+        <div class="row">
+            {% if messages %}
+                <div class="com-sm-6">
+                    {% for message in messages %}
+                        <p class="bottom {{message.tags}}">{{message|safe}}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+        {% if user.profile.alert.all %}
             <div class="table-responsive">
                 <table class="table settings-table">
                     <thead>
@@ -58,18 +58,22 @@
                                     </a>
                                 {% endif %}
                             </td>
-                            <td><a href="/?{{ alert.alertText }}&edit_alert={{ alert.pk }}">edit</a></td>
-                            <td><a href="/alert/delete/confirm/{{ alert.pk }}">delete&hellip;</a></td>
+                            <td><a href="/?{{ alert.alertText }}&edit_alert={{ alert.pk }}">Edit</a></td>
+                            <td><a href="/alert/delete/confirm/{{ alert.pk }}">Delete&hellip;</a></td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-        </div>
-    {% else %}
-        <h3>You have not made any alerts.</h3>
-        <form action="/" method="get">
-            <button type="submit" class="btn btn-primary">Make New Alert</button>
-        </form>
-    {% endif %}
+        {% else %}
+            <div class="row">
+                <div class="col-sm-12">
+                    <h3>You have not made any alerts.</h3>
+                    <form action="/" method="get">
+                        <button type="submit" class="btn btn-primary">Make New Alert</button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+    </div>
 {% endblock %}
