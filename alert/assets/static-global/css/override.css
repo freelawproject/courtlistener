@@ -786,6 +786,12 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     width: 20%;
 }
 
+/* Hide hopscotch number in tour */
+div.hopscotch-bubble .hopscotch-bubble-number {
+    display: none;
+    padding: 0;
+}
+
 /* Highlights images that need height/width */
 img:not([width]):not([height]) {
   border: 2px solid red !important;
