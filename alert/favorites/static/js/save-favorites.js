@@ -9,11 +9,11 @@ $(document).ready(function() {
     $('#save-favorite-notes-field').NobleCount('#characters-remaining',{
         // set up the char counter
         on_negative: function(t_obj, char_area, c_settings, char_rem){
-            $('#characters-remaining').addClass("errortext");
+            $('#characters-remaining').addClass("badge badge-red");
             $('#saveFavorite').attr('disabled', 'disabled');
         },
         on_positive: function(t_obj, char_area, c_settings, char_rem){
-            $('#characters-remaining').removeClass("errortext");
+            $('#characters-remaining').removeClass("badge badge-red");
             $('#saveFavorite').removeAttr('disabled');
         },
         max_chars: '500'
