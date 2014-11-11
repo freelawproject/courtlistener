@@ -39,7 +39,10 @@ a.button:active{
     -moz-transition: all 0.5s ease;
     -o-transition: all 0.5s ease;
     transition: all 0.5s ease;
+    margin-bottom: 2em;
+    margin-top: 2em;
 }
+
 
 @media(max-width:767px){
     #homepage #main-query-box #id_q {
@@ -78,10 +81,6 @@ a.button:active{
     #homepage #above-main-query {
         margin-top: 6em;
     }
-    #homepage #main-query-box {
-        margin-bottom: 2em;
-        margin-top: 2em;
-    }
     #homepage #advanced-search-starter {
         margin-bottom: 6em;
     }
@@ -98,6 +97,9 @@ a.button:active{
     }
     #homepage #main-query-box.wide #id_q {
         width: 800px;
+    }
+    .lg-v-offset-below-3 {
+        padding-bottom: 40px;
     }
 }
 @media(min-width:1200px){
