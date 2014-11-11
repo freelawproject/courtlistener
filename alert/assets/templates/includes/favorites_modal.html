@@ -19,7 +19,7 @@
                         <label for="id_name">Name</label>
                         {{ favorite_form.name }}
                         {% if favorite_form.name.errors %}
-                            <p class="help-block errortext">
+                            <p class="help-block">
                                 {% for error in favorite_form.name.errors %}
                                     {{ error|escape }}
                                 {% endfor %}
@@ -31,7 +31,7 @@
                         <label for="id_favorite_notes">Notes</label>
                         {{ favorite_form.notes }}
                         {% if favorite_form.notes.errors %}
-                            <p class="help-block errortext">
+                            <p class="help-block">
                                 {% for error in favorite_form.notes.errors %}
                                     {{ error|escape }}
                                 {% endfor %}

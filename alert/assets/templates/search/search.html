@@ -209,7 +209,7 @@
                             <label for="id_alertName">Give the alert a name</label>
                             {{ alert_form.alertName }}
                             {% if alert_form.alertName.errors %}
-                                <p class="errortext">
+                                <p class="help-block">
                                     {% for error in alert_form.alertName.errors %}
                                         {{ error|escape }}
                                     {% endfor %}
@@ -220,11 +220,11 @@
                             <label for="id_alertFrequency">How often should we notify you?</label>
                             {{ alert_form.alertFrequency }}
                             {% if alert_form.alertFrequency.errors %}
-                                <br><span class="errortext">
+                                <p class="help-block">
                                     {% for error in alert_form.alertFrequency.errors %}
                                         {{ error|escape }}
                                     {% endfor %}
-                                </span>
+                                </p>
                             {% endif %}
                         </div>
                         <div class="checkbox">

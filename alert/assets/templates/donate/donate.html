@@ -112,9 +112,10 @@
                 <p class="bottom">{{ message|safe }}</p>
             </div>
         {% endif %}
-        <form role="form" action="/donate/" method="post" id="donate-form">{% csrf_token %}
+        <form role="form" action="/donate/" method="post" id="donate-form">
+            {% csrf_token %}
             {% if donation_form.non_field_errors or user_form.non_field_errors or profile_form.non_field_errors %}
-                <span class="errortext">
+                <span class="alert alert-danger">
                     {% for error in donation_form.non_field_errors %}
                         {{ error|escape }}
                     {% endfor %}
@@ -129,11 +130,11 @@
             <div class="well" id="how-much-donate">
                 <h3 class="top">How Much Would You Like to Contribute?</h3>
                 {% if donation_form.amount.errors %}
-                    <span class="errortext">
+                    <p class="help-block">
                         {% for error in donation_form.amount.errors %}
                             {{ error|escape }}
                         {% endfor %}
-                    </span>
+                    </p>
                 {% endif %}
                 <div class="radio-list" id="how-much-donate-choices">
                     {{  donation_form.amount }}
@@ -143,11 +144,11 @@
             <div id="how-donate">
                 <h3>How would you like to donate?</h3>
                 {% if donation_form.payment_provider.errors %}
-                    <span class="errortext">
+                    <p class="help-block">
                         {% for error in donation_form.payment_provider.errors %}
                             {{ error|escape }}
                         {% endfor %}
-                    </span>
+                    </p>
                 {% endif %}
                 <div id="payment-provider-radio" class="btn-group btn-group-justified" data-toggle="buttons">
                     <label for="id_payment_provider_0" class="btn btn-default active">
@@ -173,10 +174,10 @@
                             <label for="id_first_name">First Name</label>
                             {{ user_form.first_name }}
                             {% if user_form.first_name.errors %}
-                                <p class="help-block errortext">
-                                {% for error in user_form.first_name.errors %}
-                                    {{ error|escape }}
-                                {% endfor %}
+                                <p class="help-block">
+                                    {% for error in user_form.first_name.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
                                 </p>
                             {% endif %}
                         </div>
@@ -186,10 +187,10 @@
                             <label for="id_last_name">Last Name</label>
                             {{ user_form.last_name }}
                             {% if user_form.last_name.errors %}
-                                <p class="help-block errortext">
-                                {% for error in user_form.last_name.errors %}
-                                    {{ error|escape }}
-                                {% endfor %}
+                                <p class="help-block">
+                                    {% for error in user_form.last_name.errors %}
+                                        {{ error|escape }}
+                                    {% endfor %}
                                 </p>
                             {% endif %}
                         </div>
@@ -199,7 +200,7 @@
                     <label for="id_address1">Mailing Address 1</label>
                     {{ profile_form.address1 }}
                     {% if profile_form.address1.errors %}
-                        <p class="help-block errortext">
+                        <p class="help-block">
                             {% for error in profile_form.address1.errors %}
                                 {{ error|escape }}
                             {% endfor %}
@@ -210,7 +211,7 @@
                     <label for="id_address2">Mailing Address 2</label>
                     {{ profile_form.address2 }}
                     {% if profile_form.address1.errors %}
-                        <p class="help-block errortext">
+                        <p class="help-block">
                             {% for error in profile_form.address2.errors %}
                                 {{ error|escape }}
                             {% endfor %}
@@ -221,7 +222,7 @@
                     <label for="id_city">City</label>
                     {{ profile_form.city }}
                     {% if profile_form.city.errors %}
-                        <p class="help-block errortext">
+                        <p class="help-block">
                             {% for error in profile_form.city.errors %}
                                 {{ error|escape }}
                             {% endfor %}
@@ -234,7 +235,7 @@
                             <label for="id_state">State</label>
                             {{ profile_form.state }}
                             {% if profile_form.state.errors %}
-                                <p class="help-block errortext">
+                                <p class="help-block">
                                     {% for error in profile_form.state.errors %}
                                         {{ error|escape }}
                                     {% endfor %}
@@ -247,7 +248,7 @@
                             <label for="id_zip_code">Zip</label>
                             {{ profile_form.zip_code }}
                             {% if profile_form.zip_code.errors %}
-                                <p class="help-block errortext">
+                                <p class="help-block">
                                     {% for error in profile_form.zip_code.errors %}
                                         {{ error|escape }}
                                     {% endfor %}
@@ -279,7 +280,7 @@
                                type="text">
                     {% endif %}
                     {% if user_form.email.errors %}
-                        <p class="help-block errortext">
+                        <p class="help-block">
                             {% for error in user_form.email.errors %}
                                 {{ error|escape }}
                             {% endfor %}
@@ -290,7 +291,7 @@
                 <div id="cc-info">
                     <!-- Stripe's custom form, sans name attributes -->
                     <p>
-                        <span class="payment-errors errortext"></span>
+                        <span class="payment-errors help-block"></span>
                     </p>
                     <div class="row">
                         <div class="col-sm-5">

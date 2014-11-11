@@ -31,7 +31,7 @@
                 <label for="id_username">Username*</label>
                 <input id="id_username" type="text" name="username" maxlength="30" class="auto-focus form-control">
                 {% if form.username.errors %}
-                    <p class="help-block errortext">
+                    <p class="help-block">
                         {% for error in form.username.errors %}
                             {{ error|escape }}
                         {% endfor %}
@@ -42,7 +42,7 @@
                 <label for="id_email">Email address*</label>
                 <input type="text" maxlength="75" name="email" id="id_email" class="form-control">
                 {% if form.email.errors %}
-                    <p class="help-block errortext">
+                    <p class="help-block">
                         {% for error in form.email.errors %}
                             {{ error|escape }}
                         {% endfor %}
@@ -53,7 +53,7 @@
                 <label for="id_password1">Enter password*</label>
                 <input type="password" id="id_password1" name="password1" class="form-control">
                 {% if form.password1.errors %}
-                    <p class="help-block errortext">
+                    <p class="help-block">
                         {% for error in form.password1.errors %}
                             {{ error|escape }}
                         {% endfor %}
@@ -64,7 +64,7 @@
                 <label for="id_password2">Re-enter password*</label>
                 <input type="password" id="id_password2" name="password2" class="form-control">
                 {% if form.password2.errors %}
-                    <p class="help-block errortext">
+                    <p class="help-block">
                         {% for error in form.password2.errors %}
                             {{ error|escape }}
                         {% endfor %}
@@ -75,7 +75,7 @@
                 <label for="id_first_name">First name</label>
                 <input type="text" maxlength="30" name="first_name" id="id_first_name" class="form-control">
                 {% if form.first_name.errors %}
-                    <p class="help-block errortext">
+                    <p class="help-block">
                         {% for error in form.first_name.errors %}
                             {{ error|escape }}
                         {% endfor %}
@@ -86,7 +86,7 @@
                 <label for="id_last_name">Last name</label>
                 <input type="text" maxlength="30" name="last_name" id="id_last_name" class="form-control">
                 {% if form.last_name.errors %}
-                    <p class="help-block errortext">
+                    <p class="help-block">
                         {% for error in form.last_name.errors %}
                             {{ error|escape }}
                         {% endfor %}
