@@ -88,9 +88,11 @@ LOGIN_REDIRECT_URL = "/"
 # These remap some of the the messages constants to correspond with blueprint
 from django.contrib.messages import constants as message_constants
 MESSAGE_TAGS = {
-    message_constants.DEBUG: 'notice',
-    message_constants.INFO: 'notice',
-    message_constants.WARNING: 'error',
+    message_constants.DEBUG: 'alert-warning',
+    message_constants.INFO: 'alert-info',
+    message_constants.SUCCESS: 'alert-success',
+    message_constants.WARNING: 'alert-warning',
+    message_constants.ERROR: 'alert-danger',
 }
 
 ########
