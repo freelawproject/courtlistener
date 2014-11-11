@@ -27,15 +27,6 @@
 
 {% block content %}
     <div class="col-xs-12">
-        <div class="row">
-            {% if messages %}
-                <div class="col-xs-12">
-                    {% for message in messages %}
-                        <p class="bottom {{message.tags}}">{{message|safe}}</p>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        </div>
         {% if user.profile.favorite.all %}
             <div class="table-responsive">
                 <table class="table settings-table">

@@ -122,6 +122,10 @@
         {% endblock %}
     </header>
 
+    {% block messages %}
+        {% include "includes/messages.html" %}
+    {% endblock %}
+
     <div class="row content">
         {% block sidebar %}
             <div class="col-sm-3" id="sidebar"></div>

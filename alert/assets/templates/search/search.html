@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
 {% load humanize %}
 
+{% block message %}{% endblock %}
+
 {% block title %}
     {% if request.GET.q %}
         Search Results for {{ request.GET.q }}
@@ -259,16 +261,9 @@
     </div>
 {% endblock %}
 
-
 {% block content %}
     <div id="search-results" class="col-sm-9 search-page">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert {{message.tags}}" role="alert">
-                    <p>{{message|safe}}</p>
-                </div>
-            {% endfor %}
-        {% endif %}
+        {% include "includes/messages.html" %}
         {% if alert_form.errors %}
             <div class="alert alert-danger" role="alert">
                 <p class="bottom">There was an error creating your alert. Please
@@ -284,8 +279,9 @@
                         "<strong>{{ alert_form.alertName.value }}</strong>".</p>
                     </div>
                     <div class="col-sm-6 text-right">
-                        <a class="btn btn-default btn-sm" href="?{{ get_string_sans_alert }}">
-                            Cancel editing and redo the search
+                        <a class="btn btn-default btn-sm"
+                           href="?{{ get_string_sans_alert }}">
+                            Cancel Editing
                         </a>
                     </div>
                 </div>

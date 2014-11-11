@@ -8,15 +8,6 @@
 
 {% block content %}
     <div class="col-xs-12">
-        <div class="row">
-            {% if messages %}
-                <div class="com-sm-6">
-                    {% for message in messages %}
-                        <p class="bottom {{message.tags}}">{{message|safe}}</p>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        </div>
         {% if user.profile.alert.all %}
             <div class="table-responsive">
                 <table class="table settings-table">

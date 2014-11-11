@@ -1,6 +1,6 @@
 {% if messages %}
     {% for message in messages %}
-        <div class="alert {{message.tags}}">
+        <div class="alert {{message.tags}}" role="alert">
             <p class="bottom">{{message|safe}}</p>
         </div>
     {% endfor %}

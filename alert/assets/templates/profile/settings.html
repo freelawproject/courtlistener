@@ -7,15 +7,6 @@
 
 {% block content %}
     <div class="col-xs-12">
-        {# if their email address was just changed, tell them.#}
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert {{message.tags}}">
-                    <p class="bottom">{{message|safe}}</p>
-                </div>
-            {% endfor %}
-       {% endif %}
-
         {% if user_form.errors or profile_form.errors %}
             <div class="alert alert-danger">
                 <p class="bottom">There were errors with your submission.</p>
