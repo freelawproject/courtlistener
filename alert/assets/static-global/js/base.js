@@ -314,7 +314,6 @@ $(document).ready(function() {
                 target: '#create-alert-header',
                 placement: 'top',
                 arrowOffset: 'center',
-                yOffset: '-75px',
                 title: 'Make Alerts',
                 content: '<p>Once you have placed a query, you can create ' +
                     'an alert. If there are ever any new results for your ' +
@@ -328,7 +327,7 @@ $(document).ready(function() {
             },
             {//6
                 target: '#cited-by',
-                placement: 'top',
+                placement: 'bottom',
                 arrowOffset: 'center',
                 title: 'The Power of Citation',
                 content: 'Roe v. Wade has been cited hundreds of times since ' +
