@@ -244,9 +244,10 @@
             <p>We download opinions from many jurisdictions on an ongoing basis. Here are the most recent ones.
             </p>
             {% include "includes/search_result.html" with results=results source_override="o" simple=True %}
-            <div class="right">
-                <a href="/?order_by=dateFiled+desc">See all recent opinions&hellip;</a>
-            </div>
+            <p>
+                <a href="/?order_by=dateFiled+desc"
+                   class="btn btn-default v-offset-above-2">See Recent Opinions</a>
+            </p>
         </div>
 
         <div class="col-sm-6">
@@ -257,10 +258,10 @@
                 ongoing basis. Here are the most recent ones.
             </p>
             {% include "includes/search_result.html" with results=results_oa source_override="oa" simple=True %}
-            <div class="right">
-                <a href="/?order_by=dateArgued+desc&type=oa">See all recent
-                    oral arguments&hellip;</a>
-            </div>
+            <p>
+                <a href="/?order_by=dateArgued+desc&type=oa"
+                   class="btn btn-default v-offset-above-2">See Recent Oral Arguments</a>
+            </p>
         </div>
     </div>
     <div class="row lg-v-offset-below-3">
