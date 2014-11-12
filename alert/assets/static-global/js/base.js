@@ -275,8 +275,9 @@ $(document).ready(function() {
             },
             {//2
                 target: '#extra-sidebar-fields',
-                placement: 'right',
+                placement: 'top',
                 arrowOffset: 'center',
+                zindex: 10,
                 title: 'Sophisticated Search',
                 content: 'In the Advanced Search area, you can make ' +
                     'sophisticated searches against many fields. ' +
@@ -302,7 +303,7 @@ $(document).ready(function() {
             },
             {//4
                 target: '#type-switcher',
-                placement: 'right',
+                placement: 'bottom',
                 arrowOffset: 'top',
                 title: 'What are you Looking For?',
                 content: 'By default you\'ll get opinion results, but use ' +
@@ -311,8 +312,9 @@ $(document).ready(function() {
             },
             {//5
                 target: '#create-alert-header',
-                placement: 'right',
+                placement: 'top',
                 arrowOffset: 'center',
+                yOffset: '-75px',
                 title: 'Make Alerts',
                 content: '<p>Once you have placed a query, you can create ' +
                     'an alert. If there are ever any new results for your ' +
@@ -326,7 +328,7 @@ $(document).ready(function() {
             },
             {//6
                 target: '#cited-by',
-                placement: 'right',
+                placement: 'top',
                 arrowOffset: 'center',
                 title: 'The Power of Citation',
                 content: 'Roe v. Wade has been cited hundreds of times since ' +
@@ -335,7 +337,7 @@ $(document).ready(function() {
             },
             {//7
                 target: '#authorities',
-                placement: 'right',
+                placement: 'top',
                 arrowOffset: 'center',
                 title: 'Authorities',
                 content: '<p>The Authorities section lists all of the ' +
