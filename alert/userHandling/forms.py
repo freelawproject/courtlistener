@@ -70,8 +70,27 @@ class UserForm(ModelForm):
 
 class UserCreationFormExtended(UserCreationForm):
     def __init__(self, *args, **kwargs):
+        """A bit of an unusual form because instead of creating it ourselves,
+        we are overriding the one from Django. Thus, instead of declaring
+        everything explicitly like we normally do, we just override the
+        specific parts we want to, after calling the super class's __init__().
+        """
         super(UserCreationFormExtended, self).__init__(*args, **kwargs)
+
+        self.fields['username'].label = 'User Name*'
+        self.fields['email'].label = "Email Address*"
+        self.fields['password1'].label = "Password*"
+        self.fields['password2'].label = "Confirm Password*"
+        self.fields['first_name'].label = "First Name"
+        self.fields['last_name'].label = "Last Name"
+
+        # Give all fields a form-control class.
+        for field in self.fields.itervalues():
+            field.widget.attrs.update({'class': 'form-control'})
+
         self.fields['email'].required = True
+        self.fields['username'].widget.attrs.update(
+            {'class': 'auto-focus form-control'})
 
     class Meta:
         model = User
@@ -79,7 +98,7 @@ class UserCreationFormExtended(UserCreationForm):
             'username',
             'email',
             'first_name',
-            'last_name'
+            'last_name',
         )
 
 

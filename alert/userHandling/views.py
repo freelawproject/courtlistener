@@ -261,7 +261,8 @@ def register(request):
 
 @never_cache
 def register_success(request):
-    """Tell the user they have been registered and allow them to continue where they left off."""
+    """Tell the user they have been registered and allow them to continue where
+    they left off."""
     redirect_to = request.REQUEST.get('next', '')
     return render_to_response('registration/registration_complete.html',
                               {'redirect_to': redirect_to, 'private': True},
@@ -292,7 +293,7 @@ def confirmEmail(request, activation_key):
     if confirmed_accounts_count == len(ups):
         # All the accounts were already confirmed.
         return render_to_response('registration/confirm.html',
-                                  {'alreadyConfirmed': True, 'private': True},
+                                  {'already_confirmed': True, 'private': True},
                                   RequestContext(request))
 
     if expired_key_count > 0:
@@ -320,8 +321,9 @@ def request_email_confirmation(request):
             cd = form.cleaned_data
             users = User.objects.filter(email__iexact=cd['email'])
             if not len(users):
-                # Normally, we'd throw an error here, but we don't want to reveal what accounts we have on file, so
-                # instead, we just pretend like it worked.
+                # Normally, we'd throw an error here, but we don't want to
+                # reveal what accounts we have on file, so instead, we just
+                # pretend like it worked.
                 return HttpResponseRedirect('/email-confirmation/success/')
 
             # make a new activation key for all associated accounts.

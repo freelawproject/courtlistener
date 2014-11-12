@@ -18,11 +18,9 @@
     <div class="col-sm-4 well">
         {% block h2 %}<h2>Sign In</h2>{% endblock %}
         {% if form.errors %}
-            <div class="bg-danger">
-                {%  for error in form.non_field_errors %}
-                <p class="bottom">{{ error|safe }}</p>
-                {% endfor %}
-            </div>
+            {%  for error in form.non_field_errors %}
+                <p class="alert alert-danger">{{ error|safe }}</p>
+            {% endfor %}
         {% endif %}
 
         <form action="" method="post">{% csrf_token %}
