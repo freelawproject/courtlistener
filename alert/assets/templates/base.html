@@ -79,17 +79,25 @@
                         {% block main-nav %}
                             {% if user.is_authenticated %}
                                 <ul class="nav navbar-nav">
-                                    <li><a href="/about/">About</a></li>
-                                    <li><a href="/faq/">FAQ</a></li>
-                                    <li><a href="/coverage/">Coverage</a></li>
+                                    <li><a href="/about/" tabindex="300">About</a></li>
+                                    <li><a href="/faq/" tabindex="301">FAQ</a></li>
+                                    <li><a href="/coverage/" tabindex="302">Coverage</a></li>
                                     <li class="dropdown">
-                                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
+                                        <a href="#"
+                                           class="dropdown-toggle"
+                                           tabindex="303"
+                                           data-toggle="dropdown">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
                                         <ul class="dropdown-menu" role="menu">
-                                            <li><a href="/profile/alerts/">Alerts</a></li>
-                                            <li><a href="/profile/favorites/">Favorites</a></li>
-                                            <li><a href="/profile/donations/">Donations</a></li>
-                                            <li><a href="/profile/">Account</a></li>
-                                            <li><a href="/sign-out/">Sign out</a></li>
+                                            <li><a href="/profile/alerts/"
+                                                   tabindex="304">Alerts</a></li>
+                                            <li><a href="/profile/favorites/"
+                                                   tabinex="305">Favorites</a></li>
+                                            <li><a href="/profile/donations/"
+                                                   tabindex="306">Donations</a></li>
+                                            <li><a href="/profile/"
+                                                   tabindex="307">Account</a></li>
+                                            <li><a href="/sign-out/"
+                                                   tabindex="308">Sign out</a></li>
                                         </ul>
                                     </li>
                                 </ul>
