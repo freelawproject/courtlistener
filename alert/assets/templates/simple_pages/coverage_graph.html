@@ -4,6 +4,7 @@
 
 {% block title %}Coverage - CourtListener.com{% endblock %}
 {% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
 
 {% block footer-scripts %}
     <script src="{{ STATIC_URL }}js/raphael.js"></script>
@@ -24,17 +25,26 @@
 {% block content %}
     <div class="col-xs-12">
         <div class="row">
-            <div class="col-sm-6">
+            <div class="col-sm-3">
                 <h3 class="bottom" id="graph-header"></h3>
             </div>
-            <div class="col-sm-6">
+            <div class="col-sm-9">
                 <div id="nav" class="text-right">
                     <select class="bottom top float-right"></select>
                 </div>
             </div>
         </div>
 
-        <div id="graph"></div>
+        <div id="graph" class="visible-lg"></div>
+
+        <p class="visible-xs visible-sm visible-md v-offset-above-2
+        v-offset-below-2 large">
+            <strong>
+                The chart showing the count of opinions over time is currently
+                only viewable on browsers  wider than 1200px.
+                Work is underway to make it available on all browsers. (2014/11/11)
+            </strong>
+        </p>
 
         <div>
             <h4 class="bottom">General Notes</h4>
@@ -82,7 +92,9 @@
                 {% endfor %}
             </div>
             {% if courts_with_oral_argument_scrapers.count > 0 %}
-                <p>In addition, we provide realtime coverage of oral arguments for the following courts, downloading
+                <p class="v-offset-above-2">In addition,
+                    we provide realtime coverage of oral
+                arguments for the following courts, downloading
                     the latesst oral arguments at the end of each day:</p>
                 <div class="row">
                     {% for row in courts_with_oral_argument_scrapers|rows:3 %}
@@ -99,7 +111,8 @@
                 </div>
             {% endif %}
 
-            <p>This list continues to grow as we receive <a href="/donate/?referrer=coverage">support</a> and <a href="/contact/">requests</a>
+            <p class="v-offset-above-2">This list continues to grow as we
+                receive <a href="/donate/?referrer=coverage">support</a> and <a href="/contact/">requests</a>
                 for additional jurisdictions. Your support helps make this project possible.
             </p>
         </div>
