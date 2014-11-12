@@ -23,7 +23,7 @@
                         {% for donation in user.profile.donation.all %}
                         <tr>
                             <td>${{ donation.amount }}</td>
-                            <td>{{ donation.date_created|date:"D, n/j/Y" }}</td>
+                            <td>{{ donation.date_created|date:"n/j/Y" }}</td>
                             <td>{{ donation.get_payment_provider_display }}</td>
                             <td>{{ donation.get_status_display }}</td>
                         </tr>
