@@ -340,6 +340,7 @@ $(document).ready(function() {
                 placement: 'top',
                 arrowOffset: 'center',
                 title: 'Authorities',
+                showPrevButton: false,
                 content: '<p>The Authorities section lists all of the ' +
                     'opinions that Roe v. Wade references. These can be ' +
                     'thought of as the principles it rests on.</p>' +
