@@ -68,9 +68,10 @@
                         <a class="navbar-brand" href="/"margin-bottom>
                             {% block logo %}
                                 <img src="{{ STATIC_PREFIX }}png/logo.png"
-                                     alt="CourtListener logo"
+                                     alt="CourtListener Logo"
                                      width="260"
-                                     height="29"/>
+                                     height="29"
+                                     tabindex="1"/>
                             {% endblock %}
                         </a>
                     </div>
@@ -144,7 +145,7 @@
             <div class="col-sm-8">
                 <div class="row">
                     <div class="col-xs-6">
-                        <div class="col-sm-6">
+                        <div class="col-sm-6 no-gutter">
                             <div class="footer-item">
                                 <a href="/about/">About</a>
                             </div>
@@ -159,7 +160,7 @@
                             </div>
                         </div>
 
-                        <div class="col-sm-6">
+                        <div class="col-sm-6 no-gutter">
                             <div class="footer-item">
                                 <a href="/coverage/">Coverage</a>
                             </div>
@@ -176,7 +177,7 @@
                     </div>
 
                     <div class="col-xs-6">
-                        <div class="col-sm-6">
+                        <div class="col-sm-6 no-gutter">
                             <div class="footer-item">
                                 <a href="http://freelawproject.org">Blog</a>
                             </div>
@@ -188,7 +189,7 @@
                             </div>
                         </div>
 
-                        <div class="col-sm-6">
+                        <div class="col-sm-6 no-gutter">
                             <div class="footer-item">
                                 <a href="/terms/">Terms &amp; Privacy</a>
                             </div>
@@ -199,7 +200,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-sm-4 text-right">
+            <div class="col-sm-4 text-right" id="donate-image">
                 <a href="/donate/?referrer=footer-button">
                     <img src="{{ STATIC_PREFIX }}png/donate-button.png"
                          alt="Donate to support our work"

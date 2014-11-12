@@ -68,8 +68,8 @@
     <div id="homepage" class="col-xs-12">
 
     <div id="above-main-query">
-        <p class="text-center x-large bottom">Search millions of opinions by case name, topic, or citation.</p>
-        <p class="text-center large gray">{{ court_count }} Jurisdictions. Sponsored by the Non-Profit Free Law Project.</p>
+        <p class="text-center x-large bottom">Search millions of opinions by case name, topic,&nbsp;or&nbsp;citation.</p>
+        <p class="text-center large gray">{{ court_count }} Jurisdictions. Sponsored by the Non-Profit Free&nbsp;Law&nbsp;Project.</p>
     </div>
 
     <div class="row" id="main-query-box">
@@ -86,7 +86,7 @@
                             <div class="pointer"
                                  data-toggle="modal"
                                  data-target="#court-picker">
-                                <label class="bottom">
+                                <label class="bottom pointer">
                                     Select Jurisdictions <i class="gray fa fa-external-link"></i>
                                 </label>
 
@@ -129,7 +129,8 @@
                                     type="checkbox"
                                     name="{{ status.1 }}"
                                     class="external-input status-checkbox left"
-                                    {% if status.3 %}checked="checked"{% endif %}>
+                                    {% if status.3 %}checked="checked"{% endif %}
+                                    tabindex="{{ status.5 }}">
                             <label
                                     for="id_{{ status.1 }}"
                                     class="pointer {% if status.2 == 0 %}gray{% endif %}">
@@ -201,7 +202,7 @@
     <div id="advanced-search-starter" class="row">
         <p class="text-center large alt gray top bottom">&ndash; or &ndash;</p>
         <p class="text-center large">
-            <a href="#">Advanced Search</a>
+            <a href="#" tabindex="200">Advanced Search</a>
         </p>
     </div>
 

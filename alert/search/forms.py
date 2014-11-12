@@ -88,7 +88,7 @@ class SearchForm(forms.Form):
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
                    'autocomplete': 'off',
-                   'tabindex': '10'}
+                   'tabindex': '202'}
         )
     )
     judge = forms.CharField(
@@ -97,7 +97,7 @@ class SearchForm(forms.Form):
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
                    'autocomplete': 'off',
-                   'tabindex': '11'}
+                   'tabindex': '203'}
         )
     )
     court = forms.CharField(
@@ -109,7 +109,8 @@ class SearchForm(forms.Form):
         label='Docket Number',
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
-                   'autocomplete': 'off'}
+                   'autocomplete': 'off',
+                   'tabindex': '226'}
         )
     )
 
@@ -147,7 +148,7 @@ class SearchForm(forms.Form):
         initial='score desc',
         widget=forms.Select(
             attrs={'class': 'external-input form-control',
-                   'tabindex': '9'}
+                   'tabindex': '201'}
         )
     )
     filed_after = FloorDateField(
@@ -157,7 +158,8 @@ class SearchForm(forms.Form):
         widget=forms.TextInput(
             attrs={'placeholder': 'YYYY-MM-DD',
                    'class': 'external-input form-control',
-                   'autocomplete': 'off'}
+                   'autocomplete': 'off',
+                   'tabindex': '220'}
         )
     )
     filed_before = CeilingDateField(
@@ -167,14 +169,17 @@ class SearchForm(forms.Form):
         widget=forms.TextInput(
             attrs={'placeholder': 'YYYY-MM-DD',
                    'class': 'external-input form-control',
-                   'autocomplete': 'off'}
+                   'autocomplete': 'off',
+                   'tabindex': '221'
+            }
         )
     )
     citation = forms.CharField(
         required=False,
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
-                   'autocomplete': 'off'}
+                   'autocomplete': 'off',
+                   'tabindex': '224'}
         )
     )
     neutral_cite = forms.CharField(
@@ -182,7 +187,8 @@ class SearchForm(forms.Form):
         label='Neutral Citation',
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
-                   'autocomplete': 'off'}
+                   'autocomplete': 'off',
+                   'tabindex': '225'}
         )
     )
     cited_gt = forms.CharField(
@@ -191,7 +197,8 @@ class SearchForm(forms.Form):
         initial=0,
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
-                   'autocomplete': 'off'}
+                   'autocomplete': 'off',
+                   'tabindex': '222'}
         )
     )
     cited_lt = forms.CharField(
@@ -200,7 +207,8 @@ class SearchForm(forms.Form):
         initial=20000,
         widget=forms.TextInput(
             attrs={'class': 'external-input form-control',
-                   'autocomplete': 'off'}
+                   'autocomplete': 'off',
+                   'tabindex': '223'}
         )
     )
 
@@ -221,19 +229,22 @@ class SearchForm(forms.Form):
                 initial=True,
                 widget=forms.CheckboxInput(attrs={'checked': 'checked'})
             )
+
+        tabindex_i = 204
         for status in DOCUMENT_STATUSES:
+            attrs = {'tabindex': str(tabindex_i)}
             if status[1] == 'Precedential':
                 initial = True
-                attrs = {'checked': 'checked'}
+                attrs.update({'checked': 'checked'})
             else:
                 initial = False
-                attrs = {}
             self.fields['stat_' + status[1]] = forms.BooleanField(
                 label=status[1],
                 required=False,
                 initial=initial,
                 widget=forms.CheckboxInput(attrs=attrs)
             )
+            tabindex_i += 1
 
     # This is a particularly nasty area of the code due to several factors:
     #  1. Django doesn't have a good method of setting default values for

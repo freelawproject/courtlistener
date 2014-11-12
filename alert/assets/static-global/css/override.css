@@ -70,6 +70,9 @@ a.button:active{
     #court-picker-tabs {
         padding-top: 15px;
     }
+    #donate-image {
+        text-align: start;
+    }
 }
 @media(min-width:768px){
     #id_q {
@@ -289,6 +292,11 @@ mark {
     background-color: #ffffbf;
 }
 
+.no-gutter {
+    margin-left: -15px;
+    margin-right: -15px;
+}
+
 /* For adding vertical whitespace */
 .v-offset-above-1 { margin-top: 10px; }
 .v-offset-above-2 { margin-top: 20px; }
@@ -423,6 +431,7 @@ input.bottom {
 .sidebar-section h3 > span {
     padding: 0.5em 0em 0.1em;
     border-bottom: 1px solid #ddd;
+    line-height: 1.4em;
 }
 
 div.sidebar-checkbox {
@@ -539,6 +548,9 @@ a {
 }
 a:visited.visitable {
     color: #9d11b3;
+}
+a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
+    color: gray;
 }
 #share-links a:hover {
     text-decoration: none;
@@ -679,7 +691,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 #modal-court-picker p.inline {
     margin-left: 10px;
 }
-#modal-court-picker span.close {
+#modal-court-picker a.close {
     font-size: 2em;
     position: relative;
     top: -0.45em;
