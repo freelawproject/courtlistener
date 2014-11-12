@@ -5,25 +5,39 @@
         <form id="court-picker-search-form" method="get" action="/">
             <div class="modal-content">
                 <div class="row">
-                    <div class="col-xs-1 col-xs-push-11">
-                        <span class="close float-right pointer" data-dismiss="modal" aria-hidden="true">&times;</span>
-                    </div>
-                    <div class="col-xs-11 col-xs-pull-1">
+                    <div class="col-xs-10">
                         <div class="row">
-                            <div class="col-sm-4">
+                            <div class="col-xs-12 col-sm-5">
                                 <h2 class="top">Select&nbsp;Jurisdictions</h2>
                             </div>
-                            <div class="col-sm-8">
+                            <div class="col-xs-12 col-sm-7">
                                 <div class="btn-group btn-group-xs">
-                                     <button type="button" class="btn btn-default" id="check-all">Check All</button>
-                                     <button type="button" class="btn btn-default" id="clear-all">Clear All</button>
+                                     <button type="button"
+                                             class="btn btn-default"
+                                             id="check-all"
+                                             tabindex="220">Check All</button>
+                                     <button type="button"
+                                             class="btn btn-default"
+                                             id="clear-all"
+                                             tabindex="221">Clear All</button>
                                     {% if search_form.type.value == 'o' or not request.GET.type %}
-                                        <button type="button" class="btn btn-default" id="check-current">Check Current Tab</button>
-                                        <button type="button" class="btn btn-default" id="clear-current">Clear Current Tab</button>
+                                        <button type="button"
+                                                class="btn btn-default"
+                                                id="check-current"
+                                                tabindex="222">Check Current Tab</button>
+                                        <button type="button"
+                                                class="btn btn-default"
+                                                id="clear-current"
+                                                tabindex="223">Clear Current Tab</button>
                                     {% endif %}
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="col-xs-2 right">
+                        <a class="close float-right pointer"
+                           data-dismiss="modal" aria-hidden="true">&times;</a>
                     </div>
                 </div>
                 <label class="sr-only"
@@ -32,23 +46,44 @@
                        type="text"
                        placeholder="Select Jurisdictions by Typing"
                        autocomplete="off"
-                       class="hidden-xs" />
+                       class="hidden-xs"
+                       tabindex="200"/>
                 <ul class="nav nav-tabs" id="court-picker-tabs">
-                    <li class="active"><a href="#tab-federal-appellate" data-toggle="tab">
-                        <span class="hidden-xs hidden-sm">Federal Appellate</span>
-                        <span class="hidden-md hidden-lg">Fed App</span>
-                    </a></li>
+                    <li class="active">
+                        <a href="#tab-federal-appellate"
+                           data-toggle="tab"
+                           tabindex="210">
+                            <span class="hidden-xs hidden-sm">Federal Appellate</span>
+                            <span class="hidden-md hidden-lg">Fed App</span>
+                        </a>
+                    </li>
                     {%  if search_form.type.value == 'o' or not request.GET.type %}
-                        <li><a href="#tab-federal-district" data-toggle="tab">
-                            <span class="hidden-xs hidden-sm">Federal District</span>
-                            <span class="hidden-md hidden-lg">Fed Dist</span>
-                        </a></li>
-                        <li><a href="#tab-bankruptcy" data-toggle="tab">
-                            <span class="hidden-xs hidden-sm">Bankruptcy</span>
-                            <span class="hidden-md hidden-lg">Bank</span>
-                        </a></li>
-                        <li><a href="#tab-state" data-toggle="tab">State</a></li>
-                        <li><a href="#tab-special" data-toggle="tab">Special</a></li>
+                        <li>
+                            <a href="#tab-federal-district"
+                               data-toggle="tab"
+                               tabindex="211">
+                                <span class="hidden-xs hidden-sm">Federal District</span>
+                                <span class="hidden-md hidden-lg">Fed Dist</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#tab-bankruptcy"
+                               data-toggle="tab"
+                               tabindex="212">
+                                <span class="hidden-xs hidden-sm">Bankruptcy</span>
+                                <span class="hidden-md hidden-lg">Bankr</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#tab-state"
+                               data-toggle="tab"
+                               tabindex="213">State</a>
+                        </li>
+                        <li>
+                            <a href="#tab-special"
+                               data-toggle="tab"
+                               tabindex="214">Special</a>
+                        </li>
                     {% endif %}
                 </ul>
                 <div class="tab-content">
@@ -72,7 +107,7 @@
                                         {% elif search_form.type.value == 'oa' and court.has_oral_argument_scraper %}
                                             <div class="checkbox">
                                                 <label for="id_{{ court.pk }}">
-                                                <input
+                                                    <input
                                                         id="id_{{ court.pk }}"
                                                         name="{{ court.pk }}"
                                                         {% if court.checked %}checked="checked"{% endif %}

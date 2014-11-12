@@ -42,27 +42,34 @@
     {% if user.is_authenticated %}
         <div class="navbar-right">
             <ul class="nav navbar-nav">
+                <li><a href="/about/" tabindex="300">About</a></li>
+                <li><a href="/faq/" tabindex="301">FAQ</a></li>
+                <li><a href="/coverage/" tabindex="302">Coverage</a></li>
                 <li class="dropdown">
-                    <a href="#" class="dropdown-toggle" data-toggle="dropdown">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
+                    <a href="#"
+                       class="dropdown-toggle"
+                       data-toggle="dropdown"
+                       tabindex="303">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
                     <ul class="dropdown-menu" role="menu">
-                        <li><a href="/profile/alerts/" tabindex="5">Alerts</a></li>
-                        <li><a href="/profile/favorites/" tabindex="6">Favorites</a></li>
-                        <li><a href="/profile/donations/" tabindex="7">Donations</a></li>
-                        <li><a href="/profile/" tabindex="7">Account</a></li>
-                        <li><a href="/sign-out/" tabindex="8">Sign out</a></li>
+                        <li><a href="/profile/alerts/"
+                               tabindex="304">Alerts</a></li>
+                        <li><a href="/profile/favorites/"
+                               tabindex="305">Favorites</a></li>
+                        <li><a href="/profile/donations/"
+                               tabindex="306">Donations</a></li>
+                        <li><a href="/profile/"
+                               tabindex="307">Account</a></li>
+                        <li><a href="/sign-out/"
+                               tabindex="308">Sign out</a></li>
                     </ul>
                 </li>
-                <li><a href="/sign-out">Sign Out&nbsp;<i
-                        class="gray fa fa-sign-out"></i></a></li>
             </ul>
         </div>
     {% else %}
         <a href="{% url "sign-in" %}"
-           class="btn btn-default btn-sm navbar-btn"
-           tabindex="4">Sign In</a>
+           class="btn btn-default btn-sm navbar-btn">Sign In</a>
         <a href="{% url "register" %}"
-           class="btn btn-default btn-sm navbar-btn"
-           tabindex="4">Register</a>
+           class="btn btn-default btn-sm navbar-btn">Register</a>
     {% endif %}
 {% endblock %}
 
@@ -70,8 +77,8 @@
     <div id="homepage" class="col-xs-12">
 
     <div id="above-main-query">
-        <p class="text-center x-large bottom">Search millions of opinions by case name, topic, or citation.</p>
-        <p class="text-center large gray">{{ court_count }} Jurisdictions. Sponsored by the Non-Profit Free Law Project.</p>
+        <p class="text-center x-large bottom">Search millions of opinions by case name, topic,&nbsp;or&nbsp;citation.</p>
+        <p class="text-center large gray">{{ court_count }} Jurisdictions. Sponsored by the Non-Profit Free&nbsp;Law&nbsp;Project.</p>
     </div>
 
     <div class="row" id="main-query-box">
@@ -88,7 +95,7 @@
                             <div class="pointer"
                                  data-toggle="modal"
                                  data-target="#court-picker">
-                                <label class="bottom">
+                                <label class="bottom pointer">
                                     Select Jurisdictions <i class="gray fa fa-external-link"></i>
                                 </label>
 
@@ -131,7 +138,8 @@
                                     type="checkbox"
                                     name="{{ status.1 }}"
                                     class="external-input status-checkbox left"
-                                    {% if status.3 %}checked="checked"{% endif %}>
+                                    {% if status.3 %}checked="checked"{% endif %}
+                                    tabindex="{{ status.5 }}">
                             <label
                                     for="id_{{ status.1 }}"
                                     class="pointer {% if status.2 == 0 %}gray{% endif %}">
@@ -203,7 +211,7 @@
     <div id="advanced-search-starter" class="row">
         <p class="text-center large alt gray top bottom">&ndash; or &ndash;</p>
         <p class="text-center large">
-            <a href="#">Advanced Search</a>
+            <a href="#" tabindex="200">Advanced Search</a>
         </p>
     </div>
 

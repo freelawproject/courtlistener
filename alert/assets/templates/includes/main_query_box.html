@@ -9,17 +9,18 @@
                        id="id_q"
                        autocomplete="off"
                        type="text"
-                       tabindex="5">
+                       tabindex="100">
                 <span class="input-group-btn">
                     <button type="submit"
                             class="btn btn-primary"
                             name="search"
                             id="search-button"
-                            tabindex="6"><i class="fa fa-search"></i>&nbsp;Search
+                            tabindex="101"><i class="fa fa-search"></i>&nbsp;Search
                     </button>
                 </span>
             </div>
             {% if homepage %}
+                {# Jurisdiction icon #}
                 <div data-container="body"
                      data-toggle="popover"
                      data-placement="top"
@@ -28,13 +29,17 @@
                      class="pointer form-group">
                     <a class="fa fa-university fa-2x fa-fw gray"
                        data-toggle="modal"
-                       data-target="#court-picker"></a>
+                       data-target="#court-picker"
+                       tabindex="102"
+                       href="#"></a>
                 </div>
             {% endif %}
             {% if not homepage %}
                 <br/>
                 <div class="right">
-                    <a href="/search/advanced-techniques/" id="advanced" tabindex="8">Query Help</a>
+                    <a href="/search/advanced-techniques/"
+                       id="advanced"
+                       tabindex="103">Query Help</a>
                 </div>
             {% endif %}
         </div>
