@@ -42,18 +42,27 @@
     {% if user.is_authenticated %}
         <div class="navbar-right">
             <ul class="nav navbar-nav">
+                <li><a href="/about/" tabindex="300">About</a></li>
+                <li><a href="/faq/" tabindex="301">FAQ</a></li>
+                <li><a href="/coverage/" tabindex="302">Coverage</a></li>
                 <li class="dropdown">
-                    <a href="#" class="dropdown-toggle" data-toggle="dropdown">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
+                    <a href="#"
+                       class="dropdown-toggle"
+                       data-toggle="dropdown"
+                       tabindex="303">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
                     <ul class="dropdown-menu" role="menu">
-                        <li><a href="/profile/alerts/">Alerts</a></li>
-                        <li><a href="/profile/favorites/">Favorites</a></li>
-                        <li><a href="/profile/donations/">Donations</a></li>
-                        <li><a href="/profile/">Account</a></li>
-                        <li><a href="/sign-out/">Sign out</a></li>
+                        <li><a href="/profile/alerts/"
+                               tabindex="304">Alerts</a></li>
+                        <li><a href="/profile/favorites/"
+                               tabindex="305">Favorites</a></li>
+                        <li><a href="/profile/donations/"
+                               tabindex="306">Donations</a></li>
+                        <li><a href="/profile/"
+                               tabindex="307">Account</a></li>
+                        <li><a href="/sign-out/"
+                               tabindex="308">Sign out</a></li>
                     </ul>
                 </li>
-                <li><a href="/sign-out">Sign Out&nbsp;<i
-                        class="gray fa fa-sign-out"></i></a></li>
             </ul>
         </div>
     {% else %}
