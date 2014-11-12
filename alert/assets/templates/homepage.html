@@ -66,10 +66,22 @@
             </ul>
         </div>
     {% else %}
-        <a href="{% url "sign-in" %}"
-           class="btn btn-default btn-sm navbar-btn">Sign In</a>
-        <a href="{% url "register" %}"
-           class="btn btn-default btn-sm navbar-btn">Register</a>
+        <ul class="nav navbar-nav">
+            <li><a href="/about/">About</a></li>
+            <li><a href="/faq/">FAQ</a></li>
+            <li><a href="" class="tour-link">Tour</a></li>
+            <li><a href="/coverage/">Coverage</a></li>
+        {% if request.path != "/sign-out/" %}
+            <li>
+                <a href="{% url "sign-in" %}?next={{ request.path }}?
+                        {{ get_string|urlencode }}{% if results %}page={{ results.number }}{% endif %}">
+                    Sign in / Register
+                </a>
+            </li>
+        {% else %}
+            <li><a href="{% url "sign-in" %}">Sign in / Register</a></li>
+        {% endif %}
+        </ul>
     {% endif %}
 {% endblock %}
 

@@ -243,7 +243,7 @@ $(document).ready(function() {
         showPrevButton: true,
         steps: [
             {//0
-                target: '#id_q',
+                target: '#search-container',
                 placement: 'bottom',
                 xOffset: 'center',
                 arrowOffset: 'center',
@@ -280,7 +280,7 @@ $(document).ready(function() {
                 zindex: 10,
                 title: 'Sophisticated Search',
                 content: 'In the Advanced Search area, you can make ' +
-                    'sophisticated searches against many fields. ' +
+                    'sophisticated searches against a variety of fields. ' +
                     'Press \"Next\" and we\'ll make a query for you.',
                 multipage: true,
                 showPrevButton: false,
