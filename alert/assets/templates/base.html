@@ -35,7 +35,7 @@
     <meta name="twitter:site" content="@courtlistener">
 
     {# Facebook #}
-    <meta property="og:type" content="website"/>
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}"/>
     <meta property="og:title" content="{% block og_title %}CourtListener{% endblock %}"/>
     <meta property="og:description"
           content="{% block og_description %}Create alerts, search for and browse the latest court opinions.{% endblock %}">
