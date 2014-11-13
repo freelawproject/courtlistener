@@ -1,7 +1,7 @@
 import hashlib
 import hmac
 import logging
-import json
+import simplejson
 import requests
 import time
 from alert.donate.models import Donation
@@ -22,7 +22,7 @@ def check_dwolla_signature(proposed_signature, raw):
 @csrf_exempt
 def process_dwolla_callback(request):
     if request.method == 'POST':
-        data = json.loads(request.body)
+        data = simplejson.loads(request.body)
         logger.info('data is: %s' % data)
         if check_dwolla_signature(data['Signature'], '%s&%0.2f' % (data['CheckoutId'], data['Amount'])):
             d = Donation.objects.get(payment_id=data['CheckoutId'])
@@ -48,7 +48,7 @@ def process_dwolla_callback(request):
 @csrf_exempt
 def process_dwolla_transaction_status_callback(request):
     if request.method == 'POST':
-        data = json.loads(request.body)
+        data = simplejson.loads(request.body)
         logger.info('Dwolla transaction status callback triggered with data: %s' % data)
         if check_dwolla_signature(request.META['HTTP_X_DWOLLA_SIGNATURE'], request.body):
             # Statuses can be found at: https://developers.dwolla.com/dev/pages/statuses
@@ -114,10 +114,10 @@ def process_dwolla_payment(cd_donation_form, cd_profile_form, cd_user_form, test
     }
     r = requests.post(
         'https://www.dwolla.com/payment/request',
-        data=json.dumps(data),
+        data=simplejson.dumps(data),
         headers={'Content-Type': 'application/json'}
     )
-    r_content_as_dict = json.loads(r.content)
+    r_content_as_dict = simplejson.loads(r.content)
     logger.info("Sent the payment to Dwolla, got back this data: %s" % r_content_as_dict)
     response = {
         'result': r_content_as_dict.get('Result'),
