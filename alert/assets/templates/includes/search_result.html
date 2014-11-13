@@ -14,7 +14,7 @@
         {% if search_form.type.value == 'o' or type_override == 'o' %}
             <div class="inline nowrap">
                 <span class="meta-data-header">Date Filed:</span>
-                <time class="meta-data-value" datetime="{{ result.dateFiled|date:'Y-m-d' }}" pubdate>
+                <time class="meta-data-value" datetime="{{ result.dateFiled|date:'Y-m-d' }}">
                     {% if result.dateFiled %}
                         {{ result.dateFiled|date:"F jS, Y" }}
                     {% else %}
@@ -26,7 +26,7 @@
             <div class="inline nowrap">
                 <span class="meta-data-header">Date Argued:</span>
                 <time class="meta-data-value"
-                      datetime="{{ result.dateArgued|date:'Y-m-d' }}" pubdate>
+                      datetime="{{ result.dateArgued|date:'Y-m-d' }}">
                     {% if result.dateArgued %}
                         {{ result.dateArgued|date:"F jS, Y" }}
                     {% else %}
