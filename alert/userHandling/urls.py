@@ -1,4 +1,5 @@
 from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
+from alert.userHandling.forms import CustomPasswordResetForm
 from alert.userHandling.views import (
     confirmEmail, deleteProfile, deleteProfileDone, emailConfirmSuccess,
     password_change, register, register_success,
@@ -19,7 +20,8 @@ urlpatterns = patterns('',
         name="sign-in"),
     (r'^sign-out/$', logout, {'extra_context': {'private': False}}),
     (r'^reset-password/$', password_reset,
-     {'extra_context': {'private': False}}),
+     {'extra_context': {'private': False},
+      'password_reset_form': CustomPasswordResetForm}),
     (r'^reset-password/instructions-sent/$', password_reset_done,
      {'extra_context': {'private': False}}),
     (r'^confirm-password/(?P<uidb36>.*)/(?P<token>.*)/$',
@@ -32,7 +34,10 @@ urlpatterns = patterns('',
 
     # Settings pages
     url(r'^profile/settings/$', view_settings, name='view_settings'),
-    (r'^profile/$', RedirectView.as_view(url='/profile/settings/', permanent=True)),
+    (r'^profile/$', RedirectView.as_view(
+        url='/profile/settings/',
+        permanent=True)
+    ),
     (r'^profile/favorites/$', view_favorites),
     (r'^profile/alerts/$', view_alerts),
     (r'^profile/password/change/$', password_change),
