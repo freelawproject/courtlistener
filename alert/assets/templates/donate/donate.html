@@ -59,7 +59,6 @@
     check_info.hide();
     cc_info.hide();
 
-/*    $("#payment-provider-radio").buttonset(); */
     $("#id_payment_provider_0").parent("label").click(function(){
         // Dwolla
         donor_info.show("fast");
@@ -142,7 +141,7 @@
             </div>
 
             <div id="how-donate">
-                <h3>How would you like to donate?</h3>
+                <h3>How Would You Like to Donate?</h3>
                 {% if donation_form.payment_provider.errors %}
                     <p class="help-block">
                         {% for error in donation_form.payment_provider.errors %}
@@ -152,7 +151,7 @@
                 {% endif %}
                 <div id="payment-provider-radio" class="btn-group btn-group-justified" data-toggle="buttons">
                     <label for="id_payment_provider_0" class="btn btn-default active">
-                        <input type="radio" id="id_payment_provider_0" value="dwolla" name="payment_provider" />Dwolla
+                        <input type="radio" id="id_payment_provider_0" value="dwolla" name="payment_provider" checked="checked"/>Dwolla
                     </label>
                     <label for="id_payment_provider_1" class="btn btn-default">
                         <input type="radio" id="id_payment_provider_1" value="paypal" name="payment_provider" />PayPal
