@@ -62,8 +62,8 @@ def make_line_to_dict(row):
 with open('arguments-from-brad-heath.csv', 'r') as csv:
     next(csv)  # Skip the first line
     for row in csv:
-        logger.info("Attempting to add item at: %s" % item['url'])
         item = make_line_to_dict(row)
+        logger.info("Attempting to add item at: %s" % item['url'])
         try:
             msg, r = get_binary_content(
                 item['url'],
