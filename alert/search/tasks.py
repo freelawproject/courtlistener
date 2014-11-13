@@ -109,7 +109,7 @@ def add_or_update_audio_file(pk, force_commit=True):
 
 
 @task
-def update_cite(citation_id, commit=True):
+def update_cite(citation_id, force_commit=False):
     """If a citation and a document are both updated simultaneously, we will
     needlessly update the index twice. No easy way around it.
     """
@@ -118,5 +118,5 @@ def update_cite(citation_id, commit=True):
     for doc in cite.parent_documents.all():
         search_doc = SearchDocument(doc)
         si.add(search_doc)
-    if commit:
+    if force_commit:
         si.commit()

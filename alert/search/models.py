@@ -272,7 +272,7 @@ class Citation(models.Model):
         null=True
     )
 
-    def save(self, index=True, *args, **kwargs):
+    def save(self, index=True, force_commit=False, *args, **kwargs):
         """
         Note that there is a pre_save receiver below.
         """
@@ -284,7 +284,7 @@ class Citation(models.Model):
         if index and not created:
             # Import is here to avoid looped import problem
             from search.tasks import update_cite
-            update_cite.delay(self.pk)
+            update_cite.delay(self.pk, force_commit)
 
     def __unicode__(self):
         if self.case_name:
