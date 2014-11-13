@@ -2,7 +2,7 @@ from django.contrib.auth.hashers import MAXIMUM_PASSWORD_LENGTH
 from alert.userHandling.models import UserProfile
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm, \
-    PasswordResetForm
+    PasswordResetForm, SetPasswordForm
 from django.contrib.auth.models import User
 from django.forms import ModelForm
 from localflavor.us.forms import USStateField, USZipCodeField
@@ -135,12 +135,31 @@ class CustomPasswordResetForm(PasswordResetForm):
     attributes.
     """
     def __init__(self, *args, **kwargs):
-        super(PasswordResetForm, self).__init__(*args, **kwargs)
+        super(CustomPasswordResetForm, self).__init__(*args, **kwargs)
 
         self.fields['email'].widget.attrs.update(
             {
                 'class': 'auto-focus form-control input-lg',
                 'placeholder': 'Your Email Address',
                 'autocomplete': 'off',
+            }
+        )
+
+
+class CustomSetPasswordForm(SetPasswordForm):
+    """A simple subclassing of a Django form in order to change class
+    attributes.
+    """
+    def __init__(self, user, *args, **kwargs):
+        super(CustomSetPasswordForm, self).__init__(user, *args, **kwargs)
+
+        self.fields['new_password1'].widget.attrs.update(
+            {
+                'class': 'auto-focus form-control',
+            }
+        )
+        self.fields['new_password2'].widget.attrs.update(
+            {
+                'class': 'form-control',
             }
         )

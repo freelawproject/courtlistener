@@ -1,5 +1,7 @@
 from alert.AuthenticationBackend import ConfirmedEmailAuthenticationForm
-from alert.userHandling.forms import CustomPasswordResetForm
+from alert.userHandling.forms import (
+    CustomPasswordResetForm, CustomSetPasswordForm,
+)
 from alert.userHandling.views import (
     confirmEmail, deleteProfile, deleteProfileDone, emailConfirmSuccess,
     password_change, register, register_success,
@@ -27,6 +29,7 @@ urlpatterns = patterns('',
     (r'^confirm-password/(?P<uidb36>.*)/(?P<token>.*)/$',
      password_reset_confirm,
      {'post_reset_redirect': '/reset-password/complete/',
+      'set_password_form': CustomSetPasswordForm,
       'extra_context': {'private': False}}),
     (r'^reset-password/complete/$', login, {
         'template_name': 'registration/password_reset_complete.html',

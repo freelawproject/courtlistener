@@ -223,8 +223,10 @@ def latest_terms(request):
         RequestContext(request),
     )
 
+
 class HttpResponseTemporaryUnavailable(HttpResponse):
     status_code = 503
+
 
 @never_cache
 def show_maintenance_warning(request):
