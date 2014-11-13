@@ -157,67 +157,73 @@
         </p>
         <br>
         {% if not af.processing_complete %}
-            <div class="col-xs-12 bg-warning">
-                <p class="bottom">This file has not yet completed processing on our server. Please try again in a few moments or if you prefer not to wait you may download the audio <a href="{{ af.download_url }}">directly from the court website</a>. Generally this process takes about thirty minutes.</p>
+            <div class="col-xs-12 alert alert-warning">
+                <p class="bottom">This file has not yet completed processing on
+                    our server. Please try again in a few moments or if you
+                    prefer not to wait you may download the audio <a
+                            href="{{ af.download_url }}">directly from the
+                        court website</a>. Generally this process takes about
+                    thirty minutes.
+                </p>
             </div>
-        {% endif %}
-
-        <div id="jquery_jplayer_1" class="jp-jplayer"></div>
-        <div id="jp_container_1" class="jp-audio">
-            <div class="jp-type-single">
-                <div class="jp-gui jp-interface">
-                    <ul class="jp-controls">
-                        <li><a href="javascript:;"
-                               class="jp-play">play</a></li>
-                        <li><a href="javascript:;"
-                               class="jp-pause">pause</a></li>
-                        <li><a href="javascript:;"
-                               class="jp-stop">stop</a></li>
-                        <li><a href="javascript:;"
-                               class="jp-mute"
-                               title="mute">mute</a></li>
-                        <li><a href="javascript:;"
-                               class="jp-unmute"
-                               title="unmute">unmute</a></li>
-                        <li><a href="javascript:;"
-                               class="jp-volume-max"
-                               title="max volume">max volume</a>
-                        </li>
-                    </ul>
-                    <div class="jp-progress">
-                        <div class="jp-seek-bar">
-                            <div class="jp-play-bar"></div>
+        {% else %}
+            <div id="jquery_jplayer_1" class="jp-jplayer"></div>
+            <div id="jp_container_1" class="jp-audio">
+                <div class="jp-type-single">
+                    <div class="jp-gui jp-interface">
+                        <ul class="jp-controls">
+                            <li><a href="javascript:;"
+                                   class="jp-play">play</a></li>
+                            <li><a href="javascript:;"
+                                   class="jp-pause">pause</a></li>
+                            <li><a href="javascript:;"
+                                   class="jp-stop">stop</a></li>
+                            <li><a href="javascript:;"
+                                   class="jp-mute"
+                                   title="mute">mute</a></li>
+                            <li><a href="javascript:;"
+                                   class="jp-unmute"
+                                   title="unmute">unmute</a></li>
+                            <li><a href="javascript:;"
+                                   class="jp-volume-max"
+                                   title="max volume">max volume</a>
+                            </li>
+                        </ul>
+                        <div class="jp-progress">
+                            <div class="jp-seek-bar">
+                                <div class="jp-play-bar"></div>
+                            </div>
+                        </div>
+                        <div class="jp-volume-bar">
+                            <div class="jp-volume-bar-value"></div>
+                        </div>
+                        <div class="jp-time-holder">
+                            <div class="jp-current-time"></div>
+                            <div class="jp-duration"></div>
+                            <ul class="jp-toggles">
+                                <li><a href="javascript:;"
+                                       class="jp-repeat"
+                                       title="repeat">repeat</a></li>
+                                <li><a href="javascript:;"
+                                       class="jp-repeat-off"
+                                       title="repeat off">repeat off</a></li>
+                            </ul>
                         </div>
                     </div>
-                    <div class="jp-volume-bar">
-                        <div class="jp-volume-bar-value"></div>
-                    </div>
-                    <div class="jp-time-holder">
-                        <div class="jp-current-time"></div>
-                        <div class="jp-duration"></div>
-                        <ul class="jp-toggles">
-                            <li><a href="javascript:;"
-                                   class="jp-repeat"
-                                   title="repeat">repeat</a></li>
-                            <li><a href="javascript:;"
-                                   class="jp-repeat-off"
-                                   title="repeat off">repeat off</a></li>
+                    <div class="jp-details">
+                        <ul>
+                            <li><span class="jp-title"></span></li>
                         </ul>
                     </div>
-                </div>
-                <div class="jp-details">
-                    <ul>
-                        <li><span class="jp-title"></span></li>
-                    </ul>
-                </div>
-                <div class="jp-no-solution">
-                    <span>Update Required</span>
-                    To play the media you will need to either update your
-                    browser to a recent version or update your <a
-                        href="http://get.adobe.com/flashplayer/"
-                        target="_blank">Flash plugin</a>.
+                    <div class="jp-no-solution">
+                        <span>Update Required</span>
+                        To play the media you will need to either update your
+                        browser to a recent version or update your <a
+                            href="http://get.adobe.com/flashplayer/"
+                            target="_blank">Flash plugin</a>.
+                    </div>
                 </div>
             </div>
-        </div>
+        {% endif %}
     </article>
 {% endblock %}
