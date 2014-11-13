@@ -8,6 +8,8 @@
 {% block search-form %}{% endblock %}
 
 {% block head %}
+    <meta property="og:audio:url"
+          content="https://www.courtlistener.com/{{ af.local_path_mp3 }}">
     <meta property="og:audio:secure_url" content="https://www.courtlistener.com/{{ af.local_path_mp3 }}">
     <meta property="og:audio:type" content="audio/mp3">
 
