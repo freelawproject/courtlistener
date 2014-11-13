@@ -27,6 +27,12 @@ Disallow: /assets/
 Disallow: /api/rest/v1/
 Disallow: /api/bulk-data/
 
+User-agent: twitterbot
+Disallow: /robots.txt
+Disallow: /assets/
+Disallow: /api/rest/v1/
+Disallow: /api/bulk-data/
+
 # Yandex, Ask
 # These support meta robots, but not x-robots-tag
 # Crawl everything except real files
