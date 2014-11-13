@@ -107,8 +107,8 @@ with open('arguments-from-brad-heath.csv', 'r') as csv:
             try:
                 cf = ContentFile(r.content)
                 extension = get_extension(r.content)
-                if extension not in ['mp3', 'wma']:
-                    extension = item['url'].rsplit('.', 1)[1]
+                if extension not in ['.mp3', '.wma']:
+                    extension = '.' + item['url'].rsplit('.', 1)[1]
                 # See bitbucket issue #215 for why this must be
                 # lower-cased.
                 file_name = trunc(item['case_name'].lower(), 75) + extension
