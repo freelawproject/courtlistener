@@ -10,14 +10,58 @@
     <meta name="description" content="{% block description %}Create alerts, search for and browse the latest court
         opinions. Updated automatically with the latest court documents. An initiative
         of the Free Law Project.{% endblock %}"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <link rel="author" href="/humans.txt" type="text/plain"/>
 
-    <meta name="viewport" content="width=device-width,initial-scale=1"/>
-    <link rel="search" type="application/opensearchdescription+xml" title="CourtListener" href="{{ STATIC_PREFIX }}xml/opensearch.xml" />
+    {# Open Search Plugin #}
+    <link rel="search"
+          type="application/opensearchdescription+xml"
+          title="CourtListener"
+          href="{{ STATIC_PREFIX }}xml/opensearch.xml" />
+
+    {# MS Application Icons #}
     <meta name="application-name" content="CourtListener"/>
     <meta name="msapplication-tooltip" content="Create alerts, search for and browse the latest court opinions."/>
     <meta name="msapplication-starturl" content="https://www.courtlistener.com"/>
     <meta name="msapplication-navbutton-color" content="#6683B7"/>
+    <meta name="msapplication-task"
+          content="name=Recent Opinions;action-uri=https://www.courtlistener.com/?order_by=dateFiled+desc;icon-uri=https://www.courtlistener.com/favicon.ico">
+    <meta name="msapplication-task"
+          content="name=Recent Oral Arguments;action-uri=https://www.courtlistener.com/?order_by=dateArgued+desc&type=oa;icon-uri=https://www.courtlistener.com/favicon.ico">
+
+    {# Twitter #}
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:creator" content="@freelawproject">
+    <meta name="twitter:site" content="@courtlistener">
+
+    {# Facebook #}
+    <meta property="og:type" content="website"/>
+    <meta property="og:title" content="{% block og_title %}CourtListener{% endblock %}"/>
+    <meta property="og:description"
+          content="{% block og_description %}Create alerts, search for and browse the latest court opinions.{% endblock %}">
+    <meta property="og:url" content="https://www.courtlistener.com{{ request.path }}"/>
+    <meta property="og:site_name" content="CourtListener"/>
+    <meta property="og:image"
+          content="https://www.courtlistener.com/static/png/apple-touch-icon-114x114-precomposed.png"/>
+
+    {# Apple Touch Icons, from https://mathiasbynens.be/notes/touch-icons#sizes #}
+    <link rel="icon" sizes="192x192" href="/touch-icon-192x192.png">
+    <link rel="apple-touch-icon-precomposed" sizes="180x180"
+          href="/apple-touch-icon-180x180-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="152x152"
+          href="/apple-touch-icon-152x152-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="144x144"
+          href="/apple-touch-icon-144x144-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="120x120"
+          href="/apple-touch-icon-120x120-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="114x114"
+          href="/apple-touch-icon-114x114-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="76x76"
+          href="/apple-touch-icon-76x76-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="72x72"
+          href="/apple-touch-icon-72x72-precomposed.png">
+    <link rel="apple-touch-icon-precomposed"
+          href="/apple-touch-icon-precomposed.png">
 
     <link href="//netdna.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
     <script src="{{ STATIC_PREFIX }}js/modernizr-2.0.6.min.js"></script>

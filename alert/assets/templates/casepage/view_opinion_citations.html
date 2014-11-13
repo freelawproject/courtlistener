@@ -4,7 +4,9 @@
 {# Shown on document citation pages. #}
 
 {% block title %}Opinions Citing {{ title }} - CourtListener.com{% endblock %}
-{% block description %}{{ title }}{% endblock %}
+{% block og_title %}Opinions Citing {{ title }} - CourtListener.com{% endblock %}
+{% block description %}Opinions Citing {{ title }}{% endblock %}
+{% block og_description %}Opinions Citing {{ title }}{% endblock %}
 
 {% block head %}
     <link rel="alternate" type="application/rss+xml" title="Atom feed for opinions citing {{doc.citation.case_name|truncatewords:10}}" href="/feed/{{ doc.pk }}/cited-by/">

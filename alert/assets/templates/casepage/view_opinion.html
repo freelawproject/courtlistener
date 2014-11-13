@@ -2,7 +2,9 @@
 {% load text_filters %}
 
 {% block title %}{{ title }} - CourtListener.com{% endblock %}
-{% block description %}{{ title }}{% endblock %}
+{% block og_title %}{{ title }} - CourtListener.com{% endblock %}
+{% block description %}Opinion for {{ title }}{% endblock %}
+{% block og_description %}Opinion for {{ title }}{% endblock %}
 {% block search-form %}{% endblock %}
 
 {% block head %}

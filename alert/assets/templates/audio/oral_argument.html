@@ -1,11 +1,16 @@
 {% extends "base.html" %}
 {% load text_filters %}
 
-{% block title %}{{ title }} - CourtListener.com{% endblock %}
-{% block description %}{{ title }}{% endblock %}
+{% block title %}{{ title }} - Oral Argument - CourtListener.com{% endblock %}
+{% block og_title %}Oral Argument for {{ title }} - CourtListener.com{% endblock %}
+{% block description %}Oral Argument for {{ title }}{% endblock %}
+{% block og_description %}Oral Argument for {{ title }}{% endblock %}
 {% block search-form %}{% endblock %}
 
 {% block head %}
+    <meta property="og:audio:secure_url" content="https://www.courtlistener.com/{{ af.local_path_mp3 }}">
+    <meta property="og:audio:type" content="audio/mp3">
+
     <link type="text/css" href="{{ STATIC_URL }}skin/jplayer.blue.monday.css"
           rel="stylesheet"/>
 {% endblock %}
