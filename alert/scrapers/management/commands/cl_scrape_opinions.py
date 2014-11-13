@@ -10,7 +10,6 @@ import traceback
 
 from alert.lib import magic
 from alert.lib.string_utils import trunc
-from alert.lib import sunburnt
 from alert.scrapers.models import ErrorLog
 from alert.scrapers.DupChecker import DupChecker
 from alert.search.models import Citation, Docket

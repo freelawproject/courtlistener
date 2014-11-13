@@ -103,6 +103,8 @@ class Command(cl_scrape_opinions.Command):
                     try:
                         cf = ContentFile(r.content)
                         extension = get_extension(r.content)
+                        if extension not in ['mp3', 'wma']:
+                            extension = site.download_urls[i].rsplit('.', 1)[1]
                         # See bitbucket issue #215 for why this must be
                         # lower-cased.
                         file_name = trunc(site.case_names[i].lower(), 75) + extension
