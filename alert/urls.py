@@ -42,6 +42,8 @@ urlpatterns += patterns(
         url='https://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf')),
     (r'^report/2012/$', RedirectView.as_view(
         url='https://www.ischool.berkeley.edu/files/student_projects/mcdonald_rustad_report.pdf')),
+    (r'report/2013/$', RedirectView.as_view(
+        url='https://github.com/freelawproject/related-literature/raw/master/CourtListener%20Studies/Sarah%20Tyler/sarah_tyler_dissertation.pdf')),
 
     # Dump URLs changed 2013-11-07 and updated 2014-10-02
     (r'^dump-info/$', RedirectView.as_view(url='/api/bulk-info/')),
