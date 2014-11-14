@@ -378,7 +378,13 @@ def process_audio_file(pk):
                       '-ar', '22050',
                       '-ab', '48k',
                       path_to_tmp_location]
-    _ = subprocess.check_output(avconv_command, stderr=subprocess.STDOUT)
+    try:
+        output = subprocess.check_output(avconv_command, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError, e:
+        print 'avconv failed command: %s\nerror code: %s\noutput: %s\n' % \
+              (avconv_command, e.returncode, e.output)
+        print traceback.format_exc()
+        raise
 
     # Have to do this last because otherwise the mp3 hasn't yet been generated.
     file_name = trunc(audio_file.case_name.lower(), 72) + '_cl.mp3'

@@ -25,6 +25,14 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
+2014-11-14:
+ - The dependency of eyed3 has been upgraded to handle a threading race
+   condition as documented here: https://bitbucket.org/nicfit/eyed3/issue/47/
+
+   Upgrade with:
+
+       sudo pip install --allow-external eyeD3 --allow-unverified eyeD3 eyeD3==0.7.5
+
 
 2014-10-23:
  Overview:

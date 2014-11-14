@@ -10,10 +10,12 @@ Some tricks that make it special:
    exploding.
 
 """
+from Queue import Queue
 import hashlib
 import os
 import random
 import sys
+from threading import Thread
 import traceback
 
 execfile('/etc/courtlistener')
@@ -59,10 +61,16 @@ def make_line_to_dict(row):
     return item
 
 
-with open('arguments-from-brad-heath.csv', 'r') as csv:
-    next(csv)  # Skip the first line
-    for row in csv:
-        item = make_line_to_dict(row)
+def download_and_save():
+    """This function is run in many threads simultaneously. Each thread
+    runs so long as there are items in the queue. Once an item is found, it's
+    downloaded and saved.
+
+    The number of items that can be concurrently saved is determined by the
+    number of threads that are running this function.
+    """
+    while True:
+        item = queue.get()
         logger.info("Attempting to add item at: %s" % item['url'])
         try:
             msg, r = get_binary_content(
@@ -71,16 +79,17 @@ with open('arguments-from-brad-heath.csv', 'r') as csv:
             )
         except:
             logger.info("Unable to get item at: %s" % item['url'])
+            queue.task_done()
 
         if msg:
             logger.warn(msg)
-            continue
+            queue.task_done()
 
         sha1_hash = hashlib.sha1(r.content).hexdigest()
         if Audio.objects.filter(sha1=sha1_hash).exists():
             # Simpsons did it! Try the next one.
             logger.info("Item already exists, moving to next item.")
-            continue
+            queue.task_done()
         else:
             # New item, onwards!
             logger.info('Adding new document found at: %s' % item['url'])
@@ -118,7 +127,7 @@ with open('arguments-from-brad-heath.csv', 'r') as csv:
                 msg = 'Unable to save binary to disk. Deleted document: % s.\n % s' % \
                       (item['case_name'], traceback.format_exc())
                 logger.critical(msg)
-                continue
+                queue.task_done()
 
             docket.save()
             audio_file.docket = docket
@@ -133,4 +142,27 @@ with open('arguments-from-brad-heath.csv', 'r') as csv:
             logger.info("Successfully added audio file %s: %s" % (
                 audio_file.pk, audio_file.case_name))
 
-    logger.info("%s: Successfully crawled oral arguments from BH archive.")
+
+concurrent_threads = 8
+queue = Queue(concurrent_threads * 2)
+
+if __name__ == '__main__':
+    logger.info('Creating %s threads.' % concurrent_threads)
+    for _ in range(concurrent_threads):
+        t = Thread(target=download_and_save)
+        t.daemon = True
+        t.start()
+    logger.info('All threads created and started.')
+
+    with open('arguments-from-brad-heath-shuffled.csv', 'r') as csv:
+        next(csv)  # Skip the first line
+        for row in csv:
+            item = make_line_to_dict(row)
+            queue.put(item)
+
+    # Block completion of this function until the queue is empty.
+    try:
+        queue.join()
+        logger.info("%s: Successfully crawled oral arguments from BH archive.")
+    except KeyboardInterrupt:
+        sys.exit()
