@@ -56,10 +56,12 @@ class Command(cl_scrape_opinions.Command):
         dup_checker = DupChecker(court, full_crawl=full_crawl)
         abort = dup_checker.abort_by_url_hash(site.url, site.hash)
         if not abort:
+            if site.cookies:
+                logger.info("Using cookies: %s" % site.cookies)
             for i in range(0, len(site.case_names)):
                 msg, r = get_binary_content(
                     site.download_urls[i],
-                    site._get_cookies(),
+                    site.cookies,
                     method=site.method
                 )
                 if msg:

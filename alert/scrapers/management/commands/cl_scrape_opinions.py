@@ -104,21 +104,6 @@ def get_extension(content):
     return extension
 
 
-def normalize_cookies(cookies):
-    """Selenium uses a different format for cookies than does requests. This converts from a Selenium dict to a
-    requests dict, if a selenium dict is found.
-    """
-    requests_cookies = {}
-    for cookie in cookies:
-        try:
-            # If it's a selenium-style cookie, convert to requests-style.
-            requests_cookies[cookie['name']] = cookie['value']
-        except KeyError:
-            # If above fails, it's already a requests-style cookie. Simply move on.
-            return cookies
-    return requests_cookies
-
-
 def get_binary_content(download_url, cookies, method='GET'):
     """ Downloads the file, covering a few special cases such as invalid SSL certificates and empty file errors.
 
@@ -141,9 +126,6 @@ def get_binary_content(download_url, cookies, method='GET'):
             # Note that we do a GET even if site.method is POST. This is deliberate.
             s = requests.session()
             headers = {'User-Agent': 'CourtListener'}
-            cookies = normalize_cookies(cookies)
-            if cookies:
-                logger.info("Using cookies: %s" % cookies)
             try:
                 r = s.get(download_url,
                           headers=headers,
@@ -158,14 +140,14 @@ def get_binary_content(download_url, cookies, method='GET'):
             # test for empty files (thank you CA1)
             if len(r.content) == 0:
                 msg = 'EmptyFileError: %s\n%s' % (download_url, traceback.format_exc())
-                return msg, r
+                return msg, None
 
             # test for and follow meta redirects
             r = follow_redirections(r, s)
     except:
         msg = 'DownloadingError: %s\n%s' % (download_url, traceback.format_exc())
         print msg
-        return msg, r
+        return msg, None
 
     # Success!
     return '', r
@@ -254,10 +236,12 @@ class Command(BaseCommand):
         dup_checker = DupChecker(court, full_crawl=full_crawl)
         abort = dup_checker.abort_by_url_hash(site.url, site.hash)
         if not abort:
+            if site.cookies:
+                logger.info("Using cookies: %s" % site.cookies)
             for i in range(0, len(site.case_names)):
                 msg, r = get_binary_content(
                     site.download_urls[i],
-                    site._get_cookies(),
+                    site.cookies,
                     method=site.method
                 )
                 if msg:
