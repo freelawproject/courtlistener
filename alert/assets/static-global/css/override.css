@@ -792,7 +792,8 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
     margin: 0px 5px 5px 5px;
 }
 #graph {
-    height: 400px;
+    height: 100%;
+    width: 100%;
 }
 #graph table {
     width: 20%;

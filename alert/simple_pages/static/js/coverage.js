@@ -43,15 +43,17 @@ function drawGraph(data) {
         }
     } else {
         // Draw the full version
-        $('#graph svg').attr('height', '400');
-        var chart = canvas.linechart(40, 0, 910, 370, x, [y], lineChartOptions).hover(function () {
+        $('#graph svg').attr('height', '100%');
+        var chart = canvas.linechart(40, 0, 910, 370, x, [y], lineChartOptions)
+            .hover(function () {
                 var color = this.symbol.attr('fill');
                 var label = this.axis + ': ' + this.value;
                 this.popup = canvas.popup(this.x, this.y, label).insertBefore(this).attr([{stroke: color, fill: '#ffffff'}, { fill: '#000' }]);
             },
             function () {
                 this.popup.remove();
-            });
+            }
+        );
         chart.symbols.attr({r: 3});
         // X axis label
         var labelAttributes = {'font-size': 14, 'font-weight': 'bold'};
@@ -126,6 +128,8 @@ function addNavigation() {
 $(document).ready(function() {
     addNavigation();
     canvas = Raphael('graph', 950, 400);
+    canvas.setViewBox(0, 0, 950, 400, true);
+    canvas.setSize('100%', '100%');
     $(window).hashchange();
     $('#nav select').chosen();
 });
