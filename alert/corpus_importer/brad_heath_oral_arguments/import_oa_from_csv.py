@@ -15,7 +15,7 @@ import hashlib
 import os
 import random
 import sys
-from threading import Thread
+import threading
 import traceback
 
 execfile('/etc/courtlistener')
@@ -71,7 +71,8 @@ def download_and_save():
     """
     while True:
         item = queue.get()
-        logger.info("Attempting to add item at: %s" % item['url'])
+        logger.info("Thread: %s: Attempting to add item at: %s" %
+                    (threading.current_thread().name, item['url']))
         try:
             msg, r = get_binary_content(
                 item['url'],
@@ -84,12 +85,14 @@ def download_and_save():
         if msg:
             logger.warn(msg)
             queue.task_done()
+            return
 
         sha1_hash = hashlib.sha1(r.content).hexdigest()
         if Audio.objects.filter(sha1=sha1_hash).exists():
             # Simpsons did it! Try the next one.
             logger.info("Item already exists, moving to next item.")
             queue.task_done()
+            return
         else:
             # New item, onwards!
             logger.info('Adding new document found at: %s' % item['url'])
@@ -143,13 +146,13 @@ def download_and_save():
                 audio_file.pk, audio_file.case_name))
 
 
-concurrent_threads = 8
+concurrent_threads = 16
 queue = Queue(concurrent_threads * 2)
 
 if __name__ == '__main__':
     logger.info('Creating %s threads.' % concurrent_threads)
     for _ in range(concurrent_threads):
-        t = Thread(target=download_and_save)
+        t = threading.Thread(target=download_and_save)
         t.daemon = True
         t.start()
     logger.info('All threads created and started.')
