@@ -98,7 +98,7 @@ def download_and_save():
         else:
             # New item, onwards!
             logger.info('%s: Adding new document found at: %s' %
-                        (threading.current_thread(), item['url']))
+                        (threading.current_thread().name, item['url']))
             audio_file = Audio(
                 source='H',
                 sha1=sha1_hash,
@@ -151,7 +151,7 @@ def download_and_save():
                          audio_file.case_name))
 
 
-concurrent_threads = 16
+concurrent_threads = 8
 queue = Queue(concurrent_threads * 2)
 
 if __name__ == '__main__':
