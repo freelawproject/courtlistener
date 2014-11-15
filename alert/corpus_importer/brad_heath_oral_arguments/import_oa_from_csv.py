@@ -79,7 +79,8 @@ def download_and_save():
                 {},
             )
         except:
-            logger.info("Unable to get item at: %s" % item['url'])
+            logger.info("%s: Unable to get item at: %s" %
+                        (threading.current_thread().name, item['url']))
             queue.task_done()
 
         if msg:
@@ -90,12 +91,14 @@ def download_and_save():
         sha1_hash = hashlib.sha1(r.content).hexdigest()
         if Audio.objects.filter(sha1=sha1_hash).exists():
             # Simpsons did it! Try the next one.
-            logger.info("Item already exists, moving to next item.")
+            logger.info("%s: Item already exists, moving to next item." %
+                        threading.current_thread().name)
             queue.task_done()
             continue
         else:
             # New item, onwards!
-            logger.info('Adding new document found at: %s' % item['url'])
+            logger.info('%s: Adding new document found at: %s' %
+                        (threading.current_thread(), item['url']))
             audio_file = Audio(
                 source='H',
                 sha1=sha1_hash,
@@ -142,8 +145,10 @@ def download_and_save():
                 countdown=random_delay
             )
 
-            logger.info("Successfully added audio file %s: %s" % (
-                audio_file.pk, audio_file.case_name))
+            logger.info("%s: Successfully added audio file %s: %s" %
+                        (threading.current_thread().name,
+                         audio_file.pk,
+                         audio_file.case_name))
 
 
 concurrent_threads = 16
