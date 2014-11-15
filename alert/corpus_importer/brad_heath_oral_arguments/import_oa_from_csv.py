@@ -71,7 +71,7 @@ def download_and_save():
     """
     while True:
         item = queue.get()
-        logger.info("Thread: %s: Attempting to add item at: %s" %
+        logger.info("%s: Attempting to add item at: %s" %
                     (threading.current_thread().name, item['url']))
         try:
             msg, r = get_binary_content(
@@ -85,14 +85,14 @@ def download_and_save():
         if msg:
             logger.warn(msg)
             queue.task_done()
-            return
+            continue
 
         sha1_hash = hashlib.sha1(r.content).hexdigest()
         if Audio.objects.filter(sha1=sha1_hash).exists():
             # Simpsons did it! Try the next one.
             logger.info("Item already exists, moving to next item.")
             queue.task_done()
-            return
+            continue
         else:
             # New item, onwards!
             logger.info('Adding new document found at: %s' % item['url'])
