@@ -152,51 +152,15 @@ $(document).ready(function() {
     });
 
 
-    //////////////////////////
-    // Source Tab Switching //
-    //////////////////////////
+    ///////////////////////////
+    // Result Type Switching //
+    ///////////////////////////
     $('#type-switcher label:not(.selected) input[name=type]').click(function () {
         // Note that we can't do submit here, because that'd trigger a
         // switching of the the checked radio button, and nothing would happen.
         document.location = makeSearchPath(true);
     });
 
-
-    ////////////
-    // Slider //
-    ////////////
-    /*
-    if (cited_gt.val() == "") {
-        cited_gt.val(0);
-    }
-    if (cited_lt.val() == ""){
-        cited_lt.val(20000);
-    }
-    $(function() {
-        // Load up the slider in the UI
-        $("#slider-range").slider({
-            range: true,
-            min: 0,
-            max: 20000,
-            step: 10,
-            values: [cited_gt.val(),
-                     cited_lt.val()],
-            slide: function(event, ui) {
-                // Update the text
-                if (ui.values[0] == 0 && ui.values[1] == 20000){
-                    $('#citation-count').text("(Any)");
-                } else {
-                    $("#citation-count").text( "(" + ui.values[0] + " - " + ui.values[1] + ")");
-                }
-                cited_gt.val(ui.values[0]);
-                cited_lt.val(ui.values[1]);
-            }
-        });
-    });
-    if (cited_gt.val() != 0 || cited_lt.val() != 20000) {
-        $('#citation-count').text("(" + $("#id_cited_gt").val() + " - " + $("#id_cited_lt").val() + ")")
-    }
-    */
 
     //////////////////
     // Court Picker //

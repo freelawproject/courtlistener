@@ -39,10 +39,11 @@
         </div>
         <div class="sidebar-section" id="type-switcher">
             <h3 class="bottom">
-                <label for="id_type_0" class="pointer
-                       {% if search_form.type.value == 'o' %}
-                            selected
-                       {% endif %}"
+                <label for="id_type_0"
+                       class="pointer
+                           {% if search_form.type.value == 'o' %}
+                                selected
+                           {% endif %}"
                        tabindex="198">
                     <input {% if search_form.type.value == 'o' %}
                                 checked="checked"
@@ -54,10 +55,11 @@
                            type="radio">Opinions</label>
             </h3>
             <h3 class="top">
-                <label for="id_type_1" class="pointer
-                       {% if search_form.type.value == 'oa' %}
-                           selected
-                       {% endif %}"
+                <label for="id_type_1"
+                       class="pointer
+                           {% if search_form.type.value == 'oa' %}
+                               selected
+                           {% endif %}"
                        tabindex="199">
                     <input {% if search_form.type.value == 'oa' %}
                                checked="checked"
@@ -331,14 +333,22 @@
                         &mdash; <strong>{{ request.GET.q }}</strong> &mdash;
                     {% endif %}
                     had no results.</h2>
-                <p class="bottom">Search tips:</p>
+                <p>Search tips:</p>
                 <ul>
                     <li>Check your spelling</li>
                     <li>Try fewer filters</li>
                     <li>Remove quotes if you used them</li>
+                    <li>Try searching
+                        {% if search_form.type.value == 'o' %}
+                            oral arguments
+                        {% elif search_form.type.value == 'oa' %}
+                            opinions
+                        {% endif %}
+                        instead
+                    </li>
                 </ul>
                 <p>Our <a href="/coverage/">coverage page</a> details which cases we
-                have. If you expected more results than this, <a href="/contact/">let us know</a>!
+                have. If you expected more results than this, <a href="/contact/">let us know</a>.
                 We value your feedback.</p>
             {% else %}
                 <h2 class="alt">Your search
