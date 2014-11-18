@@ -34,7 +34,8 @@ def v_wrapper(text, autoescape=None):
         esc = conditional_escape
     else:
         esc = lambda x: x
-    return mark_safe(re.sub(' v\. ', '<span class="alt bold"> v. </span>', esc(text)))
+    return mark_safe(
+        re.sub(' v\. ', '<span class="alt bold"> v. </span>', esc(text)))
 
 
 @register.filter(needs_autoescape=True)
@@ -66,24 +67,44 @@ def compress_whitespace(text, autoescape=None):
     return mark_safe(' '.join(text.split()))
 
 
-
 @register.filter(needs_autoescape=True)
-@stringfilter
-def naturalduration(seconds, autoescape=None):
+def naturalduration(seconds, autoescape=None, as_dict=False):
     """Convert a duration in seconds to a duration in hours, minutes, seconds.
 
     For example:
         61 --> 1:01
         3602 --> 1:00:02
     """
+    if seconds is None:
+        seconds = 0
     seconds = int(seconds)
+
     if autoescape:
         esc = conditional_escape
     else:
         esc = lambda x: x
 
-    hours = seconds / 3600
-    minutes = seconds % 3600 / 60
-    seconds = seconds % 3600 % 60
-    time_str = '%02d:%02d:%02d' % (hours, minutes, seconds)
-    return mark_safe(time_str.lstrip('0:'))
+    len_day = 86400
+    len_hour = 3600
+    len_minute = 60
+
+    trunc_s = seconds % len_day % len_hour % len_minute
+    trunc_m = seconds % len_day % len_hour / len_minute
+    trunc_h = seconds % len_day / len_hour
+    trunc_d = seconds / len_day
+
+    if as_dict:
+        return {
+            'd': trunc_d,
+            'h': trunc_h,
+            'm': trunc_m,
+            's': trunc_s,
+        }
+    else:
+        duration = '%02d:%02d:%02d:%02d' % (trunc_d, trunc_h, trunc_m, trunc_s)
+        trimmed_duration = duration.lstrip('0:')
+        if len(trimmed_duration) == 0:
+            # It was ALL trimmed away.
+            trimmed_duration = '0'
+
+        return mark_safe(trimmed_duration)

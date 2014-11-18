@@ -13,6 +13,8 @@ from django.views.decorators.cache import never_cache
 
 from alert.alerts.forms import CreateAlertForm
 from alert.alerts.models import Alert
+from alert.audio.models import Audio
+from alert.custom_filters.templatetags.text_filters import naturalduration
 from alert.lib import search_utils
 from alert.lib import sunburnt
 from alert.lib.bot_detector import is_bot
@@ -20,7 +22,6 @@ from alert.search.forms import SearchForm, _clean_form
 from alert import settings
 from alert.search.models import Document, Court
 from alert.stats import tally_stat, Stat
-from audio.models import Audio
 
 
 logger = logging.getLogger(__name__)
@@ -203,6 +204,10 @@ def show_results(request):
                 .filter(time_retrieved__gte=ten_days_ago).count()
             oral_arguments_in_last_ten = Audio.objects\
                 .filter(time_retrieved__gte=ten_days_ago).count()
+            days_of_oa = naturalduration(
+                Audio.objects.aggregate(Sum('duration'))['duration__sum'],
+                as_dict=True,
+            )['d']
             render_dict.update({
                 'alerts_in_last_ten': alerts_in_last_ten,
                 'queries_in_last_ten': queries_in_last_ten,
@@ -211,6 +216,7 @@ def show_results(request):
                 'bulk_in_last_ten': bulk_in_last_ten,
                 'api_in_last_ten': api_in_last_ten,
                 'users_in_last_ten': users_in_last_ten,
+                'days_of_oa': days_of_oa,
                 'private': False
             })
             return render_to_response(

@@ -282,7 +282,8 @@
 
             <div class="row">
                 <div class="col-xs-3 text-center">
-                    <span class="homepage-stat bold">{{ results.paginator.count|intcomma }}</span>
+                    <span class="homepage-stat bold"
+                          id="stat-num-precedential-opinions">{{ results.paginator.count|intcomma }}</span>
                 </div>
                 <div class="col-xs-9">
                     <p>Number of <a href="/?order_by=dateFiled+desc">precedential
@@ -292,16 +293,27 @@
 
             <div class="row">
                 <div class="col-xs-3 text-center">
-                    <span class="homepage-stat bold">{{ opinions_in_last_ten|intcomma }}</span>
+                    <span class="homepage-stat bold"
+                          id="stat-num-days-of-oa">{{ days_of_oa|intcomma }}</span>
                 </div>
-                <div class="col-xs-9"><p>Opinions added in last ten
-                    days.</p>
+                <div class="col-xs-9">
+                    <p>Duration of all oral arguments in CourtListener, in days.</p>
                 </div>
             </div>
 
             <div class="row">
                 <div class="col-xs-3 text-center">
-                    <span class="homepage-stat bold">{{ oral_arguments_in_last_ten|intcomma }}</span>
+                    <span class="homepage-stat bold"
+                          id="stat-num-opinions-in-last-ten">{{ opinions_in_last_ten|intcomma }}</span>
+                </div>
+                <div class="col-xs-9"><p>Opinions added in last ten days.</p>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-xs-3 text-center">
+                    <span class="homepage-stat bold"
+                          id="stat-num-oa-in-last-ten">{{ oral_arguments_in_last_ten|intcomma }}</span>
                 </div>
                 <div class="col-xs-9"><p>Oral arguments added in last ten
                     days.</p>
@@ -310,7 +322,8 @@
 
             <div class="row">
                 <div class="col-xs-3 text-center">
-                    <span class="homepage-stat bold">{{ queries_in_last_ten|intcomma }}</span>
+                    <span class="homepage-stat bold"
+                          id="stat-num-q-in-last-ten">{{ queries_in_last_ten|intcomma }}</span>
                 </div>
                 <div class="col-xs-9"><p>Number of queries made in last ten
                     days.</p>
@@ -319,7 +332,8 @@
 
             <div class="row">
                 <div class="col-xs-3 text-center">
-                    <span class="homepage-stat bold">{{ alerts_in_last_ten|intcomma }}</span>
+                    <span class="homepage-stat bold"
+                          id="stat-num-alerts-in-last-ten">{{ alerts_in_last_ten|intcomma }}</span>
                 </div>
                 <div class="col-xs-9"><p>Number of <a
                         href="/faq/#explain-alerts">alerts</a> sent in last ten
@@ -335,8 +349,7 @@
                     </div>
                     <div class="col-xs-9"><p>Times the <a
                             href="/api/bulk-info/">bulk data</a> has been
-                        downloaded
-                        in the last ten days.</p>
+                        downloaded in the last ten days.</p>
                     </div>
                 </div>
             {% endif %}
