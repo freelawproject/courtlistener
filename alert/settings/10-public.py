@@ -39,6 +39,7 @@ MIDDLEWARE_CLASSES = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.middleware.cache.UpdateCacheMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -58,6 +59,7 @@ INSTALLED_APPS = [
     'django.contrib.sites',
     'django.contrib.sitemaps',
     'django.contrib.staticfiles',
+    'corsheaders',
     'djcelery',
     'south',
     'tastypie',
@@ -180,6 +182,12 @@ STRIPE_REDIRECT = 'https://www.courtlistener.com/donate/stripe/complete/'
 #######
 TASTYPIE_DEFAULT_FORMATS = ['json', 'jsonp', 'xml']
 TASTYPIE_FULL_DEBUG = True
+# CORS
+CORS_ORIGIN_ALLOW_ALL = True
+CORS_URLS_REGEX = r'^/api/.*$'
+CORS_ALLOW_METHODS = ('GET', 'OPTIONS', )
+CORS_ALLOW_CREDENTIALS = True
+
 
 ######################
 # Various and Sundry #

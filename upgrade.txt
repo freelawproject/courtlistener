@@ -25,6 +25,17 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
+2014-11-18:
+
+ - CORS headers are now being sent with API requests so that folks can get past
+   the limitations of JSONP. This is untested, but introduces (yet another)
+   dependency. To upgrade, do:
+
+    - sudo pip install django-cors-headers==0.13
+
+  Then pull as usual.
+
+
 2014-11-17:
 
   - `constants.py` has been removed from CourtListener in this release and has
