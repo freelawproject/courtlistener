@@ -25,6 +25,17 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
+2014-11-17:
+
+  - `constants.py` has been removed from CourtListener in this release and has
+    been moved to its own repository. The code here should continue working,
+    but before pulling this code you must install the new reporters database,
+    as we did the Seal Rookery. This can be done with:
+
+        - sudo git clone https://github.com/freelawproject/reporters-db /usr/local/reporters_db
+        - sudo ln -s /usr/local/reporters_db /usr/lib/python2.7/dist-packages/reporters_db
+
+
 2014-11-14:
  - The dependency of eyed3 has been upgraded to handle a threading race
    condition as documented here: https://bitbucket.org/nicfit/eyed3/issue/47/

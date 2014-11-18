@@ -397,7 +397,6 @@ class ApiTest(SolrTestCase):
             json_limit_1_offset_1['objects'][0]['absolute_url']
         )
 
-
     def test_api_result_count(self):
         """Do we get back the number of results we expect in the meta data and
         in 'objects'?"""

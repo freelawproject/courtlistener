@@ -1,6 +1,5 @@
 # coding=utf-8
 from datetime import timedelta
-import os
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.test import TestCase, LiveServerTestCase

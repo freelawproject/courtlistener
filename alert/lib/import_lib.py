@@ -1,10 +1,12 @@
-from alert.citations.constants import REPORTERS
+from reporters_db import REPORTERS
 
 
 def map_citations_to_models(citations):
-    """Takes a list of citations and converts it to a dict mapping those citations to the model itself.
+    """Takes a list of citations and converts it to a dict mapping those
+    citations to the model itself.
 
-    For example, an opinion mentioning 1 U.S. 1 and 1 F.2d 1 (impossible, I know) would get mapped to:
+    For example, an opinion mentioning 1 U.S. 1 and 1 F.2d 1 (impossible, I
+    know) would get mapped to:
 
     {
      'federal_cite_one': '1 U.S. 1',
@@ -12,16 +14,19 @@ def map_citations_to_models(citations):
     }
     """
     def add_mapping(mapping, key, value):
-        """Add the mapping to federal_cite_one, if it doesn't have a value. Else, add to federal_cite_two. Etc."""
+        """Add the mapping to federal_cite_one, if it doesn't have a value.
+        Else, add to federal_cite_two. Etc.
+        """
         punt_count = 0
         numbers = ['one', 'two', 'three']
         for number in numbers:
             try:
-                mapping['%s_cite_%s' % (key, number)]
+                _ = mapping['%s_cite_%s' % (key, number)]
                 # That key is used. Try the next one...
                 punt_count += 1
                 if punt_count == len(numbers):
-                    assert("Failed to add citation to the mapping dict (it was full!): %s" % value)
+                    assert("Failed to add citation to the mapping dict (it "
+                           "was full!): %s" % value)
                 continue
             except KeyError:
                 # Key not found, so add the value and break.
@@ -31,9 +36,11 @@ def map_citations_to_models(citations):
 
     cite_mapping = {}
     for citation in citations:
-        cite_type = REPORTERS[citation.canonical_reporter][citation.lookup_index]['cite_type']
+        cite_type = REPORTERS[citation.canonical_reporter][
+            citation.lookup_index]['cite_type']
         if cite_type in ['federal', 'state', 'specialty']:
-            cite_mapping = add_mapping(cite_mapping, cite_type, citation.base_citation())
+            cite_mapping = add_mapping(cite_mapping, cite_type,
+                                       citation.base_citation())
         elif cite_type == 'state_regional':
             cite_mapping['state_cite_regional'] = citation.base_citation()
         elif cite_type == 'scotus_early':

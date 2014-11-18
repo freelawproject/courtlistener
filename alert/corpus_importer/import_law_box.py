@@ -15,7 +15,6 @@ import traceback
 from django.utils.timezone import now
 from django import db
 from lxml import html
-from alert.citations.constants import EDITIONS, REPORTERS
 from alert.citations.find_citations import get_citations
 from datetime import timedelta
 from alert.corpus_importer.court_regexes import fd_pairs, state_pairs, disambiguate_by_judge, fb_pairs
@@ -23,6 +22,7 @@ from alert.corpus_importer.judge_extractor import get_judge_from_str
 from alert.corpus_importer import dup_finder, dup_helpers
 from alert.lib.string_utils import anonymize
 from alert.lib.import_lib import map_citations_to_models
+from reporters_db import EDITIONS, REPORTERS
 
 import argparse
 import datetime
