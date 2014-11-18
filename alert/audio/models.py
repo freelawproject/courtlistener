@@ -14,23 +14,23 @@ class Audio(models.Model):
         help_text="The docket that the oral argument is a part of",
         related_name="audio_files",
         blank=True,
-        null=True
+        null=True,
     )
     source = models.CharField(
         help_text="the source of the audio file, one of: %s" % ', '.join(['%s (%s)' % (t[0], t[1]) for t in SOURCES]),
         max_length=3,
         choices=SOURCES,
-        blank=True
+        blank=True,
     )
     case_name = models.TextField(
         help_text="The full name of the case",
-        blank=True
+        blank=True,
     )
     docket_number = models.CharField(
         help_text="The docket numbers of a case, can be consolidated and quite long",
         max_length=5000,  # sometimes these are consolidated, hence they need to be long (was 50, 100, 300, 1000).
         blank=True,
-        null=True
+        null=True,
     )
     judges = models.TextField(
         help_text="The judges that brought the opinion as a simple text string",
@@ -41,7 +41,7 @@ class Audio(models.Model):
         help_text="The original creation date for the item",
         auto_now_add=True,
         editable=False,
-        db_index=True
+        db_index=True,
     )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified. A value in year"
@@ -60,7 +60,7 @@ class Audio(models.Model):
         help_text="unique ID for the document, as generated via SHA1 of the "
                   "binary file or text data",
         max_length=40,
-        db_index=True
+        db_index=True,
     )
     download_url = models.URLField(
         help_text="The URL on the court website where the document was "
@@ -102,7 +102,7 @@ class Audio(models.Model):
         help_text="Should this item be blocked from indexing by "
                   "search engines?",
         db_index=True,
-        default=False
+        default=False,
     )
 
     class Meta:
