@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load humanize %}
+{% load cache %}
 
 {% block title %}Non-Profit Free Legal Search Engine and Alert System - CourtListener.com{% endblock %}
 
@@ -276,108 +277,110 @@
             </p>
         </div>
     </div>
-    <div class="row lg-v-offset-below-3">
-        <div class="col-sm-6">
-            <h3>The Numbers&nbsp;<i class="gray fa fa-pie-chart"></i></h3>
+    {% cache 21600 stat-num-days-of-oa %}
+        <div class="row lg-v-offset-below-3">
+            <div class="col-sm-6">
+                <h3>The Numbers&nbsp;<i class="gray fa fa-pie-chart"></i></h3>
 
-            <div class="row">
-                <div class="col-xs-3 text-center">
-                    <span class="homepage-stat bold"
-                          id="stat-num-precedential-opinions">{{ results.paginator.count|intcomma }}</span>
-                </div>
-                <div class="col-xs-9">
-                    <p>Number of <a href="/?order_by=dateFiled+desc">precedential
-                        opinions</a> in CourtListener.</p>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-xs-3 text-center">
-                    <span class="homepage-stat bold"
-                          id="stat-num-days-of-oa">{{ days_of_oa|intcomma }}</span>
-                </div>
-                <div class="col-xs-9">
-                    <p>Duration of all <a href="/?type=oa">oral arguments</a>
-                        in CourtListener, in days.</p>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-xs-3 text-center">
-                    <span class="homepage-stat bold"
-                          id="stat-num-opinions-in-last-ten">{{ opinions_in_last_ten|intcomma }}</span>
-                </div>
-                <div class="col-xs-9"><p>Opinions added in last ten days.</p>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-xs-3 text-center">
-                    <span class="homepage-stat bold"
-                          id="stat-num-oa-in-last-ten">{{ oral_arguments_in_last_ten|intcomma }}</span>
-                </div>
-                <div class="col-xs-9"><p>Oral arguments added in last ten
-                    days.</p>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-xs-3 text-center">
-                    <span class="homepage-stat bold"
-                          id="stat-num-q-in-last-ten">{{ queries_in_last_ten|intcomma }}</span>
-                </div>
-                <div class="col-xs-9"><p>Number of queries made in last ten
-                    days.</p>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-xs-3 text-center">
-                    <span class="homepage-stat bold"
-                          id="stat-num-alerts-in-last-ten">{{ alerts_in_last_ten|intcomma }}</span>
-                </div>
-                <div class="col-xs-9"><p>Number of <a
-                        href="/faq/#explain-alerts">alerts</a> sent in last ten
-                    days.</p>
-                </div>
-            </div>
-
-
-            {% if bulk_in_last_ten > 0 %}
                 <div class="row">
                     <div class="col-xs-3 text-center">
-                        <span class="homepage-stat bold">{{ bulk_in_last_ten|intcomma }}</span>
+                        <span class="homepage-stat bold"
+                              id="stat-num-precedential-opinions">{{ results.paginator.count|intcomma }}</span>
                     </div>
-                    <div class="col-xs-9"><p>Times the <a
-                            href="/api/bulk-info/">bulk data</a> has been
-                        downloaded in the last ten days.</p>
+                    <div class="col-xs-9">
+                        <p>Number of <a href="/?order_by=dateFiled+desc">precedential
+                            opinions</a> in CourtListener.</p>
                     </div>
                 </div>
-            {% endif %}
 
-            <div class="row">
-                <div class="col-xs-3 text-center">
-                    <span class="homepage-stat bold">{{ api_in_last_ten|intcomma }}</span>
-                </div>
-                <div class="col-xs-9"><p><a href="/api/">API calls</a> made
-                    against our system in last ten days.</p>
-                </div>
-            </div>
-
-
-            {% if user.is_superuser %}
                 <div class="row">
                     <div class="col-xs-3 text-center">
-                        <span class="homepage-stat bold">{{ users_in_last_ten|intcomma }}</span>
+                        <span class="homepage-stat bold"
+                              id="stat-num-days-of-oa">{{ days_of_oa|intcomma }}</span>
                     </div>
-                    <div class="col-xs-9"><p>New users signed up in last ten
-                        days. <i class="gray fa fa-lock pointer"
-                                 title="admin only"></i></p>
+                    <div class="col-xs-9">
+                        <p>Duration of all <a href="/?type=oa">oral arguments</a>
+                            in CourtListener, in days.</p>
                     </div>
                 </div>
-            {% endif %}
+
+                <div class="row">
+                    <div class="col-xs-3 text-center">
+                        <span class="homepage-stat bold"
+                              id="stat-num-opinions-in-last-ten">{{ opinions_in_last_ten|intcomma }}</span>
+                    </div>
+                    <div class="col-xs-9"><p>Opinions added in last ten days.</p>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-xs-3 text-center">
+                        <span class="homepage-stat bold"
+                              id="stat-num-oa-in-last-ten">{{ oral_arguments_in_last_ten|intcomma }}</span>
+                    </div>
+                    <div class="col-xs-9"><p>Oral arguments added in last ten
+                        days.</p>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-xs-3 text-center">
+                        <span class="homepage-stat bold"
+                              id="stat-num-q-in-last-ten">{{ queries_in_last_ten|intcomma }}</span>
+                    </div>
+                    <div class="col-xs-9"><p>Number of queries made in last ten
+                        days.</p>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-xs-3 text-center">
+                        <span class="homepage-stat bold"
+                              id="stat-num-alerts-in-last-ten">{{ alerts_in_last_ten|intcomma }}</span>
+                    </div>
+                    <div class="col-xs-9"><p>Number of <a
+                            href="/faq/#explain-alerts">alerts</a> sent in last ten
+                        days.</p>
+                    </div>
+                </div>
+
+
+                {% if bulk_in_last_ten > 0 %}
+                    <div class="row">
+                        <div class="col-xs-3 text-center">
+                            <span class="homepage-stat bold">{{ bulk_in_last_ten|intcomma }}</span>
+                        </div>
+                        <div class="col-xs-9"><p>Times the <a
+                                href="/api/bulk-info/">bulk data</a> has been
+                            downloaded in the last ten days.</p>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <div class="row">
+                    <div class="col-xs-3 text-center">
+                        <span class="homepage-stat bold">{{ api_in_last_ten|intcomma }}</span>
+                    </div>
+                    <div class="col-xs-9"><p><a href="/api/">API calls</a> made
+                        against our system in last ten days.</p>
+                    </div>
+                </div>
+
+
+                {% if user.is_superuser %}
+                    <div class="row">
+                        <div class="col-xs-3 text-center">
+                            <span class="homepage-stat bold">{{ users_in_last_ten|intcomma }}</span>
+                        </div>
+                        <div class="col-xs-9"><p>New users signed up in last ten
+                            days. <i class="gray fa fa-lock pointer"
+                                     title="admin only"></i></p>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
         </div>
-    </div>
+    {% endcache %}
 
     {% include "includes/jurisdiction_picker_modal.html" %}
     </div>
