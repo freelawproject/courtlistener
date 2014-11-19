@@ -187,10 +187,13 @@
         </p>
         <br>
         {% if doc.extracted_by_ocr %}
-            <div class="col-sm-12 bg-warning">
-                <p class="bottom">The text of this document was obtained by analyzing a scanned
-                document provided by the court. As a result it may have typos, and you may prefer
-                reading the original.</p>
+            <div class="col-sm-12 alert-warning alert">
+                <p class="bottom">The text of this document was obtained by
+                    analyzing a scanned document provided by the court. As a
+                    result it may have typos, and you may prefer reading
+                    <a href="{{ doc.download_url }}" class="visitable">the
+                    original</a>.
+                </p>
             </div>
             <div class="clearfix"></div>
         {% endif %}
