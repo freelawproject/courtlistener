@@ -17,7 +17,8 @@ class Audio(models.Model):
         null=True,
     )
     source = models.CharField(
-        help_text="the source of the audio file, one of: %s" % ', '.join(['%s (%s)' % (t[0], t[1]) for t in SOURCES]),
+        help_text="the source of the audio file, one of: %s" %
+                  ', '.join(['%s (%s)' % (t[0], t[1]) for t in SOURCES]),
         max_length=3,
         choices=SOURCES,
         blank=True,
@@ -27,13 +28,15 @@ class Audio(models.Model):
         blank=True,
     )
     docket_number = models.CharField(
-        help_text="The docket numbers of a case, can be consolidated and quite long",
-        max_length=5000,  # sometimes these are consolidated, hence they need to be long (was 50, 100, 300, 1000).
+        help_text="The docket numbers of a case, can be consolidated and "
+                  "quite long",
+        max_length=5000,  # (was 50, 100, 300, 1000).
         blank=True,
         null=True,
     )
     judges = models.TextField(
-        help_text="The judges that brought the opinion as a simple text string",
+        help_text="The judges that brought the opinion as a simple text "
+                  "string",
         blank=True,
         null=True,
     )
@@ -136,4 +139,3 @@ class Audio(models.Model):
         super(Audio, self).delete(*args, **kwargs)
         from search.tasks import delete_item
         delete_item.delay(id_cache, settings.SOLR_AUDIO_URL)
-

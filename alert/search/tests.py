@@ -1,3 +1,4 @@
+import StringIO
 import os
 import shutil
 import simplejson
@@ -5,6 +6,8 @@ import time
 
 from collections import OrderedDict
 from datadiff import diff
+import datetime
+from django.core.files.base import ContentFile
 from django.test import TestCase
 from django.test.client import Client
 from django.test.utils import override_settings
@@ -21,6 +24,36 @@ from alert.search.management.commands.cl_calculate_pagerank_networkx import \
 class SetupException(Exception):
     def __init__(self, message):
         Exception.__init__(self, message)
+
+
+class ModelTest(TestCase):
+    fixtures = ['test_court.json']
+
+    def test_save_old_opinion(self):
+        """Can we save opinions older than 1900?"""
+        court = Court.objects.get(pk='test')
+
+        cite = Citation(case_name=u"Blah")
+        cite.save(index=True)
+        docket = Docket(
+            case_name=u"Blah",
+            court=court,
+        )
+        docket.save()
+        d = Document(
+            citation=cite,
+            docket=docket,
+            date_filed=datetime.date(1899, 1, 1),
+
+        )
+
+        try:
+            cf = ContentFile(StringIO.StringIO('blah').read())
+            d.local_path.save('file_name.pdf', cf, save=False)
+            d.save(index=True)
+        except ValueError:
+            raise ValueError("Unable to save a case older than 1900. Did you "
+                             "try to use `strftime`...again?")
 
 
 class DocketUpdateSignalTest(TestCase):

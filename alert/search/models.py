@@ -55,7 +55,8 @@ SOURCES = (
 class Docket(models.Model):
     """A class to sit above Documents and Audio files and link them together"""
     date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified. A value in year 1750 indicates the value is unknown",
+        help_text="The last moment when the item was modified. A value in "
+                  "year 1750 indicates the value is unknown",
         auto_now=True,
         editable=False,
         db_index=True,
@@ -77,13 +78,15 @@ class Docket(models.Model):
         null=True
     )
     date_blocked = models.DateField(
-        help_text="The date that this opinion was blocked from indexing by search engines",
+        help_text="The date that this opinion was blocked from indexing by "
+                  "search engines",
         blank=True,
         null=True,
         db_index=True,
     )
     blocked = models.BooleanField(
-        help_text="Whether a document should be blocked from indexing by search engines",
+        help_text="Whether a document should be blocked from indexing by "
+                  "search engines",
         db_index=True,
         default=False
     )
