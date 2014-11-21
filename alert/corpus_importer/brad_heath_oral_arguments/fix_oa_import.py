@@ -31,7 +31,6 @@ sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alert.settings")
 
 from django.core.files.base import ContentFile
-import eyed3
 from alert.audio.models import Audio
 from alert.corpus_importer.brad_heath_oral_arguments.import_oa_from_csv \
     import make_line_to_dict
@@ -97,8 +96,7 @@ if __name__ == '__main__':
         af.save(index=False)
 
         # Update the ID3 information and duration data.
-        set_mp3_meta_data(af, original_mp3_path)
-        af.duration = eyed3.load(original_mp3_path).info.time_secs
+        set_mp3_meta_data(af, af.local_path_original_file.path)
 
         docket.save()
         af.save(index=True)
