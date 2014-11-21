@@ -96,7 +96,9 @@ if __name__ == '__main__':
         af.save(index=False)
 
         # Update the ID3 information and duration data.
-        set_mp3_meta_data(af, af.local_path_original_file.path)
+        new_mp3_path = af.local_path_mp3.path
+        logger.info("Updating mpr at: %s" % new_mp3_path)
+        set_mp3_meta_data(af, new_mp3_path)
 
         docket.save()
         af.save(index=True)
