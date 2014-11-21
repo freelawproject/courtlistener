@@ -364,8 +364,8 @@ def process_audio_file(pk):
     """Given the key to an audio file, extract its content and add the related
     meta data to the database.
     """
-    audio_file = Audio.objects.get(pk=pk)
-    path_to_original = audio_file.local_path_original_file.path
+    af = Audio.objects.get(pk=pk)
+    path_to_original = af.local_path_original_file.path
 
     path_to_tmp_location = os.path.join('/tmp', str(time.time()) + '.mp3')
 
@@ -379,7 +379,10 @@ def process_audio_file(pk):
                       '-ab', '48k',
                       path_to_tmp_location]
     try:
-        output = subprocess.check_output(avconv_command, stderr=subprocess.STDOUT)
+        _ = subprocess.check_output(
+            avconv_command,
+            stderr=subprocess.STDOUT
+        )
     except subprocess.CalledProcessError, e:
         print 'avconv failed command: %s\nerror code: %s\noutput: %s\n' % \
               (avconv_command, e.returncode, e.output)
@@ -387,22 +390,22 @@ def process_audio_file(pk):
         raise
 
     # Have to do this last because otherwise the mp3 hasn't yet been generated.
-    file_name = trunc(audio_file.case_name.lower(), 72) + '_cl.mp3'
-    set_mp3_meta_data(audio_file, path_to_tmp_location)
+    set_mp3_meta_data(af, path_to_tmp_location)
 
-    audio_file.duration = eyed3.load(path_to_tmp_location).info.time_secs
+    af.duration = eyed3.load(path_to_tmp_location).info.time_secs
 
     with open(path_to_tmp_location, 'r') as mp3:
         try:
             cf = ContentFile(mp3.read())
-            audio_file.local_path_mp3.save(file_name, cf, save=False)
+            file_name = trunc(af.case_name.lower(), 72) + '_cl.mp3'
+            af.local_path_mp3.save(file_name, cf, save=False)
         except:
             msg = "Unable to save mp3 to audio_file in scraper.tasks.process_" \
                   "audio_file for item: %s\nTraceback:\n%s" % \
-                  (audio_file.pk, traceback.format_exc())
-            ErrorLog(log_level='CRITICAL', court=audio_file.docket.court,
+                  (af.pk, traceback.format_exc())
+            ErrorLog(log_level='CRITICAL', court=af.docket.court,
                      message=msg).save()
 
-    audio_file.processing_complete = True
-    audio_file.save()
+    af.processing_complete = True
+    af.save()
     os.remove(path_to_tmp_location)

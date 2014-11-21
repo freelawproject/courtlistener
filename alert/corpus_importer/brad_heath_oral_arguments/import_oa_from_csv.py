@@ -130,7 +130,7 @@ def download_and_save():
                 audio_file.local_path_original_file.save(file_name, cf,
                                                          save=False)
             except:
-                msg = 'Unable to save binary to disk. Deleted document: % s.\n % s' % \
+                msg = 'Unable to save binary. Deleted document: %s.\n%s' % \
                       (item['case_name'], traceback.format_exc())
                 logger.critical(msg)
                 queue.task_done()
