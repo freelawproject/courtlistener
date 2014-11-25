@@ -109,7 +109,7 @@
                             <span class="icon-bar"></span>
                             <span class="icon-bar"></span>
                         </button>
-                        <a class="navbar-brand" href="/">
+                        <a class="navbar-brand hidden-xs" href="/">
                             {% block logo %}
                                 <img src="{{ STATIC_PREFIX }}png/logo.png"
                                      alt="CourtListener Logo"
@@ -117,6 +117,13 @@
                                      height="29"
                                      tabindex="1"/>
                             {% endblock %}
+                        </a>
+                        <a class="navbar-brand visible-xs-block" href="/">
+                            <img src="{{ STATIC_PREFIX }}png/logo-initials-only.png"
+                                 alt="CourtListener Logo"
+                                 width="67"
+                                 height="40"
+                                 tabindex="1"/>
                         </a>
                     </div>
                     <div class="navbar-collapse collapse">
