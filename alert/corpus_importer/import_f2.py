@@ -397,14 +397,16 @@ def scrape_and_parse():
                             # Happens on first iteration when saved_caseDate has no strftime attribute.
                             try:
                                 saved_caseDate = dates[0]
-                                print "  1) %s" % saved_caseDate.strftime("%B %d, %Y")
+                                print "  1) %s" % saved_caseDate.strftime(
+                                    "%B %d, %Y")
                             except IndexError:
                                 # Happens when dates has no values.
                                 print "  No options available."
                         for k, date in enumerate(dates[0:4]):
                             if date.year >= 1900:
                                 # strftime can't handle dates before 1900.
-                                print "  %s) %s" % (k + 2, date.strftime("%B %d, %Y"))
+                                print "  %s) %s" % (k + 2,
+                                                    date.strftime("%B %d, %Y"))
                         choice = raw_input("Enter the date or an option to proceed [1]: ")
                         choice = choice or 1
                         if str(choice) == '1':
