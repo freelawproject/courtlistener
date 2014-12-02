@@ -245,6 +245,13 @@ div.hopscotch-bubble .hopscotch-bubble-close {
     color: gray;
 }
 
+.no-underline,
+.no-underline:hover,
+.no-underline:active,
+.no-underline:focus {
+    text-decoration: none;
+}
+
 .gray, .grey {
     color: gray;
 }
