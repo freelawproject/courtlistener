@@ -93,6 +93,14 @@ class SearchTest(SolrTestCase):
         r = self.client.get('/', {'q': '*:*', 'caseName': 'tarrant'})
         self.assertIn('Tarrant', r.content)
 
+    def test_a_query_with_white_space_only(self):
+        """Does everything work when whitespace is in various fields?"""
+        r = self.client.get('/', {'q': ' ',
+                                  'judge': ' ',
+                                  'case_name': ' '})
+        self.assertIn('Tarrant', r.content)
+        self.assertNotIn('deadly', r.content)
+
     def test_a_query_with_a_date(self):
         """Does querying by date work?"""
         response = self.client.get('/', {'q': '*:*',

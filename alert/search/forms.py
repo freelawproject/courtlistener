@@ -351,6 +351,11 @@ class SearchForm(forms.Form):
                 if key.startswith('court_'):
                     cleaned_data[key] = True
 
+        # 4. Strip any whitespace, otherwise it crashes Solr.
+        for k, v in cleaned_data.iteritems():
+            if isinstance(v, basestring):
+                cleaned_data[k] = v.strip()
+
         # Here we reset the defaults.
         stat_bools = [v for k, v in cleaned_data.iteritems()
                       if k.startswith('stat_')]
