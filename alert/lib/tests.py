@@ -1,5 +1,6 @@
 from django.test import TestCase
 from alert.lib.string_utils import trunc
+from lib.search_utils import make_fq
 
 
 class TestStringUtils(TestCase):
@@ -42,4 +43,23 @@ class TestStringUtils(TestCase):
                 msg="Failed with dict: %s.\n"
                     "%s is longer than %s" %
                     (test_dict, result, test_dict['length'])
+            )
+
+
+class TestMakeFQ(TestCase):
+    def test_make_fq(self):
+        test_pairs = (
+            ('1 2', '1 AND 2'),
+            ('1 and 2', '1 AND 2'),
+            ('"1 AND 2"', '"1 AND 2"'),
+            ('"1 2"', '"1 2"'),
+            ('1 OR 2', '1 OR 2'),
+            ('1 NOT 2', '1 NOT 2'),
+        )
+        for test in test_pairs:
+            field = 'f'
+            key = 'key'
+            self.assertEqual(
+                make_fq(cd={key: test[0]}, field=field, key=key),
+                '%s:(%s)' % (field, test[1])
             )

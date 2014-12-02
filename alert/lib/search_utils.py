@@ -203,7 +203,20 @@ def make_fq(cd, field, key):
     if '"' in cd[key]:
         fq = '%s:(%s)' % (field, cd[key])
     else:
-        fq = '%s:(%s)' % (field, ' AND '.join(cd[key].split()))
+
+        words = cd[key].split()
+        q = [words[0]]
+        needs_default_conjunction = True
+        for word in words[1:]:
+            if word.lower() in ['and', 'or', 'not']:
+                q.append(word.upper())
+                needs_default_conjunction = False
+            else:
+                if needs_default_conjunction:
+                    q.append('AND')
+                q.append(word)
+                needs_default_conjunction = True
+        fq = '%s:(%s)' % (field, ' '.join(q))
     return fq
 
 
