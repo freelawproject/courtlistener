@@ -105,48 +105,55 @@ def get_extension(content):
 
 
 def get_binary_content(download_url, cookies, method='GET'):
-    """ Downloads the file, covering a few special cases such as invalid SSL certificates and empty file errors.
+    """ Downloads the file, covering a few special cases such as invalid SSL
+    certificates and empty file errors.
 
     :param download_url: The URL for the item you wish to download.
     :param cookies: Cookies that might be necessary to download the item.
-    :param method: The HTTP method used to get the item, or "LOCAL" to get an item during testing
-    :return: Two values. The first is a msg indicating any errors encountered. If blank, that indicates success. The
-    second value is the response object containing the downloaded file.
+    :param method: The HTTP method used to get the item, or "LOCAL" to get an
+    item during testing
+    :return: Two values. The first is a msg indicating any errors encountered.
+    If blank, that indicates success. The second value is the response object
+    containing the downloaded file.
     """
     if not download_url:
         # Occurs when a DeferredList fetcher fails.
-        msg = 'NoDownloadUrlError: %s\n%s' % (download_url, traceback.format_exc())
+        msg = 'NoDownloadUrlError: %s\n%s' % (download_url,
+                                              traceback.format_exc())
         return msg, None
     # noinspection PyBroadException
     try:
         if method == 'LOCAL':
-            mr = MockRequest(url=os.path.join(settings.INSTALL_ROOT, 'alert', download_url))
+            mr = MockRequest(url=os.path.join(
+                settings.INSTALL_ROOT,
+                'alert',
+                download_url)
+            )
             r = mr.get()
         else:
-            # Note that we do a GET even if site.method is POST. This is deliberate.
+            # Note that we do a GET even if site.method is POST. This is
+            # deliberate.
             s = requests.session()
             headers = {'User-Agent': 'CourtListener'}
-            try:
-                r = s.get(download_url,
-                          headers=headers,
-                          cookies=cookies)
-            except SSLError:
-                # Washington has a certificate we don't understand.
-                r = s.get(download_url,
-                          verify=False,
-                          headers=headers,
-                          cookies=cookies)
+
+            r = s.get(download_url,
+                      verify=False,  # WA has a certificate we don't understand
+                      headers=headers,
+                      cookies=cookies)
 
             # test for empty files (thank you CA1)
             if len(r.content) == 0:
-                msg = 'EmptyFileError: %s\n%s' % (download_url, traceback.format_exc())
+                msg = 'EmptyFileError: %s\n%s' % (download_url,
+                                                  traceback.format_exc())
                 return msg, None
 
             # test for and follow meta redirects
             r = follow_redirections(r, s)
+
+            r.raise_for_status()
     except:
-        msg = 'DownloadingError: %s\n%s' % (download_url, traceback.format_exc())
-        print msg
+        msg = 'DownloadingError: %s\n%s' % (download_url,
+                                            traceback.format_exc())
         return msg, None
 
     # Success!
