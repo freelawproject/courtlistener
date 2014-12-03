@@ -26,7 +26,6 @@ from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
 from lxml import html
 from optparse import make_option
-from requests.exceptions import SSLError
 from urlparse import urljoin
 
 # for use in catching the SIGINT (Ctrl+4)
