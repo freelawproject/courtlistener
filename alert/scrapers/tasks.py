@@ -36,7 +36,7 @@ def get_clean_body_content(content):
     """Parse out the body from an html string, clean it up, and send it along.
     """
     cleaner = Cleaner(style=True,
-                      remove_tags=['a', 'body', 'font', 'noscript'])
+                      remove_tags=['a', 'body', 'font', 'noscript', 'img'])
     try:
         return cleaner.clean_html(content)
     except XMLSyntaxError:
