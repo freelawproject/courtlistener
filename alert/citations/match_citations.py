@@ -93,8 +93,14 @@ def match_citation(citation, citing_doc):
         if citation.lookup_index:
             # Some cases can't be disambiguated.
             reporter_dates = REPORTERS[citation.canonical_reporter][citation.lookup_index]['editions'][citation.reporter]
-            start_year = reporter_dates['start'].year
-            end_year = reporter_dates['end'].year
+            if hasattr(reporter_dates['start'], 'year'):
+                start_year = reporter_dates['start'].year
+            else:
+                start_year = 1750
+            if hasattr(reporter_dates['end'], 'year'):
+                end_year = reporter_dates['end'].year
+            else:
+                end_year = 2030
         if citing_doc.date_filed:
             end_year = min(end_year, citing_doc.date_filed.year)
     date_param = 'dateFiled:%s' % build_date_range(start_year, end_year)
