@@ -83,18 +83,16 @@
         {# Download original? #}
         {% if af.download_url or af.local_path_mp3 %}
             <div class="sidebar-section">
-                <h3><span>View Original</span></h3>
+                <h3><span>Download</span></h3>
                 <p>
                     {% if af.download_url %}
-                        <a href="{{ af.download_url }}" class="visitable">From
-                            the court</a>
+                        <a href="{{ af.download_url }}" class="visitable">Original</a>
                     {% endif %}
                     {% if af.download_url and af.local_path_mp3 %}
                         &nbsp;&nbsp;|&nbsp;&nbsp;
                     {% endif %}
                     {% if af.local_path_mp3 %}
-                        <a href="/{{ af.local_path_mp3 }}" class="visitable">Our
-                            backup</a>
+                        <a href="/{{ af.local_path_mp3 }}" class="visitable">Our Version</a>
                     {% endif %}
                 </p>
             </div>
