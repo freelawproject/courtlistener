@@ -153,10 +153,9 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
 
     TODO: this implementation cannot be distributed due to using local paths.
     """
-    doc = Document.objects.get(pk=pk)
+    d = Document.objects.get(pk=pk)
 
-    path = str(doc.local_path)
-    path = os.path.join(settings.MEDIA_ROOT, path)
+    path = d.local_path.path
 
     extension = path.split('.')[-1]
     if extension == 'doc':
@@ -164,47 +163,47 @@ def extract_doc_content(pk, callback=None, citation_countdown=0):
     elif extension == 'html':
         content, err = extract_from_html(path)
     elif extension == 'pdf':
-        doc, content, err = extract_from_pdf(doc, path, DEVNULL, callback)
+        d, content, err = extract_from_pdf(d, path, DEVNULL, callback)
     elif extension == 'txt':
         content, err = extract_from_txt(path)
     elif extension == 'wpd':
-        doc, content, err = extract_from_wpd(doc, path, DEVNULL)
+        d, content, err = extract_from_wpd(d, path, DEVNULL)
     else:
         print ('*****Unable to extract content due to unknown extension: %s '
-               'on doc: %s****' % (extension, doc))
+               'on d: %s****' % (extension, d))
         return 2
 
     if extension in ['html', 'wpd']:
-        doc.html, blocked = anonymize(content)
+        d.html, blocked = anonymize(content)
     else:
-        doc.plain_text, blocked = anonymize(content)
+        d.plain_text, blocked = anonymize(content)
 
     if blocked:
-        doc.blocked = True
-        doc.date_blocked = now()
+        d.blocked = True
+        d.date_blocked = now()
 
     if err:
-        print "****Error extracting text from %s: %s****" % (extension, doc)
-        return doc
+        print "****Error extracting text from %s: %s****" % (extension, d)
+        return d
 
     try:
         if citation_countdown == 0:
             # No waiting around. Save to the database now, but don't bother
             # with the index yet because citations are being done imminently.
-            doc.save(index=False)
+            d.save(index=False)
         else:
             # Save to the index now, citations come later, commit comes
             # according to schedule
-            doc.save(index=True)
+            d.save(index=True)
     except Exception, e:
-        print "****Error saving text to the db for: %s****" % doc
+        print "****Error saving text to the db for: %s****" % d
         print traceback.format_exc()
-        return doc
+        return d
 
     # Identify and link citations within the document content
-    update_document_by_id.apply_async((doc.pk,), countdown=citation_countdown)
+    update_document_by_id.apply_async((d.pk,), countdown=citation_countdown)
 
-    return doc
+    return d
 
 
 def convert_to_pngs(path, tmp_file_prefix):
@@ -216,18 +215,14 @@ def convert_to_pngs(path, tmp_file_prefix):
     return magick_out
 
 
-def convert_to_txt(tmp_file_prefix, image_type):
-    if image_type == 'tiffs':
-        tesseract_command = ['tesseract', '%s.tiff' % tmp_file_prefix,
-                             tmp_file_prefix, '-l', 'eng']
-        tess_out = subprocess.check_output(tesseract_command,
-                                           stderr=subprocess.STDOUT)
-    elif image_type == 'pngs':
-        for png in sorted(glob.glob('%s*' % tmp_file_prefix)):
-            if 'tiff' not in png:
-                tesseract_command = ['tesseract', png, png[:-4], '-l', 'eng']
-                tess_out = subprocess.check_output(tesseract_command,
-                                                   stderr=subprocess.STDOUT)
+def convert_to_txt(tmp_file_prefix):
+    tess_out = ''
+    for png in sorted(glob.glob('%s*' % tmp_file_prefix)):
+        tesseract_command = ['tesseract', png, png[:-4], '-l', 'eng']
+        tess_out = subprocess.check_output(
+            tesseract_command,
+            stderr=subprocess.STDOUT
+        )
     return tess_out
 
 
@@ -251,7 +246,7 @@ def extract_by_ocr(path):
             success = False
 
         try:
-            convert_to_txt(tmp_file_prefix, image_type='pngs')
+            convert_to_txt(tmp_file_prefix)
         except subprocess.CalledProcessError:
             # All is lost.
             content = fail_msg
@@ -265,7 +260,7 @@ def extract_by_ocr(path):
         except IOError:
             print ("OCR was unable to finish due to not having a txt file "
                    "created. This usually happens when Tesseract cannot "
-                   "ingest the tiff file created for the pdf at: %s" % path)
+                   "ingest the file created for the pdf at: %s" % path)
             content = fail_msg
             success = False
 
