@@ -27,13 +27,22 @@
 
 
         {# show the admin tools if applicable #}
-        {% if user.is_superuser %}
+        {% if perms.search.change_docket or perms.search.change_document or perms.search.change_citation %}
             <div class="sidebar-section">
                 <h3><span>Admin</span></h3>
                 <p>
-                    <a href="/admin/search/docket/{{ doc.docket_id }}/">Docket</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-                    <a href="/admin/search/document/{{doc.pk}}/">Document</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-                    <a href="/admin/search/citation/{{doc.citation_id}}/">Citation</a>
+                    {% if perms.search.change_docket %}
+                        <a href="/admin/search/docket/{{ doc.docket_id }}/"
+                           class="btn btn-primary btn-xs">Docket</a>
+                    {% endif %}
+                    {% if perms.search.change_document %}
+                        <a href="/admin/search/document/{{doc.pk}}/"
+                           class="btn btn-primary btn-xs">Document</a>
+                    {% endif %}
+                    {% if perms.search.change_citation %}
+                        <a href="/admin/search/citation/{{doc.citation_id}}/"
+                           class="btn btn-primary btn-xs">Citation</a>
+                    {% endif %}
                 </p>
             </div>
         {% endif %}

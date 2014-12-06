@@ -52,12 +52,18 @@
 
 
         {# show the admin tools if applicable #}
-        {% if user.is_superuser %}
+        {% if perms.search.change_docket or perms.audio.change_audio %}
             <div class="sidebar-section">
                 <h3><span>Admin</span></h3>
                 <p>
-                    <a href="/admin/search/docket/{{ af.docket_id }}/">Docket</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-                    <a href="/admin/audio/audio/{{ af.pk }}/">Audio File</a>
+                    {% if perms.search.change_docket %}
+                        <a href="/admin/search/docket/{{ af.docket_id }}/"
+                           class="btn btn-primary btn-xs">Docket</a>
+                    {% endif %}
+                    {% if perms.audio.change_audio %}
+                        <a href="/admin/audio/audio/{{ af.pk }}/"
+                           class="btn btn-primary btn-xs">Audio File</a>
+                    {% endif %}
                 </p>
             </div>
         {% endif %}

@@ -12,10 +12,13 @@
 
 {% block content %}
     <div class="col-xs-12">
-        {% if user.is_superuser %}
-            <p class="float-right"><a
-                    href="/admin/search/docket/{{ docket.pk }}/">Edit&nbsp;Docket&nbsp;<i
-                    class="fa fa-pencil"></i></a></p>
+        {% if perms.search.change_docket %}
+            <p class="float-right">
+                <a href="/admin/search/docket/{{ docket.pk }}/"
+                   class="btn btn-primary btn-xs">Edit&nbsp;Docket&nbsp;<i
+                   class="fa fa-pencil"></i>
+                </a>
+            </p>
         {% endif %}
         <h2>{{ docket.case_name|safe|v_wrapper }}</h2>
 
@@ -29,8 +32,9 @@
                         <a href="{{ document.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
                             {{ document.caption|safe|v_wrapper }}
                         </a>
-                        {% if user.is_superuser %}
-                            &ndash;&nbsp;<a href="/admin/search/document/{{ document.pk }}/">Edit&nbsp;<i class="fa fa-pencil"></i></a>
+                        {% if perms.search.change_document %}
+                            <a href="/admin/search/document/{{ document.pk }}/"
+                               class="btn btn-primary btn-xs">Edit</a>
                         {% endif %}
                         <br/>
                         {{ document.date_filed }}
@@ -50,8 +54,9 @@
                         <a href="{{ af.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
                             {{ af.case_name|safe|v_wrapper }}
                         </a>
-                        {% if user.is_superuser %}
-                            &ndash;&nbsp;<a href="/admin/audio/audio/{{ af.pk }}/">Edit&nbsp;<i class="fa fa-pencil"></i></a>
+                        {% if perms.audio.change_audio %}
+                            <a href="/admin/audio/audio/{{ af.pk }}/"
+                               class="btn btn-primary btn-xs">Edit</a>
                         {% endif %}
                         <br/>
                         {{ af.date_argued }}
