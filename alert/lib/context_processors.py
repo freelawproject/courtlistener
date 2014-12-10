@@ -8,7 +8,7 @@ def inject_settings(request):
     }
 
 
-info_quotes = (
+info_tips = (
     # RECAP
     '<a href="http://www.recapthelaw.org" target="_blank">RECAP</a> is our browser extension that saves you money whenever you use PACER.',
     'Using the <a href="http://www.recapthelaw.org">RECAP project</a> means never paying for the same PACER document twice.',
@@ -50,4 +50,4 @@ info_quotes = (
     'You can make sophisticated queries using a number of <a href="/search/advanced-techniques/">advanced search features</a>.',
 )
 def inject_random_tip(request):
-    return {'TIP': random.choice(info_quotes)}
+    return {'TIP': random.choice(info_tips)}
