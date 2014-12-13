@@ -106,6 +106,7 @@
 
         {% include "includes/social_links.html" with title_type="Oral Argument" %}
 
+        {% if not user.is_authenticated %}
         <script async
                 src="//pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
         <ins class="adsbygoogle"
@@ -116,6 +117,7 @@
         <script>
             (adsbygoogle = window.adsbygoogle || []).push({});
         </script>
+        {%  endif %}
     </div>
 {% endblock %}
 
