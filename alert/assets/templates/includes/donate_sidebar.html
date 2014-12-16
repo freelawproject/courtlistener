@@ -1,3 +1,5 @@
+{% load humanize %}
+
 <div class="sidebar-section hidden-xs">
     {% if user.profile.total_donated_last_year < 10 %}
         <h3><span>Donate to Turn Off Ads</span></h3>
@@ -28,7 +30,7 @@
     {% else %}
         <h3><span>Thank You</span></h3>
         <p>In the last year you donated
-            <strong>${{ user.profile.total_donated_last_year }}</strong>. This
+            <strong>${{ user.profile.total_donated_last_year|intcomma }}</strong>. This
             support allows us to begin new initiatives and support users like
             you.
         </p>
