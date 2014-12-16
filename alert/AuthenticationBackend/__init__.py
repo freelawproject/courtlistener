@@ -7,6 +7,11 @@ from django import forms
 class ConfirmedEmailAuthenticationForm(AuthenticationForm):
     """Your average form, but with an additional tweak to the clean method
     which ensures that only users with confirmed email addresses can log in.
+
+    This is needed because we create stub accounts for people that donate and
+    don't already have accounts. Without this check, people could sign up for
+    accounts, log in, and see the donations of somebody that previously only
+    had a stub account.
     """
     def __init__(self, *args, **kwargs):
         super(ConfirmedEmailAuthenticationForm, self).__init__(*args, **kwargs)
