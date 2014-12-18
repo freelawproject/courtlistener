@@ -61,4 +61,4 @@ with open(SCDB_FILENAME) as f:
             print 'Exactly one match found for %s' % d['caseId']
         elif len(ds) > 1:
             print 'Multiple items found for %s (we found %s): (%s)' % \
-                  (d['caseId'], len(ds), ', '.join([d.citation.pk for d in ds]))
+                  (d['caseId'], len(ds), ', '.join([str(d.citation.pk) for d in ds]))
