@@ -31,7 +31,7 @@ DATA_DIR = os.path.dirname(__name__)
 SCDB_FILENAME = os.path.join(DATA_DIR, 'SCDB_2014_01_caseCentered_Citation.csv')
 SCDB_BEGINS = date(1946, 11, 18)
 SCDB_ENDS = date(2014, 6, 19)
-START_ROW = 63
+START_ROW = 101
 
 with open(SCDB_FILENAME) as f:
     dialect = csv.Sniffer().sniff(f.read(1024))
@@ -75,6 +75,6 @@ with open(SCDB_FILENAME) as f:
         elif len(ds) > 1:
             print '  Multiple items found for %s (we found %s):' % \
                   (d['caseId'], len(ds))
-            print '    Documents: %s' % ', '.join([str(d.pk) for d in ds])
-            print '    Citations: %s' % ', '.join([str(d.citation.pk) for d in ds])
-            print '    Dockets:   %s' % ', '.join([str(d.docket.pk) for d in ds])
+            print '    Documents: %s' % ' '.join([str(d.pk) for d in ds])
+            print '    Citations: %s' % ' '.join([str(d.citation.pk) for d in ds])
+            print '    Dockets:   %s' % ' '.join([str(d.docket.pk) for d in ds])
