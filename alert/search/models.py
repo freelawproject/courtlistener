@@ -453,6 +453,13 @@ class Document(models.Model):
         'Whether this document is a stub or not',
         default=False
     )
+    supreme_court_db_id = models.CharField(
+        help_text='The ID of the item in the Supreme Court Database',
+        max_length=10,
+        blank=True,
+        null=True,
+        db_index=True,
+    )
 
     @property
     def caption(self):

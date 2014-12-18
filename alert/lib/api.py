@@ -45,6 +45,8 @@ class ModelResourceWithFieldsFilter(ModelResource):
     def alter_list_data_to_serialize(self, request, data):
         # Add a request_uri field
         data['meta']['request_uri'] = request.get_full_path()
+        data['meta']['donate'] = 'Please donate today to support more ' \
+                                 'projects from Free Law Project.'
 
         return data
 
@@ -68,7 +70,8 @@ class ModelResourceWithFieldsFilter(ModelResource):
         return bundle
 
     def dispatch(self, request_type, request, **kwargs):
-        """Simple override here to tally stats before sending off the results."""
+        """Simple override here to tally stats before sending off the
+        results."""
         tally_stat(self.tally_name)
         return super(ModelResourceWithFieldsFilter, self).dispatch(request_type, request, **kwargs)
 

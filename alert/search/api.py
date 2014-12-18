@@ -121,7 +121,7 @@ class DocumentResource(DeprecatedModelResourceWithFieldsFilter):
         max_limit = 20
         allowed_methods = ['get']
         include_absolute_url = True
-        excludes = ['is_stub_document', 'cases_cited', ]
+        excludes = ['is_stub_document', 'cases_cited', 'supreme_court_db_id',]
         filtering = {
             'id': ('exact',),
             'time_retrieved': good_time_filters,
@@ -165,8 +165,10 @@ class CitedByResource(DeprecatedModelResourceWithFieldsFilter):
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'cited-by'
         queryset = Document.objects.all()
-        excludes = ('is_stub_document', 'html', 'html_lawbox',
-                    'html_with_citations', 'plain_text',)
+        excludes = (
+            'is_stub_document', 'html', 'html_lawbox', 'html_with_citations',
+            'plain_text', 'supreme_court_db_id',
+        )
         include_absolute_url = True
         max_limit = 20
         list_allowed_methods = ['get']
@@ -237,7 +239,7 @@ class CitesResource(DeprecatedModelResourceWithFieldsFilter):
         queryset = Document.objects.all()
         excludes = (
             'is_stub_document', 'html', 'html_lawbox', 'html_with_citations',
-            'plain_text',
+            'plain_text', 'supreme_court_db_id',
         )
         include_absolute_url = True
         max_limit = 20
