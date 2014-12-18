@@ -42,19 +42,23 @@ with open(SCDB_FILENAME) as f:
         if len(ds) == 0:
             ds = Document.objects.filter(
                 supreme_court_db_id=d['caseId'])
-        if len(ds) == 0:
-            # None found by supreme_court_db_id. Try by citation number.
-            ds = Document.objects.filter(
-                citation__federal_cite_one=d['usCite'])
-        if len(ds) == 0:
-            ds = Document.objects.filter(
-                citation__federal_cite_two=d['usCite'])
-        if len(ds) == 0:
-            ds = Document.objects.filter(
-                citation__federal_cite_three=d['usCite'])
+        if d['usCite'].strip():
+            # Only do these lookups if there is in fact a usCite value.
+            if len(ds) == 0:
+                # None found by supreme_court_db_id. Try by citation number.
+                ds = Document.objects.filter(
+                    citation__federal_cite_one=d['usCite'])
+            if len(ds) == 0:
+                ds = Document.objects.filter(
+                    citation__federal_cite_two=d['usCite'])
+            if len(ds) == 0:
+                ds = Document.objects.filter(
+                    citation__federal_cite_three=d['usCite'])
 
-        if len(ds) > 1:
-            print 'Multiple items found for %s (we found %s)' % \
-                  (d['caseId'], len(ds))
-        elif len(ds) == 0:
+        if len(ds) == 0:
             print 'No items found for %s' % d['caseId']
+        elif len(ds) == 1:
+            print 'Exactly one match found for %s' % d['caseId']
+        elif len(ds) > 1:
+            print 'Multiple items found for %s (we found %s): (%s)' % \
+                  (d['caseId'], len(ds), ', '.join([d.citation.pk for d in ds]))
