@@ -31,7 +31,7 @@ DATA_DIR = os.path.dirname(__name__)
 SCDB_FILENAME = os.path.join(DATA_DIR, 'SCDB_2014_01_caseCentered_Citation.csv')
 SCDB_BEGINS = date(1946, 11, 18)
 SCDB_ENDS = date(2014, 6, 19)
-START_ROW = 0
+START_ROW = 62
 
 with open(SCDB_FILENAME) as f:
     dialect = csv.Sniffer().sniff(f.read(1024))
@@ -41,7 +41,7 @@ with open(SCDB_FILENAME) as f:
         # Iterate over every item, looking for matches in various ways.
         if i < START_ROW:
             continue
-        print "Row is: %s" % i
+        print "Row is: %s. ID is: %s" % (i, d['caseId'])
 
         ds = EmptyQuerySet()
         if len(ds) == 0:
