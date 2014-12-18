@@ -15,11 +15,16 @@ Once located, we update items:
  - Docket number?
  - supreme_court_db_id
 """
+import os
+import sys
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alert.settings")
+
 from alert.search.models import Document
 import csv
 from datetime import date
 from django.db.models.query import EmptyQuerySet
-import os
 
 
 DATA_DIR = os.path.dirname(__name__)
