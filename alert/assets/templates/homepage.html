@@ -74,8 +74,7 @@
             <li><a href="/coverage/">Coverage</a></li>
         {% if request.path != "/sign-out/" %}
             <li>
-                <a href="{% url "sign-in" %}?next={{ request.path }}?
-                        {{ get_string|urlencode }}{% if results %}page={{ results.number }}{% endif %}">
+                <a href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}{% if results %}page={{ results.number }}{% endif %}">
                     Sign in / Register
                 </a>
             </li>
