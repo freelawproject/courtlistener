@@ -109,7 +109,7 @@ with open(SCDB_FILENAME) as f:
             except XMLSyntaxError:
                 # hit error on item 1414
                 print '    Unable to form XML. Forcing manual review.'
-
+                cos_sim = 0
 
             if cos_sim > 0.96:
                 proceed = True
