@@ -31,7 +31,7 @@ DATA_DIR = os.path.dirname(__name__)
 SCDB_FILENAME = os.path.join(DATA_DIR, 'SCDB_2014_01_caseCentered_Citation.csv')
 SCDB_BEGINS = date(1946, 11, 18)
 SCDB_ENDS = date(2014, 6, 19)
-START_ROW = 138
+START_ROW = 145
 
 with open(SCDB_FILENAME) as f:
     dialect = csv.Sniffer().sniff(f.read(1024))
@@ -75,13 +75,16 @@ with open(SCDB_FILENAME) as f:
         elif len(ds) > 1:
             print '  Multiple items found for %s (we found %s):' % \
                   (d['caseId'], len(ds))
+            print '    Absolute URLs:\n      %s' % '\n      '.join([
+                'https://www.courtlistener.com/opinion/%s/slug/' % d.pk
+                for d in ds])
             print '    Documents:\n      %s' % '\n      '.join([
                 'https://www.courtlistener.com/admin/search/document/%s/' % d.pk
                 for d in ds])
 
-            print '    Citations: %s' % '\n      '.join([
+            print '    Citations:\n      %s' % '\n      '.join([
                 'https://www.courtlistener.com/admin/search/citation/%s/' % d.citation.pk
                 for d in ds])
-            print '    Dockets:   %s' % '\n      '.join([
+            print '    Dockets:\n      %s' % '\n      '.join([
                 'https://www.courtlistener.com/admin/search/docket/%s/' % d.docket.pk
                 for d in ds])
