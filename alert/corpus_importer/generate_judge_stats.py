@@ -3,11 +3,11 @@ import pickle
 import pprint
 import argparse
 
-from datetime import date, timedelta
 import time
-from alert.corpus_importer.import_law_box import get_html_from_raw_text, get_judge, get_court_object
+from alert.corpus_importer.import_law_box import (
+    get_judge, get_court_object, get_html_from_raw_text,
+)
 from alert.search.models import Court
-
 
 DEBUG = 4
 

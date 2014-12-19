@@ -1,7 +1,8 @@
 import subprocess
 import traceback
-from alert.corpus_importer.import_law_box import (get_html_from_raw_text, get_court_object, get_judge,
-                                                  get_citations_from_tree)
+from alert.corpus_importer.import_law_box import (
+    get_court_object, get_citations_from_tree, get_html_from_raw_text
+)
 import datetime
 
 

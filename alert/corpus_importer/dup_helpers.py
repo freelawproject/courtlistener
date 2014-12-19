@@ -2,6 +2,9 @@ import os
 import string
 from django.utils.text import slugify
 from django.utils.timezone import now
+from lxml import html
+from lxml.html import tostring
+from lxml.html.clean import Cleaner
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 import sys
@@ -12,7 +15,6 @@ from alert.lib.string_utils import anonymize, trunc
 from alert.search.models import Document, save_doc_and_cite
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 
-import datetime
 import re
 import subprocess
 
@@ -245,3 +247,24 @@ class Case(object):
                 self.case_name_fix_file.write("%s|%s\n" % (self.sha1_hash, case_name))
 
         return case_name, status
+
+
+def get_html_from_raw_text(raw_text):
+    """Using the raw_text, creates four useful variables:
+        1. complete_html_tree: A tree of the complete HTML from the file, including <head> tags and whatever else.
+        2. clean_html_tree: A tree of the HTML after stripping bad stuff.
+        3. clean_html_str: A str of the HTML after stripping bad stuff.
+        4. body_text: A str of the text of the body of the document.
+
+    We require all of these because sometimes we need the complete HTML tree, other times we don't. We create them all
+    up front for performance reasons.
+    """
+    complete_html_tree = html.fromstring(raw_text)
+    cleaner = Cleaner(style=True,
+                      remove_tags=('a', 'body', 'font', 'noscript',),
+                      kill_tags=('title',),)
+    clean_html_str = cleaner.clean_html(raw_text)
+    clean_html_tree = html.fromstring(clean_html_str)
+    body_text = tostring(clean_html_tree, method='text', encoding='unicode')
+
+    return clean_html_tree, complete_html_tree, clean_html_str, body_text

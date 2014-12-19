@@ -14,11 +14,11 @@ import subprocess
 import traceback
 from django.utils.timezone import now
 from django import db
-from lxml import html
 from alert.citations.find_citations import get_citations
 from datetime import timedelta
 from alert.corpus_importer.court_regexes import fd_pairs, state_pairs, \
     disambiguate_by_judge, fb_pairs
+from alert.corpus_importer.dup_helpers import get_html_from_raw_text
 from alert.corpus_importer.judge_extractor import get_judge_from_str
 from alert.corpus_importer import dup_finder, dup_helpers
 from alert.lib.string_utils import anonymize
@@ -29,7 +29,6 @@ import argparse
 import datetime
 import fnmatch
 import hashlib
-from lxml.html.clean import Cleaner
 from lxml.html import tostring
 
 from alert.search.models import Document, Citation, Court, save_doc_and_cite, Docket
@@ -556,27 +555,6 @@ def get_judge(html, case_path=None):
         log_print('  Judge: %s' % judge)
 
     return judge
-
-
-def get_html_from_raw_text(raw_text):
-    """Using the raw_text, creates four useful variables:
-        1. complete_html_tree: A tree of the complete HTML from the file, including <head> tags and whatever else.
-        2. clean_html_tree: A tree of the HTML after stripping bad stuff.
-        3. clean_html_str: A str of the HTML after stripping bad stuff.
-        4. body_text: A str of the text of the body of the document.
-
-    We require all of these because sometimes we need the complete HTML tree, other times we don't. We create them all
-    up front for performance reasons.
-    """
-    complete_html_tree = html.fromstring(raw_text)
-    cleaner = Cleaner(style=True,
-                      remove_tags=('a', 'body', 'font', 'noscript',),
-                      kill_tags=('title',),)
-    clean_html_str = cleaner.clean_html(raw_text)
-    clean_html_tree = html.fromstring(clean_html_str)
-    body_text = tostring(clean_html_tree, method='text', encoding='unicode')
-
-    return clean_html_tree, complete_html_tree, clean_html_str, body_text
 
 
 def import_law_box_case(case_path):

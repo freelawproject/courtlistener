@@ -1,8 +1,8 @@
-import pickle
-import subprocess
-from alert.corpus_importer.import_law_box import (get_html_from_raw_text, get_court_object, get_judge,
-                                                  get_citations_from_tree, get_date_filed)
 import datetime
+import pickle
+from alert.corpus_importer.dup_helpers import get_html_from_raw_text
+from alert.corpus_importer.import_law_box import get_citations_from_tree
+
 
 DEBUG = [
     'counter',
