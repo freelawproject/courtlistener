@@ -21,6 +21,7 @@ execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alert.settings")
 
+from alert.citations.tasks import update_document_by_id
 from alert.search.models import Document
 import csv
 from datetime import date
@@ -32,6 +33,23 @@ SCDB_FILENAME = os.path.join(DATA_DIR, 'SCDB_2014_01_caseCentered_Citation.csv')
 SCDB_BEGINS = date(1946, 11, 18)
 SCDB_ENDS = date(2014, 6, 19)
 START_ROW = 171
+
+
+def merge_docs(first_pk, second_pk):
+    first = Document.objects.get(pk=first_pk)
+    second = Document.objects.get(pk=second_pk)
+    first.source = 'LR'
+    first.judges = second.judges
+    first.html_lawbox = second.html_lawbox
+    first.save()
+    first.citation.case_name = second.citation.case_name
+    first.citation.slug = second.citation.slug
+    first.citation.save()
+    second.docket.delete()
+    second.citation.delete()
+    second.delete()
+    update_document_by_id(first_pk)
+
 
 with open(SCDB_FILENAME) as f:
     dialect = csv.Sniffer().sniff(f.read(1024))
@@ -72,19 +90,11 @@ with open(SCDB_FILENAME) as f:
             print '  No items found for %s' % d['caseId']
         elif len(ds) == 1:
             print '  Exactly one match found for %s' % d['caseId']
-        elif len(ds) > 1:
-            print '  Multiple items found for %s (we found %s):' % \
-                  (d['caseId'], len(ds))
+        elif len(ds) == 2:
+            print '  Two items found for %s:' % (d['caseId'], len(ds))
             print '    Absolute URLs:\n      %s' % '\n      '.join([
                 'https://www.courtlistener.com/opinion/%s/slug/' % d.pk
                 for d in ds])
-            print '    Documents:\n      %s' % '\n      '.join([
-                'https://www.courtlistener.com/admin/search/document/%s/' % d.pk
-                for d in ds])
-
-            print '    Citations:\n      %s' % '\n      '.join([
-                'https://www.courtlistener.com/admin/search/citation/%s/' % d.citation.pk
-                for d in ds])
-            print '    Dockets:\n      %s' % '\n      '.join([
-                'https://www.courtlistener.com/admin/search/docket/%s/' % d.docket.pk
-                for d in ds])
+            proceed = raw_input("Should we merge these? (Ctrl+C to quit, or "
+                                "Enter to merge.")
+            merge_docs(first_pk=ds[0], second_pk=ds[1])
