@@ -87,11 +87,11 @@ with open(SCDB_FILENAME) as f:
                 print "%s matches found." % len(ds)
 
         if len(ds) == 0:
-            print '  No items found for %s' % d['caseId']
+            print '  No items found.'
         elif len(ds) == 1:
-            print '  Exactly one match found for %s' % d['caseId']
+            print '  Exactly one match found.'
         elif len(ds) == 2:
-            print '  Two items found for %s:' % (d['caseId'], len(ds))
+            print '  Two items found.'
             print '    Absolute URLs:\n      %s' % '\n      '.join([
                 'https://www.courtlistener.com/opinion/%s/slug/' % d.pk
                 for d in ds])
