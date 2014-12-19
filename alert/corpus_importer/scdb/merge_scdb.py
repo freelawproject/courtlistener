@@ -75,13 +75,13 @@ with open(SCDB_FILENAME) as f:
         elif len(ds) > 1:
             print '  Multiple items found for %s (we found %s):' % \
                   (d['caseId'], len(ds))
-            print '    Documents:\n      %s' % '      \n'.join([
+            print '    Documents:\n      %s' % '\n      '.join([
                 'https://www.courtlistener.com/admin/search/document/%s/' % d.pk
                 for d in ds])
 
-            print '    Citations: %s' % '      \n'.join([
+            print '    Citations: %s' % '\n      '.join([
                 'https://www.courtlistener.com/admin/search/citation/%s/' % d.citation.pk
                 for d in ds])
-            print '    Dockets:   %s' % '      \n'.join([
+            print '    Dockets:   %s' % '\n      '.join([
                 'https://www.courtlistener.com/admin/search/docket/%s/' % d.docket.pk
                 for d in ds])
