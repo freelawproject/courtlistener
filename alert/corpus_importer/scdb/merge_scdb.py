@@ -17,11 +17,14 @@ Once located, we update items:
 """
 import os
 import sys
+
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alert.settings")
 
 from alert.citations.tasks import update_document_by_id
+from alert.corpus_importer.import_law_box import get_html_from_raw_text
+from alert.lib.string_diff import get_cosine_similarity
 from alert.search.models import Document
 import csv
 from datetime import date
@@ -95,6 +98,13 @@ with open(SCDB_FILENAME) as f:
             print '    Absolute URLs:\n      %s' % '\n      '.join([
                 'https://www.courtlistener.com/opinion/%s/slug/' % d.pk
                 for d in ds])
+
+            # Get the cosine similarity
+            _, _, _, body_text_0 = get_html_from_raw_text(ds[0].html)
+            _, _, _, body_text_1 = get_html_from_raw_text(ds[1].html_lawbox)
+            cos_sim = get_cosine_similarity(body_text_0, body_text_1)
+            print '    Cosine similarity is: %s'
+
             proceed = raw_input("    Should we merge these? (Ctrl+C to quit, "
-                                "or Enter to merge.")
+                                "or Enter to merge):")
             merge_docs(first_pk=ds[0].pk, second_pk=ds[1].pk)
