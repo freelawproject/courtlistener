@@ -32,13 +32,17 @@ class Command(BaseCommand):
             help='end id for a range of documents to update'
         ),
         make_option(
-            # Note that there's a temptation to add a field here for date_modified, so get any recently modified files.
-            # the danger of doing this is that you modify files as you process them, creating an endless loop. You'll
-            # start the program reporting X files to modify, but after those items finish, you'll discover that the
-            # program continues onto the newly edited files, including those files that have new citations to them.
+            # Note that there's a temptation to add a field here for
+            # date_modified, to get any recently modified files. The danger of
+            # doing this is that you modify files as you process them,
+            # creating an endless loop. You'll start the program reporting X
+            # files to modify, but after those items finish, you'll discover
+            # that the program continues onto the newly edited files,
+            # including those files that have new citations to them.
             '--filed_after',
             type=str,
-            help="Start date in ISO-8601 format for a range of documents to update"
+            help="Start date in ISO-8601 format for a range of documents to "
+                 "update"
         ),
         make_option(
             '--all',
@@ -50,13 +54,17 @@ class Command(BaseCommand):
             '--index',
             default='all_at_end',
             type=str,
-            help=("When/if to save changes to the Solr index. Options are all_at_end, concurrently or False. Saving "
-                  "'concurrently' is least efficient, since each document is updated once for each citation to it, "
-                  "however this setting will show changes in the index in realtime. Saving 'all_at_end' can be "
-                  "considerably more efficient, but will not show changes until the process has finished and the index "
-                  "has been completely regenerated from the database. Setting this to False disables changes to Solr, "
-                  "if that is what's desired. Finally, only 'concurrently' will avoid reindexing the entire "
-                  "collection."),
+            help=("When/if to save changes to the Solr index. Options are "
+                  "all_at_end, concurrently or False. Saving 'concurrently' "
+                  "is least efficient, since each document is updated once "
+                  "for each citation to it, however this setting will show "
+                  "changes in the index in realtime. Saving 'all_at_end' can "
+                  "be considerably more efficient, but will not show changes "
+                  "until the process has finished and the index has been "
+                  "completely regenerated from the database. Setting this to "
+                  "False disables changes to Solr, if that is what's desired. "
+                  "Finally, only 'concurrently' will avoid reindexing the "
+                  "entire collection."),
         )
     )
     help = 'Parse citations out of documents.'
@@ -106,9 +114,15 @@ class Command(BaseCommand):
                 subtasks = []
 
         if index == 'all_at_end':
-            call_command('cl_update_index', update_mode=True, everything=True)
+            call_command(
+                'cl_update_index',
+                update_mode=True,
+                everything=True,
+                solr_url='http://127.0.0.1:8983/solr/collection1'
+            )
         elif index == 'false':
-            sys.stdout.write("Solr index not updated after running citation finder. You may want to do so manually.")
+            sys.stdout.write("Solr index not updated after running citation "
+                             "finder. You may want to do so manually.")
 
     def handle(self, *args, **options):
         both_list_and_endpoints = (options.get('doc_id') is not None and
@@ -121,7 +135,8 @@ class Command(BaseCommand):
                               options.get('filed_after') is None,
                               options.get('all') is False]))
         if both_list_and_endpoints or no_option:
-            raise CommandError('Please specify either a list of documents, a range of ids, a range of dates, or '
+            raise CommandError('Please specify either a list of documents, a '
+                               'range of ids, a range of dates, or '
                                'everything.')
 
         if options.get('filed_after'):
