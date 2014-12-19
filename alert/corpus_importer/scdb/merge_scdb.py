@@ -105,6 +105,7 @@ with open(SCDB_FILENAME) as f:
             print '    Cosine similarity is: %s' % cos_sim
 
             if cos_sim > 0.97:
+                print '    --> Doing merge.'
                 proceed = True
             else:
                 proceed = raw_input("    Should we merge these? (Ctrl+C to "
