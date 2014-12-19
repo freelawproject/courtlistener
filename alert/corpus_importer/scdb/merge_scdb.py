@@ -31,7 +31,7 @@ DATA_DIR = os.path.dirname(__name__)
 SCDB_FILENAME = os.path.join(DATA_DIR, 'SCDB_2014_01_caseCentered_Citation.csv')
 SCDB_BEGINS = date(1946, 11, 18)
 SCDB_ENDS = date(2014, 6, 19)
-START_ROW = 145
+START_ROW = 171
 
 with open(SCDB_FILENAME) as f:
     dialect = csv.Sniffer().sniff(f.read(1024))
