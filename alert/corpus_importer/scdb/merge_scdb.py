@@ -17,13 +17,12 @@ Once located, we update items:
 """
 import os
 import sys
-
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alert.settings")
 
 from alert.citations.tasks import update_document_by_id
-from alert.corpus_importer.import_law_box import get_html_from_raw_text
+from alert.corpus_importer.dup_helpers import get_html_from_raw_text
 from alert.lib.string_diff import get_cosine_similarity
 from alert.search.models import Document
 import csv
@@ -35,7 +34,7 @@ DATA_DIR = os.path.dirname(__name__)
 SCDB_FILENAME = os.path.join(DATA_DIR, 'SCDB_2014_01_caseCentered_Citation.csv')
 SCDB_BEGINS = date(1946, 11, 18)
 SCDB_ENDS = date(2014, 6, 19)
-START_ROW = 265
+START_ROW = 300
 
 
 def merge_docs(first_pk, second_pk):
@@ -105,6 +104,14 @@ with open(SCDB_FILENAME) as f:
             cos_sim = get_cosine_similarity(body_text_0, body_text_1)
             print '    Cosine similarity is: %s' % cos_sim
 
-            proceed = raw_input("    Should we merge these? (Ctrl+C to quit, "
-                                "or Enter to merge):")
-            merge_docs(first_pk=ds[0].pk, second_pk=ds[1].pk)
+            if cos_sim > 0.97:
+                proceed = True
+            else:
+                proceed = raw_input("    Should we merge these? (Ctrl+C to "
+                                    "quit, or Enter to merge):")
+                if 'y' == proceed.lower():
+                    proceed = True
+                else:
+                    proceed = False
+            if proceed:
+                merge_docs(first_pk=ds[0].pk, second_pk=ds[1].pk)
