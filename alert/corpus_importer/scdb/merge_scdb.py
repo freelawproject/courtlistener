@@ -35,7 +35,7 @@ DATA_DIR = os.path.dirname(__name__)
 SCDB_FILENAME = os.path.join(DATA_DIR, 'SCDB_2014_01_caseCentered_Citation.csv')
 SCDB_BEGINS = date(1946, 11, 18)
 SCDB_ENDS = date(2014, 6, 19)
-START_ROW = 181
+START_ROW = 265
 
 
 def merge_docs(first_pk, second_pk):
@@ -103,7 +103,7 @@ with open(SCDB_FILENAME) as f:
             _, _, _, body_text_0 = get_html_from_raw_text(ds[0].html)
             _, _, _, body_text_1 = get_html_from_raw_text(ds[1].html_lawbox)
             cos_sim = get_cosine_similarity(body_text_0, body_text_1)
-            print '    Cosine similarity is: %s'
+            print '    Cosine similarity is: %s' % cos_sim
 
             proceed = raw_input("    Should we merge these? (Ctrl+C to quit, "
                                 "or Enter to merge):")
