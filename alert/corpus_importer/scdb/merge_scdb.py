@@ -32,7 +32,7 @@ DATA_DIR = os.path.dirname(__name__)
 SCDB_FILENAME = os.path.join(DATA_DIR, 'SCDB_2014_01_caseCentered_Citation.csv')
 SCDB_BEGINS = date(1946, 11, 18)
 SCDB_ENDS = date(2014, 6, 19)
-START_ROW = 171
+START_ROW = 181
 
 
 def merge_docs(first_pk, second_pk):
@@ -95,6 +95,6 @@ with open(SCDB_FILENAME) as f:
             print '    Absolute URLs:\n      %s' % '\n      '.join([
                 'https://www.courtlistener.com/opinion/%s/slug/' % d.pk
                 for d in ds])
-            proceed = raw_input("Should we merge these? (Ctrl+C to quit, or "
-                                "Enter to merge.")
-            merge_docs(first_pk=ds[0], second_pk=ds[1])
+            proceed = raw_input("    Should we merge these? (Ctrl+C to quit, "
+                                "or Enter to merge.")
+            merge_docs(first_pk=ds[0].pk, second_pk=ds[1].pk)
