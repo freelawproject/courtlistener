@@ -36,7 +36,7 @@ DATA_DIR = os.path.dirname(__name__)
 SCDB_FILENAME = os.path.join(DATA_DIR, 'SCDB_2014_01_caseCentered_Citation.csv')
 SCDB_BEGINS = date(1946, 11, 18)
 SCDB_ENDS = date(2014, 6, 19)
-START_ROW = 1414
+START_ROW = 7302
 
 
 def merge_docs(first_pk, second_pk):
@@ -115,7 +115,8 @@ with open(SCDB_FILENAME) as f:
                 proceed = True
             else:
                 proceed = raw_input("    Should we merge these? (Ctrl+C to "
-                                    "quit, or y to merge): ")
+                                    "quit, or y to merge or anything else to "
+                                    "move simply move on): ")
                 if 'y' == proceed.lower():
                     proceed = True
                 else:
