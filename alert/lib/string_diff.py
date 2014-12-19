@@ -84,10 +84,12 @@ def string_to_vector(text):
 def get_cosine_similarity(left, right):
     """Calculate the cosine similarity of two strings.
 
-    This can be useful in circumstances when the counts of the words in the strings have more meaning that the order of
-    the characters or the edit distances of individual words.
+    This can be useful in circumstances when the counts of the words in the
+    strings have more meaning that the order of the characters or the edit
+    distances of individual words.
 
-    Better for long strings with sentence-length differences, where diff_lib's ratio() can fall down.
+    Better for long strings with sentence-length differences, where diff_lib's
+    ratio() can fall down.
     """
     left, right = string_to_vector(left), string_to_vector(right)
     intersection = set(left.keys()) & set(right.keys())

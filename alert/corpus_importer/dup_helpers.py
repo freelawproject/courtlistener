@@ -100,7 +100,8 @@ def merge_cases_complex(case, target_ids):
 
 
 def find_same_docket_numbers(doc, candidates):
-    """Identify the candidates that have the same docket numbers as doc after each has been cleaned.
+    """Identify the candidates that have the same docket numbers as doc after
+    each has been cleaned.
 
     """
     new_docket_number = re.sub('(\D|0)', '', doc.citation.docket_number)
@@ -114,8 +115,8 @@ def find_same_docket_numbers(doc, candidates):
 
 
 def case_name_in_candidate(case_name_new, case_name_candidate):
-    """When there is one candidate match, this compares their case names to see if one is
-    contained in the other, in the right order.
+    """When there is one candidate match, this compares their case names to see
+    if one is contained in the other, in the right order.
 
     Returns True if so, else False.
     """

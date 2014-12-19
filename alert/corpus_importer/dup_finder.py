@@ -30,7 +30,9 @@ def build_date_range(date_filed, range=5):
 
 
 class StopWords(object):
-    """A very simple object that can hold stopwords, but that is only initialized once."""
+    """A very simple object that can hold stopwords, but that is only
+    initialized once.
+    """
     stop_words = get_term_frequency(result_type='list')
 
 
