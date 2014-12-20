@@ -37,7 +37,7 @@ SCDB_FILENAME = os.path.join(DATA_DIR, 'SCDB_2014_01_caseCentered_Citation.csv')
 SCDB_BEGINS = date(1946, 11, 18)
 SCDB_ENDS = date(2014, 6, 19)
 
-START_ROW = 1278
+START_ROW = 1414
 DEBUG = False
 
 # Relevant numbers:
@@ -155,7 +155,7 @@ with open(SCDB_FILENAME) as f:
                     print '      Case names:'
                     print '        DB: %s' % docs[0].citation.case_name
                     print '        SCDB: %s' % d['caseName']
-                    good_match = raw_input('Is this a good match [y/n]: ')
+                    good_match = raw_input('    Is this a good match [y/n]: ')
                     if good_match == 'y':
                         pass
                     else:
@@ -169,10 +169,16 @@ with open(SCDB_FILENAME) as f:
             print '    --> Enhancing document %s with data from SCDB.' % docs[0].pk
             enhance_item_with_scdb(docs[0], d)
         else:
-            print '  %s items found.' % len(docs)
-            print '    Absolute URLs:\n      %s' % '\n      '.join([
-                '%s: https://www.courtlistener.com/opinion/%s/slug/' % (i, doc.pk)
-                for i, doc in enumerate(docs)])
+            print '  %s items found:' % len(docs)
+            for j, doc in enumerate(docs):
+                print '    %s: Document %s:' % (j, doc.pk)
+                print '      https://www.courtlistener.com/opinion/%s/slug/' % doc.pk
+                print '      %s' % doc.citation.case_name
+                print '      %s' % doc.citation.docket_number
+            print '  SCDB info:'
+            print '    %s' % d['caseName']
+            print '    %s' % d['docket']
+
             choice = raw_input('  Which item should we update? [0-%s] ' %
                                (len(docs) - 1))
             try:
