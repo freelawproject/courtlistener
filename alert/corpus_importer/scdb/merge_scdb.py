@@ -70,11 +70,11 @@ def enhance_item_with_scdb(doc, scdb_info):
     c.federal_cite_three = scdb_info['ledCite']
     c.lexis_cite = scdb_info['lexisCite']
     c.docket_number = scdb_info['docket']
-    d.supreme_court_db_id = scdb_info['caseId']
+    doc.supreme_court_db_id = scdb_info['caseId']
 
     if not DEBUG:
         c.save()
-        d.save()
+        doc.save()
 
 
 def winnow_by_docket_number(docs, d):
