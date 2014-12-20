@@ -138,6 +138,7 @@ with open(SCDB_FILENAME) as f:
                     date_filed=datetime.strptime(
                         d['dateDecision'], '%m/%d/%Y'
                     ),
+                    docket__court_id='scotus',
                 )
                 print "%s matches found." % len(docs)
                 print "Winnowing by docket number...",
