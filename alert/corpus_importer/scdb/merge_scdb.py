@@ -36,7 +36,9 @@ DATA_DIR = os.path.dirname(__name__)
 SCDB_FILENAME = os.path.join(DATA_DIR, 'SCDB_2014_01_caseCentered_Citation.csv')
 SCDB_BEGINS = date(1946, 11, 18)
 SCDB_ENDS = date(2014, 6, 19)
+
 START_ROW = 7907
+DEBUG = True
 
 # Relevant numbers:
 #  - 7907: After this point we don't seem to have any citations for items.
@@ -68,9 +70,11 @@ def enhance_item_with_scdb(doc, scdb_info):
     c.federal_cite_three = scdb_info['ledCite']
     c.lexis_cite = scdb_info['lexisCite']
     c.docket_number = scdb_info['docket']
-    c.save()
     d.supreme_court_db_id = scdb_info['caseId']
-    d.save()
+
+    if not DEBUG:
+        c.save()
+        d.save()
 
 
 def winnow_by_docket_number(docs, d):
@@ -141,7 +145,7 @@ with open(SCDB_FILENAME) as f:
                     docket__court_id='scotus',
                 )
                 print "%s matches found." % len(docs)
-                print "Winnowing by docket number...",
+                print "  Winnowing by docket number...",
                 docs = winnow_by_docket_number(docs, d)
                 print "%s matches found." % len(docs)
 
