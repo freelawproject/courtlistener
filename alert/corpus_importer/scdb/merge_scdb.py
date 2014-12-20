@@ -28,7 +28,7 @@ from alert.corpus_importer.dup_helpers import get_html_from_raw_text
 from alert.lib.string_diff import get_cosine_similarity
 from alert.search.models import Document
 import csv
-from datetime import date
+from datetime import date, datetime
 from django.db.models.query import EmptyQuerySet
 
 
@@ -134,7 +134,9 @@ with open(SCDB_FILENAME) as f:
                 # try by date and then winnow by docket number
                 print "  Checking by date and docket number...",
                 docs = Document.objects.filter(
-                    date_filed=date.strftime('%m/%d/%Y', d['dateDecision']),
+                    date_filed=datetime.strptime(
+                        d['dateDecision'], '%m/%d/%Y'
+                    ),
                 )
                 docs = winnow_by_docket_number(docs, d)
                 print "%s matches found." % len(docs)
