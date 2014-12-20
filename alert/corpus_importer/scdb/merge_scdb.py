@@ -129,22 +129,22 @@ with open(SCDB_FILENAME) as f:
                     citation__federal_cite_three=d['usCite'])
                 print "%s matches found." % len(docs)
 
-            # At this point, we need to start getting more experimental b/c
-            # the easy ways to find items did not work. Items matched here are
-            # ones that lack citations.
-            if len(docs) == 0:
-                # try by date and then winnow by docket number
-                print "  Checking by date...",
-                docs = Document.objects.filter(
-                    date_filed=datetime.strptime(
-                        d['dateDecision'], '%m/%d/%Y'
-                    ),
-                    docket__court_id='scotus',
-                )
-                print "%s matches found." % len(docs)
-                print "    Winnowing by docket number...",
-                docs = winnow_by_docket_number(docs, d)
-                print "%s matches found." % len(docs)
+        # At this point, we need to start getting more experimental b/c
+        # the easy ways to find items did not work. Items matched here are
+        # ones that lack citations.
+        if len(docs) == 0:
+            # try by date and then winnow by docket number
+            print "  Checking by date...",
+            docs = Document.objects.filter(
+                date_filed=datetime.strptime(
+                    d['dateDecision'], '%m/%d/%Y'
+                ),
+                docket__court_id='scotus',
+            )
+            print "%s matches found." % len(docs)
+            print "    Winnowing by docket number...",
+            docs = winnow_by_docket_number(docs, d)
+            print "%s matches found." % len(docs)
 
         if len(docs) == 0:
             print '  No items found.'
