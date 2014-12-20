@@ -17,15 +17,12 @@ Once located, we update items:
 """
 import os
 import sys
-from lxml.etree import XMLSyntaxError
 
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alert.settings")
 
 from alert.citations.tasks import update_document_by_id
-from alert.corpus_importer.dup_helpers import get_html_from_raw_text
-from alert.lib.string_diff import get_cosine_similarity
 from alert.search.models import Document
 import csv
 from datetime import date, datetime
@@ -37,7 +34,7 @@ SCDB_FILENAME = os.path.join(DATA_DIR, 'SCDB_2014_01_caseCentered_Citation.csv')
 SCDB_BEGINS = date(1946, 11, 18)
 SCDB_ENDS = date(2014, 6, 19)
 
-START_ROW = 1414
+START_ROW = 1581
 DEBUG = False
 
 # Relevant numbers:
@@ -153,7 +150,7 @@ with open(SCDB_FILENAME) as f:
                     print '      Docket numbers: %s, %s' % \
                           (docs[0].citation.docket_number, d['docket'])
                     print '      Case names:'
-                    print '        DB: %s' % docs[0].citation.case_name
+                    print '        DB: %s (%s)' % (docs[0].citation.case_name, docs[0].pk)
                     print '        SCDB: %s' % d['caseName']
                     good_match = raw_input('    Is this a good match [y/n]: ')
                     if good_match == 'y':
@@ -185,6 +182,6 @@ with open(SCDB_FILENAME) as f:
                 choice = int(choice)
                 print '    --> Enhancing document %s with data from SCDB.' % \
                       docs[choice].pk
-                enhance_item_with_scdb(docs[int(choice)], d)
+                enhance_item_with_scdb(docs[choice], d)
             except ValueError:
                 print '  OK. No changes will be made.'
