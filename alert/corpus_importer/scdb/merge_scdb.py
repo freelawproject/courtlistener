@@ -80,14 +80,15 @@ def winnow_by_docket_number(docs, d):
     good_doc_ids = []
     for doc in docs:
         dn = doc.citation.docket_number
-        dn = dn.replace(', Original', ' ORIG')
-        dn = dn.replace('___, ORIGINAL', 'ORIG')
-        dn = dn.replace(', Orig', ' ORIG')
-        dn = dn.replace(', Misc', ' M')
-        dn = dn.replace(' Misc', ' M')
-        dn = dn.replace('NO. ', '')
-        if dn == d['docket']:
-            good_doc_ids.append(doc.pk)
+        if dn is not None:
+            dn = dn.replace(', Original', ' ORIG')
+            dn = dn.replace('___, ORIGINAL', 'ORIG')
+            dn = dn.replace(', Orig', ' ORIG')
+            dn = dn.replace(', Misc', ' M')
+            dn = dn.replace(' Misc', ' M')
+            dn = dn.replace('NO. ', '')
+            if dn == d['docket']:
+                good_doc_ids.append(doc.pk)
 
     # Convert our list of IDs back into a QuerySet for consistency.
     return Document.objects.filter(pk__in=good_doc_ids)
