@@ -133,14 +133,17 @@ with open(SCDB_FILENAME) as f:
             # ones that lack citations.
             if len(docs) == 0:
                 # try by date and then winnow by docket number
-                print "  Checking by date and docket number...",
+                print "  Checking by date...",
                 docs = Document.objects.filter(
                     date_filed=datetime.strptime(
                         d['dateDecision'], '%m/%d/%Y'
                     ),
                 )
+                print "%s matches found." % len(docs)
+                print "Winnowing by docket number...",
                 docs = winnow_by_docket_number(docs, d)
                 print "%s matches found." % len(docs)
+
                 if len(docs) == 1:
                     print '      Docket numbers: %s, %s' % \
                           (docs[0].citation.docket_number, d['docket'])
