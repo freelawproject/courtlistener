@@ -36,8 +36,10 @@ DATA_DIR = os.path.dirname(__name__)
 SCDB_FILENAME = os.path.join(DATA_DIR, 'SCDB_2014_01_caseCentered_Citation.csv')
 SCDB_BEGINS = date(1946, 11, 18)
 SCDB_ENDS = date(2014, 6, 19)
-START_ROW = 7348
+START_ROW = 7907
 
+# Relevant numbers:
+#  - 7907: After this point we don't seem to have any citations for items.
 
 def merge_docs(first_pk, second_pk):
     first = Document.objects.get(pk=first_pk)
@@ -55,6 +57,44 @@ def merge_docs(first_pk, second_pk):
     update_document_by_id(first_pk)
 
 
+def enhance_item_with_scdb(doc, scdb_info):
+    """Good news: A single Document object was found for the SCDB record.
+
+    Take that item and enhance it with the SCDB content.
+    """
+    c = doc.citation
+    c.federal_cite_one = scdb_info['usCite']
+    c.federal_cite_two = scdb_info['sctCite']
+    c.federal_cite_three = scdb_info['ledCite']
+    c.lexis_cite = scdb_info['lexisCite']
+    c.docket_number = scdb_info['docket']
+    c.save()
+    d.supreme_court_db_id = scdb_info['caseId']
+    d.save()
+
+
+def winnow_by_docket_number(docs, d):
+    """Go through each of the docs and see if they have a matching docket
+    number. Return only those oness that do.
+    """
+    good_doc_ids = []
+    for doc in docs:
+        dn = doc.citation.docket_number
+        dn = dn.replace(', Original', ' ORIG')
+        dn = dn.replace('___, ORIGINAL', 'ORIG')
+        dn = dn.replace(', Orig', ' ORIG')
+        dn = dn.replace(', Misc', ' M')
+        dn = dn.replace(' Misc', ' M')
+        dn = dn.replace('NO. ', '')
+        if dn == d['docket']:
+            good_doc_ids.append(doc.pk)
+
+    # Convert our list of IDs back into a QuerySet for consistency.
+    return Document.objects.filter(pk__in=good_doc_ids)
+
+
+
+
 with open(SCDB_FILENAME) as f:
     dialect = csv.Sniffer().sniff(f.read(1024))
     f.seek(0)
@@ -65,45 +105,57 @@ with open(SCDB_FILENAME) as f:
             continue
         print "Row is: %s. ID is: %s" % (i, d['caseId'])
 
-        ds = EmptyQuerySet()
-        if len(ds) == 0:
+        docs = EmptyQuerySet()
+        if len(docs) == 0:
             print "  Checking by caseID...",
-            ds = Document.objects.filter(
+            docs = Document.objects.filter(
                 supreme_court_db_id=d['caseId'])
-            print "%s matches found." % len(ds)
+            print "%s matches found." % len(docs)
         if d['usCite'].strip():
             # Only do these lookups if there is in fact a usCite value.
-            if len(ds) == 0:
+            if len(docs) == 0:
                 # None found by supreme_court_db_id. Try by citation number.
                 print "  Checking by federal_cite_one..",
-                ds = Document.objects.filter(
+                docs = Document.objects.filter(
                     citation__federal_cite_one=d['usCite'])
-                print "%s matches found." % len(ds)
-            if len(ds) == 0:
+                print "%s matches found." % len(docs)
+            if len(docs) == 0:
                 print "  Checking by federal_cite_one...",
-                ds = Document.objects.filter(
+                docs = Document.objects.filter(
                     citation__federal_cite_two=d['usCite'])
-                print "%s matches found." % len(ds)
-            if len(ds) == 0:
+                print "%s matches found." % len(docs)
+            if len(docs) == 0:
                 print "  Checking by federal_cite_three...",
-                ds = Document.objects.filter(
+                docs = Document.objects.filter(
                     citation__federal_cite_three=d['usCite'])
-                print "%s matches found." % len(ds)
+                print "%s matches found." % len(docs)
 
-        if len(ds) == 0:
+            # At this point, we need to start getting more experimental b/c
+            # the easy ways to find items did not work. Items matched here are
+            # ones that lack citations.
+            if len(docs) == 0:
+                # try by date and then winnow by docket number
+                docs = Document.objects.filter(
+                    date_filed=date.strftime(d['dateDecision'], '%m/%d/%Y'),
+                )
+                docs = winnow_by_docket_number(docs, d)
+
+        if len(docs) == 0:
             print '  No items found.'
-        elif len(ds) == 1:
+        elif len(docs) == 1:
             print '  Exactly one match found.'
-        elif len(ds) == 2:
+            print '    --> Enhancing with data from SCDB.'
+            enhance_item_with_scdb(docs[0], d)
+        elif len(docs) == 2:
             print '  Two items found.'
             print '    Absolute URLs:\n      %s' % '\n      '.join([
-                'https://www.courtlistener.com/opinion/%s/slug/' % d.pk
-                for d in ds])
+                'https://www.courtlistener.com/opinion/%s/slug/' % doc.pk
+                for doc in docs])
 
             # Get the cosine similarity
             try:
-                _, _, _, body_text_0 = get_html_from_raw_text(ds[0].html)
-                _, _, _, body_text_1 = get_html_from_raw_text(ds[1].html_lawbox)
+                _, _, _, body_text_0 = get_html_from_raw_text(docs[0].html)
+                _, _, _, body_text_1 = get_html_from_raw_text(docs[1].html_lawbox)
                 cos_sim = get_cosine_similarity(body_text_0, body_text_1)
                 print '    Cosine similarity is: %s' % cos_sim
             except XMLSyntaxError:
@@ -123,4 +175,4 @@ with open(SCDB_FILENAME) as f:
                     proceed = False
             if proceed:
                 print '      --> Doing merge.'
-                merge_docs(first_pk=ds[0].pk, second_pk=ds[1].pk)
+                merge_docs(first_pk=docs[0].pk, second_pk=docs[1].pk)
