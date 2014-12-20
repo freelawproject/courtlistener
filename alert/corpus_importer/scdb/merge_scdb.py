@@ -92,9 +92,6 @@ def winnow_by_docket_number(docs, d):
     # Convert our list of IDs back into a QuerySet for consistency.
     return Document.objects.filter(pk__in=good_doc_ids)
 
-
-
-
 with open(SCDB_FILENAME) as f:
     dialect = csv.Sniffer().sniff(f.read(1024))
     f.seek(0)
@@ -135,10 +132,19 @@ with open(SCDB_FILENAME) as f:
             # ones that lack citations.
             if len(docs) == 0:
                 # try by date and then winnow by docket number
+                print "  Checking by date and docket number...",
                 docs = Document.objects.filter(
                     date_filed=date.strftime(d['dateDecision'], '%m/%d/%Y'),
                 )
                 docs = winnow_by_docket_number(docs, d)
+                print "%s matches found." % len(docs)
+                if len(docs) == 1:
+                    print '      Docket numbers: %s, %s' % \
+                          (docs[0].citation.docket_number, d['docket'])
+                    print '      Case names:'
+                    print '        DB: %s' % docs[0].citation.case_name
+                    print '        SCDB: %s' % d['caseName']
+                    raw_input('Press any key to continue...')
 
         if len(docs) == 0:
             print '  No items found.'
