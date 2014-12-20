@@ -134,7 +134,7 @@ with open(SCDB_FILENAME) as f:
                 # try by date and then winnow by docket number
                 print "  Checking by date and docket number...",
                 docs = Document.objects.filter(
-                    date_filed=date.strftime(d['dateDecision'], '%m/%d/%Y'),
+                    date_filed=date.strftime('%m/%d/%Y', d['dateDecision']),
                 )
                 docs = winnow_by_docket_number(docs, d)
                 print "%s matches found." % len(docs)
