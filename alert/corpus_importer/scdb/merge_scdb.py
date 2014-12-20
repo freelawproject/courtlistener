@@ -37,8 +37,8 @@ SCDB_FILENAME = os.path.join(DATA_DIR, 'SCDB_2014_01_caseCentered_Citation.csv')
 SCDB_BEGINS = date(1946, 11, 18)
 SCDB_ENDS = date(2014, 6, 19)
 
-START_ROW = 7907
-DEBUG = True
+START_ROW = 0
+DEBUG = False
 
 # Relevant numbers:
 #  - 7907: After this point we don't seem to have any citations for items.
@@ -161,35 +161,19 @@ with open(SCDB_FILENAME) as f:
             print '  No items found.'
         elif len(docs) == 1:
             print '  Exactly one match found.'
-            print '    --> Enhancing with data from SCDB.'
+            print '    --> Enhancing document %s with data from SCDB.' % docs[0].pk
             enhance_item_with_scdb(docs[0], d)
-        elif len(docs) == 2:
-            print '  Two items found.'
+        else:
+            print '  %s items found.' % len(docs)
             print '    Absolute URLs:\n      %s' % '\n      '.join([
-                'https://www.courtlistener.com/opinion/%s/slug/' % doc.pk
-                for doc in docs])
-
-            # Get the cosine similarity
+                '%s: https://www.courtlistener.com/opinion/%s/slug/' % (i, doc.pk)
+                for i, doc in enumerate(docs)])
+            choice = raw_input('  Which item should we update? [0-%s] ' %
+                               (len(docs) - 1))
             try:
-                _, _, _, body_text_0 = get_html_from_raw_text(docs[0].html)
-                _, _, _, body_text_1 = get_html_from_raw_text(docs[1].html_lawbox)
-                cos_sim = get_cosine_similarity(body_text_0, body_text_1)
-                print '    Cosine similarity is: %s' % cos_sim
-            except XMLSyntaxError:
-                # hit error on item 1414
-                print '    Unable to form XML. Forcing manual review.'
-                cos_sim = 0
-
-            if cos_sim > 0.96:
-                proceed = True
-            else:
-                proceed = raw_input("    Should we merge these? (Ctrl+C to "
-                                    "quit, or y to merge or anything else to "
-                                    "move simply move on): ")
-                if 'y' == proceed.lower():
-                    proceed = True
-                else:
-                    proceed = False
-            if proceed:
-                print '      --> Doing merge.'
-                merge_docs(first_pk=docs[0].pk, second_pk=docs[1].pk)
+                choice = int(choice)
+                print '    --> Enhancing document %s with data from SCDB.' % \
+                      docs[choice].pk
+                enhance_item_with_scdb(docs[int(choice)], d)
+            except ValueError:
+                print '  OK. No changes will be made.'
