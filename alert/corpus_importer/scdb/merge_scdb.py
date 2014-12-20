@@ -37,7 +37,7 @@ SCDB_FILENAME = os.path.join(DATA_DIR, 'SCDB_2014_01_caseCentered_Citation.csv')
 SCDB_BEGINS = date(1946, 11, 18)
 SCDB_ENDS = date(2014, 6, 19)
 
-START_ROW = 0
+START_ROW = 1278
 DEBUG = False
 
 # Relevant numbers:
@@ -145,7 +145,7 @@ with open(SCDB_FILENAME) as f:
                     docket__court_id='scotus',
                 )
                 print "%s matches found." % len(docs)
-                print "  Winnowing by docket number...",
+                print "    Winnowing by docket number...",
                 docs = winnow_by_docket_number(docs, d)
                 print "%s matches found." % len(docs)
 
@@ -155,7 +155,12 @@ with open(SCDB_FILENAME) as f:
                     print '      Case names:'
                     print '        DB: %s' % docs[0].citation.case_name
                     print '        SCDB: %s' % d['caseName']
-                    raw_input('Press any key to continue...')
+                    good_match = raw_input('Is this a good match [y/n]: ')
+                    if good_match == 'y':
+                        pass
+                    else:
+                        # No good. Press forward with no items.
+                        docs = EmptyQuerySet()
 
         if len(docs) == 0:
             print '  No items found.'
