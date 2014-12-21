@@ -155,7 +155,7 @@ class Command(BaseCommand):
         if options.get('filed_after'):
             query = query.filter(date_filed__gte=start_date)
         if options.get('all'):
-            query = Document.object.all()
+            query = Document.objects.all()
         count = query.count()
         docs = queryset_generator(query, chunksize=10000)
         self.update_documents(docs, count, index)
