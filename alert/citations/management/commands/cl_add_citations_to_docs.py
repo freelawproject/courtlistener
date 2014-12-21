@@ -1,15 +1,16 @@
 from datetime import datetime
 import time
 import sys
-from django.utils.timezone import make_aware, utc
+from django.conf import settings
 
 from alert.lib.db_tools import queryset_generator
-from django.core.management import call_command
+from alert.lib import sunburnt
 from alert.search.models import Document
 from celery.task.sets import TaskSet
 from citations.tasks import update_document
-
+from django.core.management import call_command
 from django.core.management import BaseCommand, CommandError
+from django.utils.timezone import make_aware, utc
 from optparse import make_option
 
 
@@ -69,14 +70,14 @@ class Command(BaseCommand):
     )
     help = 'Parse citations out of documents.'
 
-    def update_documents(self, documents, count, index):
+    def update_documents(self, documents, count):
         sys.stdout.write('Graph size is {0:d} nodes.\n'.format(count))
         sys.stdout.flush()
         processed_count = 0
         subtasks = []
         timings = []
         average_per_s = 0
-        if index == 'concurrently':
+        if self.index == 'concurrently':
             index_during_subtask = True
         else:
             index_during_subtask = False
@@ -84,10 +85,8 @@ class Command(BaseCommand):
             processed_count += 1
             if processed_count % 10000 == 0:
                 # Send the commit every 10000 times.
-                commit = True
-            else:
-                commit = False
-            subtasks.append(update_document.subtask((doc, index_during_subtask, commit)))
+                self.si.commit()
+            subtasks.append(update_document.subtask((doc, index_during_subtask)))
             if processed_count % 1000 == 1:
                 t1 = time.time()
             if processed_count % 1000 == 0:
@@ -113,14 +112,14 @@ class Command(BaseCommand):
                 # The jobs finished - clean things up for the next round
                 subtasks = []
 
-        if index == 'all_at_end':
+        if self.index == 'all_at_end':
             call_command(
                 'cl_update_index',
                 update_mode=True,
                 everything=True,
                 solr_url='http://127.0.0.1:8983/solr/collection1'
             )
-        elif index == 'false':
+        elif self.index == 'false':
             sys.stdout.write("Solr index not updated after running citation "
                              "finder. You may want to do so manually.")
 
@@ -142,7 +141,8 @@ class Command(BaseCommand):
         if options.get('filed_after'):
             start_date = make_aware(datetime.strptime(options['filed_after'], '%Y-%m-%d'), utc)
 
-        index = options['index'].lower()
+        self.index = options['index'].lower()
+        self.si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='rw')
 
         # Use query chaining to build the query
         query = Document.objects.all()
@@ -158,4 +158,4 @@ class Command(BaseCommand):
             query = Document.objects.all()
         count = query.count()
         docs = queryset_generator(query, chunksize=10000)
-        self.update_documents(docs, count, index)
+        self.update_documents(docs, count)
