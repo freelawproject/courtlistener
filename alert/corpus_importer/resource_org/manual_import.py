@@ -1,3 +1,9 @@
+import os
+import sys
+
+execfile('/etc/courtlistener')
+sys.path.append(INSTALL_ROOT)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alert.settings")
 
 import argparse
 import hashlib
@@ -5,20 +11,15 @@ from juriscraper.lib.html_utils import get_clean_body_content
 import datetime
 from lxml.html import fromstring
 
-import os
 import requests
-import sys
 from alert.corpus_importer.resource_org.helpers import (
-    get_court, get_west_cite, get_docket_number, get_case_name_and_status,
+    get_court_id, get_west_cite, get_docket_number, get_case_name_and_status,
     get_date_filed, get_case_body
 )
 
-from alert.search.models import Document, Citation, Docket
-from lib.string_utils import anonymize
-
-execfile('/etc/courtlistener')
-sys.path.append(INSTALL_ROOT)
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alert.settings")
+import citations
+from alert.lib.string_utils import anonymize
+from alert.search.models import Document, Citation, Docket, Court
 
 
 def import_resource_org_item(case_location):
@@ -27,35 +28,42 @@ def import_resource_org_item(case_location):
     Path is any valid URI that the requests library can handle.
     """
     def get_file(location):
-        r = requests.get(location)
+        if location.startswith('/'):
+            with open(location) as f:
+                r = requests.Session()
+                r.content = f.read()
+        else:
+            r = requests.get(location)
         return fromstring(r.content), get_clean_body_content(r.content)
 
     # Get trees and text for the opinion itself and for the index page
     # that links to it. Each has useful data.
     case_tree, case_text = get_file(case_location)
-    vol_location = case_location.rsplit('/', 1)[-2] + '/'
+    vol_location = case_location.rsplit('/', 1)[-2] + '/index.html'
     vol_tree, vol_text = get_file(vol_location)
 
     html, blocked = anonymize(get_case_body(case_tree))
 
-    case_name, status = get_case_name_and_status(vol_tree, case_location)
+    case_location_relative = case_location.rsplit('/', 1)[1]
+    case_name, status = get_case_name_and_status(vol_tree, case_location_relative)
     cite = Citation(
         case_name=case_name,
         docket_number=get_docket_number(case_location),
-        federal_cite_one=get_west_cite(vol_tree, case_location),
+        federal_cite_one=get_west_cite(vol_tree, case_location_relative),
     )
     docket = Docket(
-        court_id=get_court(case_tree),
+        court=Court.objects.get(pk=get_court_id(case_tree)),
         case_name=case_name,
     )
     doc = Document(
-        date_filed=get_date_filed(vol_tree, case_location),
+        date_filed=get_date_filed(vol_tree, case_location_relative),
         source='R',
         sha1=hashlib.sha1(case_text).hexdigest(),
         citation=cite,
+        docket=docket,
         download_url=case_location,
         html=html,
-        status=status,
+        precedential_status=status,
     )
     if blocked:
         doc.blocked = True
@@ -65,7 +73,12 @@ def import_resource_org_item(case_location):
 
     cite.save()
     docket.save()
+    doc.docket = docket
+    doc.citation = cite
     doc.save()
+
+    # Update the citation graph
+    citations.tasks.update_document_by_id(doc.pk)
 
 
 def main():

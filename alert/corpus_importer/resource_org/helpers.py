@@ -4,14 +4,14 @@ import datetime
 from lxml.html import tostring
 
 
-def get_case_name_and_status(vol_tree, case_location):
-    case_name_node = vol_tree.xpath('//a[@href="%s"]' % case_location)
+def get_case_name_and_status(vol_tree, location):
+    case_name_node = vol_tree.xpath('//a[@href="%s"]' % location)[0]
     case_name_dirty = case_name_node.get('title')
     return get_clean_case_name_and_sniff_status(case_name_dirty)
 
 
-def get_date_filed(vol_tree, case_location):
-    d_node = vol_tree.xpath('//a[@href="%s"]' % case_location)
+def get_date_filed(vol_tree, location):
+    d_node = vol_tree.xpath('//a[@href="%s"]' % location)[1]
     d_str = d_node.text.strip()
     return datetime.datetime.strptime(d_str, '%B %d, %Y')
 
@@ -19,8 +19,10 @@ def get_date_filed(vol_tree, case_location):
 def get_docket_number(case_location):
     return case_location.split('.')[-2]
 
-def get_west_cite(vol_tree, case_location):
-    return vol_tree.xpath('//a[@href="%s"][1]/text()' % case_location)
+
+def get_west_cite(vol_tree, location):
+    return vol_tree.xpath('//a[@href="%s"][1]/text()' % location)[0]
+
 
 def get_clean_case_name_and_sniff_status(s):
     """Strips out warnings re non-precedential status that occur in case
@@ -118,46 +120,52 @@ def get_clean_case_name_and_sniff_status(s):
     status = 'Published'
     for test, regex in regexes:
         if test in s:
-            s = re.sub(regex, s)
+            s = re.sub(regex, '', s)
             status = 'Unpublished'
 
     s = titlecase(harmonize(clean_string(s)))
     return s, status
 
 
-def get_court(case_tree):
-    court_p_elems = case_tree.xpath('//p[@class = "court"]')
-    # Often the court ends up in the parties field.
-    parties_p_elems = case_tree.xpath("//p[@class= 'parties']")
+def get_court_id(case_tree):
+    court_id = None
 
-    court_strs = ''
-    for p in court_p_elems:
-        court_strs += tostring(p).lower()
-    for party in parties_p_elems:
-        court_strs += tostring(party).lower()
-    court_pairs = (
-        ('first', 'ca1'),
-        ('second', 'ca2'),
-        ('third', 'ca3'),
-        ('fourth', 'ca4'),
-        ('fifth', 'ca5'),
-        ('sixth', 'ca6'),
-        ('seventh', 'ca7'),
-        ('eighth', 'ca8'),
-        ('ninth', 'ca9'),
-        ('tenth', 'ca10'),
-        ('eleventh', 'ca11'),
-        ('columbia', 'cadc'),
-        ('federal', 'cadc'),
-        ('patent', 'ccpa'),
-        ('claims', 'uscfc'),
-    )
-    court = None
-    for test, result in court_pairs:
-        if test in court_strs:
-            court = result
+    # First pass, see if the court can be sniffed from the citations
+    cite_strs = case_tree.xpath('//p[@class="case_cite"]//text()')
+    cite_str = '|'.join(cite_strs)
+    cite_str = re.sub('\s', '', cite_str)
+    if 'U.S.' in cite_str or 'S.Ct.' in cite_str or 'L.Ed.' in cite_str:
+        court_id = 'scotus'
 
-    return court
+    # Second pass, use court field or parties
+    if court_id is None:
+        court_strs = '|'.join(case_tree.xpath('//p[@class="court"]//text()'))
+        # Often the court ends up in the parties field.
+        court_strs += '|'.join(case_tree.xpath("//p[@class='parties']//text()"))
+        court_strs = court_strs.lower()
+
+        court_pairs = (
+            ('first', 'ca1'),
+            ('second', 'ca2'),
+            ('third', 'ca3'),
+            ('fourth', 'ca4'),
+            ('fifth', 'ca5'),
+            ('sixth', 'ca6'),
+            ('seventh', 'ca7'),
+            ('eighth', 'ca8'),
+            ('ninth', 'ca9'),
+            ('tenth', 'ca10'),
+            ('eleventh', 'ca11'),
+            ('columbia', 'cadc'),
+            ('federal', 'cadc'),
+            ('patent', 'ccpa'),
+            ('claims', 'uscfc'),
+        )
+        for test, result in court_pairs:
+            if test in court_strs:
+                court_id = result
+
+    return court_id
 
 
 def get_case_body(case_tree):
