@@ -17,7 +17,7 @@ from alert.corpus_importer.resource_org.helpers import (
     get_date_filed, get_case_body
 )
 
-from alert import citations
+
 from alert.lib.string_utils import anonymize
 from alert.search.models import Document, Citation, Docket, Court
 
@@ -78,7 +78,8 @@ def import_resource_org_item(case_location):
     doc.save()
 
     # Update the citation graph
-    citations.tasks.update_document_by_id(doc.pk)
+    from alert.citations.tasks import update_document_by_id
+    update_document_by_id(doc.pk)
 
 
 def main():
