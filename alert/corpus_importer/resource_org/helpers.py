@@ -11,8 +11,12 @@ def get_case_name_and_status(vol_tree, location):
 
 
 def get_date_filed(vol_tree, location):
-    d_node = vol_tree.xpath('//a[@href="%s"]' % location)[1]
-    d_str = d_node.text.strip()
+    try:
+        d_node = vol_tree.xpath('//a[@href="%s"]' % location)[1]
+        d_str = d_node.text.strip()
+    except IndexError:
+        d_str = raw_input("    Unable to find date node in index file. What date is correct (e.g. June, 9, 1982): ")
+
     return datetime.datetime.strptime(d_str, '%B %d, %Y')
 
 
