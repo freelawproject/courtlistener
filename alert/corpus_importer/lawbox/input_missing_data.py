@@ -1,7 +1,8 @@
 import datetime
 import pickle
+
 from alert.corpus_importer.dup_helpers import get_html_from_raw_text
-from alert.corpus_importer.import_law_box import get_citations_from_tree
+from alert.corpus_importer.lawbox.import_law_box import get_citations_from_tree
 
 
 DEBUG = [

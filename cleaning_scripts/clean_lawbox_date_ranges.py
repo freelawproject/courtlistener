@@ -17,7 +17,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 import re
 from alert import settings
-from alert.corpus_importer.import_law_box import get_date_filed
+from alert.corpus_importer.lawbox.import_law_box import get_date_filed
 from alert.lib.sunburnt import sunburnt
 from alert.search.models import Document
 from lxml import html

@@ -19,7 +19,7 @@ from datetime import timedelta
 from alert.corpus_importer.court_regexes import fd_pairs, state_pairs, \
     disambiguate_by_judge, fb_pairs
 from alert.corpus_importer.dup_helpers import get_html_from_raw_text
-from alert.corpus_importer.judge_extractor import get_judge_from_str
+from alert.corpus_importer.lawbox.judge_extractor import get_judge_from_str
 from alert.corpus_importer import dup_finder, dup_helpers
 from alert.lib.string_utils import anonymize
 from alert.lib.import_lib import map_citations_to_models

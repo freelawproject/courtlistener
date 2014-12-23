@@ -2,12 +2,13 @@ import datetime
 import pickle
 import pprint
 import argparse
-
 import time
-from alert.corpus_importer.import_law_box import (
+
+from alert.corpus_importer.lawbox.import_law_box import (
     get_judge, get_court_object, get_html_from_raw_text,
 )
 from alert.search.models import Court
+
 
 DEBUG = 4
 

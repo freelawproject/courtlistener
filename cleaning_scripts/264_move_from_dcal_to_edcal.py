@@ -6,7 +6,7 @@ sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 from alert import settings
-from alert.corpus_importer.import_law_box import get_court_object
+from alert.corpus_importer.lawbox.import_law_box import get_court_object
 from alert.lib.sunburnt import sunburnt
 from alert.search.models import Document
 from lxml import html

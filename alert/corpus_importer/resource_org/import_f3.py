@@ -3,6 +3,8 @@ import dup_helpers
 import re
 import sys
 
+from alert.corpus_importer.resource_org import resource_org
+
 import settings
 
 
@@ -30,15 +32,24 @@ def run_dup_check(case, simulate=True):
             (len(candidates) == 1):
         # If the docket numbers are identical, and there was only
         # one result
-        print "  Match made on docket number of single candidate. Merging the opinions."
+        print "  Match made on docket number of single candidate. Merging the " \
+              "opinions."
         if not simulate:
             dup_helpers.merge_cases_simple(case, candidates[0]['id'])
     elif len(dup_helpers.find_same_docket_numbers(case, candidates)) == 1:
-        print "  One of the %s candidates had an identical docket number. Merging the opinions." % len(candidates)
+        print "  One of the %s candidates had an identical docket number. " \
+              "Merging the opinions." % len(candidates)
         if not simulate:
-            dup_helpers.merge_cases_simple(case, dup_helpers.find_same_docket_numbers(case, candidates)[0]['id'])
+            dup_helpers.merge_cases_simple(
+                case,
+                dup_helpers.find_same_docket_numbers(
+                    case,
+                    candidates
+                )[0]['id']
+            )
     elif len(dup_helpers.find_same_docket_numbers(case, candidates)) > 0:
-        print "  Several of the %s candidates had an identical docket number. Merging the opinions." % len(candidates)
+        print "  Several of the %s candidates had an identical docket " \
+              "number. Merging the opinions." % len(candidates)
         if not simulate:
             target_ids = [can['id'] for can in dup_helpers.find_same_docket_numbers(case, candidates)]
             dup_helpers.merge_cases_complex(case, target_ids)
@@ -69,15 +80,18 @@ def run_dup_check(case, simulate=True):
                     duplicates.append(filtered_candidates[k]['id'])
 
             if len(duplicates) == 0:
-                print "No duplicates found after manual determination. Adding the opinion."
+                print "No duplicates found after manual determination. " \
+                      "Adding the opinion."
                 if not simulate:
                     dup_helpers.add_case(case)
             elif len(duplicates) == 1:
-                print "Single duplicate found after manual determination. Merging the opinions."
+                print "Single duplicate found after manual determination. " \
+                      "Merging the opinions."
                 if not simulate:
                     dup_helpers.merge_cases_simple(case, duplicates[0])
             elif len(duplicates) > 1:
-                print "Multiple duplicates found after manual determination. Merging the opinions."
+                print "Multiple duplicates found after manual determination. " \
+                      "Merging the opinions."
                 if not simulate:
                     dup_helpers.merge_cases_complex(case, duplicates)
 
@@ -91,7 +105,7 @@ def import_by_hand():
     over it so that the documents can be imported manually.
     """
     simulate = False
-    corpus = dup_helpers.Corpus('file://%s/Resource.org/data/F3/' % settings.INSTALL_ROOT)
+    corpus = resource_org.Corpus('file://%s/Resource.org/data/F3/' % settings.INSTALL_ROOT)
     hand_file = open('%s/Resource.org/logs/hand_file.csv' % settings.INSTALL_ROOT, 'r')
     line_placeholder = open('%s/Resource.org/logs/line_placeholder.txt' % settings.INSTALL_ROOT, 'r+')
     try:

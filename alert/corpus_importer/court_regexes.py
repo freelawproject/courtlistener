@@ -482,7 +482,8 @@ state_pairs = (
 # such.
 ##########################################
 try:
-    with open(os.path.join(INSTALL_ROOT, 'alert', 'corpus_importer', 'judge_stats.pkl'), 'rb') as fix_file:
+    with open(os.path.join(INSTALL_ROOT, 'alert', 'corpus_importer', 'lawbox',
+                           'judge_stats.pkl'), 'rb') as fix_file:
         judge_stats = pickle.load(fix_file)
 except (IOError, EOFError):
     print "Unable to load judge_stats.pkl"
