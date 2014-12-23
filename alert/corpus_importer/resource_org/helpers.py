@@ -120,8 +120,9 @@ def get_clean_case_name_and_sniff_status(s):
     status = 'Published'
     for test, regex in regexes:
         if test in s:
-            s = re.sub(regex, '', s)
-            status = 'Unpublished'
+            if re.match(regex, s):
+                s = re.sub(regex, '', s)
+                status = 'Unpublished'
 
     s = titlecase(harmonize(clean_string(s)))
     return s, status
