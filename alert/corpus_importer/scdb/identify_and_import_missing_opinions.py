@@ -73,6 +73,10 @@ def main():
             if i < start_row:
                 continue
             print "Row is: %s. ID is: %s" % (i, d['caseId'])
+            if d['decisionType'] == '4':
+                print "  Punting decision b/c is it is a decree."
+                continue
+
             print "  Checking by caseID...",
             docs = Document.objects.filter(
                 supreme_court_db_id=d['caseId'])
