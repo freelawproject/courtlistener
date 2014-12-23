@@ -26,7 +26,12 @@ def make_document_for_enhancement(d):
     # Use the citation to find the correct item on disk. The directories look
     # like:     /sources/Resource.org/data/US/99/99.US.668.html
     print "    Attempting to add it from PRO collection at: %s" % PRO_ROOT
-    vol, page = d['usCite'].split(' U.S. ')
+    try:
+        vol, page = d['usCite'].split(' U.S. ')
+    except ValueError:
+        # No usCite value. Punt.
+        print "     No U.S. citation, cannot proceed."
+        return None
     dir_path = os.path.join(PRO_ROOT, vol)
     candidate_files = glob.glob(os.path.join(
         dir_path,
