@@ -37,6 +37,7 @@ def make_document_for_enhancement(d):
         doc = import_resource_org_item(
             os.path.join(dir_path, candidate_files[0])
         )
+        print "Created doc: %s" % doc.pk
     else:
         print "    Unable to find and add a PRO document."
         doc = None
