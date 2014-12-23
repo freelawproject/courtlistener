@@ -17,7 +17,7 @@ from alert.corpus_importer.resource_org.helpers import (
     get_date_filed, get_case_body
 )
 
-import citations
+from alert import citations
 from alert.lib.string_utils import anonymize
 from alert.search.models import Document, Citation, Docket, Court
 
