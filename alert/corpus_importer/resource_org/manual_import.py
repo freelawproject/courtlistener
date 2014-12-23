@@ -45,7 +45,8 @@ def import_resource_org_item(case_location):
     html, blocked = anonymize(get_case_body(case_tree))
 
     case_location_relative = case_location.rsplit('/', 1)[1]
-    case_name, status = get_case_name_and_status(vol_tree, case_location_relative)
+    case_name, status = get_case_name_and_status(
+        vol_tree, case_location_relative)
     cite = Citation(
         case_name=case_name,
         docket_number=get_docket_number(case_location),
@@ -81,6 +82,8 @@ def import_resource_org_item(case_location):
     from alert.citations.tasks import update_document_by_id
     update_document_by_id(doc.pk)
 
+    return doc
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -102,7 +105,7 @@ def main():
     )
     args = parser.parse_args()
 
-    import_resource_org_item(args.location)
+    _ = import_resource_org_item(args.location)
 
 
 if __name__ == '__main__':
