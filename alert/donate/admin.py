@@ -6,6 +6,9 @@ from alert.userHandling.models import UserProfile
 class DonorInline(admin.TabularInline):
     model = UserProfile.donation.through
     max_num = 1
+    raw_id_fields = (
+        'userprofile',
+    )
 
 
 class DonationAdmin(admin.ModelAdmin):
@@ -18,6 +21,7 @@ class DonationAdmin(admin.ModelAdmin):
         'amount',
         'payment_provider',
         'status',
+        'date_created',
     )
     list_filter = (
         'payment_provider',
