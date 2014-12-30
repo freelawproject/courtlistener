@@ -123,8 +123,16 @@ class UserProfile(models.Model):
     @property
     def total_donated_last_year(self):
         one_year_ago = now() - timedelta(days=365)
-        total = self.donation.filter(date_created__gte=one_year_ago).aggregate(
-            Sum('amount'))['amount__sum']
+        total = self.donation.filter(
+            date_created__gte=one_year_ago,
+        ).exclude(
+            status__in=[
+                1,  # Unknown error
+                3,  # Cancelled
+                6,  # Failed
+                7,  # Reclaimed/Refunded
+            ]
+        ).aggregate(Sum('amount'))['amount__sum']
         if total is None:
             total = Decimal(0.0)
         return total
