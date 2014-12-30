@@ -1,3 +1,4 @@
+import hashlib
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
@@ -113,33 +114,72 @@ def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form, 
 
 
 def donate(request):
+    """Load the donate page or process a submitted donation.
+
+    This page has several branches. The logic is as follows:
+        if GET:
+            --> Load the page
+        elif POST:
+            if user is anonymous:
+                if email address on record as a stub account:
+                    --> Use it.
+                elif new email address or a non-stub account:
+                    --> We cannot allow anonymous people to update real
+                        accounts, or this is a new email address, so create a
+                        new stub account.
+            elif user is logged in:
+                --> associate with account.
+
+            We now have an account. Process the payment and associate it.
+    """
+
     message = None
     if request.method == 'POST':
         donation_form = DonationForm(request.POST)
-        stub_account = False
 
         if request.user.is_anonymous():
-            # Either this is a new account, a stubbed one, or a user that's simply not logged into their account
+            # Either this is a new account, a stubbed one, or a user that's
+            # simply not logged into their account
             try:
-                stub_account = User.objects.filter(profile__stub_account=True). \
-                                            get(email__iexact=request.POST.get('email'))
+                stub_account = User.objects.filter(
+                    profile__stub_account=True).get(
+                    email__iexact=request.POST.get('email')
+                )
             except User.DoesNotExist:
-                pass
+                stub_account = False
 
-            if not stub_account:
+            if stub_account:
+                # We use the stub account and anonymous users even are allowed
+                # to update it. This is OK, because we don't care too much
+                # about the accuracy of this data. Later if/when this becomes
+                # a real account, anonymous users won't be able to update this
+                # information -- that's what matters.
+                user_form = UserForm(
+                    request.POST,
+                    instance=stub_account
+                )
+                profile_form = ProfileForm(
+                    request.POST,
+                    instance=stub_account.profile
+                )
+            else:
+                # Either a regular account or an email address we've never
+                # seen before. Create a new user from the POST data.
                 user_form = UserForm(request.POST)
                 profile_form = ProfileForm(request.POST)
-            else:
-                # We use the stub account and anonymous users even are allowed to update it. This is OK, because we
-                # don't care too much about the accuracy of this data. Later if/when this becomes a real account,
-                # anonymous users won't be able to update this information -- that's what matters.
-                user_form = UserForm(request.POST, instance=stub_account)
-                profile_form = ProfileForm(request.POST, instance=stub_account.profile)
         else:
-            user_form = UserForm(request.POST, instance=request.user)
-            profile_form = ProfileForm(request.POST, instance=request.user.profile)
+            user_form = UserForm(
+                request.POST,
+                instance=request.user
+            )
+            profile_form = ProfileForm(
+                request.POST,
+                instance=request.user.profile
+            )
 
-        if all([donation_form.is_valid(), user_form.is_valid(), profile_form.is_valid()]):
+        if all([donation_form.is_valid(),
+                user_form.is_valid(),
+                profile_form.is_valid()]):
             # Process the data in form.cleaned_data
             cd_donation_form = donation_form.cleaned_data
             cd_user_form = user_form.cleaned_data
@@ -147,20 +187,31 @@ def donate(request):
             stripe_token = request.POST.get('stripeToken')
 
             # Route the payment to a payment provider
-            response = route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form, stripe_token)
+            response = route_and_process_donation(
+                cd_donation_form,
+                cd_profile_form,
+                cd_user_form,
+                stripe_token
+            )
             logger.info("Payment routed with response: %s" % response)
 
             if response['status'] == 0:
                 d = donation_form.save(commit=False)
                 d.status = response['status']
                 d.payment_id = response['payment_id']
-                d.transaction_id = response.get('transaction_id')  # Will onlyl work for Paypal.
+                d.transaction_id = response.get('transaction_id')  # Will only work for Paypal.
                 d.save()
 
                 if request.user.is_anonymous() and not stub_account:
                     # Create a stub account with an unusable password
                     new_user = User.objects.create_user(
-                        cd_user_form['email'][:30],  # Username can only be 30 chars long
+                        # Username can only be 30 chars long. Use a hash of the
+                        # email address to reduce the odds of somebody
+                        # wanting to create an account that already exists.
+                        # We'll change this to good values later, when the stub
+                        # account is upgraded to a real account with a real
+                        # username.
+                        hashlib.md5(request.POST.get('email')).hexdigest()[:30],
                         cd_user_form['email'],
                     )
                     new_user.first_name = cd_user_form['first_name']
@@ -188,7 +239,8 @@ def donate(request):
                 return HttpResponseRedirect(response['redirect'])
 
             else:
-                logger.critical("Got back status of %s when making initial request of API. Message was:\n%s" %
+                logger.critical("Got back status of %s when making initial "
+                                "request of API. Message was:\n%s" %
                                 (response['status'], response['message']))
                 message = response['message']
     else:

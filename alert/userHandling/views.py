@@ -12,11 +12,13 @@ from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
-from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
+from django.views.decorators.debug import sensitive_post_parameters, \
+    sensitive_variables
 
 from alert import settings
 from alert.stats import tally_stat
-from alert.userHandling.forms import ProfileForm, UserForm, UserCreationFormExtended, EmailConfirmationForm, \
+from alert.userHandling.forms import ProfileForm, UserForm, \
+    UserCreationFormExtended, EmailConfirmationForm, \
     CustomPasswordChangeForm
 from alert.userHandling.models import UserProfile
 from alert.custom_filters.decorators import check_honeypot
@@ -49,7 +51,8 @@ def view_alerts(request):
 @login_required
 @never_cache
 def view_favorites(request):
-    favorites = Favorite.objects.filter(users__user=request.user).order_by('pk')
+    favorites = Favorite.objects.filter(users__user=request.user).order_by(
+        'pk')
     favorite_forms = []
     for favorite in favorites:
         favorite_forms.append(FavoriteForm(instance=favorite))
@@ -92,11 +95,14 @@ def view_settings(request):
                           "The CourtListener team\n\n"
                           "------------------\n"
                           "For questions or comments, please see our contact page, "
-                          "https://www.courtlistener.com/contact/." % (user.username, up.activation_key))
-            send_mail(email_subject, email_body, 'CourtListener <noreply@courtlistener.com>', [new_email])
+                          "https://www.courtlistener.com/contact/." % (
+                user.username, up.activation_key))
+            send_mail(email_subject, email_body,
+                      'CourtListener <noreply@courtlistener.com>', [new_email])
 
             messages.add_message(request, messages.SUCCESS,
-                                 ('Your settings were saved successfully. To continue '
+                                 (
+                                     'Your settings were saved successfully. To continue '
                                  'receiving emails, please confirm your new email address '
                                  'by checking your email within five days.'))
         elif not up.email_confirmed:
@@ -183,25 +189,36 @@ def register(request):
     if request.user.is_anonymous():
         if request.method == 'POST':
             try:
-                stub_account = User.objects.filter(profile__stub_account=True).\
-                                            get(email__iexact=request.POST.get('email'))
+                stub_account = User.objects.filter(
+                    profile__stub_account=True).get(
+                    email__iexact=request.POST.get('email'))
             except User.DoesNotExist:
                 stub_account = False
 
-            if not stub_account:
-                form = UserCreationFormExtended(request.POST)
+            if stub_account:
+                form = UserCreationFormExtended(
+                    request.POST,
+                    instance=stub_account
+                )
             else:
-                form = UserCreationFormExtended(request.POST, instance=stub_account)
+                form = UserCreationFormExtended(request.POST)
 
             if form.is_valid():
                 cd = form.cleaned_data
                 if not stub_account:
-                    # make a new user that is active, but has not confirmed their email address
-                    user = User.objects.create_user(cd['username'], cd['email'], cd['password1'])
+                    # make a new user that is active, but has not confirmed
+                    # their email address
+                    user = User.objects.create_user(
+                        cd['username'],
+                        cd['email'],
+                        cd['password1']
+                    )
                     up = UserProfile(user=user)
                 else:
+                    # Upgrade the stub account to make it a regular account.
                     user = stub_account
                     user.set_password(cd['password1'])
+                    user.username = cd['username']
                     up = stub_account.profile
                     up.stub_account = False
 
@@ -213,21 +230,24 @@ def register(request):
 
                 # Build and assign the activation key
                 salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-                up.activation_key = hashlib.sha1(salt + user.username).hexdigest()
+                up.activation_key = hashlib.sha1(
+                    salt + user.username).hexdigest()
                 up.key_expires = now() + timedelta(days=5)
                 up.save()
 
                 # Send an email with the confirmation link to the new user
                 email_subject = 'Confirm your account on CourtListener.com'
-                email_body = ("Hello, %s, and thanks for signing up for an account!\n\n"
-                              "To send you emails, we need you to activate your account with CourtListener. To "
-                              "activate your account, click this link within five days:\n\n"
-                              "https://www.courtlistener.com/email/confirm/%s\n\n"
-                              "Thanks for using our site,\n\n"
-                              "The CourtListener Team\n\n"
-                              "-------------------\n"
-                              "For questions or comments, please see our contact page, "
-                              "https://www.courtlistener.com/contact/." % (user.username, up.activation_key))
+                email_body = (
+                    "Hello, %s, and thanks for signing up for an account!\n\n"
+                    "To send you emails, we need you to activate your account with CourtListener. To "
+                    "activate your account, click this link within five days:\n\n"
+                    "https://www.courtlistener.com/email/confirm/%s\n\n"
+                    "Thanks for using our site,\n\n"
+                    "The CourtListener Team\n\n"
+                    "-------------------\n"
+                    "For questions or comments, please see our contact page, "
+                    "https://www.courtlistener.com/contact/." % (
+                        user.username, up.activation_key))
                 send_mail(
                     email_subject,
                     email_body, 'CourtListener <noreply@courtlistener.com>',
@@ -236,18 +256,21 @@ def register(request):
 
                 # Send an email letting the admins know there's somebody to say hi to
                 email_subject = 'New user confirmed on CourtListener: %s' % up.user.username
-                email_body = ("A new user has signed up on CourtListener and they'll be automatically welcomed soon!\n\n"
-                              "  Their name is: %s\n"
-                              "  Their email address is: %s\n\n"
-                              "Sincerely,\n\n"
-                              "The CourtListener Bots" % (up.user.get_full_name() or "Not provided",
-                                                          up.user.email))
+                email_body = (
+                    "A new user has signed up on CourtListener and they'll be automatically welcomed soon!\n\n"
+                    "  Their name is: %s\n"
+                    "  Their email address is: %s\n\n"
+                    "Sincerely,\n\n"
+                    "The CourtListener Bots" % (
+                        up.user.get_full_name() or "Not provided",
+                        up.user.email))
                 send_mail(email_subject,
                           email_body,
                           'CourtListener <noreply@courtlistener.com>',
                           [a[1] for a in settings.ADMINS])
                 tally_stat('user.created')
-                return HttpResponseRedirect('/register/success/?next=%s' % redirect_to)
+                return HttpResponseRedirect(
+                    '/register/success/?next=%s' % redirect_to)
         else:
             form = UserCreationFormExtended()
         return render_to_response("profile/register.html",
@@ -366,9 +389,10 @@ def request_email_confirmation(request):
 
 @never_cache
 def emailConfirmSuccess(request):
-    return render_to_response('registration/request_email_confirmation_success.html',
-                              {'private': False},
-                              RequestContext(request))
+    return render_to_response(
+        'registration/request_email_confirmation_success.html',
+        {'private': False},
+        RequestContext(request))
 
 
 @sensitive_post_parameters('old_password', 'new_password1', 'new_password2')
