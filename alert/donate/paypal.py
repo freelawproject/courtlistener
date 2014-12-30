@@ -3,7 +3,9 @@ import simplejson
 import requests
 from alert.donate.models import Donation
 from django.conf import settings
-from django.http import HttpResponseRedirect, HttpResponseNotAllowed
+from django.http import (
+    HttpResponseRedirect, HttpResponseNotAllowed, HttpResponseForbidden
+)
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.utils.timezone import now
@@ -184,11 +186,12 @@ def process_paypal_sale_complete_callback(request):
             pass
         else:
             logger.warn('Paypal HMAC signature check failed.')
-            return HTTPResponseForbidden(
+            return HttpResponseForbidden(
                 '<h1>403: Did not pass signature check.</h1>'
             )
     else:
         return HttpResponseNotAllowed(
-            '<h1>405: This is a callback endpoint for a payment provider. '
-            'Only POST methods are allowed.</h1>'
+            permitted_methods={'POST'},
+            content='<h1>405: This is a callback endpoint for a payment '
+                    'provider. Only POST methods are allowed.</h1>'
         )

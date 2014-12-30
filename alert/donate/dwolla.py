@@ -50,8 +50,9 @@ def process_dwolla_callback(request):
             )
     else:
         return HttpResponseNotAllowed(
-            '<h1>405: This is a callback endpoint for a payment provider. '
-            'Only POST methods are allowed.</h1>'
+            permitted_methods={'POST'},
+            content='<h1>405: This is a callback endpoint for a payment '
+                    'provider. Only POST methods are allowed.</h1>'
         )
 
 
@@ -95,8 +96,9 @@ def process_dwolla_transaction_status_callback(request):
             )
     else:
         return HttpResponseNotAllowed(
-            '<h1>405: This is a callback endpoint for a payment provider. '
-            'Only POST methods are allowed.</h1>'
+            permitted_methods={'POST'},
+            content='<h1>405: This is a callback endpoint for a payment '
+                    'provider. Only POST methods are allowed.</h1>'
         )
 
 

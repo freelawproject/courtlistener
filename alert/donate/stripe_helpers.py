@@ -52,8 +52,9 @@ def process_stripe_callback(request):
         return HttpResponse('<h1>200: OK</h1>')
     else:
         return HttpResponseNotAllowed(
-            '<h1>405: This is a callback endpoint for a payment provider. '
-            'Only POST methods are allowed.</h1>'
+            permitted_methods={'POST'},
+            content='<h1>405: This is a callback endpoint for a payment '
+                    'provider. Only POST methods are allowed.</h1>'
         )
 
 

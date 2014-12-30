@@ -54,7 +54,10 @@ def save_or_update_favorite(request):
 
         return HttpResponse("It worked")
     else:
-        return HttpResponseNotAllowed("Not an ajax request.")
+        return HttpResponseNotAllowed(
+            permitted_methods={'POST'},
+            content="Not an ajax request."
+        )
 
 
 @login_required
@@ -100,5 +103,8 @@ def delete_favorite(request):
         return HttpResponse("It worked.")
 
     else:
-        return HttpResponseNotAllowed("Not an ajax request.")
+        return HttpResponseNotAllowed(
+            permitted_methods={'POST'},
+            content="Not an ajax request."
+        )
 
