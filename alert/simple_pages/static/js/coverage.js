@@ -14,7 +14,8 @@ var lineChartOptions = {
 };
 
 var canvas;
-var court_data = [];
+var court_data = [],
+    chartData = [];
 
 function updateHeader(data) {
     $('#graph-header').text(data.total + ' Opinions');
@@ -109,6 +110,29 @@ function addNavigation() {
                 // Update the drawing area
                 updateHeader(data);
                 drawGraph(data);
+
+                chartData = [];
+                var entry = {};
+
+                for (var item in data.annual_counts) {
+                    if (data.annual_counts.hasOwnProperty(item)) {
+                        entry = {};
+                        entry.x = item;
+                        entry.y = data.annual_counts[item];
+                        chartData.push(entry);
+                    }
+                }
+
+                chartData.sort(function(a, b) {
+                    return a.x - b.x;
+                });
+
+                $('#coverageChart').empty();
+
+                new Chartographer.LineChart(chartData)
+                    .xLabel(court_data[location.hash.substr(1)].short_name)
+                    .yLabel('Number of Opinions')
+                    .renderTo('#coverageChart');
             },
             error: function(){
                 // If ajax fails (perhaps it's an invalid court?) set it back to all.
@@ -127,6 +151,10 @@ function addNavigation() {
 
 $(document).ready(function() {
     addNavigation();
+    d3.select('#chart')
+        .append('svg')
+        .attr('id', 'coverageChart')
+        .attr('height', '400px');
     canvas = Raphael('graph', 950, 400);
     canvas.setViewBox(0, 0, 950, 400, true);
     canvas.setSize('100%', '100%');
