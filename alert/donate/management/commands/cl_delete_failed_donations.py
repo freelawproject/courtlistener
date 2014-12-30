@@ -49,6 +49,7 @@ class Command(BaseCommand):
                 status__in=[
                     0,
                     1,
+                    3,  # Cancelled
                 ]
             ),
             'Stripe': Donation.objects.filter(
