@@ -52,8 +52,8 @@ def process_stripe_callback(request):
         return HttpResponse('<h1>200: OK</h1>')
     else:
         return HttpResponseNotAllowed(
-            '<h1>405: This is a callback endpoint for a payment provider. Only '
-            'POST methods are allowed.</h1>'
+            '<h1>405: This is a callback endpoint for a payment provider. '
+            'Only POST methods are allowed.</h1>'
         )
 
 
@@ -78,7 +78,7 @@ def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
         logger.warn("Stripe was unable to process the payment: %s" % e)
         response = {
             'message': 'Oops, we had a problem processing your card: '
-                       '<strong>%s<strong>' %
+                       '<strong>%s</strong>' %
                        e.json_body['error']['message'],
             'status': 1,  # ERROR
             'payment_id': None,
