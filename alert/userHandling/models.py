@@ -92,6 +92,7 @@ class UserProfile(models.Model):
     donation = models.ManyToManyField(
         Donation,
         verbose_name='the donations made by the user',
+        related_name='donors',
         blank=True,
         null=True
     )

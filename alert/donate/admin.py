@@ -1,4 +1,31 @@
 from django.contrib import admin
 from alert.donate.models import Donation
+from alert.userHandling.models import UserProfile
 
-admin.site.register(Donation)
+
+class DonorInline(admin.TabularInline):
+    model = UserProfile.donation.through
+    max_num = 1
+
+
+class DonationAdmin(admin.ModelAdmin):
+    readonly_fields = (
+        'date_modified',
+        'date_created',
+    )
+    list_display = (
+        '__str__',
+        'amount',
+        'payment_provider',
+        'status',
+    )
+    list_filter = (
+        'payment_provider',
+        'status',
+    )
+    inlines = (
+        DonorInline,
+    )
+
+
+admin.site.register(Donation, DonationAdmin)
