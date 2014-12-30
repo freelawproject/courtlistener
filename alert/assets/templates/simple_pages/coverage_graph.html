@@ -7,11 +7,18 @@
 {% block sidebar %}{% endblock %}
 
 {% block footer-scripts %}
-    <script src="{{ STATIC_URL }}js/jquery.ba-hashchange.min.js"></script>
-    <script src="{{ STATIC_URL }}js/chosen.jquery.min.js"></script>
 
-    <script src="{{ STATIC_URL }}js/d3.min.js"></script>
-    <script src="{{ STATIC_URL }}js/plottable.min.js"></script>
+    {% if DEBUG %}
+        <script src="{{ STATIC_URL }}js/jquery.ba-hashchange.js"></script>
+        <script src="{{ STATIC_URL }}js/chosen.jquery.js"></script>
+        <script src="{{ STATIC_URL }}js/d3.js"></script>
+        <script src="{{ STATIC_URL }}js/plottable.js"></script>
+    {% else %}
+        <script src="{{ STATIC_URL }}js/jquery.ba-hashchange.min.js"></script>
+        <script src="{{ STATIC_URL }}js/chosen.jquery.min.js"></script>
+        <script src="{{ STATIC_URL }}js/d3.min.js"></script>
+        <script src="{{ STATIC_URL }}js/plottable.min.js"></script>
+    {% endif %}
     <script src="{{ STATIC_URL }}js/chartographer.js"></script>
 
     <script type="text/javascript">
@@ -39,7 +46,7 @@
             </div>
         </div>
 
-        <div id="chart"></div>
+        <div id="chart" style="height: 400px;"></div>
 
         <div>
             <h4 class="bottom">General Notes</h4>

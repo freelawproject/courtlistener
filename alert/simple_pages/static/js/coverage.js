@@ -10,18 +10,14 @@ function updateHeader(data) {
 }
 
 function drawGraph(data) {
-    chartData = [],
-        entry = {},
-        courtName = '';
-
-    if (hash) {
+    var entry = {},
         courtName = court_data[hash].short_name;
-    }
+    chartData = [];
 
     for (var item in data.annual_counts) {
         if (data.annual_counts.hasOwnProperty(item)) {
             entry = {};
-            entry.x = item;
+            entry.x = parseInt(item, 10);
             entry.y = data.annual_counts[item];
             chartData.push(entry);
         }
@@ -29,20 +25,17 @@ function drawGraph(data) {
     chartData.sort(function(a, b) {
         return a.x - b.x;
     });
+    $('#coverageChart').empty();
+    new Chartographer.BarChart(chartData)
+        .xLabel(courtName)
+        .yLabel('Number of Opinions')
+        .renderTo('#coverageChart');
 
-    if (chartData.length < 5) {
-        $('#coverageChart').empty();
-        new Chartographer.BarChart(chartData)
-            .xLabel(courtName)
-            .yLabel('Number of Opinions')
-            .renderTo('#coverageChart');
-    } else {
-        $('#coverageChart').empty();
-        new Chartographer.LineChart(chartData)
-            .xLabel(courtName)
-            .yLabel('Number of Opinions')
-            .renderTo('#coverageChart');
-    }
+    components.yAxis.formatter(function (d) {
+        return '$' + d.formatMoney(0, '.', ',');
+    });
+
+
 }
 
 // Do this when the hash of the page changes (i.e. at page load or when a select is chosen.
@@ -96,6 +89,10 @@ function addNavigation() {
     }
     $('#nav select').val(hash);
 }
+
+// hover
+// click
+// thousands formatting
 
 $(document).ready(function() {
     addNavigation();
