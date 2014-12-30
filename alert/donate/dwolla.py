@@ -7,7 +7,8 @@ import time
 from alert.donate.models import Donation
 from dateutil import parser
 from django.conf import settings
-from django.http import HttpResponseNotAllowed, HttpResponse, HttpResponseForbidden
+from django.http import HttpResponseNotAllowed, HttpResponse, \
+    HttpResponseForbidden
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 
@@ -141,12 +142,14 @@ def process_dwolla_payment(cd_donation_form, cd_profile_form, cd_user_form,
         headers={'Content-Type': 'application/json'}
     )
     r_content_as_dict = simplejson.loads(r.content)
-    logger.info("Sent the payment to Dwolla, got back this data: %s" % r_content_as_dict)
+    logger.info("Sent the payment to Dwolla, got back this data: %s" %
+                r_content_as_dict)
     response = {
         'result': r_content_as_dict.get('Result'),
         'status_code': r.status_code,
         'message': r_content_as_dict.get('Message'),  # None if no errors.
-        'redirect': 'https://www.dwolla.com/payment/checkout/%s' % r_content_as_dict.get('CheckoutId'),
+        'redirect': 'https://www.dwolla.com/payment/checkout/%s' %
+                    r_content_as_dict.get('CheckoutId'),
         'payment_id': r_content_as_dict.get('CheckoutId')
     }
     return response

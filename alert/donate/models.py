@@ -10,10 +10,10 @@ PROVIDERS = (
 PAYMENT_STATUSES = (
     (0, 'Awaiting Payment'),
     (1, 'Unknown Error'),
-    # This does not mean we get the money, must await "PROCESSED" for that.
+    # This does not mean we get the money; must await "PROCESSED" for that.
     (2, 'Completed, but awaiting processing'),
     (3, 'Cancelled'),
-    (4, 'Processed'),
+    (4, 'Processed'),  # Gold standard.
     (5, 'Pending'),
     (6, 'Failed'),
     (7, 'Reclaimed/Refunded'),
