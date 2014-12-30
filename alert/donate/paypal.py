@@ -3,7 +3,7 @@ import simplejson
 import requests
 from alert.donate.models import Donation
 from django.conf import settings
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponseNotAllowed
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.utils.timezone import now
@@ -55,8 +55,10 @@ def process_paypal_callback(request):
     access_token = get_paypal_access_token()
     d = Donation.objects.get(transaction_id=request.GET['token'])
     r = requests.post(
-        '%s/v1/payments/payment/%s/execute/' % (settings.PAYPAL_ENDPOINT,
-                                                d.payment_id),
+        '%s/v1/payments/payment/%s/execute/' % (
+            settings.PAYPAL_ENDPOINT,
+            d.payment_id
+        ),
         headers={
             'Content-Type': 'application/json',
             'Authorization': 'Bearer %s' % access_token
@@ -122,7 +124,7 @@ def process_paypal_payment(cd_donation_form):
             #     u'method': u'POST',
             #     u'rel': u'execute'}
             #   ]
-            redirect = [link for link in simplejson.loads(r.content)['links'] if
+            redirect = [link for link in r_content_as_dict['links'] if
                         link['rel'].lower() == 'approval_url'][0]['href']
             parsed_redirect = urlparse(redirect)
             token = parse_qs(parsed_redirect.query)['token'][0]
@@ -155,3 +157,38 @@ def donate_paypal_cancel(request):
         },
         RequestContext(request)
     )
+
+
+def check_paypal_signature():
+    """Check that the signature provided is valid.
+
+    This is an arduous process as documented here:
+
+    https://developer.paypal.com/webapps/developer/docs/integration/direct/rest-webhooks-overview/#event-security
+
+    This is not yet completed since this function is currently only used to
+    validate sale completion. Fortunately, if somebody starts faking this, it's
+    not a huge deal.
+
+    Thus, just a stub until a brave soul attempts the link above.
+    """
+    return True
+
+
+def process_paypal_sale_complete_callback(request):
+    if request.method == 'POST':
+        data = simplejson.loads(request.body)
+        logger.info('Data from PayPal complete sale callback is: %s' % data)
+        if check_paypal_signature():
+            # Get the donation, update the status, and send the thank you note.
+            pass
+        else:
+            logger.warn('Paypal HMAC signature check failed.')
+            return HTTPResponseForbidden(
+                '<h1>403: Did not pass signature check.</h1>'
+            )
+    else:
+        return HttpResponseNotAllowed(
+            '<h1>405: This is a callback endpoint for a payment provider. '
+            'Only POST methods are allowed.</h1>'
+        )

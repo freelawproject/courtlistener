@@ -18,7 +18,8 @@ def check_dwolla_signature(proposed_signature, raw):
     signature = hmac.new(
         settings.DWOLLA_SECRET_KEY,
         raw,
-        hashlib.sha1).hexdigest()
+        hashlib.sha1
+    ).hexdigest()
     return True if (signature == proposed_signature) else False
 
 
@@ -26,7 +27,7 @@ def check_dwolla_signature(proposed_signature, raw):
 def process_dwolla_callback(request):
     if request.method == 'POST':
         data = simplejson.loads(request.body)
-        logger.info('data is: %s' % data)
+        logger.info('Data from Dwolla callback is: %s' % data)
         if check_dwolla_signature(
                 data['Signature'],
                 '%s&%0.2f' % (data['CheckoutId'], data['Amount'])):

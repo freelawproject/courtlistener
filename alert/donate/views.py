@@ -54,8 +54,10 @@ def send_thank_you_email(donation):
     )
 
 
-def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form, stripe_token):
-    """Routes the donation to the correct payment provider, then normalizes its response.
+def route_and_process_donation(cd_donation_form, cd_profile_form,
+                               cd_user_form, stripe_token):
+    """Routes the donation to the correct payment provider, then normalizes
+    its response.
 
     Returns a dict with:
      - message: Any error messages that apply
@@ -97,7 +99,8 @@ def route_and_process_donation(cd_donation_form, cd_profile_form, cd_user_form, 
             }
         else:
             response = {
-                'message': 'We had an error working with PayPal. Please try another payment method.',
+                'message': 'We had an error working with PayPal. Please try '
+                           'another payment method.',
                 'status': 1,  # ERROR
                 'payment_id': None,
                 'redirect': None,
