@@ -1,10 +1,11 @@
 from optparse import make_option
 from django.core.management.base import BaseCommand
-from datetime import timedelta, date
+from datetime import timedelta
+from django.utils.timezone import now
 from alert.donate.models import Donation
 
 
-TOO_MANY_DAYS_AGO = date.today() - timedelta(days=7)
+TOO_MANY_DAYS_AGO = now() - timedelta(days=7)
 
 
 class Command(BaseCommand):
