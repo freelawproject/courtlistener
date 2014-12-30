@@ -69,7 +69,12 @@ def process_paypal_callback(request):
     )
     if r.status_code == 200:
         d.clearing_date = now()
-        d.status = 2
+        # Technically, this should be d.status = 2 (Completed, awaiting
+        # processing) and we should await a webhook to tell us that the
+        # processing completed successfully (4). Alas, PayPal is so terrible
+        # that I can't figure that out, so we just assume that if it gets
+        # completed (2), it'll get processed (4).
+        d.status = 4
         d.save()
         from alert.donate.views import send_thank_you_email
         send_thank_you_email(d)
@@ -159,39 +164,3 @@ def donate_paypal_cancel(request):
         },
         RequestContext(request)
     )
-
-
-def check_paypal_signature():
-    """Check that the signature provided is valid.
-
-    This is an arduous process as documented here:
-
-    https://developer.paypal.com/webapps/developer/docs/integration/direct/rest-webhooks-overview/#event-security
-
-    This is not yet completed since this function is currently only used to
-    validate sale completion. Fortunately, if somebody starts faking this, it's
-    not a huge deal.
-
-    Thus, just a stub until a brave soul attempts the link above.
-    """
-    return True
-
-
-def process_paypal_sale_complete_callback(request):
-    if request.method == 'POST':
-        data = simplejson.loads(request.body)
-        logger.info('Data from PayPal complete sale callback is: %s' % data)
-        if check_paypal_signature():
-            # Get the donation, update the status, and send the thank you note.
-            pass
-        else:
-            logger.warn('Paypal HMAC signature check failed.')
-            return HttpResponseForbidden(
-                '<h1>403: Did not pass signature check.</h1>'
-            )
-    else:
-        return HttpResponseNotAllowed(
-            permitted_methods={'POST'},
-            content='<h1>405: This is a callback endpoint for a payment '
-                    'provider. Only POST methods are allowed.</h1>'
-        )
