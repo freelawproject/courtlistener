@@ -15,6 +15,11 @@ get_stub_account.short_description = "Stub Account?"
 
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
+    filter_horizontal = (
+        'donation',
+        'favorite',
+        'alert',
+    )
 
 
 class UserAdmin(admin.ModelAdmin):
