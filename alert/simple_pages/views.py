@@ -18,7 +18,7 @@ from alert.lib import search_utils
 from alert.lib.bot_detector import is_bot
 from alert.lib.sunburnt import sunburnt
 from alert.search.models import Court, Document
-from alert.search.forms import SearchForm, _clean_form
+from alert.search.forms import SearchForm
 from alert.simple_pages.forms import ContactForm
 from alert.stats import tally_stat
 
@@ -68,15 +68,10 @@ def build_court_dicts(courts):
 def coverage_graph(request):
     courts = Court.objects.filter(in_use=True)
     courts_json = json.dumps(build_court_dicts(courts))
+
     search_form = SearchForm(request.GET)
-    if search_form.is_valid():
-        cd = search_form.cleaned_data
-        conn = sunburnt.SolrInterface(
-            settings.SOLR_OPINION_URL, mode='r')
-        stat_facet_fields = search_utils.place_facet_queries(cd, conn)
-        search_form = _clean_form(request, cd)
-        precedential_statuses = search_utils.make_stats_variable(
-            stat_facet_fields, search_form)
+    precedential_statuses = [field for field in
+        search_form.fields.iterkeys() if field.startswith('stat_')]
 
     # Build up the sourcing stats.
     counts = Document.objects.values('source').annotate(Count('source'))

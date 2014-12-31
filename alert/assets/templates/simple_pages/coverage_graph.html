@@ -23,7 +23,7 @@
     <script type="text/javascript">
         var precedentTypes = [
             {% for status in precedential_statuses %}
-                '{{ status.1 }}'{% if not forloop.last %},{% endif %}
+                '{{ status }}'{% if not forloop.last %},{% endif %}
             {% endfor %}
         ];
         var sorted_courts = {{ sorted_courts|safe}};
