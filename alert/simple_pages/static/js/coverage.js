@@ -51,8 +51,8 @@ function drawGraph(data) {
         .animate(true)
         .project("x", getXDataValue, xScale)
         .project("y", getYDataValue, yScale)
-        .hoverMode('line') // need to do performance check on this setting or comment out
-        .barLabelsEnabled(true);
+        //.hoverMode('line') // need to do performance check on this setting or comment out
+        .barLabelsEnabled(chartData.length < 11);
 
 
     yAxis.formatter(function (d) {
@@ -91,11 +91,10 @@ function drawGraph(data) {
             for (i = 0; i < precedentTypes.length; i++) {
                 prec += '&' + precedentTypes[i] + '=on';
             }
-            window.location.href = '/?type=o' +
-                prec +
-                '&filed_after=' + year +
-                '-01-01&filed_before=' + (year + 1) +
-                '-12-31&order_by=score+desc' + ((hash !== 'all') ? '&court=' + hash : '');
+            window.location.href = '/?filed_after=' + year +
+                '&filed_before=' + year + 
+                prec + 
+                ((hash !== 'all') ? '&court=' + hash : '');
         }
     });
     plot.registerInteraction(click);
