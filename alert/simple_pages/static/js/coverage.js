@@ -91,7 +91,7 @@ function drawGraph(data) {
             for (i = 0; i < precedentTypes.length; i++) {
                 prec += '&' + precedentTypes[i] + '=on';
             }
-            window.location.pathname = '?type=o' +
+            window.location.href = '/?type=o' +
                 prec +
                 '&filed_after=' + year +
                 '-01-01&filed_before=' + (year + 1) +
