@@ -123,7 +123,7 @@ def show_results(request):
 
     if request.method == 'POST':
         # The user is trying to save an alert.
-        alert_form = CreateAlertForm(request.POST)
+        alert_form = CreateAlertForm(request.POST, user=request.user)
         if alert_form.is_valid():
             cd = alert_form.cleaned_data
 
@@ -135,11 +135,12 @@ def show_results(request):
                     pk=request.POST.get('edit_alert'),
                     userprofile=request.user.profile
                 )
-                alert_form = CreateAlertForm(cd, instance=alert)
+                alert_form = CreateAlertForm(cd, instance=alert,
+                                             user=request.user)
                 alert_form.save()
                 action = "edited"
             else:
-                alert_form = CreateAlertForm(cd)
+                alert_form = CreateAlertForm(cd, user=request.user)
                 alert = alert_form.save()
 
                 # associate the user with the alert
@@ -237,6 +238,7 @@ def show_results(request):
                 alert_form = CreateAlertForm(
                     instance=alert,
                     initial={'alertText': get_string_sans_alert},
+                    user=request.user,
                 )
             else:
                 # Just a regular search
@@ -244,8 +246,11 @@ def show_results(request):
                     tally_stat('search.results')
 
                 # Create bare-bones alert form.
-                alert_form = CreateAlertForm(initial={'alertText': get_string,
-                                                      'alertFrequency': "dly"})
+                alert_form = CreateAlertForm(
+                    initial={'alertText': get_string,
+                             'alertFrequency': "dly"},
+                    user=request.user
+                )
             render_dict.update(do_search(request))
             render_dict.update({'alert_form': alert_form})
             return render_to_response(

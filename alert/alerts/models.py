@@ -1,6 +1,7 @@
 from django.db import models
 
 FREQUENCY = (
+    ('rt',  'Real Time'),
     ('dly', 'Daily'),
     ('wly', 'Weekly'),
     ('mly', 'Monthly'),

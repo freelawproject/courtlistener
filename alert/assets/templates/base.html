@@ -321,6 +321,9 @@
             src="{{ STATIC_URL }}js/hopscotch.min.js"></script>
 {% endif %}
 <script type="text/javascript" src="{{ STATIC_URL }}js/base.js"></script>
+<script type="text/javascript">
+    var totalDonatedLastYear = parseFloat({{ user.profile.total_donated_last_year|safe}});
+</script>
 
 {# Allows your own scripts in the footer. #}
 {% block footer-scripts %}{% endblock %}

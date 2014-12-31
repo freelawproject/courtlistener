@@ -7,6 +7,7 @@ from django.shortcuts import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 
+
 @login_required
 def edit_alert_redirect(request, alert_id):
     """Note that this method is still very useful because it gives people an

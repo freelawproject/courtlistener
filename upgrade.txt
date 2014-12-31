@@ -25,6 +25,18 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
+2014-12-30:
+
+ - Adds support for real time alerts.
+ - Todo:
+    - Add an FAQ.
+    - Add code to disable them the day that somebody hasn't donated anymore.
+    - Add code to re-enable them the day (or moment) that somebody donates again.
+    - Figure out how to block their creation in the editor.
+    - Figure out how to trigger them on the backend. Make sure it works with
+      the index commits.
+
+
 2014-11-18:
 
  - CORS headers are now being sent with API requests so that folks can get past
