@@ -1,13 +1,9 @@
 /*eslint-env browser */
-/*global $, sorted_courts */
+/*global $, sorted_courts, precedentTypes */
 
 var hash = window.location.hash.substr(1),
     court_data = [],
     chartData = [];
-
-function updateHeader(data) {
-    $('#graph-header').text(data.total + ' Opinions');
-}
 
 function drawGraph(data) {
     var entry = {},
@@ -26,16 +22,80 @@ function drawGraph(data) {
         return a.x - b.x;
     });
     $('#coverageChart').empty();
-    new Chartographer.BarChart(chartData)
-        .xLabel(courtName)
-        .yLabel('Number of Opinions')
-        .renderTo('#coverageChart');
 
-    components.yAxis.formatter(function (d) {
-        return '$' + d.formatMoney(0, '.', ',');
+    function getXDataValue(d) {
+        return d.x;
+    }
+
+    function getYDataValue(d) {
+        return d.y;
+    }
+
+    // Scales
+    if (chartData.length > 10) {
+        var xScale = new Plottable.Scale.Linear();
+        var xAxis  = new Plottable.Axis.Numeric(xScale, 'bottom');
+    } else {
+        var xScale = new Plottable.Scale.Ordinal();
+        var xAxis  = new Plottable.Axis.Category(xScale, 'bottom');
+    }
+    var yScale = new Plottable.Scale.Linear();
+
+    // Plot Components
+    var title  = new Plottable.Component.TitleLabel(parseInt(data.total, 10).toLocaleString() + ' Opinions');
+    var yLabel = new Plottable.Component.Label('Number of Opinions', 'left');
+    var xLabel = new Plottable.Component.Label(courtName);
+    var yAxis  = new Plottable.Axis.Numeric(yScale, 'left');
+    var plot   = new Plottable.Plot.Bar(xScale, yScale, true)
+        .addDataset(chartData)
+        .animate(true)
+        .project("x", getXDataValue, xScale)
+        .project("y", getYDataValue, yScale)
+        .hoverMode('line')
+        .barLabelsEnabled(true);
+
+
+    yAxis.formatter(function (d) {
+        return d.toLocaleString();
     });
 
+    var table = new Plottable.Component.Table([
+        [null, null, title],
+        [yLabel, yAxis, plot],
+        [null, null, xAxis],
+        [null, null, xLabel]
+    ]);
 
+    // Render it
+    table.renderTo('#coverageChart');
+
+    var hover = new Plottable.Interaction.Hover();
+    hover.onHoverOver(function(hoverData) {
+        var xString = hoverData.data[0].x;
+        var yString = hoverData.data[0].y.toLocaleString();
+        title.text(yString + " opinions in "+ xString);
+    });
+    hover.onHoverOut(function() {
+        title.text(parseInt(data.total, 10).toLocaleString() + ' Opinions');
+    });
+    plot.registerInteraction(hover);
+
+    var click = new Plottable.Interaction.Click();
+    click.callback(function(p) {
+        var bars = plot.getBars(p.x, p.y),
+            year = bars.data()[0].x,
+            prec = '',
+            i;
+        for (i = 0; i < precedentTypes.length; i++) {
+            prec += '&' + precedentTypes[i] + '=on';
+        }
+        window.location.pathname = '?type=o' +
+            prec +
+            '&filed_after=' + year +
+            '-01-01&filed_before=' + (year + 1) +
+            '-12-31&order_by=score+desc' + ((hash !== 'all') ? '&court=' + hash : '');
+    });
+    plot.registerInteraction(click);
 }
 
 // Do this when the hash of the page changes (i.e. at page load or when a select is chosen.
@@ -52,7 +112,6 @@ $(window).hashchange(function() {
         url: '/api/rest/v2/coverage/' + hash + '/',
         success: function(data) {
             // Update the drawing area
-            updateHeader(data);
             drawGraph(data);
         },
         error: function(){
@@ -92,7 +151,6 @@ function addNavigation() {
 
 // hover
 // click
-// thousands formatting
 
 $(document).ready(function() {
     addNavigation();
