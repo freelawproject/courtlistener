@@ -15,12 +15,28 @@ get_stub_account.short_description = "Stub Account?"
 
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
+    filter_horizontal = (
+        'donation',
+        'favorite',
+        'alert',
+    )
 
 
 class UserAdmin(admin.ModelAdmin):
-    inlines = [UserProfileInline, ]
-    list_display = ('username', get_email_confirmed, get_stub_account)
-    search_fields = ['username', 'first_name', 'last_name', 'email']
+    inlines = (
+        UserProfileInline,
+    )
+    list_display = (
+        'username',
+        get_email_confirmed,
+        get_stub_account,
+    )
+    search_fields = (
+        'username',
+        'first_name',
+        'last_name',
+        'email',
+    )
 
 admin.site.register(Alert)
 admin.site.register(BarMembership)
