@@ -7,35 +7,47 @@
 {% block sidebar %}{% endblock %}
 
 {% block footer-scripts %}
-    <script src="{{ STATIC_URL }}js/raphael.js"></script>
-    <script src="{{ STATIC_URL }}js/g.raphael.js"></script>
-    <script src="{{ STATIC_URL }}js/g.line.js"></script>
-    <script src="{{ STATIC_URL }}js/jquery.ba-hashchange.min.js"></script>
-    <script src="{{ STATIC_URL }}js/chosen.jquery.min.js"></script>
+
+    {% if DEBUG %}
+        <script src="{{ STATIC_URL }}js/jquery.ba-hashchange.js"></script>
+        <script src="{{ STATIC_URL }}js/chosen.jquery.js"></script>
+        <script src="{{ STATIC_URL }}js/d3.js"></script>
+        <script src="{{ STATIC_URL }}js/plottable.js"></script>
+    {% else %}
+        <script src="{{ STATIC_URL }}js/jquery.ba-hashchange.min.js"></script>
+        <script src="{{ STATIC_URL }}js/chosen.jquery.min.js"></script>
+        <script src="{{ STATIC_URL }}js/d3.min.js"></script>
+        <script src="{{ STATIC_URL }}js/plottable.min.js"></script>
+    {% endif %}
+
     <script type="text/javascript">
+        var precedentTypes = [
+            {% for status in precedential_statuses %}
+                '{{ status }}'{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
         var sorted_courts = {{ sorted_courts|safe}};
     </script>
     <script src="{{ STATIC_URL }}js/coverage.js"></script>
 {% endblock %}
 
 {% block head %}
+    <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/plottable.css"
+          type="text/css" media="screen, projection">
     <link rel="stylesheet" href="{{ STATIC_URL }}css/chosen.min.css" type="text/css" media="screen, projection"/>
 {% endblock %}
 
 {% block content %}
     <div class="col-xs-12">
         <div class="row">
-            <div class="col-sm-3">
-                <h3 class="bottom" id="graph-header"></h3>
-            </div>
-            <div class="col-sm-9">
+            <div class="col-sm-12">
                 <div id="nav" class="text-right">
                     <select class="bottom top float-right"></select>
                 </div>
             </div>
         </div>
 
-        <div id="graph"></div>
+        <div id="chart" style="height: 400px;"></div>
 
         <div>
             <h4 class="bottom">General Notes</h4>

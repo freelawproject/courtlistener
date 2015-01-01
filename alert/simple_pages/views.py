@@ -18,6 +18,7 @@ from alert.lib import search_utils
 from alert.lib.bot_detector import is_bot
 from alert.lib.sunburnt import sunburnt
 from alert.search.models import Court, Document
+from alert.search.forms import SearchForm
 from alert.simple_pages.forms import ContactForm
 from alert.stats import tally_stat
 
@@ -68,6 +69,10 @@ def coverage_graph(request):
     courts = Court.objects.filter(in_use=True)
     courts_json = json.dumps(build_court_dicts(courts))
 
+    search_form = SearchForm(request.GET)
+    precedential_statuses = [field for field in
+        search_form.fields.iterkeys() if field.startswith('stat_')]
+
     # Build up the sourcing stats.
     counts = Document.objects.values('source').annotate(Count('source'))
     count_pro = 0
@@ -91,6 +96,7 @@ def coverage_graph(request):
         'simple_pages/coverage_graph.html',
         {
             'sorted_courts': courts_json,
+            'precedential_statuses': precedential_statuses,
             'count_pro': count_pro,
             'count_lawbox': count_lawbox,
             'count_scraper': count_scraper,
