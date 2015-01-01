@@ -231,9 +231,8 @@ class SolrInterface(object):
 
     def raw_query(self, *args, **kwargs):
         # Accepts a query, and builds a RawSolrSearch object from it.
-        if not 'caller' in kwargs:
+        if 'caller' not in kwargs:
             logger.warning('Caller not defined for Solr query.')
-
 
         if not self.readable:
             raise TypeError("This Solr instance is only for writing")

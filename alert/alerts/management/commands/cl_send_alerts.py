@@ -92,7 +92,7 @@ class Command(BaseCommand):
             '[--user USER]')
 
     def run_query(self, alert):
-        results = None
+        results = []
         error = False
         try:
             logger.info("Now running the query: %s\n" % alert.query)
@@ -108,6 +108,11 @@ class Command(BaseCommand):
             search_form = SearchForm(data)
             if search_form.is_valid():
                 cd = search_form.cleaned_data
+
+                if self.rate == 'rt' and len(self.valid_ids[cd['type']]) == 0:
+                    # Bail out. No results will be found if no valid_ids.
+                    return error, cd['type'], results
+
                 if cd['type'] == 'o':
                     cd['filed_after'] = self.cut_off_date
                 elif cd['type'] == 'oa':
@@ -179,7 +184,6 @@ class Command(BaseCommand):
                         alert.date_last_hit = now()
                         alert.save()
                     elif len(results) == 0 and alert.always_send_email:
-                        # if they want an alert even when no hits.
                         hits.append([alert, type, None])
                         logger.info("  Sending results for negative alert "
                                     "'%s'\n" % alert.name)
@@ -195,10 +199,9 @@ class Command(BaseCommand):
                 logger.info("  No hits. Not sending mail for this alert.\n")
 
         if not self.options['simulate']:
-            tally_stat('alerts.sent.%s' % self.options['rate'],
-                       inc=alerts_sent_count)
-            logger.info("Sent %s %s email alerts." % (
-                alerts_sent_count, self.options['rate']))
+            tally_stat('alerts.sent.%s' % self.rate, inc=alerts_sent_count)
+            logger.info("Sent %s %s email alerts." %
+                        (alerts_sent_count, self.rate))
 
     def clean_rt_queue(self):
         """Clean out any items in the RealTime queue once they've been run or
@@ -228,13 +231,16 @@ class Command(BaseCommand):
         valid_ids = {}
         for type in [t[0] for t in ITEM_TYPES]:
             ids = RealTimeQueue.objects.filter(item_type=type)
-            main_params = {
-                'caller': 'cl_send_alerts',
-                'fl': 'id',
-                'fq': ['id:(%s)' % ' OR '.join([str(i.pk) for i in ids])],
-            }
-            results = self.connections[type].raw_query(**main_params).execute()
-            valid_ids[type] = [int(r['id']) for r in results.result.docs]
+            if ids:
+                main_params = {
+                    'caller': 'cl_send_alerts',
+                    'fl': 'id',
+                    'fq': ['id:(%s)' % ' OR '.join([str(i.pk) for i in ids])],
+                }
+                results = self.connections[type].raw_query(**main_params).execute()
+                valid_ids[type] = [int(r['id']) for r in results.result.docs]
+            else:
+                valid_ids[type] = []
         return valid_ids
 
     def handle(self, *args, **options):
@@ -249,15 +255,15 @@ class Command(BaseCommand):
                               ', '.join(dict(FREQUENCY).keys()))
             exit(1)
 
-        self.cut_off_date = get_cut_off_date(options['rate'])
-
-        if self.rate == 'rt':
-            self.valid_ids = self.get_new_ids()
+        self.cut_off_date = get_cut_off_date(self.rate)
 
         self.connections = {
             'o': sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r'),
             'oa': sunburnt.SolrInterface(settings.SOLR_AUDIO_URL, mode='r'),
         }
+
+        if self.rate == 'rt':
+            self.valid_ids = self.get_new_ids()
 
         if self.options.get('simulate'):
             logger.info("******************************************\n"
