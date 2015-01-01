@@ -24,7 +24,7 @@ def edit_alert_redirect(request, alert_id):
         pk=alert_id,
         userprofile=request.user.profile
     )
-    return HttpResponseRedirect('/?%s&edit_alert=%s' % (alert.alertText, alert.pk))
+    return HttpResponseRedirect('/?%s&edit_alert=%s' % (alert.query, alert.pk))
 
 
 @login_required

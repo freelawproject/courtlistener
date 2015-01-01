@@ -168,8 +168,8 @@ class Court(models.Model):
         null=True
     )
     jurisdiction = models.CharField(
-        help_text='the jurisdiction of the court, one of: %s' % ', '.join(['%s (%s)' % (t[0], t[1])
-                                                                           for t in JURISDICTIONS]),
+        help_text='the jurisdiction of the court, one of: %s' %
+                  ', '.join(['%s (%s)' % (t[0], t[1]) for t in JURISDICTIONS]),
         max_length=3,
         choices=JURISDICTIONS
     )

@@ -9,8 +9,8 @@ class CreateAlertForm(ModelForm):
         self.user = kwargs.pop('user', None)
         super(CreateAlertForm, self).__init__(*args, **kwargs)
 
-    def clean_alertFrequency(self):
-        rate = self.cleaned_data['alertFrequency']
+    def clean_rate(self):
+        rate = self.cleaned_data['rate']
         if rate == 'rt' and self.user.profile.total_donated_last_year < 10:
             # Somebody is trying to hack past the JS/HTML block on the front
             # end. Don't let them create the alert until they've donated.
@@ -24,30 +24,30 @@ class CreateAlertForm(ModelForm):
     class Meta:
         model = Alert
         fields = (
-            'alertName',
-            'alertText',
-            'alertFrequency',
-            'sendNegativeAlert',
+            'name',
+            'query',
+            'rate',
+            'always_send_email',
         )
         widgets = {
-            'alertText': HiddenInput(
+            'query': HiddenInput(
                 attrs={
                     'tabindex': '250'
                 }
             ),
-            'alertName': TextInput(
+            'name': TextInput(
                 attrs={
                     'class': 'form-control',
                     'tabindex': '251'
                 }
             ),
-            'alertFrequency': Select(
+            'rate': Select(
                 attrs={
                     'class': 'form-control',
                     'tabindex': '252',
                 }
             ),
-            'sendNegativeAlert': CheckboxInput(
+            'always_send_email': CheckboxInput(
                 attrs={
                     'tabindex': '253',
                 }

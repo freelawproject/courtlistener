@@ -254,10 +254,10 @@ class AlertTest(TestCase):
         # Set up some handy variables
         self.client = Client()
         self.alert_params = {
-            'alertText': 'q=asdf',
-            'alertName': 'dummy alert',
-            'alertFrequency': 'dly',
-            'sendNegativeAlert': 'on',
+            'query': 'q=asdf',
+            'name': 'dummy alert',
+            'rate': 'dly',
+            'always_send_email': 'on',
         }
 
     def test_create_alert(self):
@@ -273,7 +273,7 @@ class AlertTest(TestCase):
         # Use a copy to shield other tests from changes.
         bad_alert_params = self.alert_params.copy()
         # Break the form
-        bad_alert_params.pop('alertText', None)
+        bad_alert_params.pop('query', None)
         self.client.login(username='pandora', password='password')
         r = self.client.post('/', bad_alert_params, follow=True)
         self.assertEqual(r.status_code, 200)

@@ -99,7 +99,8 @@ def do_search(request, rows=20, order_by=None, type=None):
 def show_results(request):
     """
     This view can vary significantly, depending on how it is called:
-     - In its most simple form, it is called via GET and without any parameters.
+     - In its most simple form, it is called via GET and without any
+       parameters.
         --> This loads the homepage.
      - It might also be called with GET *with* parameters.
         --> This loads search results.
@@ -172,13 +173,16 @@ def show_results(request):
 
             # Load the render_dict with good results that can be shown in the
             # "Latest Cases" section
-            render_dict.update(do_search(request, rows=5, order_by='dateFiled desc'))
+            render_dict.update(do_search(request, rows=5,
+                                         order_by='dateFiled desc'))
             # Get the results from the oral arguments as well
-            oa_dict = do_search(request, rows=5, order_by='dateArgued desc', type='oa')
+            oa_dict = do_search(request, rows=5, order_by='dateArgued desc',
+                                type='oa')
             render_dict.update({'results_oa': oa_dict['results']})
             # But give it a fresh form for the advanced search section
             render_dict.update({'search_form': SearchForm(request.GET)})
-            ten_days_ago = make_aware(datetime.today() - timedelta(days=10), utc)
+            ten_days_ago = make_aware(datetime.today() - timedelta(days=10),
+                                      utc)
             alerts_in_last_ten = Stat.objects\
                 .filter(
                     name__contains='alerts.sent',
@@ -237,7 +241,7 @@ def show_results(request):
                 )
                 alert_form = CreateAlertForm(
                     instance=alert,
-                    initial={'alertText': get_string_sans_alert},
+                    initial={'query': get_string_sans_alert},
                     user=request.user,
                 )
             else:
@@ -247,8 +251,8 @@ def show_results(request):
 
                 # Create bare-bones alert form.
                 alert_form = CreateAlertForm(
-                    initial={'alertText': get_string,
-                             'alertFrequency': "dly"},
+                    initial={'query': get_string,
+                             'rate': "dly"},
                     user=request.user
                 )
             render_dict.update(do_search(request))

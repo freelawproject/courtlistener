@@ -198,7 +198,7 @@ def make_fq(cd, field, key):
 
     This is necessary because despite our putting AND as the default join
     method, in some cases Solr decides OR is a better approach. So, to work
-    around this bug, we do some minimal query parsing ourselves (ugh!).
+    around this bug, we do some minimal query parsing ourselves.
     """
     if '"' in cd[key]:
         fq = '%s:(%s)' % (field, cd[key])

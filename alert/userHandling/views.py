@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 def view_alerts(request):
     alerts = request.user.profile.alert.all()
     for a in alerts:
-        alert_dict = search_utils.get_string_to_dict(a.alertText)
+        alert_dict = search_utils.get_string_to_dict(a.query)
         if alert_dict.get('type') == 'oa':
             a.type = 'oa'
         else:

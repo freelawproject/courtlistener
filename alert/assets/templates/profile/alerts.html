@@ -31,26 +31,34 @@
                                         <i class="fa-volume-up fa gray"
                                            title="Oral Argument Alert"></i>
                                     {% endif %}
-                                    <a href="/?{{ alert.alertText }}">{{ alert.alertName }}</a>
+                                    <a href="/?{{ alert.query }}">{{ alert.name }}</a>
                                 </p>
                             </td>
-                            <td>{{ alert.get_alertFrequency_display }}</td>
-                            <td>{{ alert.lastHitDate|date:"D, n/j/Y"|default:"Never" }}</td>
+                            <td>{{ alert.get_rate_display }}</td>
+                            <td>{{ alert.date_last_hit|date:"D, n/j/Y"|default:"Never" }}</td>
                             <td>
                                 {% if alert.type == 'o' %}
-                                    <a href="/feed/search/?{{ alert.alertText }}"
+                                    <a href="/feed/search/?{{ alert.query }}"
                                        title="Atom feed for this alert">
                                         <i class="fa fa-rss gray"></i>
                                     </a>
                                 {% elif alert.type == 'oa' %}
-                                    <a href="/podcast/search/?{{ alert.alertText }}"
+                                    <a href="/podcast/search/?{{ alert.query }}"
                                        title="Podcast for this alert">
                                         <i class="fa fa-rss gray"></i>
                                     </a>
                                 {% endif %}
                             </td>
-                            <td><a href="/?{{ alert.alertText }}&edit_alert={{ alert.pk }}">Edit</a></td>
-                            <td><a href="/alert/delete/confirm/{{ alert.pk }}">Delete&hellip;</a></td>
+                            <td>
+                                {% if user.profile.total_donated_last_year < 10 and alert.rate == 'rt' %}
+                                    <p title="Donate at least $10 each year for Real Time alerts"
+                                       class="bottom">Disabled</p>
+                                {% else %}
+                                    <a href="/?{{ alert.query }}&edit_alert={{ alert.pk }}">Edit</a>
+                                {% endif %}
+                            </td>
+                            <td><a href="/alert/delete/confirm/{{ alert.pk }}"
+                                   class="btn btn-danger btn-xs">Delete&hellip;</a></td>
                         </tr>
                         {% endfor %}
                     </tbody>

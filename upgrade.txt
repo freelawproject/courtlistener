@@ -29,10 +29,8 @@ We welcome a conversion of these notes to a better process using Fabric.
 
  - Adds support for real time alerts.
  - Todo:
-    - Add an FAQ.
     - Add code to disable them the day that somebody hasn't donated anymore.
     - Add code to re-enable them the day (or moment) that somebody donates again.
-    - Figure out how to block their creation in the editor.
     - Figure out how to trigger them on the backend. Make sure it works with
       the index commits.
 

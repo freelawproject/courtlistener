@@ -10,7 +10,7 @@ import datetime
 import logging
 import traceback
 
-from alert.alerts.models import FREQUENCY
+from alert.alerts.models import FREQUENCY, RealTimeQueue, ITEM_TYPES
 from alert.lib import search_utils
 from alert.lib import sunburnt
 from alert.search.forms import SearchForm
@@ -34,7 +34,12 @@ def get_cut_off_date(rate, d=datetime.date.today()):
     """Given a rate of dly, wly or mly and a date, returns the date after which
     new results should be considered a hit for an alert.
     """
-    if rate == 'dly':
+    cut_off_date = None
+    if rate == 'rt':
+        # use a couple days ago to limit results without risk of leaving out
+        # important items (this will be filtered further later).
+        cut_off_date = d - datetime.timedelta(days=2)
+    elif rate == 'dly':
         cut_off_date = d
     elif rate == 'wly':
         cut_off_date = d - datetime.timedelta(days=7)
@@ -51,6 +56,22 @@ def get_cut_off_date(rate, d=datetime.date.today()):
     return cut_off_date
 
 
+def send_alert(user_profile, hits, simulate):
+    email_subject = 'New hits for your CourtListener alerts'
+    email_sender = 'CourtListener Alerts <alerts@courtlistener.com>'
+
+    txt_template = loader.get_template('alerts/email.txt')
+    html_template = loader.get_template('alerts/email.html')
+    c = Context({'hits': hits})
+    txt = txt_template.render(c)
+    html = html_template.render(c)
+    msg = EmailMultiAlternatives(email_subject, txt, email_sender,
+                                 [user_profile.user.email])
+    msg.attach_alternative(html, "text/html")
+    if not simulate:
+        msg.send(fail_silently=False)
+
+
 class Command(BaseCommand):
     option_list = BaseCommand.option_list + (
         make_option(
@@ -65,58 +86,32 @@ class Command(BaseCommand):
             help='Simulate the emails that would be sent using the console '
                  'backend.',
         ),
-        make_option(
-            '--date',
-            help="The date that you want to send alerts for (for debugging, "
-                 "applies simulate mode).",
-        ),
-        make_option(
-            '--user_id',
-            help="A particular user id you want to run the alerts for (debug)."
-        ),
     )
     help = 'Sends the alert emails on a daily, weekly or monthly basis.'
     args = ('--rate (dly|wly|mly) [--simulate] [--date YYYY-MM-DD] '
             '[--user USER]')
 
-    def send_alert(self, user_profile, hits):
-        email_subject = 'New hits for your CourtListener alerts'
-        email_sender = 'CourtListener Alerts <alerts@courtlistener.com>'
-
-        txt_template = loader.get_template('alerts/email.txt')
-        html_template = loader.get_template('alerts/email.html')
-        c = Context({'hits': hits})
-        txt = txt_template.render(c)
-        html = html_template.render(c)
-        msg = EmailMultiAlternatives(email_subject, txt,
-                                     email_sender, [user_profile.user.email])
-        msg.attach_alternative(html, "text/html")
-        if not self.options['simulate']:
-            msg.send(fail_silently=False)
-
-    def run_query(self, alert, cut_off_date):
+    def run_query(self, alert):
         results = None
         error = False
         try:
-            if self.verbosity >= 1:
-                print "Now running the query: %s" % alert.alertText
+            logger.info("Now running the query: %s\n" % alert.query)
 
             # Set up the data
-            data = search_utils.get_string_to_dict(alert.alertText)
+            data = search_utils.get_string_to_dict(alert.query)
             try:
                 del data['filed_before']
             except KeyError:
                 pass
             data['order_by'] = 'score desc'
-            if self.verbosity >= 1:
-                print "  Data sent to SearchForm is: %s" % data
+            logger.info("  Data sent to SearchForm is: %s\n" % data)
             search_form = SearchForm(data)
             if search_form.is_valid():
                 cd = search_form.cleaned_data
                 if cd['type'] == 'o':
-                    cd['filed_after'] = cut_off_date
+                    cd['filed_after'] = self.cut_off_date
                 elif cd['type'] == 'oa':
-                    cd['argued_after'] = cut_off_date
+                    cd['argued_after'] = self.cut_off_date
                 main_params = search_utils.build_main_query(cd)
                 main_params.update({
                     'rows': '20',
@@ -125,53 +120,53 @@ class Command(BaseCommand):
                     'hl.tag.post': '</strong></em>',
                     'caller': 'cl_send_alerts',
                 })
-                if cd['type'] == 'o':
-                    conn = sunburnt.SolrInterface(
-                        settings.SOLR_OPINION_URL, mode='r'
+                if self.rate == 'rt':
+                    main_params['fq'].append(
+                        'id:(%s)' % ' OR '.join(self.valid_ids[cd['type']]),
                     )
-                elif cd['type'] == 'oa':
-                    conn = sunburnt.SolrInterface(
-                        settings.SOLR_AUDIO_URL, mode='r'
-                    )
-                results = conn.raw_query(**main_params).execute()
+                results = self.connections[
+                    cd['type']
+                ].raw_query(
+                    **main_params
+                ).execute()
             else:
-                print "  Query for alert %s was invalid" % alert.alertText
-                print "  Errors from the SearchForm: %s" % search_form.errors
+                logger.info("  Query for alert %s was invalid\n"
+                            "  Errors from the SearchForm: %s\n" %
+                            (alert.query, search_form.errors))
                 error = True
         except:
             traceback.print_exc()
-            print "  Search for this alert failed: %s" % alert.alertText
+            logger.info("  Search for this alert failed: %s\n" %
+                        alert.query)
             error = True
 
-        if self.verbosity >= 1:
-            if results:
-                print "  There were %s results" % len(results)
-            else:
-                print "  There were no results"
-        if self.verbosity >= 2:
-            print "  The value of results is: %s" % results
+        logger.info("  There were %s results\n" % len(results))
 
-        return error, cd['type'], results,
+        return error, cd['type'], results
 
-    def emailer(self, ups, cut_off_date):
+    def send_emails(self):
         """Send out an email to every user whose alert has a new hit for a
         rate.
         """
+        ups = UserProfile.objects.filter(
+            alert__rate=self.rate,
+        ).distinct()
 
-        # for each user with a daily, weekly or monthly alert...
         alerts_sent_count = 0
         for up in ups:
-            # ...get their alerts...
-            alerts = up.alert.filter(alertFrequency=self.options['rate'])
-            if self.verbosity >= 1:
-                print "\n\nAlerts for user '%s': %s" % (
-                    up.user, alerts)
-                print "*" * 40
+            if up.total_donated_last_year < 10 and self.rate == 'rt':
+                # They haven't donated enough. Move along.
+                logger.info('\n\nUser: %s has not donated enough for their %s RT '
+                            'alerts to be sent.\n' % (up.user, len(alerts)))
+                continue
+
+            alerts = up.alert.filter(rate=self.rate)
+            logger.info("\n\nAlerts for user '%s': %s\n"
+                        "%s\n" % (up.user, alerts, '*' * 40))
 
             hits = []
-            # ...and iterate over their alerts.
             for alert in alerts:
-                error, type, results = self.run_query(alert, cut_off_date)
+                error, type, results = self.run_query(alert)
                 if error:
                     continue
 
@@ -181,24 +176,23 @@ class Command(BaseCommand):
                 try:
                     if len(results) > 0:
                         hits.append([alert, type, results])
-                        alert.lastHitDate = now()
+                        alert.date_last_hit = now()
                         alert.save()
-                    elif len(results) == 0 and alert.sendNegativeAlert:
+                    elif len(results) == 0 and alert.always_send_email:
                         # if they want an alert even when no hits.
                         hits.append([alert, type, None])
-                        if self.verbosity >= 1:
-                            print "  Sending results for negative alert '%s'" % \
-                                  alert.alertName
+                        logger.info("  Sending results for negative alert "
+                                    "'%s'\n" % alert.name)
                 except Exception, e:
                     traceback.print_exc()
-                    print "  Search failed on this alert: %s" % alert.alertText
-                    print e
+                    logger.info("  Search failed on this alert: %s\n%s\n" %
+                                (alert.query, e))
 
             if len(hits) > 0:
                 alerts_sent_count += 1
-                self.send_alert(up, hits)
+                send_alert(up, hits, self.options['simulate'])
             elif self.verbosity >= 1:
-                print "  No hits, thus not sending mail for this alert."
+                logger.info("  No hits. Not sending mail for this alert.\n")
 
         if not self.options['simulate']:
             tally_stat('alerts.sent.%s' % self.options['rate'],
@@ -206,58 +200,71 @@ class Command(BaseCommand):
             logger.info("Sent %s %s email alerts." % (
                 alerts_sent_count, self.options['rate']))
 
-    def get_profiles(self):
-        """Look up all users that have alerts for a given period of time.
-
-        It's tempting to lookup alerts and iterate over those instead of over
-        the users. The problem with that is that it would send one email per
-        *alert*, not per *user*.
+    def clean_rt_queue(self):
+        """Clean out any items in the RealTime queue once they've been run or
+        if they are stale.
         """
-        # Query all users with alerts of the desired frequency
-        # Use the distinct method to only return one instance of each person.
-        if self.options.get('user_id'):
-            ups = UserProfile.objects.filter(
-                alert__alertFrequency=self.options['rate']). \
-                filter(user__pk=self.options['user_id']).distinct()
-        else:
-            ups = UserProfile.objects.filter(
-                alert__alertFrequency=self.options['rate']).distinct()
-        return ups
+        if self.rate == 'rt':
+            for type, ids in self.valid_ids.iteritems():
+                RealTimeQueue.objects.filter(
+                    item_type=type,
+                    item_pk__in=ids
+                ).delete()
+
+            RealTimeQueue.objects.filter(
+                date_modified__lt=now() - datetime.timedelta(days=7),
+            ).delete()
+
+    def get_new_ids(self):
+        """For every item that's in the RealTimeQueue, query Solr and
+        see which have made it to the index. We'll use these to run the alerts.
+
+        Returns a dict like so:
+            {
+                'oa': [list, of, ids],
+                'o': [list, of, ids],
+            }
+        """
+        valid_ids = {}
+        for type in [t[0] for t in ITEM_TYPES]:
+            ids = RealTimeQueue.objects.filter(item_type=type)
+            main_params = {
+                'caller': 'cl_send_alerts',
+                'fl': 'id',
+                'fq': ['id:(%s)' % ' OR '.join([str(i.pk) for i in ids])],
+            }
+            results = self.connections[type].raw_query(**main_params).execute()
+            valid_ids[type] = [int(r['id']) for r in results.result.docs]
+        return valid_ids
 
     def handle(self, *args, **options):
         self.verbosity = int(options.get('verbosity', 1))
         self.options = options
-        if not options.get('rate'):
+        self.rate = options.get('rate')
+        if not self.rate:
             self.stderr.write("You must specify a rate")
             exit(1)
-        if options['rate'] not in dict(FREQUENCY).keys():
+        if self.rate not in dict(FREQUENCY).keys():
             self.stderr.write("Invalid rate. Rate must be one of: %s" %
                               ', '.join(dict(FREQUENCY).keys()))
-        if options.get('user_id'):
-            try:
-                options['user_id'] = int(options['user_id'])
-            except ValueError:
-                self.stderr.write("user_id must be an ID parsable as an int.")
-        if options.get('date'):
-            # Enable simulate mode if a date is provided.
-            options['simulate'] = True
-        if options.get('date'):
-            try:
-                # Midnight of day requested
-                cut_off_date = get_cut_off_date(
-                    options['rate'],
-                    datetime.datetime.strptime(options['date'], '%Y-%m-%d')
-                )
-            except ValueError:
-                self.stderr.write("Invalid date string. Format should be "
-                                  "YYYY-MM-DD.")
-        else:
-            cut_off_date = get_cut_off_date(options['rate'])
+            exit(1)
 
-        if options.get('simulate'):
-            print "******************************************"
-            print "* SIMULATE MODE - NO EMAILS WILL BE SENT *"
-            print "******************************************"
+        self.cut_off_date = get_cut_off_date(options['rate'])
 
-        return self.emailer(self.get_profiles(), cut_off_date)
+        if self.rate == 'rt':
+            self.valid_ids = self.get_new_ids()
+
+        self.connections = {
+            'o': sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r'),
+            'oa': sunburnt.SolrInterface(settings.SOLR_AUDIO_URL, mode='r'),
+        }
+
+        if self.options.get('simulate'):
+            logger.info("******************************************\n"
+                        "* SIMULATE MODE - NO EMAILS WILL BE SENT *\n"
+                        "******************************************\n")
+
+        self.send_emails()
+        self.clean_rt_queue()
+
 

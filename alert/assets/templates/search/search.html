@@ -213,13 +213,13 @@
                         <p>Get regular notifications about this query by creating an alert.</p>
                     {% endif %}
                     <form action="" method="post">{% csrf_token %}
-                        {{ alert_form.alertText }}
+                        {{ alert_form.query }}
                         <div class="form-group">
-                            <label for="id_alertName">Give the alert a name</label>
-                            {{ alert_form.alertName }}
-                            {% if alert_form.alertName.errors %}
+                            <label for="id_name">Give the alert a name</label>
+                            {{ alert_form.name }}
+                            {% if alert_form.name.errors %}
                                 <p class="help-block">
-                                    {% for error in alert_form.alertName.errors %}
+                                    {% for error in alert_form.name.errors %}
                                         {{ error|escape }}
                                     {% endfor %}
                                 </p>
@@ -227,11 +227,11 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="id_alertFrequency">How often should we notify you?</label>
-                            {{ alert_form.alertFrequency }}
-                            {% if alert_form.alertFrequency.errors %}
+                            <label for="id_rate">How often should we notify you?</label>
+                            {{ alert_form.rate }}
+                            {% if alert_form.rate.errors %}
                                 <p class="help-block">
-                                    {% for error in alert_form.alertFrequency.errors %}
+                                    {% for error in alert_form.rate.errors %}
                                         {{ error|escape }}
                                     {% endfor %}
                                 </p>
@@ -263,8 +263,8 @@
                         </div>
 
                         <div class="checkbox">
-                            <label for="id_sendNegativeAlert">
-                                {{ alert_form.sendNegativeAlert }} Send me an email even if there are no new hits
+                            <label for="id_always_send_email">
+                                {{ alert_form.always_send_email }} Send me an email even if there are no new hits
                             </label>
                         </div>
                         {% if request.GET.edit_alert %}
@@ -313,7 +313,7 @@
                 <div class="row">
                     <div class="col-sm-6">
                         <p class="bottom">You are currently editing your alert,
-                        "<strong>{{ alert_form.alertName.value }}</strong>".</p>
+                        "<strong>{{ alert_form.name.value }}</strong>".</p>
                     </div>
                     <div class="col-sm-6 text-right">
                         <a class="btn btn-default btn-sm"

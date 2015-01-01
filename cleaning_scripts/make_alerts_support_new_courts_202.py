@@ -12,18 +12,18 @@ from optparse import OptionParser
 def fixer(simulate=False, verbose=False):
     """If an alert is set up to query ALL courts with them individually listed,
     simply strip out all the court values."""
-    alerts = Alert.objects.filter(alertText__contains='court_all')
+    alerts = Alert.objects.filter(query__contains='court_all')
 
     for alert in alerts:
         if verbose:
             print "Fixing alert %s" % alert
-            print "  Old query: %s" % alert.alertText
-        q = alert.alertText
+            print "  Old query: %s" % alert.query
+        q = alert.query
         q_parts = q.split('&')
         q_parts = [q for q in q_parts if not q.startswith('court_')]
-        alert.alertText = '&'.join(q_parts)
+        alert.query = '&'.join(q_parts)
         if verbose:
-            print "  New query: %s" % alert.alertText
+            print "  New query: %s" % alert.query
         if not simulate:
             alert.save()
 

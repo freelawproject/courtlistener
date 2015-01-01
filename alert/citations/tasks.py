@@ -9,18 +9,21 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 from alert.opinion_page.views import make_citation_string
 from alert.citations import find_citations, match_citations
-from alert.search.models import Document, Citation
+from alert.search.models import Document
 from celery import task
 
 
 def get_document_citations(document):
-    """Identify and return citations from the html or plain text of the document."""
+    """Identify and return citations from the html or plain text of the
+    document.
+    """
     if document.html_lawbox:
         citations = find_citations.get_citations(document.html_lawbox)
     elif document.html:
         citations = find_citations.get_citations(document.html)
     elif document.plain_text:
-        citations = find_citations.get_citations(document.plain_text, html=False)
+        citations = find_citations.get_citations(document.plain_text,
+                                                 html=False)
     else:
         citations = []
     return citations
@@ -30,7 +33,8 @@ def create_cited_html(document, citations):
     if document.html_lawbox or document.html:
         new_html = document.html_lawbox or document.html
         for citation in citations:
-            new_html = re.sub(citation.as_regex(), citation.as_html(), new_html)
+            new_html = re.sub(citation.as_regex(), citation.as_html(),
+                              new_html)
     elif document.plain_text:
         inner_html = document.plain_text
         for citation in citations:
