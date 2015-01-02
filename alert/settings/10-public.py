@@ -170,15 +170,21 @@ TEMPLATE_DIRS = (
 )
 
 
-############
-# Payments #
-############
+#####################
+# Payments & Prices #
+#####################
 DWOLLA_CALLBACK = 'https://www.courtlistener.com/donate/callbacks/dwolla/'
 DWOLLA_REDIRECT = 'https://www.courtlistener.com/donate/dwolla/complete/'
 PAYPAL_CALLBACK = 'https://www.courtlistener.com/donate/callbacks/paypal/'
 PAYPAL_REDIRECT = 'https://www.courtlistener.com/donate/paypal/complete/'
 PAYPAL_CANCELLATION = 'https://www.courtlistener.com/donate/paypal/cancel/'
 STRIPE_REDIRECT = 'https://www.courtlistener.com/donate/stripe/complete/'
+
+MIN_DONATION = {
+    'rt_alerts': 10,
+    'no_ads': 10,
+}
+
 
 #######
 # API #

@@ -162,7 +162,9 @@ class Command(BaseCommand):
 
         alerts_sent_count = 0
         for up in ups:
-            if up.total_donated_last_year < 10 and self.rate == 'rt':
+            not_donated_enough = up.total_donated_last_year < \
+                settings.MIN_DONATION['rt_alerts']
+            if not_donated_enough and self.rate == 'rt':
                 logger.info('\n\nUser: %s has not donated enough for their %s RT '
                             'alerts to be sent.\n' % (up.user, len(alerts)))
                 continue

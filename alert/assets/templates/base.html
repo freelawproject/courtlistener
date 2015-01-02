@@ -322,7 +322,8 @@
 {% endif %}
 <script type="text/javascript" src="{{ STATIC_URL }}js/base.js"></script>
 <script type="text/javascript">
-    var totalDonatedLastYear = parseFloat({{ user.profile.total_donated_last_year|safe}});
+    var totalDonatedLastYear = parseFloat({{ user.profile.total_donated_last_year|safe}}),
+        priceRtAlerts = parseFloat({{ MIN_DONATION.rt_alerts }});
 </script>
 
 {# Allows your own scripts in the footer. #}

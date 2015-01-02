@@ -197,7 +197,8 @@ $(document).ready(function() {
     // RT Alerts //
     ///////////////
     $('#id_rate').change(function(){
-        if ($(this).val() === 'rt' && totalDonatedLastYear < 10){
+        if ($(this).val() === 'rt' &&
+            totalDonatedLastYear < priceRtAlerts){
             $('#donate-for-rt').removeClass('hidden');
             $('#alertSave').prop("disabled", true);
         } else {

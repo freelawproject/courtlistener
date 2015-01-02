@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.forms import ModelForm
 from django.forms.widgets import HiddenInput, TextInput, Select, CheckboxInput
@@ -11,7 +12,9 @@ class CreateAlertForm(ModelForm):
 
     def clean_rate(self):
         rate = self.cleaned_data['rate']
-        if rate == 'rt' and self.user.profile.total_donated_last_year < 10:
+        not_donated_enough = self.user.profile.total_donated_last_year < \
+            settings.MIN_DONATION['rt_alerts']
+        if rate == 'rt' and not_donated_enough:
             # Somebody is trying to hack past the JS/HTML block on the front
             # end. Don't let them create the alert until they've donated.
             raise ValidationError(

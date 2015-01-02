@@ -50,7 +50,7 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if user.profile.total_donated_last_year < 10 and alert.rate == 'rt' %}
+                                {% if user.profile.total_donated_last_year < MIN_DONATION.rt_alerts and alert.rate == 'rt' %}
                                     <p title="Donate at least $10 each year for Real Time alerts"
                                        class="bottom">Disabled</p>
                                 {% else %}
