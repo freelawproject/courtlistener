@@ -27,7 +27,7 @@ def view_donations(request):
 
 
 def send_thank_you_email(donation):
-    profile = donation.userprofile_set.all()[0]
+    profile = donation.donors.all()[0]
     email_subject = 'Thanks for your donation to the Free Law Project!'
     email_body = ('Hello %s,\n\nThanks for your donation of $%0.2f to the Free '
                   'Law Project. We are currently using donations like yours '
