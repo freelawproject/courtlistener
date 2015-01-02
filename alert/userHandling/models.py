@@ -10,6 +10,13 @@ from django.contrib.auth.models import User
 from localflavor.us.models import USStateField
 from south.modelsinspector import add_introspection_rules
 
+donation_exclusion_codes = [
+    1,  # Unknown error
+    3,  # Cancelled
+    6,  # Failed
+    7,  # Reclaimed/Refunded
+]
+
 
 class BarMembership(models.Model):
     barMembership = USStateField(
@@ -126,12 +133,16 @@ class UserProfile(models.Model):
         total = self.donation.filter(
             date_created__gte=one_year_ago,
         ).exclude(
-            status__in=[
-                1,  # Unknown error
-                3,  # Cancelled
-                6,  # Failed
-                7,  # Reclaimed/Refunded
-            ]
+            status__in=donation_exclusion_codes,
+        ).aggregate(Sum('amount'))['amount__sum']
+        if total is None:
+            total = Decimal(0.0)
+        return total
+
+    @property
+    def total_donated(self):
+        total = self.donation.exclude(
+            status__in=donation_exclusion_codes
         ).aggregate(Sum('amount'))['amount__sum']
         if total is None:
             total = Decimal(0.0)

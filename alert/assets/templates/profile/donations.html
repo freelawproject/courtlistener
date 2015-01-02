@@ -1,4 +1,5 @@
 {% extends "profile/nav.html" %}
+{% load humanize %}
 
 {% block title %}Donations - CourtListener.com{% endblock %}
 
@@ -22,7 +23,7 @@
                     <tbody>
                         {% for donation in user.profile.donation.all %}
                         <tr>
-                            <td>${{ donation.amount }}</td>
+                            <td>${{ donation.amount|intcomma }}</td>
                             <td>{{ donation.date_created|date:"n/j/Y" }}</td>
                             <td>{{ donation.get_payment_provider_display }}</td>
                             <td>{{ donation.get_status_display }}</td>
@@ -31,18 +32,34 @@
                     </tbody>
                 </table>
             </div>
-            <h3>Thanks for your support!</h3>
-            <p>Your support <em>truly</em> makes a difference. If you would like to change a donation or if you
-                have questions please get in touch with us at <a href="mailto:donate@freelawproject.org">donate@freelawproject.org</a>.
-                We'd be happy to hear from you.</p>
+            <div>
+                <div class="col-xs-12 col-sm-9 col-md-10">
+                    <h2>Thanks for your support!</h2>
+                    <p>Your support <em>truly</em> makes a difference. If you
+                        would like to change a donation or if you have any
+                        questions, please get in touch with us at <a
+                                href="mailto:donate@freelawproject.org">donate@freelawproject.org</a>.
+                        We'd be happy to hear from you.</p>
+                </div>
+                <div class="col-xs-12 col-sm-3 col-md-2 well">
+                    <h4>Total Donations</h4>
+                    <p class="bold">This Year: ${{ user.profile.total_donated_last_year|intcomma }}</p>
+                    <p class="bold">All Time: ${{ user.profile.total_donated|intcomma }}</p>
+                </div>
+            </div>
         {% else %}
             <div class="row">
                 <div class="col-sm-12">
                     <h3>Make a Donation to Support the Free Law Project</h3>
-                    <p>CourtListener is a part of the <a href="http://freelawproject.org">Free Law Project</a> and is supported
-                        in part by people like you. We run a very lean budget and your donations go towards paying our full time
-                        developers, server costs and fund raising efforts.</p>
-                    <p>To learn more or support our cause, visit <a href="/donate?referrer=profile">our donations page</a>.</p>
+                    <p>CourtListener is a part of the <a
+                            href="http://freelawproject.org">Free Law
+                        Project</a> and is supported in part by people like
+                        you. We run a very lean budget and your donations go
+                        towards paying our full time developers, server costs
+                        and fund raising efforts.</p>
+                    <p>To learn more or support our cause, visit <a
+                            href="/donate?referrer=profile">our donations
+                        page</a>.</p>
                 </div>
             </div>
         {% endif %}
