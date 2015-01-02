@@ -18,6 +18,7 @@ from alert.search.models import Document
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import build_module_list
 from juriscraper.tests import MockRequest
+from alerts.models import RealTimeQueue
 from scrapers.tasks import extract_doc_content, extract_by_ocr
 
 from celery.task.sets import subtask
@@ -47,7 +48,8 @@ def test_for_meta_redirections(r):
     if extension == '.html':
         html_tree = html.fromstring(r.text)
         try:
-            attr = html_tree.xpath("//meta[translate(@http-equiv, 'REFSH', 'refsh') = 'refresh']/@content")[0]
+            path = "//meta[translate(@http-equiv, 'REFSH', 'refsh') = 'refresh']/@content"
+            attr = html_tree.xpath(path)[0]
             wait, text = attr.split(";")
             if text.lower().startswith("url="):
                 url = text[4:]
@@ -76,7 +78,8 @@ def get_extension(content):
     """A handful of workarounds for getting extensions we can trust."""
     file_str = magic.from_buffer(content)
     if file_str.startswith('Composite Document File V2 Document'):
-        # Workaround for issue with libmagic1==5.09-2 in Ubuntu 12.04. Fixed in libmagic 5.11-2.
+        # Workaround for issue with libmagic1==5.09-2 in Ubuntu 12.04. Fixed
+        # in libmagic 5.11-2.
         mime = 'application/msword'
     elif file_str == '(Corel/WP)':
         mime = 'application/vnd.wordperfect'
@@ -165,22 +168,26 @@ class Command(BaseCommand):
                     '--daemon',
                     action='store_true',
                     dest='daemonmode',
-                    help=(
-                        'Use this flag to turn on daemon mode, in which all courts requested will be scraped in turn, '
-                        'nonstop.')),
+                    help=('Use this flag to turn on daemon mode, in which all '
+                          'courts requested will be scraped in turn, '
+                          'nonstop.')),
         make_option('-r',
                     '--rate',
                     dest='rate',
                     metavar='RATE',
-                    help=('The length of time in minutes it takes to crawl all requested courts. Particularly useful '
-                          'if it is desired to quickly scrape over all courts. Default is 30 minutes.')),
+                    help=('The length of time in minutes it takes to crawl '
+                          'all requested courts. Particularly useful if it is '
+                          'desired to quickly scrape over all courts. Default '
+                          'is 30 minutes.')),
         make_option('-c',
                     '--courts',
                     dest='court_id',
                     metavar="COURTID",
-                    help=('The court(s) to scrape and extract. This should be in the form of a python module or '
-                          'package import from the Juriscraper library, e.g. '
-                          '"juriscraper.opinions.united_states.federal.ca1" or simply "opinions" to do all opinions.')),
+                    help=('The court(s) to scrape and extract. This should be '
+                          'in the form of a python module or package import '
+                          'from the Juriscraper library, e.g. '
+                          '"juriscraper.opinions.united_states.federal.ca1" '
+                          'or simply "opinions" to do all opinions.')),
         make_option('-f',
                     '--fullcrawl',
                     dest='full_crawl',
@@ -191,7 +198,9 @@ class Command(BaseCommand):
     help = 'Runs the Juriscraper toolkit against one or many jurisdictions.'
 
     def associate_meta_data_to_objects(self, site, i, court, sha1_hash):
-        """Takes the meta data from the scraper and assocites it with objects. Returns the created objects.
+        """Takes the meta data from the scraper and assocites it with objects.
+
+        Returns the created objects.
         """
         cite = Citation(case_name=site.case_names[i])
         if site.docket_numbers:
@@ -231,6 +240,10 @@ class Command(BaseCommand):
         docket.save()
         doc.docket = docket
         doc.save(index=index)
+        RealTimeQueue.objects.create(
+            item_type='o',
+            item_pk=doc.pk,
+        )
 
     def scrape_court(self, site, full_crawl=False):
         download_error = False
@@ -265,8 +278,10 @@ class Command(BaseCommand):
 
                 # Make a hash of the data
                 sha1_hash = hashlib.sha1(r.content).hexdigest()
-                if court_str == 'nev' and site.precedential_statuses[i] == 'Unpublished':
-                    # Nevada's non-precedential cases have different SHA1 sums every time.
+                if court_str == 'nev' and \
+                                site.precedential_statuses[i] == 'Unpublished':
+                    # Nevada's non-precedential cases have different SHA1
+                    # sums every time.
                     onwards = dup_checker.should_we_continue_break_or_carry_on(
                         Document,
                         current_date,
@@ -287,12 +302,14 @@ class Command(BaseCommand):
                     # It's a duplicate, but we haven't hit any thresholds yet.
                     continue
                 elif onwards == 'BREAK':
-                    # It's a duplicate, and we hit a date or dup_count threshold.
+                    # It's a duplicate, and we hit a date or dup_count
+                    # threshold.
                     dup_checker.update_site_hash(sha1_hash)
                     break
                 elif onwards == 'CARRY_ON':
                     # Not a duplicate, carry on
-                    logger.info('Adding new document found at: %s' % site.download_urls[i])
+                    logger.info('Adding new document found at: %s' %
+                                site.download_urls[i])
                     dup_checker.reset()
 
                     cite, docket, doc = self.associate_meta_data_to_objects(
@@ -304,13 +321,19 @@ class Command(BaseCommand):
                         extension = get_extension(r.content)
                         # See bitbucket issue #215 for why this must be
                         # lower-cased.
-                        file_name = trunc(site.case_names[i].lower(), 75) + extension
+                        file_name = trunc(site.case_names[i].lower(), 75) + \
+                            extension
                         doc.local_path.save(file_name, cf, save=False)
                     except:
-                        msg = 'Unable to save binary to disk. Deleted document: % s.\n % s' % \
-                              (site.case_names[i], traceback.format_exc())
+                        msg = ('Unable to save binary to disk. Deleted '
+                               'document: % s.\n % s' %
+                               (site.case_names[i], traceback.format_exc()))
                         logger.critical(msg)
-                        ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
+                        ErrorLog(
+                            log_level='CRITICAL',
+                            court=court,
+                            message=msg
+                        ).save()
                         download_error = True
                         continue
 
@@ -333,7 +356,6 @@ class Command(BaseCommand):
             if not download_error and not full_crawl:
                 # Only update the hash if no errors occurred.
                 dup_checker.update_site_hash(site.hash)
-
 
     def parse_and_scrape_site(self, mod, full_crawl):
         site = mod.Site().parse()
@@ -358,11 +380,13 @@ class Command(BaseCommand):
 
         court_id = options.get('court_id')
         if not court_id:
-            raise CommandError('You must specify a court as a package or module.')
+            raise CommandError('You must specify a court as a package or '
+                               'module.')
         else:
             module_strings = build_module_list(court_id)
             if not len(module_strings):
-                raise CommandError('Unable to import module or package. Aborting.')
+                raise CommandError('Unable to import module or package. '
+                                   'Aborting.')
 
             logger.info("Starting up the scraper.")
             num_courts = len(module_strings)
@@ -388,22 +412,29 @@ class Command(BaseCommand):
                     try:
                         msg = ('********!! CRAWLER DOWN !!***********\n'
                                '*****scrape_court method failed!*****\n'
-                               '********!! ACTION NEEDED !!**********\n%s') % traceback.format_exc()
+                               '********!! ACTION NEEDED !!**********\n%s' %
+                               traceback.format_exc())
                         logger.critical(msg)
 
                         # opinions.united_states.federal.ca9_u --> ca9
                         court_str = mod.Site.__module__.split('.')[-1].split('_')[0]
                         court = Court.objects.get(pk=court_str)
-                        ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
+                        ErrorLog(
+                            log_level='CRITICAL',
+                            court=court,
+                            message=msg
+                        ).save()
                     except Exception, e:
-                        # This is very important. Without this, an exception above will crash the caller.
+                        # This is very important. Without this, an exception
+                        # above will crash the caller.
                         pass
                 finally:
                     time.sleep(wait)
                     last_court_in_list = (i == (num_courts - 1))
                     if last_court_in_list and daemon_mode:
                         # Start over...
-                        logger.info("All jurisdictions done. Looping back to the beginning.")
+                        logger.info("All jurisdictions done. Looping back to "
+                                    "the beginning.")
                         i = 0
                     else:
                         i += 1

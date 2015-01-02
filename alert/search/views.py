@@ -111,7 +111,7 @@ def show_results(request):
      - It must react properly to an invalid alert form.
      - It must react properly to an invalid or failing search form.
 
-    All of these paths have tests in tests.py.
+    All of these paths have tests.
     """
     # Create a search string that does not contain the page numbers
     get_string = search_utils.make_get_string(request)

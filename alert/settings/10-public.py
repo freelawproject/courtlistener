@@ -126,7 +126,8 @@ else:
     CELERY_RESULT_BACKEND = 'amqp'
     CELERYD_CONCURRENCY = 18
 
-# Rate limits aren't ever used, so disable them across the board for better performance
+# Rate limits aren't ever used, so disable them across the board for better
+# performance
 CELERY_DISABLE_RATE_LIMITS = True
 CELERY_SEND_TASK_ERROR_EMAILS = True
 

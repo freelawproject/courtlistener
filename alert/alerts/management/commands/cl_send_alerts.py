@@ -113,10 +113,11 @@ class Command(BaseCommand):
                     # Bail out. No results will be found if no valid_ids.
                     return error, cd['type'], results
 
+                cut_off_date = get_cut_off_date(self.rate)
                 if cd['type'] == 'o':
-                    cd['filed_after'] = self.cut_off_date
+                    cd['filed_after'] = cut_off_date
                 elif cd['type'] == 'oa':
-                    cd['argued_after'] = self.cut_off_date
+                    cd['argued_after'] = cut_off_date
                 main_params = search_utils.build_main_query(cd)
                 main_params.update({
                     'rows': '20',
@@ -127,7 +128,9 @@ class Command(BaseCommand):
                 })
                 if self.rate == 'rt':
                     main_params['fq'].append(
-                        'id:(%s)' % ' OR '.join(self.valid_ids[cd['type']]),
+                        'id:(%s)' % ' OR '.join(
+                            [str(i) for i in self.valid_ids[cd['type']]]
+                        ),
                     )
                 results = self.connections[
                     cd['type']
@@ -160,7 +163,6 @@ class Command(BaseCommand):
         alerts_sent_count = 0
         for up in ups:
             if up.total_donated_last_year < 10 and self.rate == 'rt':
-                # They haven't donated enough. Move along.
                 logger.info('\n\nUser: %s has not donated enough for their %s RT '
                             'alerts to be sent.\n' % (up.user, len(alerts)))
                 continue
@@ -207,11 +209,11 @@ class Command(BaseCommand):
         """Clean out any items in the RealTime queue once they've been run or
         if they are stale.
         """
-        if self.rate == 'rt':
+        if self.rate == 'rt' and not self.options['simulate']:
             for type, ids in self.valid_ids.iteritems():
                 RealTimeQueue.objects.filter(
                     item_type=type,
-                    item_pk__in=ids
+                    item_pk__in=ids,
                 ).delete()
 
             RealTimeQueue.objects.filter(
@@ -235,7 +237,9 @@ class Command(BaseCommand):
                 main_params = {
                     'caller': 'cl_send_alerts',
                     'fl': 'id',
-                    'fq': ['id:(%s)' % ' OR '.join([str(i.pk) for i in ids])],
+                    'fq': ['id:(%s)' % ' OR '.join(
+                        [str(i.item_pk) for i in ids]
+                    )],
                 }
                 results = self.connections[type].raw_query(**main_params).execute()
                 valid_ids[type] = [int(r['id']) for r in results.result.docs]
@@ -255,8 +259,6 @@ class Command(BaseCommand):
                               ', '.join(dict(FREQUENCY).keys()))
             exit(1)
 
-        self.cut_off_date = get_cut_off_date(self.rate)
-
         self.connections = {
             'o': sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r'),
             'oa': sunburnt.SolrInterface(settings.SOLR_AUDIO_URL, mode='r'),
@@ -265,7 +267,7 @@ class Command(BaseCommand):
         if self.rate == 'rt':
             self.valid_ids = self.get_new_ids()
 
-        if self.options.get('simulate'):
+        if self.options['simulate']:
             logger.info("******************************************\n"
                         "* SIMULATE MODE - NO EMAILS WILL BE SENT *\n"
                         "******************************************\n")

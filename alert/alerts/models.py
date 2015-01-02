@@ -29,13 +29,11 @@ class Alert(models.Model):
         max_length=10
     )
     always_send_email = models.BooleanField(
-        verbose_name='should alerts be sent when there are no hits during a '
-                     'specified period',
+        verbose_name='Always send an alert?',
         default=False
     )
     date_last_hit = models.DateTimeField(
-        verbose_name='the exact date and time stamp that the alert last sent '
-                     'an email',
+        verbose_name='time of last trigger',
         blank=True,
         null=True
     )

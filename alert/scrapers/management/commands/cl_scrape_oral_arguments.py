@@ -10,6 +10,7 @@ from alert.scrapers.management.commands.cl_scrape_opinions import \
     get_binary_content, get_extension
 from alert.scrapers.models import ErrorLog
 from alert.search.models import Court, Docket
+from alerts.models import RealTimeQueue
 from scrapers.tasks import process_audio_file
 
 from juriscraper.AbstractSite import logger
@@ -45,6 +46,10 @@ class Command(cl_scrape_opinions.Command):
         docket.save()
         audio_file.docket = docket
         audio_file.save(index=False)
+        RealTimeQueue.objects.create(
+            item_type='oa',
+            item_pk=audio_file.pk,
+        )
 
     def scrape_court(self, site, full_crawl=False):
         download_error = False

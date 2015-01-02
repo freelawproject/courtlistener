@@ -49,11 +49,13 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
     except socket.error, exc:
         add_or_update_items.retry(exc=exc, countdown=120)
 
+
 @task
 def delete_items(items):
     si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='w')
     si.delete(list(items))
     si.commit()
+
 
 @task
 def add_or_update_docs(item_pks):
@@ -65,6 +67,7 @@ def add_or_update_docs(item_pks):
     si.add(item_list)
     si.commit()
 
+
 @task
 def add_or_update_audio_files(item_pks):
     si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='w')
@@ -75,6 +78,7 @@ def add_or_update_audio_files(item_pks):
     si.add(item_list)
     si.commit()
 
+
 @task
 def delete_item(pk, solr_url):
     """Deletes the item from the index.
@@ -82,6 +86,7 @@ def delete_item(pk, solr_url):
     si = sunburnt.SolrInterface(solr_url, mode='w')
     si.delete(pk)
     si.commit()
+
 
 @task
 def add_or_update_doc(pk, force_commit=True):
@@ -94,6 +99,7 @@ def add_or_update_doc(pk, force_commit=True):
             si.commit()
     except SolrError, exc:
         add_or_update_doc.retry(exc=exc, countdown=30)
+
 
 @task
 def add_or_update_audio_file(pk, force_commit=True):

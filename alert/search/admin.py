@@ -3,6 +3,9 @@ from alert.search.models import Court
 from alert.search.models import Document
 
 from django.contrib import admin
+from djcelery.models import (
+    IntervalSchedule, CrontabSchedule, PeriodicTask,  TaskState, WorkerState,
+)
 
 
 class CitationAdmin(admin.ModelAdmin):
@@ -76,3 +79,9 @@ admin.site.register(Court, CourtAdmin)
 admin.site.register(Citation, CitationAdmin)
 admin.site.register(Docket, admin.ModelAdmin)
 
+
+admin.site.unregister(CrontabSchedule)
+admin.site.unregister(IntervalSchedule)
+admin.site.unregister(PeriodicTask)
+admin.site.unregister(TaskState)
+admin.site.unregister(WorkerState)

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.models import User
-from alert.userHandling.models import Alert, BarMembership, UserProfile
+from alert.userHandling.models import UserProfile
 
 
 def get_email_confirmed(obj):
@@ -38,10 +38,6 @@ class UserAdmin(admin.ModelAdmin):
         'email',
     )
 
-admin.site.register(Alert)
-admin.site.register(BarMembership)
-
-# Un-register the built in user admin and register the custom User admin with
-# UserProfile
+# Replace the normal User admin with our better one.
 admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
