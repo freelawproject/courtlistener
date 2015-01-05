@@ -237,6 +237,7 @@ class Command(BaseCommand):
             ids = RealTimeQueue.objects.filter(item_type=type)
             if ids:
                 main_params = {
+                    'q': '*:*',  # Vital!
                     'caller': 'cl_send_alerts',
                     'fl': 'id',
                     'fq': ['id:(%s)' % ' OR '.join(
