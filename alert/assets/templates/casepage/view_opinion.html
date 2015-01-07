@@ -215,15 +215,17 @@
         {% else %}
         <div id='default-text'>
         {% endif %}
-        {% if doc.html_with_citations %}
-            {{ doc.html_with_citations|safe }}
-        {% elif doc.html_lawbox %}
-            {{ doc.html_lawbox|safe }}
-        {% elif doc.html %}
-            {{doc.html|safe}}
-        {% else %}
-            <pre>{{doc.plain_text}}</pre>
-        {% endif %}
+            <div id="opinion-content"> {# used by Zotero #}
+                {% if doc.html_with_citations %}
+                    {{ doc.html_with_citations|safe }}
+                {% elif doc.html_lawbox %}
+                    {{ doc.html_lawbox|safe }}
+                {% elif doc.html %}
+                    {{doc.html|safe}}
+                {% else %}
+                    <pre>{{doc.plain_text}}</pre>
+                {% endif %}
+            </div>
         </div>
     </article>
 {% endblock %}
