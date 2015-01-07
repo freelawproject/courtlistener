@@ -22,10 +22,12 @@ class DonationAdmin(admin.ModelAdmin):
         'payment_provider',
         'status',
         'date_created',
+        'referrer',
     )
     list_filter = (
         'payment_provider',
         'status',
+        'referrer',
     )
     inlines = (
         DonorInline,
