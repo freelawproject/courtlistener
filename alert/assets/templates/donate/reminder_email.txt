@@ -1,10 +1,10 @@
 {% load humanize %}********************
-The Free Law Project
+Free Law Project
 ********************
 
 {% if up.user.first_name %}Hello {{ up.user.first_name }},{% else %}Hello,{% endif %}
 
-About a year ago you donated ${{ amount|floatformat:"-2" }} to the Free Law Project to support our work on the CourtListener platform and other projects under our umbrella. We've had a fantastic year and we hope you'll donate again to help sustain our work. To do so, please click the link below:
+About a year ago you donated ${{ amount|floatformat:"-2" }} to Free Law Project to support our work on the CourtListener platform and other projects under our umbrella. We've had a fantastic year and we hope you'll donate again to help sustain our work. To do so, please click the link below:
 
  - https://www.courtlistener.com/donate/
 
@@ -20,7 +20,7 @@ We still have a lot to do, but every bit that you give helps to sustain our effo
 
  - https://www.courtlistener.com/contribute/
 
-Since it's been a year, we hope that you will consider donating to the Free Law Project again, and that you will consider telling your friends and colleagues about the work we do. If you have any questions, please don't hesitate to get in touch.
+Since it's been a year, we hope that you will consider donating to Free Law Project again, and that you will consider telling your friends and colleagues about the work we do. If you have any questions, please don't hesitate to get in touch.
 
 Thanks again,
 

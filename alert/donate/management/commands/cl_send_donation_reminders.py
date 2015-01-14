@@ -37,7 +37,7 @@ class Command(BaseCommand):
 
     def send_reminder_email(self, up, amount):
         """Send an email imploring the person for another donation."""
-        email_subject = "Please donate again to the Free Law Project"
+        email_subject = "Please donate again to Free Law Project"
         email_sender = "CourtListener <mike@courtlistener.com>"
         txt_template = loader.get_template('donate/reminder_email.txt')
         html_template = loader.get_template('donate/reminder_email.html')

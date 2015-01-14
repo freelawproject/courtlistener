@@ -128,7 +128,7 @@ def process_dwolla_payment(cd_donation_form, cd_profile_form, cd_user_form,
             'total': cd_donation_form['amount'],
             'OrderItems': [
                 {
-                    'Name': 'Donation to the Free Law Project',
+                    'Name': 'Donation to Free Law Project',
                     'Description': 'Your donation makes our work possible.',
                     'Price': cd_donation_form['amount'],
                     'Quantity': '1',

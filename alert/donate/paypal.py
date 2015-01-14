@@ -105,7 +105,7 @@ def process_paypal_payment(cd_donation_form):
                         'total': cd_donation_form['amount'],
                         'currency': 'USD',
                     },
-                    'description': 'Donation to the Free Law Project',
+                    'description': 'Donation to Free Law Project',
                 }
             ]
         }
