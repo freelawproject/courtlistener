@@ -38,17 +38,20 @@ def merge_cases_simple(new, target_id):
     elif target.source == 'CR':
         target.source = 'LCR'
 
-    # Add the URL if it's not a court one, replacing resource.org's info in some cases.
+    # Add the URL if it's not a court one, replacing public.resource.org's
+    # info in some cases.
     if cached_source == 'R':
         target.download_url = new.download_url
 
-    # Recreate the slug from the new case name (this changes the URL, but the old will continue working)
+    # Recreate the slug from the new case name (this changes the URL, but the
+    # old will continue working)
     target.citation.slug = trunc(slugify(new.citation.case_name), 50)
 
     # Take the case name from the new item; they tend to be pretty good
     target.citation.case_name = new.citation.case_name
 
-    # Add the docket number if the old doesn't exist, but keep the old if one does.
+    # Add the docket number if the old doesn't exist, but keep the old if one
+    # does.
     if not target.citation.docket_number:
         target.citation.docket_number = new.citation.docket_number
 
@@ -150,8 +153,9 @@ def filter_by_stats(candidates, stats):
         'cos_sims': [],
     }
     for i in range(0, len(candidates)):
-        # Commented out because the casenames in resource.org can be so long this varies too much.
-        #if stats['case_name_similarities'][i] < 0.125:
+        # Commented out because the casenames in public.resource.org can be so
+        # long this varies too much.
+        # if stats['case_name_similarities'][i] < 0.125:
         #    # The case name is wildly different
         #    continue
         if stats['length_diffs'][i] > 400:

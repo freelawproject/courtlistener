@@ -40,7 +40,7 @@ DOCUMENT_STATUSES = (
 
 SOURCES = (
     ('C', 'court website'),
-    ('R', 'resource.org'),
+    ('R', 'public.resource.org'),
     ('CR', 'court website merged with resource.org'),
     ('L', 'lawbox'),
     ('LC', 'lawbox merged with court'),

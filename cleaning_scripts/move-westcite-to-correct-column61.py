@@ -13,11 +13,11 @@ from lxml.html import fromstring
 
 
 def db_corrector(simulate, verbose):
-    """Fixes invalid resource.org citations
+    """Fixes invalid public.resource.org citations
 
     This one-off script iterates over all documents currently in the system
-    that were imported from resource.org, and moves their citation information
-    from the caseNumber field to the docket_number field.
+    that were imported from public.resource.org, and moves their citation
+    information from the caseNumber field to the docket_number field.
 
     Once that is complete, it pulls the HTML for the document, and extracts
     the docket number from it, if possible. Since we already have the West

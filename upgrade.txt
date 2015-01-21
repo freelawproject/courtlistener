@@ -225,7 +225,7 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 
 2013-10-21:
- - Removes resource.org polling. If you have used this, remove the cached file in the robots directory and any
+ - Removes public.resource.org polling. If you have used this, remove the cached file in the robots directory and any
    associated cron jobs.
  - Moves and re-works the alert tool. If you have cron jobs that depended on it, it's now moved to the proper location
    and you'll need to update your cron jobs.

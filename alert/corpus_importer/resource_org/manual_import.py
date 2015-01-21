@@ -97,8 +97,8 @@ def main():
         '-l',
         '--location',
         required=True,
-        help=('What is the location of the resource.org item you wish to '
-              'import?\nValid locations could be:\n'
+        help=('What is the location of the public.resource.org item you wish '
+              'to import?\nValid locations could be:\n'
               '  /sources/Resource.org/data/F3/247/247.F3d.532.00-2881.html\n'
               '  https://bulk.resource.org/courts.gov/c/US/335/335.US.303.1.2.'
               'html')

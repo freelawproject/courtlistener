@@ -53,7 +53,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=(
             'Iterate over the SCDB. If no hits are found for an item, import '
-            'it from the resource.org corpus.'
+            'it from the public.resource.org corpus.'
         )
     )
     parser.add_argument(
