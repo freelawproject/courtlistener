@@ -239,6 +239,7 @@ class Command(BaseCommand):
                 main_params = {
                     'q': '*:*',  # Vital!
                     'caller': 'cl_send_alerts',
+                    'rows': 1000,
                     'fl': 'id',
                     'fq': ['id:(%s)' % ' OR '.join(
                         [str(i.item_pk) for i in ids]
