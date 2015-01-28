@@ -38,7 +38,7 @@ def get_cut_off_date(rate, d=datetime.date.today()):
     if rate == 'rt':
         # use a couple days ago to limit results without risk of leaving out
         # important items (this will be filtered further later).
-        cut_off_date = d - datetime.timedelta(days=2)
+        cut_off_date = d - datetime.timedelta(days=10)
     elif rate == 'dly':
         cut_off_date = d
     elif rate == 'wly':
