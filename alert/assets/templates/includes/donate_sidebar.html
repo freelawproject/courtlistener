@@ -2,7 +2,8 @@
 
 <div class="sidebar-section hidden-xs">
     {% if user.profile.total_donated_last_year < MIN_DONATION.no_ads %}
-        <h3><span>Donate to Turn Off Ads</span></h3>
+        {# This title must say "Sponsored Links" or Google will disable our ads. #}
+        <h3><span>Sponsored Links</span></h3>
         <script async
                 src="//pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
         <div>
