@@ -179,6 +179,12 @@
             {% endif %}
         </p>
         <p class="bottom">
+            {% if doc.supreme_court_db_id %}
+                <span class="meta-data-header">Supreme Court Database ID:</span>
+                <span class="meta-data-value">{{ doc.supreme_court_db_id }}</span>
+            {% endif %}
+        </p>
+        <p class="bottom">
             {%  if doc.judges %}
                 <span class="meta-data-header">Judges:</span>
                 <span class="meta-data-value">{{ doc.judges }}</span>
