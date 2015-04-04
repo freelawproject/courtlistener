@@ -6,19 +6,25 @@
 {% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="span-17 last">
-        <h2>You are about to delete your account</h2>
-        <h3>This <em>is</em> forever.</h3>
-        <p>While we hope that you will have no need to delete your account, we
-            understand that it may at times be necessary.</p>
+    <div class="col-sm-3">&nbsp;</div>
+    <div class="col-sm-6">
+        <h2>You Are About to Delete Your Account</h2>
+        <h3>This <em>cannot</em> be undone.</h3>
+        <p>We hope that you will have no need to delete your account, but we
+            understand that sometimes people want a clean slate.</p>
 
-        <p>After you press the button below, your data will be deleted, and
-            resurrecting your account will not be possible.</p>
+        <p class="v-offset-below-3">After you press the button below, your data
+            will be deleted and resurrecting your account will not be
+            possible.
+        </p>
 
-        <form action="" method="post">{% csrf_token %}
-            <button type="submit" class="button">I'm sure I want to do this.
-                Delete my account now.</button>
+        <a href="/profile/settings/" class="btn btn-primary">Cancel and Go
+            Back</a>&nbsp;&nbsp;
+        <form action="" method="post" class="float-right">{% csrf_token %}
+            <button type="submit" class="btn btn-danger">Delete My Account Now</button>
         </form>
+
     </div>
+    <div class="col-sm-3">&nbsp;</div>
 {% endblock %}
 

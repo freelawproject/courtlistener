@@ -5,8 +5,14 @@ from django import forms
 
 
 class ConfirmedEmailAuthenticationForm(AuthenticationForm):
-    """Your average form, but with an additional tweak to the clean method which ensures that only users with
-    confirmed email addresses can log in."""
+    """Your average form, but with an additional tweak to the clean method
+    which ensures that only users with confirmed email addresses can log in.
+
+    This is needed because we create stub accounts for people that donate and
+    don't already have accounts. Without this check, people could sign up for
+    accounts, log in, and see the donations of somebody that previously only
+    had a stub account.
+    """
     def __init__(self, *args, **kwargs):
         super(ConfirmedEmailAuthenticationForm, self).__init__(*args, **kwargs)
 
@@ -18,7 +24,8 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
             self.user_cache = authenticate(username=username, password=password)
             if self.user_cache is None:
                 raise forms.ValidationError(
-                    _("Please enter a correct username and password. Note that both fields are case-sensitive."))
+                    _("Please enter a correct username and password. Note that"
+                      " both fields are case-sensitive."))
             elif not self.user_cache.is_active:
                 raise forms.ValidationError(_("This account is inactive."))
             elif not self.user_cache.profile.email_confirmed:

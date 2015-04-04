@@ -1,4 +1,4 @@
-/**! hopscotch - v0.2.0
+/**! hopscotch - v0.2.2
 *
 * Copyright 2014 LinkedIn Corp. All rights reserved.
 *
@@ -35,11 +35,19 @@
                                  // loading so that it can start?
       hasJquery         = (typeof window.jQuery !== undefinedStr),
       hasSessionStorage = false,
+      isStorageWritable = false,
       document          = window.document;
 
   // If cookies are disabled, accessing sessionStorage can throw an error.
+  // sessionStorage could also throw an error in Safari on write (even though it exists).
+  // So, we'll try writing to sessionStorage to verify it's available.
   try {
-    hasSessionStorage = (typeof window.sessionStorage !== undefinedStr);
+    if(typeof window.sessionStorage !== undefinedStr){
+      hasSessionStorage = true;
+      sessionStorage.setItem('hopscotch.test.storage', 'ok');
+      sessionStorage.removeItem('hopscotch.test.storage');
+      isStorageWritable = true;
+    }
   } catch (err) {}
 
   defaultOpts       = {
@@ -358,9 +366,6 @@
       if (result) {
         return result;
       }
-      if (document.querySelector) {
-        return document.querySelector(target);
-      }
       if (hasJquery) {
         result = jQuery(target);
         return result.length ? result[0] : null;
@@ -368,6 +373,11 @@
       if (Sizzle) {
         result = new Sizzle(target);
         return result.length ? result[0] : null;
+      }
+      if (document.querySelector) {
+        try {
+          return document.querySelector(target);
+        } catch (err) {}
       }
       // Regex test for id. Following the HTML 4 spec for valid id formats.
       // (http://www.w3.org/TR/html4/types.html#type-id)
@@ -396,9 +406,8 @@
       }
 
       if (typeof step.target === 'string') {
-        //Just one target to test. Check, cache, and return its results.
-        step.target = utils.getStepTargetHelper(step.target);
-        return step.target;
+        //Just one target to test. Check and return its results.
+        return utils.getStepTargetHelper(step.target);
       }
       else if (Array.isArray(step.target)) {
         // Multiple items to check. Check each and return the first success.
@@ -411,8 +420,6 @@
             queriedTarget = utils.getStepTargetHelper(step.target[i]);
 
             if (queriedTarget) {
-              // Replace step.target with result so we don't have to look it up again.
-              step.target = queriedTarget;
               return queriedTarget;
             }
           }
@@ -447,10 +454,21 @@
       var expires = '',
           date;
 
-      if (hasSessionStorage) {
-        sessionStorage.setItem(name, value);
+      if (hasSessionStorage && isStorageWritable) {
+        try{
+          sessionStorage.setItem(name, value);
+        }
+        catch(err){
+          isStorageWritable = false;
+          this.setState(name, value, days);
+        }
       }
       else {
+        if(hasSessionStorage){
+          //Clear out existing sessionStorage key so the new value we set to cookie gets read.
+          //(If we're here, we've run into an error while trying to write to sessionStorage).
+          sessionStorage.removeItem(name);
+        }
         if (days) {
           date = new Date();
           date.setTime(date.getTime()+(days*24*60*60*1000));
@@ -470,17 +488,21 @@
           c,
           state;
 
+      //return value from session storage if we have it
       if (hasSessionStorage) {
         state = sessionStorage.getItem(name);
+        if(state){
+          return state;
+        }
       }
-      else {
-        for(i=0;i < ca.length;i++) {
-          c = ca[i];
-          while (c.charAt(0)===' ') {c = c.substring(1,c.length);}
-          if (c.indexOf(nameEQ) === 0) {
-            state = c.substring(nameEQ.length,c.length);
-            break;
-          }
+
+      //else, try cookies
+      for(i=0;i < ca.length;i++) {
+        c = ca[i];
+        while (c.charAt(0)===' ') {c = c.substring(1,c.length);}
+        if (c.indexOf(nameEQ) === 0) {
+          state = c.substring(nameEQ.length,c.length);
+          break;
         }
       }
 
@@ -782,7 +804,7 @@
       }
 
       // Set z-index and arrow placement
-      el.style.zIndex = step.zindex || '';
+      el.style.zIndex = (typeof step.zindex === 'number') ? step.zindex : 'auto';
       this._setArrow(step.placement);
 
       // Set bubble positioning
@@ -908,6 +930,12 @@
     _handleBubbleClick: function(evt){
       var action;
 
+      // Override evt for IE8 as IE8 doesn't pass event but binds it to window
+      evt = evt || window.event; // get window.event if argument is falsy (in IE)
+
+      // get srcElement if target is falsy (IE)
+      var targetElement = evt.target || evt.srcElement;
+
       //Recursively look up the parent tree until we find a match
       //with one of the classes we're looking for, or the triggering element.
       function findMatchRecur(el){
@@ -927,7 +955,7 @@
          /*else*/ return findMatchRecur(el.parentElement);
       }
 
-      action = findMatchRecur(evt.target);
+      action = findMatchRecur(targetElement);
 
       //Now that we know what action we should take, let's take it.
       if (action === 'cta'){
@@ -2243,6 +2271,11 @@ __p += '\n<div class="hopscotch-bubble-container" style="width: ' +
 'px; padding: ' +
 ((__t = ( step.padding )) == null ? '' : __t) +
 'px;">\n  ';
+ if(tour.isTour){ ;
+__p += '<span class="hopscotch-bubble-number">' +
+((__t = ( i18n.stepNum )) == null ? '' : __t) +
+'</span>';
+ } ;
 __p += '\n  <div class="hopscotch-bubble-content">\n    ';
  if(step.title !== ''){ ;
 __p += '<h3 class="hopscotch-title">' +
@@ -2278,7 +2311,7 @@ __p += '\n  </div>\n  ';
 __p += '<a title="' +
 ((__t = ( i18n.closeTooltip )) == null ? '' : __t) +
 '" href="#" class="hopscotch-bubble-close hopscotch-close">' +
-'<i class="gray fa fa-times"></i>' +
+((__t = ( i18n.closeTooltip )) == null ? '' : __t) +
 '</a>';
  } ;
 __p += '\n</div>\n<div class="hopscotch-bubble-arrow-container hopscotch-arrow">\n  <div class="hopscotch-bubble-arrow-border"></div>\n  <div class="hopscotch-bubble-arrow"></div>\n</div>';

@@ -1,126 +1,165 @@
-var line_chart_options = {
-    gutter: 35,
-    symbol: "circle",
-    nostroke: false,
-    smooth: true,
-    shade: false,
-    dash: "",
-    axis: "0 0 1 1",
-    axisxstep: 11, // How many x interval labels to render
-    axisystep: 10
-};
+/*eslint-env browser */
+/*global $, sorted_courts, precedentTypes */
 
-var canvas;
-var court_data = new Array();
+var hash = window.location.hash.substr(1),
+    court_data = [],
+    chartData = [];
+
+function drawGraph(data) {
+    var entry = {},
+        courtName = court_data[hash].short_name;
+    chartData = [];
+
+    for (var item in data.annual_counts) {
+        if (data.annual_counts.hasOwnProperty(item)) {
+            entry = {};
+            entry.x = parseInt(item, 10);
+            entry.y = data.annual_counts[item];
+            chartData.push(entry);
+        }
+    }
+    chartData.sort(function(a, b) {
+        return a.x - b.x;
+    });
+    $('#coverageChart').empty();
+
+    function getXDataValue(d) {
+        return d.x;
+    }
+
+    function getYDataValue(d) {
+        return d.y;
+    }
+
+    // Scales
+    if (chartData.length > 10) {
+        var xScale = new Plottable.Scale.Linear();
+        var xAxis  = new Plottable.Axis.Numeric(xScale, 'bottom');
+    } else {
+        var xScale = new Plottable.Scale.Ordinal();
+        var xAxis  = new Plottable.Axis.Category(xScale, 'bottom');
+    }
+    var yScale = new Plottable.Scale.Linear();
+
+    // Plot Components
+    var title  = new Plottable.Component.TitleLabel(parseInt(data.total, 10).toLocaleString() + ' Opinions');
+    var yLabel = new Plottable.Component.Label('Number of Opinions', 'left');
+    var xLabel = new Plottable.Component.Label(courtName);
+    var yAxis  = new Plottable.Axis.Numeric(yScale, 'left');
+    var plot   = new Plottable.Plot.Bar(xScale, yScale, true)
+        .addDataset(chartData)
+        .animate(true)
+        .project("x", getXDataValue, xScale)
+        .project("y", getYDataValue, yScale)
+        //.hoverMode('line') // need to do performance check on this setting or comment out
+        .barLabelsEnabled(chartData.length < 11);
+
+
+    yAxis.formatter(function (d) {
+        return d.toLocaleString();
+    });
+
+    var table = new Plottable.Component.Table([
+        [null, null, title],
+        [yLabel, yAxis, plot],
+        [null, null, xAxis],
+        [null, null, xLabel]
+    ]);
+
+    // Render it
+    table.renderTo('#coverageChart');
+
+    var hover = new Plottable.Interaction.Hover();
+    hover.onHoverOver(function(hoverData) {
+        var xString = hoverData.data[0].x;
+        var yString = hoverData.data[0].y.toLocaleString();
+        title.text(yString + " opinions in "+ xString);
+    });
+    hover.onHoverOut(function() {
+        title.text(parseInt(data.total, 10).toLocaleString() + ' Opinions');
+    });
+    plot.registerInteraction(hover);
+
+    var click = new Plottable.Interaction.Click();
+    click.callback(function(p) {
+        var bars = plot.getBars(p.x, p.y),
+            year,
+            prec = '',
+            i;
+        if (bars[0].length) {
+            year = bars.data()[0].x;
+            for (i = 0; i < precedentTypes.length; i++) {
+                prec += '&' + precedentTypes[i] + '=on';
+            }
+            window.location.href = '/?filed_after=' + year +
+                '&filed_before=' + year + 
+                prec + 
+                ((hash !== 'all') ? '&court=' + hash : '');
+        }
+    });
+    plot.registerInteraction(click);
+}
+
+// Do this when the hash of the page changes (i.e. at page load or when a select is chosen.
+$(window).hashchange(function() {
+    hash = window.location.hash.substr(1);
+    if (hash === '') {
+        hash = 'all';
+    } else if (document.getElementById(hash)){
+        // The user tried to get to an unrelated ID
+        hash = 'all';
+    }
+    $.ajax({
+        type: 'GET',
+        url: '/api/rest/v2/coverage/' + hash + '/',
+        success: function(data) {
+            // Update the drawing area
+            drawGraph(data);
+        },
+        error: function(){
+            // If ajax fails (perhaps it's an invalid court?) set it back to all.
+            window.location.hash = 'all';
+        }
+    });
+});
+
+$('#nav select').change(function(){
+    // Update the hash whenever the select is changed.
+    var id = $('#nav select option:selected')[0].value;
+    window.location.hash = id;
+});
 
 function addNavigation() {
-    // Initialization....
     $(sorted_courts).each(function(index, court) {
         // Build up the chooser
-        var select_elem = $('#nav select');
-        $('<option></option>').attr('value', court.pk).attr('id', 'court_' + court.pk)
-                                                            .text(court.short_name).appendTo(select_elem);
-        if (index == 0) {
-            select_elem.toggleClass('selected');
-        }
-        select_elem.appendTo('#nav');
+        var selectElement = $('#nav select');
+        $('<option></option>').attr('value', court.pk)
+            .attr('id', 'court_' + court.pk)
+            .text(court.short_name)
+            .appendTo(selectElement);
+        selectElement.appendTo('#nav');
 
         // Make a totals dict (necessary, because otherwise courts are in a list
         // where we can't look things up by court name).
         court_data[court.pk] = {'pk': court.pk,
-                                'total': court.total_docs,
-                                'short_name': court.short_name};
+            'total': court.total_docs,
+            'short_name': court.short_name};
     });
-
-    // Do this when the hash of the page changes (i.e. at page load or when a select is chosen.
-    $(window).hashchange(function(){
-        var hash = window.location.hash.substr(1)
-        if (hash === "") {
-            hash = 'all';
-        } else if (document.getElementById(hash)){
-            // The user tried to get to an unrelated ID
-            hash = 'all';
-        }
-
-        $.ajax({
-            type: "GET",
-            url: "/api/rest/v1/coverage/" + hash + "/",
-            success: function(data){
-                // Clean things up
-                canvas.clear();
-                $('#graph svg').attr('height', '0');
-                $('#graph table, #graph p').remove();
-
-                // Update the drawing area
-                updateHeader(data);
-                drawGraph(data);
-            },
-            error: function(){
-                // If ajax fails (perhaps it's an invalid court?) set it back to all.
-                window.location.hash = 'all';
-            }
-        });
-    });
-
-    $('#nav select').change(function(){
-        // Update the hash whenever the select is changed.
-        var id = $('#nav select option:selected')[0].value;
-        window.location.hash = id;
-    });
-
-}
-
-function updateHeader(data) {
-    $('#graph-header').text(data['total'] + " Opinions");
-}
-
-function drawGraph(data) {
-    var keys = Object.keys(data['annual_counts']);
-    keys.sort();
-    var y = [];
-    y.length = keys.length;
-    $.each(data["annual_counts"], function(key, value) {
-      y[keys.indexOf(key)] = value;
-    });
-    var x = [];
-    $.each(keys, function(index, value) {
-      x.push(parseInt(value));
-    });
-    if (keys.length < 5) {
-        // Make a table
-        var not_enough_elem = "<p>We do not have enough data to show this court as a graph. We require at least five year's data.</p>";
-        $('#graph').append(not_enough_elem);
-        var table_stub = "<table><thead><tr><th>Year</th><th>Count</th></tr></thead><tbody></tbody></table>";
-        $('#graph').append(table_stub);
-        for(var i = 0; i < x.length; i++){
-            $('#graph tbody').append('<tr><td>' + x[i] + '</td><td>' + y[i] + '</td></tr>');
-        }
-    } else {
-        // Draw the full version
-        $('#graph svg').attr('height', '400');
-        var chart = canvas.linechart(40, 0, 910, 370, x, [y], line_chart_options).hover(function () {
-            var color = this.symbol.attr("fill");
-            var label = this.axis + ": " + this.value;
-            this.popup = canvas.popup(this.x, this.y, label).insertBefore(this).attr([{stroke: color, fill: "#fff"}, { fill: "#000" }]);
-        },
-        function () {
-            this.popup.remove();
-        });
-        chart.symbols.attr({r: 3});
-        // X axis label
-        var label_attrs = {'font-size': 14, 'font-weight': 'bold'};
-        var court_name = court_data[location.hash.substr(1)].short_name;
-        canvas.text(475, 370, court_name).attr(label_attrs);
-
-        // Y axis label
-        var y_label = canvas.text(15, 200, "Number of Opinions").attr(label_attrs);
-        y_label.transform('r-90');
+    if (hash === '') {
+        hash = 'all';
     }
+    $('#nav select').val(hash);
 }
+
+// hover
+// click
 
 $(document).ready(function() {
     addNavigation();
-    canvas = Raphael("graph", 950, 400);
+    d3.select('#chart')
+        .append('svg')
+        .attr('id', 'coverageChart')
+        .attr('height', '400px');
     $(window).hashchange();
-    $("#nav select").chosen();
+    $('#nav select').chosen();
 });

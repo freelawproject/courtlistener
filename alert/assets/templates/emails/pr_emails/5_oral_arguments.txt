@@ -1,0 +1,30 @@
+Hi,
+
+We’re very excited to announce today that CourtListener is currently in the process of rolling out support for Oral Argument audio. This is a feature that we’ve wanted for at least four years — our name is CourtListener, after all — and one that will bring a raft of new features to the project. We already have about 500 oral arguments on the site, and we’ve got many more we’re we’ll be adding over the coming weeks.
+
+For now we are getting oral argument audio in real time from ten federal appellate courts. As we get this audio, we are using it to power a number of features:
+
+  - Oral Argument files become immediately available in our search results.
+
+  - A podcast is automatically available for every jurisdiction we support and for any query that you can dream up. Want a custom podcast containing all of the 9th circuit arguments for a particular litigant? You got it.
+
+  - You can now get alerts for oral arguments so you can be sure that you keep up with the latest coming out of the courts.
+
+  - For developers, there are a number of new endpoints in both our REST API and our bulk data API for audio files.
+
+  - Using the Free Law Seal Rookery, we are enhancing the audio we find on court websites by adding album art and better meta data.
+
+We’re very excited about being able to provide oral argument data and have posted more details on our blog:
+
+  - http://freelawproject.org/2014/10/31/announcing-oral-arguments-on-courtlistener-2/
+
+To start using Oral Arguments, simply do a search and switch to the oral arguments tab. From there you can filter by all the fields you expect from CourtListener.
+
+We can’t wait to see what kinds of legal research and innovation these new features bring.
+
+Mike & Brian
+Founders, FLP
+
+-----------
+If you wish to unsubscribe from these newsletters, just reply and we'll take you right off.
+

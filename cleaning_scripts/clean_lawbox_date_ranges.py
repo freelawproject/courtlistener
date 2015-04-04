@@ -17,7 +17,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 import re
 from alert import settings
-from alert.corpus_importer.import_law_box import get_date_filed
+from alert.corpus_importer.lawbox.import_law_box import get_date_filed
 from alert.lib.sunburnt import sunburnt
 from alert.search.models import Document
 from lxml import html
@@ -34,7 +34,7 @@ def cleaner(simulate=False, verbose=False):
      - Match a regex for the funky date pattern
 
     """
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='rw')
     q = {
         'q': 'argued',
         'fl': 'id,text,source',
@@ -87,7 +87,7 @@ def cleaner(simulate=False, verbose=False):
                 print "  - Updating with new date."
             if not simulate:
                 doc.date_filed = new_date
-                doc.save(index=True, commit=False)
+                doc.save(index=True, force_commit=False)
 
     # Do one big commit at the end
     conn.commit()

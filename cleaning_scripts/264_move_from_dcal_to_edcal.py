@@ -6,7 +6,7 @@ sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 from alert import settings
-from alert.corpus_importer.import_law_box import get_court_object
+from alert.corpus_importer.lawbox.import_law_box import get_court_object
 from alert.lib.sunburnt import sunburnt
 from alert.search.models import Document
 from lxml import html
@@ -16,7 +16,7 @@ from optparse import OptionParser
 def cleaner(simulate=False, verbose=False):
     """Find items that are in californiad and change them to be in caed by using an updated set of regexes.
     """
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='rw')
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='rw')
     q = {'fq': ['court_exact:%s' % 'californiad']}
 
     results = conn.raw_query(**q)
@@ -50,7 +50,7 @@ def cleaner(simulate=False, verbose=False):
                 print "  - Updating with new value."
             if not simulate:
                 doc.court_id = correct_court
-                doc.save(index=True, commit=False)
+                doc.save(index=True, force_commit=False)
 
     # Do one big commit at the end
     conn.commit()

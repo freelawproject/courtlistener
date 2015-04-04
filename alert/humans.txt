@@ -35,7 +35,7 @@
               Tesseract, titlecase
         Display: Silk icons, Blueprint CSS, Bootstrap, Font Awesome
         Infrastructure: Apache2, Linux, Postgres, Solr
-  Source: https://github.com/freelawproject/courtlistener
+  Source: https://github.com/freelawproject/courtlistener/
 
 
 

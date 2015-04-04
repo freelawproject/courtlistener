@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% load text_filters %}
+
+{% block title %}{{ title }} - CourtListener.com{% endblock %}
+{% block og_title %}{{ title }} - CourtListener.com{% endblock %}
+{% block description %}Opinion for {{ title }}{% endblock %}
+{% block og_description %}Opinion for {{ title }}{% endblock %}
+{% block search-form %}{% endblock %}
+
+{% block head %}
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{doc.citation.case_name|truncatewords:10}}" href="/feed/{{ doc.pk }}/cited-by/">
+{% endblock %}
+
+{% block footer-scripts %}
+    <script defer type="text/javascript" src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+    <script defer type="text/javascript" src="{{ STATIC_URL }}js/save-favorites.js"></script>
+{% endblock %}
+
+{% block sidebar %}
+    <div class="col-sm-3" id="sidebar">
+        <div class="sidebar-section">
+            <h4>
+                <i class="fa fa-arrow-circle-o-left gray"></i>
+                <a href="/?{{ request.META.QUERY_STRING }}">Back to {% if get_string %}Search Results{% else %}Home Page{% endif %}</a>
+            </h4>
+        </div>
+
+
+        {# show the admin tools if applicable #}
+        {% if perms.search.change_docket or perms.search.change_document or perms.search.change_citation %}
+            <div class="sidebar-section">
+                <h3><span>Admin</span></h3>
+                <p>
+                    {% if perms.search.change_docket %}
+                        <a href="/admin/search/docket/{{ doc.docket_id }}/"
+                           class="btn btn-primary btn-xs">Docket</a>
+                    {% endif %}
+                    {% if perms.search.change_document %}
+                        <a href="/admin/search/document/{{doc.pk}}/"
+                           class="btn btn-primary btn-xs">Document</a>
+                    {% endif %}
+                    {% if perms.search.change_citation %}
+                        <a href="/admin/search/citation/{{doc.citation_id}}/"
+                           class="btn btn-primary btn-xs">Citation</a>
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
+
+        {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
+        <div class="{% if not favorite_form.instance.doc_id %}hidden{% endif %} sidebar-section" id="sidebar-notes">
+            <div>
+                <h3 class="inline"><span>Your Notes</span></h3>
+                <p class="inline" data-toggle="modal" data-target="#modal-save-favorite">
+                    (<a href="#favorite-editor">edit</a>)
+                     <i class="fa fa-pencil gray pointer"></i>
+                </p>
+                <p id="sidebar-notes-text">
+                    {{ favorite_form.instance.notes|default:"(none)" }}
+                </p>
+            </div>
+        </div>
+
+        {# Show cases that cite this case #}
+        {% if doc.citation_count > 0 %}
+            <div id="cited-by" class="sidebar-section">
+                <h3><span>Cited By ({{ doc.citation_count }})</span></h3>
+                <p class="bottom">This opinion has been cited by these opinions:</p>
+                <ul>
+                    {% for case in cited_by_trunc %}
+                        <li>
+                            <a href="{{ case.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                                {{ case.caption|safe|truncatewords:10|v_wrapper }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <h4>
+                    <a href="{{ doc.get_absolute_url }}cited-by/?{{ request.META.QUERY_STRING }}">
+                        Full List of Citations
+                        <i class="fa fa-arrow-circle-o-right gray"></i>
+                    </a>
+                </h4>
+            </div>
+        {% endif %}
+
+        {# Show cases this case cites #}
+        {% if authorities_trunc %}
+            <div id="authorities" class="sidebar-section">
+                <h3><span>Authorities ({{ authorities_count }})</span></h3>
+                <p class="bottom">This opinion cites:</p>
+                <ul>
+                    {% for case in authorities_trunc %}
+                        {% with case=case.parent_documents.all.0 %}
+                            <li>
+                                <a href="{{ case.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                                    {{ case.caption|safe|truncatewords:10|v_wrapper }}
+                                </a>
+                            </li>
+                        {% endwith %}
+                    {% endfor %}
+                </ul>
+                <h4>
+                    <a href="{{ doc.get_absolute_url }}authorities/?{{ request.META.QUERY_STRING }}">
+                        Full Table of Authorities
+                        <i class="fa fa-arrow-circle-o-right gray"></i>
+                    </a>
+                </h4>
+            </div>
+        {% endif %}
+
+        {# Download original? #}
+        {% if doc.download_url or doc.local_path %}
+            <div class="sidebar-section">
+                {% if doc.source != 'R' and doc.source != 'L' and doc.source != 'LR' %}
+                    <h3><span>View Original</span></h3>
+                    <p>
+                        {% if doc.download_url and result.source != 'R' %}
+                            <a href="{{doc.download_url}}" class="visitable">From the court</a>
+                        {% endif %}
+                        {% if doc.download_url and result.source != 'R' and doc.local_path %}
+                            &nbsp;&nbsp;|&nbsp;&nbsp;
+                        {% endif %}
+                        {% if doc.local_path %}
+                            <a href="/{{doc.local_path}}" class="visitable">Our backup</a>
+                        {% endif %}
+                    </p>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% include "includes/social_links.html" with title_type="Opinion" %}
+        {% include "includes/donate_sidebar.html" with referrer="ad-o" %}
+    </div>
+{% endblock %}
+
+
+{% block content %}
+    <article class="col-sm-9">
+        <i id="favorites-star"
+           class="{% if favorite_form.instance.doc_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
+           data-toggle="modal"
+           data-target="#modal-save-favorite, #modal-logged-out"
+           title="Save this record as a favorite in your profile"></i>
+        <h2 class="inline">{{ doc.caption|safe|v_wrapper }}</h2>
+        {% include "includes/favorites_modal.html" %}
+
+        <h3>{{ doc.docket.court }}</h3>
+        <p class="bottom">
+            <span class="meta-data-header">Filed:</span>
+            <span class="meta-data-value">
+                {% if doc.date_filed %}
+                    {{doc.date_filed|date:"F jS, Y"}}
+                {% else %}
+                    Unknown Date
+                {% endif %}
+            </span>
+        </p>
+        <p class="bottom">
+            <span class="meta-data-header">Status:</span>
+            <span class="meta-data-value">
+                {% if doc.precedential_status %}
+                    {{doc.get_precedential_status_display}}
+                {% else %}
+                    Unknown
+                {% endif %}
+            </span>
+        </p>
+        <p class="bottom">
+            {% if citation_string %}
+                <span class="meta-data-header">Citations:</span>
+                <span class="meta-data-value">{{ citation_string }}</span>
+            {% endif %}
+        </p>
+        <p class="bottom">
+            {% if doc.citation.docket_number %}
+                <span class="meta-data-header">Docket Number:</span>
+                <span class="meta-data-value">{{ doc.citation.docket_number }}</span>
+            {% endif %}
+        </p>
+        <p class="bottom">
+            {% if doc.supreme_court_db_id %}
+                <span class="meta-data-header">Supreme Court Database ID:</span>
+                <span class="meta-data-value">{{ doc.supreme_court_db_id }}</span>
+            {% endif %}
+        </p>
+        <p class="bottom">
+            {%  if doc.judges %}
+                <span class="meta-data-header">Judges:</span>
+                <span class="meta-data-value">{{ doc.judges }}</span>
+            {% endif %}
+        </p>
+        <p class="bottom">
+            {%  if doc.nature_of_suit %}
+                <span class="meta-data-header">Nature of suit:</span>
+                <span class="meta-data-value">{{ doc.nature_of_suit }}</span>
+            {% endif %}
+        </p>
+        <p>
+            <span class="meta-data-header"
+                  title="SHA1 Hash of the binary or text">Fingerprint:</span>
+            <span class="meta-data-value">{{ doc.sha1 }}</span>
+        </p>
+        <br>
+        {% if doc.extracted_by_ocr %}
+            <div class="col-sm-12 alert-warning alert">
+                <p class="bottom">The text of this document was obtained by
+                    analyzing a scanned document provided by the court. As a
+                    result it may have typos, and you may prefer reading
+                    <a href="{{ doc.download_url }}" class="visitable">the
+                    original</a>.
+                </p>
+            </div>
+            <div class="clearfix"></div>
+        {% endif %}
+
+        {% if doc.source == 'L' or doc.source == 'LC' or doc.source == 'LR' or doc.source == 'LCR' %}
+        <div id='lawbox-text'>
+        {% elif doc.source == 'R' or doc.source == 'CR' %}
+        <div id='resource-org-text'>
+        {% else %}
+        <div id='default-text'>
+        {% endif %}
+            <div id="opinion-content"> {# used by Zotero #}
+                {% if doc.html_with_citations %}
+                    {{ doc.html_with_citations|safe }}
+                {% elif doc.html_lawbox %}
+                    {{ doc.html_lawbox|safe }}
+                {% elif doc.html %}
+                    {{doc.html|safe}}
+                {% else %}
+                    <pre>{{doc.plain_text}}</pre>
+                {% endif %}
+            </div>
+        </div>
+    </article>
+{% endblock %}

@@ -23,8 +23,8 @@ CELERYD_LOG_LEVEL="INFO"
 CELERYD_PID_FILE="/var/run/celery/celery@%n.pid"
 
 # Workers should run as an unprivileged user.
-CELERYD_USER="celery"
-CELERYD_GROUP="celery"
+CELERYD_USER="www-data"
+CELERYD_GROUP="www-data"
 
 # Name of the projects settings module.
 export DJANGO_SETTINGS_MODULE="alert.settings"

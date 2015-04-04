@@ -1,10 +1,11 @@
-This file contains notes for upgrades when special instructions are necessary. In general, simply doing:
+This file contains notes for upgrades when special instructions are necessary.
+In general, simply doing:
 
 # Get the latest code
-hg pull -u
+git pull
 
 # Gather any new static files
-manage.py collectstatic
+manage.py collectstatic (sudo -u www-data ./manage.py collectstatic)
 
 (enter yes, when prompted)
 
@@ -17,32 +18,147 @@ sudo service celeryd restart
 # Restart apache's code
 touch apache/django.wsgi
 
-is all that's necessary. In the case that spclecial instructions are needed, we will attempt to put them here, with the
-most recent at the top.
+is all that's necessary. In the case that special instructions are needed, we
+will attempt to put them here, with the most recent at the top.
 
 We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
+2014-12-30:
 
-2014-06-20:
- - This is a very large upgrade and brings the concept of the "Case" into CourtListener. After this point, we will have
-   both opinions and oral arguments for the first time, with the result being that we need some kind of container that
-   we can hold them in. A new class has been added to search.models called "Case" to hold this kind of information.
- - When upgrading to this version, everything will completely break until your database is updated. I recommend enabling
-   the maintenance mode URL if you wish to avoid chaos.
- - The database upgrade for this version will take some time, as we are moving a number of fields from one database
-   table to another.
+ - Adds support for real time alerts.
+ - Re-organizes the alert database. Please migrate to get the changes.
 
- TODO:
-  - A new flag was added to the Court for has_oral_argument_scraper. We should add the corresponding information to the
-    coverage page.
-  - API 1.1 will need to be released.
-  - When a Case object is saved, it should check if the "name" attribute has changed. If so, it needs to update the
-    search index and slug.
 
- API breakages:
-  - The has_scraper field is now renamed has_opinion_scraper, and there is a new field, has_oral_argument_scraper.
+2014-11-18:
+
+ - CORS headers are now being sent with API requests so that folks can get past
+   the limitations of JSONP. This is untested, but introduces (yet another)
+   dependency. To upgrade, do:
+
+    - sudo pip install django-cors-headers==0.13
+
+  Then pull as usual.
+
+
+2014-11-17:
+
+  - `constants.py` has been removed from CourtListener in this release and has
+    been moved to its own repository. The code here should continue working,
+    but before pulling this code you must install the new reporters database,
+    as we did the Seal Rookery. This can be done with:
+
+        - sudo git clone https://github.com/freelawproject/reporters-db /usr/local/reporters_db
+        - sudo ln -s /usr/local/reporters_db /usr/lib/python2.7/dist-packages/reporters_db
+
+
+2014-11-14:
+ - The dependency of eyed3 has been upgraded to handle a threading race
+   condition as documented here: https://bitbucket.org/nicfit/eyed3/issue/47/
+
+   Upgrade with:
+
+       sudo pip install --allow-external eyeD3 --allow-unverified eyeD3 eyeD3==0.7.5
+
+
+2014-10-23:
+ Overview:
+ - This is a very large upgrade and brings the concept of the "Docket" into
+   CourtListener. After this point, we will have both opinions and oral
+   arguments for the first time, with the result being that we need some kind
+   of container that we can hold them in. A new class has been added to
+   search.models called "Docket" to hold this kind of information.
+
+ - When upgrading to this version, everything will completely break until your
+   database is updated. I recommend enabling the maintenance mode URL if you
+   wish to avoid chaos for your users.
+
+ - The database upgrade for this version will take some time, as we are moving
+   a number of fields from one database table to another. A re-index is also
+   required, but, if you have ample disk space, this will not cause downtime.
+
+  Deployment:
+  - Install new dependencies:
+    - sudo pip install --allow-external eyeD3 --allow-unverified eyeD3 eyeD3==0.7.4
+    - sudo pip install datadiff==1.1.5
+    - avconv: sudo apt-get install libav-tools
+  - Install the seal-rookery:
+    - sudo git clone https://github.com/freelawproject/seal-rookery /usr/local/seal_rookery
+    - sudo ln -s /usr/local/seal_rookery /usr/lib/python2.7/dist-packages/seal_rookery
+
+  - Disable any current scrapers using killall, and disable cron jobs from
+    kicking in again.
+  - Flush any background tasks with countdowns in the celery queue by following
+    the notes here: https://stackoverflow.com/questions/26535719/
+  - Stop Celery
+  - Pull the code and the maintenance mode will be enabled.
+  - Restart apache to enable the new code and clear its caches:
+        - cl; sudo touch apache/django.wsgi
+  - Database changes
+        - manage.py migrate search --delete-ghost-migrations
+        - manage.py migrate
+  - Add a new core to Solr (paths below may need changing to correspond with
+    the location of your current configurations):
+
+        1. Create a new configuration directory based on our current one:
+
+           % sudo cp -r /usr/local/solr/example/solr/collection1 /usr/local/solr/example/solr/audio
+           % source /etc/courtlistener
+           % sudo ln -s -f $INSTALL_ROOT/Solr/conf/audio_schema.xml /usr/local/solr/example/solr/audio/conf/schema.xml
+
+        2. Create the new core in Python:
+
+            from alert.lib.solr_core_admin import create_solr_core
+            from alert import settings
+            import os
+            create_solr_core(
+               core_name='audio',
+               data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data_audio'),
+               schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf', 'audio_schema.xml'),
+               instance_dir='/usr/local/solr/example/solr/audio',
+            )
+
+  - Turn maintenance mode back off.
+  - Re-start celery
+  - Re-enable scrapers and kick off the oral argument scrapers
+  - Flip the has_oral_argument_scraper flag to true on all correct courts.
+  - absolute_urls have changed throughout, necessitating a complete re-index
+    for links in search results to work without redirects. We can re-index in
+    a background core and then swap it in using the following commands:
+
+        >>> create_solr_core(
+            core_name='swap_core',
+            data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data_swap'),
+            schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf', 'schema.xml'),
+        )
+
+        % screen
+        % manage.py cl_update_index --update --everything --optimize --solr-url http://127.0.0.1:8983/solr/swap_core --type opinions --traceback
+
+        >>> swap_solr_core('collection1', 'swap_core')
+        >>> delete_solr_core('swap_core', delete_data_dir=True)
+
+  - Bulk files have been rewritten and require some new tweaks:
+        - Update cron to generate bulk files on the last day of each month,
+          using something like the following:
+
+              min hour 30 4,6,9,11        * manage.py cl_make_bulk_data
+              min hour 31 1,3,5,7,8,10,12 * manage.py cl_make_bulk_data
+              min hour 28 2               * manage.py cl_make_bulk_data
+
+        - Remove any old cron entries referencing dump_all_files.py
+        - Add a new directory at $INSTALL_ROOT/alert/assets/media/bulk-data to
+          contain the new bulk files when they are created, and symlink it from
+          /sata/.
+        - Generate the new bulk files by calling manage.py cl_make_bulk_data.
+        - Be sure that Apache is restarted so the new location is updated.
+        - Delete any old bulk files located at
+          $INSTALL_ROOT/alert/assets/media/dumps
+  - Update cron jobs to point to cl_scrape_opinions and cl_scrape_oral_arguments
+  - Update the CL calendar to have bulk files generated at 3am on the last day
+    of every month.
+  - Add symlinks for the new data types so we don't fill the SSDs
 
 2014-06-18:
  - This update makes alert editing a lot more intuitive.
@@ -109,7 +225,7 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 
 2013-10-21:
- - Removes resource.org polling. If you have used this, remove the cached file in the robots directory and any
+ - Removes public.resource.org polling. If you have used this, remove the cached file in the robots directory and any
    associated cron jobs.
  - Moves and re-works the alert tool. If you have cron jobs that depended on it, it's now moved to the proper location
    and you'll need to update your cron jobs.
@@ -191,32 +307,39 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 
 2013-09-16:
- - OVERVIEW: This update contains a number of large fixes, which will alter your database in a number of ways. It lands
-   the beginning work for the Lawbox corpus import (including > 300 new courts), and lands the initial work for a
-   donation page. Between these two changes, hundreds of changes have been made to the codebase, which will take a bit
-   of work to upgrade. Before we begin, turn off the scrapers with:
+ - OVERVIEW: This update contains a number of large fixes, which will alter
+   your database in a number of ways. It lands the beginning work for the
+   Lawbox corpus import (including > 300 new courts), and lands the initial
+   work for a donation page. Between these two changes, hundreds of changes
+   have been made to the codebase, which will take a bit of work to upgrade.
+   Before we begin, turn off the scrapers with:
 
      sudo service scrapers stop
 
    Once that's complete, proceed through the steps below.
 
- - CourtListener has been modified to support multiple installations on a single computer. For this to work, a new file
-   must be created at /etc/courtlistener, with contents like the following:
+ - CourtListener has been modified to support multiple installations on a
+   single computer. For this to work, a new file must be created at
+   /etc/courtlistener, with contents like the following:
 
      INSTALL_ROOT='/home/mlissner/Programming/intellij/courtlistener'
 
-   This variable will be used by both bash scripts and all Django scripts henceforth for determining where CourtListener
-   is installed. If you are a developer with multiple installations, this will make your life considerably easier, as
-   you can simply change this variable to automatically update all of your Django settings.
+   This variable will be used by both bash scripts and all Django scripts
+   henceforth for determining where CourtListener is installed. If you are a
+   developer with multiple installations, this will make your life considerably
+   easier, as you can simply change this variable to automatically update all
+   of your Django settings.
 
-   If you are wondering why an environmental variable cannot be used instead of a configuration file, the reason is that
-   oddly, environment variables cannot be changed on the fly without restarting the computer. Please see this
-   stackoverflow question and my answer for more details:
+   If you are wondering why an environmental variable cannot be used instead
+   of a configuration file, the reason is that oddly, environment variables
+   cannot be changed on the fly without restarting the computer. Please see
+   this stackoverflow question and my answer for more details:
 
      http://stackoverflow.com/questions/8677504/setting-environment-variable-globally-without-restarting-ubuntu/18388854#18388854
 
- - Hundreds of new courts have been added to initial_data.json and will be installed automatically, but there are some
-   conflicts with the current courts that need to be fixed first. To do that, in a Python shell run:
+ - Hundreds of new courts have been added to court_data.json and will be
+   installed automatically, but there are some conflicts with the current
+   courts that need to be fixed first. To do that, in a Python shell run:
 
         from search.models import Court
         c = Court.objects.get(pk="calctapp")
@@ -235,17 +358,20 @@ We welcome a conversion of these notes to a better process using Fabric.
         c.position = 366.55
         c.save()
 
-   The remainder of the courts will get updated automatically when you perform the next steps.
+   The remainder of the courts will get updated automatically when you perform
+   the next steps.
 
- - the user profiles have been updated to support donations. Update your database with:
+ - the user profiles have been updated to support donations. Update your
+   database with:
 
     manage.py migrate donate
     manage.py migrate userHandling
 
-   A new fixture has also been added that will automatically populate your database with 56 bar membership
-   jurisdictions.
+   A new fixture has also been added that will automatically populate your
+   database with 56 bar membership jurisdictions.
 
- - we've added payment support, which introduces a new dependency. Install it with:
+ - we've added payment support, which introduces a new dependency. Install it
+   with:
 
     sudo pip install --index-url https://code.stripe.com --upgrade stripe
 
@@ -253,24 +379,28 @@ We welcome a conversion of these notes to a better process using Fabric.
 
    $ sudo aptitude install curl
 
- - The database has been updated to include date_modified fields, support the lawbox use case, and to support much
-   greater citation granularity. Migrate your database with:
+ - The database has been updated to include date_modified fields, support the
+   lawbox use case, and to support much greater citation granularity. Migrate
+   your database with:
 
     manage.py migrate search
     manage.py migrate favorites
 
- - Our data dumps have been expanded to continue mirroring our database. They now contain many additional fields for
-   citations: federal_cite_one, federal_cite_two, federal_cite_three, state_cite_one, state_cite_two, state_cite_three,
-   state_regional_cite, specialty_cite_one, scotus_early_cite and westlaw_cite. The goal of this change is to provide
-   much greater granularity to those that are importing this data, splitting out parallel citations into more
-   understandable fields.
+ - Our data dumps have been expanded to continue mirroring our database. They
+   now contain many additional fields for citations: federal_cite_one,
+   federal_cite_two, federal_cite_three, state_cite_one, state_cite_two,
+   state_cite_three, state_regional_cite, specialty_cite_one, scotus_early_cite
+   and westlaw_cite. The goal of this change is to provide  much greater
+   granularity to those that are importing this data, splitting out parallel
+   citations into more understandable fields.
 
-   Be sure to delete old copies of the dumps so they are no longer cached, and at the end we will create the monthly
-   dump so it is cached.
+   Be sure to delete old copies of the dumps so they are no longer cached, and
+   at the end we will create the monthly dump so it is cached.
 
- - The Solr backend has been updated to deprecate the westCite field and rename it as simply "citation". The old field
-   will continue working for at least one year, though alerts and documentation have been updated to begin phasing it
-   out.
+ - The Solr backend has been updated to deprecate the westCite field and rename
+   it as simply "citation". The old field will continue working for at least
+   one year, though alerts and documentation have been updated to begin phasing
+   it out.
 
    To create a new Solr core and smoothly swap it in takes a few incantations:
 
@@ -280,43 +410,51 @@ We welcome a conversion of these notes to a better process using Fabric.
    Halt the scrapers and restart Solr to bring in the new schema
      % sudo service solr restart
 
-   Create a new Solr core named "swap_core", using the normal core's settings, and in a Python shell:
+   Create a new Solr core named "swap_core", using the normal core's settings,
+   and in a Python shell:
 
      % manage.py shell
      >>> from alert.lib.solr_core_admin import *
      >>> from alert import settings
      >>> create_solr_core("swap_core", data_dir='%s/Solr/data/2/' % settings.INSTALL_ROOT)
 
-   The cl_update_index command has been updated with a new argument, --solr-url, that allows users to override the
-   default SOLR_URL value that is normally pulled from the site-wide settings. Use the new argument to reindex all
-   content to the new core we just created. This will take several hours on a large index and require twice the disk
-   space and memory your Solr index currently uses:
+   The cl_update_index command has been updated with a new argument,
+   --solr-url, that allows users to override the default SOLR_URL value that is
+   normally pulled from the site-wide settings. Use the new argument to reindex
+   all content to the new core we just created. This will take several hours on
+   a large index and require twice the disk space and memory your Solr index
+   currently uses:
+
      % manage.py cl_update_index --everything --update --optimize --solr-url='http://127.0.0.1:8983/solr/swap_core'
 
    Once complete, swap the indexes in your Python shell with:
 
      >>> swap_solr_core('collection1', 'swap_core')
 
-   Note that the core named "swap_core" is now your old core (the one from before we began the upgrade). This can be
-   confusing -- you've been warned!
+   Note that the core named "swap_core" is now your old core (the one from
+   before we began the upgrade). This can be confusing -- you've been warned!
 
-   Test your system at this point to ensure that the new citation field is working.
+   Test your system at this point to ensure that the new citation field is
+   working.
 
    Delete the old core and index:
 
      >>> delete_solr_core('swap_core', delete_index=True)
 
- - The variables SERVER_EMAIL and DEFAULT_FROM_EMAIL have been changed from 'noreply@courtlistener.com' to
-   'CourtListener <noreply@courtlistener.com>' to provide a proper name to email readers. This is changed in the default
+ - The variables SERVER_EMAIL and DEFAULT_FROM_EMAIL have been changed from
+   'noreply@courtlistener.com' to 'CourtListener <noreply@courtlistener.com>'
+   to provide a proper name to email readers. This is changed in the default
    variable file, but can be overridden in your 05-private.py file, if desired.
 
- - A new page has been added at /api/jurisdictions/ if you wish to include it in your sitemaps.
+ - A new page has been added at /api/jurisdictions/ if you wish to include it
+   in your sitemaps.
 
  - And finally, restart the scrapers:
 
     % sudo service scrapers start
 
-   And if this is a production system, regenerate the monthly dump that we deleted.
+   And if this is a production system, regenerate the monthly dump that we
+   deleted.
 
     % sudo -u www-data /usr/bin/python /var/www/court-listener/alert/dump_all_cases.py
 
@@ -396,7 +534,3 @@ We welcome a conversion of these notes to a better process using Fabric.
 
  - The scrape_and_extract.py script has been converted to the cl_scrape_and_extract management command. It is API
    compatible in terms of args, but any jobs calling the script will need to be updated.
-
-
-
-

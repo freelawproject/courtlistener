@@ -14,7 +14,8 @@ class EmailCommandTest(TestCase):
 
     def test_sending_an_email(self):
         """Do we send emails correctly?"""
-        # Set this value since the JSON will get stale and can't have dynamic dates.
+        # Set this value since the JSON will get stale and can't have dynamic
+        # dates.
         about_a_year_ago = now() - timedelta(days=355)
         Donation.objects.filter(pk=1).update(date_created=about_a_year_ago)
 
@@ -30,18 +31,13 @@ class StripeTest(TestCase):
     def setUp(self):
         self.client = Client()
 
-    def test_making_a_donation_and_getting_the_callback(self):
-        """These two tests must live together because they need to be done sequentially.
-
-        First, we place a donation using the client. Then we send a mock callback to our
-        webhook, to make sure it accepts it properly.
-        """
+    def make_a_donation(self, cc_number):
         stripe.api_key = settings.STRIPE_SECRET_KEY
-        # Create a stripe token (this would normally be done via javascript in the front
-        # end when the submit button was pressed)
+        # Create a stripe token (this would normally be done via javascript in
+        # the front end when the submit button was pressed)
         token = stripe.Token.create(
             card={
-                'number': '4242424242424242',
+                'number': cc_number,
                 'exp_month': '6',
                 'exp_year': str(datetime.today().year + 1),
                 'cvc': '123',
@@ -64,18 +60,33 @@ class StripeTest(TestCase):
             'referrer': 'footer',
             'stripeToken': token.id,
         })
+        return token, r
 
-        self.assertEqual(r.status_code, 302)  # 302 because we redirect after a post.
+    def test_making_a_donation_and_getting_the_callback(self):
+        """These two tests must live together because they need to be done
+        sequentially.
+
+        First, we place a donation using the client. Then we send a mock
+        callback to our webhook, to make sure it accepts it properly.
+        """
+        token, r = self.make_a_donation('4242424242424242')
+
+        self.assertEqual(r.status_code, 302)  # 302 (redirect after a post)
 
         # Get the stripe event so we can post it to the webhook
-        # We don't know the event ID, so we have to get the latest ones, then filter...
+        # We don't know the event ID, so we have to get the latest ones, then
+        # filter...
         events = stripe.Event.all()
         event = None
         for obj in events.data:
             if obj.data.object.card.fingerprint == token.card.fingerprint:
                 event = obj
                 break
-        self.assertIsNotNone(event, msg="Unable to find correct event for token: %s" % token.card.fingerprint)
+        self.assertIsNotNone(
+            event,
+            msg="Unable to find correct event for token: %s"
+                % token.card.fingerprint
+        )
 
         r = self.client.post('/donate/callbacks/stripe/',
                              data=simplejson.dumps(event),
@@ -83,6 +94,15 @@ class StripeTest(TestCase):
 
         # Does it return properly?
         self.assertEqual(r.status_code, 200)
+
+    def test_making_a_donation_with_a_bad_card(self):
+        """Do we do the right thing when bad credentials are provided?"""
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        # Create a stripe token (this would normally be done via javascript in
+        # the front end when the submit button was pressed)
+        token, r = self.make_a_donation('4000000000000127')
+        self.assertIn("Your card's security code is incorrect.", r.content)
+
 
 
 

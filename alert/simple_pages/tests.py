@@ -19,3 +19,7 @@ class ContactTest(TestCase):
         r = self.client.get('/contact/')
         self.assertNotIn('pandora', r.content)
 
+    def test_robots_page(self):
+        r = self.client.get('/robots.txt')
+        self.assertTrue(r.status_code, 200)
+

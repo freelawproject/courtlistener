@@ -7,20 +7,23 @@ execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
-from alert.casepage.views import make_citation_string
+from alert.opinion_page.views import make_citation_string
 from alert.citations import find_citations, match_citations
-from alert.search.models import Document, Citation
+from alert.search.models import Document
 from celery import task
 
 
 def get_document_citations(document):
-    """Identify and return citations from the html or plain text of the document."""
+    """Identify and return citations from the html or plain text of the
+    document.
+    """
     if document.html_lawbox:
         citations = find_citations.get_citations(document.html_lawbox)
     elif document.html:
         citations = find_citations.get_citations(document.html)
     elif document.plain_text:
-        citations = find_citations.get_citations(document.plain_text, html=False)
+        citations = find_citations.get_citations(document.plain_text,
+                                                 html=False)
     else:
         citations = []
     return citations
@@ -30,7 +33,8 @@ def create_cited_html(document, citations):
     if document.html_lawbox or document.html:
         new_html = document.html_lawbox or document.html
         for citation in citations:
-            new_html = re.sub(citation.as_regex(), citation.as_html(), new_html)
+            new_html = re.sub(citation.as_regex(), citation.as_html(),
+                              new_html)
     elif document.plain_text:
         inner_html = document.plain_text
         for citation in citations:
@@ -40,27 +44,10 @@ def create_cited_html(document, citations):
     return new_html.encode('utf-8')
 
 
-def create_stub(citations):
-    """Creates a stub document with the bare minimum of meta data."""
-    cite = Citation()
-    # Add the dict of citations to the object as its attributes.
-    citations_as_dict = map_citations_to_models(citations)
-    for k, v in citations_as_dict.iteritems():
-        setattr(cite, k, v)
-    # TODO: We can use the court information in the citation here. Failure to do so will mean that our URLs will later
-    #       change -- something we wish to avoid.
-    stub_doc = Document(
-        is_stub_document=True,
-        sha1='!',
-        court=None,
-        citation=cite,
-    )
-    stub_doc.save(index=False)
-    return stub_doc
-
-
 @task
-def update_document(document, index=True, commit=True):
+def update_document(document, index=True):
+    """Get the citations for an item and save it and add it to the index if
+    requested."""
     DEBUG = 0
     if DEBUG >= 1:
         print "%s at https://www.courtlistener.com/admin/search/citation/%s/" % \
@@ -114,8 +101,9 @@ def update_document(document, index=True, commit=True):
         if DEBUG >= 3:
             print document.html_with_citations
 
-    # Update Solr if requested. In some cases we do it at the end for performance reasons.
-    document.save(index=index, commit=commit)
+    # Update Solr if requested. In some cases we do it at the end for
+    # performance reasons.
+    document.save(index=index)
     if DEBUG >= 1:
         citation_matches = sum(matched_citations)
         name_matches = len(matched_citations) - citation_matches

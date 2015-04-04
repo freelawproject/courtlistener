@@ -4,10 +4,12 @@
 import os
 import re
 import sys
-from alert.citations.constants import EDITIONS, REPORTERS, VARIATIONS_ONLY
+from juriscraper.lib.html_utils import get_visible_text
+from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
+from django.utils.timezone import now
 from alert.citations import reporter_tokenizer
 from alert.search.models import Court
-from juriscraper.lib.html_utils import get_visible_text
+
 
 FORWARD_SEEK = 20
 
@@ -18,24 +20,26 @@ STOP_TOKENS = ['v', 're', 'parte', 'denied', 'citing', "aff'd", "affirmed",
 
 # Store court values to avoid repeated DB queries
 if not set(sys.argv).isdisjoint(['test', 'syncdb', 'shell', 'migrate']):
-    # If it's a test, we can't count on the database being prepped, so we have to load lazily
+    # If it's a test, we can't count on the database being prepped, so we have
+    # to load lazily
     ALL_COURTS = Court.objects.all().values('citation_string', 'pk')
 else:
-    # list() forces early evaluation of the queryset so we don't have issues with closed cursors.
+    # list() forces early evaluation of the queryset so we don't have issues
+    # with closed cursors.
     ALL_COURTS = list(Court.objects.all().values('citation_string', 'pk'))
 
 
 class Citation(object):
-    """Convenience class which represents a single citation found in a document.
-
+    """Convenience class which represents a single citation found in a
+    document.
     """
-
-    def __init__(self, reporter, page, volume, canonical_reporter=None, lookup_index=None,
-                 extra=None, defendant=None, plaintiff=None, court=None, year=None, match_url=None,
-                 match_id=None):
-        # Note: It will be tempting to resolve reporter variations in the __init__ function, but, alas, you cannot,
-        #       because often reporter variations refer to one of several reporters (e.g. P.R. could be a variant of
-        #       either ['Pen. & W.', 'P.R.R.', 'P.']).
+    def __init__(self, reporter, page, volume, canonical_reporter=None,
+                 lookup_index=None, extra=None, defendant=None, plaintiff=None,
+                 court=None, year=None, match_url=None, match_id=None):
+        # Note: It will be tempting to resolve reporter variations in the
+        #       __init__ function, but, alas, you cannot, because often
+        #       reporter variations refer to one of several reporters (e.g.
+        #       P.R. could be a variant of either 'Pen. & W.', 'P.R.R.', 'P.').
 
         self.reporter = reporter
         self.canonical_reporter = canonical_reporter
@@ -69,7 +73,8 @@ class Citation(object):
         else:
             span_class += " no-link"
             data_attr = ''
-        return u'<span class="%s"%s>%s</span>' % (span_class, data_attr, inner_html)
+        return u'<span class="%s"%s>%s</span>' % \
+               (span_class, data_attr, inner_html)
 
     def __repr__(self):
         print_string = self.base_citation()
@@ -156,7 +161,8 @@ def get_court_by_paren(paren_string, citation):
     else:
         # Map the string to a court, if possible.
         for court in ALL_COURTS:
-            # Use startswith because citations are often missing final period, e.g. "2d Cir"
+            # Use startswith because citations are often missing final period,
+            # e.g. "2d Cir"
             if court['citation_string'].startswith(court_str):
                 court_code = court['pk']
                 break
@@ -245,8 +251,9 @@ def add_defendant(citation, words, reporter_index):
 def extract_base_citation(words, reporter_index):
     """Construct and return a citation object from a list of "words"
 
-    Given a list of words and the index of a federal reporter, look before and after
-    for volume and page number.  If found, construct and return a Citation object.
+    Given a list of words and the index of a federal reporter, look before and
+    after for volume and page number.  If found, construct and return a
+    Citation object.
     """
     reporter = words[reporter_index]
     if words[reporter_index - 1].isdigit():
@@ -267,16 +274,19 @@ def extract_base_citation(words, reporter_index):
 
 
 def is_date_in_reporter(editions, year):
-    """Checks whether a year falls within the range of 1 to n editions of a reporter
+    """Checks whether a year falls within the range of 1 to n editions of a
+    reporter
 
     Editions will look something like:
-        'editions': {'S.E.': (datetime.datetime(1887, 1, 1, tzinfo=utc),
-                              datetime.datetime(1939, 12, 31, tzinfo=utc)),
-                     'S.E.2d': (datetime.datetime(1939, 1, 1, tzinfo=utc),
-                                now())},
+        'editions': {'S.E.': {'start': datetime.datetime(1887, 1, 1),
+                              'end': datetime.datetime(1939, 12, 31)},
+                     'S.E.2d': {'start': datetime.datetime(1939, 1, 1),
+                                'end': None}},
     """
-    for start, end in editions.values():
-        if start.year <= year <= end.year:
+    for date_dict in editions.values():
+        if date_dict['end'] is None:
+            date_dict['end'] = now()
+        if date_dict['start'].year <= year <= date_dict['end'].year:
             return True
     return False
 
@@ -295,13 +305,15 @@ def disambiguate_reporters(citations):
      - All combinations of the above:
         - More than one variation.
         - More than one variation, with more than one reporter for the key.
-        - More than one variation, with more than one reporter for the key, which is an edition.
+        - More than one variation, with more than one reporter for the key,
+          which is an edition.
         - More than one variation, which is an edition
         - ...
 
     For variants, we just need to sort out the canonical_reporter.
 
-    If it's not possible to disambiguate the reporter, we simply have to drop it.
+    If it's not possible to disambiguate the reporter, we simply have to drop
+    it.
     """
     unambiguous_citations = []
     for citation in citations:
@@ -341,15 +353,16 @@ def disambiguate_reporters(citations):
                     unambiguous_citations.append(citation)
                     continue
                 else:
-                    # Multiple reporters under a single misspelled key (e.g. Wn.2d --> Wash --> Va Reports, Wash or
-                    #                                                   Washington Reports).
+                    # Multiple reporters under a single misspelled key
+                    # (e.g. Wn.2d --> Wash --> Va Reports, Wash or
+                    #                          Washington Reports).
                     if citation.year:
                         # attempt resolution by date
                         possible_citations = []
                         for i in range(0, len(REPORTERS[citation.canonical_reporter])):
                             if is_date_in_reporter(REPORTERS[citation.canonical_reporter][i]['editions'],
                                                    citation.year):
-                                possible_citations.append((citation.reporter, i,))
+                                possible_citations.append((citation.reporter, i))
                         if len(possible_citations) == 1:
                             # We were able to identify only one hit after filtering by year.
                             citation.lookup_index = possible_citations[0][1]

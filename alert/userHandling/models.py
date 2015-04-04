@@ -1,10 +1,21 @@
 from alert.alerts.models import Alert
 from alert.donate.models import Donation
 from alert.favorites.models import Favorite
+from datetime import timedelta
+from decimal import Decimal
+from django.db.models import Sum
+from django.utils.timezone import now
 from django.db import models
 from django.contrib.auth.models import User
 from localflavor.us.models import USStateField
 from south.modelsinspector import add_introspection_rules
+
+donation_exclusion_codes = [
+    1,  # Unknown error
+    3,  # Cancelled
+    6,  # Failed
+    7,  # Reclaimed/Refunded
+]
 
 
 class BarMembership(models.Model):
@@ -88,6 +99,7 @@ class UserProfile(models.Model):
     donation = models.ManyToManyField(
         Donation,
         verbose_name='the donations made by the user',
+        related_name='donors',
         blank=True,
         null=True
     )
@@ -114,6 +126,27 @@ class UserProfile(models.Model):
         'The user has confirmed their email address',
         default=False
     )
+
+    @property
+    def total_donated_last_year(self):
+        one_year_ago = now() - timedelta(days=365)
+        total = self.donation.filter(
+            date_created__gte=one_year_ago,
+        ).exclude(
+            status__in=donation_exclusion_codes,
+        ).aggregate(Sum('amount'))['amount__sum']
+        if total is None:
+            total = Decimal(0.0)
+        return total
+
+    @property
+    def total_donated(self):
+        total = self.donation.exclude(
+            status__in=donation_exclusion_codes
+        ).aggregate(Sum('amount'))['amount__sum']
+        if total is None:
+            total = Decimal(0.0)
+        return total
 
     def __unicode__(self):
         return self.user.username

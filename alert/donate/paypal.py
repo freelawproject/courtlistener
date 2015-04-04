@@ -2,9 +2,10 @@ import logging
 import simplejson
 import requests
 from alert.donate.models import Donation
-from datetime import datetime
 from django.conf import settings
-from django.http import HttpResponseRedirect
+from django.http import (
+    HttpResponseRedirect, HttpResponseNotAllowed, HttpResponseForbidden
+)
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.utils.timezone import now
@@ -35,7 +36,8 @@ def get_paypal_access_token():
     if r.status_code == 200:
         logger.info("Got paypal token successfully.")
     else:
-        logger.critical("Problem getting paypal token status_code was: %s, with content: %s" % (r.status_code, r.content))
+        logger.critical("Problem getting paypal token status_code was: %s, "
+                        "with content: %s" % (r.status_code, r.content))
     return simplejson.loads(r.content).get('access_token')
 
 
@@ -43,16 +45,22 @@ def get_paypal_access_token():
 def process_paypal_callback(request):
     """Process the GET request that PayPal uses.
 
-    After a transaction is completed, PayPal sends the user back to a page on our site. This could be our "Thanks" page,
-    but since that page is seen by all the payment providers, instead this is an intermediate page, where we grab the
-    correct things from the URL, process the item, and then shuttle the user off to the normal "Thanks" page.
+    After a transaction is completed, PayPal sends the user back to a page on
+    our site. This could be our "Thanks" page, but since that page is seen by
+    all the payment providers, instead this is an intermediate page, where we
+    grab the correct things from the URL, process the item, and then shuttle
+    the user off to the normal "Thanks" page.
 
-    The other providers do this via a POST rather than a GET, so that's why this one is a bit of an oddball.
+    The other providers do this via a POST rather than a GET, so that's why
+    this one is a bit of an oddball.
     """
     access_token = get_paypal_access_token()
     d = Donation.objects.get(transaction_id=request.GET['token'])
     r = requests.post(
-        '%s/v1/payments/payment/%s/execute/' % (settings.PAYPAL_ENDPOINT, d.payment_id),
+        '%s/v1/payments/payment/%s/execute/' % (
+            settings.PAYPAL_ENDPOINT,
+            d.payment_id
+        ),
         headers={
             'Content-Type': 'application/json',
             'Authorization': 'Bearer %s' % access_token
@@ -61,13 +69,18 @@ def process_paypal_callback(request):
     )
     if r.status_code == 200:
         d.clearing_date = now()
-        d.status = 2
+        # Technically, this should be d.status = 2 (Completed, awaiting
+        # processing) and we should await a webhook to tell us that the
+        # processing completed successfully (4). Alas, PayPal is so terrible
+        # that I can't figure that out, so we just assume that if it gets
+        # completed (2), it'll get processed (4).
+        d.status = 4
         d.save()
         from alert.donate.views import send_thank_you_email
         send_thank_you_email(d)
     else:
-        logger.critical("Unable to execute PayPal transaction. Status code %s with data: %s" %
-                        (r.status_code, r.content))
+        logger.critical("Unable to execute PayPal transaction. Status code %s "
+                        "with data: %s" % (r.status_code, r.content))
         d.status = 1
         d.save()
     # Finally, show them the thank you page
@@ -92,7 +105,7 @@ def process_paypal_payment(cd_donation_form):
                         'total': cd_donation_form['amount'],
                         'currency': 'USD',
                     },
-                    'description': 'Donation to the Free Law Project',
+                    'description': 'Donation to Free Law Project',
                 }
             ]
         }
@@ -118,7 +131,7 @@ def process_paypal_payment(cd_donation_form):
             #     u'method': u'POST',
             #     u'rel': u'execute'}
             #   ]
-            redirect = [link for link in simplejson.loads(r.content)['links'] if
+            redirect = [link for link in r_content_as_dict['links'] if
                         link['rel'].lower() == 'approval_url'][0]['href']
             parsed_redirect = urlparse(redirect)
             token = parse_qs(parsed_redirect.query)['token'][0]

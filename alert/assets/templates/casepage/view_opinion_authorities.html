@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load text_filters %}
+
+{# Shown on authorities pages. #}
+
+{% block title %}Table of Authorities for {{ title }} - CourtListener.com{% endblock %}
+{% block og_title %}Table of Authorities for {{ title }} -
+    CourtListener.com{% endblock %}
+{% block description %}Table of Authorities for {{ title }}{% endblock %}
+{% block og_description %}Table of Authorities for {{ title }}{% endblock %}
+
+{% block sidebar %}
+    <div class="col-sm-3" id="sidebar">
+        <div class="sidebar-section">
+            <h4 class="bottom">
+                <i class="fa fa-arrow-circle-o-left gray"></i>
+                <a href="{{ doc.get_absolute_url }}?{{ request.META.QUERY_STRING }}">Back to Document</a>
+            </h4>
+        </div>
+    </div>
+{% endblock sidebar %}
+
+{% block content %}
+    <div class="col-sm-9">
+        <h2>
+            {{ doc.caption|safe|v_wrapper }}
+        </h2>
+
+        <div id="authorities">
+            <h3>This opinion cites {{ authorities.count }} opinion{{ authorities.count|pluralize }}</h3>
+            <hr>
+            {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
+                <ul>
+                    {% for opinion in authorities %}
+                        {%  with opinion=opinion.parent_documents.all.0 %}
+                        <li>
+                            <a href="{{ opinion.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                                {{ opinion.caption|safe|v_wrapper }}
+                            </a>
+                            <br/>
+                            {{ opinion.docket.court }} |
+                            {{ opinion.date_filed }} |
+                            {% if opinion.citation_count != 0 %}
+                                <a href="{{ opinion.get_absolute_url }}cited-by/">
+                                    Cited {{ opinion.citation_count }} time{{ opinion.citation_count|pluralize }}
+                                </a>
+                            {% else %}
+                                Cited 0 times
+                            {% endif %}
+                        </li>
+                        {% endwith %}
+                    {% endfor %}
+                </ul>
+        </div>
+    </div>
+{% endblock %}

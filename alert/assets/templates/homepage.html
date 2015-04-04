@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load humanize %}
+{% load cache %}
 
 {% block title %}Non-Profit Free Legal Search Engine and Alert System - CourtListener.com{% endblock %}
 
@@ -10,12 +11,24 @@
 {% block main-nav %}{% endblock %}
 
 {% block footer-scripts %}
-<script type="text/javascript">
-    $(document).ready(function () {
-        $('#id_q').focus();
-    });
-    // Initialize popovers (required because they're "opt-in for performance reasons")
-    $("[data-toggle='popover']").popover();
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $('#id_q').focus();
+        });
+        // Initialize popovers (required because they're "opt-in for performance reasons")
+        $("[data-toggle='popover']").popover();
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "http://schema.org",
+      "@type": "WebSite",
+      "url": "https://www.courtlistener.com/",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://www.courtlistener.com/?q={search_term}",
+        "query-input": "required name=search_term"
+      }
+    }
 </script>
 {% endblock %}
 
@@ -27,109 +40,118 @@
 {% endblock %}
 
 {% block sign-in %}
-
-    <div class="span-17 last">
-        {% if not user.is_authenticated %}
-            <form action="/sign-in/" method="post" class="float-right">{% csrf_token %}
-                <div class="span-3">
-                    <label for="username" class="hidden">Username</label>
-                    <input type="text"
-                           name="username"
-                           value=""
-                           id="username"
-                           placeholder="User Name"
-                           class="span-3 bottom"
-                           tabindex="2">
-                    <a href="/register/" class="small">Want to sign up?</a>
-                </div>
-                <div class="span-3">
-                    <label for="password" class="hidden">Password</label>
-                    <input type="password"
-                           name="password"
-                           value=""
-                           id="password"
-                           placeholder="Password"
-                           class="span-3 bottom"
-                           tabindex="3">
-                    <a href="/reset-password/" class="small">Need help?</a>
-                </div>
-                <button type="submit" class="button small" tabindex="4">Sign In</button>
-            </form>
+    {% if user.is_authenticated %}
+        <div class="navbar-right">
+            <ul class="nav navbar-nav">
+                <li><a href="/about/" tabindex="300">About</a></li>
+                <li><a href="/faq/" tabindex="301">FAQ</a></li>
+                <li><a href="/coverage/" tabindex="302">Coverage</a></li>
+                <li class="dropdown">
+                    <a href="#"
+                       class="dropdown-toggle"
+                       data-toggle="dropdown"
+                       tabindex="303">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
+                    <ul class="dropdown-menu" role="menu">
+                        <li><a href="/profile/alerts/"
+                               tabindex="304">Alerts</a></li>
+                        <li><a href="/profile/favorites/"
+                               tabindex="305">Favorites</a></li>
+                        <li><a href="/profile/donations/"
+                               tabindex="306">Donations</a></li>
+                        <li><a href="/profile/"
+                               tabindex="307">Account</a></li>
+                        <li><a href="/sign-out/"
+                               tabindex="308">Sign out</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    {% else %}
+        <ul class="nav navbar-nav">
+            <li><a href="/about/">About</a></li>
+            <li><a href="/faq/">FAQ</a></li>
+            <li><a href="" class="tour-link">Tour</a></li>
+            <li><a href="/coverage/">Coverage</a></li>
+        {% if request.path != "/sign-out/" %}
+            <li>
+                <a href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}{% if results %}page={{ results.number }}{% endif %}">
+                    Sign in / Register
+                </a>
+            </li>
         {% else %}
-            <nav class="float-right">
-                <ul>
-                    <li><a href="/profile/">Profile&nbsp;<i class="gray fa fa-user"></i></a></li>
-                    <li><a href="/sign-out">Sign Out&nbsp;<i class="gray fa fa-sign-out"></i></a></li>
-                </ul>
-            </nav>
+            <li><a href="{% url "sign-in" %}">Sign in / Register</a></li>
         {% endif %}
-    </div>
+        </ul>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div id="homepage">
-        <hr class="space">
-        <hr class="space">
-        <hr class="space">
+    <div id="homepage" class="col-xs-12">
 
-        <h2 class="center bottom">Search millions of opinions by case name, topic, or citation.</h2>
-        <h3 class="center gray">{{ court_count }} Jurisdictions. Sponsored by the Non-Profit Free Law Project.</h3>
+    <div id="above-main-query">
+        <p class="text-center x-large bottom">Search millions of opinions by case name, topic,&nbsp;or&nbsp;citation.</p>
+        <p class="text-center large gray">{{ court_count }} Jurisdictions. Sponsored by the Non-Profit Free&nbsp;Law&nbsp;Project.</p>
+    </div>
 
-        <div class="span-24 last">
-            <div id="main-query-box">
-                {% include "includes/main_query_box.html" with homepage=True %}
-            </div>
-        </div>
-        <hr class="space">
-        <div id="advanced-search-inputs" class="hidden">
-            <div id="extra-sidebar-fields" class="span-17 append-2">
-                {#  Modal is at bottom of results, so it loads last. #}
-                <div class="span-11 append-1">
-                    <div class="span-11 last">
-                        <div class="span-5 append-1">
+    <div class="row" id="main-query-box">
+        {% include "includes/main_query_box.html" with homepage=True %}
+    </div>
+
+    <div id="advanced-search-inputs" class="hidden row">
+        {#  Modal is at bottom of results, so it loads last. #}
+        <div id="extra-sidebar-fields" class="col-sm-9">
+            <div class="row">
+                <div class="col-sm-8">
+                    <div class="row">
+                        <div class="col-sm-6">
                             <div class="pointer"
                                  data-toggle="modal"
                                  data-target="#court-picker">
-                                <h4 class="bottom">
+                                <label class="bottom pointer">
                                     Select Jurisdictions <i class="gray fa fa-external-link"></i>
-                                </h4>
+                                </label>
 
-                                <p class="bottom"><span id="jurisdiction-count">{{ court_count }}</span>
+                                <p class="top"><span id="jurisdiction-count">{{ court_count }}</span>
                                     jurisdictions selected</p>
                             </div>
                         </div>
-                        <div class="span-5 last">
-                            <h4 class="bottom">Result Ordering</h4>
-                            {{ search_form.order_by }}
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                {{ search_form.order_by.label_tag }}
+                                {{ search_form.order_by }}
+                            </div>
                         </div>
                     </div>
-                    <hr class="space">
-                    <hr class="space">
-
-                    <div class="span-11 last">
-                        <div class="span-5 append-1">
-                            <h4 class="bottom">Case Name</h4>
-
-                            <p class="bottom span-6">{{ search_form.case_name }}</p>
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                {{ search_form.case_name.label_tag }}
+                                {{ search_form.case_name }}
+                            </div>
                         </div>
-                        <div class="span-5 last">
-                            <h4 class="bottom">Judge</h4>
-
-                            <p class="bottom span-6">{{ search_form.judge }}</p>
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                {{ search_form.judge.label_tag }}
+                                {{ search_form.judge }}
+                            </div>
                         </div>
                     </div>
                 </div>
-
-                <div class="span-5 last">
-                    <h4 class="bottom">Precedential Status</h4>
+                <div class="col-sm-4">
+                    <label>Precedential Status</label>
                     {% for status in status_facets %}
-                        <div class="sidebar-checkbox">
+                        {% if forloop.counter == 4 %}
+                            <a id="show-all-statuses"
+                               class="cursor">Show All Statuses&hellip;</a>
+                        {% endif %}
+                        <div class="sidebar-checkbox status-item{% if forloop.counter >= 4 %} hidden{% endif %}">
                             <input
                                     id="id_{{ status.1 }}"
                                     type="checkbox"
                                     name="{{ status.1 }}"
                                     class="external-input status-checkbox left"
-                                    {% if status.3 %}checked="checked"{% endif %}>
+                                    {% if status.3 %}checked="checked"{% endif %}
+                                    tabindex="{{ status.5 }}">
                             <label
                                     for="id_{{ status.1 }}"
                                     class="pointer {% if status.2 == 0 %}gray{% endif %}">
@@ -139,166 +161,226 @@
                         </div>
                     {% endfor %}
                 </div>
-
-                <hr class="space">
-                <hr class="space">
-
-                <div class="span-17 append-2">
-                    <div class="span-5 append-1">
-                        <h4 class="bottom">Filed After</h4>
-                        <p class="bottom span-6">{{ search_form.filed_after }}</p>
+            </div>
+            <div class="row">
+                <div class="col-sm-4">
+                    <div class="form-group">
+                        {{ search_form.filed_after.label_tag }}
+                        {{ search_form.filed_after }}
                     </div>
-                    <div class="span-5 append-1">
-                        <h4 class="bottom">Filed Before</h4>
-                        <p class="bottom span-6">
-                            <div class="date input-append" data-date-format="yyyy-mm-dd" data-date="12-02-2012">
-                                {{ search_form.filed_before }}
-                                <span class="add-on"><i class="icon-th"></i></span>
+                </div>
+                <div class="col-sm-4">
+                    <div class="form-group">
+                        {{ search_form.filed_before.label_tag }}
+                        {{ search_form.filed_before }}
+                    </div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="row">
+                        <div class="col-xs-6">
+                            <div class="form-group">
+                                {{ search_form.cited_gt.label_tag }}
+                                {{ search_form.cited_gt }}
                             </div>
-                        </p>
-
-                    </div>
-                    <div class="span-5 last">
-                        <div class="span-5">
-                            {{ search_form.cited_gt }}
-                            {{ search_form.cited_lt }}
-                            <h4 class="bottom inline">Citation Count</h4>
-                            <span type="text" id="citation-count" class="gray small bottom">(Any)</span>
                         </div>
-                        <div id="slider-range" class="span-5 bottom"></div>
-                    </div>
-                </div>
-                <hr class="space">
-                <hr class="space">
-
-                <div class="span-17 append-2">
-                    <div class="span-5 append-1">
-                        <h4 class="bottom">Citation</h4>
-                        <p class="bottom">{{ search_form.citation }}</p>
-                    </div>
-                    <div class="span-5 append-1">
-                        <h4 class="bottom">Neutral Citation</h4>
-                        <p class="bottom">{{ search_form.neutral_cite }}</p>
-                    </div>
-                    <div class="span-5 last">
-                        <h4 class="bottom">Docket Number</h4>
-                        <p class="bottom">{{ search_form.docket_number }}</p>
+                        <div class="col-xs-6">
+                            <div class="form-group">
+                                {{ search_form.cited_lt.label_tag }}
+                                {{ search_form.cited_lt }}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-
-            <div class="span-5 last">
-                {% include "includes/operators_quick_list.html" %}
-                <div class="span-5 last right">
-                    <a href="/search/advanced-techniques/">More details&hellip;</a>
+            <div class="row">
+                <div class="col-sm-4">
+                    <div class="form-group">
+                        {{ search_form.citation.label_tag }}
+                        {{ search_form.citation }}
+                    </div>
                 </div>
-            </div>
-
-        </div>
-        {# Jurisdiction modal is at the bottom so it loads last #}
-
-
-        <div id="advanced-search-starter">
-            <h2 class="center alt gray bottom">&ndash; or &ndash;</h2>
-            <h3 class="fake-link center">Advanced Search</h3>
-        </div>
-        <hr class="space">
-        <hr class="space">
-        <hr class="space">
-        <hr class="space">
-        <hr class="space">
-        <div class="span-24">
-            <div class="span-11 append-2">
-                <h3>About CourtListener</h3>
-                <p>CourtListener is a free legal research website containing millions of legal opinions from federal and
-                    state courts. With CourtListener, lawyers, journalists, academics, and the public can research an
-                    important case, stay up to date with new opinions as they are filed, or do deep analysis using our
-                    raw data.
-                </p>
-            </div>
-            <div class="span-11 last">
-                <h3>About Free Law Project</h3>
-                <p><a href="http://freelawproject.org">Free Law Project</a> seeks to provide free access to primary
-                    legal materials, develop legal research
-                    tools, and support academic research on legal corpora. We work diligently with volunteers to expand
-                    our efforts at building an open source, open access, legal research ecosystem. Currently Free Law
-                    Project sponsors the development of <a
-                            href="https://github.com/freelawproject/courtlistener">CourtListener</a>,
-                    <a
-                            href="https://github.com/freelawproject/juriscraper/">Juriscraper</a>, and <a
-                            href="https://www.recapthelaw.org">RECAP</a>.
-                </p>
+                <div class="col-sm-4">
+                    <div class="form-group">
+                        {{ search_form.neutral_cite.label_tag }}
+                        {{ search_form.neutral_cite }}
+                    </div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="form-group">
+                        {{ search_form.docket_number.label_tag }}
+                        {{ search_form.docket_number }}
+                    </div>
+                </div>
             </div>
         </div>
-        <hr class="space">
-        <hr class="space">
-        <hr class="space">
-        <div class="span-24">
-            {% comment %}
-            <div class="span-7 append-1">
-                <h3>Learn About CourtListener&nbsp;<i class="gray fa fa-youtube-play"></i></h3>
-                <iframe width="270" height="203" src="//www.youtube.com/embed/txqiwrbYGrs" frameborder="0"
-                        allowfullscreen></iframe>
-            </div>
-            {% endcomment %}
+        <div class="col-sm-3">
+            {% include "includes/operators_quick_list.html" %}
+            <a class="text-right" href="/search/advanced-techniques/">More details&hellip;</a>
+        </div>
+    </div>
+    {# Jurisdiction modal is at the bottom so it loads last #}
 
-            <div class="span-11 append-2">
-                <h3>The Numbers&nbsp;<i class="gray fa fa-cogs"></i></h3>
+    <div id="advanced-search-starter" class="row">
+        <p class="text-center large alt gray top bottom">&ndash; or &ndash;</p>
+        <p class="text-center large">
+            <a href="#" tabindex="200">Advanced Search</a>
+        </p>
+    </div>
 
-                <div class="span-2 center">
-                    <span class="homepage-stat bold">{{ results.paginator.count|intcomma }}</span>
+    <div class="row lg-v-offset-below-3">
+        <div class="col-sm-6">
+            <h3>About CourtListener</h3>
+            <p>CourtListener is a free legal research website containing millions of legal opinions from federal and
+                state courts. With CourtListener, lawyers, journalists, academics, and the public can research an
+                important case, stay up to date with new opinions as they are filed, or do deep analysis using our
+                raw data.
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <h3>About Free Law Project</h3>
+            <p><a href="http://freelawproject.org">Free Law Project</a> seeks to provide free access to primary
+                legal materials, develop legal research
+                tools, and support academic research on legal corpora. We work diligently with volunteers to expand
+                our efforts at building an open source, open access, legal research ecosystem. Currently Free Law
+                Project sponsors the development of <a
+                        href="https://github.com/freelawproject/courtlistener">CourtListener</a>,
+                <a
+                        href="https://github.com/freelawproject/juriscraper">Juriscraper</a>, and <a
+                        href="https://www.recapthelaw.org">RECAP</a>.
+            </p>
+        </div>
+    </div>
+    <div class="row lg-v-offset-below-3">
+        <div class="col-sm-6">
+            <h3>Latest Opinions&nbsp;<i class="gray fa fa-file-text-o"></i></h3>
+            <p>We download opinions from many jurisdictions on an ongoing basis. Here are the most recent ones.
+            </p>
+            {% include "includes/search_result.html" with results=results type_override="o" simple=True %}
+            <p>
+                <a href="/?order_by=dateFiled+desc"
+                   class="btn btn-default v-offset-above-2">See Recent Opinions</a>
+            </p>
+        </div>
+
+        <div class="col-sm-6">
+            <h3>Latest Oral Arguments&nbsp;<i class="gray fa fa-volume-up"></i>
+            </h3>
+
+            <p>We download oral arguments from many jurisdictions on an
+                ongoing basis. Here are the most recent ones.
+            </p>
+            {% include "includes/search_result.html" with results=results_oa type_override="oa" simple=True %}
+            <p>
+                <a href="/?order_by=dateArgued+desc&type=oa"
+                   class="btn btn-default v-offset-above-2">See Recent Oral Arguments</a>
+            </p>
+        </div>
+    </div>
+    {% cache 21600 stat-num-days-of-oa %}
+        <div class="row lg-v-offset-below-3">
+            <div class="col-sm-6">
+                <h3>The Numbers&nbsp;<i class="gray fa fa-pie-chart"></i></h3>
+
+                <div class="row">
+                    <div class="col-xs-3 text-center">
+                        <span class="homepage-stat bold"
+                              id="stat-num-precedential-opinions">{{ results.paginator.count|intcomma }}</span>
+                    </div>
+                    <div class="col-xs-9">
+                        <p>Number of <a href="/?order_by=dateFiled+desc">precedential
+                            opinions</a> in CourtListener.</p>
+                    </div>
                 </div>
-                <div class="span-9 last"><p>Number of <a href="/?order_by=dateFiled+desc">precedential
-                    opinions</a> in CourtListener.</p></div>
 
-                <div class="span-2 center">
-                    <span class="homepage-stat bold">{{ opinions_in_last_ten|intcomma }}</span>
+                <div class="row">
+                    <div class="col-xs-3 text-center">
+                        <span class="homepage-stat bold"
+                              id="stat-num-days-of-oa">{{ days_of_oa|intcomma }}</span>
+                    </div>
+                    <div class="col-xs-9">
+                        <p>Duration of all <a href="/?type=oa">oral arguments</a>
+                            in CourtListener, in days.</p>
+                    </div>
                 </div>
-                <div class="span-9 last"><p>Opinions added in last ten days.</p></div>
 
-                <div class="span-2 center">
-                    <span class="homepage-stat bold">{{ queries_in_last_ten|intcomma }}</span>
+                <div class="row">
+                    <div class="col-xs-3 text-center">
+                        <span class="homepage-stat bold"
+                              id="stat-num-opinions-in-last-ten">{{ opinions_in_last_ten|intcomma }}</span>
+                    </div>
+                    <div class="col-xs-9"><p>Opinions added in last ten days.</p>
+                    </div>
                 </div>
-                <div class="span-9 last"><p>Number of queries made in last ten days.</p></div>
 
-                <div class="span-2 center">
-                    <span class="homepage-stat bold">{{ alerts_in_last_ten|intcomma }}</span>
+                <div class="row">
+                    <div class="col-xs-3 text-center">
+                        <span class="homepage-stat bold"
+                              id="stat-num-oa-in-last-ten">{{ oral_arguments_in_last_ten|intcomma }}</span>
+                    </div>
+                    <div class="col-xs-9"><p>Oral arguments added in last ten
+                        days.</p>
+                    </div>
                 </div>
-                <div class="span-9 last"><p>Number of <a href="/faq/#explain-alerts">alerts</a> sent in last ten days.</p></div>
+
+                <div class="row">
+                    <div class="col-xs-3 text-center">
+                        <span class="homepage-stat bold"
+                              id="stat-num-q-in-last-ten">{{ queries_in_last_ten|intcomma }}</span>
+                    </div>
+                    <div class="col-xs-9"><p>Number of queries made in last ten
+                        days.</p>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-xs-3 text-center">
+                        <span class="homepage-stat bold"
+                              id="stat-num-alerts-in-last-ten">{{ alerts_in_last_ten|intcomma }}</span>
+                    </div>
+                    <div class="col-xs-9"><p>Number of <a
+                            href="/faq/#explain-alerts">alerts</a> sent in last ten
+                        days.</p>
+                    </div>
+                </div>
+
 
                 {% if bulk_in_last_ten > 0 %}
-                    <div class="span-2 center">
-                        <span class="homepage-stat bold">{{ bulk_in_last_ten|intcomma }}</span>
+                    <div class="row">
+                        <div class="col-xs-3 text-center">
+                            <span class="homepage-stat bold">{{ bulk_in_last_ten|intcomma }}</span>
+                        </div>
+                        <div class="col-xs-9"><p>Times the <a
+                                href="/api/bulk-info/">bulk data</a> has been
+                            downloaded in the last ten days.</p>
+                        </div>
                     </div>
-                    <div class="span-9 last"><p>Times the <a href="/api/bulk-info/">bulk data</a> has been downloaded
-                        in the last ten days.</p></div>
                 {% endif %}
 
-                <div class="span-2 center">
-                    <span class="homepage-stat bold">{{ api_in_last_ten|intcomma }}</span>
+                <div class="row">
+                    <div class="col-xs-3 text-center">
+                        <span class="homepage-stat bold">{{ api_in_last_ten|intcomma }}</span>
+                    </div>
+                    <div class="col-xs-9"><p><a href="/api/">API calls</a> made
+                        against our system in last ten days.</p>
+                    </div>
                 </div>
-                <div class="span-9 last"><p><a href="/api/">API calls</a> made against our system in last ten days.</p></div>
+
 
                 {% if user.is_superuser %}
-                    <div class="span-2 center">
-                        <span class="homepage-stat bold">{{ users_in_last_ten|intcomma }}</span>
+                    <div class="row">
+                        <div class="col-xs-3 text-center">
+                            <span class="homepage-stat bold">{{ users_in_last_ten|intcomma }}</span>
+                        </div>
+                        <div class="col-xs-9"><p>New users signed up in last ten
+                            days. <i class="gray fa fa-lock pointer"
+                                     title="admin only"></i></p>
+                        </div>
                     </div>
-                    <div class="span-9 last"><p>New users signed up in last ten days. <i class="gray fa fa-lock pointer" title="admin only"></i></p></div>
                 {% endif %}
             </div>
-
-            <div class="span-11 last">
-                <h3>Latest Cases&nbsp;<i class="gray fa fa-clock-o"></i></h3>
-                <p>We download opinions from many jurisdictions on an ongoing basis. Here are the most recent ones.
-                </p>
-                {% include "includes/search_result.html" with simple=True %}
-                <div class="right">
-                    <hr class="space">
-                    <a href="/?order_by=dateFiled+desc">See all recent opinions&hellip;</a>
-                </div>
-            </div>
         </div>
+    {% endcache %}
 
-        {% include "includes/jurisdiction_picker_modal.html" %}
+    {% include "includes/jurisdiction_picker_modal.html" %}
     </div>
 {% endblock %}

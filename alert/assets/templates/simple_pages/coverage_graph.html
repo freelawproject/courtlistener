@@ -4,37 +4,52 @@
 
 {% block title %}Coverage - CourtListener.com{% endblock %}
 {% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
 
 {% block footer-scripts %}
-    <script src="{{ STATIC_URL }}js/raphael.js"></script>
-    <script src="{{ STATIC_URL }}js/g.raphael.js"></script>
-    <script src="{{ STATIC_URL }}js/g.line.js"></script>
-    <script src="{{ STATIC_URL }}js/jquery.ba-hashchange.min.js"></script>
-    <script src="{{ STATIC_URL }}js/chosen.jquery.min.js"></script>
+
+    {% if DEBUG %}
+        <script src="{{ STATIC_URL }}js/jquery.ba-hashchange.js"></script>
+        <script src="{{ STATIC_URL }}js/chosen.jquery.js"></script>
+        <script src="{{ STATIC_URL }}js/d3.js"></script>
+        <script src="{{ STATIC_URL }}js/plottable.js"></script>
+    {% else %}
+        <script src="{{ STATIC_URL }}js/jquery.ba-hashchange.min.js"></script>
+        <script src="{{ STATIC_URL }}js/chosen.jquery.min.js"></script>
+        <script src="{{ STATIC_URL }}js/d3.min.js"></script>
+        <script src="{{ STATIC_URL }}js/plottable.min.js"></script>
+    {% endif %}
+
     <script type="text/javascript">
+        var precedentTypes = [
+            {% for status in precedential_statuses %}
+                '{{ status }}'{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
         var sorted_courts = {{ sorted_courts|safe}};
     </script>
     <script src="{{ STATIC_URL }}js/coverage.js"></script>
 {% endblock %}
 
 {% block head %}
-    <link rel="stylesheet" href="{{ STATIC_URL }}css/coverage.css" type="text/css" media="screen, projection"/>
+    <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/plottable.css"
+          type="text/css" media="screen, projection">
     <link rel="stylesheet" href="{{ STATIC_URL }}css/chosen.min.css" type="text/css" media="screen, projection"/>
 {% endblock %}
 
 {% block content %}
-    <div class="span-24 last">
-        <h3 class="bottom span-10" id="graph-header"></h3>
-
-        <div id="nav" class="float-right span-12 last">
-            <select class="bottom top float-right"></select>
+    <div class="col-xs-12">
+        <div class="row">
+            <div class="col-sm-12">
+                <div id="nav" class="text-right">
+                    <select class="bottom top float-right"></select>
+                </div>
+            </div>
         </div>
 
-        <div id="graph"></div>
+        <div id="chart" style="height: 400px;"></div>
 
         <div>
-            <hr class="space">
-            <hr class="space">
             <h4 class="bottom">General Notes</h4>
 
             <p>Charts indicate the number of cases that we have in our database for
@@ -48,7 +63,7 @@
                 Resource.org</a> has contributed to <strong>{{ count_pro|intcomma }}</strong> opinions.</li>
                 <li>A generous donation from <a href="http://lawboxapps.com/">Lawbox, LLC</a> has contributed to
                     <strong>{{ count_lawbox|intcomma }}</strong> opinions.</li>
-                <li>Our own <a href="https://github.com/freelawproject/juriscraper//">scraper framework</a>, which began in
+                <li>Our own <a href="https://github.com/freelawproject/juriscraper/">scraper framework</a>, which began in
                     2010, has contributed to <strong>{{ count_scraper|intcomma }}</strong> opinions.</li>
             </ul>
             <p>We welcome additional data donations on our <a href="/donate/">donate</a> page of any public domain legal data.</p>
@@ -63,26 +78,44 @@
 
             <h4 id="scraped-jurisdictions">Realtime Coverage</h4>
             <p>We have realtime coverage of many courts, but if you are setting up an alert, it's important to
-                note that we do not yet have realtime coverage for all of the 350 courts on CourtListener. The courts
+                note that we do not yet have realtime coverage for all of the courts on CourtListener. The courts
                 for which we currently can provide realtime coverage and alerts are:
             </p>
-            <div class="span-24">
-                {% for row in courts_with_scrapers|rows:3 %}
-                    <div class="span-8 {% if forloop.last %}last{% endif %}">
-                        <ul>
+            <div class="row">
+                {% for row in courts_with_opinion_scrapers|rows:3 %}
+                    <div class="col-sm-4">
+                        <ul class="{% if not forloop.last %}bottom{% endif %}">
                             {% for court in row %}
-                                {% if court.has_scraper %}
-                                    <li>
-                                        <a href="/?q=&court_{{ court.pk }}=on&order_by=dateFiled+desc">{{ court }}</a>
-                                    </li>
-                                {% endif %}
+                                <li>
+                                    <a href="/?q=&court_{{ court.pk }}=on&order_by=dateFiled+desc">{{ court }}</a>
+                                </li>
                             {% endfor %}
                         </ul>
                     </div>
                 {% endfor %}
             </div>
+            {% if courts_with_oral_argument_scrapers.count > 0 %}
+                <p class="v-offset-above-2">In addition,
+                    we provide realtime coverage of oral
+                arguments for the following courts, downloading
+                    the latesst oral arguments at the end of each day:</p>
+                <div class="row">
+                    {% for row in courts_with_oral_argument_scrapers|rows:3 %}
+                        <div class="col-sm-4">
+                            <ul class="{% if not forloop.last %}bottom{% endif %}">
+                                {% for court in row %}
+                                    <li>
+                                        <a href="/?q=&court_{{ court.pk }}=on&order_by=dateArgued+desc&type=oa">{{ court }}</a>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
 
-            <p>This list continues to grow as we receive <a href="/donate/">support</a> and <a href="/contact/">requests</a>
+            <p class="v-offset-above-2">This list continues to grow as we
+                receive <a href="/donate/?referrer=coverage">support</a> and <a href="/contact/">requests</a>
                 for additional jurisdictions. Your support helps make this project possible.
             </p>
         </div>

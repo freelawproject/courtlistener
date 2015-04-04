@@ -19,6 +19,10 @@ def list_option_callback(option, opt, value, parser):
 
 
 class Command(BaseCommand):
+    """Note that this entire command can be replaced with scheduled celery
+    tasks. Instead of running this once daily, you just schedule a task for
+    later when somebody signs up.
+    """
     option_list = BaseCommand.option_list + (
         make_option(
             '--simulate',
@@ -27,7 +31,8 @@ class Command(BaseCommand):
             help='Don\'t send any emails, just pretend.',
         ),
     )
-    help = 'Sends a welcome email to the people who signed up in the last 24 hours.'
+    help = 'Sends a welcome email to the people who signed up in the last ' \
+           '24 hours.'
 
     def send_emails(self, recipients):
         """Send the emails using the templates and contexts requested."""
@@ -49,7 +54,8 @@ class Command(BaseCommand):
             send_mass_mail(messages, fail_silently=False)
             logger.info("Sent daily welcome emails.")
         else:
-            sys.stdout.write('Simulation mode. Imagine that we just sent the welcome emails!\n')
+            sys.stdout.write('Simulation mode. Imagine that we just sent the '
+                             'welcome emails!\n')
 
     def handle(self, *args, **options):
         self.options = options

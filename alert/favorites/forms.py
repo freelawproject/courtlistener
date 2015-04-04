@@ -8,6 +8,7 @@ class FavoriteForm(ModelForm):
         model = Favorite
         fields = (
             'id',
+            'audio_id',
             'doc_id',
             'name',
             'notes'
@@ -15,6 +16,7 @@ class FavoriteForm(ModelForm):
         widgets = {
             'id': forms.HiddenInput(),
             'doc_id': forms.HiddenInput(),
+            'audio_id': forms.HiddenInput(),
             'name': forms.TextInput(
                 attrs={
                     'id': 'save-favorite-name-field',

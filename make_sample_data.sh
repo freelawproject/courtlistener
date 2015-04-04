@@ -1,5 +1,6 @@
 #!/bin/bash
-# This file loops through a few sample sizes and generates sample data in the /sata/sample-data directory
+# This file loops through a few sample sizes and generates sample data in the
+# /sata/sample-data directory
 
 # Get the password
 echo -n "What is the database password for the postgres user: "

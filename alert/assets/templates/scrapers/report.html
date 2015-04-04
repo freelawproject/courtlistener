@@ -32,17 +32,6 @@
                    font-style: inherit;
                    margin: 10px;
                    padding: 0;">Error Counts</h2>
-
-        {% if critical_today %}
-            <p style="font-size: 1em;
-                      font-weight: normal;
-                      font-family: inherit;
-                      vertical-align: baseline;
-                      font-style: inherit;
-                      margin: 0 0 1.5em;
-                      padding: 0;">More than 10 critical in a court today. This is a critical problem.</p>
-        {% endif %}
-
         <table style="text-align: center;">
             <thead>
             <tr>
@@ -79,28 +68,99 @@
                    vertical-align: baseline;
                    font-style: inherit;
                    margin: 10px;
-                   padding: 0;">Result Counts</h2>
-
-        {% if critical_history %}
-            <p style="font-size: 1em;
+                   padding: 0;">New Problem Courts</h2>
+        <p style="font-size: 1em;
                       font-weight: normal;
                       font-family: inherit;
                       vertical-align: baseline;
                       font-style: inherit;
                       margin: 0 0 1.5em;
-                      padding: 0;">A court has 0 results for the past sixty days. This is a critical problem.</p>
-        {% endif %}
+                      padding: 0;">The most recent result for these courts was in the 30
+            to 35 day window. This means they're newly problematic.</p>
+        <table style="text-align: center;">
+            <thead>
+            <tr>
+                <th style="padding-right: 10px;
+                               text-align: left;">Court</th>
+                <th style="padding-right: 10px;
+                               text-align: left;">Most Recent Case</th>
+                <th style="padding-right: 10px;
+                               text-align: left;">GET / POST</th>
+                <th style="padding-right: 10px;
+                               text-align: left;">URL</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for court, d, method, url in recently_dying_courts %}
+                <tr>
+                    <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;
+                                   text-align: left;"><p>{{ court }}</p></td>
+                    <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;
+                                   text-align: left;"><p>{{ d }}</p></td>
+                    {% if method == 'Unknown' %}
+                        <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;
+                                   text-align: left;"
+                            colspan="2"><p>Unknown: Multiple scrapers
+                            found for jurisdiction.</p></td>
+                    {% else %}
+                        <td style="border-color: gray;
+                                       border-style: dotted;
+                                       border-width: 0 0 1px;
+                                       text-align: left;"><p>{{ method }}</p>
+                        </td>
+                        <td style="border-color: gray;
+                                       border-style: dotted;
+                                       border-width: 0 0 1px;
+                                       text-align: left;"><p><a
+                                href="{{ url }}">Link</a></p></td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
 
+
+        <h2 style="font-size: 1.5em;
+                   font-weight: normal;
+                   line-height: 1;
+                   font-family: inherit;
+                   color: #111;
+                   vertical-align: baseline;
+                   font-style: inherit;
+                   margin: 10px;
+                   padding: 0;">Old Problem Courts</h2>
+        <p style="font-size: 1em;
+                      font-weight: normal;
+                      font-family: inherit;
+                      vertical-align: baseline;
+                      font-style: inherit;
+                      margin: 0 0 1.5em;
+                      padding: 0;">These courts have 0 results for more than 30 days.</p>
         <table style="text-align: center;">
             <thead>
                 <tr>
                     <th style="padding-right: 10px;
-                               text-align: left;">Court</th>
-                    <th style="padding-right: 10px;">Most Recent Case</th>
+                               text-align: left;">Court
+                    </th>
+                    <th style="padding-right: 10px;
+                               text-align: left;">Most Recent Case
+                    </th>
+                    <th style="padding-right: 10px;
+                               text-align: left;">GET / POST
+                    </th>
+                    <th style="padding-right: 10px;
+                               text-align: left;">URL
+                    </th>
                 </tr>
             </thead>
             <tbody>
-                {% for court, value in most_recent_opinions %}
+                {% for court, d, method, url in most_recent_opinions %}
                     <tr>
                         <td style="border-color: gray;
                                    border-style: dotted;
@@ -108,7 +168,25 @@
                                    text-align: left;"><p>{{ court }}</p></td>
                         <td style="border-color: gray;
                                    border-style: dotted;
-                                   border-width: 0 0 1px;"><p>{{ value }}</p></td>
+                                   border-width: 0 0 1px;
+                                   text-align: left;"><p>{{ d }}</p></td>
+                        {% if method == 'Unknown' %}
+                            <td style="border-color: gray;
+                                   border-style: dotted;
+                                   border-width: 0 0 1px;
+                                   text-align: left;"
+                                colspan="2"><p>Unknown: Multiple scrapers
+                                found for jurisdiction.</p></td>
+                        {% else %}
+                            <td style="border-color: gray;
+                                       border-style: dotted;
+                                       border-width: 0 0 1px;
+                                       text-align: left;"><p>{{ method }}</p></td>
+                            <td style="border-color: gray;
+                                       border-style: dotted;
+                                       border-width: 0 0 1px;
+                                       text-align: left;"><p><a href="{{ url }}">Link</a></p></td>
+                        {% endif %}
                     </tr>
                 {% endfor %}
             </tbody>

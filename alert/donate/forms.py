@@ -48,12 +48,11 @@ class ProfileForm(ModelForm):
     state = USStateField(
         widget=forms.Select(
             choices=STATE_CHOICES,
-            attrs={'class': 'span-5'})
+            attrs={'class': 'form-control'}
+        )
     )
     zip_code = USZipCodeField(
-        widget=forms.TextInput(
-            attrs={'class': 'span-4'}
-        )
+        widget=forms.TextInput(attrs={'class': 'form-control'})
     )
 
     class Meta:
@@ -67,16 +66,10 @@ class ProfileForm(ModelForm):
             'wants_newsletter',
         )
         widgets = {
-            'address1': forms.TextInput(
-                attrs={'class': 'span-9'}
-            ),
-            'address2': forms.TextInput(
-                attrs={'class': 'span-9'}
-            ),
-            'city': forms.TextInput(
-                attrs={'class': 'span-9'}
-            ),
-
+            'address1': forms.TextInput(attrs={'class': 'form-control'}),
+            'address2': forms.TextInput(attrs={'class': 'form-control'}),
+            'city': forms.TextInput(attrs={'class': 'form-control'}),
+            'zip_code': forms.TextInput(attrs={'class': 'form-control'})
         }
 
     def __init__(self, *args, **kwargs):
@@ -95,12 +88,8 @@ class UserForm(ModelForm):
             'email',
         )
         widgets = {
-            'first_name': forms.TextInput(
-                attrs={'class': 'span-4'}
-            ),
-            'last_name': forms.TextInput(
-                attrs={'class': 'span-5'}
-            )
+            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control'})
         }
 
     def __init__(self, *args, **kwargs):

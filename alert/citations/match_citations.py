@@ -8,7 +8,7 @@ import sys
 
 execfile('/etc/courtlistener')
 sys.path.append(INSTALL_ROOT)
-from alert.citations.constants import REPORTERS
+from reporters_db import REPORTERS
 from alert.citations.find_citations import strip_punct
 from alert.lib import sunburnt
 from datetime import date, datetime
@@ -80,8 +80,9 @@ def case_name_query(conn, params, citation, citing_doc):
 
 
 def match_citation(citation, citing_doc):
-    # TODO: Create shared solr connection to use across multiple citations/documents
-    conn = sunburnt.SolrInterface(settings.SOLR_URL, mode='r')
+    # TODO: Create shared solr connection to use across multiple citations/
+    # documents
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
     main_params = {'fq': []}
     # Set up filter parameters
     start_year = 1750
@@ -91,7 +92,15 @@ def match_citation(citation, citing_doc):
     else:
         if citation.lookup_index:
             # Some cases can't be disambiguated.
-            start_year, end_year = [d.year for d in REPORTERS[citation.canonical_reporter][citation.lookup_index]['editions'][citation.reporter]]
+            reporter_dates = REPORTERS[citation.canonical_reporter][citation.lookup_index]['editions'][citation.reporter]
+            if hasattr(reporter_dates['start'], 'year'):
+                start_year = reporter_dates['start'].year
+            else:
+                start_year = 1750
+            if hasattr(reporter_dates['end'], 'year'):
+                end_year = reporter_dates['end'].year
+            else:
+                end_year = 2030
         if citing_doc.date_filed:
             end_year = min(end_year, citing_doc.date_filed.year)
     date_param = 'dateFiled:%s' % build_date_range(start_year, end_year)

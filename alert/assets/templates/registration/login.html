@@ -1,52 +1,50 @@
 {% extends "base.html" %}
 
 {% block title %}Sign In - CourtListener.com{% endblock %}
+{% block description %}
+    Sign into CourtListener to turn on features like alerts, favorites and
+    more.
+{% endblock %}
+{% block og_description %}
+    Sign into CourtListener to turn on features like alerts, favorites and
+    more.
+{% endblock %}
 
 {% block footer-scripts %}
     <script type="text/javascript">
-	    $(document).ready(function() {
-		    $('.auto-focus:first').focus();
-	    });
-     </script>
+        $(document).ready(function() {
+            $('.auto-focus:first').focus();
+        });
+    </script>
 {% endblock %}
 
 {% block search-form %}{% endblock %}
 {% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="span-24 last">
-        <hr class="space">
-        <hr class="space">
-        <div class="prepend-9 span-6 last">
-            <div class="box round">
-                {% block h2 %}<h2>Sign in</h2>{% endblock %}
-                {% if form.errors %}
-                    <div class="span-4 error">
-                        {%  for error in form.non_field_errors %}
-                        <p class="bottom">{{ error|safe }}</p>
-                        {% endfor %}
-                    </div>
-                {% endif %}
+    <div class="col-xs-1 col-sm-2 col-md-3"></div>
+    <div class="col-xs-10 col-sm-8 col-md-6 well">
+        {% block h2 %}<h2>Sign In</h2>{% endblock %}
+        {% if form.errors %}
+            {%  for error in form.non_field_errors %}
+                <p class="alert alert-danger">{{ error|safe }}</p>
+            {% endfor %}
+        {% endif %}
 
-                <form action="" method="post">{% csrf_token %}
-                    <p>
-                        <label for="username">Username</label><br>
-                        <input type="text" name="username" value="" id="username" class="auto-focus span-5">
-                    </p>
-
-                    <p>
-                        <label for="password">Password</label><br>
-                        <input type="password" name="password" value="" id="password" class="span-5">
-
-                    </p>
-                    <input type="hidden" name="next" value="{{ next|escape }}">
-                    <button type="submit" class="button last">Sign In</button>
-                </form>
-                <p class="bottom"><a href="/reset-password/">Forgot username/password?</a></p>
-                <p><a href="/register/">Need to register?</a></p>
+        <form action="" method="post">{% csrf_token %}
+            <div class="form-group">
+                <label for="username">Username</label><br>
+                <input type="text" name="username" value="" id="username" class="auto-focus form-control">
             </div>
-        </div>
+            <div class="form-group">
+                <label for="password">Password</label><br>
+                <input type="password" name="password" value="" id="password" class="form-control">
+            </div>
+            <input type="hidden" name="next" value="{{ next|escape }}">
+            <button type="submit" class="btn btn-primary">Sign In</button>
+        </form>
+        <p class="v-offset-above-2"><a href="/reset-password/">Forgot username/password?</a></p>
+        <p><a href="/register/">Need to register?</a></p>
     </div>
-    <hr class="space">
-    <hr class="space">
+    <div class="col-xs-1 col-sm-2 col-med-3"></div>
 {% endblock %}

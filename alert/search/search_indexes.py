@@ -3,7 +3,7 @@ from datetime import time
 from django.core.urlresolvers import NoReverseMatch
 from django.template import Context
 from django.template import loader
-from alert.casepage.views import make_citation_string
+from alert.opinion_page.views import make_citation_string
 
 
 class InvalidDocumentError(Exception):
@@ -12,51 +12,82 @@ class InvalidDocumentError(Exception):
         Exception.__init__(self, message)
 
 
-class SearchDocument(object):
-    def __init__(self, doc):
-        # Used to nuke null and control characters.
-        null_map = dict.fromkeys(range(0, 10) + range(11, 13) + range(14, 32))
+# Used to nuke null and control characters.
+null_map = dict.fromkeys(range(0, 10) + range(11, 13) + range(14, 32))
 
+
+class SearchDocument(object):
+    def __init__(self, item):
         # Standard fields
-        self.id = doc.pk
-        if doc.date_filed is not None:
-            self.dateFiled = datetime.combine(doc.date_filed, time())  # Midnight, PST
-        self.citeCount = doc.citation_count
-        self.court = doc.court.full_name
-        self.court_id = doc.court.pk
-        self.court_citation_string = doc.court.citation_string
+        self.id = item.pk
+        if item.date_filed is not None:
+            self.dateFiled = datetime.combine(item.date_filed, time())  # Midnight, PST
+        self.citeCount = item.citation_count
+        self.court = item.docket.court.full_name
+        self.court_id = item.docket.court.pk
+        self.court_citation_string = item.docket.court.citation_string
         try:
-            self.caseName = doc.citation.case_name
-            self.absolute_url = doc.get_absolute_url()
+            self.caseName = item.citation.case_name
+            self.absolute_url = item.get_absolute_url()
         except AttributeError:
             raise InvalidDocumentError("Unable to save to index due to missing Citation object.")
         except NoReverseMatch:
-            raise InvalidDocumentError("Unable to save to index due to missing absolute_url (court_id: %s, doc.pk: %s). "
+            raise InvalidDocumentError("Unable to save to index due to missing absolute_url (court_id: %s, item.pk: %s). "
                                        "Might the court have in_use set to False?"
-                                       % (self.court_id, doc.pk))
-        self.judge = doc.judges
-        self.suitNature = doc.nature_of_suit
-        self.docketNumber = doc.citation.docket_number
-        self.lexisCite = doc.citation.lexis_cite
-        self.neutralCite = doc.citation.neutral_cite
-        self.status = doc.get_precedential_status_display()
-        self.source = doc.source
-        self.download_url = doc.download_url
-        self.local_path = unicode(doc.local_path)
-        self.citation = make_citation_string(doc)
+                                       % (self.docket.court_id, item.pk))
+        self.judge = item.judges
+        self.suitNature = item.nature_of_suit
+        self.docketNumber = item.citation.docket_number
+        self.lexisCite = item.citation.lexis_cite
+        self.neutralCite = item.citation.neutral_cite
+        self.status = item.get_precedential_status_display()
+        self.source = item.source
+        self.download_url = item.download_url
+        self.local_path = unicode(item.local_path)
+        self.citation = make_citation_string(item)
         # Assign the docket number and/or the citation to the caseNumber field
-        if doc.citation and doc.citation.docket_number:
-            self.caseNumber = '%s, %s' % (self.citation, doc.citation.docket_number)
-        elif doc.citation:
+        if item.citation and item.citation.docket_number:
+            self.caseNumber = '%s, %s' % (self.citation, item.citation.docket_number)
+        elif item.citation:
             self.caseNumber = self.citation
-        elif doc.citation.docket_number:
+        elif item.citation.docket_number:
             self.caseNumber = self.citation.docket_number
 
         # Load the document text using a template for cleanup and concatenation
-        text_template = loader.get_template('search/indexes/text.txt')
-        c = Context({'object': doc})
+        text_template = loader.get_template('search/indexes/opinion_text.txt')
+        c = Context({'object': item})
         self.text = '%s %s' % (text_template.render(c).translate(null_map), self.caseNumber)
 
         # Faceting fields
-        self.status_exact = doc.get_precedential_status_display()
-        self.court_exact = doc.court.pk
+        self.status_exact = item.get_precedential_status_display()
+        self.court_exact = item.docket.court.pk
+
+
+class SearchAudioFile(object):
+    def __init__(self, item):
+        self.id = item.pk
+        self.docket = item.docket_id
+        if item.date_argued is not None:
+            self.dateArgued = datetime.combine(item.date_argued, time())  # Midnight, PST
+        self.court = item.docket.court.full_name
+        self.court_id = item.docket.court_id
+        self.court_citation_string = item.docket.court.citation_string
+        self.court_exact = item.docket.court_id  # For faceting
+        self.caseName = item.case_name
+        try:
+            self.absolute_url = item.get_absolute_url()
+        except NoReverseMatch:
+            raise InvalidDocumentError(
+                "Unable to save to index due to missing absolute_url: %s"
+                % item.pk)
+        self.judge = item.judges
+        self.docketNumber = item.docket_number
+        self.file_size_mp3 = item.local_path_mp3.size
+        self.duration = item.duration
+        self.source = item.source
+        self.download_url = item.download_url
+        self.local_path = unicode(item.local_path_mp3)
+
+        text_template = loader.get_template('search/indexes/audio_text.txt')
+        c = Context({'object': item})
+        self.text = text_template.render(c).translate(null_map)

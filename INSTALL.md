@@ -1,4 +1,4 @@
-Install instructions for the courtlistener project
+Install instructions for the CourtListener project
 --------------------------------------------------
 
 You have two options for installing the CourtListener project. You may either

@@ -2,6 +2,9 @@ import os
 import string
 from django.utils.text import slugify
 from django.utils.timezone import now
+from lxml import html
+from lxml.html import tostring
+from lxml.html.clean import Cleaner
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'alert.settings'
 import sys
@@ -12,7 +15,6 @@ from alert.lib.string_utils import anonymize, trunc
 from alert.search.models import Document, save_doc_and_cite
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 
-import datetime
 import re
 import subprocess
 
@@ -36,17 +38,20 @@ def merge_cases_simple(new, target_id):
     elif target.source == 'CR':
         target.source = 'LCR'
 
-    # Add the URL if it's not a court one, replacing resource.org's info in some cases.
+    # Add the URL if it's not a court one, replacing public.resource.org's
+    # info in some cases.
     if cached_source == 'R':
         target.download_url = new.download_url
 
-    # Recreate the slug from the new case name (this changes the URL, but the old will continue working)
+    # Recreate the slug from the new case name (this changes the URL, but the
+    # old will continue working)
     target.citation.slug = trunc(slugify(new.citation.case_name), 50)
 
     # Take the case name from the new item; they tend to be pretty good
     target.citation.case_name = new.citation.case_name
 
-    # Add the docket number if the old doesn't exist, but keep the old if one does.
+    # Add the docket number if the old doesn't exist, but keep the old if one
+    # does.
     if not target.citation.docket_number:
         target.citation.docket_number = new.citation.docket_number
 
@@ -100,7 +105,8 @@ def merge_cases_complex(case, target_ids):
 
 
 def find_same_docket_numbers(doc, candidates):
-    """Identify the candidates that have the same docket numbers as doc after each has been cleaned.
+    """Identify the candidates that have the same docket numbers as doc after
+    each has been cleaned.
 
     """
     new_docket_number = re.sub('(\D|0)', '', doc.citation.docket_number)
@@ -114,8 +120,8 @@ def find_same_docket_numbers(doc, candidates):
 
 
 def case_name_in_candidate(case_name_new, case_name_candidate):
-    """When there is one candidate match, this compares their case names to see if one is
-    contained in the other, in the right order.
+    """When there is one candidate match, this compares their case names to see
+    if one is contained in the other, in the right order.
 
     Returns True if so, else False.
     """
@@ -147,8 +153,9 @@ def filter_by_stats(candidates, stats):
         'cos_sims': [],
     }
     for i in range(0, len(candidates)):
-        # Commented out because the casenames in resource.org can be so long this varies too much.
-        #if stats['case_name_similarities'][i] < 0.125:
+        # Commented out because the casenames in public.resource.org can be so
+        # long this varies too much.
+        # if stats['case_name_similarities'][i] < 0.125:
         #    # The case name is wildly different
         #    continue
         if stats['length_diffs'][i] > 400:
@@ -244,3 +251,24 @@ class Case(object):
                 self.case_name_fix_file.write("%s|%s\n" % (self.sha1_hash, case_name))
 
         return case_name, status
+
+
+def get_html_from_raw_text(raw_text):
+    """Using the raw_text, creates four useful variables:
+        1. complete_html_tree: A tree of the complete HTML from the file, including <head> tags and whatever else.
+        2. clean_html_tree: A tree of the HTML after stripping bad stuff.
+        3. clean_html_str: A str of the HTML after stripping bad stuff.
+        4. body_text: A str of the text of the body of the document.
+
+    We require all of these because sometimes we need the complete HTML tree, other times we don't. We create them all
+    up front for performance reasons.
+    """
+    complete_html_tree = html.fromstring(raw_text)
+    cleaner = Cleaner(style=True,
+                      remove_tags=('a', 'body', 'font', 'noscript',),
+                      kill_tags=('title',),)
+    clean_html_str = cleaner.clean_html(raw_text)
+    clean_html_tree = html.fromstring(clean_html_str)
+    body_text = tostring(clean_html_tree, method='text', encoding='unicode')
+
+    return clean_html_tree, complete_html_tree, clean_html_str, body_text

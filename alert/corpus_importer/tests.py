@@ -1,8 +1,9 @@
 # coding=utf-8
 from django.test import TestCase
+
 from alert.corpus_importer.dup_helpers import case_name_in_candidate
-from alert.corpus_importer.import_law_box import get_docket_number
-from alert.corpus_importer.judge_extractor import get_judge_from_str, REASONS
+from alert.corpus_importer.lawbox.import_law_box import get_docket_number
+from alert.corpus_importer.lawbox.judge_extractor import get_judge_from_str, REASONS
 
 
 class DocketNumberTest(TestCase):

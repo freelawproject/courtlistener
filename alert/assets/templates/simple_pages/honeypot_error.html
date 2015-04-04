@@ -9,14 +9,17 @@
 {% block title %}Server Error 400 - CourtListener.com{% endblock %}
 
 {% block content %}
-    <div class="span-17 last">
+    <div class="col-xs-12">
         <h2>400 Bad Request</h2>
         <p>Honey Pot Error: ({{fieldname}}). Request aborted.</p>
-        <p>We believe that you're a spam bot, but the following may help:</p>
+        <p>We believe that you're a spam bot, but if you're a human reading
+            this we definitely made a mistake. The following may help:</p>
         <ul>
-            <li>Try filling out the form on the previous page more carefully.</li>
+            <li>Try filling out the form on the previous page more carefully,
+                or disabling any browser extensions that interact with forms.
+            </li>
             <li><a href="/contact/">Let us</a> know that you're having trouble using this form.</li>
-            <li>Try something else, like a new <a href="/search/">search</a> or <a href="https://groups.google.com/forum/#!forum/courtlistener-discuss">a post on our forum</a>.</li>
+            <li>Try something else, like a new <a href="/search/">search</a> or <a href="http://lists.freelawproject.org/cgi-bin/mailman/listinfo/dev">a post on our forum</a>.</li>
         </ul>
 
         <p>Sorry about this. If you continue having problems, please do <a href="/contact/">let us know</a>.</p>

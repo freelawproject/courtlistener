@@ -1,5 +1,4 @@
 from django.db import models
-from datetime import date
 
 PROVIDERS = (
     ('dwolla', 'Dwolla'),
@@ -11,9 +10,10 @@ PROVIDERS = (
 PAYMENT_STATUSES = (
     (0, 'Awaiting Payment'),
     (1, 'Unknown Error'),
-    (2, 'Completed, but awaiting processing'),  # This does not mean we get the money, must await "PROCESSED" for that.
+    # This does not mean we get the money; must await "PROCESSED" for that.
+    (2, 'Completed, but awaiting processing'),
     (3, 'Cancelled'),
-    (4, 'Processed'),
+    (4, 'Processed'),  # Gold standard.
     (5, 'Pending'),
     (6, 'Failed'),
     (7, 'Reclaimed/Refunded'),
@@ -69,7 +69,11 @@ class Donation(models.Model):
     )
 
     def __unicode__(self):
-        return '%s: $%s, %s' % (self.get_payment_provider_display(), self.amount, self.get_status_display())
+        return '%s: $%s, %s' % (
+            self.get_payment_provider_display(),
+            self.amount,
+            self.get_status_display()
+        )
 
     class Meta:
         ordering = ['-date_created']
