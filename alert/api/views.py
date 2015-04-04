@@ -142,7 +142,7 @@ def coverage_data(request, court):
     Responds to either AJAX or regular requests.
     """
     
-    q = request.GET.q    
+    q = request.GET.get('q')
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
     start_year = search_utils.get_court_start_year(conn, court)
     response = conn.raw_query(
