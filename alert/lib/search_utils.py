@@ -484,7 +484,7 @@ def get_court_start_year(conn, court):
     return year
 
 
-def build_coverage_query(court, start_year):
+def build_coverage_query(court, start_year, q):
     params = {
         'facet': 'true',
         'facet.range': 'dateFiled',
@@ -492,7 +492,7 @@ def build_coverage_query(court, start_year):
         'facet.range.end': 'NOW/DAY',
         'facet.range.gap': '+1YEAR',
         'rows': 0,
-        'q': '*:*',  # Without this, results will be omitted.
+        'q': q or '*:*',  # Without this, results will be omitted.
         'caller': 'build_coverage_query',
     }
     if court.lower() != 'all':
