@@ -141,10 +141,12 @@ def coverage_data(request, court):
 
     Responds to either AJAX or regular requests.
     """
+    
+    q = request.GET.get('q')
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
     start_year = search_utils.get_court_start_year(conn, court)
     response = conn.raw_query(
-        **search_utils.build_coverage_query(court, start_year)
+        **search_utils.build_coverage_query(court, start_year, q)
     ).execute()
     counts = response.facet_counts.facet_ranges[0][1][0][1]
     counts = strip_trailing_zeroes(counts)
