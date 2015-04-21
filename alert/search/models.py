@@ -337,7 +337,8 @@ class Document(models.Model):
         db_index=True
     )
     date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified. A value in year 1750 indicates the value is unknown",
+        help_text="The last moment when the item was modified. A value in "
+                  "year 1750 indicates the value is unknown",
         auto_now=True,
         editable=False,
         db_index=True,
@@ -350,13 +351,15 @@ class Document(models.Model):
         db_index=True
     )
     source = models.CharField(
-        help_text="the source of the document, one of: %s" % ', '.join(['%s (%s)' % (t[0], t[1]) for t in SOURCES]),
+        help_text="the source of the document, one of: %s" %
+                  ', '.join(['%s (%s)' % (t[0], t[1]) for t in SOURCES]),
         max_length=3,
         choices=SOURCES,
         blank=True
     )
     sha1 = models.CharField(
-        help_text="unique ID for the document, as generated via SHA1 of the binary file or text data",
+        help_text="unique ID for the document, as generated via SHA1 of the "
+                  "binary file or text data",
         max_length=40,
         db_index=True
     )
@@ -375,29 +378,34 @@ class Document(models.Model):
         null=True
     )
     download_url = models.URLField(
-        help_text="The URL on the court website where the document was originally scraped",
+        help_text="The URL on the court website where the document was "
+                  "originally scraped",
         max_length=500,
         db_index=True,
         null=True,
         blank=True,
     )
     local_path = models.FileField(
-        help_text="The location, relative to MEDIA_ROOT on the CourtListener server, where files are stored",
+        help_text="The location, relative to MEDIA_ROOT on the CourtListener "
+                  "server, where files are stored",
         upload_to=make_upload_path,
         blank=True,
         db_index=True
     )
     judges = models.TextField(
-        help_text="The judges that brought the opinion as a simple text string",
+        help_text="The judges that brought the opinion as a simple text "
+                  "string",
         blank=True,
         null=True,
     )
     nature_of_suit = models.TextField(
-        help_text="The nature of the suit. For the moment can be codes or laws or whatever",
+        help_text="The nature of the suit. For the moment can be codes or "
+                  "laws or whatever",
         blank=True
     )
     plain_text = models.TextField(
-        help_text="Plain text of the document after extraction using pdftotext, wpd2txt, etc.",
+        help_text="Plain text of the document after extraction using "
+                  "pdftotext, wpd2txt, etc.",
         blank=True
     )
     html = models.TextField(
@@ -411,7 +419,8 @@ class Document(models.Model):
         null=True,
     )
     html_with_citations = models.TextField(
-        help_text="HTML of the document with citation links and other post-processed markup added",
+        help_text="HTML of the document with citation links and other "
+                  "post-processed markup added",
         blank=True
     )
     cases_cited = models.ManyToManyField(
@@ -422,25 +431,29 @@ class Document(models.Model):
         blank=True
     )
     citation_count = models.IntegerField(
-        help_text='The number of times this document is cited by other opinion',
+        help_text='The number of times this document is cited by other '
+                  'opinion',
         default=0,
         db_index=True,
     )
     precedential_status = models.CharField(
-        help_text='The precedential status of document, one of: %s' % ', '.join([t[0] for t in DOCUMENT_STATUSES]),
+        help_text='The precedential status of document, one of: '
+                  '%s' % ', '.join([t[0] for t in DOCUMENT_STATUSES]),
         max_length=50,
         blank=True,
         choices=DOCUMENT_STATUSES,
         db_index=True,
     )
     date_blocked = models.DateField(
-        help_text="The date that this opinion was blocked from indexing by search engines",
+        help_text="The date that this opinion was blocked from indexing by "
+                  "search engines",
         blank=True,
         null=True,
         db_index=True,
     )
     blocked = models.BooleanField(
-        help_text="Whether a document should be blocked from indexing by search engines",
+        help_text="Whether a document should be blocked from indexing by "
+                  "search engines",
         db_index=True,
         default=False
     )
@@ -450,7 +463,7 @@ class Document(models.Model):
         db_index=True,
     )
     is_stub_document = models.BooleanField(
-        'Whether this document is a stub or not',
+        help_text='Whether this document is a stub or not',
         default=False
     )
     supreme_court_db_id = models.CharField(

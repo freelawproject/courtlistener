@@ -24,8 +24,9 @@ class DecimalOrOtherField(forms.DecimalField):
         super(DecimalOrOtherField, self).__init__(*args, **kwargs)
 
     def to_python(self, value):
-        """Makes sure that the value returned is either returned as a decimal (as required by amount) or as the word
-        'other', which is fixed in the clean() method for the DonationForm class.
+        """Makes sure that the value returned is either returned as a decimal
+        (as required by amount) or as the word 'other', which is fixed in the
+        clean() method for the DonationForm class.
         """
         if value == 'other':
             return value
@@ -100,7 +101,7 @@ class UserForm(ModelForm):
 
 
 class DonationForm(ModelForm):
-    amount_other = forms.CharField(
+    amount_other = forms.DecimalField(
         required=False,
     )
     amount = DecimalOrOtherField(

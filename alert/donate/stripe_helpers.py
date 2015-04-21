@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 @csrf_exempt
 def process_stripe_callback(request):
+    """Always return 200 message or else the webhook will try again ~200 times
+    and then send us an email.
+    """
     if request.method == 'POST':
         # Stripe hits us with a callback, and their security model is for us
         # to use the ID from that to hit their API. It's analogous to when you
@@ -24,30 +27,44 @@ def process_stripe_callback(request):
         event = simplejson.loads(str(stripe.Event.retrieve(event_id)))
         logger.info('Stripe callback triggered. See webhook documentation for details.')
         if event['type'].startswith('charge') and \
-                        event['livemode'] != settings.PAYMENT_TESTING_MODE:  # Livemode is opposite of testing mode
+                        event['livemode'] != settings.PAYMENT_TESTING_MODE:
             charge = event['data']['object']
-            d = get_object_or_404(Donation, payment_id=charge['id'])
+            try:
+                d = Donation.objects.get(payment_id=charge['id'])
+            except Donation.DoesNotExist:
+                d = None
+
             # See: https://stripe.com/docs/api#event_types
             if event['type'].endswith('succeeded'):
-                d.clearing_date = datetime.utcfromtimestamp(charge['created']).replace(tzinfo=utc)
+                d.clearing_date = datetime.utcfromtimestamp(
+                    charge['created']).replace(tzinfo=utc)
                 d.status = 4
                 from alert.donate.views import send_thank_you_email
                 send_thank_you_email(d)
             elif event['type'].endswith('failed'):
-                d.clearing_date = datetime.utcfromtimestamp(charge['created']).replace(tzinfo=utc)
+                if not d:
+                    return HttpResponse('<h1>200: No matching object in the '
+                                        'database. No action needed.</h1>')
+                d.clearing_date = datetime.utcfromtimestamp(
+                    charge['created']).replace(tzinfo=utc)
                 d.status = 1
             elif event['type'].endswith('refunded'):
-                d.clearing_date = datetime.utcfromtimestamp(charge['created']).replace(tzinfo=utc)
+                d.clearing_date = datetime.utcfromtimestamp(
+                    charge['created']).replace(tzinfo=utc)
                 d.status = 7
             elif event['type'].endswith('captured'):
-                d.clearing_date = datetime.utcfromtimestamp(charge['created']).replace(tzinfo=utc)
+                d.clearing_date = datetime.utcfromtimestamp(
+                    charge['created']).replace(tzinfo=utc)
                 d.status = 8
             elif event['type'].endswith('dispute.created'):
-                logger.critical("Somebody has created a dispute in Stripe: %s" % charge['id'])
+                logger.critical("Somebody has created a dispute in "
+                                "Stripe: %s" % charge['id'])
             elif event['type'].endswith('dispute.updated'):
-                logger.critical("The Stripe dispute on charge %s has been updated." % charge['id'])
+                logger.critical("The Stripe dispute on charge %s has been "
+                                "updated." % charge['id'])
             elif event['type'].endswith('dispute.closed'):
-                logger.critical("The Stripe dispute on charge %s has been closed." % charge['id'])
+                logger.critical("The Stripe dispute on charge %s has been "
+                                "closed." % charge['id'])
             d.save()
         return HttpResponse('<h1>200: OK</h1>')
     else:
@@ -64,7 +81,7 @@ def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
     # Create the charge on Stripe's servers
     try:
         charge = stripe.Charge.create(
-            amount=int(cd_donation_form['amount']) * 100,  # amount in cents, watch yourself
+            amount=int(float(cd_donation_form['amount']) * 100),  # amount in cents, watch yourself
             currency="usd",
             card=stripe_token,
             description=cd_user_form['email'],
@@ -73,7 +90,7 @@ def process_stripe_payment(cd_donation_form, cd_user_form, stripe_token):
             'message': None,
             'status': 0,  # Awaiting payment
             'payment_id': charge.id,
-            'redirect': '/donate/stripe/complete',
+            'redirect': '/donate/stripe/complete/',
         }
     except stripe.error.CardError, e:
         logger.warn("Stripe was unable to process the payment: %s" % e)
