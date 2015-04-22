@@ -62,19 +62,42 @@ class Docket(models.Model):
         db_index=True,
         null=True,
     )
+    date_argued = models.DateField(
+        help_text="the date the case was argued",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    date_reargued = models.DateField(
+        help_text="the date the case was reargued",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
     court = models.ForeignKey(
         'Court',
         help_text="The court where the docket was filed",
         db_index=True,
-        null=True
+        null=True,
     )
     case_name = models.TextField(
+        help_text="The abridged name of the case",
+        blank=True,
+    )
+    case_name_full = models.TextField(
         help_text="The full name of the case",
-        blank=True
+        blank=True,
     )
     slug = models.SlugField(
         help_text="URL that the document should map to (the slug)",
         max_length=50,
+        null=True,
+    )
+    docket_number = models.CharField(
+        help_text="The docket numbers of a case, can be consolidated and "
+                  "quite long",
+        max_length=5000,  # was 50, 100, 300, 1000
+        blank=True,
         null=True
     )
     date_blocked = models.DateField(
