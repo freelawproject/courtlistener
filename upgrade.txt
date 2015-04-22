@@ -25,6 +25,18 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
+2015-04-21:
+
+Today we begin upgrading the database to support the new data that we will be
+importing. Most of these changes should occur automatically when the migrations
+are run, but please take note that some data migrations will take a significant
+amount of time to run.
+
+1. The first migration adds fields to the docket object without updating any
+code. It should not cause any issues and should apply nearly instantly.
+1.
+
+
 2014-12-30:
 
  - Adds support for real time alerts.
