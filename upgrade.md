@@ -35,9 +35,6 @@ We welcome a conversion of these notes to a better process using Fabric.
     - /citation/: This endpoint no longer has docket_number values, because
       they have been moved to the v2 Docket endpoint. Further, endpoints that
       embed the citation object will no longer have docket number.
-    values.
- - v1:
-    - None yet!
  - v2:
     - /docket/: This endpoint has four new fields: case_name_full, date_argued,
       date_reargued, and docket_number (which was previously on the Citation
@@ -58,13 +55,13 @@ code. It should not cause any issues and should apply nearly instantly.
 1. The next migration deletes these fields.
 
 
-2014-12-30:
+# 2014-12-30:
 
  - Adds support for real time alerts.
  - Re-organizes the alert database. Please migrate to get the changes.
 
 
-2014-11-18:
+# 2014-11-18:
 
  - CORS headers are now being sent with API requests so that folks can get past
    the limitations of JSONP. This is untested, but introduces (yet another)
@@ -75,7 +72,7 @@ code. It should not cause any issues and should apply nearly instantly.
   Then pull as usual.
 
 
-2014-11-17:
+# 2014-11-17:
 
   - `constants.py` has been removed from CourtListener in this release and has
     been moved to its own repository. The code here should continue working,
@@ -86,7 +83,7 @@ code. It should not cause any issues and should apply nearly instantly.
         - sudo ln -s /usr/local/reporters_db /usr/lib/python2.7/dist-packages/reporters_db
 
 
-2014-11-14:
+# 2014-11-14:
  - The dependency of eyed3 has been upgraded to handle a threading race
    condition as documented here: https://bitbucket.org/nicfit/eyed3/issue/47/
 
@@ -95,7 +92,7 @@ code. It should not cause any issues and should apply nearly instantly.
        sudo pip install --allow-external eyeD3 --allow-unverified eyeD3 eyeD3==0.7.5
 
 
-2014-10-23:
+# 2014-10-23:
  Overview:
  - This is a very large upgrade and brings the concept of the "Docket" into
    CourtListener. After this point, we will have both opinions and oral
@@ -193,23 +190,23 @@ code. It should not cause any issues and should apply nearly instantly.
     of every month.
   - Add symlinks for the new data types so we don't fill the SSDs
 
-2014-06-18:
+# 2014-06-18:
  - This update makes alert editing a lot more intuitive.
 
-2014-05-22:
+# 2014-05-22:
  - This upgrade brings several major improvements including a new footer, social links, several new or updated pages, a
    new homepage and a feature tour. It's much-needed polish.
  - Several small apps have been combined into the "simple_pages" app. This should vastly simplify finding the right
    code for the task at hand but otherwise should not have any noticeable effects.
  - After upgrade, delete any flatpages that have been replaced by the new simple_pages app.
 
-2013-11-25:
+# 2013-11-25:
  - This revision adds a new script that will welcome new users whenever it is called. It will send an email to anybody
    that's new in the last 24 hours each time it is called. If you wish to use it, simply add it to your crontab.
  - This revision also tweaks Solr in a way that should not cause any problems for folks on 4.0 or 4.1, but that will
    make it perform faster in production.
 
-2013-11-15:
+# 2013-11-15:
  - This upgrades Solr to version 4.1, which supports file listeners. To upgrade Solr, simply:
    - Download Solr version 4.1 with:
         - cd ~/Downloads/
@@ -227,7 +224,7 @@ code. It should not cause any issues and should apply nearly instantly.
         - sudo service solr start
 
 
-2013-11-08:
+# 2013-11-08:
  - This initiates the work on the API. To roll this out:
    - install django-tastypie: sudo pip install django-tastypie==0.10.0
        - This version has a bug (https://github.com/toastdriven/django-tastypie/issues/1005) that makes migrations fail
@@ -240,11 +237,11 @@ code. It should not cause any issues and should apply nearly instantly.
    - install defusedxml: sudo pip install defusedxml
    - migrate the database: manage.py migrate
 
-2013-11-05:
+# 2013-11-05:
  - This deploys the pagerank algorithm, which requires that Solr be restarted. Restart solr with:
    % sudo service solr restart
 
-2013-10-28:
+# 2013-10-28:
  - The lawbox code is ready to go at long last. To make it live and to update all the needed resources on the site:
    + Check opinion count before beginning: 951,929
    + Pull the latest code, migrate, static files, and touch it live.
@@ -257,13 +254,13 @@ code. It should not cause any issues and should apply nearly instantly.
    - Some bug with the counts on the jurisdiction page
 
 
-2013-10-21:
+# 2013-10-21:
  - Removes public.resource.org polling. If you have used this, remove the cached file in the robots directory and any
    associated cron jobs.
  - Moves and re-works the alert tool. If you have cron jobs that depended on it, it's now moved to the proper location
    and you'll need to update your cron jobs.
 
-2013-09-25:
+# 2013-09-25:
  - Django has been upgraded to version 1.5.4, at last. This was long overdue, but Django finally forced our hand with
    old bugs and new features (a one-two punch of hate/awesome). To upgrade to the new version, you're going to have to
    do some not fun work, alas.
@@ -310,12 +307,12 @@ code. It should not cause any issues and should apply nearly instantly.
         manage.py migrate
     - restart celery if on a production machine.
 
-2013-09-24:
+# 2013-09-24:
  - We've added two new fields to the Document model that will need to be migrated with:
 
     manage.py migrate search
 
-2013-09-21:
+# 2013-09-21:
  - I've added a new feature that allows us to log stats. It it has the signature of tally_stat('name_of_stat', inc=1,
    date=date.today()), which, if not self explanatory should be pretty clear. As you might expect, it comes with a
    database change, which you'll need tohg s run:
@@ -325,7 +322,7 @@ code. It should not cause any issues and should apply nearly instantly.
    With that complete, a number of the major CL features will begin logging their work.
 
 
-2013-09-17:
+# 2013-09-17:
  - BEFORE PULL: We've finally (*finally*) dealt with Python's painful logging system and deployed logging. To make
    this work, you'll need a directory at /var/log/courtlistener/ that the server can write to. Create it with:
 
@@ -339,7 +336,7 @@ code. It should not cause any issues and should apply nearly instantly.
    PAYMENT_TESTING_MODE = False
 
 
-2013-09-16:
+# 2013-09-16:
  - OVERVIEW: This update contains a number of large fixes, which will alter
    your database in a number of ways. It lands the beginning work for the
    Lawbox corpus import (including > 300 new courts), and lands the initial
@@ -492,20 +489,20 @@ code. It should not cause any issues and should apply nearly instantly.
     % sudo -u www-data /usr/bin/python /var/www/court-listener/alert/dump_all_cases.py
 
 
-2013-07-07:
+# 2013-07-07:
  - The piwik configuration has been merged into the virtual host for the main site. If you are using piwik, you will
    need to restart your apache server to enable this configuration. After this change, piwik will be located at
    /piwik rather than as a subdomain.
 
 
-2013-07-03:
+# 2013-07-03:
  - Adds a notes field to the Courts model. Migrate your database with:
 
     manage.py migrate search
 
    And you'll be good to go.
 
-2013-06-27:
+# 2013-06-27:
  - This release will require downtime and will put your site into management mode upon pulling it.
  - judge, suitNature and citeCount have been added to the Solr configuration. judges and nature_of_suit have been added
    to the Document model.Unfortunately, these require a recrawl of the database into the Solr index and a migration of
@@ -547,13 +544,13 @@ code. It should not cause any issues and should apply nearly instantly.
  [1]: https://docs.djangoproject.com/en/1.3/howto/static-files/#staticfiles-in-templates
 
 
-2013-06-20:
+# 2013-06-20:
  - The add_citations script has been converted to a management command. Any previous usages of it will need to be
    updated to use manage.py cl_add_citations_to_docs. It remains mostly API compatible, but management commands do
    not support variable numbers of arguments so the doc_ids parameter is now doc_id. It takes an int instead of an
    iterable.
 
-2013-06-19:
+# 2013-06-19:
  - Numerous changes to the models have been made to rename variables. Please update your database after pulling the
    code. This should be an instant migration in PostGres.
 
