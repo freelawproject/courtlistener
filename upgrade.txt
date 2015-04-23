@@ -1,0 +1,660 @@
+This file contains notes for upgrades when special instructions are necessary.
+In general, simply doing:
+
+# Get the latest code
+git pull
+
+# Gather any new static files
+manage.py collectstatic (sudo -u www-data ./manage.py collectstatic)
+
+(enter yes, when prompted)
+
+# Migrate the database
+manage.py migrate
+
+# Restart celery
+sudo service celeryd restart
+
+# Restart apache's code
+touch apache/django.wsgi
+
+is all that's necessary. In the case that special instructions are needed, we
+will attempt to put them here, with the most recent at the top.
+
+We welcome a conversion of these notes to a better process using Fabric or
+related tools.
+
+----------------------------
+
+
+
+# The great Database Upgrade
+
+- Follow up with the removal of authentication backend. I removed it, so now we
+  can have unauthenticated users. However, we need to make sure that:
+   - Such users don't get any emails (alerts, anything else?)
+   - It's obvious what the problem is these people have.
+   - They can't see donations until they confirm.
+
+## Updates for `systemd` (Requires updates to all systems)
+
+If you are using an operating system that uses `systemd`, this upgrade brings
+support to your system, but brings a file re-organization that breaks past
+init-based systems. Read on regardless of whether your OS uses SysV or systemd.
+
+For all systems, the memory configuration for Solr has moved from within CourtListener
+to the /etc/courtlistener file. To make this change simply add a line to the bottom of
+/etc/courtlistener.:
+
+For development machines:
+
+    CL_SOLR_XMX=500MB
+
+For production machines:
+
+    CL_SOLR_XMX=30GB
+
+Or however much memory you wish to provide Solr.
+
+
+### If your system uses `systemd`...
+
+ - Copy the new `systemd` unit file to `/etc/systemd/system/solr.service`
+
+        sudo cp $INSTALL_ROOT/scripts/systemd/solr.service /etc/systemd/system/
+        sudo cp $INSTALL_ROOT/scripts/systemd/celery.service /etc/systemd/system/
+        sudo cp $INSTALL_ROOT/scripts/systemd/juriscraper.service /etc/systemd/system/
+
+ - Copy the new `systemd` log configuration files (this maintains the retention
+   policy in our Privacy policy -- 12 weeks):
+
+        sudo mkdir /etc/systemd/journald.conf.d
+        sudo cp $INSTALL_ROOT/scripts/systemd/solr.conf /etc/systemd/journald.conf.d/solr.conf
+        sudo cp $INSTALL_ROOT/scripts/systemd/celery.conf /etc/systemd/journald.conf.d/celery.conf
+        sudo cp $INSTALL_ROOT/scripts/systemd/juriscraper.conf /etc/systemd/journald.conf.d/juriscraper.conf
+
+ - Enable the new `systemd` unit script and start the services:
+
+        sudo systemctl enable solr
+        sudo systemctl start solr
+        sudo systemctl enable celery
+        sudo systemctl start celery
+        sudo systemctl enable juriscraper
+        sudo systemctl start juriscraper
+
+ - Make the logs persistent (by default they're volatile)
+
+        sudo mkdir -p /var/log/journal/
+        sudo systemctl restart systemd-journald
+
+### If your system uses the init system...
+
+Some files have moved around. Due to our usage of symlinks, you'll need to update
+your installation with the following commands:
+
+    sudo rm /etc/init.d/celeryd /etc/init.d/scraper /etc/init.d/solr
+    sudo ln -s scripts/init/celeryd /etc/init.d/celeryd
+    sudo ln -s scripts/init/solr /etc/init.d/solr
+    sudo ln -s scripts/init/scraper /etc/init.d/scraper
+
+    sudo rm /etc/logrotate.d/solr /etc/logrotate.d/celery /etc/logrotate.d/scraper
+    sudo ln -s scripts/log/celery /etc/logrotate.d/celery
+    sudo ln -s scripts/log/solr /etc/logrotate.d/solr
+    sudo ln -s scripts/log/scraper /etc/logrotate.d/scraper
+
+
+## API Deprecations and changes:
+
+ - all versions:
+    - /citation/: This endpoint no longer has docket_number values, because
+      they have been moved to the v2 Docket endpoint. Further, endpoints that
+      embed the citation object will no longer have docket number.
+ - v2:
+    - /docket/: This endpoint has four new fields: case_name_full, date_argued,
+      date_reargued, and docket_number (which was previously on the Citation
+      endpoint).
+    - /audio/: date_argued is no longer on this endpoint and is instead on the
+      docket endpoint.
+
+
+Today we begin upgrading the database to support the new data that we will be
+importing. Most of these changes should occur automatically when the migrations
+are run, but please take note that some data migrations will take a significant
+amount of time to run.
+
+1. The first migration adds fields to the docket object without updating any
+code. It should not cause any issues and should apply nearly instantly.
+1. The next migration moves the docket_number and date_argued values to the
+   docket
+1. The next migration deletes these fields.
+
+
+## Other changes
+
+This is a major upgrade and a number of other changes have been made:
+
+ - Django is upgraded to the latest version (1.8) and most Python requirements have been frozen into a requirements.txt file, with many of them being upgraded to the latest versions. To upgrade your system run:
+
+      sudo pip uninstall pil
+      sudo pip install -r requirements.txt --upgrade
+
+ - The account_management.py command has been converted into a django management
+   command that lives at userHandling/management/commands/cl_account_management.py.
+   If you have a cron command that references the old location, you'll need to
+   update it to point to the new location. In addition, the short flags have
+   been removed from all commands, so -d, -v, and related flags are all gone,
+   replaced with more explicit long versions instead. You will need to update
+   any automated scripts, such as cron jobs.
+
+ - ping_all_search_engines.py has been removed. Its utility was dubious, at
+   best.
+
+# 2014-12-30:
+
+ - Adds support for real time alerts.
+ - Re-organizes the alert database. Please migrate to get the changes.
+
+
+# 2014-11-18:
+
+ - CORS headers are now being sent with API requests so that folks can get past
+   the limitations of JSONP. This is untested, but introduces (yet another)
+   dependency. To upgrade, do:
+
+    - sudo pip install django-cors-headers==0.13
+
+  Then pull as usual.
+
+
+# 2014-11-17:
+
+  - `constants.py` has been removed from CourtListener in this release and has
+    been moved to its own repository. The code here should continue working,
+    but before pulling this code you must install the new reporters database,
+    as we did the Seal Rookery. This can be done with:
+
+        - sudo git clone https://github.com/freelawproject/reporters-db /usr/local/reporters_db
+        - sudo ln -s /usr/local/reporters_db /usr/lib/python2.7/dist-packages/reporters_db
+
+
+# 2014-11-14:
+ - The dependency of eyed3 has been upgraded to handle a threading race
+   condition as documented here: https://bitbucket.org/nicfit/eyed3/issue/47/
+
+   Upgrade with:
+
+       sudo pip install --allow-external eyeD3 --allow-unverified eyeD3 eyeD3==0.7.5
+
+
+# 2014-10-23:
+ Overview:
+ - This is a very large upgrade and brings the concept of the "Docket" into
+   CourtListener. After this point, we will have both opinions and oral
+   arguments for the first time, with the result being that we need some kind
+   of container that we can hold them in. A new class has been added to
+   search.models called "Docket" to hold this kind of information.
+
+ - When upgrading to this version, everything will completely break until your
+   database is updated. I recommend enabling the maintenance mode URL if you
+   wish to avoid chaos for your users.
+
+ - The database upgrade for this version will take some time, as we are moving
+   a number of fields from one database table to another. A re-index is also
+   required, but, if you have ample disk space, this will not cause downtime.
+
+  Deployment:
+  - Install new dependencies:
+    - sudo pip install --allow-external eyeD3 --allow-unverified eyeD3 eyeD3==0.7.4
+    - sudo pip install datadiff==1.1.5
+    - avconv: sudo apt-get install libav-tools
+  - Install the seal-rookery:
+    - sudo git clone https://github.com/freelawproject/seal-rookery /usr/local/seal_rookery
+    - sudo ln -s /usr/local/seal_rookery /usr/lib/python2.7/dist-packages/seal_rookery
+
+  - Disable any current scrapers using killall, and disable cron jobs from
+    kicking in again.
+  - Flush any background tasks with countdowns in the celery queue by following
+    the notes here: https://stackoverflow.com/questions/26535719/
+  - Stop Celery
+  - Pull the code and the maintenance mode will be enabled.
+  - Restart apache to enable the new code and clear its caches:
+        - cl; sudo touch apache/django.wsgi
+  - Database changes
+        - manage.py migrate search --delete-ghost-migrations
+        - manage.py migrate
+  - Add a new core to Solr (paths below may need changing to correspond with
+    the location of your current configurations):
+
+        1. Create a new configuration directory based on our current one:
+
+           % sudo cp -r /usr/local/solr/example/solr/collection1 /usr/local/solr/example/solr/audio
+           % source /etc/courtlistener
+           % sudo ln -s -f $INSTALL_ROOT/Solr/conf/audio_schema.xml /usr/local/solr/example/solr/audio/conf/schema.xml
+
+        2. Create the new core in Python:
+
+            from alert.lib.solr_core_admin import create_solr_core
+            from alert import settings
+            import os
+            create_solr_core(
+               core_name='audio',
+               data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data_audio'),
+               schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf', 'audio_schema.xml'),
+               instance_dir='/usr/local/solr/example/solr/audio',
+            )
+
+  - Turn maintenance mode back off.
+  - Re-start celery
+  - Re-enable scrapers and kick off the oral argument scrapers
+  - Flip the has_oral_argument_scraper flag to true on all correct courts.
+  - absolute_urls have changed throughout, necessitating a complete re-index
+    for links in search results to work without redirects. We can re-index in
+    a background core and then swap it in using the following commands:
+
+        >>> create_solr_core(
+            core_name='swap_core',
+            data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data_swap'),
+            schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf', 'schema.xml'),
+        )
+
+        % screen
+        % manage.py cl_update_index --update --everything --optimize --solr-url http://127.0.0.1:8983/solr/swap_core --type opinions --traceback
+
+        >>> swap_solr_core('collection1', 'swap_core')
+        >>> delete_solr_core('swap_core', delete_data_dir=True)
+
+  - Bulk files have been rewritten and require some new tweaks:
+        - Update cron to generate bulk files on the last day of each month,
+          using something like the following:
+
+              min hour 30 4,6,9,11        * manage.py cl_make_bulk_data
+              min hour 31 1,3,5,7,8,10,12 * manage.py cl_make_bulk_data
+              min hour 28 2               * manage.py cl_make_bulk_data
+
+        - Remove any old cron entries referencing dump_all_files.py
+        - Add a new directory at $INSTALL_ROOT/alert/assets/media/bulk-data to
+          contain the new bulk files when they are created, and symlink it from
+          /sata/.
+        - Generate the new bulk files by calling manage.py cl_make_bulk_data.
+        - Be sure that Apache is restarted so the new location is updated.
+        - Delete any old bulk files located at
+          $INSTALL_ROOT/alert/assets/media/dumps
+  - Update cron jobs to point to cl_scrape_opinions and cl_scrape_oral_arguments
+  - Update the CL calendar to have bulk files generated at 3am on the last day
+    of every month.
+  - Add symlinks for the new data types so we don't fill the SSDs
+
+# 2014-06-18:
+ - This update makes alert editing a lot more intuitive.
+
+# 2014-05-22:
+ - This upgrade brings several major improvements including a new footer, social links, several new or updated pages, a
+   new homepage and a feature tour. It's much-needed polish.
+ - Several small apps have been combined into the "simple_pages" app. This should vastly simplify finding the right
+   code for the task at hand but otherwise should not have any noticeable effects.
+ - After upgrade, delete any flatpages that have been replaced by the new simple_pages app.
+
+# 2013-11-25:
+ - This revision adds a new script that will welcome new users whenever it is called. It will send an email to anybody
+   that's new in the last 24 hours each time it is called. If you wish to use it, simply add it to your crontab.
+ - This revision also tweaks Solr in a way that should not cause any problems for folks on 4.0 or 4.1, but that will
+   make it perform faster in production.
+
+# 2013-11-15:
+ - This upgrades Solr to version 4.1, which supports file listeners. To upgrade Solr, simply:
+   - Download Solr version 4.1 with:
+        - cd ~/Downloads/
+        - wget https://archive.apache.org/dist/lucene/solr/4.1.0/solr-4.1.0.tgz
+   - Unpack the tgz file with:
+        - tar -x -f solr-4.1.0.tgz
+   - Set up the INSTALL_ROOT variable:
+        - source /etc/courtlistener
+   - Stop Solr, swap in the correct version and restart solr:
+        - sudo service solr stop
+        - sudo mv /usr/local/solr /usr/local/solr-4.0.bak && sudo mv ~/Downloads/solr-4.1.0 /usr/local/solr
+        - sudo mv /usr/local/solr/example/solr/collection1/conf/solrconfig.xml /usr/local/solr/example/solr/collection1/conf/solrconfig.orig
+        - sudo ln -s -f $INSTALL_ROOT/Solr/conf/solrconfig.xml /usr/local/solr/example/solr/collection1/conf/solrconfig.xml
+        - sudo ln -s -f $INSTALL_ROOT/Solr/conf/schema.xml /usr/local/solr/example/solr/collection1/conf/schema.xml
+        - sudo service solr start
+
+
+# 2013-11-08:
+ - This initiates the work on the API. To roll this out:
+   - install django-tastypie: sudo pip install django-tastypie==0.10.0
+       - This version has a bug (https://github.com/toastdriven/django-tastypie/issues/1005) that makes migrations fail
+         so we fix that manually. To do so, open:
+           - sudo vi /usr/local/lib/python2.7/dist-packages/tastypie/migrations/0001_initial.py and
+           - sudo vi /usr/local/lib/python2.7/dist-packages/tastypie/migrations/0002_add_apikey_index.py
+         Inside each file there is an import that says "from __future__ import unicode_literals" just remove that line
+         from each file.
+   - install python-mimeparse: sudo pip install python-mimeparse==0.1.4
+   - install defusedxml: sudo pip install defusedxml
+   - migrate the database: manage.py migrate
+
+# 2013-11-05:
+ - This deploys the pagerank algorithm, which requires that Solr be restarted. Restart solr with:
+   % sudo service solr restart
+
+# 2013-10-28:
+ - The lawbox code is ready to go at long last. To make it live and to update all the needed resources on the site:
+   + Check opinion count before beginning: 951,929
+   + Pull the latest code, migrate, static files, and touch it live.
+   + Import lawbox files using the script.
+        + They are now in the database, but not the index.
+   - Delete the old dump files and kick off the rebuild dump_all_cases.py
+   - Kick off cl_add_citations_to_docs to make the data go live in the index.
+   - Multi-merges.
+   - Update the fixtures.
+   - Some bug with the counts on the jurisdiction page
+
+
+# 2013-10-21:
+ - Removes public.resource.org polling. If you have used this, remove the cached file in the robots directory and any
+   associated cron jobs.
+ - Moves and re-works the alert tool. If you have cron jobs that depended on it, it's now moved to the proper location
+   and you'll need to update your cron jobs.
+
+# 2013-09-25:
+ - Django has been upgraded to version 1.5.4, at last. This was long overdue, but Django finally forced our hand with
+   old bugs and new features (a one-two punch of hate/awesome). To upgrade to the new version, you're going to have to
+   do some not fun work, alas.
+ - Some new features this comes with:
+    - Security:
+       - Click jacking is now prevented by setting the X-Frame-Options HTTP header to SAMEORIGIN.
+       - The hashing algorithm we use for user's passwords has been updated to PBKDF2
+       - Our Cross-Site Request Forgery cookies will now be sent over HTTPS.
+       - Sensitive variables will no longer be sent in our error emails
+       - Security measures to prevent cache poisoning have been put in place.
+       - A number of other minor security fixes
+    - UX:
+       - All elements on all pages should now be timezone aware, and will be presented in the user's time zone.
+    - Developers:
+       - The wonderful {% elif %} template tag is now available and implemented everywhere that makes sense. I've waited
+         years for this tag.
+       - Documentation for the releases is at:
+          - https://docs.djangoproject.com/en/dev/releases/
+ - Upgrade process:
+    - Install Localflavor (it was spun out of the Django project itself):
+
+        sudo pip install django-localflavor==1.0
+
+    - Ensure pytz is installed with:
+
+        sudo pip install pytz --upgrade
+
+    - Upgrade django-debug-toolbar if you're on a development machine. Normally we would choose a specific version to
+      develop against, but the currently released version has a deprecation warning with Django 1.5 (fun!). Since we
+      only use this on development machines, it's OK to have a rolling dev version. We'll lock this down after their
+      next release, when the deprecation is fixed (as it is in dev).
+
+      On all machines, run:
+        sudo pip uninstall django-debug-toolbar
+
+      On dev machines only, run (our prod machines no longer have this dependency, a performance boost):
+        sudo pip install django-debug-toolbar==dev
+
+    - pull the latest code
+    - enable management mode if on a production system.
+    - upgrade django:
+        sudo pip install django==1.5.4 --upgrade
+    - Migrate django
+        manage.py migrate
+    - restart celery if on a production machine.
+
+# 2013-09-24:
+ - We've added two new fields to the Document model that will need to be migrated with:
+
+    manage.py migrate search
+
+# 2013-09-21:
+ - I've added a new feature that allows us to log stats. It it has the signature of tally_stat('name_of_stat', inc=1,
+   date=date.today()), which, if not self explanatory should be pretty clear. As you might expect, it comes with a
+   database change, which you'll need tohg s run:
+
+     manage.py migrate stats
+
+   With that complete, a number of the major CL features will begin logging their work.
+
+
+# 2013-09-17:
+ - BEFORE PULL: We've finally (*finally*) dealt with Python's painful logging system and deployed logging. To make
+   this work, you'll need a directory at /var/log/courtlistener/ that the server can write to. Create it with:
+
+     sudo mkdir /var/log/courtlistener/
+     sudo chmod 777 /var/log/courtlistener/
+
+ - BEFORE PULL: The donation system has been fully deployed. To make the donation system work, you need to set up the
+   payment related section of 05-private.example in your 05-private.py file. To get these keys, you'll need to set up
+   accounts with PayPal, Dwolla and Stripe. At a minimum, you need to set up these variables:
+
+   PAYMENT_TESTING_MODE = False
+
+
+# 2013-09-16:
+ - OVERVIEW: This update contains a number of large fixes, which will alter
+   your database in a number of ways. It lands the beginning work for the
+   Lawbox corpus import (including > 300 new courts), and lands the initial
+   work for a donation page. Between these two changes, hundreds of changes
+   have been made to the codebase, which will take a bit of work to upgrade.
+   Before we begin, turn off the scrapers with:
+
+     sudo service scrapers stop
+
+   Once that's complete, proceed through the steps below.
+
+ - CourtListener has been modified to support multiple installations on a
+   single computer. For this to work, a new file must be created at
+   /etc/courtlistener, with contents like the following:
+
+     INSTALL_ROOT='/home/mlissner/Programming/intellij/courtlistener'
+
+   This variable will be used by both bash scripts and all Django scripts
+   henceforth for determining where CourtListener is installed. If you are a
+   developer with multiple installations, this will make your life considerably
+   easier, as you can simply change this variable to automatically update all
+   of your Django settings.
+
+   If you are wondering why an environmental variable cannot be used instead
+   of a configuration file, the reason is that oddly, environment variables
+   cannot be changed on the fly without restarting the computer. Please see
+   this stackoverflow question and my answer for more details:
+
+     http://stackoverflow.com/questions/8677504/setting-environment-variable-globally-without-restarting-ubuntu/18388854#18388854
+
+ - Hundreds of new courts have been added to court_data.json and will be
+   installed automatically, but there are some conflicts with the current
+   courts that need to be fixed first. To do that, in a Python shell run:
+
+        from search.models import Court
+        c = Court.objects.get(pk="calctapp")
+        c.position = 350.1
+        c.save()
+        c = Court.objects.get(pk="wva")
+        c.position = 385.1
+        c.save()
+        c = Court.objects.get(pk="ark")
+        c.position = 330.0
+        c.save()
+        c = Court.objects.get(pk="ri")
+        c.position = 367.3
+        c.save()
+        c = Court.objects.get(pk="nj")
+        c.position = 366.55
+        c.save()
+
+   The remainder of the courts will get updated automatically when you perform
+   the next steps.
+
+ - the user profiles have been updated to support donations. Update your
+   database with:
+
+    manage.py migrate donate
+    manage.py migrate userHandling
+
+   A new fixture has also been added that will automatically populate your
+   database with 56 bar membership jurisdictions.
+
+ - we've added payment support, which introduces a new dependency. Install it
+   with:
+
+    sudo pip install --index-url https://code.stripe.com --upgrade stripe
+
+ - A new dependency has been added. Install it with:
+
+   $ sudo aptitude install curl
+
+ - The database has been updated to include date_modified fields, support the
+   lawbox use case, and to support much greater citation granularity. Migrate
+   your database with:
+
+    manage.py migrate search
+    manage.py migrate favorites
+
+ - Our data dumps have been expanded to continue mirroring our database. They
+   now contain many additional fields for citations: federal_cite_one,
+   federal_cite_two, federal_cite_three, state_cite_one, state_cite_two,
+   state_cite_three, state_regional_cite, specialty_cite_one, scotus_early_cite
+   and westlaw_cite. The goal of this change is to provide  much greater
+   granularity to those that are importing this data, splitting out parallel
+   citations into more understandable fields.
+
+   Be sure to delete old copies of the dumps so they are no longer cached, and
+   at the end we will create the monthly dump so it is cached.
+
+ - The Solr backend has been updated to deprecate the westCite field and rename
+   it as simply "citation". The old field will continue working for at least
+   one year, though alerts and documentation have been updated to begin phasing
+   it out.
+
+   To create a new Solr core and smoothly swap it in takes a few incantations:
+
+   First, set up a session that supports (dis/re)connection:
+     % screen
+
+   Halt the scrapers and restart Solr to bring in the new schema
+     % sudo service solr restart
+
+   Create a new Solr core named "swap_core", using the normal core's settings,
+   and in a Python shell:
+
+     % manage.py shell
+     >>> from alert.lib.solr_core_admin import *
+     >>> from alert import settings
+     >>> create_solr_core("swap_core", data_dir='%s/Solr/data/2/' % settings.INSTALL_ROOT)
+
+   The cl_update_index command has been updated with a new argument,
+   --solr-url, that allows users to override the default SOLR_URL value that is
+   normally pulled from the site-wide settings. Use the new argument to reindex
+   all content to the new core we just created. This will take several hours on
+   a large index and require twice the disk space and memory your Solr index
+   currently uses:
+
+     % manage.py cl_update_index --everything --update --optimize --solr-url='http://127.0.0.1:8983/solr/swap_core'
+
+   Once complete, swap the indexes in your Python shell with:
+
+     >>> swap_solr_core('collection1', 'swap_core')
+
+   Note that the core named "swap_core" is now your old core (the one from
+   before we began the upgrade). This can be confusing -- you've been warned!
+
+   Test your system at this point to ensure that the new citation field is
+   working.
+
+   Delete the old core and index:
+
+     >>> delete_solr_core('swap_core', delete_index=True)
+
+ - The variables SERVER_EMAIL and DEFAULT_FROM_EMAIL have been changed from
+   'noreply@courtlistener.com' to 'CourtListener <noreply@courtlistener.com>'
+   to provide a proper name to email readers. This is changed in the default
+   variable file, but can be overridden in your 05-private.py file, if desired.
+
+ - A new page has been added at /api/jurisdictions/ if you wish to include it
+   in your sitemaps.
+
+ - And finally, restart the scrapers:
+
+    % sudo service scrapers start
+
+   And if this is a production system, regenerate the monthly dump that we
+   deleted.
+
+    % sudo -u www-data /usr/bin/python /var/www/court-listener/alert/dump_all_cases.py
+
+
+# 2013-07-07:
+ - The piwik configuration has been merged into the virtual host for the main site. If you are using piwik, you will
+   need to restart your apache server to enable this configuration. After this change, piwik will be located at
+   /piwik rather than as a subdomain.
+
+
+# 2013-07-03:
+ - Adds a notes field to the Courts model. Migrate your database with:
+
+    manage.py migrate search
+
+   And you'll be good to go.
+
+# 2013-06-27:
+ - This release will require downtime and will put your site into management mode upon pulling it.
+ - judge, suitNature and citeCount have been added to the Solr configuration. judges and nature_of_suit have been added
+   to the Document model.Unfortunately, these require a recrawl of the database into the Solr index and a migration of
+   the database. To realize these changes:
+
+     sudo -u www-data pull -u
+     sudo service apache2 restart # Welcome to management mode.
+     sudo servce scraper stop
+     manage.py migrate search
+     manage.py cl_update_index --delete --everything
+     sudo service solr restart
+     sudo service celeryd restart
+     manage.py cl_update_index --update --everything
+     sudo servce scraper start
+
+   There have also been changes to the settings to enable staticfiles as indicated below, and settings have been
+   overhauled to make them much simpler.
+
+   To effect the changes to settings, copy 05-private.example to 05-private.py, and edit it as needed. Once complete,
+   delete 20-private.py or rename it with a different extension, if you need a backup.
+
+   At this point your system should be upgraded, and you can disable the management mode in urls.py, then restart apache
+   again.
+
+ - We've moved to using django.contrib.staticfiles[1]. This introduces better management of static files and moves CL
+   towards standard Django practices in versions >= 1.3, but presents several changes for the project:
+    - When deploying, there are new commands that must be run if there are any new static files:
+       manage.py collectstatic
+    - The locations of static files have been distributed to either the app they correspond with or to a new directory,
+      "alert/assets/static-global", that contains static items that have a global scope across apps. Within each app
+      there is a /static/ directory where their own static files should go. Files are not served from these locations,
+      but are instead collected into the "alert/assets/static/" directory upon deploying the app.
+    - Changes have been made to the apache configuration which will make it serve files from the new location. These
+      changes require that Apache be restarted after pulling from hg.
+    - urls.py has been simplified, since django.contrib.staticfiles serves static files automatically when
+      DEBUG == True.
+    - Nearly all templates have been altered to use this app, introducing the possibility of missing images, css or JS.
+
+ [1]: https://docs.djangoproject.com/en/1.3/howto/static-files/#staticfiles-in-templates
+
+
+# 2013-06-20:
+ - The add_citations script has been converted to a management command. Any previous usages of it will need to be
+   updated to use manage.py cl_add_citations_to_docs. It remains mostly API compatible, but management commands do
+   not support variable numbers of arguments so the doc_ids parameter is now doc_id. It takes an int instead of an
+   iterable.
+
+# 2013-06-19:
+ - Numerous changes to the models have been made to rename variables. Please update your database after pulling the
+   code. This should be an instant migration in PostGres.
+
+     manage.py migrate search
+
+ - The dependency on the requests library has been updated to version 1.2.3:
+
+   sudo pip uninstall requests
+   sudo apt-get purge python-requests
+   sudo pip install requests==1.2.3
+
+ - The scrape_and_extract.py script has been converted to the cl_scrape_and_extract management command. It is API
+   compatible in terms of args, but any jobs calling the script will need to be updated.

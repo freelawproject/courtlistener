@@ -35,7 +35,7 @@ def inspect(dir_name):
             except KeyError:
                 fonts[font] = 1
 
-    sorted_fonts = sorted(fonts.iteritems(), key=operator.itemgetter(1), reverse=True)
+    sorted_fonts = sorted(fonts.items(), key=operator.itemgetter(1), reverse=True)
     for font_count in sorted_fonts:
         print '%s, %s' % font_count
 

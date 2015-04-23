@@ -1,0 +1,60 @@
+##################
+# Debug settings #
+##################
+DEBUG = True
+TEMPLATE_DEBUG = DEBUG
+# DEBUG can be set to True on any machine, but this is used to tune down
+# resource consumption (SOLR, queryset iterator size, etc) on dev machines.
+DEVELOPMENT = True
+
+ADMINS = (
+    ('Joe Schmoe', 'joe@courtlistener.com'),
+)
+
+MANAGERS = ADMINS
+
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': 'courtlistener',
+        'USER': 'django',
+        'PASSWORD': 'your-password',
+        'HOST': '',
+        'PORT': '',
+    },
+}
+
+# Make these unique, and don't share it with anybody.
+SECRET_KEY = 'your-secret-key'
+if not DEVELOPMENT:
+    CELERY_PASSWORD = 'your-celery-password'
+
+# Payment secrets
+EIN = ''  # The business tax ID.
+if DEVELOPMENT:
+    PAYMENT_TESTING_MODE = True
+else:
+    PAYMENT_TESTING_MODE = False
+if PAYMENT_TESTING_MODE:
+    PAYPAL_ENDPOINT = 'https://api.sandbox.paypal.com'
+    PAYPAL_ACCOUNT = 'donate-facilitator@freelawproject.org'
+    PAYPAL_CLIENT_ID = ''
+    PAYPAL_SECRET_KEY = ''
+    STRIPE_SECRET_KEY = ''
+    STRIPE_PUBLIC_KEY = ''
+else:
+    PAYPAL_ENDPOINT = 'https://api.paypal.com'
+    PAYPAL_ACCOUNT = 'donate@freelawproject.org'
+    PAYPAL_CLIENT_ID = ''
+    PAYPAL_SECRET_KEY = ''
+    STRIPE_SECRET_KEY = ''
+    STRIPE_PUBLIC_KEY = ''
+
+
+# Local time zone for this installation. Choices can be found here:
+# http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
+# although not all choices may be available on all operating systems.
+# If running in a Windows environment this must be set to the same as your
+# system time zone.
+TIME_ZONE = 'America/Los_Angeles'

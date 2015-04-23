@@ -1,0 +1,13 @@
+[Unit]
+Description=Juriscraper
+After=syslog.target network.target remote-fs.target nss-lookup.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/courtlistener
+ExecStart=/usr/bin/python $INSTALL_ROOT/manage.py cl_scrape_and_extract -d -c juriscraper.opinions.united_states
+Restart=on-failure
+User=www-data
+
+[Install]
+WantedBy=multi-user.target

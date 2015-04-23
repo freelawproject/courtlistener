@@ -1,0 +1,122 @@
+[
+  {
+    "pk": "scotus",
+    "model": "search.court",
+    "fields": {
+      "jurisdiction": "F",
+      "end_date": null,
+      "citation_string": "SCOTUS",
+      "short_name": "Supreme Court",
+      "in_use": true,
+      "url": "http://supremecourt.gov/",
+      "notes": "",
+      "date_modified": "2013-08-14T16:46:30Z",
+      "full_name": "Supreme Court of the United States",
+      "position": 1.0,
+      "has_opinion_scraper": true,
+      "has_oral_argument_scraper": false,
+      "start_date": "1789-09-24"
+    }
+  },
+  {
+    "fields": {
+      "date_blocked": null,
+      "date_reargument_denied": null,
+      "court": "scotus",
+      "date_reargued": null,
+      "case_name_full": "",
+      "date_argued": "1982-05-09",
+      "date_modified": "2015-07-23T23:07:27.419Z",
+      "case_name": "afsd",
+      "case_name_short": "",
+      "docket_number": "asdf",
+      "slug": "afsd",
+      "blocked": false
+    },
+    "model": "search.docket",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "date_blocked": null,
+      "case_name_full": "",
+      "lexis_cite": "",
+      "neutral_cite": "",
+      "state_cite_regional": "",
+      "state_cite_two": "",
+      "blocked": false,
+      "state_cite_three": "",
+      "syllabus": "",
+      "federal_cite_three": "",
+      "date_filed": "2015-06-10",
+      "procedural_history": "",
+      "citation_id": null,
+      "source": "C",
+      "state_cite_one": "",
+      "panel": [],
+      "per_curiam": false,
+      "federal_cite_one": "",
+      "judges": "",
+      "case_name": "Brickett v. HSBC Bank USA, N.A.",
+      "westlaw_cite": "",
+      "attorneys": "",
+      "slug": "brickett-v-hsbc-bank-usa-na",
+      "posture": "",
+      "scotus_early_cite": "",
+      "federal_cite_two": "",
+      "date_modified": "2015-07-09T17:06:31.289Z",
+      "precedential_status": "Unpublished",
+      "citation_count": 0,
+      "supreme_court_db_id": "",
+      "specialty_cite_one": "",
+      "nature_of_suit": "",
+      "non_participating_judges": [],
+      "docket": 1
+    },
+    "model": "search.opinioncluster",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "time_retrieved": "2015-07-28T00:00:03.227Z",
+      "sha1": "c4d265d6dfda89dc16b5ccd0ac28f8b1ea779351",
+      "date_modified": "2015-07-28T00:00:03.841Z",
+      "extracted_by_ocr": false,
+      "html_mayer": null,
+      "author": null,
+      "plain_text": "the plain text",
+      "html": "",
+      "download_url": "http://media.ca1.uscourts.gov/pdf.opinions/13-1632P-01A.pdf",
+      "cluster": 1,
+      "html_with_citations": "contents of html with citations",
+      "local_path": "pdf/2015/07/06/united_states_v._garcia-ortiz.pdf",
+      "joined_by": [],
+      "html_lawbox": "",
+      "type": "combined"
+    },
+    "model": "search.opinion",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "time_retrieved": "2015-07-28T00:36:35.620Z",
+      "date_blocked": null,
+      "judges": "",
+      "sha1": "f540838e606f15585e713812c67537affc0df944",
+      "local_path_original_file": "mp3/2015/07/08/hong_liu_yang_v._loretta_e._lynch.mp3",
+      "date_modified": "2015-07-28T00:36:40.957Z",
+      "case_name_full": "",
+      "processing_complete": true,
+      "download_url": "http://media.ca7.uscourts.gov/sound/external/gw.14-2631.14-2631_07_08_2015.mp3",
+      "case_name": "Hong Liu Yang v. Loretta E. Lynch",
+      "source": "C",
+      "local_path_mp3": "mp3/2015/07/08/hong_liu_yang_v._loretta_e._lynch_cl.mp3",
+      "duration": 653,
+      "panel": [],
+      "docket": 1,
+      "blocked": false
+    },
+    "model": "audio.audio",
+    "pk": 1
+  }
+]

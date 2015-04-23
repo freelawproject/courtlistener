@@ -21,7 +21,7 @@ def fixer(simulate=False, verbose=False):
             print "Fixing document %s: %s" % (doc.pk, doc)
 
         if not simulate:
-            doc.citation.case_name = harmonize(clean_string(doc.citation.case_name))
+            doc.case_name = harmonize(clean_string(doc.case_name))
             doc.citation.save()
 
 
