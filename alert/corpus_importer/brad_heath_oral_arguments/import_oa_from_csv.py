@@ -103,7 +103,6 @@ def download_and_save():
                 source='H',
                 sha1=sha1_hash,
                 case_name=item['case_name'],
-                date_argued=item['date_argued'],
                 download_url=item['url'],
                 processing_complete=False,
             )
@@ -117,6 +116,7 @@ def download_and_save():
             docket = Docket(
                 case_name=item['case_name'],
                 court=court,
+                date_argued=item['date_argued'],
             )
             # Make and associate the file object
             try:

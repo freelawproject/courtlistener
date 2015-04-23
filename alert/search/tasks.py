@@ -39,10 +39,12 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
                 search_item_list.append(SearchAudioFile(item))
             elif type(item) == Document:
                 search_item_list.append(SearchDocument(item))
-        except AttributeError:
-            print "AttributeError trying to add doc.pk: %s" % item.pk
+        except AttributeError as e:
+            print "AttributeError trying to add: %s\n  %s" % (item, e)
+        except ValueError as e:
+            print "ValueError trying to add: %s\n  %s" % (item, e)
         except InvalidDocumentError:
-            print "Unable to parse document %s" % item.pk
+            print "Unable to parse: %s" % item
 
     try:
         si.add(search_item_list)

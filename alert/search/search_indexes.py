@@ -67,8 +67,8 @@ class SearchAudioFile(object):
     def __init__(self, item):
         self.id = item.pk
         self.docket = item.docket_id
-        if item.date_argued is not None:
-            self.dateArgued = datetime.combine(item.date_argued, time())  # Midnight, PST
+        if item.docket.date_argued is not None:
+            self.dateArgued = datetime.combine(item.docket.date_argued, time())  # Midnight, PST
         self.court = item.docket.court.full_name
         self.court_id = item.docket.court_id
         self.court_citation_string = item.docket.court.citation_string

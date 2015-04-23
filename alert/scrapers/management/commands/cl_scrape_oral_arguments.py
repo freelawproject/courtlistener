@@ -25,7 +25,6 @@ class Command(cl_scrape_opinions.Command):
             source='C',
             sha1=sha1_hash,
             case_name=site.case_names[i],
-            date_argued=site.case_dates[i],
             download_url=site.download_urls[i],
             processing_complete=False,
         )
@@ -35,6 +34,7 @@ class Command(cl_scrape_opinions.Command):
             audio_file.docket_number = site.docket_numbers[i]
 
         docket = Docket(
+            date_argued=site.case_dates[i],
             case_name=site.case_names[i],
             court=court,
         )
@@ -105,6 +105,8 @@ class Command(cl_scrape_opinions.Command):
 
                     docket, audio_file = self.associate_meta_data_to_objects(
                         site, i, court, sha1_hash)
+
+                    audio_file.docket = docket
 
                     # Make and associate the file object
                     try:

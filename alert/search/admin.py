@@ -11,7 +11,6 @@ from djcelery.models import (
 class CitationAdmin(admin.ModelAdmin):
     search_fields = (
         'case_name',
-        'docket_number',
         'federal_cite_one'
     )
 

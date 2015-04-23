@@ -42,6 +42,8 @@ We welcome a conversion of these notes to a better process using Fabric.
     - /docket/: This endpoint has four new fields: case_name_full, date_argued,
       date_reargued, and docket_number (which was previously on the Citation
       endpoint).
+    - /audio/: date_argued is no longer on this endpoint and is instead on the
+      docket endpoint.
 
 
 Today we begin upgrading the database to support the new data that we will be
