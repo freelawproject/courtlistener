@@ -13,16 +13,16 @@ from django.utils.encoding import smart_unicode
 # changes here need to be mirrored in the coverage page view and Solr configs
 # Note that spaces cannot be used in the keys, or else the SearchForm won't work
 JURISDICTIONS = (
-    ('F', 'Federal Appellate'),
-    ('FD', 'Federal District'),
-    ('FB', 'Federal Bankruptcy'),
+    ('F',   'Federal Appellate'),
+    ('FD',  'Federal District'),
+    ('FB',  'Federal Bankruptcy'),
     ('FBP', 'Federal Bankruptcy Panel'),
-    ('FS', 'Federal Special'),
-    ('S', 'State Supreme'),
-    ('SA', 'State Appellate'),
-    ('SS', 'State Special'),
-    ('C', 'Committee'),
-    ('T', 'Testing'),
+    ('FS',  'Federal Special'),
+    ('S',   'State Supreme'),
+    ('SA',  'State Appellate'),
+    ('SS',  'State Special'),
+    ('C',   'Committee'),
+    ('T',   'Testing'),
 )
 
 DOCUMENT_STATUSES = (
@@ -360,6 +360,87 @@ class Document(models.Model):
         editable=False,
         db_index=True,
         null=True,
+    )
+    slug = models.SlugField(
+        help_text="URL that the document should map to (the slug)",
+        max_length=50,
+        null=True
+    )
+    case_name = models.TextField(
+        help_text="The full name of the case",
+        blank=True
+    )
+    federal_cite_one = models.CharField(
+        help_text="Primary federal citation",
+        max_length=50,
+        blank=True,
+        null=True
+    )
+    federal_cite_two = models.CharField(
+        help_text="Secondary federal citation",
+        max_length=50,
+        blank=True,
+        null=True
+    )
+    federal_cite_three = models.CharField(
+        help_text="Tertiary federal citation",
+        max_length=50,
+        blank=True,
+        null=True
+    )
+    state_cite_one = models.CharField(
+        help_text="Primary state citation",
+        max_length=50,
+        blank=True,
+        null=True
+    )
+    state_cite_two = models.CharField(
+        help_text="Secondary state citation",
+        max_length=50,
+        blank=True,
+        null=True
+    )
+    state_cite_three = models.CharField(
+        help_text="Tertiary state citation",
+        max_length=50,
+        blank=True,
+        null=True
+    )
+    state_cite_regional = models.CharField(
+        help_text="Regional citation",
+        max_length=50,
+        blank=True,
+        null=True
+    )
+    specialty_cite_one = models.CharField(
+        help_text="Specialty citation",
+        max_length=50,
+        blank=True,
+        null=True
+    )
+    scotus_early_cite = models.CharField(
+        help_text="Early SCOTUS citation such as How., Black, Cranch., etc.",
+        max_length=50,
+        blank=True,
+        null=True
+    )
+    lexis_cite = models.CharField(
+        help_text="Lexis Nexus citation (e.g. 1 LEXIS 38237)",
+        max_length=50,
+        blank=True,
+        null=True
+    )
+    westlaw_cite = models.CharField(
+        help_text="WestLaw citation (e.g. 22 WL 238)",
+        max_length=50,
+        blank=True,
+        null=True
+    )
+    neutral_cite = models.CharField(
+        help_text='Neutral citation',
+        max_length=50,
+        blank=True,
+        null=True
     )
     date_filed = models.DateField(
         help_text="The date filed by the court",
