@@ -5,7 +5,9 @@ from south.v2 import DataMigration
 from django.db import models
 
 class Migration(DataMigration):
-
+    needed_by = (
+        ("audio", "0002_auto__del_field_audio_date_argued__del_field_audio_docket_number"),
+    )
     def forwards(self, orm):
         """A few fields are handled in this migration:
 
@@ -20,8 +22,8 @@ class Migration(DataMigration):
         # Use orm.ModelName to refer to models in this application,
         # and orm['appname.ModelName'] for models in other applications.
         for docket in orm.Docket.objects.all().iterator():
-            print "Working on docket file: %s" % docket.pk
-            no_documents, no_audio_files = False
+            print "   > Working on docket file: %s" % docket.pk
+            no_documents, no_audio_files = False, False
             try:
                 doc = docket.documents.all()[0]
                 docket.docket_number = doc.citation.docket_number
@@ -38,12 +40,27 @@ class Migration(DataMigration):
                 no_audio_files = True
 
             if no_documents and no_audio_files:
-                # It's an orphaned Docket. Kill it.
+                print "    > Orphaned Docket. Deleting."
                 docket.delete()
 
     def backwards(self, orm):
         for docket in orm.Docket.objects.all().iterator():
             print "Reverting docket file: %s" % docket.pk
+            try:
+                cite = docket.documents.all()[0].citation
+                cite.docket_number = docket.docket_number
+                cite.save()
+            except IndexError:
+                pass
+
+            try:
+                af = docket.audio_files.all()[0]
+                af.docket_number = docket.docket_number
+                af.date_argued = docket.date_argued
+                af.save()
+            except IndexError:
+                pass
+
             docket.date_argued = None
             docket.docket_number = None
             docket.save()
