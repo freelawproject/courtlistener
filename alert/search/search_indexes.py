@@ -37,7 +37,7 @@ class SearchDocument(object):
                                        % (self.docket.court_id, item.pk))
         self.judge = item.judges
         self.suitNature = item.nature_of_suit
-        self.docketNumber = item.citation.docket_number
+        self.docketNumber = item.docket.docket_number
         self.lexisCite = item.citation.lexis_cite
         self.neutralCite = item.citation.neutral_cite
         self.status = item.get_precedential_status_display()
@@ -46,12 +46,12 @@ class SearchDocument(object):
         self.local_path = unicode(item.local_path)
         self.citation = make_citation_string(item)
         # Assign the docket number and/or the citation to the caseNumber field
-        if item.citation and item.citation.docket_number:
-            self.caseNumber = '%s, %s' % (self.citation, item.citation.docket_number)
+        if item.citation and item.docket.docket_number:
+            self.caseNumber = '%s, %s' % (self.citation, item.docket.docket_number)
         elif item.citation:
             self.caseNumber = self.citation
-        elif item.citation.docket_number:
-            self.caseNumber = self.citation.docket_number
+        elif item.docket.docket_number:
+            self.caseNumber = self.docket.docket_number
 
         # Load the document text using a template for cleanup and concatenation
         text_template = loader.get_template('search/indexes/opinion_text.txt')
@@ -81,7 +81,7 @@ class SearchAudioFile(object):
                 "Unable to save to index due to missing absolute_url: %s"
                 % item.pk)
         self.judge = item.judges
-        self.docketNumber = item.docket_number
+        self.docketNumber = item.docket.docket_number
         self.file_size_mp3 = item.local_path_mp3.size
         self.duration = item.duration
         self.source = item.source

@@ -70,7 +70,7 @@ if __name__ == '__main__':
         if item['judges']:
             af.judges = item['judges']
         if item['docket_number']:
-            af.docket_number = item['docket_number']
+            af.docket.docket_number = item['docket_number']
 
         court = Court.objects.get(pk=item['court_code'])
         docket.court = court

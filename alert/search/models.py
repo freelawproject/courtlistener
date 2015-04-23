@@ -219,12 +219,6 @@ class Citation(models.Model):
         help_text="The full name of the case",
         blank=True
     )
-    docket_number = models.CharField(
-        help_text="The docket numbers of a case, can be consolidated and quite long",
-        max_length=5000,  # sometimes these are consolidated, hence they need to be long (was 50, 100, 300, 1000).
-        blank=True,
-        null=True
-    )
     federal_cite_one = models.CharField(
         help_text="Primary federal citation",
         max_length=50,
@@ -521,8 +515,8 @@ class Document(models.Model):
         elif self.citation.lexis_cite:
             # If only LEXIS
             caption += ", %s" % self.citation.lexis_cite
-        elif self.citation.docket_number:
-            caption += ", %s" % self.citation.docket_number
+        elif self.docket.docket_number:
+            caption += ", %s" % self.docket.docket_number
         caption += ' ('
         if self.docket.court.citation_string != 'SCOTUS':
             caption += re.sub(' ', '&nbsp;', self.docket.court.citation_string)

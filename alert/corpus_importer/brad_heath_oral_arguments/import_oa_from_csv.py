@@ -110,7 +110,7 @@ def download_and_save():
             if item['judges']:
                 audio_file.judges = item['judges']
             if item['docket_number']:
-                audio_file.docket_number = item['docket_number']
+                audio_file.docket.docket_number = item['docket_number']
 
             court = Court.objects.get(pk=item['court_code'])
 

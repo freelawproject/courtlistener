@@ -306,7 +306,7 @@ def set_mp3_meta_data(audio_obj, mp3_path):
     audio_file.tag.comments.set(
         u'Argued: {date_argued}. Docket number: {docket_number}'.format(
             date_argued=audio_obj.date_argued.strftime('%Y-%m-%d'),
-            docket_number=audio_obj.docket_number,
+            docket_number=audio_obj.docket.docket_number,
         ))
     audio_file.tag.genre = u'Speech'
     audio_file.tag.publisher = u'Free Law Project'

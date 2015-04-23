@@ -203,8 +203,6 @@ class Command(BaseCommand):
         Returns the created objects.
         """
         cite = Citation(case_name=site.case_names[i])
-        if site.docket_numbers:
-            cite.docket_number = site.docket_numbers[i]
         if site.neutral_citations:
             cite.neutral_cite = site.neutral_citations[i]
         if site.west_citations:
@@ -212,10 +210,11 @@ class Command(BaseCommand):
         if site.west_state_citations:
             cite.west_state_cite = site.west_state_citations[i]
 
-        docket = Docket(
-            case_name=site.case_names[i],
-            court=court,
-        )
+        docket = Docket()
+        if site.docket_numbers:
+            docket.docket_number = site.docket_numbers[i]
+        docket.case_name = site.case_names[i]
+        docket.court = court
 
         doc = Document(
             source='C',

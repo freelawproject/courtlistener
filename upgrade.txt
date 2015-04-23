@@ -25,7 +25,24 @@ We welcome a conversion of these notes to a better process using Fabric.
 
 ----------------------------
 
-2015-04-21:
+
+
+# The great Database Upgrade
+
+## API Deprecations and changes:
+
+ - all versions:
+    - /citation/: This endpoint no longer has docket_number values, because
+      they have been moved to the v2 Docket endpoint. Further, endpoints that
+      embed the citation object will no longer have docket number.
+    values.
+ - v1:
+    - None yet!
+ - v2:
+    - /docket/: This endpoint has four new fields: case_name_full, date_argued,
+      date_reargued, and docket_number (which was previously on the Citation
+      endpoint).
+
 
 Today we begin upgrading the database to support the new data that we will be
 importing. Most of these changes should occur automatically when the migrations
@@ -34,7 +51,9 @@ amount of time to run.
 
 1. The first migration adds fields to the docket object without updating any
 code. It should not cause any issues and should apply nearly instantly.
-1.
+1. The next migration moves the docket_number and date_argued values to the
+   docket
+1. The next migration deletes these fields.
 
 
 2014-12-30:

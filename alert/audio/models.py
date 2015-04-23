@@ -27,13 +27,6 @@ class Audio(models.Model):
         help_text="The full name of the case",
         blank=True,
     )
-    docket_number = models.CharField(
-        help_text="The docket numbers of a case, can be consolidated and "
-                  "quite long",
-        max_length=5000,  # (was 50, 100, 300, 1000).
-        blank=True,
-        null=True,
-    )
     judges = models.TextField(
         help_text="The judges that brought the opinion as a simple text "
                   "string",
@@ -51,12 +44,6 @@ class Audio(models.Model):
                   " 1750 indicates the value is unknown",
         auto_now=True,
         editable=False,
-        db_index=True,
-    )
-    date_argued = models.DateField(
-        help_text="the date the case was argued",
-        blank=True,
-        null=True,
         db_index=True,
     )
     sha1 = models.CharField(
