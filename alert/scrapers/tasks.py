@@ -290,7 +290,16 @@ def set_mp3_meta_data(audio_obj, mp3_path):
         '--quiet',
         mp3_path,
     ]
-    _ = subprocess.check_output(eyed3_command, stderr=subprocess.STDOUT)
+    try:
+        _ = subprocess.check_output(
+            eyed3_command,
+            stderr=subprocess.STDOUT
+        )
+    except subprocess.CalledProcessError, e:
+        print 'eyeD3 failed command: %s\nerror code: %s\noutput: %s\n' % \
+              (eyed3_command, e.returncode, e.output)
+        print traceback.format_exc()
+        raise
 
     # Load the file, then create a fresh tag.
     audio_file = eyed3.load(mp3_path)
