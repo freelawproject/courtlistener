@@ -74,8 +74,46 @@
                         search engines (more detail at right).
                     </li>
                 </ol>
+                <h3 id="fields">Important notes about document fields</h3>
+                <p>Whether you use our bulk data or our REST API, the most frequent question we
+                   receive is people wondering what the different document fields mean and why they are
+                   sometimes populated and sometimes not. Here are the details:</p>
+                <p>We have a source field to indicate the source of the document/audio file, one of: 
+                   C (court website), R (public.resource.org), CR (court website merged with resource.org), 
+                   L (lawbox), LC (lawbox merged with court), LR (lawbox merged with resource.org), 
+                   LCR (lawbox merged with court and resource.org), M (manual input), A (internet archive),
+                   or H (brad heath archive).</p>
+                <p>The source field gives you an idea where you might find document text. We have
+                   several fields that may or may not be used, depending on our source. There is:
+                   <ol>
+                      <li>a <code>plain_text</code> field: This is always created (usually from a pdf via pdftotext) 
+                          so that we can put the plain text into the search engine.
+                          There's very rarely a court that actually posts opinions in plain text, so in 
+                          those instances it might even reflect the original source document.
+                      </li>
+                      <li>a <code>html</code> field: This is used when the original document we received was already 
+                          in HTML format. This happens when the courts themselves provide the documents in 
+                          HTML format and includes the documents we got from Public.Resource.Org.
+                      </li>
+                      <li>a <code>html_lawbox</code> field: This is the original format of over a million opinions we 
+                          got from LawBox.
+                      </li>
+                      <li>a <code>html_with_citations</code> field: This is the field we use to put our processed 
+                          version of the opinion in and except for maybe the first hour after we retrieve 
+                          an opinion is always the version displayed on the website. We scan the opinion 
+                          for citations and then hyperlink them to our copies of those cited opinions. Note 
+                          that because recent opinions typically come from PDF and pdftotext doesn't do much 
+                          to maintain a nice structure, we typically have to just wrap the entire opinion in 
+                          PRE tags (and nothing else), so this is "HTML" in a very weak sense of the acronym. 
+                          Only if we got the opinion (from the court in HTML, from LawBox in HTML, or from 
+                          Public.Resource.Org in HTML) might this field contain prettier markup that makes 
+                          the opinion actually look nice online. Most of the documents we archive come as PDFs
+                          and so they look pretty ugly on our site. We've wanted to fix this for years, but 
+                          other demands always intruded... <em>This is the only field that is always guaranteed to 
+                          have content, and therefore most likely the field you want to use for most purposes.</em>
+                      </li>
+                </p>
             </div>
-
             <div class="col-sm-6">
                 <h3 id="privacy">Privacy Concerns</h3>
                 <p>As is explained in our <a href="/removal/">removal policy</a>, we
