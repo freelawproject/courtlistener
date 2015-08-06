@@ -269,7 +269,7 @@ class Command(BaseCommand):
                              court=court,
                              message=msg).save()
                     continue
-                r.content = site.cleanup_content(r.content)
+                content = site.cleanup_content(r.content)
 
                 current_date = site.case_dates[i]
                 try:
@@ -278,7 +278,10 @@ class Command(BaseCommand):
                     next_date = None
 
                 # Make a hash of the data
-                sha1_hash = hashlib.sha1(r.content).hexdigest()
+                if isinstance(content, unicode):
+                    sha1_hash = hashlib.sha1(content.encode('utf-8')).hexdigest()
+                else:
+                    sha1_hash = hashlib.sha1(content).hexdigest()
                 if court_str == 'nev' and \
                                 site.precedential_statuses[i] == 'Unpublished':
                     # Nevada's non-precedential cases have different SHA1
@@ -318,8 +321,8 @@ class Command(BaseCommand):
 
                     # Make and associate the file object
                     try:
-                        cf = ContentFile(r.content)
-                        extension = get_extension(r.content)
+                        cf = ContentFile(content)
+                        extension = get_extension(content)
                         # See bitbucket issue #215 for why this must be
                         # lower-cased.
                         file_name = trunc(site.case_names[i].lower(), 75) + \
