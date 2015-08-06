@@ -269,6 +269,7 @@ class Command(BaseCommand):
                              court=court,
                              message=msg).save()
                     continue
+                r.content = site.cleanup_content(r.content)
 
                 current_date = site.case_dates[i]
                 try:
