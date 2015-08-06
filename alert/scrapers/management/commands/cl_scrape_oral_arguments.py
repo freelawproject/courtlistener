@@ -75,7 +75,7 @@ class Command(cl_scrape_opinions.Command):
                              court=court,
                              message=msg).save()
                     continue
-                r.content = site.cleanup_content(r.content)
+                content = site.cleanup_content(r.content)
 
                 current_date = site.case_dates[i]
                 try:
@@ -83,7 +83,7 @@ class Command(cl_scrape_opinions.Command):
                 except IndexError:
                     next_date = None
 
-                sha1_hash = hashlib.sha1(r.content).hexdigest()
+                sha1_hash = hashlib.sha1(content).hexdigest()
                 onwards = dup_checker.should_we_continue_break_or_carry_on(
                     Audio,
                     current_date,
@@ -109,8 +109,8 @@ class Command(cl_scrape_opinions.Command):
 
                     # Make and associate the file object
                     try:
-                        cf = ContentFile(r.content)
-                        extension = get_extension(r.content)
+                        cf = ContentFile(content)
+                        extension = get_extension(content)
                         if extension not in ['.mp3', '.wma']:
                             extension = '.' + site.download_urls[i].rsplit('.', 1)[1]
                         # See bitbucket issue #215 for why this must be
