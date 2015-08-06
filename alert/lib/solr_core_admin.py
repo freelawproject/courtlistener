@@ -32,8 +32,7 @@ def create_solr_core(core_name, data_dir='/tmp/solr/data',
     }
     r = requests.get('http://localhost:8983/solr/admin/cores', params=params)
     if r.status_code != 200:
-        print "Problem creating core. Got status_code of %s. Check the Solr " \
-              "logs for details." % r.status_code
+        print "Problem creating core. Got status_code of %s. Check the Solr logs for details." % r.status_code
 
 
 def delete_solr_core(core_name, delete_index=True, delete_data_dir=False):
@@ -47,15 +46,14 @@ def delete_solr_core(core_name, delete_index=True, delete_data_dir=False):
     }
     r = requests.get('http://localhost:8983/solr/admin/cores', params=params)
     if r.status_code != 200:
-        print "Problem deleting core. Got status_code of %s. Check the Solr " \
-              "logs for details." % r.status_code
+        print "Problem deleting core. Got status_code of %s. Check the Solr logs for details." % r.status_code
 
 
 def swap_solr_core(current_core, desired_core):
     """Swap cores, keeping on on deck for easy reversion.
 
-    @current_core is the core you are currently using which will be swapped OUT.
-    @desired_core is the core you intend to make live which will be swapped IN.
+    @current_core is the core you are currently using, and which will be swapped OUT.
+    @desired_core is the core you intend to make live, and which will be swapped IN.
     """
     params = {
         'wt': 'json',
@@ -65,8 +63,7 @@ def swap_solr_core(current_core, desired_core):
     }
     r = requests.get('http://localhost:8983/solr/admin/cores', params=params)
     if r.status_code != 200:
-        print "Problem swapping cores. Got status_code of %s. Check the Solr " \
-              "logs for details." % r.status_code
+        print "Problem swapping cores. Got status_code of %s. Check the Solr logs for details." % r.status_code
 
 
 def get_solr_core_status(core='all'):
@@ -78,8 +75,7 @@ def get_solr_core_status(core='all'):
     r = requests.get(
         'http://localhost:8983/solr/admin/cores?action=STATUS%s' % core_query)
     if r.status_code != 200:
-        print "Problem getting the core status. Got status_code of %s. Check " \
-              "the Solr logs for details." % r.status_code
+        print "Problem getting the core status. Got status_code of %s. Check the Solr logs for details." % r.status_code
 
     try:
         solr_config = lxml.etree.parse(StringIO.StringIO(r.content))
@@ -107,8 +103,7 @@ def get_term_frequency(count=500, result_type='dict', field='text'):
         else:
             top_terms = []
             for result in content_as_json['fields']['text']['topTerms']:
-                # Top terms is a list of alternating terms and counts. Their
-                # types are different, so we'll use that.
+                # Top terms is a list of alternating terms and counts. Their types are different, so we'll use that.
                 if isinstance(result, basestring):
                     top_terms.append(result)
             return top_terms
@@ -118,8 +113,7 @@ def get_term_frequency(count=500, result_type='dict', field='text'):
         else:
             top_terms = {}
             for result in content_as_json['fields']['text']['topTerms']:
-                # We set aside the term until we reach its count, then we add
-                # them as a k,v pair
+                # We set aside the term until we reach its count, then we add them as a k,v pair
                 if isinstance(result, basestring):
                     key = result
                 else:
@@ -141,10 +135,7 @@ def get_data_dir_location(core='collection1'):
 
 
 def reload_pagerank_external_file_cache():
-    """Hit the URL of reloadCache to reload ExternalFileField (necessary for
-    Solr version prior to 4.1)
-    """
+    """Hit the URL of reloadCache to reload ExternalFileField (necessory for Solr version prior to 4.1)"""
     r = requests.get('http://localhost:8983/solr/reloadCache')
     if r.status_code != 200:
-        print "Problem reloading cache. Got status_code of %s. Check the Solr " \
-              "logs for details." % r.status_code
+        print "Problem reloading cache. Got status_code of %s. Check the Solr logs for details." % r.status_code

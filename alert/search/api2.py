@@ -116,11 +116,13 @@ class AudioResource(ModelResourceWithFieldsFilter):
             'id': ('exact',),
             'time_retrieved': good_time_filters,
             'date_modified': good_time_filters,
+            'date_argued': good_date_filters,
             'sha1': ('exact',),
             'date_blocked': good_date_filters,
             'blocked': ALL,
         }
-        ordering = ['time_retrieved', 'date_modified', 'date_blocked']
+        ordering = ['time_retrieved', 'date_modified', 'date_argued',
+                    'date_blocked']
 
 
 class DocumentResource(ModelResourceWithFieldsFilter):

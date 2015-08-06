@@ -7,7 +7,7 @@ def make_upload_path(instance, filename):
         # Cannot do proper type checking here because of circular import
         # problems when importing Audio, Document, etc.
         if 'Audio' in str(type(instance)):
-            d = instance.docket.date_argued
+            d = instance.date_argued
         elif 'Document' in str(type(instance)):
             d = instance.date_filed
         else:

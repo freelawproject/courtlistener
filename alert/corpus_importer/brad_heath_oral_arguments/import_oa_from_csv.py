@@ -103,20 +103,20 @@ def download_and_save():
                 source='H',
                 sha1=sha1_hash,
                 case_name=item['case_name'],
+                date_argued=item['date_argued'],
                 download_url=item['url'],
                 processing_complete=False,
             )
             if item['judges']:
                 audio_file.judges = item['judges']
             if item['docket_number']:
-                audio_file.docket.docket_number = item['docket_number']
+                audio_file.docket_number = item['docket_number']
 
             court = Court.objects.get(pk=item['court_code'])
 
             docket = Docket(
                 case_name=item['case_name'],
                 court=court,
-                date_argued=item['date_argued'],
             )
             # Make and associate the file object
             try:

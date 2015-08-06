@@ -10,6 +10,7 @@
 }, "objects": [
     {
         "case_name": "Tarrant Regional Water District v. Herrmann",
+        "docket_number": "11-889",
         "federal_cite_one": "4 fake_west 44",
         "federal_cite_three": null,
         "federal_cite_two": null,
@@ -28,6 +29,7 @@
     },
     {
         "case_name": "In Re Motion for Consent to Disclosure of Court Records",
+        "docket_number": "Misc. 13-01",
         "federal_cite_one": "2 fake_west 4",
         "federal_cite_three": null,
         "federal_cite_two": null,
@@ -59,6 +61,7 @@
         "neutral_cite": "2005 IN 442",
         "state_cite_regional": null,
         "state_cite_two": null,
+        "docket_number": "49S00-0308-DP-392",
         "id": 3,
         "resource_uri": "/api/rest/v1/citation/3/"
     }

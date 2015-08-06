@@ -335,6 +335,7 @@ def scrape_and_parse():
             if DEBUG >= 4:
                 print "precedential_status: " + precedential_status
                 print "west_cite: " + cite.west_cite
+                print "docket_number: " + cite.docket_number
                 print "caseName: " + cite.caseNameFull
 
             # date is kinda tricky...details here:

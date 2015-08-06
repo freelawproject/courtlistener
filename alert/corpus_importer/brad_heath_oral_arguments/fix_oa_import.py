@@ -65,12 +65,12 @@ if __name__ == '__main__':
 
         af.case_name = item['case_name']
         docket.case_name = item['case_name']
-        af.docket.date_argued = item['date_argued']
+        af.date_argued = item['date_argued']
 
         if item['judges']:
             af.judges = item['judges']
         if item['docket_number']:
-            af.docket.docket_number = item['docket_number']
+            af.docket_number = item['docket_number']
 
         court = Court.objects.get(pk=item['court_code'])
         docket.court = court

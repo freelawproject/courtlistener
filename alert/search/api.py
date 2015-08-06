@@ -12,7 +12,6 @@ from tastypie import fields
 from tastypie import authentication
 from tastypie.constants import ALL
 from tastypie.exceptions import BadRequest
-from search.api2 import DocketResource
 
 logger = logging.getLogger(__name__)
 

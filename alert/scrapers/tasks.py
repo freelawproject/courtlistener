@@ -298,20 +298,20 @@ def set_mp3_meta_data(audio_obj, mp3_path):
     audio_file.tag.title = audio_obj.case_name
     audio_file.tag.album = u'{court}, {year}'.format(
         court=court.full_name,
-        year=audio_obj.docket.date_argued.year
+        year=audio_obj.date_argued.year
     )
     audio_file.tag.artist = court.full_name
     audio_file.tag.artist_url = court.url
     audio_file.tag.audio_source_url = audio_obj.download_url
     audio_file.tag.comments.set(
         u'Argued: {date_argued}. Docket number: {docket_number}'.format(
-            date_argued=audio_obj.docket.date_argued.strftime('%Y-%m-%d'),
-            docket_number=audio_obj.docket.docket_number,
+            date_argued=audio_obj.date_argued.strftime('%Y-%m-%d'),
+            docket_number=audio_obj.docket_number,
         ))
     audio_file.tag.genre = u'Speech'
     audio_file.tag.publisher = u'Free Law Project'
     audio_file.tag.publisher_url = u'http://www.freelawproject.org'
-    audio_file.tag.recording_date = audio_obj.docket.date_argued.strftime('%Y-%m-%d')
+    audio_file.tag.recording_date = audio_obj.date_argued.strftime('%Y-%m-%d')
 
     # Add images to the mp3. If it has a seal, use that for the Front Cover
     # and use the FLP logo for the Publisher Logo. If it lacks a seal, use the

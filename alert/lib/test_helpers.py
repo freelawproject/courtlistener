@@ -54,12 +54,12 @@ class SolrTestCase(TestCase):
         for i in range(0, 3):
             cite = Citation(
                 case_name=self.site_opinion.case_names[i],
+                docket_number=self.site_opinion.docket_numbers[i],
                 neutral_cite=self.site_opinion.neutral_citations[i],
                 federal_cite_one=self.site_opinion.west_citations[i],
             )
             cite.save(index=False)
             docket = Docket(
-                docket_number=self.site_opinion.docket_numbers[i],
                 case_name=self.site_opinion.case_names[i],
                 court=self.court,
             )

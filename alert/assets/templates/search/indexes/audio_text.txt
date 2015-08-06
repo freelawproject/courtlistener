@@ -4,4 +4,4 @@
 {{ object.docket.court.citation_string|default_if_none:"" }}
 {{ object.docket.court.pk|default_if_none:"" }}
 {{ object.judges|default_if_none:"" }}
-{{ object.docket.docket_number|default_if_none:"" }}
+{{ object.docket_number|default_if_none:"" }}
