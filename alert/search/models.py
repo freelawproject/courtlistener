@@ -62,19 +62,42 @@ class Docket(models.Model):
         db_index=True,
         null=True,
     )
+    date_argued = models.DateField(
+        help_text="the date the case was argued",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    date_reargued = models.DateField(
+        help_text="the date the case was reargued",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
     court = models.ForeignKey(
         'Court',
         help_text="The court where the docket was filed",
         db_index=True,
-        null=True
+        null=True,
     )
     case_name = models.TextField(
+        help_text="The abridged name of the case",
+        blank=True,
+    )
+    case_name_full = models.TextField(
         help_text="The full name of the case",
-        blank=True
+        blank=True,
     )
     slug = models.SlugField(
         help_text="URL that the document should map to (the slug)",
         max_length=50,
+        null=True,
+    )
+    docket_number = models.CharField(
+        help_text="The docket numbers of a case, can be consolidated and "
+                  "quite long",
+        max_length=5000,  # was 50, 100, 300, 1000
+        blank=True,
         null=True
     )
     date_blocked = models.DateField(
@@ -195,12 +218,6 @@ class Citation(models.Model):
     case_name = models.TextField(
         help_text="The full name of the case",
         blank=True
-    )
-    docket_number = models.CharField(
-        help_text="The docket numbers of a case, can be consolidated and quite long",
-        max_length=5000,  # sometimes these are consolidated, hence they need to be long (was 50, 100, 300, 1000).
-        blank=True,
-        null=True
     )
     federal_cite_one = models.CharField(
         help_text="Primary federal citation",
@@ -498,8 +515,8 @@ class Document(models.Model):
         elif self.citation.lexis_cite:
             # If only LEXIS
             caption += ", %s" % self.citation.lexis_cite
-        elif self.citation.docket_number:
-            caption += ", %s" % self.citation.docket_number
+        elif self.docket.docket_number:
+            caption += ", %s" % self.docket.docket_number
         caption += ' ('
         if self.docket.court.citation_string != 'SCOTUS':
             caption += re.sub(' ', '&nbsp;', self.docket.court.citation_string)

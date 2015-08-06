@@ -139,10 +139,10 @@ def get_dup_stats(doc):
         print "    - main_params are: %s" % main_params
     candidates = conn.raw_query(**main_params).execute()
 
-    if not len(candidates) and doc.citation.docket_number is not None:
+    if not len(candidates) and doc.docket.docket_number is not None:
         # Try by docket number rather than case name
         clean_docket_number_words = []
-        for word in doc.citation.docket_number.split():
+        for word in doc.docket.docket_number.split():
             if not re.search('\d', word):
                 # Must have numbers.
                 continue
@@ -194,8 +194,8 @@ def get_dup_stats(doc):
     # Second, if there were exact hits, we forward those onwards. If not, we
     # forward everything.
     remaining_candidates = []
-    if doc.citation.docket_number:
-        new_docket_number = re.sub("(\D|0)", "", doc.citation.docket_number)
+    if doc.docket.docket_number:
+        new_docket_number = re.sub("(\D|0)", "", doc.docket.docket_number)
         for candidate in candidates:
             if candidate.get('docketNumber'):
                 # Get rid of anything in the docket numbers that's not a digit

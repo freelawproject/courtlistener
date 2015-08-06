@@ -126,8 +126,8 @@
         <p class="bottom">
             <span class="meta-data-header">Date Argued:</span>
             <span class="meta-data-value">
-                {% if af.date_argued %}
-                    {{ af.date_argued|date:"F jS, Y" }}
+                {% if af.docket.date_argued %}
+                    {{ af.docket.date_argued|date:"F jS, Y" }}
                 {% else %}
                     Unknown Date
                 {% endif %}
@@ -142,9 +142,9 @@
         {% endif %}
 
         <p class="bottom">
-            {% if af.docket_number %}
+            {% if af.docket.docket_number %}
                 <span class="meta-data-header">Docket Number: </span>
-                <span class="meta-data-value">{{ af.docket_number }}</span>
+                <span class="meta-data-value">{{ af.docket.docket_number }}</span>
             {% endif %}
         </p>
 

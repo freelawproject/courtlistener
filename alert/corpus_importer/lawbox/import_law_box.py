@@ -580,11 +580,14 @@ def import_law_box_case(case_path):
         download_url=case_path,
     )
 
-    cite = Citation(
-        docket_number=get_docket_number(clean_html_tree, case_path=case_path, court=court)
-    )
+    cite = Citation()
 
     docket = Docket(
+        docket_number=get_docket_number(
+            clean_html_tree,
+            case_path=case_path,
+            court=court
+        ),
         case_name=get_case_name(complete_html_tree, case_path),
         court=court,
     )
@@ -661,11 +664,11 @@ def find_duplicates(doc, case_path):
         return []
     elif len(candidates) == 1:
 
-        if doc.citation.docket_number and candidates[0].get('docketNumber') is not None:
+        if doc.docket.docket_number and candidates[0].get('docketNumber') is not None:
             # One in the other or vice versa
             if (re.sub("(\D|0)", "", candidates[0]['docketNumber']) in
-                                        re.sub("(\D|0)", "", doc.citation.docket_number)) or \
-               (re.sub("(\D|0)", "", doc.citation.docket_number) in
+                                        re.sub("(\D|0)", "", doc.docket.docket_number)) or \
+               (re.sub("(\D|0)", "", doc.docket.docket_number) in
                                         re.sub("(\D|0)", "", candidates[0]['docketNumber'])):
                 log_print("  - Duplicate found: Only one candidate returned and docket number matches.")
                 return [candidates[0]['id']]
@@ -674,7 +677,7 @@ def find_duplicates(doc, case_path):
                     # CIT documents have neutral citations in the database. Look that up and compare against that.
                     candidate_doc = Document.objects.get(pk=candidates[0]['id'])
                     if doc.citation.neutral_cite and candidate_doc.citation.neutral_cite:
-                        if candidate_doc.citation.neutral_cite in doc.citation.docket_number:
+                        if candidate_doc.citation.neutral_cite in doc.docket.docket_number:
                             log_print('  - Duplicate found: One candidate from CIT and its neutral citation matches the new document\'s docket number.')
                             return [candidates[0]['id']]
                 else:
@@ -693,7 +696,7 @@ def find_duplicates(doc, case_path):
 
     else:
         # More than one candidate.
-        if doc.citation.docket_number:
+        if doc.docket.docket_number:
             dups_by_docket_number = dup_helpers.find_same_docket_numbers(doc, candidates)
             if len(dups_by_docket_number) > 1:
                 log_print("  - Duplicates found: %s candidates matched by docket number." % len(dups_by_docket_number))
@@ -737,7 +740,7 @@ def find_duplicates(doc, case_path):
                 # Have to determine by "hand"
                 log_print("  %s) Case name: %s" % (k + 1, doc.citation.case_name))
                 log_print("                 %s" % filtered_candidates[k]['caseName'])
-                log_print("      Docket nums: %s" % doc.citation.docket_number)
+                log_print("      Docket nums: %s" % doc.docket.docket_number)
                 log_print("                   %s" % filtered_candidates[k].get('docketNumber', 'None'))
                 log_print("      Cosine Similarity: %s" % filtered_stats['cos_sims'][k])
                 log_print("      Candidate URL: file://%s" % case_path)

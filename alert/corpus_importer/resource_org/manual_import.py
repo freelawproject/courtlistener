@@ -49,10 +49,10 @@ def import_resource_org_item(case_location):
         vol_tree, case_location_relative)
     cite = Citation(
         case_name=case_name,
-        docket_number=get_docket_number(case_location),
         federal_cite_one=get_west_cite(vol_tree, case_location_relative),
     )
     docket = Docket(
+        docket_number=get_docket_number(case_location),
         court=Court.objects.get(pk=get_court_id(case_tree)),
         case_name=case_name,
     )

@@ -15,12 +15,12 @@ class ViewDocumentTest(TestCase):
         # Add a document to the index
         site = test_opinion_scraper.Site().parse()
         cite = Citation(
-            docket_number=site.docket_numbers[0],
             neutral_cite=site.neutral_citations[0],
             federal_cite_one=site.west_citations[0]
         )
         cite.save(index=False)
         docket = Docket(
+            docket_number=site.docket_numbers[0],
             court=self.court,
             case_name=site.case_names[0],
         )

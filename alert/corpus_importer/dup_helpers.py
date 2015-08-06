@@ -52,8 +52,8 @@ def merge_cases_simple(new, target_id):
 
     # Add the docket number if the old doesn't exist, but keep the old if one
     # does.
-    if not target.citation.docket_number:
-        target.citation.docket_number = new.citation.docket_number
+    if not target.docket.docket_number:
+        target.docket.docket_number = new.docket.docket_number
 
     # Get the citations from the new item (ditch the old).
     target.citation.federal_cite_one = new.citation.federal_cite_one
@@ -109,7 +109,7 @@ def find_same_docket_numbers(doc, candidates):
     each has been cleaned.
 
     """
-    new_docket_number = re.sub('(\D|0)', '', doc.citation.docket_number)
+    new_docket_number = re.sub('(\D|0)', '', doc.docket.docket_number)
     same_docket_numbers = []
     for candidate in candidates:
         old_docket_number = re.sub('(\D|0)', '', candidate.get('docketNumber', ''))

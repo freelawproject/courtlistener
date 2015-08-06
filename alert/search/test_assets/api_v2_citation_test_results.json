@@ -9,7 +9,6 @@
 }, "objects": [
     {
         "case_name": "Tarrant Regional Water District v. Herrmann",
-        "docket_number": "11-889",
         "document_uris": ["/api/rest/v2/document/1/"],
         "federal_cite_one": "4 fake_west 44",
         "federal_cite_three": null,
@@ -28,7 +27,6 @@
     },
     {
         "case_name": "In Re Motion for Consent to Disclosure of Court Records",
-        "docket_number": "Misc. 13-01",
         "document_uris": ["/api/rest/v2/document/2/"],
         "federal_cite_one": "2 fake_west 4",
         "federal_cite_three": null,
@@ -47,7 +45,6 @@
     },
     {
         "case_name": "State of Indiana v. Charles Barker",
-        "docket_number": "49S00-0308-DP-392",
         "document_uris": ["/api/rest/v2/document/3/"],
         "federal_cite_one": "23 fake_west 449",
         "federal_cite_three": null,

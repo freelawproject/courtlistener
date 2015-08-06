@@ -77,11 +77,11 @@ def enhance_item_with_scdb(doc, scdb_info):
 
 def winnow_by_docket_number(docs, d):
     """Go through each of the docs and see if they have a matching docket
-    number. Return only those oness that do.
+    number. Return only those ones that do.
     """
     good_doc_ids = []
     for doc in docs:
-        dn = doc.citation.docket_number
+        dn = doc.docket.docket_number
         if dn is not None:
             dn = dn.replace(', Original', ' ORIG')
             dn = dn.replace('___, ORIGINAL', 'ORIG')
@@ -101,7 +101,7 @@ def get_human_review(docs, d):
         print '    %s: Document %s:' % (i, doc.pk)
         print '      https://www.courtlistener.com/opinion/%s/slug/' % doc.pk
         print '      %s' % doc.citation.case_name
-        print '      %s' % doc.citation.docket_number
+        print '      %s' % doc.docket.docket_number
     print '  SCDB info:'
     print '    %s' % d['caseName']
     print '    %s' % d['docket']
