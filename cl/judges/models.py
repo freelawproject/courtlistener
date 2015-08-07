@@ -31,44 +31,9 @@ DATE_GRANULARITIES = (
 
 
 class Judge(models.Model):
-    judge_position = models.ForeignKey(
-        'Position',
-        blank=True,
-        null=True,
-    )
-    education = models.ForeignKey(
-        'Education',
-        blank=True,
-        null=True,
-    )
-    career = models.ForeignKey(
-        'Career',
-        blank=True,
-        null=True,
-    )
-    title = models.ForeignKey(
-        'Title',
-        blank=True,
-        null=True,
-    )
-    political_affiliation = models.ForeignKey(
-        'PoliticalAffiliation',
-        blank=True,
-        null=True,
-    )
-    source = models.ForeignKey(
-        'Source',
-        blank=True,
-        null=True,
-    )
     race = models.ManyToManyField(
         'Race',
         blank=True,
-    )
-    aba_rating = models.ForeignKey(
-        'ABARating',
-        blank=True,
-        null=True,
     )
     is_alias_of = models.ForeignKey(
         'self',
@@ -208,13 +173,14 @@ class Position(models.Model):
         ('bad_judge', 'Impeached and Convicted'),
         ('recess_not_confirmed', 'Recess Appointment Not Confirmed'),
     )
-    appointer = models.ForeignKey(
-        'Politician',
+    judge = models.ForeignKey(
+        Judge,
+        related_name='positions',
         blank=True,
         null=True,
     )
-    retention_event = models.ForeignKey(
-        'RetentionEvent',
+    appointer = models.ForeignKey(
+        'Politician',
         blank=True,
         null=True,
     )
@@ -225,11 +191,9 @@ class Position(models.Model):
     )
     court = models.ForeignKey(
         Court,
-        # The default related name from the Court object is Court.position,
-        # which clashes with the position field that is directly a part of the
-        # court object. Thus, unless we rename Court.position, we need to
-        # have an explicit related_name value here.
-        related_name='judge_position',
+        # + indicates that we don't really see the need for this reverse
+        # relationship.
+        related_name='+',
     )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
@@ -380,10 +344,6 @@ class Politician(models.Model):
         editable=False,
         db_index=True
     )
-    political_party = models.ForeignKey(
-        'PoliticalAffiliation',
-        blank=True,
-    )
     name_first = models.CharField(
         max_length=50,
     )
@@ -418,6 +378,12 @@ class RetentionEvent(models.Model):
         ('elec_p', 'Partisan Election'),
         ('elec_n', 'Nonpartisan Election'),
         ('elec_u', 'Uncontested Election'),
+    )
+    position = models.ForeignKey(
+        Position,
+        related_name='retention_events',
+        blank=True,
+        null=True,
     )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
@@ -456,6 +422,12 @@ class Education(models.Model):
         auto_now=True,
         editable=False,
         db_index=True,
+    )
+    judge = models.ForeignKey(
+        Judge,
+        related_name='educations',
+        blank=True,
+        null=True,
     )
     school = models.ForeignKey(
         'judges.School',
@@ -524,6 +496,12 @@ class Career(models.Model):
         ('pub_def', 'Public Defender'),
         ('pol',     'Politician'),
         ('j', 'Judge'),
+    )
+    judge = models.ForeignKey(
+        Judge,
+        related_name='careers',
+        blank=True,
+        null=True,
     )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
@@ -643,6 +621,12 @@ class Title(models.Model):
             ('dep-sol-gen',      'Deputy Solicitor General'),
         )),
     )
+    judge = models.ForeignKey(
+        Judge,
+        related_name='titles',
+        blank=True,
+        null=True,
+    )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
         auto_now=True,
@@ -715,6 +699,18 @@ class PoliticalAffiliation(models.Model):
         editable=False,
         db_index=True,
     )
+    judge = models.ForeignKey(
+        Judge,
+        related_name='political_affiliations',
+        blank=True,
+        null=True,
+    )
+    politician = models.ForeignKey(
+        Politician,
+        related_name='political_affiliations',
+        blank=True,
+        null=True,
+    )
     political_party = models.CharField(
         choices=POLITICAL_PARTIES,
         max_length=5,
@@ -750,6 +746,12 @@ class PoliticalAffiliation(models.Model):
 
 
 class Source(models.Model):
+    judge = models.ForeignKey(
+        Judge,
+        related_name='sources',
+        blank=True,
+        null=True,
+    )
     url = models.URLField(
         help_text="The URL where this data was gathered.",
         max_length=2000,
@@ -773,6 +775,12 @@ class ABARating(models.Model):
         ('q', 'Qualified'),
         ('nq', 'Not Qualified'),
         ('nqa', 'Not Qualified By Reason of Age'),
+    )
+    judge = models.ForeignKey(
+        Judge,
+        related_name='aba_ratings',
+        blank=True,
+        null=True,
     )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
