@@ -13,4 +13,4 @@ def donate_sitemap_maker(request):
     ]
 
     xml = smart_str(loader.render_to_string('sitemap.xml', {'urlset': urls}))
-    return HttpResponse(xml, mimetype='application/xml')
+    return HttpResponse(xml, content_type='application/xml')

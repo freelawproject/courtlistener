@@ -249,7 +249,7 @@ def show_maintenance_warning(request):
 @cache_page(60 * 60 * 12)  # 12 hours
 def robots(request):
     """Generate the robots.txt file"""
-    response = HttpResponse(mimetype='text/plain')
+    response = HttpResponse(content_type='text/plain')
     t = loader.get_template('robots.txt')
     response.write(t.render({}))
     return response

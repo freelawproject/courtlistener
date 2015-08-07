@@ -44,6 +44,6 @@ def index_sitemap_maker(request):
 
     # These links contain case names, so they should get crawled but not
     # indexed
-    response = HttpResponse(xml, mimetype='application/xml')
+    response = HttpResponse(xml, content_type='application/xml')
     response['X-Robots-Tag'] = 'noindex, noodp, noarchive, noimageindex'
     return response
