@@ -29,18 +29,11 @@
             "key_expires": "2013-09-02T23:07:21Z",
             "address1": "",
             "address2": "",
-            "favorite": [
-                13
-            ],
-            "donation": [
-                1
-            ],
             "employer": "",
             "plaintext_preferred": false,
             "wants_newsletter": true,
             "state": "",
             "user": 1,
-            "alert": [],
             "email_confirmed": true,
             "zip_code": ""
         }
@@ -49,6 +42,7 @@
         "pk": 1,
         "model": "donate.donation",
         "fields": {
+            "donor": 1,
             "payment_id": "c830e335-da96-498f-a706-d4e9c70b2a3c",
             "status": 4,
             "payment_provider": "paypal",

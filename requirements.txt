@@ -32,6 +32,7 @@ python-dateutil==2.4.2
 python-mimeparse==0.1.4
 pytz==2015.4
 requests==2.7.0
+simplejson
 six==1.9.0
 sqlparse==0.1.15
 stripe==1.22.3

@@ -1,10 +1,11 @@
 import json
+import stripe
+
 from datetime import datetime, timedelta
 from django.conf import settings
 from django.core import mail
 from django.test import Client, TestCase
 from django.utils.timezone import now
-import stripe
 from cl.donate.management.commands.cl_send_donation_reminders import Command
 from cl.donate.models import Donation
 
@@ -35,6 +36,48 @@ class EmailCommandTest(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn('you donated $1', mail.outbox[0].body)
         self.assertIn('you donated $1', mail.outbox[0].alternatives[0][0])
+
+
+class DonationFormSubmissionTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.params = {
+            'address1': "123 Sesame St.",
+            'city': 'New York',
+            'state': 'NY',
+            'zip_code': '12345',
+            'wants_newsletter': True,
+            'first_name': 'Elmo',
+            'last_name': 'Muppet',
+            'email': 'pandora@courtlistener.com',
+            'send_annual_reminder': True,
+            'payment_provider': 'paypal',
+        }
+
+    def test_paypal_with_other_value_as_anonymous(self):
+        """Can a paypal donation go through using the "Other" field?"""
+        self.params.update({
+            'amount': 'other',
+            'amount_other': '1',
+        })
+        r = self.client.post(
+            '/donate/',
+            self.params,
+            follow=True,
+        )
+        self.assertEqual(r.redirect_chain[0][1], 302)
+
+    def test_paypal_with_regular_value_as_anonymous(self):
+        """Can a stripe donation go through using the "Other" field?"""
+        self.params.update({
+            'amount': '10',
+        })
+        r = self.client.post(
+            '/donate/',
+            self.params,
+            follow=True,
+        )
+        self.assertEqual(r.redirect_chain[0][1], 302)
 
 
 class StripeTest(TestCase):
@@ -141,10 +184,3 @@ class StripeTest(TestCase):
         )
         self.assertEqual(r.status_code, 302)  # 302 (redirect after a post)
         self.assertEventPostsCorrectly(token)
-
-
-
-
-
-
-

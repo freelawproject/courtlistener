@@ -1,11 +1,9 @@
 import logging
-import json
+import simplejson as json  # This is needed to handle Decimal objects.
 import requests
 from cl.donate.models import Donation
 from django.conf import settings
-from django.http import (
-    HttpResponseRedirect, HttpResponseNotAllowed, HttpResponseForbidden
-)
+from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.utils.timezone import now

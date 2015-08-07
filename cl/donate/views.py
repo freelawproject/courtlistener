@@ -1,21 +1,21 @@
 import logging
 
+from cl.donate.paypal import process_paypal_payment
+from cl.donate.forms import DonationForm, UserForm, ProfileForm
+from cl.donate.stripe_helpers import process_stripe_payment
+from cl.users.utils import create_stub_account
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
-from cl.donate.paypal import process_paypal_payment
-from cl.donate.forms import DonationForm, UserForm, ProfileForm
-from cl.donate.stripe_helpers import process_stripe_payment
-from cl.users.utils import create_stub_account
 
 logger = logging.getLogger(__name__)
 
 
 def send_thank_you_email(donation):
-    user = donation.user
+    user = donation.donor
     email_subject = 'Thanks for your donation to Free Law Project!'
     email_body = ('Hello %s,\n\nThanks for your donation of $%0.2f to Free '
                   'Law Project. We are currently using donations like yours '
@@ -109,7 +109,8 @@ def donate(request):
             # simply not logged into their account
             try:
                 stub_account = User.objects.filter(
-                    profile__stub_account=True).get(
+                    profile__stub_account=True
+                ).get(
                     email__iexact=request.POST.get('email')
                 )
             except User.DoesNotExist:
@@ -162,28 +163,26 @@ def donate(request):
             logger.info("Payment routed with response: %s" % response)
 
             if response['status'] == 0:
-                d = donation_form.save(commit=False)
-                d.status = response['status']
-                d.payment_id = response['payment_id']
-                d.transaction_id = response.get('transaction_id')  # Will only work for Paypal.
-                d.save()
-
                 if request.user.is_anonymous() and not stub_account:
                     # Create a stub account with an unusable password
-                    new_user, new_profile = create_stub_account(
+                    user, profile = create_stub_account(
                         cd_user_form,
                         cd_profile_form,
                     )
-                    new_user.save()
-                    new_profile.save()
+                    user.save()
+                    profile.save()
                 else:
                     # Logged in user or an existing stub account.
                     user = user_form.save()
                     profile = profile_form.save()
 
-                # Associate the donation with the profile
-                profile.donation.add(d)
-                profile.save()
+                d = donation_form.save(commit=False)
+                d.status = response['status']
+                d.payment_id = response['payment_id']
+                d.transaction_id = response.get('transaction_id')  # Will only work for Paypal.
+                d.donor = user
+                d.save()
+
                 return HttpResponseRedirect(response['redirect'])
 
             else:
@@ -192,6 +191,7 @@ def donate(request):
                                 (response['status'], response['message']))
                 message = response['message']
     else:
+        # Loading the page...
         try:
             donation_form = DonationForm(
                 initial={

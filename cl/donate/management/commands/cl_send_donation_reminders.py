@@ -1,12 +1,12 @@
+from datetime import timedelta
+from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
 from django.core.management.base import BaseCommand
 from django.db.models import Sum
 from django.template import loader
 from django.utils.timezone import now
-from cl.search.models import Document, Court
+from cl.search.models import Opinion, Court
 from cl.stats import Stat
-from cl.users.models import UserProfile
-from datetime import timedelta
 
 
 class Command(BaseCommand):
@@ -19,14 +19,14 @@ class Command(BaseCommand):
         self.court_count = 0
         self.bulk_data_count = 0
         self.alerts_sent_count = 0
-        self.ups = []
+        self.users = []
         self.verbosity = 0
 
-    def gather_stats_and_ups(self):
+    def gather_stats_and_users(self):
         about_a_year_ago = now() - timedelta(days=355)
 
         # Gather some stats to email
-        self.new_doc_count = Document.objects.filter(
+        self.new_doc_count = Opinion.objects.filter(
             time_retrieved__gte=about_a_year_ago
         ).count()
         self.court_count = Court.objects.all().count()
@@ -38,20 +38,20 @@ class Command(BaseCommand):
             name='alerts.sent',
             date_logged__gte=about_a_year_ago,
         ).aggregate(Sum('count'))['count__sum']
-        self.ups = UserProfile.objects.filter(
-            donation__date_created__year=about_a_year_ago.year,
-            donation__date_created__month=about_a_year_ago.month,
-            donation__date_created__day=about_a_year_ago.day,
-            donation__send_annual_reminder=True,
-            donation__status=4
-        ).annotate(Sum('donation__amount'))
+        self.users = User.objects.filter(
+            donations__date_created__year=about_a_year_ago.year,
+            donations__date_created__month=about_a_year_ago.month,
+            donations__date_created__day=about_a_year_ago.day,
+            donations__send_annual_reminder=True,
+            donations__status=4
+        ).annotate(Sum('donations__amount'))
 
-    def send_reminder_email(self, up, amount):
+    def send_reminder_email(self, user, amount):
         """Send an email imploring the person for another donation."""
         email_subject = "Please donate again to Free Law Project"
         email_sender = "CourtListener <mike@courtlistener.com>"
-        txt_template = loader.get_template('donate/reminder_email.txt')
-        html_template = loader.get_template('donate/reminder_email.html')
+        txt_template = loader.get_template('reminder_email.txt')
+        html_template = loader.get_template('reminder_email.html')
         context = {
             'amount': amount,
             'new_doc_count': self.new_doc_count,
@@ -65,14 +65,14 @@ class Command(BaseCommand):
             email_subject,
             txt,
             email_sender,
-            [up.user.email],
+            [user.email],
         )
         msg.attach_alternative(html, 'text/html')
         msg.send(fail_silently=False)
 
     def handle(self, *args, **options):
         self.verbosity = int(options.get('verbosity', 1))
-        self.gather_stats_and_ups()
-        for up in self.ups:
+        self.gather_stats_and_users()
+        for user in self.users:
             # Iterate over the people and send them emails
-            self.send_reminder_email(up, up.donation__amount__sum)
+            self.send_reminder_email(user, user.donations__amount__sum)
