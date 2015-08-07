@@ -74,6 +74,21 @@ def follow_redirections(r, s):
     return r
 
 
+def is_html(s):
+    """Sniffs for stuff that distinguishes an HTML document. Tricky because we
+    allow partial ones and because other formats (like WordPerfect) closely
+    resemble HTML.
+    """
+    if any([
+        '<a href=' in s[:100],
+        '<table ' in s[:100],
+        '<html' in s[:100],
+    ]):
+        html_status = True
+    else:
+        html_status = False
+    return html_status
+
 def get_extension(content):
     """A handful of workarounds for getting extensions we can trust."""
     file_str = magic.from_buffer(content)
@@ -94,6 +109,8 @@ def get_extension(content):
         if 'PDF' in content[0:40]:
             # Does 'PDF' appear in the beginning of the content?
             extension = '.pdf'
+        elif is_html(content):
+            extension = '.html'
         else:
             extension = '.wpd'
     if extension == '.wsdl':
