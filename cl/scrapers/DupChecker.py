@@ -9,7 +9,7 @@ class DupChecker(dict):
         self.full_crawl = full_crawl
         self.court = court
         self.dup_threshold = dup_threshold
-        self.url2Hash = None
+        self.url_hash = None
         self.dup_count = 0
         self.last_found_date = None
         super(DupChecker, self).__init__(*args, **kwargs)
@@ -27,8 +27,8 @@ class DupChecker(dict):
         self.last_found_date = None
 
     def update_site_hash(self, hash):
-        self.url2Hash.SHA1 = hash
-        self.url2Hash.save()
+        self.url_hash.sha1 = hash
+        self.url_hash.save()
 
     def _court_changed(self, url, hash):
         """Determines whether a court website has changed since we last saw it.
@@ -37,13 +37,13 @@ class DupChecker(dict):
         in the DB, if there is one. If there is a value and it is the same, it
         returns False. Else, it returns True.
         """
-        url2Hash, created = UrlHash.objects.get_or_create(pk=url)
-        if not created and url2Hash.SHA1 == hash:
+        url_hash, created = UrlHash.objects.get_or_create(pk=url)
+        if not created and url_hash.sha1 == hash:
             # it wasn't created, and it has the same SHA --> not changed.
-            return False, url2Hash
+            return False, url_hash
         else:
             # It's a known URL or it's a changed hash.
-            return True, url2Hash
+            return True, url_hash
 
     def abort_by_url_hash(self, url, hash):
         """Checks whether we should abort due to a hash of the site data being
