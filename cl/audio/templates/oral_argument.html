@@ -105,7 +105,7 @@
             </div>
         {% endif %}
 
-        {% include "includes/social_links.html" with title_type="Oral Argument" %}
+        {% include "includes/social_links.html" %}
         {% include "includes/donate_sidebar.html" with referrer="ad-oa" %}
     </div>
 {% endblock %}
@@ -117,7 +117,7 @@
            class="{% if favorite_form.instance.audio_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
            data-toggle="modal"
            data-target="#modal-save-favorite, #modal-logged-out"
-           title="Save this record as a favorite in your profile"></i>
+           title="{% if favorite_form.instance.audio_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
 
         <h2 class="inline">{{ af.case_name|safe|v_wrapper }}</h2>
         {% include "includes/favorites_modal.html" %}
