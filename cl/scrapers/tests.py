@@ -11,7 +11,7 @@ from cl.lib.string_utils import trunc
 from cl.lib import sunburnt
 from cl.lib.test_helpers import CitationTest
 from cl.scrapers.DupChecker import DupChecker
-from cl.scrapers.models import urlToHash, ErrorLog
+from cl.scrapers.models import UrlHash, ErrorLog
 from cl.scrapers.management.commands.cl_report_scrape_status import \
     generate_report
 from cl.scrapers.management.commands.cl_scrape_opinions import get_extension
@@ -227,7 +227,7 @@ class DupcheckerTest(TestCase):
         site = test_opinion_scraper.Site()
         site.hash = 'this is a dummy hash code string'
         for dup_checker in self.dup_checkers:
-            urlToHash(id=site.url, SHA1=site.hash).save()
+            UrlHash(id=site.url, SHA1=site.hash).save()
             abort = dup_checker.abort_by_url_hash(site.url, site.hash)
             if dup_checker.full_crawl:
                 self.assertFalse(
@@ -250,7 +250,7 @@ class DupcheckerTest(TestCase):
         site = test_opinion_scraper.Site()
         site.hash = 'this is a dummy hash code string'
         for dup_checker in self.dup_checkers:
-            urlToHash(pk=site.url, SHA1=site.hash).save()
+            UrlHash(pk=site.url, SHA1=site.hash).save()
             abort = dup_checker.abort_by_url_hash(
                 site.url,
                 "this is a *different* hash!")

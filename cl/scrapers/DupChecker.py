@@ -1,4 +1,4 @@
-from cl.scrapers.models import urlToHash
+from cl.scrapers.models import UrlHash
 
 from juriscraper.AbstractSite import logger
 
@@ -37,7 +37,7 @@ class DupChecker(dict):
         in the DB, if there is one. If there is a value and it is the same, it
         returns False. Else, it returns True.
         """
-        url2Hash, created = urlToHash.objects.get_or_create(pk=url)
+        url2Hash, created = UrlHash.objects.get_or_create(pk=url)
         if not created and url2Hash.SHA1 == hash:
             # it wasn't created, and it has the same SHA --> not changed.
             return False, url2Hash
