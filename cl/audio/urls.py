@@ -10,8 +10,8 @@ urlpatterns = [
     url(r'^audio/(\d*)/(.*)/$', view_audio_file, name="view_audio_file"),
 
     # Podcasts
-    url(r'^podcast/court/(?P<court>\w{1,15})/$', JurisdictionPodcast()),
     url(r'^podcast/court/all/$', AllJurisdictionsPodcast()),
+    url(r'^podcast/court/(?P<court>\w{1,15})/$', JurisdictionPodcast()),
     url(r'^podcast/(search)/', SearchPodcast()),
 
     # Sitemap
