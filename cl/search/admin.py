@@ -19,7 +19,7 @@ class OpinionAdmin(admin.ModelAdmin):
         'html_lawbox',
         'html_mayer',
         'html_with_citations',
-        'time_retrieved',
+        'date_created',
         'date_modified',
     )
     raw_id_fields = (
@@ -32,7 +32,7 @@ class OpinionAdmin(admin.ModelAdmin):
         'html_mayer',
     )
     readonly_fields = (
-        'time_retrieved',
+        'date_created',
         'date_modified',
     )
 

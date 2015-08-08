@@ -30,12 +30,10 @@ class Donation(models.Model):
     )
     date_modified = models.DateTimeField(
         auto_now=True,
-        editable=False,
         db_index=True,
     )
     date_created = models.DateTimeField(
         auto_now_add=True,
-        editable=False,
         db_index=True
     )
     clearing_date = models.DateTimeField(

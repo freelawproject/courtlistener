@@ -27,7 +27,7 @@ class Command(BaseCommand):
 
         # Gather some stats to email
         self.new_doc_count = Opinion.objects.filter(
-            time_retrieved__gte=about_a_year_ago
+            date_created__gte=about_a_year_ago
         ).count()
         self.court_count = Court.objects.all().count()
         self.bulk_data_count = Stat.objects.filter(

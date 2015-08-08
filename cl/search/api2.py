@@ -113,13 +113,13 @@ class AudioResource(ModelResourceWithFieldsFilter):
         include_absolute_url = True
         filtering = {
             'id': ('exact',),
-            'time_retrieved': good_time_filters,
+            'date_created': good_time_filters,
             'date_modified': good_time_filters,
             'sha1': ('exact',),
             'date_blocked': good_date_filters,
             'blocked': ALL,
         }
-        ordering = ['time_retrieved', 'date_modified', 'date_blocked']
+        ordering = ['date_created', 'date_modified', 'date_blocked']
 
 
 class DocumentResource(ModelResourceWithFieldsFilter):
@@ -183,7 +183,7 @@ class DocumentResource(ModelResourceWithFieldsFilter):
         excludes = ['opinions_cited']
         filtering = {
             'id': ('exact',),
-            'time_retrieved': good_time_filters,
+            'date_created': good_time_filters,
             'date_modified': good_time_filters,
             'date_filed': good_date_filters,
             'sha1': ('exact',),
@@ -195,7 +195,7 @@ class DocumentResource(ModelResourceWithFieldsFilter):
             'extracted_by_ocr': ALL,
             'supreme_court_db_id': ('exact',),
         }
-        ordering = ['time_retrieved', 'date_modified', 'date_filed',
+        ordering = ['date_created', 'date_modified', 'date_filed',
                     'date_blocked']
 
 

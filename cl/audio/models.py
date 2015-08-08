@@ -47,17 +47,15 @@ class Audio(models.Model):
         blank=True,
         null=True,
     )
-    time_retrieved = models.DateTimeField(
+    date_created = models.DateTimeField(
         help_text="The original creation date for the item",
         #auto_now_add=True,
-        editable=False,
         db_index=True,
     )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified. A value in year"
                   " 1750 indicates the value is unknown",
         #auto_now=True,
-        editable=False,
         db_index=True,
     )
     sha1 = models.CharField(
@@ -112,7 +110,7 @@ class Audio(models.Model):
     )
 
     class Meta:
-        ordering = ["-time_retrieved"]
+        ordering = ["-date_created"]
         verbose_name_plural = 'Audio Files'
 
     def __unicode__(self):

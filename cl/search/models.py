@@ -69,14 +69,19 @@ OPINION_TYPES = (
 
 
 class Docket(models.Model):
-    """A class to sit above Documents and Audio files and link them together"""
+    """A class to sit above OpinionClusters and Audio files and link them
+    together.
+    """
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        # auto_now_add=True,
+        db_index=True,
+    )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified. A value in "
                   "year 1750 indicates the value is unknown",
         #auto_now=True,
-        editable=False,
         db_index=True,
-        null=True,
     )
     date_argued = models.DateField(
         help_text="the date the case was argued",
@@ -166,9 +171,7 @@ class Court(models.Model):
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified",
         # auto_now=True,
-        editable=False,
         db_index=True,
-        null=True
     )
     in_use = models.BooleanField(
         help_text='Whether this jurisdiction is in use in CourtListener -- '
@@ -269,19 +272,16 @@ class Opinion(models.Model):
         help_text="Other judges that joined the primary author in this opinion",
         blank=True,
     )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        # auto_now_add=True,
+        db_index=True
+    )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified. A value in "
                   "year 1750 indicates the value is unknown",
         # auto_now=True,
-        editable=False,
         db_index=True,
-        null=True,
-    )
-    time_retrieved = models.DateTimeField(
-        help_text="The original creation date for the item",
-        # auto_now_add=True,
-        editable=False,
-        db_index=True
     )
     type = models.CharField(
         max_length=20,
@@ -364,7 +364,8 @@ class OpinionsCited(models.Model):
     )
 
     def __unicode__(self):
-        return u'%s  ——cites—→ %s' % (self.citing_opinion.id, self.cited_opinion.id)
+        return u'%s  ——cites—→ %s' % (self.citing_opinion.id,
+                                      self.cited_opinion.id)
 
 
 class OpinionCluster(models.Model):
@@ -377,7 +378,7 @@ class OpinionCluster(models.Model):
     panel = models.ManyToManyField(
         'judges.Judge',
         help_text="The judges that heard the oral arguments",
-        related_name="opinion_clusters_particpating_judges",
+        related_name="opinion_clusters_participating_judges",
         blank=True,
     )
     non_participating_judges = models.ManyToManyField(
@@ -397,11 +398,15 @@ class OpinionCluster(models.Model):
         help_text="Was this case heard per curiam?",
         default=False,
     )
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        # auto_now_add=True,
+        db_index=True,
+    )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified. A value in "
                   "year 1750 indicates the value is unknown",
         # auto_now=True,
-        editable=False,
         db_index=True,
     )
     date_filed = models.DateField(

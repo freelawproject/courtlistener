@@ -240,7 +240,7 @@ class Command(BaseCommand):
 
         Relies on the items still being in the database.
         """
-        qs = self.type.objects.filter(time_retrieved__gt=dt)
+        qs = self.type.objects.filter(date_created__gt=dt)
         count = qs.count()
         if proceed_with_deletion(self.stdout, count):
             self.stdout.write("Deleting all item(s) newer than %s\n" % dt)
@@ -282,7 +282,7 @@ class Command(BaseCommand):
         """
         self.stdout.write(
             "Adding or updating items(s) newer than %s\n" % dt)
-        qs = self.type.objects.filter(time_retrieved__gt=dt)
+        qs = self.type.objects.filter(date_created__gt=dt)
         items = queryset_generator(qs)
         count = qs.count()
         self._chunk_queryset_into_tasks(items, count)

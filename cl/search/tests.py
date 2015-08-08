@@ -243,9 +243,9 @@ class ApiTest(SolrTestCase):
                         'opinion'):
             for j in (actual, correct,):
                 for o in j['objects']:
-                    if 'time_retrieved' in o:
+                    if 'date_created' in o:
                         # Not all objects have this field
-                        o['time_retrieved'] = None
+                        o['date_created'] = None
                     o['date_modified'] = None
         elif endpoint == 'search':
             # Drop the timestamps and scores b/c they can differ

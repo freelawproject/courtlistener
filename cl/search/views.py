@@ -205,9 +205,9 @@ def show_results(request):
             users_in_last_ten = User.objects\
                 .filter(date_joined__gte=ten_days_ago).count()
             opinions_in_last_ten = Opinion.objects\
-                .filter(time_retrieved__gte=ten_days_ago).count()
+                .filter(date_created__gte=ten_days_ago).count()
             oral_arguments_in_last_ten = Audio.objects\
-                .filter(time_retrieved__gte=ten_days_ago).count()
+                .filter(date_created__gte=ten_days_ago).count()
             days_of_oa = naturalduration(
                 Audio.objects.aggregate(Sum('duration'))['duration__sum'],
                 as_dict=True,

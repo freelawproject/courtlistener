@@ -40,17 +40,15 @@ class Judge(models.Model):
         blank=True,
         null=True,
     )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        editable=False,
-        db_index=True,
-    )
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
         auto_now_add=True,
-        editable=False,
         db_index=True
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
     )
     fjc_id = models.IntegerField(
         help_text="The ID of the judge as assigned by the Federal Judicial "
@@ -195,10 +193,14 @@ class Position(models.Model):
         # relationship.
         related_name='+',
     )
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
         auto_now=True,
-        editable=False,
         db_index=True,
     )
     date_nominated = models.DateField(
@@ -335,13 +337,11 @@ class Politician(models.Model):
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
         auto_now=True,
-        editable=False,
         db_index=True,
     )
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
         auto_now_add=True,
-        editable=False,
         db_index=True
     )
     name_first = models.CharField(
@@ -385,10 +385,14 @@ class RetentionEvent(models.Model):
         blank=True,
         null=True,
     )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True
+    )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
         auto_now=True,
-        editable=False,
         db_index=True,
     )
     retention_type = models.CharField(
@@ -417,10 +421,14 @@ class RetentionEvent(models.Model):
 
 
 class Education(models.Model):
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True
+    )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
         auto_now=True,
-        editable=False,
         db_index=True,
     )
     judge = models.ForeignKey(
@@ -453,6 +461,16 @@ class School(models.Model):
         'self',
         blank=True,
         null=True,
+    )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified",
+        auto_now=True,
+        db_index=True,
     )
     name = models.CharField(
         max_length=120,  # Dept. Ed. bulk data had a max of 91.
@@ -503,10 +521,14 @@ class Career(models.Model):
         blank=True,
         null=True,
     )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True
+    )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
         auto_now=True,
-        editable=False,
         db_index=True,
     )
     job_type = models.CharField(
@@ -627,10 +649,14 @@ class Title(models.Model):
         blank=True,
         null=True,
     )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True
+    )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
         auto_now=True,
-        editable=False,
         db_index=True,
     )
     title_name = models.CharField(
@@ -693,10 +719,14 @@ class PoliticalAffiliation(models.Model):
         ('g', 'Green'),
         ('l', 'Libertarian'),
     )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True
+    )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
         auto_now=True,
-        editable=False,
         db_index=True,
     )
     judge = models.ForeignKey(
@@ -752,6 +782,11 @@ class Source(models.Model):
         blank=True,
         null=True,
     )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified",
+        auto_now=True,
+        db_index=True,
+    )
     url = models.URLField(
         help_text="The URL where this data was gathered.",
         max_length=2000,
@@ -782,10 +817,14 @@ class ABARating(models.Model):
         blank=True,
         null=True,
     )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True
+    )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified.",
         auto_now=True,
-        editable=False,
         db_index=True,
     )
     date_rated = models.DateField(

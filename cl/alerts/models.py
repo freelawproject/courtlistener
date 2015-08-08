@@ -21,6 +21,22 @@ class Alert(models.Model):
         help_text="The user that created the item",
         related_name="alerts",
     )
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        # auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified. A value in year"
+                  " 1750 indicates the value is unknown",
+        # auto_now=True,
+        db_index=True,
+    )
+    date_last_hit = models.DateTimeField(
+        verbose_name='time of last trigger',
+        blank=True,
+        null=True
+    )
     name = models.CharField(
         verbose_name='a name for the alert',
         max_length=75
@@ -38,11 +54,6 @@ class Alert(models.Model):
         verbose_name='Always send an alert?',
         default=False
     )
-    date_last_hit = models.DateTimeField(
-        verbose_name='time of last trigger',
-        blank=True,
-        null=True
-    )
 
     def __unicode__(self):
         return u'Alert %s: %s' % (self.pk, self.name)
@@ -55,7 +66,6 @@ class RealTimeQueue(models.Model):
     date_modified = models.DateTimeField(
         help_text='the last moment when the item was modified',
         auto_now=True,
-        editable=False,
         db_index=True,
     )
     item_type = models.CharField(

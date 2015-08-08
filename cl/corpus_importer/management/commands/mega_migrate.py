@@ -25,7 +25,6 @@ it as necessary along the way.
 #        remained the same.
 #  5. Post data migartion:
 #     1. Uncomment auto_now and auto_now_add fields and migrate the fields.
-
 from cl.corpus_importer.models_legacy import (
     Docket as DocketOld,
     Document as DocumentOld,
@@ -56,14 +55,18 @@ from cl.stats.models import (
 from cl.users.models import (
     UserProfile as UserProfileNew
 )
+
+from datetime import datetime
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
+from django.utils.timezone import make_aware, utc
 from juriscraper.lib.string_utils import CaseNameTweaker
 
 
 class Command(BaseCommand):
     help = 'Migrate all data for all apps from one DB to another.'
     case_name_tweaker = CaseNameTweaker()
+    the_beginning_of_time = make_aware(datetime(1750, 1, 1), utc)
 
     @staticmethod
     def _none_to_blank(value):
@@ -137,6 +140,7 @@ class Command(BaseCommand):
             new_docket = DocketNew(
                 pk=old_docket.pk,
                 date_modified=old_docket.date_modified,
+                date_created=old_docket.date_modified,
                 court=court,
                 case_name=case_name,
                 case_name_full=case_name_full,
@@ -156,6 +160,7 @@ class Command(BaseCommand):
                     docket=new_docket,
                     judges=self._none_to_blank(old_document.judges),
                     date_modified=old_document.date_modified,
+                    date_created=old_document.date_modified,
                     date_filed=old_document.date_filed,
                     slug=self._none_to_blank(old_citation.slug),
                     citation_id=old_document.citation_id,
@@ -200,7 +205,7 @@ class Command(BaseCommand):
                     pk=old_document.pk,
                     cluster=new_opinion_cluster,
                     date_modified=old_document.date_modified,
-                    time_retrieved=old_document.time_retrieved,
+                    date_created=old_document.time_retrieved,
                     type='combined',
                     sha1=old_document.sha1,
                     download_url=old_document.download_url,
@@ -223,7 +228,7 @@ class Command(BaseCommand):
                     source=old_audio.source,
                     case_name=old_audio.case_name,
                     judges=self._none_to_blank(old_audio.judges),
-                    time_retrieved=old_audio.time_retrieved,
+                    date_created=old_audio.time_retrieved,
                     date_modified=old_audio.date_modified,
                     sha1=old_audio.sha1,
                     download_url=old_audio.download_url,
@@ -395,6 +400,8 @@ class Command(BaseCommand):
                 new_alert = AlertNew(
                     pk=old_alert.pk,
                     user=new_user,
+                    date_created=self.the_beginning_of_time,
+                    date_modified=self.the_beginning_of_time,
                     name=old_alert.name,
                     query=old_alert.query,
                     rate=old_alert.rate,
@@ -418,6 +425,7 @@ class Command(BaseCommand):
                     user=new_user,
                     cluster_id=cluster,
                     audio_id=audio,
+                    date_created=old_favorite.date_modified,
                     date_modified=old_favorite.date_modified,
                     name=old_favorite.name,
                     notes=old_favorite.notes,

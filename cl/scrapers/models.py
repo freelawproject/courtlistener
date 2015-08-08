@@ -36,7 +36,6 @@ class ErrorLog(models.Model):
     log_time = models.DateTimeField(
         'the exact date and time of the error',
         auto_now_add=True,
-        editable=False,
         null=True
     )
     log_level = models.CharField(
@@ -46,7 +45,7 @@ class ErrorLog(models.Model):
     )
     court = models.ForeignKey(
         Court,
-        verbose_name='the court where the document was filed'
+        verbose_name='the court where the error occurred'
     )
     message = models.TextField(
         'the message produced in the log',
