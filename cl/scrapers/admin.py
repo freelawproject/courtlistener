@@ -1,5 +1,5 @@
 from django.contrib import admin
-from cl.scrapers.models import urlToHash, ErrorLog
+from cl.scrapers.models import UrlHash, ErrorLog
 
 
 class ErrorLogAdmin(admin.ModelAdmin):
@@ -8,5 +8,5 @@ class ErrorLogAdmin(admin.ModelAdmin):
     list_filter = ('court',)
 
 
-admin.site.register(urlToHash)
+admin.site.register(UrlHash)
 admin.site.register(ErrorLog, ErrorLogAdmin)
