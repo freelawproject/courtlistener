@@ -258,8 +258,6 @@ class SearchForm(forms.Form):
         sub_pairs = (
             ('casename', 'caseName'),
             ('lexiscite', 'lexisCite'),
-            ('westcite', 'westCite'),
-            ('casenumber', 'caseNumber'),
             ('docketnumber', 'docketNumber'),
             ('neutralcite', 'neutralCite'),
             ('citecount', 'citeCount'),

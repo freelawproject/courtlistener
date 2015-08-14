@@ -17,7 +17,7 @@ class OpinionAdmin(admin.ModelAdmin):
         'plain_text',
         'html',
         'html_lawbox',
-        'html_mayer',
+        'html_columbia',
         'html_with_citations',
         'date_created',
         'date_modified',
@@ -29,7 +29,7 @@ class OpinionAdmin(admin.ModelAdmin):
         'plain_text',
         'html',
         'html_lawbox',
-        'html_mayer',
+        'html_columbia',
     )
     readonly_fields = (
         'date_created',

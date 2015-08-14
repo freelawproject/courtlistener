@@ -96,43 +96,126 @@
       and back compatibility is not guaranteed.  Names with both leading and
       trailing underscores (e.g. _version_) are reserved.
    -->
-     <field name="id"                    type="string"               indexed="true"
-            stored="true" required="true" multiValued="false" />
-     <field name="docket_id"             type="string"               indexed="true"
-            stored="true" multiValued="false"/>
-     <field name="_version_"             type="long"                 indexed="true"
-            stored="true"/>
-     <field name="text"                  type="text_en_splitting_cl" indexed="true"
-            stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true"/>
-     <field name="court"                 type="text_en_splitting_cl" indexed="true"
-            stored="true" multiValued="false" />
-     <field name="court_id"              type="text_en_splitting_cl" indexed="true"
-            stored="true" multiValued="false" />
-     <field name="court_citation_string" type="string"               indexed="true"
-            stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
-     <field name="court_exact" type="string" indexed="true"
-            stored="true" multiValued="false"/>
-     <field name="caseName"              type="text_en_splitting_cl" indexed="true"
-            stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
-     <field name="dateArgued"            type="date"                 indexed="true"
-            stored="true" multiValued="false" />
-     <field name="docketNumber"          type="text_en_splitting_cl" indexed="true"
-            stored="true" multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
-     <field name="judge"                 type="text_en_splitting_cl" indexed="true" stored="true"
-            multiValued="false" termVectors="true" termPositions="true" termOffsets="true" />
+     <!--IDs-->
+     <field name="id"
+            type="int"
+            indexed="true"
+            stored="true"
+            required="true"
+            multiValued="false" />
+     <field name="docket_id"
+            type="int"
+            indexed="true"
+            stored="true"
+            multiValued="false"/>
+     <field name="court_id"
+            type="string"
+            indexed="true"
+            stored="true"
+            required="true"
+            multiValued="false"/>
+
+     <!--Docket-->
+     <field name="dateArgued"
+            type="date"
+            indexed="true"
+            stored="true"
+            multiValued="false"/>
+     <field name="dateReargued"
+            type="date"
+            indexed="true"
+            stored="true"
+            multiValued="false"/>
+     <field name="dateReargumentDenied"
+            type="date"
+            indexed="true"
+            stored="true"
+            multiValued="false"/>
+     <field name="docketNumber"
+            type="text_en_splitting_cl"
+            indexed="true"
+            stored="true"
+            multiValued="false"
+            termVectors="true"
+            termPositions="true"
+            termOffsets="true"/>
+
+     <!--Court-->
+     <field name="court"
+            type="text_en_splitting_cl"
+            indexed="true"
+            stored="true"
+            multiValued="false"/>
+     <field name="court_citation_string"
+            type="string"
+            indexed="true"
+            stored="true"
+            multiValued="false"
+            termVectors="true"
+            termPositions="true"
+            termOffsets="true"/>
+
+     <!--Audio file-->
+     <field name="caseName"
+            type="text_en_splitting_cl"
+            indexed="true"
+            stored="true"
+            multiValued="false"
+            termVectors="true"
+            termPositions="true"
+            termOffsets="true" />
+     <field name="panel_ids"
+            type="int"
+            indexed="true"
+            stored="true"
+            multiValued="true"/>
+     <field name="judge"
+            type="text_en_splitting_cl"
+            indexed="true"
+            stored="true"
+            multiValued="false"
+            termVectors="true"
+            termPositions="true"
+            termOffsets="true" />
+     <field name="file_size_mp3"
+            type="int"
+            indexed="false"
+            stored="true"
+            multiValued="false"/>
+     <field name="duration"
+            type="int"
+            indexed="false"
+            stored="true"
+            multiValued="false"/>
+     <field name="source"
+            type="string"
+            indexed="false"
+            stored="true"
+            multiValued="false"/>
+
+     <!--URLs and paths-->
      <field name="absolute_url"          type="string"               indexed="false"
             stored="true" multiValued="false" />
      <field name="download_url"          type="string"               indexed="false"
             stored="true" multiValued="false" />
      <field name="local_path"            type="string"               indexed="false"
             stored="true" multiValued="false" />
-     <field name="file_size_mp3"         type="int"                  indexed="false"
-            stored="true" multiValued="false" />
-     <field name="duration"              type="int"                  indexed="false"
-            stored="true" multiValued="false" />
-     <field name="source"                type="string"               indexed="false"
-            stored="true" multiValued="false" />
 
+     <!--Faceting-->
+     <field name="court_exact"
+            type="string"
+            indexed="true"
+            stored="true"
+            multiValued="false"/>
+
+     <!--special fields-->
+     <field name="_version_" type="long" indexed="true"
+            stored="true"/>
+
+     <!--TEXT!-->
+     <field name="text" type="text_en_splitting_cl" indexed="true"
+            stored="true" multiValued="false" termVectors="true"
+            termPositions="true" termOffsets="true"/>
 
      <!-- mlr
      <field name="sku" type="text_en_splitting_tight" indexed="true" stored="true" omitNorms="true"/>

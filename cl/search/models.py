@@ -324,8 +324,8 @@ class Opinion(models.Model):
         blank=True,
         null=True,
     )
-    html_mayer = models.TextField(
-        help_text='HTML of Mayer documents',
+    html_columbia = models.TextField(
+        help_text='HTML of Columbia archive',
         blank=True,
         null=True,
     )
@@ -426,6 +426,11 @@ class OpinionCluster(models.Model):
         null=True,
         blank=True,
     )
+    case_name_short = models.TextField(
+        help_text="The abridged name of the case, often a single word, e.g. "
+                  "'Marsh'",
+        blank=True,
+    )
     case_name = models.TextField(
         help_text="The shortened name of the case",
         blank=True
@@ -521,7 +526,7 @@ class OpinionCluster(models.Model):
         blank=True,
     )
     posture = models.TextField(
-        help_text="XXX",
+        help_text="The procedural posture of the case.",
         blank=True,
     )
     syllabus = models.TextField(

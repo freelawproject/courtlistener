@@ -12,6 +12,7 @@ class DupChecker(dict):
         self.url_hash = None
         self.dup_count = 0
         self.last_found_date = None
+        self.emulate_break = False
         super(DupChecker, self).__init__(*args, **kwargs)
 
     def _increment(self, current_date):
@@ -53,7 +54,7 @@ class DupChecker(dict):
         the item in the database if it doesn't already exist, assigning it to
         self.url2Hash.
         """
-        changed, self.url2Hash = self._court_changed(url, hash)
+        changed, self.url_hash = self._court_changed(url, hash)
         if not self.full_crawl:
             if not changed:
                 logger.info("Unchanged hash at: %s" % url)
@@ -66,14 +67,18 @@ class DupChecker(dict):
             # no matter what.
             return False
 
-    def should_we_continue_break_or_carry_on(self, object_type, current_date,
-                                             next_date, lookup_value,
-                                             lookup_by='sha1'):
-        """Checks if a we have a document with identical content in the CL
-        corpus by making a hash of the data and attempting to look that up.
-        Depending on the result of that, we either CONTINUE to the next item,
-        we CARRY_ON with adding this item to the DB or we BREAK from the court
-        entirely.
+    def press_on(self, object_type, current_date, next_date, lookup_value,
+                 lookup_by='sha1'):
+        """Checks if a we have an `object_type` with identical content in the CL
+        corpus by looking up `lookup_value` in the `lookup_by` field. Depending
+        on the result of that, we either return True or False. True represents
+        the fact that the next item should be processed. False means that either
+        the item was a duplicate or that we've hit so many duplicates that we've
+        stopped checking (we hit a duplicate threshold). Either way, the caller
+        should move to the next item and try it.
+
+        The effect of this is that this emulates for loop constructs for
+        continue (False), break (False), return (True).
 
         Following logic applies:
          - if we have the item already
@@ -85,7 +90,10 @@ class DupChecker(dict):
          - if not
             - carry on
         """
-        # using the hash or the download_url check for a duplicate in the db.
+        if self.emulate_break:
+            return False
+
+        # check for a duplicate in the db.
         if lookup_by == 'sha1':
             exists = object_type.objects.filter(sha1=lookup_value).exists()
         elif lookup_by == 'download_url':
@@ -110,16 +118,19 @@ class DupChecker(dict):
                     if self.court.pk == 'mich':
                         # Michigan sometimes has multiple occurrences of the
                         # same case with different dates on a page.
-                        return 'CONTINUE'
+                        return False
                     else:
                         logger.info('Next case occurs prior to when we found a '
                                     'duplicate. Court is up to date.')
-                        return 'BREAK'
+                        self.emulate_break = True
+                        return False
                 elif self.dup_count >= self.dup_threshold:
                     logger.info('Found %s duplicates in a row. Court is up to date.' % self.dup_count)
-                    return 'BREAK'
+                    self.emulate_break = True
+                    return False
             else:
-                # Not the fifth duplicate. Continue onwards.
-                return 'CONTINUE'
+                # Not the fifth duplicate. Continue onwards, but don't
+                # emulate a break statement.
+                return False
         else:
-            return 'CARRY_ON'
+            return True

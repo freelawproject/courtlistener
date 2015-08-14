@@ -18,8 +18,8 @@ from django.core.files.base import ContentFile
 
 
 class Command(cl_scrape_opinions.Command):
-    @staticmethod
-    def associate_meta_data_to_objects(site, i, court, sha1_hash):
+    def associate_meta_data_to_objects(self, site, i, court, sha1_hash,
+                                       content):
         audio_file = Audio(
             source='C',
             sha1=sha1_hash,
@@ -38,7 +38,25 @@ class Command(cl_scrape_opinions.Command):
             court=court,
         )
 
-        return docket, audio_file
+        # Make and associate the file object
+        error = False
+        try:
+            cf = ContentFile(content)
+            extension = get_extension(content)
+            if extension not in ['.mp3', '.wma']:
+                extension = '.' + site.download_urls[i].rsplit('.', 1)[1]
+            # See bitbucket issue #215 for why this must be
+            # lower-cased.
+            file_name = trunc(site.case_names[i].lower(), 75) + extension
+            audio_file.local_path_original_file.save(file_name, cf, save=False)
+        except:
+            msg = 'Unable to save binary to disk. Deleted document: % s.\n % s' % \
+                  (site.case_names[i], traceback.format_exc())
+            logger.critical(msg)
+            ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
+            error = True
+
+        return docket, audio_file, error
 
     @staticmethod
     def save_everything(docket, audio_file):
@@ -68,7 +86,7 @@ class Command(cl_scrape_opinions.Command):
                     site.cookies,
                     method=site.method
                 )
-                r.content = site.cleanup_content(r.content)
+                content = site.cleanup_content(r.content)
                 if msg:
                     logger.warn(msg)
                     ErrorLog(log_level='WARNING',
@@ -82,8 +100,8 @@ class Command(cl_scrape_opinions.Command):
                 except IndexError:
                     next_date = None
 
-                sha1_hash = hashlib.sha1(r.content).hexdigest()
-                onwards = dup_checker.should_we_continue_break_or_carry_on(
+                sha1_hash = hashlib.sha1(content).hexdigest()
+                onwards = dup_checker.press_on(
                     Audio,
                     current_date,
                     next_date,
@@ -103,27 +121,12 @@ class Command(cl_scrape_opinions.Command):
                     logger.info('Adding new document found at: %s' % site.download_urls[i])
                     dup_checker.reset()
 
-                    docket, audio_file = self.associate_meta_data_to_objects(
-                        site, i, court, sha1_hash)
+                    docket, audio_file, error = self.associate_meta_data_to_objects(
+                        site, i, court, sha1_hash, content)
 
                     audio_file.docket = docket
 
-                    # Make and associate the file object
-                    try:
-                        cf = ContentFile(r.content)
-                        extension = get_extension(r.content)
-                        if extension not in ['.mp3', '.wma']:
-                            extension = '.' + site.download_urls[i].rsplit('.', 1)[1]
-                        # See bitbucket issue #215 for why this must be
-                        # lower-cased.
-                        file_name = trunc(site.case_names[i].lower(), 75) + extension
-                        audio_file.local_path_original_file.save(file_name, cf, save=False)
-                    except:
-                        msg = 'Unable to save binary to disk. Deleted document: % s.\n % s' % \
-                              (site.case_names[i], traceback.format_exc())
-                        logger.critical(msg)
-                        ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
-                        download_error = True
+                    if error:
                         continue
 
                     self.save_everything(docket, audio_file)

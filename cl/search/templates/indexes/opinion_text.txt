@@ -1,21 +1,47 @@
-{# The body of the item #}
-{% if object.html_lawbox %}
-    {# lawbox > html > plaintext #}
-    {{ object.html_lawbox|striptags|default_if_none:"" }}
-{% elif object.html %}
-    {{ object.html|striptags|default_if_none:"" }}
+{# The body of the item. #}
+{% if item.html_columbia %}
+    {# columbia > lawbox > html > plaintext #}
+    {{ item.html_columbia|striptags }}
+{% elif item.html_lawbox %}
+    {{ item.html_lawbox|striptags }}
+{% elif item.html %}
+    {{ item.html|striptags }}
 {% else %}
-    {{ object.plain_text|default_if_none:"" }}
+    {{ item.plain_text }}
 {% endif %}
 
-{# The document itself #}
-{{ object.case_name|default_if_none:"" }}
-{{ object.precedential_status|default_if_none:"" }}
-{{ object.sha1|default_if_none:"" }}
-{{ object.docket.court.full_name|default_if_none:"" }}
-{{ object.docket.court.citation_string|default_if_none:"" }}
-{{ object.docket.court.pk|default_if_none:"" }}
-{{ object.judges|default_if_none:"" }}
-{{ object.nature_of_suit|default_if_none:"" }}
+{# Docket #}
+{# Need dates so queries for the date are sure to be returned (see #271) #}
+{{ item.cluster.docket.date_argued|date:"j F Y" }}
+{{ item.cluster.docket.date_reargued|date:"j F Y" }}
+{{ item.cluster.docket.date_reargument_denied|date:"j F Y}}
+{{ item.cluster.docket.docket_number }}
 
-TODO: Add dates here and to oral args to resolve #271.
+{# Court #}
+{{ item.cluster.docket.court.full_name }}
+{{ item.cluster.docket.court.pk }}
+{{ item.cluster.docket.court.citation_string }}
+
+{# Cluster #}
+{% if item.cluster.case_name_full %}
+    {{ item.cluster.case_name_full }}
+{% else %}
+    {{ item.cluster.case_name }}
+{% endif %}
+{% for judge in item.cluster.panel.all %}
+    {{ judge.name_full }}
+{% endfor %}
+{{ item.cluster.judges }}
+{{ item.cluster.date_filed:"j F Y" }}
+{{ citation_string }}
+{{ item.cluster.procedural_history }}
+{{ item.cluster.attorneys }}
+{{ item.cluster.nature_of_suit }}
+{{ item.cluster.posture }}
+{{ item.cluster.syllabus }}
+{{ item.cluster.precedential_status }}
+
+{# Opinion #}
+{{ item.sha1 }}
+
+{# HTML fields would go here, but they must be first, since they're displayed when no query #}

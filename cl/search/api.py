@@ -297,11 +297,6 @@ class SearchResource(DeprecatedModelResourceWithFieldsFilter):
         help_text="The full name of the case",
         null=True,
     )
-    case_number = fields.CharField(
-        attribute='caseNumber',
-        help_text="The combination of the citation and the docket number.",
-        null=True,
-    )
     citation = fields.CharField(
         attribute='citation',
         help_text="A concatenated list of all the citations for an opinion.",

@@ -268,11 +268,9 @@ qf = {
     'court': 1.0,
     'caseName': 3,
     'docketNumber': 1.0,
-    'westCite': 1.0,
     'neutralCite': 1.0,
     'lexisCite': 1.0,
     'status': 1.25,
-    'caseNumber': 1.25,
 }
 
 

@@ -133,7 +133,9 @@ class Command(BaseCommand):
                 old_document = None
             if old_document is not None:
                 old_citation = old_document.citation
-                case_name, case_name_full, case_name_short = self._get_case_names(old_citation.case_name)
+                old_doc_case_name, old_doc_case_name_full, old_doc_case_name_short = self._get_case_names(old_citation.case_name)
+            if old_audio is not None:
+                old_audio_case_name, old_audio_case_name_full, old_audio_case_name_short = self._get_case_names(old_audio.case_name)
 
             court = CourtNew.objects.get(pk=old_docket.court_id)  # Courts are in place thanks to initial data.
 
@@ -142,9 +144,9 @@ class Command(BaseCommand):
                 date_modified=old_docket.date_modified,
                 date_created=old_docket.date_modified,
                 court=court,
-                case_name=case_name,
-                case_name_full=case_name_full,
-                case_name_short=case_name_short,
+                case_name=old_doc_case_name,
+                case_name_full=old_doc_case_name_full,
+                case_name_short=old_doc_case_name_short,
                 slug=self._none_to_blank(old_docket.slug),
                 docket_number=self._none_to_blank(old_citation.docket_number),
                 date_blocked=old_docket.date_blocked,
@@ -164,8 +166,9 @@ class Command(BaseCommand):
                     date_filed=old_document.date_filed,
                     slug=self._none_to_blank(old_citation.slug),
                     citation_id=old_document.citation_id,
-                    case_name=case_name,
-                    case_name_full=case_name_full,
+                    case_name_short=old_doc_case_name_short,
+                    case_name=old_doc_case_name,
+                    case_name_full=old_doc_case_name_full,
                     federal_cite_one=self._none_to_blank(
                         old_citation.federal_cite_one),
                     federal_cite_two=self._none_to_blank(
@@ -226,7 +229,9 @@ class Command(BaseCommand):
                     pk=old_audio.pk,
                     docket=new_docket,
                     source=old_audio.source,
-                    case_name=old_audio.case_name,
+                    case_name=old_audio_case_name,
+                    case_name_short=old_audio_case_name_short,
+                    case_name_full=old_audio_case_name_full,
                     judges=self._none_to_blank(old_audio.judges),
                     date_created=old_audio.time_retrieved,
                     date_modified=old_audio.date_modified,

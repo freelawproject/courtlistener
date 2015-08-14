@@ -2,7 +2,7 @@ import argparse
 import csv
 import os
 from cl.audio.models import Audio
-from cl.search.models import Document
+from cl.search.models import Opinion
 from dateutil import parser
 from django.utils.timezone import is_naive, make_aware, utc
 
@@ -46,7 +46,7 @@ def readable_dir(prospective_dir):
 
 def valid_obj_type(s):
     if s == 'opinions':
-        return Document
+        return Opinion
     elif s == 'audio':
         return Audio
     else:

@@ -26,6 +26,11 @@ class Audio(models.Model):
         choices=SOURCES,
         blank=True,
     )
+    case_name_short = models.TextField(
+        help_text="The abridged name of the case, often a single word, e.g. "
+                  "'Marsh'",
+        blank=True,
+    )
     case_name = models.TextField(
         help_text="The full name of the case",
         blank=True,

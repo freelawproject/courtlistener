@@ -1,6 +1,3 @@
-
-# TODO: Add case_name_short, summary, etc to this guy and to the oral arg scraper as applicable.
-
 import hashlib
 import mimetypes
 import os
@@ -26,9 +23,11 @@ from juriscraper.lib.importer import build_module_list
 from juriscraper.tests import MockRequest
 
 from celery.task.sets import subtask
+from datetime import date
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
+from django.utils.timezone import make_aware, utc, now
 from lxml import html
 from urlparse import urljoin
 
@@ -211,44 +210,78 @@ class Command(BaseCommand):
             help="Disable duplicate aborting.",
         )
 
-    def associate_meta_data_to_objects(self, site, i, court, sha1_hash):
+    @staticmethod
+    def make_objects(item, court, sha1_hash, content):
         """Takes the meta data from the scraper and associates it with objects.
 
         Returns the created objects.
         """
-        docket = Docket()
-        if site.docket_numbers:
-            docket.docket_number = site.docket_numbers[i]
-        docket.case_name = site.case_names[i]
-        docket.court = court
+        blocked = item['blocked_statuses']
+        if blocked is not None:
+            date_blocked = date.today()
+        else:
+            date_blocked = None
+
+        docket = Docket(
+            docket_number=item.get('docket_numbers', ''),
+            case_name=item['case_names'],
+            case_name_short=item['case_name_shorts'],
+            court=court,
+            blocked=blocked,
+            date_blocked=date_blocked,
+            # TODO remove these lines after the DB migration
+            date_created=now(),
+            date_modified=now(),
+        )
 
         cluster = OpinionCluster(
-            case_name=site.case_names[i],
+            judges=item.get('judges', ''),
+            date_filed=item['case_dates'],
+            case_name=item['case_names'],
+            case_name_short=item['case_name_shorts'],
             source='C',
-            date_filed=site.case_dates[i],
-            precedential_status=site.precedential_statuses[i]
+            precedential_status=item['precedential_statuses'],
+            nature_of_suit=item.get('nature_of_suit', ''),
+            blocked=blocked,
+            date_blocked=date_blocked,
+            federal_cite_one=item.get('west_citations', ''),
+            state_cite_one=item.get('west_state_citations', ''),
+            neutral_cite=item.get('neutral_citations', ''),
+            # TODO remove these lines after the DB migration
+            date_created=now(),
+            date_modified=now(),
         )
         opinion = Opinion(
+            type='combined',
             sha1=sha1_hash,
-            download_url=site.download_urls[i],
+            download_url=item['download_urls'],
+            # TODO remove these lines after the DB migration
+            date_created=now(),
+            date_modified=now(),
         )
-        if site.neutral_citations:
-            cluster.neutral_cite = site.neutral_citations[i]
-        if site.west_citations:
-            cluster.federal_cite_one = site.west_citations[i]
-        if site.west_state_citations:
-            cluster.west_state_cite = site.west_state_citations[i]
-        if site.judges:
-            cluster.judges = site.judges[i]
-        if site.nature_of_suit:
-            cluster.nature_of_suit = site.nature_of_suit[i]
 
-        return docket, opinion, cluster
+        error = False
+        try:
+            cf = ContentFile(content)
+            extension = get_extension(content)
+            file_name = trunc(item['case_names'].lower(), 75) + extension
+            opinion.file_with_date = cluster.date_filed
+            opinion.local_path.save(file_name, cf, save=False)
+        except:
+            msg = ('Unable to save binary to disk. Deleted '
+                   'item: %s.\n %s' %
+                   (item['case_names'], traceback.format_exc()))
+            logger.critical(msg)
+            ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
+            error = True
+
+        return docket, opinion, cluster, error
 
     @staticmethod
-    def save_everything(docket, opinion, cluster, index=False):
+    def save_everything(items, index=False):
         """Saves all the sub items and associates them as appropriate.
         """
+        docket, cluster, opinion = items['docket'], items['cluster'], items['opinion']
         docket.save()
         cluster.docket = docket
         cluster.save(index=False)  # Index only when the opinion is associated.
@@ -271,13 +304,13 @@ class Command(BaseCommand):
         if not abort:
             if site.cookies:
                 logger.info("Using cookies: %s" % site.cookies)
-            for i in range(0, len(site.case_names)):
+            for i, item in enumerate(site):
                 msg, r = get_binary_content(
-                    site.download_urls[i],
+                    item['download_urls'],
                     site.cookies,
                     method=site.method
                 )
-                r.content = site.cleanup_content(r.content)
+                content = site.cleanup_content(r.content)
                 if msg:
                     logger.warn(msg)
                     ErrorLog(log_level='WARNING',
@@ -285,74 +318,47 @@ class Command(BaseCommand):
                              message=msg).save()
                     continue
 
-                current_date = site.case_dates[i]
+                current_date = item['case_dates']
                 try:
-                    next_date = site.case_dates[i + 1]
+                    next_date = site[i + 1]['case_dates']
                 except IndexError:
                     next_date = None
 
                 # Make a hash of the data
-                sha1_hash = hashlib.sha1(r.content).hexdigest()
+                sha1_hash = hashlib.sha1(content).hexdigest()
                 if court_str == 'nev' and \
-                                site.precedential_statuses[i] == 'Unpublished':
+                                item['precedential_statuses'] == 'Unpublished':
                     # Nevada's non-precedential cases have different SHA1
                     # sums every time.
-                    onwards = dup_checker.should_we_continue_break_or_carry_on(
-                        Opinion,
-                        current_date,
-                        next_date,
-                        lookup_value=site.download_urls[i],
-                        lookup_by='download_url'
-                    )
+                    lookup_params = {'lookup_value': item['download_urls'],
+                                     'lookup_by': 'download_url'}
                 else:
-                    onwards = dup_checker.should_we_continue_break_or_carry_on(
-                        Opinion,
-                        current_date,
-                        next_date,
-                        lookup_value=sha1_hash,
-                        lookup_by='sha1'
-                    )
+                    lookup_params = {'lookup_value': sha1_hash,
+                                     'lookup_by': 'sha1'}
 
-                if onwards == 'CONTINUE':
-                    # It's a duplicate, but we haven't hit any thresholds yet.
-                    continue
-                elif onwards == 'BREAK':
-                    # It's a duplicate, and we hit a date or dup_count
-                    # threshold.
-                    dup_checker.update_site_hash(sha1_hash)
-                    break
-                elif onwards == 'CARRY_ON':
+                onwards = dup_checker.press_on(Opinion, current_date, next_date,
+                                               **lookup_params)
+                if onwards:
                     # Not a duplicate, carry on
                     logger.info('Adding new document found at: %s' %
-                                site.download_urls[i])
+                                item['download_urls'])
                     dup_checker.reset()
 
-                    docket, opinion, cluster = self.associate_meta_data_to_objects(
-                        site, i, court, sha1_hash)
+                    docket, opinion, cluster, error = self.make_objects(
+                        item, court, sha1_hash, content)
 
-                    # Make and associate the file object
-                    try:
-                        cf = ContentFile(r.content)
-                        extension = get_extension(r.content)
-                        file_name = trunc(site.case_names[i].lower(), 75) + \
-                                    extension
-                        opinion.file_with_date = cluster.date_filed
-                        opinion.local_path.save(file_name, cf, save=False)
-                    except:
-                        msg = ('Unable to save binary to disk. Deleted '
-                               'item: %s.\n %s' %
-                               (site.case_names[i], traceback.format_exc()))
-                        logger.critical(msg)
-                        ErrorLog(
-                            log_level='CRITICAL',
-                            court=court,
-                            message=msg
-                        ).save()
-                        download_error = True
+                    if error:
                         continue
 
                     # Save everything, but don't update Solr index yet
-                    self.save_everything(docket, opinion, cluster, index=False)
+                    self.save_everything(
+                        items={
+                            'docket': docket,
+                            'opinion': opinion,
+                            'cluster': cluster
+                        },
+                        index=False
+                    )
                     random_delay = random.randint(0, 3600)
                     extract_doc_content.delay(
                         opinion.pk,
@@ -362,7 +368,7 @@ class Command(BaseCommand):
 
                     logger.info("Successfully added doc {pk}: {name}".format(
                         pk=opinion.pk,
-                        name=site.case_names[i]
+                        name=item['case_names'],
                     ))
 
             # Update the hash if everything finishes properly.

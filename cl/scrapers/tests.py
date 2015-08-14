@@ -5,8 +5,9 @@ import time
 
 from cl import settings
 from cl.audio.models import Audio
-from cl.lib.solr_core_admin import create_solr_core, delete_solr_core, \
-    swap_solr_core
+from cl.lib.solr_core_admin import (
+    create_solr_core, delete_solr_core, swap_solr_core
+)
 from cl.lib.string_utils import trunc
 from cl.lib import sunburnt
 from cl.lib.test_helpers import CitationTest
@@ -222,7 +223,7 @@ class DupcheckerTest(TestCase):
             dup_checker.url2Hash.delete()
 
     def test_abort_on_unchanged_court_website(self):
-        """Similar to the above, but we create a url2hash object before
+        """Similar to the above, but we create a UrlHash object before
         checking if it exists."""
         site = test_opinion_scraper.Site()
         site.hash = 'this is a dummy hash code string'
@@ -244,7 +245,7 @@ class DupcheckerTest(TestCase):
             dup_checker.url2Hash.delete()
 
     def test_abort_on_changed_court_website(self):
-        """Similar to the above, but we create a url2Hash with a different
+        """Similar to the above, but we create a UrlHash with a different
         hash before checking if it exists.
         """
         site = test_opinion_scraper.Site()
@@ -268,25 +269,38 @@ class DupcheckerTest(TestCase):
 
             dup_checker.url2Hash.delete()
 
-    def test_should_we_continue_break_or_carry_on_with_an_empty_database(self):
+    def test_press_on_with_an_empty_database(self):
         for dup_checker in self.dup_checkers:
-            onwards = dup_checker.should_we_continue_break_or_carry_on(
+            onwards = dup_checker.press_on(
                 Document,
                 now(),
                 now() - timedelta(days=1),
+                hash=site.hash
                 lookup_value='content',
                 lookup_by='sha1'
             )
-            if not dup_checker.full_crawl:
-                self.assertTrue(onwards, "DupChecker says to abort during a full crawl.")
-            else:
+            if dup_checker.full_crawl:
+                self.assertTrue(
+                    onwards,
+                    "DupChecker says to abort during a full crawl. This should "
+                    "never happen."
+                )
+            elif dup_checker.full_crawl is False:
                 count = Document.objects.all().count()
-                self.assertTrue(onwards, "DupChecker says to abort on dups when the database has %s Documents." % count)
+                self.assertTrue(
+                    onwards,
+                    "DupChecker says to abort on dups when the database has %s "
+                    "Documents." % count
+                )
 
-    def test_should_we_continue_break_or_carry_on_with_a_dup_found(self):
+    def test_press_on_with_a_dup_found(self):
         # Set the dup_threshold to zero for this test
-        self.dup_checkers = [DupChecker(self.court, full_crawl=True, dup_threshold=0),
-                             DupChecker(self.court, full_crawl=False, dup_threshold=0)]
+        self.dup_checkers = [DupChecker(self.court,
+                                        full_crawl=True,
+                                        dup_threshold=0),
+                             DupChecker(self.court,
+                                        full_crawl=False,
+                                        dup_threshold=0)]
         content = "this is dummy content that we hash"
         content_hash = hashlib.sha1(content).hexdigest()
         for dup_checker in self.dup_checkers:
@@ -295,7 +309,7 @@ class DupcheckerTest(TestCase):
             docket.save()
             doc = Document(sha1=content_hash, docket=docket)
             doc.save(index=False)
-            onwards = dup_checker.should_we_continue_break_or_carry_on(
+            onwards = dup_checker.press_on(
                 Document,
                 now(),
                 now(),
@@ -303,24 +317,26 @@ class DupcheckerTest(TestCase):
                 lookup_by='sha1'
             )
             if dup_checker.full_crawl:
-                self.assertEqual(
+                self.assertTrue(
                     onwards,
-                    'CONTINUE',
-                    'DupChecker says to %s during a full crawl.' % onwards
+                    'DupChecker returned %s during a full crawl.' % onwards
                 )
 
-            else:
-                self.assertEqual(
+            elif dup_checker.full_crawl is False:
+                self.assertFalse(
                     onwards,
-                    'BREAK',
-                    "DupChecker says to %s but there should be a duplicate in "
+                    "DupChecker returned %s but there should be a duplicate in "
                     "the database. dup_count is %s, and dup_threshold is %s" %
                     (onwards, dup_checker.dup_count, dup_checker.dup_threshold)
+                )
+                self.assertTrue(
+                    dup_checker.emulate_break,
+                    "We should have hit a break but didn't."
                 )
 
             doc.delete()
 
-    def test_should_we_continue_break_or_carry_on_with_dup_found_and_older_date(self):
+    def test_press_on_with_dup_found_and_older_date(self):
         content = "this is dummy content that we hash"
         content_hash = hashlib.sha1(content).hexdigest()
         for dup_checker in self.dup_checkers:
@@ -329,7 +345,7 @@ class DupcheckerTest(TestCase):
             doc = Document(sha1=content_hash, docket=docket)
             doc.save(index=False)
             # Note that the next case occurs prior to the current one
-            onwards = dup_checker.should_we_continue_break_or_carry_on(
+            onwards = dup_checker.press_on(
                 Document,
                 now(),
                 now() - timedelta(days=1),
@@ -337,16 +353,18 @@ class DupcheckerTest(TestCase):
                 lookup_by='sha1'
             )
             if dup_checker.full_crawl:
-                self.assertEqual(
+                self.assertTrue(
                     onwards,
-                    'CONTINUE',
                     'DupChecker says to %s during a full crawl.' % onwards)
             else:
-                self.assertEqual(
+                self.assertFalse(
                     onwards,
-                    'BREAK',
-                    "DupChecker says to %s but there should be a duplicate in "
+                    "DupChecker returned %s but there should be a duplicate in "
                     "the database. dup_count is %s, and dup_threshold is %s" %
                     (onwards, dup_checker.dup_count, dup_checker.dup_threshold)
+                )
+                self.assertTrue(
+                    dup_checker.emulate_break,
+                    "We should have hit a break but didn't."
                 )
             doc.delete()
