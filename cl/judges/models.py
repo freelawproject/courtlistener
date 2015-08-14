@@ -59,7 +59,7 @@ class Judge(models.Model):
         db_index=True,
     )
     slug = models.SlugField(
-        max_length=158  # len(' '.join([first, middle, last, suffix]))
+        max_length=158  # len(self.name_full)
     )
     name_first = models.CharField(
         max_length=50,
@@ -135,6 +135,15 @@ class Judge(models.Model):
         for field in ['dob', 'dod']:
             validate_partial_date(self, field)
         super(Judge, self).clean_fields(*args, **kwargs)
+
+    @property
+    def name_full(self):
+        return ' '.join([
+            self.name_first,
+            self.name_middle,
+            self.name_last,
+            self.name_suffix,
+        ])
 
 
 class Position(models.Model):
