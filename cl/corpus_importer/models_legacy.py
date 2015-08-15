@@ -699,16 +699,6 @@ class Audio(models.Model):
     def get_absolute_url(self):
         return reverse('view_audio_file', args=[self.pk, self.docket.slug])
 
-    def delete(self, *args, **kwargs):
-        """
-        Update the index as items are deleted.
-        """
-        id_cache = self.pk
-        super(Audio, self).delete(*args, **kwargs)
-        from search.tasks import delete_item
-
-        delete_item.delay(id_cache, settings.SOLR_AUDIO_URL)
-
 
 ##
 # UserHandling

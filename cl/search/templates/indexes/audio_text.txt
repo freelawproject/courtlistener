@@ -9,7 +9,7 @@
 {# Need dates so queries for the date are sure to be returned (see #271) #}
 {{ item.docket.date_argued|date:"j F Y" }}
 {{ item.docket.date_reargued|date:"j F Y" }}
-{{ item.docket.date_reargument_denied|date:"j F Y}}
+{{ item.docket.date_reargument_denied|date:"j F Y" }}
 {{ item.docket.docket_number }}
 
 {# Court #}

@@ -1,6 +1,5 @@
-{# The body of the item. #}
+{# The body of the item (columbia > lawbox > html > plaintext) #}
 {% if item.html_columbia %}
-    {# columbia > lawbox > html > plaintext #}
     {{ item.html_columbia|striptags }}
 {% elif item.html_lawbox %}
     {{ item.html_lawbox|striptags }}
@@ -14,7 +13,7 @@
 {# Need dates so queries for the date are sure to be returned (see #271) #}
 {{ item.cluster.docket.date_argued|date:"j F Y" }}
 {{ item.cluster.docket.date_reargued|date:"j F Y" }}
-{{ item.cluster.docket.date_reargument_denied|date:"j F Y}}
+{{ item.cluster.docket.date_reargument_denied|date:"j F Y" }}
 {{ item.cluster.docket.docket_number }}
 
 {# Court #}
@@ -32,7 +31,7 @@
     {{ judge.name_full }}
 {% endfor %}
 {{ item.cluster.judges }}
-{{ item.cluster.date_filed:"j F Y" }}
+{{ item.cluster.date_filed|date:"j F Y" }}
 {{ citation_string }}
 {{ item.cluster.procedural_history }}
 {{ item.cluster.attorneys }}

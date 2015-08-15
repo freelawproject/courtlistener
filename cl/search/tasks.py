@@ -47,72 +47,37 @@ def add_or_update_items(items, solr_url=settings.SOLR_OPINION_URL):
 
 
 @task
-def delete_items(items):
+def add_or_update_opinions(item_pks, force_commit=True):
     si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='w')
+    try:
+        si.add([SearchDocument(item) for item in
+                Opinion.objects.filter(pk__in=item_pks)])
+        if force_commit:
+            si.commit()
+    except SolrError, exc:
+        add_or_update_opinions.retry(exc=exc, countdown=30)
+
+
+@task
+def add_or_update_audio_files(item_pks, force_commit=True):
+    si = sunburnt.SolrInterface(settings.SOLR_AUDIO_URL, mode='w')
+    try:
+        si.add([SearchAudioFile(item) for item in
+                Audio.objeccts.filter(pk__in=item_pks)])
+        if force_commit:
+            si.commit()
+    except SolrError, exc:
+        add_or_update_audio_files.retry(exc=exc, countdown=30)
+
+
+@task
+def delete_items(items, solr_url):
+    si = sunburnt.SolrInterface(solr_url, mode='w')
     si.delete(list(items))
     si.commit()
 
 
 @task
-def add_or_update_docs(item_pks):
-    si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='w')
-    item_list = []
-    for pk in item_pks:
-        item = Opinion.objects.get(pk=pk)
-        item_list.append(SearchDocument(item))
-    si.add(item_list)
-    si.commit()
-
-
-@task
-def add_or_update_audio_files(item_pks):
-    si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='w')
-    item_list = []
-    for pk in item_pks:
-        item = Audio.objects.get(pk=pk)
-        item_list.append(SearchDocument(item))
-    si.add(item_list)
-    si.commit()
-
-
-@task
-def delete_item(pk, solr_url):
-    """Deletes the item from the index.
-    """
-    si = sunburnt.SolrInterface(solr_url, mode='w')
-    si.delete(pk)
-    si.commit()
-
-
-@task
-def add_or_update_opinion(pk, force_commit=True):
-    """Updates the document in the index. Called by Document save function.
-
-    TODO: Update this. It was renamed, but the find/replace not completed. Will
-    have invalid references to add_or_update_doc
-    """
-    si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='w')
-    try:
-        si.add(SearchDocument(Opinion.objects.get(pk=pk)))
-        if force_commit:
-            si.commit()
-    except SolrError, exc:
-        add_or_update_opinion.retry(exc=exc, countdown=30)
-
-@task
 def add_or_update_cluster(pk, force_commit=True):
     # TODO: Implement this.
     pass
-
-
-@task
-def add_or_update_audio_file(pk, force_commit=True):
-    """Updates the document in the index. Called by Document save function.
-    """
-    si = sunburnt.SolrInterface(settings.SOLR_AUDIO_URL, mode='w')
-    try:
-        si.add(SearchAudioFile(Audio.objects.get(pk=pk)))
-        if force_commit:
-            si.commit()
-    except SolrError, exc:
-        add_or_update_audio_file.retry(exc=exc, countdown=30)

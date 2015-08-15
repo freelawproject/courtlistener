@@ -18,7 +18,7 @@ null_map = dict.fromkeys(range(0, 10) + range(11, 13) + range(14, 32))
 class SearchDocument(object):
     def __init__(self, item):
         self.id = item.pk
-        self.docket_id = item.cludter.docket.pk
+        self.docket_id = item.cluster.docket.pk
         self.cluster_id = item.cluster.pk
         self.court_id = item.cluster.docket.court.pk
 
@@ -71,10 +71,10 @@ class SearchDocument(object):
 
         # Opinion
         self.cites = [opinion.pk for opinion in item.opinions_cited.all()]
-        self.author_id = item.author.pk
+        self.author_id = getattr(item.author, 'pk', None)
         self.joined_by_ids = [judge.pk for judge in item.joined_by.all()]
         self.type = item.type
-        self.download_url = item.download_url
+        self.download_url = item.download_url or None
         self.local_path = unicode(item.local_path)
 
         try:
@@ -92,8 +92,8 @@ class SearchDocument(object):
         self.text = text_template.render(context).translate(null_map)
 
         # Faceting fields
-        self.status_exact = item.get_precedential_status_display()
-        self.court_exact = item.docket.court.pk
+        self.status_exact = item.cluster.get_precedential_status_display()
+        self.court_exact = item.cluster.docket.court.pk
 
 
 class SearchAudioFile(object):

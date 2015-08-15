@@ -45,9 +45,11 @@ def readable_dir(prospective_dir):
 
 
 def valid_obj_type(s):
-    if s == 'opinions':
+    options = ('opinions', 'audio')
+    if s.lower() == 'opinions':
         return Opinion
-    elif s == 'audio':
+    elif s.lower() == 'audio':
         return Audio
     else:
-        raise argparse.ArgumentTypeError("Unable to parse type, %s" % s)
+        raise argparse.ArgumentTypeError(
+            "Unable to parse type, %s. Valid options are %s" % (s, options))

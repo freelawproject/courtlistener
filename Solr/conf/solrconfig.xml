@@ -1510,14 +1510,15 @@
        results for a given query regardless of the normal lucene
        scoring.
     -->
-  <searchComponent name="elevator" class="solr.QueryElevationComponent" >
+    <!--mlr
+  <searchComponent name="elevator" class="solr.QueryElevationComponent" >-->
     <!-- pick a fieldType to analyze queries -->
-    <str name="queryFieldType">string</str>
+    <!--mlr <str name="queryFieldType">string</str>
     <str name="config-file">elevate.xml</str>
-  </searchComponent>
+  </searchComponent>-->
 
   <!-- A request handler for demonstrating the elevator component -->
-  <requestHandler name="/elevate" class="solr.SearchHandler" startup="lazy">
+  <!--mlr<requestHandler name="/elevate" class="solr.SearchHandler" startup="lazy">
     <lst name="defaults">
       <str name="echoParams">explicit</str>
       <str name="df">text</str>
@@ -1525,7 +1526,7 @@
     <arr name="last-components">
       <str>elevator</str>
     </arr>
-  </requestHandler>
+  </requestHandler>-->
 
   <requestHandler name="/reloadCache"
                 class="org.apache.solr.search.function.FileFloatSource$ReloadCacheRequestHandler" />

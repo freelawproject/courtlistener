@@ -6,9 +6,9 @@ from cl.lib import sunburnt
 from cl.lib.argparse_types import valid_date_time, valid_obj_type
 from cl.lib.db_tools import queryset_generator
 from cl.lib.timer import print_timing
-from cl.search.models import Document
+from cl.search.models import Opinion
 from cl.search.tasks import (delete_items, add_or_update_audio_files,
-                                add_or_update_docs, add_or_update_items)
+                             add_or_update_opinions, add_or_update_items)
 from celery.task.sets import TaskSet
 from django.core.management.base import BaseCommand
 
@@ -41,11 +41,18 @@ class Command(BaseCommand):
     help = ('Adds, updates, deletes items in an index, committing changes and '
             'optimizing it, if requested.')
 
+    def __init__(self, *args, **kwargs):
+        super(Command, self).__init__(*args, **kwargs)
+        self.solr_url = None
+        self.si = None
+        self.verbosity = None
+        self.options = []
+        self.type = None
+
     def add_arguments(self, parser):
         parser.add_argument(
             '--type',
             type=valid_obj_type,
-            choices=('audio', 'opinions'),
             required=True,
             help='Because the Solr indexes are loosely bound to the database, '
                  'commands require that the correct model is provided in this '
@@ -119,7 +126,9 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.verbosity = int(options.get('verbosity', 1))
         self.solr_url = options['solr_url']
-        self.si = sunburnt.SolrInterface(options['solr_url'], mode='rw')
+        self.si = sunburnt.SolrInterface(self.solr_url, mode='rw')
+        self.options = options
+        self.type = options['type']
 
         if options['update']:
             if self.verbosity >= 1:
@@ -129,7 +138,7 @@ class Command(BaseCommand):
             elif options.get('datetime'):
                 self.add_or_update_by_datetime(options['datetime'])
             elif options.get('query'):
-                self.stderr.write("Updating by query not yet implemented.")
+                self.stderr.write("Updating by query not implemented.")
                 sys.exit(1)
             elif options.get('items'):
                 self.add_or_update(*options['items'])
@@ -208,30 +217,29 @@ class Command(BaseCommand):
         self.stdout.write('\n')
 
     @print_timing
-    def delete(self, *items):
+    def delete(self, items):
         """
         Given an item, creates a Celery task to delete it.
         """
-        self.stdout.write("Deleting items(s): %s\n" % list(items))
-        # Use Celery to delete the item asynchronously
-        delete_items.delay(items)
+        self.stdout.write("Deleting items(s): %s\n" % items)
+        delete_items.delay(items, self.solr_url)
 
     def delete_all(self):
         """
         Deletes all items from the database.
         """
         count = self.si.raw_query(
-            **{'q': '*:*', 'caller': 'cl_update_index', }).count()
+            **{'q': '*:*', 'caller': 'cl_update_index:delete_all', }).count()
 
         if proceed_with_deletion(self.stdout, count):
             self.stdout.write('Removing all items from your index because '
                               'you said so.\n')
-            self.stdout.write('Marking all items as deleted...\n')
+            self.stdout.write('  Marking all items as deleted...\n')
             self.si.delete_all()
-            self.stdout.write('Committing the deletion...\n')
+            self.stdout.write('  Committing the deletion...\n')
             self.si.commit()
-            self.stdout.write('\nDone. Your index has been emptied. Hope this '
-                              'is what you intended.\n')
+            self.stdout.write('\nDone. The index located at: %s\n'
+                              'is now empty.\n' % self.solr_url)
 
     @print_timing
     def delete_by_datetime(self, dt):
@@ -240,13 +248,16 @@ class Command(BaseCommand):
 
         Relies on the items still being in the database.
         """
-        qs = self.type.objects.filter(date_created__gt=dt)
+        qs = self.type.objects.filter(
+            date_created__gt=dt
+        ).values_list(
+            'pk',
+            flat=True,
+        )
         count = qs.count()
         if proceed_with_deletion(self.stdout, count):
             self.stdout.write("Deleting all item(s) newer than %s\n" % dt)
-            items = queryset_generator(qs)
-            for item in items:
-                self.si.delete(item)
+            self.si.delete(list(qs))
             self.si.commit()
 
     @print_timing
@@ -270,8 +281,8 @@ class Command(BaseCommand):
         """
         self.stdout.write("Adding or updating item(s): %s\n" % list(items))
         # Use Celery to add or update the item asynchronously
-        if self.type == Document:
-            add_or_update_docs.delay(items)
+        if self.type == Opinion:
+            add_or_update_opinions.delay(items)
         elif self.type == Audio:
             add_or_update_audio_files.delay(items)
 
@@ -280,10 +291,9 @@ class Command(BaseCommand):
         """
         Given a datetime, adds or updates all items newer than that time.
         """
-        self.stdout.write(
-            "Adding or updating items(s) newer than %s\n" % dt)
-        qs = self.type.objects.filter(date_created__gt=dt)
-        items = queryset_generator(qs)
+        self.stdout.write("Adding or updating items(s) newer than %s\n" % dt)
+        qs = self.type.objects.filter(date_created__gte=dt)
+        items = queryset_generator(qs, chunksize=5000)
         count = qs.count()
         self._chunk_queryset_into_tasks(items, count)
 

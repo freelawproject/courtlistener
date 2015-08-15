@@ -109,8 +109,15 @@ class DocketAdmin(admin.ModelAdmin):
         'date_modified',
     )
 
+
+class OpinionsCitedAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'citing_opinion',
+        'cited_opinion',
+    )
+
 admin.site.register(Opinion, OpinionAdmin)
 admin.site.register(Court, CourtAdmin)
 admin.site.register(Docket, DocketAdmin)
-admin.site.register(OpinionsCited, admin.ModelAdmin)
+admin.site.register(OpinionsCited, OpinionsCitedAdmin)
 admin.site.register(OpinionCluster, OpinionClusterAdmin)

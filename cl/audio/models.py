@@ -134,8 +134,8 @@ class Audio(models.Model):
         """
         super(Audio, self).save(*args, **kwargs)
         if index:
-            from cl.search.tasks import add_or_update_audio_file
-            add_or_update_audio_file.delay(self.pk, force_commit)
+            from cl.search.tasks import add_or_update_audio_files
+            add_or_update_audio_files.delay([self.pk], force_commit)
 
     def delete(self, *args, **kwargs):
         """
@@ -143,5 +143,5 @@ class Audio(models.Model):
         """
         id_cache = self.pk
         super(Audio, self).delete(*args, **kwargs)
-        from cl.search.tasks import delete_item
-        delete_item.delay(id_cache, settings.SOLR_AUDIO_URL)
+        from cl.search.tasks import delete_items
+        delete_items.delay([id_cache], settings.SOLR_AUDIO_URL)

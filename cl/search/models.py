@@ -349,8 +349,8 @@ class Opinion(models.Model):
     def save(self, index=True, force_commit=False, *args, **kwargs):
         super(Opinion, self).save(*args, **kwargs)
         if index:
-            from cl.search.tasks import add_or_update_opinion
-            add_or_update_opinion.delay(self.pk, force_commit)
+            from cl.search.tasks import add_or_update_opinions
+            add_or_update_opinions.delay([self.pk], force_commit)
 
 
 class OpinionsCited(models.Model):
@@ -364,9 +364,11 @@ class OpinionsCited(models.Model):
     )
 
     def __unicode__(self):
-        return u'%s  ——cites—→ %s' % (self.citing_opinion.id,
+        return u'%s ⤜--cites⟶ %s' % (self.citing_opinion.id,
                                       self.cited_opinion.id)
 
+    class Meta:
+        verbose_name_plural = 'Opinions cited'
 
 class OpinionCluster(models.Model):
     """A class representing a cluster of court opinions."""
@@ -618,5 +620,5 @@ class OpinionCluster(models.Model):
         """
         id_cache = self.pk
         super(OpinionCluster, self).delete(*args, **kwargs)
-        from cl.search.tasks import delete_item
-        delete_item.delay(id_cache, settings.SOLR_OPINION_URL)
+        from cl.search.tasks import delete_items
+        delete_items.delay([id_cache], settings.SOLR_OPINION_URL)

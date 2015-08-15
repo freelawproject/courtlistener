@@ -722,7 +722,7 @@ def object_to_dict(o, schema):
     d = {}
     for name in schema.fields.keys():
         a = get_attribute_or_callable(o, name)
-        if a is not None:
+        if a is not None and a != '':
             d[name] = a
     # and now try for dynamicFields:
     try:
