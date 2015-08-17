@@ -166,6 +166,7 @@ class ExtractionTest(TestCase):
 
 
 class ReportScrapeStatusTest(CitationTest):
+    fixtures = ['test_objects.json']
     def setUp(self):
         super(ReportScrapeStatusTest, self).setUp()
 

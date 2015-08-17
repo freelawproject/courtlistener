@@ -13,10 +13,13 @@ from celery.task.sets import TaskSet
 from django.core.management.base import BaseCommand
 
 
-def proceed_with_deletion(out, count):
+def proceed_with_deletion(out, count, noinput):
     """
     Checks whether we want to proceed to delete (lots of) items
     """
+    if noinput:
+        return True
+
     proceed = True
     out.write("\n")
     yes_or_no = raw_input('WARNING: Are you **sure** you want to delete all '
@@ -28,7 +31,7 @@ def proceed_with_deletion(out, count):
 
     if count > 10000 and proceed is True:
         # Double check...something might be off.
-        yes_or_no = raw_input('Are you double-plus sure? There is an awful '
+        yes_or_no = raw_input('Are you double-plus sure? There are an awful '
                               'lot of items here? [y/N] ')
         if not yes_or_no.lower().startswith('y'):
             out.write("No action taken.\n")
@@ -48,6 +51,7 @@ class Command(BaseCommand):
         self.verbosity = None
         self.options = []
         self.type = None
+        self.noinput = None
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -66,6 +70,12 @@ class Command(BaseCommand):
                  'Solr URL, overriding the default value that\'s in the '
                  'settings, e.g., http://127.0.0.1:8983/solr/swap_core'
         )
+        parser.add_argument(
+            '--noinput',
+            action='store_true',
+            help="Do NOT prompt the user for input of any kind. Useful in "
+                 "tests, but can disable important warnings."
+        )
 
         actions_group = parser.add_mutually_exclusive_group()
         actions_group.add_argument(
@@ -83,6 +93,7 @@ class Command(BaseCommand):
                  'from the index. Note that this will not delete items from '
                  'the index that do not continue to exist in the database.'
         )
+
         parser.add_argument(
             '--optimize',
             action='store_true',
@@ -129,6 +140,7 @@ class Command(BaseCommand):
         self.si = sunburnt.SolrInterface(self.solr_url, mode='rw')
         self.options = options
         self.type = options['type']
+        self.noinput = options['noinput']
 
         if options['update']:
             if self.verbosity >= 1:
@@ -231,7 +243,7 @@ class Command(BaseCommand):
         count = self.si.raw_query(
             **{'q': '*:*', 'caller': 'cl_update_index:delete_all', }).count()
 
-        if proceed_with_deletion(self.stdout, count):
+        if proceed_with_deletion(self.stdout, count, self.noinput):
             self.stdout.write('Removing all items from your index because '
                               'you said so.\n')
             self.stdout.write('  Marking all items as deleted...\n')
@@ -255,7 +267,7 @@ class Command(BaseCommand):
             flat=True,
         )
         count = qs.count()
-        if proceed_with_deletion(self.stdout, count):
+        if proceed_with_deletion(self.stdout, count, self.noinput):
             self.stdout.write("Deleting all item(s) newer than %s\n" % dt)
             self.si.delete(list(qs))
             self.si.commit()
@@ -267,7 +279,7 @@ class Command(BaseCommand):
         """
         query_dict = ast.literal_eval(query)
         count = self.si.query(self.si.Q(**query_dict)).count()
-        if proceed_with_deletion(self.stdout, count):
+        if proceed_with_deletion(self.stdout, count, self.noinput):
             self.stdout.write("Deleting all item(s) that match the query: "
                               "%s\n" % query)
             self.si.delete(queries=self.si.Q(**query_dict))

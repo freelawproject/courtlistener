@@ -1,0 +1,29 @@
+[
+  {
+    "fields": {
+      "gender": "f",
+      "name_first": "Judith",
+      "name_last": "Sheindlin",
+      "date_modified": "2015-08-14T20:59:36.580Z",
+      "date_dod": null,
+      "date_dob": "1942-10-21",
+      "date_granularity_dob": "%Y-%m-%d",
+      "name_suffix": "",
+      "date_granularity_dod": "",
+      "name_middle": "Susan",
+      "race": [
+        1
+      ],
+      "dod_city": "",
+      "dod_state": "",
+      "dob_city": "Brookyln",
+      "is_alias_of": null,
+      "date_created": "2015-08-14T20:59:36.580Z",
+      "fjc_id": null,
+      "dob_state": "NY",
+      "slug": "judith-susan-sheindlin"
+    },
+    "model": "judges.judge",
+    "pk": 1
+  }
+]

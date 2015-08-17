@@ -1,7 +1,7 @@
 __author__ = 'Krist Jin'
 
 from cl import settings
-from cl.search.models import Document
+#from cl.search.models import Document
 from cl.lib.db_tools import queryset_generator
 from cl.lib.solr_core_admin import get_data_dir_location, reload_pagerank_external_file_cache
 from django.core.management.base import BaseCommand

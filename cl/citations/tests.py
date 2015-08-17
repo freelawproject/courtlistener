@@ -267,7 +267,7 @@ class MatchingTest(TestCase):
 
 
 class CitationFeedTest(CitationTest):
-    fixtures = ['test_court.json']
+    fixtures = ['test_court.json', 'test_objects.json']
 
     def test_basic_cited_by_feed(self):
         """Can we load the cited-by feed without it crashing?"""

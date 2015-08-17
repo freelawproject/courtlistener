@@ -4,6 +4,7 @@ from cl import settings
 from cl.lib.model_helpers import make_upload_path
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
+from django.core.exceptions import ValidationError
 from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils.text import slugify
@@ -243,132 +244,6 @@ class Court(models.Model):
     class Meta:
         ordering = ["position"]
 
-
-class Opinion(models.Model):
-    cluster = models.ForeignKey(
-        'OpinionCluster',
-        help_text="The cluster that the opinion is a part of",
-        related_name="sub_opinions",
-    )
-    opinions_cited = models.ManyToManyField(
-        'self',
-        help_text="Opinions cited by this opinion",
-        through='OpinionsCited',
-        through_fields=('citing_opinion', 'cited_opinion'),
-        symmetrical=False,
-        related_name="opinions_citing",
-        blank=True,
-    )
-    author = models.ForeignKey(
-        'judges.Judge',
-        help_text="The primary author of this opinion",
-        related_name='opinions_written',
-        blank=True,
-        null=True,
-    )
-    joined_by = models.ManyToManyField(
-        'judges.Judge',
-        related_name='opinions_joined',
-        help_text="Other judges that joined the primary author in this opinion",
-        blank=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        # auto_now_add=True,
-        db_index=True
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified. A value in "
-                  "year 1750 indicates the value is unknown",
-        # auto_now=True,
-        db_index=True,
-    )
-    type = models.CharField(
-        max_length=20,
-        choices=OPINION_TYPES,
-    )
-    sha1 = models.CharField(
-        help_text="unique ID for the document, as generated via SHA1 of the "
-                  "binary file or text data",
-        max_length=40,
-        db_index=True
-    )
-    download_url = models.URLField(
-        help_text="The URL on the court website where the document was "
-                  "originally scraped",
-        max_length=500,
-        db_index=True,
-        null=True,
-        blank=True,
-    )
-    local_path = models.FileField(
-        help_text="The location, relative to MEDIA_ROOT on the CourtListener "
-                  "server, where files are stored",
-        upload_to=make_upload_path,
-        storage=IncrementingFileSystemStorage(),
-        blank=True,
-        db_index=True
-    )
-    plain_text = models.TextField(
-        help_text="Plain text of the document after extraction using "
-                  "pdftotext, wpd2txt, etc.",
-        blank=True
-    )
-    html = models.TextField(
-        help_text="HTML of the document, if available in the original",
-        blank=True,
-        null=True,
-    )
-    html_lawbox = models.TextField(
-        help_text='HTML of Lawbox documents',
-        blank=True,
-        null=True,
-    )
-    html_columbia = models.TextField(
-        help_text='HTML of Columbia archive',
-        blank=True,
-        null=True,
-    )
-    html_with_citations = models.TextField(
-        help_text="HTML of the document with citation links and other "
-                  "post-processed markup added",
-        blank=True
-    )
-    extracted_by_ocr = models.BooleanField(
-        help_text='Whether OCR was used to get this document content',
-        default=False,
-        db_index=True,
-    )
-
-    def __unicode__(self):
-        try:
-            return self.cluster.case_name
-        except AttributeError:
-            return u'Orphan opinion with ID: %s' % self.pk
-
-    def save(self, index=True, force_commit=False, *args, **kwargs):
-        super(Opinion, self).save(*args, **kwargs)
-        if index:
-            from cl.search.tasks import add_or_update_opinions
-            add_or_update_opinions.delay([self.pk], force_commit)
-
-
-class OpinionsCited(models.Model):
-    citing_opinion = models.ForeignKey(
-        Opinion,
-        related_name='cited_opinions',
-    )
-    cited_opinion = models.ForeignKey(
-        Opinion,
-        related_name='citing_opinions',
-    )
-
-    def __unicode__(self):
-        return u'%s ⤜--cites⟶ %s' % (self.citing_opinion.id,
-                                      self.cited_opinion.id)
-
-    class Meta:
-        verbose_name_plural = 'Opinions cited'
 
 class OpinionCluster(models.Model):
     """A class representing a cluster of court opinions."""
@@ -622,3 +497,135 @@ class OpinionCluster(models.Model):
         super(OpinionCluster, self).delete(*args, **kwargs)
         from cl.search.tasks import delete_items
         delete_items.delay([id_cache], settings.SOLR_OPINION_URL)
+
+
+class Opinion(models.Model):
+    cluster = models.ForeignKey(
+        OpinionCluster,
+        help_text="The cluster that the opinion is a part of",
+        related_name="sub_opinions",
+    )
+    opinions_cited = models.ManyToManyField(
+        'self',
+        help_text="Opinions cited by this opinion",
+        through='OpinionsCited',
+        through_fields=('citing_opinion', 'cited_opinion'),
+        symmetrical=False,
+        related_name="opinions_citing",
+        blank=True,
+    )
+    author = models.ForeignKey(
+        'judges.Judge',
+        help_text="The primary author of this opinion",
+        related_name='opinions_written',
+        blank=True,
+        null=True,
+    )
+    joined_by = models.ManyToManyField(
+        'judges.Judge',
+        related_name='opinions_joined',
+        help_text="Other judges that joined the primary author in this opinion",
+        blank=True,
+    )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        # auto_now_add=True,
+        db_index=True
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified. A value in "
+                  "year 1750 indicates the value is unknown",
+        # auto_now=True,
+        db_index=True,
+    )
+    type = models.CharField(
+        max_length=20,
+        choices=OPINION_TYPES,
+    )
+    sha1 = models.CharField(
+        help_text="unique ID for the document, as generated via SHA1 of the "
+                  "binary file or text data",
+        max_length=40,
+        db_index=True,
+    )
+    download_url = models.URLField(
+        help_text="The URL on the court website where the document was "
+                  "originally scraped",
+        max_length=500,
+        db_index=True,
+        null=True,
+        blank=True,
+    )
+    local_path = models.FileField(
+        help_text="The location, relative to MEDIA_ROOT on the CourtListener "
+                  "server, where files are stored",
+        upload_to=make_upload_path,
+        storage=IncrementingFileSystemStorage(),
+        blank=True,
+        db_index=True
+    )
+    plain_text = models.TextField(
+        help_text="Plain text of the document after extraction using "
+                  "pdftotext, wpd2txt, etc.",
+        blank=True
+    )
+    html = models.TextField(
+        help_text="HTML of the document, if available in the original",
+        blank=True,
+        null=True,
+    )
+    html_lawbox = models.TextField(
+        help_text='HTML of Lawbox documents',
+        blank=True,
+        null=True,
+    )
+    html_columbia = models.TextField(
+        help_text='HTML of Columbia archive',
+        blank=True,
+        null=True,
+    )
+    html_with_citations = models.TextField(
+        help_text="HTML of the document with citation links and other "
+                  "post-processed markup added",
+        blank=True
+    )
+    extracted_by_ocr = models.BooleanField(
+        help_text='Whether OCR was used to get this document content',
+        default=False,
+        db_index=True,
+    )
+
+    def __unicode__(self):
+        try:
+            return self.cluster.case_name
+        except AttributeError:
+            return u'Orphan opinion with ID: %s' % self.pk
+
+    def clean(self):
+        if self.type == '':
+            raise ValidationError("'type' is a required field.")
+
+    def save(self, index=True, force_commit=False, *args, **kwargs):
+        super(Opinion, self).save(*args, **kwargs)
+        if index:
+            from cl.search.tasks import add_or_update_opinions
+
+            add_or_update_opinions.delay([self.pk], force_commit)
+
+
+class OpinionsCited(models.Model):
+    citing_opinion = models.ForeignKey(
+        Opinion,
+        related_name='cited_opinions',
+    )
+    cited_opinion = models.ForeignKey(
+        Opinion,
+        related_name='citing_opinions',
+    )
+
+    def __unicode__(self):
+        return u'%s ⤜--cites⟶ %s' % (self.citing_opinion.id,
+                                     self.cited_opinion.id)
+
+    class Meta:
+        verbose_name_plural = 'Opinions cited'
