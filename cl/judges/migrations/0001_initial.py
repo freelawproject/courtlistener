@@ -15,6 +15,7 @@ class Migration(migrations.Migration):
             name='ABARating',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('date_created', models.DateTimeField(help_text=b'The original creation date for the item', auto_now_add=True, db_index=True)),
                 ('date_modified', models.DateTimeField(help_text=b'The last moment when the item was modified.', auto_now=True, db_index=True)),
                 ('date_rated', models.DateField(null=True, blank=True)),
                 ('date_granularity_rated', models.CharField(blank=True, max_length=15, choices=[(b'%Y', b'Year'), (b'%Y-%m', b'Month'), (b'%Y-%m-%d', b'Day')])),
@@ -25,6 +26,7 @@ class Migration(migrations.Migration):
             name='Career',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('date_created', models.DateTimeField(help_text=b'The original creation date for the item', auto_now_add=True, db_index=True)),
                 ('date_modified', models.DateTimeField(help_text=b'The last moment when the item was modified.', auto_now=True, db_index=True)),
                 ('job_type', models.CharField(max_length=10, choices=[(b'prac', b'Practitioner'), (b'prof', b'Professor'), (b'pros', b'Prosecutor'), (b'pub_def', b'Public Defender'), (b'pol', b'Politician'), (b'j', b'Judge')])),
                 ('job_title', models.CharField(max_length=100, blank=True)),
@@ -42,6 +44,7 @@ class Migration(migrations.Migration):
             name='Education',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('date_created', models.DateTimeField(help_text=b'The original creation date for the item', auto_now_add=True, db_index=True)),
                 ('date_modified', models.DateTimeField(help_text=b'The last moment when the item was modified.', auto_now=True, db_index=True)),
                 ('degree', models.CharField(max_length=100, blank=True)),
                 ('degree_year', models.PositiveSmallIntegerField(help_text=b'The year the degree was awarded.', null=True, blank=True)),
@@ -51,8 +54,8 @@ class Migration(migrations.Migration):
             name='Judge',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('date_modified', models.DateTimeField(help_text=b'The last moment when the item was modified.', auto_now=True, db_index=True)),
                 ('date_created', models.DateTimeField(help_text=b'The original creation date for the item', auto_now_add=True, db_index=True)),
+                ('date_modified', models.DateTimeField(help_text=b'The last moment when the item was modified.', auto_now=True, db_index=True)),
                 ('fjc_id', models.IntegerField(help_text=b'The ID of the judge as assigned by the Federal Judicial Center.', unique=True, null=True, db_index=True, blank=True)),
                 ('slug', models.SlugField(max_length=158)),
                 ('name_first', models.CharField(max_length=50)),
@@ -74,6 +77,7 @@ class Migration(migrations.Migration):
             name='PoliticalAffiliation',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('date_created', models.DateTimeField(help_text=b'The original creation date for the item', auto_now_add=True, db_index=True)),
                 ('date_modified', models.DateTimeField(help_text=b'The last moment when the item was modified.', auto_now=True, db_index=True)),
                 ('political_party', models.CharField(max_length=5, choices=[(b'd', b'Democrat'), (b'r', b'Republican'), (b'i', b'Independent'), (b'g', b'Green'), (b'l', b'Libertarian')])),
                 ('source', models.CharField(blank=True, max_length=5, choices=[(b'b', b'Ballot'), (b'a', b'Appointer'), (b'o', b'Other')])),
@@ -100,6 +104,7 @@ class Migration(migrations.Migration):
             name='Position',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('date_created', models.DateTimeField(help_text=b'The time when this item was created', auto_now_add=True, db_index=True)),
                 ('date_modified', models.DateTimeField(help_text=b'The last moment when the item was modified.', auto_now=True, db_index=True)),
                 ('date_nominated', models.DateField(help_text=b'The date recorded in the Senate Executive Journal when a federal judge was nominated for their position or the date a state judge nominated by the legislature. When a nomination is by primary election, this is the date of the election. When a nomination is from a merit commission, this is the date the nomination was announced.', null=True, db_index=True, blank=True)),
                 ('date_elected', models.DateField(help_text=b'Judges are elected in most states. This is the date of theirfirst election. This field will be null if the judge was initially selected by nomination.', null=True, db_index=True, blank=True)),
@@ -134,6 +139,7 @@ class Migration(migrations.Migration):
             name='RetentionEvent',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('date_created', models.DateTimeField(help_text=b'The original creation date for the item', auto_now_add=True, db_index=True)),
                 ('date_modified', models.DateTimeField(help_text=b'The last moment when the item was modified.', auto_now=True, db_index=True)),
                 ('retention_type', models.CharField(max_length=10, choices=[(b'reapp_gov', b'Governor Reappointment'), (b'reapp_leg', b'Legislative Reappointment'), (b'elec_p', b'Partisan Election'), (b'elec_n', b'Nonpartisan Election'), (b'elec_u', b'Uncontested Election')])),
                 ('date_retention', models.DateField(db_index=True)),
@@ -141,16 +147,19 @@ class Migration(migrations.Migration):
                 ('votes_no', models.PositiveSmallIntegerField(null=True, blank=True)),
                 ('unopposed', models.NullBooleanField()),
                 ('won', models.NullBooleanField()),
+                ('position', models.ForeignKey(related_name='retention_events', blank=True, to='judges.Position', null=True)),
             ],
         ),
         migrations.CreateModel(
             name='School',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('date_created', models.DateTimeField(help_text=b'The original creation date for the item', auto_now_add=True, db_index=True)),
+                ('date_modified', models.DateTimeField(help_text=b'The last moment when the item was modified', auto_now=True, db_index=True)),
                 ('name', models.CharField(max_length=120, db_index=True)),
-                ('unit_id', models.IntegerField(help_text=b'This is the ID assigned by the Department of Education, as found in the data on their API.', unique=True, db_index=True)),
-                ('ein', models.IntegerField(help_text=b'The EIN assigned by the IRS', unique=True, null=True, db_index=True, blank=True)),
-                ('ope_id', models.IntegerField(help_text=b"This is the ID assigned by the Department of Education's Office of Postsecondary Education (OPE) for schools that have a Program Participation Agreement making them eligible for aid from the Federal Student Financial Assistance Program", unique=True, null=True, db_index=True, blank=True)),
+                ('unit_id', models.IntegerField(help_text=b'This is the ID assigned by the Department of Education, as found in the data on their API.', unique=True, null=True, db_index=True)),
+                ('ein', models.IntegerField(help_text=b'The EIN assigned by the IRS', null=True, db_index=True, blank=True)),
+                ('ope_id', models.IntegerField(help_text=b"This is the ID assigned by the Department of Education's Office of Postsecondary Education (OPE) for schools that have a Program Participation Agreement making them eligible for aid from the Federal Student Financial Assistance Program", null=True, db_index=True, blank=True)),
                 ('is_alias_of', models.ForeignKey(blank=True, to='judges.School', null=True)),
             ],
         ),
@@ -158,21 +167,25 @@ class Migration(migrations.Migration):
             name='Source',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('date_modified', models.DateTimeField(help_text=b'The last moment when the item was modified', auto_now=True, db_index=True)),
                 ('url', models.URLField(help_text=b'The URL where this data was gathered.', max_length=2000, blank=True)),
                 ('date_accessed', models.DateField(null=True, blank=True)),
                 ('notes', models.TextField(help_text=b"Any additional notes about the data's provenance, in Markdown format.", blank=True)),
+                ('judge', models.ForeignKey(related_name='sources', blank=True, to='judges.Judge', null=True)),
             ],
         ),
         migrations.CreateModel(
             name='Title',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('date_created', models.DateTimeField(help_text=b'The original creation date for the item', auto_now_add=True, db_index=True)),
                 ('date_modified', models.DateTimeField(help_text=b'The last moment when the item was modified.', auto_now=True, db_index=True)),
                 ('title_name', models.CharField(help_text=b'Title of the judge (Associate, Chief, Magistrate, etc.)', max_length=30, choices=[(b'Acting', ((b'act-jud', b'Acting Judge'), (b'act-pres-jud', b'Acting Presiding Judge'))), (b'Associate', ((b'ass-jud', b'Associate Judge'), (b'ass-c-jud', b'Associate Chief Judge'), (b'ass-pres-jud', b'Associate Presiding Judge'), (b'jud', b'Judge'), (b'jus', b'Justice'))), (b'Chief', ((b'c-jud', b'Chief Judge'), (b'c-jus', b'Chief Justice'), (b'pres-jud', b'Presiding Judge'), (b'pres-jus', b'Presiding Justice'), (b'pres-mag', b'Presiding Magistrate'))), (b'Commissioner', ((b'com', b'Commissioner'), (b'com-dep', b'Deputy Commissioner'))), (b'Pro Tem', ((b'jud-pt', b'Judge Pro Tem'), (b'jus-pt', b'Justice Pro Tem'), (b'mag-pt', b'Magistrate Pro Tem'))), (b'Referee', ((b'ref-jud-tr', b'Judge Trial Referee'), (b'ref-off', b'Official Referee'), (b'ref-state-trial', b'State Trial Referee'))), (b'Retired', ((b'ret-act-jus', b'Active Retired Justice'), (b'ret-ass-jud', b'Retired Associate Judge'), (b'ret-c-jud', b'Retired Chief Judge'), (b'ret-jus', b'Retired Justice'), (b'ret-senior-jud', b'Senior Judge'))), (b'Special', ((b'spec-chair', b'Special Chairman'), (b'spec-jud', b'Special Judge'), (b'spec-m', b'Special Master'), (b'spec-scjcbc', b'Special Superior Court Judge for Complex Business Cases'))), (b'Other', ((b'chair', b'Chairman'), (b'chan', b'Chancellor'), (b'mag', b'Magistrate'), (b'presi', b'President'), (b'res-jud', b'Reserve Judge'), (b'trial-jud', b'Trial Judge'), (b'vice-chan', b'Vice Chancellor'), (b'vice-cj', b'Vice Chief Judge'))), (b'Attorney General', ((b'att-gen', b'Attorney General'), (b'att-gen-ass', b'Assistant Attorney General'), (b'att-gen-ass-spec', b'Special Assistant Attorney General'), (b'sen-counsel', b'Senior Counsel'), (b'dep-sol-gen', b'Deputy Solicitor General')))])),
                 ('date_start', models.DateField(help_text=b'The year that a judge began holding the title.', db_index=True)),
                 ('date_granularity_start', models.CharField(max_length=15, choices=[(b'%Y', b'Year'), (b'%Y-%m', b'Month'), (b'%Y-%m-%d', b'Day')])),
                 ('date_end', models.DateField(help_text=b'The year that a judge ceased holding the title.', null=True, blank=True)),
                 ('date_granularity_end', models.CharField(max_length=15, choices=[(b'%Y', b'Year'), (b'%Y-%m', b'Month'), (b'%Y-%m-%d', b'Day')])),
+                ('judge', models.ForeignKey(related_name='titles', blank=True, to='judges.Judge', null=True)),
             ],
         ),
     ]

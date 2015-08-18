@@ -9,10 +9,7 @@ from django.conf import settings
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('alerts', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('donate', '0001_initial'),
-        ('favorites', '0002_favorite_cluster_id'),
     ]
 
     operations = [
@@ -44,10 +41,7 @@ class Migration(migrations.Migration):
                 ('activation_key', models.CharField(max_length=40)),
                 ('key_expires', models.DateTimeField(null=True, verbose_name=b"The time and date when the user's activation_key expires", blank=True)),
                 ('email_confirmed', models.BooleanField(default=False, verbose_name=b'The user has confirmed their email address')),
-                ('alert', models.ManyToManyField(to='alerts.Alert', verbose_name=b'the alerts created by the user', blank=True)),
                 ('barmembership', models.ManyToManyField(to='users.BarMembership', verbose_name=b'the bar memberships held by the user', blank=True)),
-                ('donation', models.ManyToManyField(related_name='donors', verbose_name=b'the donations made by the user', to='donate.Donation', blank=True)),
-                ('favorite', models.ManyToManyField(related_name='users', verbose_name=b'the favorites created by the user', to='favorites.Favorite', blank=True)),
                 ('user', models.OneToOneField(related_name='profile', verbose_name=b'the user this model extends', to=settings.AUTH_USER_MODEL)),
             ],
             options={

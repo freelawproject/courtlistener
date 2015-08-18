@@ -15,20 +15,19 @@ class Migration(migrations.Migration):
             name='ErrorLog',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('log_time', models.DateTimeField(auto_now_add=True, verbose_name=b'the exact date and time of the error', null=True)),
+                ('log_time', models.DateTimeField(auto_now_add=True, verbose_name=b'the exact date and time of the error')),
                 ('log_level', models.CharField(verbose_name=b'the loglevel of the error encountered', max_length=15, editable=False)),
                 ('message', models.TextField(verbose_name=b'the message produced in the log', editable=False, blank=True)),
-                ('court', models.ForeignKey(verbose_name=b'the court where the document was filed', to='search.Court')),
+                ('court', models.ForeignKey(verbose_name=b'the court where the error occurred', to='search.Court')),
             ],
         ),
         migrations.CreateModel(
-            name='urlToHash',
+            name='UrlHash',
             fields=[
-                ('id', models.CharField(primary_key=True, serialize=False, editable=False, max_length=5000, blank=True, verbose_name=b'the ID of the item that is hashed')),
-                ('SHA1', models.CharField(verbose_name=b'a SHA1 corresponding to the item', max_length=40, editable=False, blank=True)),
+                ('id', models.CharField(verbose_name=b'the ID of the item that is hashed', max_length=5000, serialize=False, editable=False, primary_key=True)),
+                ('sha1', models.CharField(verbose_name=b'a SHA1 corresponding to the item', max_length=40, editable=False)),
             ],
             options={
-                'verbose_name': 'URL Hash',
                 'verbose_name_plural': 'URL Hashes',
             },
         ),

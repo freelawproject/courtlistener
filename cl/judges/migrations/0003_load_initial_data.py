@@ -23,7 +23,7 @@ def unload_fixture(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('judges', '0005_auto_20150807_1826'),
+        ('judges', '0002_auto_20150818_0954'),
     ]
 
     operations = [
