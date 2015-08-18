@@ -1,8 +1,10 @@
+from cl.lib.utils import deepgetattr
+from cl.opinion_page.views import make_citation_string
+
 from datetime import datetime
 from datetime import time
 from django.core.urlresolvers import NoReverseMatch
 from django.template import loader
-from cl.opinion_page.views import make_citation_string
 
 
 class InvalidDocumentError(Exception):
@@ -131,11 +133,11 @@ class SearchAudioFile(object):
             self.caseName = item.case_name_full
         self.panel_ids = [judge.pk for judge in item.panel.all()]
         self.judge = item.judges
-        self.file_size_mp3 = item.local_path_mp3.size
+        self.file_size_mp3 = deepgetattr(item, 'local_path_mp3.size', None)
         self.duration = item.duration
         self.source = item.source
         self.download_url = item.download_url
-        self.local_path = unicode(item.local_path_mp3)
+        self.local_path = unicode(getattr(item, 'local_path_mp3', None))
 
         try:
             self.absolute_url = item.get_absolute_url()

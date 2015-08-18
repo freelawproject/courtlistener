@@ -1,0 +1,71 @@
+[
+  {
+    "fields": {
+      "date_blocked": null,
+      "judges": "",
+      "sha1": "de8cff186eb263dc06bdc5340860eb6809f898d3",
+      "local_path_original_file": "mp3/2015/07/08/sec_v._frank_j._custable_jr..mp3",
+      "date_modified": "2015-07-28T00:36:13.094Z",
+      "case_name_full": "case name full",
+      "processing_complete": true,
+      "download_url": "http://media.ca7.uscourts.gov/sound/external/gw.15-1442.15-1442_07_08_2015.mp3",
+      "case_name": "SEC v. Frank J. Custable, Jr.",
+      "source": "C",
+      "local_path_mp3": "test_audio/2.mp3",
+      "duration": 1290,
+      "date_created": "2015-08-08T01:24:26.633Z",
+      "case_name_short": "short",
+      "panel": [],
+      "docket": 1,
+      "blocked": false
+    },
+    "model": "audio.audio",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "date_blocked": null,
+      "judges": "",
+      "sha1": "daadaf6cc018114259f7eba27c4c2e6bba9bd0d7",
+      "local_path_original_file": "mp3/2015/07/08/jose_a._dominguez_v._loretta_e._lynch.mp3",
+      "date_modified": "2015-07-28T00:36:26.116Z",
+      "case_name_full": "case name full 2",
+      "processing_complete": true,
+      "download_url": "http://media.ca7.uscourts.gov/sound/external/gw.14-3661.14-3661_07_08_2015.mp3",
+      "case_name": "Jose A. Dominguez v. Loretta E. Lynch",
+      "source": "C",
+      "local_path_mp3": "test_audio/2.mp3",
+      "duration": 837,
+      "date_created": "2015-08-08T01:24:26.633Z",
+      "case_name_short": "short case name 2",
+      "panel": [],
+      "docket": 2,
+      "blocked": false
+    },
+    "model": "audio.audio",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "date_blocked": null,
+      "judges": "",
+      "sha1": "f540838e606f15585e713812c67537affc0df944",
+      "local_path_original_file": "mp3/2015/07/08/hong_liu_yang_v._loretta_e._lynch.mp3",
+      "date_modified": "2015-07-28T00:36:40.957Z",
+      "case_name_full": "full case name",
+      "processing_complete": true,
+      "download_url": "http://media.ca7.uscourts.gov/sound/external/gw.14-2631.14-2631_07_08_2015.mp3",
+      "case_name": "Hong Liu Yang v. Loretta E. Lynch",
+      "source": "C",
+      "local_path_mp3": "test_audio/2.mp3",
+      "duration": 653,
+      "date_created": "2015-08-08T01:24:26.633Z",
+      "case_name_short": "short",
+      "panel": [],
+      "docket": 3,
+      "blocked": false
+    },
+    "model": "audio.audio",
+    "pk": 3
+  }
+]

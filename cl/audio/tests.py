@@ -1,8 +1,8 @@
-from cl.lib.test_helpers import SolrTestCase
+from cl.lib.test_helpers import IndexedSolrTestCase
 from lxml import etree
 
 
-class PodcastTest(SolrTestCase):
+class PodcastTest(IndexedSolrTestCase):
     def test_do_podcasts_have_good_content(self):
         """Can we simply load the podcast page?"""
         response = self.client.get('/podcast/court/test/')
@@ -13,9 +13,9 @@ class PodcastTest(SolrTestCase):
             ('//channel/title', 1),
             ('//channel/link', 1),
             ('//channel/description', 1),
-            ('//channel/item', 2),
-            ('//channel/item/title', 2),
-            ('//channel/item/enclosure/@url', 2),
+            ('//channel/item', 3),
+            ('//channel/item/title', 3),
+            ('//channel/item/enclosure/@url', 3),
         )
         for test, count in node_tests:
             node_count = len(xml_tree.xpath(test))

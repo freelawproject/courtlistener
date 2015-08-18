@@ -29,7 +29,6 @@ class SetupException(Exception):
 
 class UpdateIndexCommandTest(SolrTestCase):
     args = [
-        '--solr-url', 'http://127.0.0.1:8983/solr/collection1',
         '--type', 'opinions',
         '--noinput',
     ]
@@ -47,6 +46,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         # First, we add everything to Solr.
         args = list(self.args)  # Make a copy of the list.
         args.extend([
+            '--solr-url', 'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
             '--update',
             '--everything',
             '--do-commit',
@@ -81,6 +81,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         # Next, we delete everything from Solr
         args = list(self.args)  # Make a copy of the list.
         args.extend([
+            '--solr-url', 'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
             '--delete',
             '--everything',
             '--do-commit',
@@ -102,6 +103,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         # Add things back, but do it by ID
         args = list(self.args)  # Make a copy of the list.
         args.extend([
+            '--solr-url', 'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
             '--update',
             '--items', '1', '2', '3',
             '--do-commit',
@@ -534,7 +536,7 @@ class FeedTest(SolrTestCase):
 
 
 # class PagerankTest(TestCase):
-#     fixtures = ['test_objects.json']
+#     fixtures = ['test_objects_search.json']
 #
 #     def test_pagerank_calculation(self):
 #         """Create a few Documents and fake citation relation among them, then
