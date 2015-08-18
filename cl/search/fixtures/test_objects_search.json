@@ -197,7 +197,7 @@
       "download_url": null,
       "cluster": 1,
       "html_with_citations": "",
-      "local_path": "",
+      "local_path": "test/search/opinion_doc.doc",
       "html_columbia": null,
       "joined_by": [],
       "date_created": "2015-08-15T14:10:56.801Z",
@@ -218,7 +218,7 @@
       "download_url": null,
       "cluster": 2,
       "html_with_citations": "",
-      "local_path": "",
+      "local_path": "test/search/opinion_pdf_image_based.pdf",
       "html_columbia": null,
       "joined_by": [],
       "date_created": "2015-08-15T14:10:56.801Z",
@@ -239,7 +239,7 @@
       "download_url": null,
       "cluster": 3,
       "html_with_citations": "",
-      "local_path": "",
+      "local_path": "test/search/opinion_pdf_text_based.pdf",
       "html_columbia": null,
       "joined_by": [],
       "date_created": "2015-08-15T14:10:56.801Z",
@@ -248,6 +248,69 @@
     },
     "model": "search.opinion",
     "pk": 3
+  },
+  {
+    "fields": {
+      "sha1": "asdfasdfasdfasdfasdfasddf",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "extracted_by_ocr": false,
+      "author": 1,
+      "plain_text": "my plain text secret word for queries",
+      "html": null,
+      "download_url": null,
+      "cluster": 1,
+      "html_with_citations": "",
+      "local_path": "test/search/opinion_html.html",
+      "html_columbia": null,
+      "joined_by": [],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "html_lawbox": null,
+      "type": "combined"
+    },
+    "model": "search.opinion",
+    "pk": 4
+  },
+  {
+    "fields": {
+      "sha1": "asdfasdfasdfasdfasdfasddf",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "extracted_by_ocr": false,
+      "author": 1,
+      "plain_text": "my plain text secret word for queries",
+      "html": null,
+      "download_url": null,
+      "cluster": 1,
+      "html_with_citations": "",
+      "local_path": "test/search/opinion_wpd.wpd",
+      "html_columbia": null,
+      "joined_by": [],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "html_lawbox": null,
+      "type": "combined"
+    },
+    "model": "search.opinion",
+    "pk": 5
+  },
+  {
+    "fields": {
+      "sha1": "asdfasdfasdfasdfasdfasddf",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "extracted_by_ocr": false,
+      "author": 1,
+      "plain_text": "my plain text secret word for queries",
+      "html": null,
+      "download_url": null,
+      "cluster": 1,
+      "html_with_citations": "",
+      "local_path": "test/search/opinion_txt.txt",
+      "html_columbia": null,
+      "joined_by": [],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "html_lawbox": null,
+      "type": "combined"
+    },
+    "model": "search.opinion",
+    "pk": 6
   },
 
 

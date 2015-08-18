@@ -4,7 +4,7 @@ from operator import itemgetter
 from django.utils.timezone import now
 
 from cl.scrapers.models import ErrorLog
-from cl.search.models import Court, Document
+from cl.search.models import Court, OpinionCluster
 from datetime import date, timedelta
 from django.conf import settings
 from django.core import mail
@@ -33,8 +33,8 @@ def calculate_counts():
     thirty_days_ago = now() - timedelta(days=30)
     thirty_five_days_ago = now() - timedelta(days=35)
     cts_more_than_30_days = Court.objects \
-        .filter(docket__documents__date_filed__gt=thirty_days_ago) \
-        .annotate(count=Count('docket__documents__pk')) \
+        .filter(docket__clusters__date_filed__gt=thirty_days_ago) \
+        .annotate(count=Count('docket__clusters__sub_opinions__pk')) \
         .values('pk', 'count')
 
     # Needed because annotation calls above don't return courts with no new
@@ -58,8 +58,11 @@ def calculate_counts():
         if cts_more_than_30_days.get(court, 0) == 0:
             # No results in newer than 35 days. Get date of most recent
             # item.
-            date_filed = Document.objects.filter(docket__court_id=court)\
-                .order_by('-date_filed')[0].date_filed
+            date_filed = OpinionCluster.objects.filter(
+                docket__court_id=court
+            ).order_by(
+                '-date_filed'
+            )[0].date_filed
             try:
                 mod = __import__(
                     mod_dict[court],
@@ -147,7 +150,7 @@ def generate_report():
     most_recent_opinions, recently_dying_courts = calculate_counts()
     errors = tally_errors()
 
-    html_template = loader.get_template('scrapers/report.html')
+    html_template = loader.get_template('report.html')
     context = {
         'most_recent_opinions': most_recent_opinions,
         'recently_dying_courts': recently_dying_courts,

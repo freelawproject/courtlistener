@@ -9,8 +9,8 @@ from cl.sitemap import items_per_sitemap
 
 def oral_argument_sitemap_maker(request):
     conn = sunburnt.SolrInterface(settings.SOLR_AUDIO_URL, mode='r')
-    page = request.GET.get("p")
-    start = (int(page) - 1) * items_per_sitemap
+    page = int(request.GET.get("p", 1))
+    start = (page - 1) * items_per_sitemap
     params = {
         'q': '*:*',
         'rows': items_per_sitemap,

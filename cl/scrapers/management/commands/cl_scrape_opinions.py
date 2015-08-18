@@ -130,11 +130,10 @@ def get_binary_content(download_url, cookies, method='GET'):
     # noinspection PyBroadException
     try:
         if method == 'LOCAL':
-            mr = MockRequest(url=os.path.join(
-                settings.INSTALL_ROOT,
-                'alert',
+            url = os.path.join(
+                settings.MEDIA_ROOT,
                 download_url)
-            )
+            mr = MockRequest(url=url)
             r = mr.get()
         else:
             # Note that we do a GET even if site.method is POST. This is
