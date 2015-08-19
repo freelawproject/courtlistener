@@ -239,12 +239,12 @@ def make_date_query(query_field, before, after):
 
 def make_cite_count_query(cd):
     """Given the cleaned data from a form, return a valid Solr fq string"""
-    start = cd['cited_gt']
-    end = cd['cited_lt']
-    if start or end:
-        return 'citeCount:[%s TO %s]' % (start, end)
-    else:
+    start = cd.get('cited_gt', '*')
+    end = cd.get('cited_lt', '*')
+    if start == '*' and end == '*':
         return ""
+    else:
+        return 'citeCount:[%s TO %s]' % (start, end)
 
 
 def get_selected_field_string(cd, prefix):
