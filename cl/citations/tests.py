@@ -1,5 +1,3 @@
-from datetime import date
-
 from reporters_db import REPORTERS
 from cl.citations.find_citations import get_citations, is_date_in_reporter
 from cl.citations import find_citations
@@ -7,8 +5,10 @@ from cl.citations.reporter_tokenizer import tokenize
 from cl.citations.tasks import update_document
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.models import Opinion, OpinionsCited, OpinionCluster
-from django.test import TestCase
 
+from datetime import date
+from django.test import TestCase
+from lxml import etree
 
 
 class CiteTest(TestCase):
@@ -234,26 +234,35 @@ class CitationFeedTest(TestCase):
     fixtures = ['test_court.json', 'judge_judy.json',
                 'test_objects_search.json']
 
+    def _tree_has_content(self, content, expected_count):
+        xml_tree = etree.fromstring(content)
+        count = len(xml_tree.xpath(
+            '//s:entry',
+            namespaces={'s': 'http://www.w3.org/2005/Atom'})
+        )
+        self.assertEqual(
+            count,
+            expected_count,
+        )
+
     def test_basic_cited_by_feed(self):
-        """Can we load the cited-by feed without it crashing?"""
-        # TODO: Use example from audio.tests to upgrade this to check for
-        # actual content. This is weak sauce just to test for non-crashingness.
+        """Can we load the cited-by feed and does it have content?"""
         r = self.client.get('/feed/2/cited-by/')
         self.assertEqual(r.status_code, 200)
+
+        expected_count = 1
+        self._tree_has_content(r.content, expected_count)
 
     def test_unicode_content(self):
         """Does the citation feed continue working even when we have a unicode
         case name?
         """
-        cite = Document.objects.get(pk=1).citation
-        orig_case_name = cite.case_name
         new_case_name = u'MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & ' \
                         u'CO., \u2014'
-        cite.case_name = new_case_name
-        cite.save()
+        OpinionCluster.objects.filter(pk=1).update(case_name=new_case_name)
 
         r = self.client.get('/feed/1/cited-by/')
         self.assertEqual(r.status_code, 200)
 
-        cite.case_name = orig_case_name
-        cite.save()
+        expected_count = 1
+        self._tree_has_content(r.content, expected_count)

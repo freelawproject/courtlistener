@@ -5,7 +5,6 @@ from django.contrib.syndication.views import Feed
 from django.shortcuts import get_object_or_404
 from django.utils.feedgenerator import Atom1Feed
 
-# TODO: Should this be a feed of clusters instead of opinions? Probably.
 class CitedByFeed(Feed):
     """Creates a feed of cases that cite a case, ordered by date filed."""
     feed_type = Atom1Feed
@@ -26,21 +25,21 @@ class CitedByFeed(Feed):
 
     def items(self, obj):
         """Return the latest 20 cases citing this one."""
-        return obj.citing_opinions.all().order_by('-date_filed')[:20]
+        return obj.opinions_citing.all().order_by('-cluster__date_filed')[:20]
 
     def item_link(self, item):
-        return item.get_absolute_url()
+        return item.cluster.get_absolute_url()
 
     def item_author_name(self, item):
         return item.cluster.docket.court
 
     def item_pubdate(self, item):
-        return datetime.datetime.combine(item.date_filed, datetime.time())
+        return datetime.datetime.combine(item.cluster.date_filed, datetime.time())
 
     def item_title(self, item):
         return item
 
     def item_categories(self, item):
-        return [item.precedential_status, ]
+        return [item.cluster.precedential_status, ]
 
     description_template = 'feeds/template.html'
