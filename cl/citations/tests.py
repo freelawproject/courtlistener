@@ -1,19 +1,14 @@
-import time
 from datetime import date
 
-from reporters_db import REPORTERS, VARIATIONS_ONLY, EDITIONS
+from reporters_db import REPORTERS
 from cl.citations.find_citations import get_citations, is_date_in_reporter
 from cl.citations import find_citations
 from cl.citations.reporter_tokenizer import tokenize
 from cl.citations.tasks import update_document
-from cl.lib import sunburnt
-from cl.lib.solr_core_admin import create_solr_core, delete_solr_core, \
-    swap_solr_core
-from cl.lib.test_helpers import CitationTest
-from cl.search.models import Court, Docket, Document
-from cl.search import models
-from django.conf import settings
+from cl.lib.test_helpers import IndexedSolrTestCase
+from cl.search.models import Opinion, OpinionsCited, OpinionCluster
 from django.test import TestCase
+
 
 
 class CiteTest(TestCase):
@@ -88,9 +83,15 @@ class CiteTest(TestCase):
         )
         for q, a in test_pairs:
             cite_found = get_citations(q)[0]
-            self.assertEqual(cite_found, a,
-                             msg='%s\n%s != \n%s' % (
-                                 q, cite_found.__dict__, a.__dict__))
+            self.assertEqual(
+                cite_found,
+                a,
+                msg='%s\n%s != \n%s' % (
+                    q,
+                    cite_found.__dict__,
+                    a.__dict__
+                )
+            )
 
     def test_date_in_editions(self):
         test_pairs = [
@@ -202,23 +203,7 @@ class CiteTest(TestCase):
             )
 
 
-class MatchingTest(TestCase):
-    fixtures = ['test_court.json']
-
-    def setUp(self):
-        # Set up a testing core in Solr and swap it in
-        self.core_name = '%s.test-%s' % (self.__module__, time.time())
-        create_solr_core(self.core_name)
-        swap_solr_core('collection1', self.core_name)
-
-        # Set up some handy variables
-        self.court = Court.objects.get(pk='test')
-        self.si_opinion = sunburnt.SolrInterface(
-            settings.SOLR_OPINION_URL, mode='rw')
-
-    def tearDown(self):
-        swap_solr_core(self.core_name, 'collection1')
-        delete_solr_core(self.core_name)
+class MatchingTest(IndexedSolrTestCase):
 
     def test_citation_matching(self):
         """Creates a few documents that contain specific citations, then
@@ -226,51 +211,33 @@ class MatchingTest(TestCase):
 
         This becomes a bit of an integration test, which is fine.
         """
-        docket1 = Docket(
-            case_name=u"Lissner v. Saad",
-            court=self.court,
-        )
-        docket1.save()
-        d1 = models.Document(
-            date_filed=date(1795, 6, 9),
-            docket=docket1,
-            precedential_status='Published',
-            federal_cite_one=u'1 Yeates 1 (test 1795)'
-        )
-        d1.save(index=True)
-        # Reference d1 from the text of another document
-        docket2 = Docket(
-            case_name=u"Reference to Lissner v. Saad",
-            court=self.court,
-        )
-        docket2.save()
-        d2 = models.Document(
-            date_filed=date(1982, 6, 9),
-            docket=docket2,
-            plain_text=u"1 Yeates 1"
-        )
-        d2.save(index=True)
+        # Delete all the connections between items that are in the fixtures by
+        # default, and reset counts to zero.
+        OpinionsCited.objects.all().delete()
+        OpinionCluster.objects.all().update(citation_count=0)
 
-        # Do a commit, or else citations can't be found in the index.
-        self.si_opinion.commit()
-        update_document(d2)  # Updates d1's citation count in a Celery task
-        d1 = models.Document.objects.get(pk=1)  # cache-bust d1
+        citing = Opinion.objects.get(pk=3)
+        update_document(citing)  # Updates d1's citation count in a Celery task
 
+        cited = Opinion.objects.get(pk=2)
+        expected_count = 1
         self.assertEqual(
-            d1.citation_count,
-            1,
-            msg=u"d1 was not updated by a citation found in d2. Count was: %s"
-                % d1.citation_count
+            cited.cluster.citation_count,
+            expected_count,
+            msg=u"'cited' was not updated by a citation found in 'citing', or "
+                u"the citation was not found. Count was: %s instead of %s"
+                % (cited.cluster.citation_count, expected_count)
         )
-        d1.delete()
-        d2.delete()
 
 
-class CitationFeedTest(CitationTest):
-    fixtures = ['test_court.json', 'test_objects_search.json']
+class CitationFeedTest(TestCase):
+    fixtures = ['test_court.json', 'judge_judy.json',
+                'test_objects_search.json']
 
     def test_basic_cited_by_feed(self):
         """Can we load the cited-by feed without it crashing?"""
+        # TODO: Use example from audio.tests to upgrade this to check for
+        # actual content. This is weak sauce just to test for non-crashingness.
         r = self.client.get('/feed/2/cited-by/')
         self.assertEqual(r.status_code, 200)
 

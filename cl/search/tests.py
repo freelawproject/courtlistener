@@ -14,7 +14,7 @@ from django.test.utils import override_settings
 from lxml import html
 
 
-from cl.lib.solr_core_admin import (get_data_dir_location)
+from cl.lib.solr_core_admin import get_data_dir_location
 from cl.lib.test_helpers import SolrTestCase
 from cl.search.models import Court, Docket
 from cl import settings

@@ -1,11 +1,11 @@
 import os
-from django.core.management import call_command
 from cl.lib import sunburnt
 from cl.lib.solr_core_admin import (
     create_solr_core, swap_solr_core, delete_solr_core
 )
 from cl.search.models import Court
 from django.conf import settings
+from django.core.management import call_command
 from django.test import TestCase
 from django.test.utils import override_settings
 
@@ -16,19 +16,14 @@ core_name_audio = 'audio_test'
     SOLR_OPINION_URL='http://127.0.0.1:8983/solr/%s' % core_name_opinion,
     SOLR_AUDIO_URL='http://127.0.0.1:8983/solr/%s' % core_name_audio,
 )
-class SolrTestCase(TestCase):
-    """A generic class that contains the setUp and tearDown functions for
-    inheriting children.
+class EmptySolrTestCase(TestCase):
+    """Sets up an empty Solr index for tests that need to set up data manually.
 
-    Good for tests with both audio and documents.
+    Other Solr test classes subclass this one, adding additional content or
+    features.
     """
-    fixtures = ['test_court.json', 'judge_judy.json',
-                'test_objects_search.json', 'test_objects_audio.json']
 
     def setUp(self):
-        # Set up some handy variables
-        self.court = Court.objects.get(pk='test')
-
         # Set up testing cores in Solr and swap them in
         self.core_name_opinion = core_name_opinion
         self.core_name_audio = core_name_audio
@@ -46,8 +41,6 @@ class SolrTestCase(TestCase):
         self.si_audio = sunburnt.SolrInterface(
             settings.SOLR_AUDIO_URL, mode='rw')
 
-        self.expected_num_results_opinion = 3
-        self.expected_num_results_audio = 2
         self.si_opinion.commit()
         self.si_audio.commit()
 
@@ -58,8 +51,24 @@ class SolrTestCase(TestCase):
         delete_solr_core(self.core_name_audio)
 
 
+class SolrTestCase(EmptySolrTestCase):
+    """A standard Solr test case with content included in the database,  but not
+    yet indexed into the database.
+    """
+    fixtures = ['test_court.json', 'judge_judy.json',
+                'test_objects_search.json', 'test_objects_audio.json']
+
+    def setUp(self):
+        # Set up some handy variables
+        super(SolrTestCase, self).setUp()
+
+        self.court = Court.objects.get(pk='test')
+        self.expected_num_results_opinion = 3
+        self.expected_num_results_audio = 2
+
+
 class IndexedSolrTestCase(SolrTestCase):
-    """Similar to the above test case, but the data is indexed in Solr"""
+    """Similar to the SolrTestCase, but the data is indexed in Solr"""
 
     def setUp(self):
         super(IndexedSolrTestCase, self).setUp()

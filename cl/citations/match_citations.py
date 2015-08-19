@@ -74,6 +74,14 @@ def case_name_query(conn, params, citation, citing_doc):
 
 
 def match_citation(citation, citing_doc):
+    """For a citation object, try to match it to an item in the database using
+    a variety of heuristics.
+
+    Returns:
+      - a Solr Result object with the results, or an empty list if no hits
+      - a Boolean indicating whether results were found by searching the
+        citation itself.
+    """
     # TODO: Create shared solr connection to use across multiple citations/
     # documents
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
@@ -84,7 +92,7 @@ def match_citation(citation, citing_doc):
     if citation.year:
         start_year = end_year = citation.year
     else:
-        if citation.lookup_index:
+        if citation.lookup_index is not None:
             # Some cases can't be disambiguated.
             reporter_dates = REPORTERS[
                 citation.canonical_reporter][
@@ -99,8 +107,8 @@ def match_citation(citation, citing_doc):
                 end_year = reporter_dates['end'].year
             else:
                 end_year = 2030
-        if citing_doc.date_filed:
-            end_year = min(end_year, citing_doc.date_filed.year)
+        if citing_doc.cluster.date_filed:
+            end_year = min(end_year, citing_doc.cluster.date_filed.year)
     date_param = 'dateFiled:%s' % build_date_range(start_year, end_year)
     main_params['fq'].append(date_param)
     if citation.court:
@@ -113,7 +121,7 @@ def match_citation(citation, citing_doc):
     # Take 1: Use citation
     citation_param = 'citation:"%s"' % citation.base_citation()
     main_params['fq'].append(citation_param)
-    main_params['caller'] = 'citations'
+    main_params['caller'] = 'citation.match_citations.match_citation'
     results = conn.raw_query(**main_params).execute()
     if len(results) == 1:
         return results, True
@@ -125,10 +133,6 @@ def match_citation(citation, citing_doc):
     # Take 2: Use case name
     if not citation.defendant:
         return [], False
-        # Remove citation parameter
+    # Remove citation parameter
     main_params['fq'].remove(citation_param)
     return case_name_query(conn, main_params, citation, citing_doc), False
-
-
-if __name__ == '__main__':
-    exit(0)

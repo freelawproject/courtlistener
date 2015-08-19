@@ -1,3 +1,4 @@
+# coding=utf-8
 import time
 import sys
 
@@ -5,7 +6,7 @@ from cl.citations.tasks import update_document
 from cl.lib import sunburnt
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.db_tools import queryset_generator
-from cl.search.models import Document
+from cl.search.models import Opinion
 from celery.task.sets import TaskSet
 from django.conf import settings
 from django.core.management import call_command
@@ -19,18 +20,19 @@ class Command(BaseCommand):
         parser.add_argument(
             '--doc_id',
             type=int,
-            help='id of a document to update',
+            nargs='*',
+            help='ids of opinions to update',
         )
         parser.add_argument(
             '--start_id',
             type=int,
             default=0,
-            help='start id for a range of documents to update',
+            help='start id for a range of documents to update (inclusive)',
         )
         parser.add_argument(
             '--end_id',
             type=int,
-            help='end id for a range of documents to update',
+            help='end id for a range of documents to update (inclusive)',
         )
         parser.add_argument(
             # Note that there's a temptation to add a field here for
@@ -40,7 +42,7 @@ class Command(BaseCommand):
             # files to modify, but after those items finish, you'll discover
             # that the program continues onto the newly edited files,
             # including those files that have new citations to them.
-            # Smoke in the server, fire in the wires.
+            # ♪♪♪ Smoke in the server, fire in the wires. ♪♪♪
             '--filed_after',
             type=valid_date_time,
             help="Start date in ISO-8601 format for a range of documents to "
@@ -67,8 +69,44 @@ class Command(BaseCommand):
                   "completely regenerated from the database. Setting this to "
                   "False disables changes to Solr, if that is what's desired. "
                   "Finally, only 'concurrently' will avoid reindexing the "
-                  "entire collection."),
+                  "entire collection. If you are only updating a subset of "
+                  "the opinions, it is thus generally wise to use "
+                  "'concurrently'."),
         )
+
+    def handle(self, *args, **options):
+        both_list_and_endpoints = (options.get('doc_id') is not None and
+                                   (options.get('start_id') is not None or
+                                    options.get('end_id') is not None or
+                                    options.get('filed_after') is not None))
+        no_option = (not any([options.get('doc_id') is None,
+                              options.get('start_id') is None,
+                              options.get('end_id') is None,
+                              options.get('filed_after') is None,
+                              options.get('all') is False]))
+        if both_list_and_endpoints or no_option:
+            raise CommandError('Please specify either a list of documents, a '
+                               'range of ids, a range of dates, or '
+                               'everything.')
+
+        self.index = options['index']
+        self.si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='rw')
+
+        # Use query chaining to build the query
+        query = Opinion.objects.all()
+        if options.get('doc_id'):
+            query = query.filter(pk__in=options.get('doc_id'))
+        if options.get('end_id'):
+            query = query.filter(pk__lte=options.get('end_id'))
+        if options.get('start_id'):
+            query = query.filter(pk__gte=options.get('start_id'))
+        if options.get('filed_after'):
+            query = query.filter(cluster__date_filed__gte=options['filed_after'])
+        if options.get('all'):
+            query = Opinion.objects.all()
+        count = query.count()
+        docs = queryset_generator(query, chunksize=10000)
+        self.update_documents(docs, count)
 
     def update_documents(self, documents, count):
         sys.stdout.write('Graph size is {0:d} nodes.\n'.format(count))
@@ -101,13 +139,13 @@ class Command(BaseCommand):
             ))
             sys.stdout.flush()
             last_document = (count == processed_count)
-            if (processed_count % 500 == 0) or last_document:
-                # Every 500 documents, we send the subtasks off for processing
+            if (processed_count % 5000 == 0) or last_document:
+                # Every 5000 documents, we send the subtasks off for processing
                 # Poll to see when they're done.
                 job = TaskSet(tasks=subtasks)
                 result = job.apply_async()
                 while not result.ready():
-                    time.sleep(0.5)
+                    time.sleep(1)
 
                 # The jobs finished - clean things up for the next round
                 subtasks = []
@@ -115,44 +153,13 @@ class Command(BaseCommand):
         if self.index == 'all_at_end':
             call_command(
                 'cl_update_index',
-                update_mode=True,
-                everything=True,
-                solr_url='http://127.0.0.1:8983/solr/collection1'
+                '--type', 'opinions',
+                '--noinput',
+                '--update',
+                '--everything',
+                '--do-commit',
+                solr_url=settings.SOLR_OPINION_URL,
             )
         elif self.index == 'false':
             sys.stdout.write("Solr index not updated after running citation "
                              "finder. You may want to do so manually.")
-
-    def handle(self, *args, **options):
-        both_list_and_endpoints = (options.get('doc_id') is not None and
-                                   (options.get('start_id') is not None or
-                                    options.get('end_id') is not None or
-                                    options.get('filed_after') is not None))
-        no_option = (not any([options.get('doc_id') is None,
-                              options.get('start_id') is None,
-                              options.get('end_id') is None,
-                              options.get('filed_after') is None,
-                              options.get('all') is False]))
-        if both_list_and_endpoints or no_option:
-            raise CommandError('Please specify either a list of documents, a '
-                               'range of ids, a range of dates, or '
-                               'everything.')
-
-        self.index = options['index']
-        self.si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='rw')
-
-        # Use query chaining to build the query
-        query = Document.objects.all()
-        if options.get('doc_id'):
-            query = query.filter(pk=options.get('doc_id'))
-        if options.get('end_id'):
-            query = query.filter(pk__lte=options.get('end_id'))
-        if options.get('start_id'):
-            query = query.filter(pk__gte=options.get('start_id'))
-        if options.get('filed_after'):
-            query = query.filter(date_filed__gte=options['filed_after'])
-        if options.get('all'):
-            query = Document.objects.all()
-        count = query.count()
-        docs = queryset_generator(query, chunksize=10000)
-        self.update_documents(docs, count)
