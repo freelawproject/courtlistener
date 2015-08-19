@@ -21,12 +21,11 @@ class Command(BaseCommand):
             '--doc_id',
             type=int,
             nargs='*',
-            help='ids of opinions to update',
+            help='ids of citing opinions',
         )
         parser.add_argument(
             '--start_id',
             type=int,
-            default=0,
             help='start id for a range of documents to update (inclusive)',
         )
         parser.add_argument(

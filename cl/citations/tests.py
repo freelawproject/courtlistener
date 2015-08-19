@@ -7,8 +7,16 @@ from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.models import Opinion, OpinionsCited, OpinionCluster
 
 from datetime import date
+from django.core.management import call_command
 from django.test import TestCase
 from lxml import etree
+
+def remove_citations_from_imported_fixtures():
+    """Delete all the connections between items that are in the fixtures by
+    default, and reset counts to zero.
+    """
+    OpinionsCited.objects.all().delete()
+    OpinionCluster.objects.all().update(citation_count=0)
 
 
 class CiteTest(TestCase):
@@ -211,10 +219,7 @@ class MatchingTest(IndexedSolrTestCase):
 
         This becomes a bit of an integration test, which is fine.
         """
-        # Delete all the connections between items that are in the fixtures by
-        # default, and reset counts to zero.
-        OpinionsCited.objects.all().delete()
-        OpinionCluster.objects.all().update(citation_count=0)
+        remove_citations_from_imported_fixtures()
 
         citing = Opinion.objects.get(pk=3)
         update_document(citing)  # Updates d1's citation count in a Celery task
@@ -266,3 +271,55 @@ class CitationFeedTest(TestCase):
 
         expected_count = 1
         self._tree_has_content(r.content, expected_count)
+
+
+class CitationCommandTest(IndexedSolrTestCase):
+    """Test a variety of the ways that cl_find_citations can be called."""
+    def call_command_and_test_it(self, args):
+        remove_citations_from_imported_fixtures()
+        call_command('cl_find_citations', *args)
+        cited = Opinion.objects.get(pk=2)
+        expected_count = 1
+        self.assertEqual(
+            cited.cluster.citation_count,
+            expected_count,
+            msg=u"'cited' was not updated by a citation found in 'citing', or "
+                u"the citation was not found. Count was: %s instead of %s"
+                % (cited.cluster.citation_count, expected_count)
+        )
+
+    def test_index_by_doc_id(self):
+        args = [
+            '--doc_id', '3',
+            '--index', 'concurrently',
+        ]
+        self.call_command_and_test_it(args)
+
+    def test_index_by_doc_ids(self):
+        args = [
+            '--doc_id', '3', '2',
+            '--index', 'concurrently',
+        ]
+        self.call_command_and_test_it(args)
+
+    def test_index_by_start_only(self):
+        args = [
+            '--start_id', '0',
+            '--index', 'concurrently',
+        ]
+        self.call_command_and_test_it(args)
+
+    def test_index_by_start_and_end(self):
+        args = [
+            '--start_id', '0',
+            '--end_id', '5',
+            '--index', 'concurrently',
+        ]
+        self.call_command_and_test_it(args)
+
+    def test_filed_after(self):
+        args = [
+            '--filed_after', '2015-06-09',
+            '--index', 'concurrently',
+        ]
+        self.call_command_and_test_it(args)
