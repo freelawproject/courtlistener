@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-import os
 import re
 import sys
 from juriscraper.lib.html_utils import get_visible_text
@@ -134,7 +133,8 @@ def is_scotus_reporter(citation):
 
     if reporter:
         truisms = [
-            reporter['cite_type'] == 'federal' and 'supreme' in reporter['name'].lower(),
+            (reporter['cite_type'] == 'federal' and
+             'supreme' in reporter['name'].lower()),
             'scotus' in reporter['cite_type'].lower()
         ]
         if any(truisms):
@@ -144,10 +144,11 @@ def is_scotus_reporter(citation):
 
 
 def get_court_by_paren(paren_string, citation):
-    """Takes the citation string, usually something like "2d Cir", and maps that back to the court code.
+    """Takes the citation string, usually something like "2d Cir", and maps
+    that back to the court code.
 
-    Does not work on SCOTUS, since that court lacks parentheticals, and needs to be handled after disambiguation has
-    been completed.
+    Does not work on SCOTUS, since that court lacks parentheticals, and needs to
+    be handled after disambiguation has been completed.
     """
     if citation.year is None:
         court_str = strip_punct(paren_string)
@@ -201,7 +202,8 @@ def add_post_citation(citation, words, reporter_index):
     """
     end_position = reporter_index + 2
     # Start looking 2 tokens after the reporter (1 after page)
-    for start in xrange(reporter_index + 2, min((reporter_index + FORWARD_SEEK), len(words))):
+    for start in xrange(reporter_index + 2,
+                        min((reporter_index + FORWARD_SEEK), len(words))):
         if words[start].startswith('('):
             for end in xrange(start, start + FORWARD_SEEK):
                 try:
@@ -219,7 +221,8 @@ def add_post_citation(citation, words, reporter_index):
                     end_position = end
                     break
             if start > reporter_index + 2:
-                # Then there's content between page and (), starting with a comma, which we skip
+                # Then there's content between page and (), starting with a
+                # comma, which we skip
                 citation.extra = u' '.join(words[reporter_index + 2:start])
             break
 
@@ -227,11 +230,13 @@ def add_post_citation(citation, words, reporter_index):
 
 
 def add_defendant(citation, words, reporter_index):
-    """Scan backwards from 2 tokens before reporter until you find v., in re, etc.
-    If no known stop-token is found, no defendant name is stored.  In the future,
-    this could be improved."""
+    """Scan backwards from 2 tokens before reporter until you find v., in re,
+    etc. If no known stop-token is found, no defendant name is stored.  In the
+    future, this could be improved.
+    """
     start_index = None
-    for index in xrange(reporter_index - 1, max(reporter_index - BACKWARD_SEEK, 0), -1):
+    for index in xrange(reporter_index - 1,
+                        max(reporter_index - BACKWARD_SEEK, 0), -1):
         word = words[index]
         if word == ',':
             # Skip it
@@ -334,7 +339,8 @@ def disambiguate_reporters(citations):
                         if is_date_in_reporter(REPORTERS[EDITIONS[citation.reporter]][i]['editions'], citation.year):
                             possible_citations.append((citation.reporter, i,))
                     if len(possible_citations) == 1:
-                        # We were able to identify only one hit after filtering by year.
+                        # We were able to identify only one hit after filtering
+                        # by year.
                         citation.reporter = possible_citations[0][0]
                         citation.lookup_index = possible_citations[0][1]
                         unambiguous_citations.append(citation)
@@ -364,18 +370,21 @@ def disambiguate_reporters(citations):
                                                    citation.year):
                                 possible_citations.append((citation.reporter, i))
                         if len(possible_citations) == 1:
-                            # We were able to identify only one hit after filtering by year.
+                            # We were able to identify only one hit after
+                            # filtering by year.
                             citation.lookup_index = possible_citations[0][1]
                             unambiguous_citations.append(citation)
                             continue
-                    # Attempt resolution by unique variation (e.g. Cr. can only be Cranch[0])
+                    # Attempt resolution by unique variation (e.g. Cr. can only
+                    # be Cranch[0])
                     possible_citations = []
                     for i in range(0, len(REPORTERS[citation.canonical_reporter])):
                         for variation in REPORTERS[citation.canonical_reporter][i]['variations'].items():
                             if variation[0] == cached_variation:
                                 possible_citations.append((variation[1], i))
                     if len(possible_citations) == 1:
-                        # We were able to find a single match after filtering by variation.
+                        # We were able to find a single match after filtering
+                        # by variation.
                         citation.lookup_index = possible_citations[0][1]
                         unambiguous_citations.append(citation)
                         continue
@@ -384,11 +393,13 @@ def disambiguate_reporters(citations):
                 possible_citations = []
                 for reporter_key in VARIATIONS_ONLY[citation.reporter]:
                     for i in range(0, len(REPORTERS[EDITIONS[reporter_key]])):
-                        # This inner loop works regardless of the number of reporters under the key.
+                        # This inner loop works regardless of the number of
+                        # reporters under the key.
                         if is_date_in_reporter(REPORTERS[EDITIONS[reporter_key]][i]['editions'], citation.year):
                             possible_citations.append((reporter_key, i,))
                 if len(possible_citations) == 1:
-                    # We were able to identify only one hit after filtering by year.
+                    # We were able to identify only one hit after filtering by
+                    # year.
                     citation.canonical_reporter = EDITIONS[possible_citations[0][0]]
                     citation.reporter = possible_citations[0][0]
                     citation.lookup_index = possible_citations[0][1]
@@ -426,39 +437,3 @@ def get_citations(text, html=True, do_post_citation=True, do_defendant=True):
             citation.court = 'scotus'
 
     return citations
-
-
-def getFileContents(filename):
-    f = open(filename, "r")
-    text = f.read()
-    f.close()
-    return text
-
-
-def getCitationsFromFile(filename):
-    contents = getFileContents(filename)
-    return get_citations(contents)
-
-
-def getCitationsFromFiles(filenames):
-    citations = []
-    for filename in filenames:
-        citations.extend(getCitationsFromFile(filename))
-    return citations
-
-
-def main():
-    citations = []
-    if len(sys.argv) > 1:
-        path = sys.argv[1]
-        filenames = []
-        for filename in os.listdir(path):
-            if len(filenames) > 100:
-                break
-            if not (filename.endswith("xml") or filename.endswith("pdf")):
-                filenames.append(path + "/" + filename)
-        citations = getCitationsFromFiles(filenames)
-
-
-if __name__ == "__main__":
-    main()
