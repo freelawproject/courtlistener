@@ -30,7 +30,7 @@ def verify_honeypot_value(request, field_name):
     if request.method == 'POST':
         field = field_name or settings.HONEYPOT_FIELD_NAME
         if field not in request.POST or not verifier(request.POST[field]):
-            resp = render_to_string('simple_pages/honeypot_error.html',
+            resp = render_to_string('honeypot_error.html',
                                     {'fieldname': field})
             return HttpResponseBadRequest(resp)
 
