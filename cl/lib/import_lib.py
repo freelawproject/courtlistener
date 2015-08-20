@@ -25,8 +25,8 @@ def map_citations_to_models(citations):
                 # That key is used. Try the next one...
                 punt_count += 1
                 if punt_count == len(numbers):
-                    assert("Failed to add citation to the mapping dict (it "
-                           "was full!): %s" % value)
+                    raise("Failed to add citation to the mapping dict (it "
+                          "was full!): %s" % value)
                 continue
             except KeyError:
                 # Key not found, so add the value and break.
