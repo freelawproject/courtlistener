@@ -69,7 +69,7 @@ def follow_redirections(r, s):
     """
     redirected, url = test_for_meta_redirections(r)
     if redirected:
-        logger.info('Following a meta redirection to: %s' % url)
+        logger.info('Following a meta redirection to: %s' % url.encode('utf-8'))
         r = follow_redirections(s.get(url), s)
     return r
 
@@ -330,7 +330,7 @@ class Command(BaseCommand):
                 elif onwards == 'CARRY_ON':
                     # Not a duplicate, carry on
                     logger.info('Adding new document found at: %s' %
-                                site.download_urls[i])
+                                site.download_urls[i].encode('utf-8'))
                     dup_checker.reset()
 
                     cite, docket, doc = self.associate_meta_data_to_objects(
@@ -349,7 +349,7 @@ class Command(BaseCommand):
                         msg = ('Unable to save binary to disk. Deleted '
                                'document: % s.\n % s' %
                                (site.case_names[i], traceback.format_exc()))
-                        logger.critical(msg)
+                        logger.critical(msg.encode('utf-8'))
                         ErrorLog(
                             log_level='CRITICAL',
                             court=court,
@@ -369,7 +369,7 @@ class Command(BaseCommand):
 
                     logger.info("Successfully added doc {pk}: {name}".format(
                         pk=doc.pk,
-                        name=site.case_names[i]
+                        name=site.case_names[i].encode('utf-8')
                     ))
 
             # Update the hash if everything finishes properly.
