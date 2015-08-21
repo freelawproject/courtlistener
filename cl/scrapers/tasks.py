@@ -15,6 +15,7 @@ from lxml.html.clean import Cleaner
 from lxml.etree import XMLSyntaxError
 from seal_rookery import seals_data, seals_root
 
+import os
 import eyed3
 import glob
 import subprocess
@@ -349,7 +350,7 @@ def set_mp3_meta_data(audio_obj, mp3_path):
 
     for frame in flp_image_frames:
         with open(os.path.join(settings.INSTALL_ROOT,
-                               'alert', 'audio', 'static', 'png',
+                               'cl', 'audio', 'static', 'png',
                                'producer.png'), 'r') as f:
             audio_file.tag.images.set(
                 frame,
@@ -400,6 +401,7 @@ def process_audio_file(pk):
         try:
             cf = ContentFile(mp3.read())
             file_name = trunc(af.case_name.lower(), 72) + '_cl.mp3'
+            af.file_with_date = af.docket.date_argued
             af.local_path_mp3.save(file_name, cf, save=False)
         except:
             msg = "Unable to save mp3 to audio_file in scraper.tasks.process_" \

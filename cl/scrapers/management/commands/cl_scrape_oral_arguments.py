@@ -14,44 +14,62 @@ from cl.scrapers.tasks import process_audio_file
 from cl.search.models import Court, Docket
 from juriscraper.AbstractSite import logger
 
+from datetime import date
 from django.core.files.base import ContentFile
+from django.utils.timezone import now
 
 
 class Command(cl_scrape_opinions.Command):
-    def associate_meta_data_to_objects(self, site, i, court, sha1_hash,
-                                       content):
-        audio_file = Audio(
-            source='C',
-            sha1=sha1_hash,
-            case_name=site.case_names[i],
-            download_url=site.download_urls[i],
-            processing_complete=False,
-        )
-        if site.judges:
-            audio_file.judges = site.judges[i]
-        if site.docket_numbers:
-            audio_file.docket_number = site.docket_numbers[i]
+
+    @staticmethod
+    def make_objects(item, court, sha1_hash, content):
+        blocked = item['blocked_statuses']
+        if blocked is not None:
+            date_blocked = date.today()
+        else:
+            date_blocked = None
 
         docket = Docket(
-            date_argued=site.case_dates[i],
-            case_name=site.case_names[i],
+            docket_number=item.get('docket_numbers', ''),
+            case_name=item['case_names'],
+            case_name_short=item['case_name_shorts'],
             court=court,
+            blocked=blocked,
+            date_blocked=date_blocked,
+            date_argued=item['case_dates'],
+            # TODO: Remove these lines after the DB migration
+            date_created=now(),
+            date_modified=now(),
         )
 
-        # Make and associate the file object
+        audio_file = Audio(
+            judges=item.get('judges', ''),
+            source='C',
+            case_name=item['case_names'],
+            case_name_short=item['case_name_shorts'],
+            sha1=sha1_hash,
+            download_url=item['download_urls'],
+            blocked=blocked,
+            date_blocked=date_blocked,
+            # TODO remove these lines after the DB migration
+            date_created=now(),
+            date_modified=now(),
+        )
+
         error = False
         try:
             cf = ContentFile(content)
             extension = get_extension(content)
             if extension not in ['.mp3', '.wma']:
-                extension = '.' + site.download_urls[i].rsplit('.', 1)[1]
+                extension = '.' + item['download_urls'].rsplit('.', 1)[1]
             # See bitbucket issue #215 for why this must be
             # lower-cased.
-            file_name = trunc(site.case_names[i].lower(), 75) + extension
+            file_name = trunc(item['case_names'].lower(), 75) + extension
+            audio_file.file_with_date = docket.date_argued
             audio_file.local_path_original_file.save(file_name, cf, save=False)
         except:
-            msg = 'Unable to save binary to disk. Deleted document: % s.\n % s' % \
-                  (site.case_names[i], traceback.format_exc())
+            msg = 'Unable to save binary to disk. Deleted audio file: %s.\n ' \
+                  '%s' % (item['case_names'], traceback.format_exc())
             logger.critical(msg.encode('utf-8'))
             ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
             error = True
@@ -59,10 +77,11 @@ class Command(cl_scrape_opinions.Command):
         return docket, audio_file, error
 
     @staticmethod
-    def save_everything(docket, audio_file):
+    def save_everything(items, index=False):
+        docket, audio_file = items['docket'], items['audio_file']
         docket.save()
         audio_file.docket = docket
-        audio_file.save(index=False)
+        audio_file.save(index=index)
         RealTimeQueue.objects.create(
             item_type='oa',
             item_pk=audio_file.pk,
@@ -80,9 +99,9 @@ class Command(cl_scrape_opinions.Command):
         if not abort:
             if site.cookies:
                 logger.info("Using cookies: %s" % site.cookies)
-            for i in range(0, len(site.case_names)):
+            for i, item in enumerate(site):
                 msg, r = get_binary_content(
-                    site.download_urls[i],
+                    item['download_urls'],
                     site.cookies,
                     method=site.method
                 )
@@ -94,9 +113,9 @@ class Command(cl_scrape_opinions.Command):
                              message=msg).save()
                     continue
 
-                current_date = site.case_dates[i]
+                current_date = item['case_dates']
                 try:
-                    next_date = site.case_dates[i + 1]
+                    next_date = site[i + 1]['case_dates']
                 except IndexError:
                     next_date = None
 
@@ -109,37 +128,42 @@ class Command(cl_scrape_opinions.Command):
                     lookup_by='sha1'
                 )
 
-                if onwards == 'CONTINUE':
-                    # It's a duplicate, but we haven't hit any thresholds yet.
-                    continue
-                elif onwards == 'BREAK':
-                    # It's a duplicate, and we hit a date or dup_count threshold.
-                    dup_checker.update_site_hash(sha1_hash)
-                    break
-                elif onwards == 'CARRY_ON':
+                if onwards:
                     # Not a duplicate, carry on
-                    logger.info('Adding new document found at: %s' % site.download_urls[i])
+                    logger.info('Adding new document found at: %s' %
+                                item['download_urls'].encode('utf-8'))
                     dup_checker.reset()
 
-                    docket, audio_file, error = self.associate_meta_data_to_objects(
-                        site, i, court, sha1_hash, content)
-
-                    audio_file.docket = docket
-
-                    if error:
-                        continue
-
-                    self.save_everything(docket, audio_file)
-                    random_delay = random.randint(0, 3600)
-                    process_audio_file.apply_async(
-                        (audio_file.pk,),
-                        countdown=random_delay
+                    docket, audio_file, error = self.make_objects(
+                        item, court, sha1_hash, content,
                     )
 
-                    logger.info("Successfully added audio file %s: %s" % (audio_file.pk, site.case_names[i]))
+                    if error:
+                        download_error = True
+                        continue
+
+                    self.save_everything(
+                        items={
+                            'docket': docket,
+                            'audio_file': audio_file,
+                        },
+                        index=False,
+                    )
+                    process_audio_file.apply_async(
+                        (audio_file.pk,),
+                        countdown=random.randint(0, 3600)
+                    )
+
+                    logger.info(
+                        "Successfully added audio file {pk}: {name}".format(
+                            pk=audio_file.pk,
+                            name=item['case_names'].encode('utf-8')
+                        )
+                    )
 
             # Update the hash if everything finishes properly.
-            logger.info("%s: Successfully crawled oral arguments." % site.court_id)
+            logger.info("%s: Successfully crawled oral arguments." %
+                        site.court_id)
             if not download_error and not full_crawl:
                 # Only update the hash if no errors occurred.
                 dup_checker.update_site_hash(site.hash)

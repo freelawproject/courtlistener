@@ -1,15 +1,10 @@
-# from cl.opinion_page.views import (
-#     redirect_opinion_pages,
-#     redirect_cited_by_feeds,
-# )
-# from cl.simple_pages.views import show_maintenance_warning
-# from cl.sitemap import index_sitemap_maker
 from django.conf.urls import include, url
 from django.contrib import admin
 from django.views.generic import RedirectView
 from cl.opinion_page.views import (
     redirect_opinion_pages, redirect_cited_by_feeds,
 )
+#from cl.simple_pages.views import show_maintenance_warning
 from cl.sitemap import index_sitemap_maker
 
 urlpatterns = [
@@ -19,7 +14,7 @@ urlpatterns = [
 
     # Maintenance and SOPA/PIPA mode! Must be here so it intercepts any other
     # urls.
-    # url(r'/*', show_maintenance_warning),
+    #url(r'/*', show_maintenance_warning),
 
     url('', include('cl.audio.urls')),
     url('', include('cl.opinion_page.urls')),

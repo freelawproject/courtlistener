@@ -27,7 +27,7 @@ from datetime import date
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
-from django.utils.timezone import make_aware, utc, now
+from django.utils.timezone import now
 from lxml import html
 from urlparse import urljoin
 
@@ -323,7 +323,6 @@ class Command(BaseCommand):
                 except IndexError:
                     next_date = None
 
-                # Make a hash of the data
                 sha1_hash = hashlib.sha1(content).hexdigest()
                 if court_str == 'nev' and \
                                 item['precedential_statuses'] == 'Unpublished':
@@ -344,12 +343,13 @@ class Command(BaseCommand):
                     dup_checker.reset()
 
                     docket, opinion, cluster, error = self.make_objects(
-                        item, court, sha1_hash, content)
+                        item, court, sha1_hash, content
+                    )
 
                     if error:
+                        download_error = True
                         continue
 
-                    # Save everything, but don't update Solr index yet
                     self.save_everything(
                         items={
                             'docket': docket,
@@ -358,11 +358,10 @@ class Command(BaseCommand):
                         },
                         index=False
                     )
-                    random_delay = random.randint(0, 3600)
                     extract_doc_content.delay(
                         opinion.pk,
                         callback=subtask(extract_by_ocr),
-                        citation_countdown=random_delay
+                        citation_countdown=random.randint(0, 3600)
                     )
 
                     logger.info("Successfully added doc {pk}: {name}".format(
