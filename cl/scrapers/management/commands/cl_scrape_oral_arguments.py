@@ -52,7 +52,7 @@ class Command(cl_scrape_opinions.Command):
         except:
             msg = 'Unable to save binary to disk. Deleted document: % s.\n % s' % \
                   (site.case_names[i], traceback.format_exc())
-            logger.critical(msg)
+            logger.critical(msg.encode('utf-8'))
             ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
             error = True
 

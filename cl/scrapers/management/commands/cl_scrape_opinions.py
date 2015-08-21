@@ -73,7 +73,7 @@ def follow_redirections(r, s):
     """
     redirected, url = test_for_meta_redirections(r)
     if redirected:
-        logger.info('Following a meta redirection to: %s' % url)
+        logger.info('Following a meta redirection to: %s' % url.encode('utf-8'))
         r = follow_redirections(s.get(url), s)
     return r
 
@@ -270,7 +270,7 @@ class Command(BaseCommand):
             msg = ('Unable to save binary to disk. Deleted '
                    'item: %s.\n %s' %
                    (item['case_names'], traceback.format_exc()))
-            logger.critical(msg)
+            logger.critical(msg.encode('utf-8'))
             ErrorLog(log_level='CRITICAL', court=court, message=msg).save()
             error = True
 
@@ -340,7 +340,7 @@ class Command(BaseCommand):
                 if onwards:
                     # Not a duplicate, carry on
                     logger.info('Adding new document found at: %s' %
-                                item['download_urls'])
+                                item['download_urls'].encode('utf-8'))
                     dup_checker.reset()
 
                     docket, opinion, cluster, error = self.make_objects(
@@ -367,7 +367,7 @@ class Command(BaseCommand):
 
                     logger.info("Successfully added doc {pk}: {name}".format(
                         pk=opinion.pk,
-                        name=item['case_names'],
+                        name=item['case_names'].encode('utf-8'),
                     ))
 
             # Update the hash if everything finishes properly.
