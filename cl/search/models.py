@@ -619,6 +619,9 @@ class Opinion(models.Model):
         except AttributeError:
             return u'Orphan opinion with ID: %s' % self.pk
 
+    def get_absolute_url(self):
+        return reverse('view_case', args=[self.cluster.pk, self.cluster.slug])
+
     def clean(self):
         if self.type == '':
             raise ValidationError("'type' is a required field.")
