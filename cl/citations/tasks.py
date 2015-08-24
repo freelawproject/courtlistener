@@ -1,6 +1,5 @@
 import re
 from django.core import urlresolvers
-from cl.opinion_page.views import make_citation_string
 from cl.citations import find_citations, match_citations
 from cl.search.models import Opinion, OpinionsCited
 from celery import task
@@ -62,7 +61,7 @@ def update_document(opinion, index=True):
     for citation in citations:
         # Resource.org docs contain their own citation in the html text, which
         # we don't want to include
-        if citation.base_citation() in make_citation_string(opinion.cluster):
+        if citation.base_citation() in opinion.cluster.citation_string:
             continue
         matches, is_citation_match = match_citations.match_citation(
             citation,

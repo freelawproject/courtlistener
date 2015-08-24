@@ -65,7 +65,8 @@ def send_alert(user_profile, hits, simulate):
 
 
 class Command(BaseCommand):
-    help = 'Sends the alert emails on a daily, weekly or monthly basis.'
+    help = 'Sends the alert emails on a real time, daily, weekly or monthly ' \
+           'basis.'
 
     def __init__(self, *args, **kwargs):
         super(Command, self).__init__(*args, **kwargs)

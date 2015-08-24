@@ -15,23 +15,6 @@ from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
 
 
-def make_citation_string(cluster):
-    """Make a citation string, joined by commas
-
-    This function creates a series of citations separated by commas that can be
-    listed as meta data for an opinion. The order of the items in this list
-    follows BlueBook order, so our citations aren't just willy nilly.
-    """
-    cites = [cluster.neutral_cite, cluster.federal_cite_one,
-             cluster.federal_cite_two, cluster.federal_cite_three,
-             cluster.specialty_cite_one, cluster.state_cite_regional,
-             cluster.state_cite_one, cluster.state_cite_two,
-             cluster.state_cite_three, cluster.westlaw_cite,
-             cluster.lexis_cite]
-    citation_string = ', '.join([cite for cite in cites if cite])
-    return citation_string
-
-
 def view_docket(request, pk, _):
     docket = get_object_or_404(Docket, pk=pk)
     return render_to_response(
@@ -53,8 +36,10 @@ def view_opinion(request, pk, _):
     """
     # Look up the court, document, title and favorite information
     cluster = get_object_or_404(OpinionCluster, pk=pk)
-    citation_string = make_citation_string(cluster)
-    title = '%s, %s' % (trunc(cluster.case_name, 100), citation_string)
+    title = '%s, %s' % (
+        trunc(cluster.case_name, 100),
+        cluster.citation_string,
+    )
     get_string = search_utils.make_get_string(request)
 
     try:
@@ -108,7 +93,9 @@ def view_opinion(request, pk, _):
 def view_opinion_citations(request, pk, _):
     doc = get_object_or_404(Document, pk=pk)
     title = '%s, %s' % (
-        trunc(doc.case_name, 100), make_citation_string(doc))
+        trunc(doc.case_name, 100),
+        cluster.citation_string
+    )
 
     # Get list of cases we cite, ordered by citation count
     citing_opinions = doc.citation.citing_opinions.select_related(
@@ -143,16 +130,18 @@ def view_opinion_citations(request, pk, _):
 
 
 def view_authorities(request, pk, _):
-    doc = get_object_or_404(Document, pk=pk)
+    cluster = get_object_or_404(OpinionCluster, pk=pk)
     title = '%s, %s' % (
-        trunc(doc.case_name, 100), make_citation_string(doc))
+        trunc(cluster.case_name, 100),
+        cluster.citation_string
+    )
 
     # Ordering is by case name is the norm.
-    authorities = doc.opinions_cited.all().select_related(
+    authorities = cluster.opinions_cited.all().select_related(
         'document').order_by('case_name')
 
     private = False
-    if doc.blocked:
+    if cluster.blocked:
         private = True
     else:
         for case in authorities:

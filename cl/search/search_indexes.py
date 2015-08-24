@@ -1,5 +1,4 @@
 from cl.lib.utils import deepgetattr
-from cl.opinion_page.views import make_citation_string
 
 from datetime import datetime
 from datetime import time
@@ -62,7 +61,7 @@ class SearchDocument(object):
                 time()
             )  # Midnight, PST
         self.lexisCite = item.cluster.lexis_cite
-        self.citation = make_citation_string(item.cluster)
+        self.citation = item.cluster.citation_string
         self.neutralCite = item.cluster.neutral_cite
         self.scdb_id = item.cluster.supreme_court_db_id
         self.source = item.cluster.source
