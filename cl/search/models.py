@@ -490,6 +490,51 @@ class OpinionCluster(models.Model):
 
         return ', '.join([cite for cite in cites if cite])
 
+    @property
+    def authority_data(self):
+        """Return a dict with two things:
+         - the count of authorities from all sub opinions
+         - a list of clusters that are cited by all of the sub opinions,
+           in order by their own citation counts.
+
+        Ideally, these two pieces of data would be separate, but since they both
+        need the same computation, it makes sense to do them together.
+        """
+        authority_data = {
+            # All clusters that have sub_opinions cited by the sub_opinions of
+            # the current cluster, ordered by citation count, descending.
+            # Note that:
+            #  - sum()'ing an empty list with a nested one, flattens the nested
+            #    list.
+            #  - QuerySets are lazy by default, so we need to call list() on the
+            #    queryset object to evaluate it here and now.
+            'authorities': OpinionCluster.objects.filter(
+                sub_opinions__in=sum(
+                    [list(sub_opinion.opinions_cited.all()) for
+                     sub_opinion in
+                     self.sub_opinions.all()],
+                    []
+                )
+            ).order_by('-citation_count', '-date_filed')
+        }
+
+        authority_data['count'] = authority_data['authorities'].count()
+
+        return authority_data
+
+    @property
+    def citing_clusters(self):
+        # All clusters that have a sub_opinion that cites one of the
+        # sub_opinions of this cluster.
+        return OpinionCluster.objects.filter(
+            sub_opinions__in=sum(
+                [list(sub_opinion.opinions_citing.all()) for
+                 sub_opinion in
+                 self.sub_opinions.all()],
+                []
+            )
+        ).order_by('-citation_count', '-date_filed')
+
     def __unicode__(self):
         if self.case_name:
             return u'%s: %s' % (self.pk, self.case_name)

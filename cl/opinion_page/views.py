@@ -27,14 +27,14 @@ def view_docket(request, pk, _):
 
 @never_cache
 def view_opinion(request, pk, _):
-    """Using the ID, return the document.
+    """Using the cluster ID, return the cluster of opinions.
 
-    We also test if the document ID is a favorite for the user, and send data
-    as such. If it's a favorite, we send the bound form for the favorite so
+    We also test if the cluster ID is a favorite for the user, and send data
+    if needed. If it's a favorite, we send the bound form for the favorite so
     it can populate the form on the page. If it is not a favorite, we send the
     unbound form.
     """
-    # Look up the court, document, title and favorite information
+    # Look up the court, cluster, title and favorite information
     cluster = get_object_or_404(OpinionCluster, pk=pk)
     title = '%s, %s' % (
         trunc(cluster.case_name, 100),
@@ -57,48 +57,30 @@ def view_opinion(request, pk, _):
             }
         )
 
-    # get most influential opinions that cite this opinion
-    citing_clusters = OpinionCluster.objects.filter(
-        sub_opinions__in=cluster.sub_opinions.all()
-    ).order_by(
-        '-citation_count',
-        '-date_filed',
-    )[:5]
-
-    authorities_count = 0
-    top_authorities = None
-    for sub_opinion in cluster.sub_opinions.all():
-        authorities_count += sub_opinion.opinions_cited.all().count()
-        if sub_opinion.type == 'lead' or sub_opinion.type == 'combined':
-            # At first, all citations will be between majority or combined
-            # sub_opinions.
-            top_authorities = sub_opinion.opinions_cited.all().select_related(
-                'cluster').order_by('cluster__case_name')[:5]
-
     return render_to_response(
         'view_opinion.html',
-        {'title': title,
-         'citation_string': citation_string,
-         'cluster': cluster,
-         'favorite_form': favorite_form,
-         'get_string': get_string,
-         'private': cluster.blocked,
-         'citing_clusters': citing_clusters,
-         'top_authorities': top_authorities,
-         'authorities_count': authorities_count},
+        {
+            'title': title,
+            'cluster': cluster,
+            'favorite_form': favorite_form,
+            'get_string': get_string,
+            'private': cluster.blocked,
+            'citing_clusters': cluster.citing_clusters[:5],
+            'top_authorities': cluster.authority_data['authorities'][:5],
+        },
         RequestContext(request)
     )
 
 
 def view_opinion_citations(request, pk, _):
-    doc = get_object_or_404(Document, pk=pk)
+    cluster = get_object_or_404(OpinionCluster, pk=pk)
     title = '%s, %s' % (
-        trunc(doc.case_name, 100),
+        trunc(cluster.case_name, 100),
         cluster.citation_string
     )
 
     # Get list of cases we cite, ordered by citation count
-    citing_opinions = doc.citation.citing_opinions.select_related(
+    citing_opinions = cluster.citation.citing_opinions.select_related(
         'citation', 'docket__court').order_by('-citation_count', '-date_filed')
 
     paginator = Paginator(citing_opinions, 20, orphans=2)

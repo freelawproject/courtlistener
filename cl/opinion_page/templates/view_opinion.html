@@ -8,7 +8,7 @@
 {% block search-form %}{% endblock %}
 
 {% block head %}
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{doc.case_name|truncatewords:10}}" href="/feed/{{ doc.pk }}/cited-by/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{cluster.case_name|truncatewords:10}}" href="/feed/{{ cluster.pk }}/cited-by/">
 {% endblock %}
 
 {% block footer-scripts %}
@@ -39,7 +39,7 @@
                         <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}"
                            class="btn btn-primary btn-xs">Cluster</a>
                     {% endif %}
-                    {% if perms.search.change_document %}
+                    {% if perms.search.change_opinion %}
                         {% for sub_opinion in cluster.sub_opinions.all %}
                             <a href="{% url 'admin:search_opinion_change' sub_opinion.pk %}"
                                class="btn btn-primary btn-xs">{{ sub_opinion.type }} opinion</a>
@@ -89,7 +89,7 @@
         {# Show cases this case cites #}
         {% if top_authorities %}
             <div id="authorities" class="sidebar-section">
-                <h3><span>Authorities ({{ authorities_count }})</span></h3>
+                <h3><span>Authorities ({{ cluster.authority_data.count }})</span></h3>
                 <p class="bottom">This opinion cites:</p>
                 <ul>
                     {% for authority in top_authorities %}
@@ -101,7 +101,7 @@
                     {% endfor %}
                 </ul>
                 <h4>
-                    <a href="{{ authority.get_absolute_url }}authorities/?{{ request.META.QUERY_STRING }}">
+                    <a href="{{ cluster.get_absolute_url }}authorities/?{{ request.META.QUERY_STRING }}">
                         Full Table of Authorities
                         <i class="fa fa-arrow-circle-o-right gray"></i>
                     </a>
@@ -151,56 +151,54 @@
         <p class="bottom">
             <span class="meta-data-header">Filed:</span>
             <span class="meta-data-value">
-                {% if cluster.date_filed %}
-                    {{cluster.date_filed|date:"F jS, Y"}}
-                {% else %}
-                    Unknown Date
-                {% endif %}
+                {{cluster.date_filed|date:"F jS, Y"}}
             </span>
         </p>
         <p class="bottom">
-            <span class="meta-data-header">Status:</span>
+            <span class="meta-data-header">Precedential Status:</span>
             <span class="meta-data-value">
-                {% if cluster.precedential_status %}
-                    {{cluster.get_precedential_status_display}}
+                {{cluster.get_precedential_status_display|default:'Unknown'}}
+            </span>
+        </p>
+        <p class="bottom">
+            <span class="meta-data-header">Citations:</span>
+            <span class="meta-data-value">
+                {{ cluster.citation_string|default:"Unknown" }}
+            </span>
+        </p>
+        <p class="bottom">
+            <span class="meta-data-header">Docket Number:</span>
+            <span class="meta-data-value">
+                {{ cluster.docket.docket_number|default:"Unknown" }}
+            </span>
+        </p>
+        <p class="bottom">
+            <span class="meta-data-header">Supreme Court Database ID:</span>
+            <span class="meta-data-value">
+                {% if cluster.supreme_court_db_id %}
+                    <a href="http://supremecourtdatabase.org/analysisCaseDetail.php?cid={{ cluster.supreme_court_db_id }}" target="_blank">
+                    {{ cluster.supreme_court_db_id }}
+                    </a><i class="gray fa fa-external-link"></i>
                 {% else %}
                     Unknown
                 {% endif %}
             </span>
         </p>
         <p class="bottom">
-            {% if citation_string %}
-                <span class="meta-data-header">Citations:</span>
-                <span class="meta-data-value">{{ citation_string }}</span>
-            {% endif %}
+            <span class="meta-data-header">Judges:</span>
+            <span class="meta-data-value">
+                {{ cluster.judges|default:"Unknown" }}
+            </span>
         </p>
         <p class="bottom">
-            {% if cluster.docket.docket_number %}
-                <span class="meta-data-header">Docket Number:</span>
-                <span class="meta-data-value">{{ cluster.docket.docket_number }}</span>
-            {% endif %}
-        </p>
-        <p class="bottom">
-            {% if cluster.supreme_court_db_id %}
-                <span class="meta-data-header">Supreme Court Database ID:</span>
-                <span class="meta-data-value">{{ cluster.supreme_court_db_id }}</span>
-            {% endif %}
-        </p>
-        <p class="bottom">
-            {%  if cluster.judges %}
-                <span class="meta-data-header">Judges:</span>
-                <span class="meta-data-value">{{ cluster.judges }}</span>
-            {% endif %}
-        </p>
-        <p class="bottom">
-            {%  if cluster.nature_of_suit %}
-                <span class="meta-data-header">Nature of suit:</span>
-                <span class="meta-data-value">{{ cluster.nature_of_suit }}</span>
-            {% endif %}
+            <span class="meta-data-header">Nature of suit:</span>
+            <span class="meta-data-value">
+                {{ cluster.nature_of_suit|default:"Unknown" }}
+            </span>
         </p>
         <br>
 
-        <ul class="nav nav-tabs" role="tablist">
+        <ul class="nav nav-tabs v-offset-below-3" role="tablist">
             {% for sub_opinion in cluster.sub_opinions.all %}
                 <li role="presentation" {% if forloop.first %}class="active"{% endif %}>
                     <a href="#{{ sub_opinion.type }}{{ forloop.counter }}"
@@ -223,23 +221,27 @@
                                 obtained by analyzing a scanned document
                                 provided by the court. As a result it may have
                                 typos, and you may prefer <a
-                                        href="{{ cluster.download_url }}"
+                                        href="{{ sub_opinion.download_url }}"
                                         class="visitable">reading the
                                     original</a>.
                             </p>
                         </div>
                         <div class="clearfix"></div>
                     {% endif %}
-                    {% if doc.source == 'L' or doc.source == 'LC' or doc.source == 'LR' or doc.source == 'LCR' %}
+                    {% if 'Z' in cluster.source %}
+                    <div id="columbia-text">
+                    {% elif 'L' in cluster.source %}
                     <div id='lawbox-text'>
-                    {% elif doc.source == 'R' or doc.source == 'CR' %}
+                    {% elif 'R' in cluster.source %}
                     <div id='resource-org-text'>
                     {% else %}
                     <div id='default-text'>
                     {% endif %}
-                        <div id="opinion-content"> {# used by Zotero #}
+                        <div id="opinion-content"> {# used by Zotero, Juris-M #}
                             {% if sub_opinion.html_with_citations %}
                                 {{ sub_opinion.html_with_citations|safe }}
+                            {% elif sub_opinion.html_columbia %}
+                                {{ sub_opinion.html_columbia|safe }}
                             {% elif sub_opinion.html_lawbox %}
                                 {{ sub_opinion.html_lawbox|safe }}
                             {% elif sub_opinion.html %}
