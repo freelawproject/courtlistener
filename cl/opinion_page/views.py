@@ -41,6 +41,8 @@ def view_opinion(request, pk, _):
         cluster.citation_string,
     )
     get_string = search_utils.make_get_string(request)
+    or_joined_sub_ids = ' OR '.join([str(sub_opinion.pk) for sub_opinion in
+                                     cluster.sub_opinions.all()])
 
     try:
         fave = Favorite.objects.get(
@@ -62,6 +64,7 @@ def view_opinion(request, pk, _):
         {
             'title': title,
             'cluster': cluster,
+            'or_joined_sub_ids': or_joined_sub_ids,
             'favorite_form': favorite_form,
             'get_string': get_string,
             'private': cluster.blocked,
@@ -70,45 +73,6 @@ def view_opinion(request, pk, _):
         },
         RequestContext(request)
     )
-
-
-def view_opinion_citations(request, pk, _):
-    cluster = get_object_or_404(OpinionCluster, pk=pk)
-    title = '%s, %s' % (
-        trunc(cluster.case_name, 100),
-        cluster.citation_string
-    )
-
-    # Get list of cases we cite, ordered by citation count
-    citing_opinions = cluster.citation.citing_opinions.select_related(
-        'citation', 'docket__court').order_by('-citation_count', '-date_filed')
-
-    paginator = Paginator(citing_opinions, 20, orphans=2)
-    page = request.GET.get('page')
-    try:
-        citing_opinions = paginator.page(page)
-    except (TypeError, PageNotAnInteger):
-        # TypeError can be removed in Django 1.4, where it properly will be
-        # caught upstream.
-        citing_opinions = paginator.page(1)
-    except EmptyPage:
-        citing_opinions = paginator.page(paginator.num_pages)
-
-    private = False
-    if doc.blocked:
-        private = True
-    else:
-        for case in citing_opinions.object_list:
-            if case.blocked:
-                private = True
-                break
-
-    return render_to_response('view_opinion_citations.html',
-                              {'title': title,
-                               'doc': doc,
-                               'private': private,
-                               'citing_opinions': citing_opinions},
-                              RequestContext(request))
 
 
 def view_authorities(request, pk, _):
@@ -139,20 +103,31 @@ def view_authorities(request, pk, _):
                               RequestContext(request))
 
 
-def redirect_opinion_pages(request, pk, slug):
+def redirect_opinion_pages(request, pk):
+    # Handles the old /$court/$ascii/$slug/(authorities)? format. /cited-by/
+    # is handled elsewhere since that page has now been through additional
+    # movements.
     pk = ascii_to_num(pk)
-    path = reverse('view_case', args=[pk, slug])
+    path = reverse('view_case', args=[pk])
     if request.path.endswith('/authorities/'):
         path += 'authorities/'
-    elif request.path.endswith('/cited-by/'):
-        path += 'cited-by/'
     if request.META['QUERY_STRING']:
         path = '%s?%s' % (path, request.META['QUERY_STRING'])
     return HttpResponsePermanentRedirect(path)
 
 
 def redirect_cited_by_feeds(request, pk):
-    pk = ascii_to_num(pk)
-    path = reverse('cited_by_feed', kwargs={'doc_id': pk})
-    return HttpResponsePermanentRedirect(path)
+    try:
+        int(pk)
+    except ValueError:
+        # Cannot cast to int, must be ascii.
+        pk = ascii_to_num(pk)
+    return HttpResponsePermanentRedirect('/feed/search/?q=cites%%3A%s' % pk)
 
+def redirect_cited_by_page(request, pk):
+    try:
+        int(pk)
+    except ValueError:
+        # Cannot cast to int, must be ascii
+        pk = ascii_to_num(pk)
+    return HttpResponsePermanentRedirect('/?q=cites%%3A%s' % pk)

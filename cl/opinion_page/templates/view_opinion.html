@@ -78,8 +78,8 @@
                     {% endfor %}
                 </ul>
                 <h4>
-                    <a href="{{ cluster.get_absolute_url }}cited-by/?{{ request.META.QUERY_STRING }}">
-                        Full List of Citations
+                    <a href="/?q=cites%3A({{ or_joined_sub_ids }})">
+                        Full List of Cited Opinions
                         <i class="fa fa-arrow-circle-o-right gray"></i>
                     </a>
                 </h4>
