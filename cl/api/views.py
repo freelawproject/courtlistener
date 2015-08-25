@@ -4,7 +4,6 @@ import os
 from cl import settings
 from cl.lib import magic
 from cl.lib import search_utils
-from cl.lib.filesize import size
 from cl.lib.sunburnt import sunburnt
 from cl.search.models import Court
 from cl.stats import tally_stat
@@ -87,17 +86,10 @@ def bulk_data_index(request):
     """Shows an index page for the dumps."""
     courts = make_court_variable()
     court_count = len(courts)
-    try:
-        bulk_data_size = size(os.path.getsize(
-            os.path.join(settings.BULK_DATA_DIR, 'all.xml.gz')))
-    except os.error:
-        # Happens when the file is inaccessible or doesn't exist. An estimate.
-        bulk_data_size = 'about 13GB'
     return render_to_response(
         'bulk-data.html',
         {'court_count': court_count,
          'courts': courts,
-         'bulk_data_size': bulk_data_size,
          'private': False},
         RequestContext(request)
     )
