@@ -4,10 +4,10 @@ from django.conf.urls import url
 
 
 urlpatterns = [
-    url(r'^opinion/(\d*)/(.*)/authorities/$', view_authorities,
+    url(r'^opinion/(\d*)/([^/]*)/authorities/$', view_authorities,
         name='view_authorities'),
-    url(r'^opinion/(\d*)/(.*)/$', view_opinion, name="view_case"),
-    url(r'^docket/(\d*)/(.*)/$', view_docket, name="view_docket"),
+    url(r'^opinion/(\d*)/([^/]*)/$', view_opinion, name="view_case"),
+    url(r'^docket/(\d*)/([^/]*)/$', view_docket, name="view_docket"),
 
     # Sitemap
     url(r'^sitemap-opinions\.xml', opinion_sitemap_maker),

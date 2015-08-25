@@ -103,12 +103,12 @@ def view_authorities(request, pk, _):
                               RequestContext(request))
 
 
-def redirect_opinion_pages(request, pk):
+def redirect_opinion_pages(request, pk, slug):
     # Handles the old /$court/$ascii/$slug/(authorities)? format. /cited-by/
     # is handled elsewhere since that page has now been through additional
     # movements.
     pk = ascii_to_num(pk)
-    path = reverse('view_case', args=[pk])
+    path = reverse('view_case', args=[pk, slug])
     if request.path.endswith('/authorities/'):
         path += 'authorities/'
     if request.META['QUERY_STRING']:
