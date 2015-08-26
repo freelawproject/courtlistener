@@ -209,7 +209,7 @@ class Command(BaseCommand):
                     cluster=new_opinion_cluster,
                     date_modified=old_document.date_modified,
                     date_created=old_document.time_retrieved,
-                    type='combined',
+                    type='010combined',
                     sha1=old_document.sha1,
                     download_url=old_document.download_url,
                     local_path=old_document.local_path,

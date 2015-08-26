@@ -62,10 +62,10 @@ SOURCES = (
 )
 
 OPINION_TYPES = (
-    ('01combined', 'Combined Opinion'),
-    ('02lead', 'Lead Opinion'),
-    ('03concurrence', 'Concurrence'),
-    ('04dissent', 'Dissent'),
+    ('010combined', 'Combined Opinion'),
+    ('020lead', 'Lead Opinion'),
+    ('030concurrence', 'Concurrence'),
+    ('040dissent', 'Dissent'),
 )
 
 
@@ -609,7 +609,6 @@ class Opinion(models.Model):
     type = models.CharField(
         max_length=20,
         choices=OPINION_TYPES,
-        db_index=True,
     )
     sha1 = models.CharField(
         help_text="unique ID for the document, as generated via SHA1 of the "

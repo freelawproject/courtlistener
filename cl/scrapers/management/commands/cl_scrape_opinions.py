@@ -251,7 +251,7 @@ class Command(BaseCommand):
             date_modified=now(),
         )
         opinion = Opinion(
-            type='combined',
+            type='010combined',
             sha1=sha1_hash,
             download_url=item['download_urls'],
             # TODO remove these lines after the DB migration
