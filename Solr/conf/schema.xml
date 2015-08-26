@@ -171,6 +171,11 @@
              termVectors="true"
              termPositions="true"
              termOffsets="true"/>
+      <field name="sibling_ids"
+             type="int"
+             indexed="true"
+             stored="true"
+             multiValued="true"/>
       <field name="panel_ids"
              type="int"
              indexed="true"

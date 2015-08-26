@@ -108,3 +108,12 @@ def naturalduration(seconds, autoescape=None, as_dict=False):
             trimmed_duration = '0'
 
         return mark_safe(trimmed_duration)
+
+
+@register.filter(is_safe=True)
+def OR_join(queryset):
+    """Take the input queryset, and return its PKs joined by ' OR '
+
+    This is a one-liner, but you can't do this kind of thing in a template.
+    """
+    return ' OR '.join([str(item.pk) for item in queryset])

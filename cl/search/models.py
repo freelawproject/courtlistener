@@ -62,10 +62,10 @@ SOURCES = (
 )
 
 OPINION_TYPES = (
-    ('combined', 'Combined Opinion'),
-    ('dissent', 'Dissent'),
-    ('concurrence', 'Concurrence'),
-    ('lead', 'Lead Opinion'),
+    ('01combined', 'Combined Opinion'),
+    ('02lead', 'Lead Opinion'),
+    ('03concurrence', 'Concurrence'),
+    ('04dissent', 'Dissent'),
 )
 
 
@@ -491,36 +491,41 @@ class OpinionCluster(models.Model):
         return ', '.join([cite for cite in cites if cite])
 
     @property
-    def authority_data(self):
-        """Return a dict with two things:
-         - the count of authorities from all sub opinions
-         - a list of clusters that are cited by all of the sub opinions,
-           in order by their own citation counts.
-
-        Ideally, these two pieces of data would be separate, but since they both
-        need the same computation, it makes sense to do them together.
+    def authorities(self):
+        """Returns a queryset that can be used for querying and caching
+        authorities.
         """
-        authority_data = {
-            # All clusters that have sub_opinions cited by the sub_opinions of
-            # the current cluster, ordered by citation count, descending.
-            # Note that:
-            #  - sum()'ing an empty list with a nested one, flattens the nested
-            #    list.
-            #  - QuerySets are lazy by default, so we need to call list() on the
-            #    queryset object to evaluate it here and now.
-            'authorities': OpinionCluster.objects.filter(
-                sub_opinions__in=sum(
-                    [list(sub_opinion.opinions_cited.all()) for
-                     sub_opinion in
-                     self.sub_opinions.all()],
-                    []
-                )
-            ).order_by('-citation_count', '-date_filed')
-        }
+        # All clusters that have sub_opinions cited by the sub_opinions of
+        # the current cluster, ordered by citation count, descending.
+        # Note that:
+        #  - sum()'ing an empty list with a nested one, flattens the nested
+        #    list.
+        #  - QuerySets are lazy by default, so we need to call list() on the
+        #    queryset object to evaluate it here and now.
+        return OpinionCluster.objects.filter(
+            sub_opinions__in=sum(
+                [list(sub_opinion.opinions_cited.all()) for
+                 sub_opinion in
+                 self.sub_opinions.all()],
+                []
+            )
+        ).order_by('-citation_count', '-date_filed')
 
-        authority_data['count'] = authority_data['authorities'].count()
+    @property
+    def authority_count(self):
+        return self.authorities.count()
 
-        return authority_data
+    @property
+    def has_private_authority(self):
+        if not hasattr(self, '_has_private_authority'):
+            # Calculate it, then cache it.
+            private = False
+            for authority in self.authorities:
+                if authority.blocked:
+                    private = True
+                    break
+            self._has_private_authority = private
+        return self._has_private_authority
 
     @property
     def citing_clusters(self):
@@ -604,6 +609,7 @@ class Opinion(models.Model):
     type = models.CharField(
         max_length=20,
         choices=OPINION_TYPES,
+        db_index=True,
     )
     sha1 = models.CharField(
         help_text="unique ID for the document, as generated via SHA1 of the "
@@ -657,6 +663,10 @@ class Opinion(models.Model):
         default=False,
         db_index=True,
     )
+
+    @property
+    def siblings(self):
+        return self.cluster.sub_opinions
 
     def __unicode__(self):
         try:

@@ -3,8 +3,8 @@
 
 {# Shown on authorities pages. #}
 
-{% block title %}Table of Authorities for {{ title }} - CourtListener.com{% endblock %}
-{% block og_title %}Table of Authorities for {{ title }} -
+{% block title %}Table of Authorities for {{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}Table of Authorities for {{ title }} –
     CourtListener.com{% endblock %}
 {% block description %}Table of Authorities for {{ title }}{% endblock %}
 {% block og_description %}Table of Authorities for {{ title }}{% endblock %}
@@ -14,7 +14,7 @@
         <div class="sidebar-section">
             <h4 class="bottom">
                 <i class="fa fa-arrow-circle-o-left gray"></i>
-                <a href="{{ doc.get_absolute_url }}?{{ request.META.QUERY_STRING }}">Back to Document</a>
+                <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">Back to Opinion</a>
             </h4>
         </div>
     </div>
@@ -23,34 +23,32 @@
 {% block content %}
     <div class="col-sm-9">
         <h2>
-            {{ doc.caption|safe|v_wrapper }}
+            {{ cluster.caption|safe|v_wrapper }}
         </h2>
 
         <div id="authorities">
             <h3>This opinion cites {{ authorities.count }} opinion{{ authorities.count|pluralize }}</h3>
             <hr>
             {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
-                <ul>
-                    {% for opinion in authorities %}
-                        {%  with opinion=opinion.parent_documents.all.0 %}
-                        <li>
-                            <a href="{{ opinion.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                                {{ opinion.caption|safe|v_wrapper }}
+            <ul>
+                {% for authority in authorities %}
+                    <li>
+                        <a href="{{ authority.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                            {{ authority.caption|safe|v_wrapper }}
+                        </a>
+                        <br/>
+                        {{ authority.docket.court }} |
+                        {{ authority.date_filed }} |
+                        {% if authority.citation_count > 0 %}
+                            <a href="/?q=cites%3A({{ authority.sub_opinions.all|OR_join }})">
+                                Cited {{ authority.citation_count }} time{{ authority.citation_count|pluralize }}
                             </a>
-                            <br/>
-                            {{ opinion.docket.court }} |
-                            {{ opinion.date_filed }} |
-                            {% if opinion.citation_count != 0 %}
-                                <a href="{{ opinion.get_absolute_url }}cited-by/">
-                                    Cited {{ opinion.citation_count }} time{{ opinion.citation_count|pluralize }}
-                                </a>
-                            {% else %}
-                                Cited 0 times
-                            {% endif %}
-                        </li>
-                        {% endwith %}
-                    {% endfor %}
-                </ul>
+                        {% else %}
+                            Cited 0 times
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
         </div>
     </div>
 {% endblock %}

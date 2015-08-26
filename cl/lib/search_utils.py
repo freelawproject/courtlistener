@@ -325,7 +325,7 @@ def build_main_query(cd, highlight='all', order_by=''):
             if cd['type'] == 'o':
                 main_params.update({
                     'fl': ','.join(common_fl + ['status', 'dateFiled',
-                                                 'citeCount']),
+                                                 'citeCount', 'sibling_ids']),
                     'hl.fl': ','.join(common_hlfl +
                                       ['suitNature', 'citation', 'neutralCite',
                                        'lexisCite']),

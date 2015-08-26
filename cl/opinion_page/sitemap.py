@@ -31,14 +31,10 @@ def opinion_sitemap_maker(request):
     urls = []
     for result in search_results_object:
         url_strs = [
-            'https://www.courtlistener.com%s' % result['absolute_url']]
-        if int(result['citeCount']) > 0:
-            # Only include this page if there are citations.
-            url_strs.append(
-                'https://www.courtlistener.com%scited-by/' % result['absolute_url'])
-        url_strs.append(
-            'https://www.courtlistener.com%sauthorities/' % result['absolute_url']
-        )
+            'https://www.courtlistener.com%s' % result['absolute_url'],
+            'https://www.courtlistener.com%sauthorities/' %
+            result['absolute_url']
+        ]
         if result.get('local_path') and result.get('local_path') != '':
             url_strs.append(
                 'https://www.courtlistener.com/%s' % result['local_path'])
@@ -49,7 +45,7 @@ def opinion_sitemap_maker(request):
             sitemap_item['changefreq'] = 'yearly'
             sitemap_item['lastmod'] = result['timestamp']
             if any(s in url_str for s in
-                   ['authorities', 'cited-by', 'pdf', 'doc', 'wpd']):
+                   ['authorities', 'pdf', 'doc', 'wpd']):
                 sitemap_item['priority'] = '0.3'
             else:
                 sitemap_item['priority'] = '0.5'

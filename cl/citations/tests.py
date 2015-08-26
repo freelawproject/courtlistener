@@ -252,7 +252,7 @@ class CitationFeedTest(TestCase):
 
     def test_basic_cited_by_feed(self):
         """Can we load the cited-by feed and does it have content?"""
-        r = self.client.get('/feed/2/cited-by/')
+        r = self.client.get('/feed/search/?q=cites:2')
         self.assertEqual(r.status_code, 200)
 
         expected_count = 1
@@ -266,7 +266,7 @@ class CitationFeedTest(TestCase):
                         u'CO., \u2014'
         OpinionCluster.objects.filter(pk=1).update(case_name=new_case_name)
 
-        r = self.client.get('/feed/1/cited-by/')
+        r = self.client.get('/feed/search/?q=cites:1')
         self.assertEqual(r.status_code, 200)
 
         expected_count = 1

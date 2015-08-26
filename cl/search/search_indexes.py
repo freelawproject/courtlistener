@@ -50,6 +50,7 @@ class SearchDocument(object):
             self.caseName = item.cluster.case_name
         elif item.cluster.case_name_full:
             self.caseName = item.cluster.case_name_full
+        self.sibling_ids = [sibling.pk for sibling in item.siblings.all()]
         self.panel_ids = [judge.pk for judge in item.cluster.panel.all()]
         self.non_participating_judge_ids = [judge.pk for judge in
                                             item.cluster.non_participating_judges.all()]

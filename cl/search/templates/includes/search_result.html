@@ -84,7 +84,7 @@
         {% if result.citeCount > 0 %}
             <div class="bottom" class="inline nowrap">
                 <span class="meta-data-value">
-                    <a href="{{ result.absolute_url }}cited-by/?{{ request.META.QUERY_STRING }}">
+                    <a href="/?q=cites%3A({{ result.sibling_ids|join:" OR " }})">
                         Cited {{ result.citeCount|intcomma }} time{{ result.citeCount|pluralize }}
                     </a>
                 </span>

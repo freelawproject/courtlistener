@@ -1,6 +1,5 @@
 from django.core.urlresolvers import reverse
 from django.core.exceptions import ObjectDoesNotExist
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.http import HttpResponsePermanentRedirect
 from django.shortcuts import render_to_response
 from django.shortcuts import get_object_or_404
@@ -64,12 +63,11 @@ def view_opinion(request, pk, _):
         {
             'title': title,
             'cluster': cluster,
-            'or_joined_sub_ids': or_joined_sub_ids,
             'favorite_form': favorite_form,
             'get_string': get_string,
             'private': cluster.blocked,
             'citing_clusters': cluster.citing_clusters[:5],
-            'top_authorities': cluster.authority_data['authorities'][:5],
+            'top_authorities': cluster.authorities[:5],
         },
         RequestContext(request)
     )
@@ -77,30 +75,19 @@ def view_opinion(request, pk, _):
 
 def view_authorities(request, pk, _):
     cluster = get_object_or_404(OpinionCluster, pk=pk)
-    title = '%s, %s' % (
-        trunc(cluster.case_name, 100),
-        cluster.citation_string
-    )
 
-    # Ordering is by case name is the norm.
-    authorities = cluster.opinions_cited.all().select_related(
-        'document').order_by('case_name')
-
-    private = False
-    if cluster.blocked:
-        private = True
-    else:
-        for case in authorities:
-            if case.parent_documents.all()[0].blocked:
-                private = True
-                break
-
-    return render_to_response('view_opinion_authorities.html',
-                              {'title': title,
-                               'doc': doc,
-                               'private': private,
-                               'authorities': authorities},
-                              RequestContext(request))
+    return render_to_response(
+        'view_opinion_authorities.html',
+        {
+            'title': '%s, %s' % (
+                trunc(cluster.case_name, 100),
+                cluster.citation_string
+            ),
+            'cluster': cluster,
+            'private': cluster.blocked or cluster.has_private_authority,
+            'authorities': cluster.authorities.order_by('case_name'),
+        },
+        RequestContext(request))
 
 
 def redirect_opinion_pages(request, pk, slug):
@@ -123,6 +110,7 @@ def redirect_cited_by_feeds(request, pk):
         # Cannot cast to int, must be ascii.
         pk = ascii_to_num(pk)
     return HttpResponsePermanentRedirect('/feed/search/?q=cites%%3A%s' % pk)
+
 
 def redirect_cited_by_page(request, pk):
     try:

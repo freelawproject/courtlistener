@@ -8,7 +8,7 @@
 {% block search-form %}{% endblock %}
 
 {% block head %}
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{cluster.case_name|truncatewords:10}}" href="/feed/{{ cluster.pk }}/cited-by/">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{cluster.case_name|truncatewords:10}}" href="/feed/search/?q=cites:({{ cluster.sub_opinions.all|OR_join }})">
 {% endblock %}
 
 {% block footer-scripts %}
@@ -78,7 +78,7 @@
                     {% endfor %}
                 </ul>
                 <h4>
-                    <a href="/?q=cites%3A({{ or_joined_sub_ids }})">
+                    <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})">
                         Full List of Cited Opinions
                         <i class="fa fa-arrow-circle-o-right gray"></i>
                     </a>
@@ -114,7 +114,7 @@
             {% if sub_opinion.download_url or sub_opinion.local_path %}
                 <div class="sidebar-section">
                     {% if sub_opinion.source != 'R' and sub_opinion.source != 'L' and sub_opinion.source != 'LR' %}
-                        <h3><span>View Original</span></h3>
+                        <h3><span>Original {{sub_opinion.get_type_display}}</span></h3>
                         <p>
                             {% if sub_opinion.download_url and sub_opinion.source != 'R' %}
                                 <a href="{{sub_opinion.download_url}}" class="visitable">From the court</a>
