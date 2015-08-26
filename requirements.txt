@@ -24,6 +24,7 @@ kombu==3.0.26
 logilab-common==0.63.2
 lxml==3.4.4
 networkx==1.8.1
+nose
 psycopg2==2.6.1
 pyinotify==0.9.6
 pylint==1.4.3
