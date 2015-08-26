@@ -159,7 +159,6 @@ class Donation(models.Model):
         blank=True,
     )
     status = models.SmallIntegerField(
-        max_length=2,
         choices=PAYMENT_STATUSES,
     )
     referrer = models.TextField(

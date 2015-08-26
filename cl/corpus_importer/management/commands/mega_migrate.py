@@ -4,7 +4,6 @@ it as necessary along the way.
 
 # TODO:
 #   1. Ensure:
-#     1. All legacy models have db_table set explicitly.
 #     2. All pk's are explicitly copied across.
 #     3. All models have migrations disabled.
 #     5. All lookups and saves have 'using' set properly.
@@ -49,9 +48,7 @@ from cl.search.models import (
     OpinionCluster as OpinionClusterNew,
     Court as CourtNew,
 )
-from cl.stats.models import (
-    Stat as StatNew,
-)
+from cl.stats.models import Stat
 from cl.users.models import (
     UserProfile as UserProfileNew
 )
@@ -67,6 +64,44 @@ class Command(BaseCommand):
     help = 'Migrate all data for all apps from one DB to another.'
     case_name_tweaker = CaseNameTweaker()
     the_beginning_of_time = make_aware(datetime(1750, 1, 1), utc)
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--search',
+            action='store_true',
+            default=False,
+            help="Do migrations for the models in the search app: opinions, "
+                 "oral args, and dockets"
+        )
+        parser.add_argument(
+            '--citations',
+            action='store_true',
+            default=False,
+            help="Do migrations for citations between objects"
+        )
+        parser.add_argument(
+            '--user-stuff',
+            action='store_true',
+            default=False,
+            help="Do migrations for user-related stuff (bar memberships, "
+                 "alerts, favorites, donations, etc.)"
+        )
+        parser.add_argument(
+            '--stats',
+            action='store_true',
+            default=False,
+            help="Do migrations for stats"
+        )
+
+    def handle(self, *args, **options):
+        if options['search']:
+            self.migrate_opinions_oral_args_and_dockets()
+        if options['citations']:
+            self.migrate_intra_object_citations()
+        if options['user_stuff']:
+            self.migrate_users_profiles_alerts_favorites_and_donations()
+        if options['stats']:
+            self.migrate_stats()
 
     @staticmethod
     def _none_to_blank(value):
@@ -103,13 +138,6 @@ class Command(BaseCommand):
             ', '.join(['%s: %s' % (k, v) for k, v in errors.items()]),
         ), ending='')
         self.stdout.flush()
-
-    def handle(self, *args, **options):
-        self.migrate_opinions_oral_args_and_dockets()
-        self.migrate_intra_object_citations()
-        self.migrate_users_profiles_alerts_favorites_and_donations()
-
-        #self.migrate_stats()
 
     def migrate_opinions_oral_args_and_dockets(self):
         self.stdout.write("Migrating dockets, audio files, and opinions to new "
@@ -354,9 +382,7 @@ class Command(BaseCommand):
         num_users = old_users.count()
 
         progress = 0
-        self.stdout.write("\tMigrated %s of %s (%s%%)" % (
-            progress, num_users, float(progress) / num_users * 100
-        ), ending='')
+        self._print_progress(progress, num_users)
         for old_user in old_users:
             old_profile = old_user.profile_legacy
             old_alerts = old_profile.alert.all()
@@ -459,12 +485,14 @@ class Command(BaseCommand):
         self.stdout.write(u'')  # Do a newline...
 
     def migrate_stats(self):
-        old_stats = StatNew.objects.using('old').all()
+        self.stdout.write("Migrating stats to the new database...")
+        # Stats use the same model in new and old, with no db_table definitions.
+        # Makes life oh-so-easy.
+        old_stats = Stat.objects.using('old').all()
         stat_count = old_stats.count()
+
         progress = 0
-        self.stdout.write("\tMigrated %s of %s (%s%%)" % (
-            progress, stat_count, float(progress) / stat_count * 100
-        ), ending='')
+        self._print_progress(progress, stat_count)
         for old_stat in old_stats:
             old_stat.save(using='default')
             progress += 1
