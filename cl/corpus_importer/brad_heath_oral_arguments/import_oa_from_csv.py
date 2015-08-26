@@ -20,11 +20,9 @@ import traceback
 from datetime import datetime
 from django.core.files.base import ContentFile
 from juriscraper.lib.string_utils import clean_string, harmonize
-
-from cl.scrapers.management.commands.cl_scrape_opinions import \
-    get_binary_content, get_extension
 from juriscraper.AbstractSite import logger
 from cl.audio.models import Audio
+from cl.lib.scrape_helpers import get_extension, get_binary_content
 from cl.lib.string_utils import trunc
 from cl.scrapers.tasks import process_audio_file
 from cl.search.models import Court, Docket

@@ -7,8 +7,7 @@ from cl.audio.models import Audio
 from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import cl_scrape_opinions
-from cl.scrapers.management.commands.cl_scrape_opinions import \
-    get_binary_content, get_extension
+from cl.lib.scrape_helpers import get_extension, get_binary_content
 from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import process_audio_file
 from cl.search.models import Court, Docket

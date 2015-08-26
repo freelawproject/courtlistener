@@ -1,6 +1,6 @@
 from django.test import TestCase
 from cl.lib.string_utils import trunc
-from lib.search_utils import make_fq
+from cl.lib.search_utils import make_fq
 
 
 class TestStringUtils(TestCase):

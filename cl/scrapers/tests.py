@@ -3,22 +3,17 @@ import os
 
 from cl import settings
 from cl.audio.models import Audio
+from cl.lib.scrape_helpers import get_extension
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.models import UrlHash, ErrorLog
-from cl.scrapers.management.commands.cl_report_scrape_status import \
-    generate_report
-from cl.scrapers.management.commands.cl_scrape_opinions import get_extension
-from cl.scrapers.management.commands.cl_scrape_opinions import \
-    Command as OpinionCommand
-from cl.scrapers.management.commands.cl_scrape_oral_arguments import \
-    Command as OralArgCommand
-from cl.scrapers.management.commands.cl_report_scrape_status import \
-    tally_errors
-from cl.scrapers.tasks import extract_from_txt, extract_doc_content, \
-    extract_by_ocr
-from cl.scrapers.test_assets import test_opinion_scraper, \
-    test_oral_arg_scraper
+from cl.scrapers.management.commands import (
+    cl_report_scrape_status, cl_scrape_opinions, cl_scrape_oral_arguments
+)
+from cl.scrapers.tasks import (
+    extract_from_txt, extract_doc_content, extract_by_ocr
+)
+from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.search.models import Court, Opinion
 
 from celery.task.sets import subtask
@@ -35,7 +30,7 @@ class IngestionTest(IndexedSolrTestCase):
         site = test_opinion_scraper.Site()
         site.method = "LOCAL"
         parsed_site = site.parse()
-        OpinionCommand().scrape_court(parsed_site, full_crawl=True)
+        cl_scrape_opinions.Command().scrape_court(parsed_site, full_crawl=True)
 
         self.assertTrue(False, msg="Need to check the DB for content here.")
 
@@ -44,7 +39,10 @@ class IngestionTest(IndexedSolrTestCase):
         site = test_oral_arg_scraper.Site()
         site.method = "LOCAL"
         parsed_site = site.parse()
-        OralArgCommand().scrape_court(parsed_site, full_crawl=True)
+        cl_scrape_oral_arguments.Command().scrape_court(
+            parsed_site,
+            full_crawl=True
+        )
 
         # There should now be two items in the database.
         audio_files = Audio.objects.all()
@@ -109,7 +107,7 @@ class ReportScrapeStatusTest(TestCase):
                  message="test_msg").save()
 
     def test_tallying_errors(self):
-        errors = tally_errors()
+        errors = cl_report_scrape_status.tally_errors()
         self.assertEqual(
             errors['test'],
             [1, 1],
@@ -124,7 +122,7 @@ class ReportScrapeStatusTest(TestCase):
         A better version of this test would check the contents of the generated
         report by importing it from the test inbox.
         """
-        generate_report()
+        cl_report_scrape_status.generate_report()
 
 
 class DupcheckerTest(TestCase):
