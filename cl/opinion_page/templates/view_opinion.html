@@ -40,7 +40,7 @@
                            class="btn btn-primary btn-xs">Cluster</a>
                     {% endif %}
                     {% if perms.search.change_opinion %}
-                        {% for sub_opinion in cluster.sub_opinions.all %}
+                        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
                             <a href="{% url 'admin:search_opinion_change' sub_opinion.pk %}"
                                class="btn btn-primary btn-xs">{{ sub_opinion.type }} opinion</a>
                         {% endfor %}
@@ -110,7 +110,7 @@
         {% endif %}
 
         {# Download original? #}
-        {% for sub_opinion in cluster.sub_opinions.all %}
+        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
             {% if sub_opinion.download_url or sub_opinion.local_path %}
                 <div class="sidebar-section">
                     {% if sub_opinion.source != 'R' and sub_opinion.source != 'L' and sub_opinion.source != 'LR' %}
@@ -199,7 +199,7 @@
         <br>
 
         <ul class="nav nav-tabs v-offset-below-3" role="tablist">
-            {% for sub_opinion in cluster.sub_opinions.all %}
+            {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
                 <li role="presentation" {% if forloop.first %}class="active"{% endif %}>
                     <a href="#{{ sub_opinion.type }}{{ forloop.counter }}"
                        aria-controls="{{ sub_opinion.type }}{{ forloop.counter }}"
@@ -210,7 +210,7 @@
         </ul>
 
         <div class="tab-content">
-            {% for sub_opinion in cluster.sub_opinions.all %}
+            {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
                 <div role="tabpanel"
                      class="tab-pane {% if forloop.first %}active{% endif %}"
                      id="{{ sub_opinion.type }}{{ forloop.counter }}">
