@@ -1,3 +1,4 @@
+from cl.lib.test_helpers import SitemapTest
 from django.test import TestCase
 from django.test.client import Client
 
@@ -39,3 +40,15 @@ class RedirectionTest(TestCase):
                 r.redirect_chain[0][0],
                 'http://testserver%s' % destination,
             )
+
+
+class OpinionSitemapTest(SitemapTest):
+    def __init__(self, *args, **kwargs):
+        super(OpinionSitemapTest, self).__init__(*args, ** kwargs)
+        # Count here will be fickle, as it's a combination of the authority,
+        # binary and regular opinion pages.
+        self.expected_item_count = 18
+        self.sitemap_url = '/sitemap-opinions.xml'
+
+    def test_does_the_sitemap_have_content(self):
+        super(OpinionSitemapTest, self).does_the_sitemap_have_content()

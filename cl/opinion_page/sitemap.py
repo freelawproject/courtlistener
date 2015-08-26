@@ -9,7 +9,7 @@ from cl.sitemap import items_per_sitemap
 
 def opinion_sitemap_maker(request):
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
-    page = request.GET.get("p")
+    page = request.GET.get("p", '1')
     start = (int(page) - 1) * items_per_sitemap
     params = {
         'q': '*:*',

@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase
 from django.test.utils import override_settings
+from lxml import etree
 
 core_name_opinion = 'opinion_test'
 core_name_audio = 'audio_test'
@@ -87,3 +88,30 @@ class IndexedSolrTestCase(SolrTestCase):
             ]
             call_command('cl_update_index', *args)
 
+
+class SitemapTest(IndexedSolrTestCase):
+    def __init__(self, *args, **kwargs):
+        super(SitemapTest, self).__init__(*args, ** kwargs)
+        self.expected_item_count = None
+        self.sitemap_url = None
+
+    def does_the_sitemap_have_content(self):
+        """Does content get into the sitemap?"""
+        response = self.client.get(self.sitemap_url)
+        self.assertEqual(
+            200,
+            response.status_code,
+            msg="Did not get a 200 OK status code."
+        )
+        xml_tree = etree.fromstring(response.content)
+        node_count = len(xml_tree.xpath(
+            '//s:url',
+            namespaces={'s': 'http://www.sitemaps.org/schemas/sitemap/0.9'},
+        ))
+        self.assertEqual(
+            node_count,
+            self.expected_item_count,
+            msg="Did not get the right number of items in the sitemap.\n"
+                "\tCounted:\t%s\n"
+                "\tExpected:\t%s" % (node_count, self.expected_item_count)
+        )
