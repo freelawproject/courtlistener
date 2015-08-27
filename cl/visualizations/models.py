@@ -1,5 +1,6 @@
 # coding=utf-8
 from django.contrib.auth.models import User
+from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils.text import slugify
 
@@ -94,7 +95,8 @@ class SCOTUSMaps(models.Model):
         return '{pk}: {title}'.format(self.pk, self.title)
 
     def get_absolute_url(self):
-        pass
+        return reverse('view_visualization', kwargs={'pk': self.pk,
+                                                     'slug': self.slug})
 
     def save(self, *args, **kwargs):
         if self.pk is None:
