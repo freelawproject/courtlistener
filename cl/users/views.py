@@ -18,7 +18,6 @@ from django.views.decorators.debug import (sensitive_post_parameters,
 from cl import settings
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
-from cl.favorites.models import Favorite
 from cl.lib import search_utils
 from cl.stats import tally_stat
 from cl.users.forms import (
