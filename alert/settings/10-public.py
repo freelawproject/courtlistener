@@ -16,11 +16,6 @@ DEFAULT_CHARSET = 'utf-8'
 LANGUAGE_CODE = 'en-us'
 USE_TZ = True
 
-import warnings
-warnings.filterwarnings(
-        'error', r"DateTimeField received a naive datetime",
-        RuntimeWarning, r'django\.db\.models\.fields'
-)
 
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',
@@ -140,6 +135,9 @@ if DEVELOPMENT:
 
 SERVER_EMAIL = 'CourtListener <noreply@courtlistener.com>'
 DEFAULT_FROM_EMAIL = 'CourtListener <noreply@courtlistener.com>'
+SCRAPER_ADMINS = (
+    ('Juriscraper List', 'juriscraper@lists.freelawproject.org')
+)
 
 
 #######
