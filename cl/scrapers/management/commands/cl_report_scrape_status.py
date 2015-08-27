@@ -158,7 +158,7 @@ def generate_report():
     }
     report = html_template.render(context)
 
-    subject = 'CourtListener status email for {date}'.format(
+    subject = '[juriscraper-notification] CourtListener status email for {date}'.format(
         date=date.strftime(now(), '%Y-%m-%d')
     )
 
