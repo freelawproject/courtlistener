@@ -35,10 +35,6 @@ urlpatterns = [
 
     # Settings pages
     url(r'^profile/settings/$', view_settings, name='view_settings'),
-    url(r'^profile/$',
-        RedirectView.as_view(
-            url='/profile/settings/',
-            permanent=True)),
     url(r'^profile/favorites/$', view_favorites),
     url(r'^profile/alerts/$', view_alerts),
     url(r'^profile/password/change/$', password_change),
