@@ -84,6 +84,7 @@ INSTALLED_APPS = [
     'cl.simple_pages',
     'cl.stats',
     'cl.users',
+    'cl.visualizations',
 ]
 
 
