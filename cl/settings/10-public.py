@@ -138,7 +138,7 @@ if DEVELOPMENT:
 
 SERVER_EMAIL = 'CourtListener <noreply@courtlistener.com>'
 DEFAULT_FROM_EMAIL = 'CourtListener <noreply@courtlistener.com>'
-
+SCRAPER_ADMINS = ('Juriscraper List', 'juriscraper@lists.freelawproject.org')
 
 ###############
 # Directories #

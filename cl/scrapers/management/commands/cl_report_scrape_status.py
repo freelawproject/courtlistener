@@ -101,7 +101,7 @@ def send_report(report, subject, debug=True):
     connection = mail.get_connection(backend=BACKEND)
     connection.open()
     msg = EmailMessage(subject, report, settings.SERVER_EMAIL,
-                       [a[1] for a in settings.ADMINS],
+                       [a[1] for a in settings.SCRAPER_ADMINS],
                        connection=connection)
     # Set it to html only -- making a plaintext version would be awful.
     msg.content_subtype = 'html'
