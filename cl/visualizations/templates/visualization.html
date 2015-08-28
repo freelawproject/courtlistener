@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load markdown_deux_tags %}
+
+{% block title %}Network Graph of {{ viz.title }}{% endblock %}
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    {% if vis.deleted %}
+        <div class="col-xs-12">
+            <h2>Deleted by Owner</h2>
+            <p>This visualization was deleted by the owner. If this was done in
+                error, and you are the owner, you can restore it from your <a
+                        href="{% url "visualization_profile_page" %}">profile
+                    page</a>.
+            </p>
+        </div>
+    {% else %}
+        {# Not a deleted viz; make decisions on owner/anon and unpub/published #}
+        {% if user != viz.user %}
+            {% if not viz.published %}
+                {# Not published, not deleted, accessed by anon #}
+                <div class="col-xs-12">
+                    <h2>This Visualization is Unpublished</h2>
+                    {# Are they anonymous or just the wrong person? #}
+                    {% if user.is_authenticated %}
+                        <p>You don't appear to be the owner of this
+                            visualization and it has not been published by its
+                            owner. If you know the creator of this
+                            visualization, ask them to hit the publish button
+                            to make it live.
+                        </p>
+                    {% else %}
+                        <p>You are not signed in and this an unpublished
+                            visualization. If you're the creator of this
+                            visualization and wish to edit it, please <a
+                                    href="{% url "sign-in" %}?next={{ request.path }}">sign
+                                in</a> and you will be able to access it. If you
+                            are not the creator of this visualization, and you
+                            know the creator, ask them to hit the publish button
+                            to make it live.
+                        </p>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% else %}
+            {# Owner of an non-deleted viz. We're in business. #}
+            <div class="col-xs-12">
+                <h2 id="title">{{ vis.title }}</h2>
+                <h3 id="subtitle">{{ vis.subtitle }}</h3>
+                {% if not viz.published %}
+                    <!-- Throw a warning to the owner, encouraging publication -->
+                    <p>This is an unpublished viz. Click this thing over here to
+                        get it published (I still need to make the thing).
+                    </p>
+                {% endif %}
+                <p>Created: {{ viz.date_created }}</p>
+                <p>Modified: {{ viz.date_modified }}</p>
+                <p>From: {{ viz.cluster_start.get_absolute_url }}</p>
+                <p>To: {{ viz.cluster_end.get_absolute_url }}</p>
+                <p>Views: {{ viz.view_count }}</p>
+                <p>{{ viz.notes|markdown }}</p>
+            </div>
+        {% endif %}
+    {% endif %}
+{% endblock %}

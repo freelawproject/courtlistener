@@ -8,7 +8,7 @@ from cl.lib.string_utils import trunc
 from cl.search.models import OpinionCluster
 
 
-class SCOTUSMaps(models.Model):
+class SCOTUSMap(models.Model):
     user = models.ForeignKey(
         User,
         help_text="The user that owns the visualization",
@@ -69,6 +69,11 @@ class SCOTUSMaps(models.Model):
     deleted = models.BooleanField(
         help_text="Has a user chosen to delete this visualization?",
         default=False,
+    )
+    generation_time = models.FloatField(
+        help_text="The length of time it takes to generate a visuzalization, "
+                  "in seconds.",
+        default=0,
     )
 
     def make_title(self):

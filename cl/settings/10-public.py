@@ -1,7 +1,9 @@
 # Celery imports
 import djcelery
+
 djcelery.setup_loader()
 import os
+import re
 import sys
 from django.contrib.messages import constants as message_constants
 
@@ -64,6 +66,7 @@ INSTALLED_APPS = [
     'django.contrib.sitemaps',
     'django.contrib.staticfiles',
     'corsheaders',
+    'markdown_deux',
     'djcelery',
     'tastypie',
 
@@ -179,6 +182,28 @@ CORS_URLS_REGEX = r'^/api/.*$'
 CORS_ALLOW_METHODS = ('GET', 'OPTIONS', )
 CORS_ALLOW_CREDENTIALS = True
 
+############
+# Markdown #
+############
+MARKDOWN_DEUX_STYLES = {
+    "default": {
+        "extras": {
+            "code-friendly": None,
+            "cuddled-lists": None,
+            "footnotes": None,
+            "header-ids": None,
+            "link-patterns": [
+                (re.compile('graph\s+(\d+)'. re.I),
+                 r'/visualization/scotus-mapper/\1/md/')
+            ],
+            "nofollow": None,
+            "smarty-pants": None,
+            "spoiler": None,
+            "tables": None,
+        },
+        "safe_mode": "escape",
+    },
+}
 
 ######################
 # Various and Sundry #
