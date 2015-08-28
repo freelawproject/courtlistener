@@ -23,7 +23,11 @@ urlpatterns = [
      serve_static_file),
 
     # Advanced search page
-    url(r'^search/advanced-techniques/$', advanced_search),
+    url(
+        r'^search/advanced-techniques/$',
+        advanced_search,
+        name='advanced_search'
+    ),
 
     url(r'^terms/v/(\d{1,2})/$', old_terms),
     url(r'^terms/$', latest_terms),
