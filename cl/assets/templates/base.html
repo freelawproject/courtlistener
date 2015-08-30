@@ -221,7 +221,7 @@
                                 <a href="" class="tour-link">Tour</a>
                             </div>
                             <div class="footer-item">
-                                <a href="/donate/?referrer=footer-link">Donate</a>
+                                <a href="{% url "donate" %}?referrer=footer-link">Donate</a>
                             </div>
                         </div>
 
@@ -266,7 +266,7 @@
                 </div>
             </div>
             <div class="col-sm-4 text-right" id="donate-image">
-                <a href="/donate/?referrer=footer-button">
+                <a href="{% url "donate" %}?referrer=footer-button">
                     <img src="{{ STATIC_PREFIX }}png/donate-button.png"
                          alt="Donate to support our work"
                          height="75"

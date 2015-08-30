@@ -58,7 +58,7 @@
                         towards paying our full time developers, server costs
                         and fund raising efforts.</p>
                     <p>To learn more or support our cause, visit <a
-                            href="/donate?referrer=profile">our donations
+                            href="{% url "donate" %}?referrer=profile">our donations
                         page</a>.</p>
                     {% if not user.profile.email_confirmed %}
                         <p class="gray">If you have already donated, you may

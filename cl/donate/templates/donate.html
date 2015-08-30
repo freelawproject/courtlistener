@@ -115,7 +115,7 @@
                 <p class="bottom">{{ message|safe }}</p>
             </div>
         {% endif %}
-        <form role="form" action="/donate/" method="post" id="donate-form">
+        <form role="form" action="{% url "donate" %}" method="post" id="donate-form">
             {% csrf_token %}
             {% if donation_form.non_field_errors or user_form.non_field_errors or profile_form.non_field_errors %}
                 <span class="alert alert-danger">

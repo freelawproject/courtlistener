@@ -6,7 +6,7 @@ Free Law Project
 
 About a year ago you donated ${{ amount|floatformat:"-2" }} to Free Law Project to support our work on the CourtListener platform and other projects under our umbrella. We've had a fantastic year and we hope you'll donate again to help sustain our work. To do so, please click the link below:
 
- - https://www.courtlistener.com/donate/
+ - https://www.courtlistener.com{% url "donate" %}
 
 With your support, we've made a lot of progress over the past year:
 

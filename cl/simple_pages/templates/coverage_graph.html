@@ -66,7 +66,7 @@
                 <li>Our own <a href="https://github.com/freelawproject/juriscraper/">scraper framework</a>, which began in
                     2010, has contributed to <strong>{{ count_scraper|intcomma }}</strong> opinions.</li>
             </ul>
-            <p>We welcome additional data donations on our <a href="/donate/">donate</a> page of any public domain legal data.</p>
+            <p>We welcome additional data donations on our <a href="{% url "donate" %}?referrer=coverage">donate</a> page of any public domain legal data.</p>
 
             <p>Our coverage of the Supreme Court and the third series of the Federal Reporter is the best
                 available on the open Web. This page serves to show that fact, but also to share where we have known gaps
@@ -115,7 +115,7 @@
             {% endif %}
 
             <p class="v-offset-above-2">This list continues to grow as we
-                receive <a href="/donate/?referrer=coverage">support</a> and <a href="/contact/">requests</a>
+                receive <a href="{% url "donate" %}?referrer=coverage">support</a> and <a href="/contact/">requests</a>
                 for additional jurisdictions. Your support helps make this project possible.
             </p>
         </div>

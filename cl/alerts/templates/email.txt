@@ -28,6 +28,6 @@ Edit / Delete this Alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
  - Blog: http://freelawproject.org
  - Twitter: http://twitter.com/freelawproject
- - Donate: https://www.courtlistener.com/donate/?referrer=pt-email
+ - Donate: https://www.courtlistener.com{% url "donate" %}?referrer=pt-email
 
 Please donate to support our work.
