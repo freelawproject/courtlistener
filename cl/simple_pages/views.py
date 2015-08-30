@@ -52,6 +52,13 @@ def faq(request):
         initial={'subject': 'FAQs'},
     )
 
+def markdown_help(request):
+    return render_to_response(
+        'markdown_help.html',
+        {'private': False},
+        RequestContext(request),
+    )
+
 
 def build_court_dicts(courts):
     """Takes the court objects, and manipulates them into a list of more useful

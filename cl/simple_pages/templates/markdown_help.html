@@ -1,0 +1,450 @@
+{% extends "base.html" %}
+
+{% block title %}Markdown Guide - CourtListener.com{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div class="col-sm-8">
+        <h2>Understanding Markdown</h2>
+        <p>Markdown is a lightweight and simple system that can be used to write complex and beautiful documents on the Web. At CourtListener, you can use Markdown in a number of locations to add links, headers, and other formatting.
+        </p>
+        <p>Markdown is based loosely on email formatting and is very easy to learn. For example, to make a word bold, all you have to do is add asterisks around it, **like this**, and then when CourtListener displays the words, they'll be bold. Many of the rules of Markdown are similar, so most people are able to learn the basics in a few minutes.
+        </p>
+
+        <h2 id="basics">Basic Formatting</h2>
+        <h3 id="paragraphs">Paragraphs</h3>
+        <p>The easiest thing to do in Markdown is to create paragraphs. To create paragraphs, simply press <kbd>enter</kbd> twice, like you normally do. For example, these are paragraphs from the recent Supreme Court opinion, <em><a
+                href="/opinion/2812209/obergefell-v-hodges/">Obergefell v. Hodges</a></em>:
+        </p>
+        <pre>
+It would misunderstand these men and women to say they disrespect the idea of
+marriage. Their plea is that they do respect it, respect it so deeply that they
+seek to find its fulfillment for themselves.
+
+Who ever thought that intimacy and spirituality (whatever that means) were
+freedoms? And if intimacy is, one would think Freedom of Intimacy is abridged
+rather than expanded by marriage. Ask the nearest hippie.</pre>
+        <p>When rendered, these paragraphs do what you might expect, becoming:</p>
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <p>It would misunderstand these men and women to say they disrespect
+                    the idea of marriage. Their plea is that they do respect it,
+                    respect it so deeply that they seek to find its fulfillment for
+                    themselves.
+                </p>
+                <p>Who ever thought that intimacy and spirituality (whatever that
+                    means) were freedoms? And if intimacy is, one would think
+                    Freedom of Intimacy is abridged rather than expanded by
+                    marriage. Ask the nearest hippie.
+                </p>
+            </div>
+        </div>
+        <p id="manual-link-break">If you want a manual line break, without a space between two paragraphs, add two or more spaces to the end of a line:
+        </p>
+        <pre>
+I know it when I see it␣␣
+the motion picture involved in this case is not that.</pre>
+        <p>Which then renders as:</p>
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <p>I know it when I see it<br>the motion picture involved in this case is not that.</p>
+            </div>
+        </div>
+
+
+        <h3 id="umph" class="v-offset-above-3">Emphasis</h3>
+        <p>Like you sometimes see in email, it's easy to make bold, italics and the combination of the two:</p>
+        <pre>
+*italics*
+**bold**
+***bold italics***</pre>
+        <p>Becomes:</p>
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <em>italics</em><br>
+                <strong>bold</strong><br>
+                <em><strong>bold italics</strong></em>
+            </div>
+        </div>
+
+
+        <h3 id="headers" class="v-offset-above-3">Headers</h3>
+        <p>The easiest way to make headers is to put a pound sign in front of some words. For example:
+        </p>
+        <pre># Biggest Header
+## Smaller Header
+### Smaller Still
+#### Smallest Header</pre>
+        <p>Becomes:</p>
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <h1>Biggest Header</h1>
+                <h2>Smaller Header</h2>
+                <h3>Smaller Still</h3>
+                <h4>Smallest Header</h4>
+            </div>
+        </div>
+
+        <h3 id="lists" class="v-offset-above-3">Lists</h3>
+        <p>You can make basic lists as well using dashes or asterisks at the beginning of the line:
+        </p>
+        <pre>
+Here's a list of fruit:
+
+- apples
+- bananas
+- berries
+    - strawberries</pre>
+        <p>Becomes:</p>
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <p>Here's a list of fruit:</p>
+                <ul>
+                    <li>apples</li>
+                    <li>bananas</li>
+                    <li>berries</li>
+                    <ul>
+                        <li>strawberries</li>
+                    </ul>
+
+                </ul>
+            </div>
+         </div>
+        <p>You can also make ordered lists using numbers at the beginning of the line. For example:
+        </p>
+        <pre>
+1. This list is
+2. Numbered</pre>
+        <p>Becomes:</p>
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <ol>
+                    <li>This list is</li>
+                    <li>Numbered</li>
+                </ol>
+            </div>
+         </div>
+
+        <p>You don't have to use sequential numbers, and lots of people just use the number one over and over so that they can change the order of the list easily. For example, this is the same as above:
+            <pre>
+1. This list is
+1. Numbered</pre>
+        </p>
+        <p>You can also mix and match numbered and ordered lists, even nesting, one inside the other, like so:</p>
+        <pre>
+ - Something
+ - Something else
+ - These are other things:
+    1. Thingamajig
+    1. Wingding</pre>
+        <p>Which becomes:</p>
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <ul>
+                    <li>Something</li>
+                    <li>Something else</li>
+                    <li>These are other things:
+                        <ol>
+                            <li>Thingamajig</li>
+                            <li>Wingding</li>
+                        </ol>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <p>If you put an extra return between two bullets or two numbered lines, you can create numbered paragraphs, with slightly more space between. And if you want one item in your list to have multiple paragraphs, you can do that too using an additional four spaces before the second paragraph. Here's an example showing both these features:
+        </p>
+        <pre>
+1. This is an example of space between list items.
+
+1. Look at all that space.
+
+    And here's an extra paragraph as part of bullet 2!
+
+1. And then a third item.
+        </pre>
+        <p>Becomes:</p>
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <ol>
+                    <li>
+                        <p>This is an example of space between list items.</p>
+                    </li>
+                    <li>
+                        <p>Look at all that space.</p>
+                        <p>And here's an extra paragraph as part of bullet 2!</p>
+                    </li>
+                    <li><p>And then a third item.</p></li>
+                </ol>
+            </div>
+        </div>
+
+
+        <h3 id="links" class="v-offset-above-3">Links</h3>
+        <p>There are three ways to make links. The first is very easy. Just put a link in <code>&lt;</code> and <code>&gt;</code>, and it will become clickable:</p>
+        <pre>
+&lt;http://freelawproject.org&gt;</pre>
+        <p>The second way to make a link allows certain text to be in the link. So:</p>
+        <pre>
+The [Free Law Project](http://freelawproject.org) is a 501(c)(3) non-profit.</pre>
+
+        <p>Becomes:</p>
+
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <p>The <a href="http://freelawproject.org">Free Law Project</a> is a 501(c)(3) non-profit.
+                </p>
+            </div>
+        </div>
+        <p>The third way is again borrowed from email and uses footnotes:</p>
+        <pre>
+We rely on your [donations][1] to survive.
+
+Some of our projects are [CourtListener][cl], [RECAP][recap], and [OpenJudiciary][oj].
+
+[1]: https://www.courtlistener.com{% url "donate" %}
+[cl]: https://courtlistener.com/
+[recap]: https://www.recapthelaw.org
+[oj]: http://openjudicary.org</pre>
+
+        <p>Becomes:</p>
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <p>We rely on your <a
+                        href="https://www.courtlistener.com{% url "donate" %}">donations</a>
+                    to survive.</p>
+
+                <p>Some of our projects are <a
+                        href="https://courtlistener.com/">CourtListener</a>, <a
+                        href="https://www.recapthelaw.org">RECAP</a>, and <a
+                        href="http://openjudicary.org">OpenJudiciary</a>. </p>
+
+            </div>
+        </div>
+        <p>Note that you're free to use numbers or any other specific text when creating these footnote-style links. It's often easier to give them meaningful names instead of numbers so that you can remember them later if you want to use the same footnote a second or third time. (Above, I used
+            <code>1</code>, <code>cl</code>, <code>recap</code>, <code>oj</code>, but I could have used anything.)
+        </p>
+
+
+        <h3 id="quotes" class="v-offset-above-3">Quotes</h3>
+        <p>If you wish to quote somebody, you can do that too, again borrowing a style common in email:
+        </p>
+        <pre>
+> This is a quote!</pre>
+        <p>Becomes:</p>
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <blockquote>
+                    This is a quote!
+                </blockquote>
+            </div>
+        </div>
+        <p>If you want to nest quotes, just repeat the format:</p>
+        <pre>
+The [Oyez Project][oyez] reported big news today on their blog:
+
+> Thomas asked a question during oral argument! He said:
+
+> > I'm sorry, could you repeat that?
+
+[oyez]: http://www.oyez.org</pre>
+
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <p>The <a href="http://www.oyez.org">Oyez Project</a> reported
+                    big news today on their blog:</p>
+
+                <blockquote>
+                    <p>Thomas asked a question during oral argument! He
+                        said:</p>
+
+                    <blockquote>
+                        <p>I'm sorry, could you repeat that?</p>
+                    </blockquote>
+                </blockquote>
+            </div>
+        </div>
+        <p>This example also shows an extra paragraph and a footnote-style link, to build up a more complex example.</p>
+
+
+
+        <h2 id="special" class="v-offset-above-3">Special Topics</h2>
+        <h3 id="images">Images</h3>
+        <p>Links to images are allowed, and can be used in two ways similar to the link formats. For example, you can either do:
+        </p>
+        <pre>
+![CourtListener Logo](https://www.courtlistener.com{{ STATIC_PREFIX }}png/logo.png)</pre>
+        <p>Or you can do footnote-style images:</p>
+        <pre>
+![CourtListener Logo][logo]
+
+[logo]: https://www.courtlistener.com{{ STATIC_PREFIX }}png/logo.png</pre>
+        <p>Both of these would render as:</p>
+        <img src="{{ STATIC_PREFIX }}png/logo.png"
+             alt="CourtListener Logo"
+             width="260"
+             height="29">
+        <p class="v-offset-above-2">These formats mirror those of links, but with an exclamation point at the front.
+        </p>
+        <p>Naturally, you can also make an image into a link, by wrapping it like we did when making links:</p>
+        <pre>
+[![CourtListener Logo][logo]][cl]
+
+[logo]: https://www.courtlistener.com{{ STATIC_PREFIX }}png/logo.png
+[cl]: https://www.courtlistener.com/</pre>
+
+        <p>Which looks the same as above, but takes you to the CourtListener homepage:</p>
+        <p><a href="/"><img
+                src="{{ STATIC_PREFIX }}png/logo.png"
+                alt="CourtListener Logo"
+                width="260"
+                height="29"/></a>
+        </p>
+
+        <h3 id="footnotes" class="v-offset-above-3">Footnotes</h3>
+        <p>You can create footnotes as follows:</p>
+        <pre>
+This is a paragraph with a footnote. [^note-id]
+
+[^note-id]: This is the text of the note.</pre>
+        <p>Which creates:</p>
+
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <p>This is a paragraph with a footnote.<sup class="footnote-ref"
+                                                            id="fnref-note-id"><a
+                        href="#fn-note-id">1</a></sup>
+                </p>
+                <hr/>
+                <ol>
+                    <li id="fn-note-id">
+                        <p>This is the text of the note.&nbsp;
+                            <a href="#fnref-note-id"
+                               title="Jump back to footnote 1 in the text.">
+                                &#8617;</a>
+                        </p>
+                    </li>
+                </ol>
+            </div>
+        </div>
+
+
+        <h3 id="tables" class="v-offset-above-3">Tables</h3>
+        <p>You can make tables using pipes (<code>|</code>) and dashes
+            (<code>-</code>). For example:
+        </p>
+        <pre>
+Fruits|Vegetables
+------|----------
+apple|spinach
+orange|celery</pre>
+        <p>Which becomes:</p>
+
+        <div class="panel-default panel">
+            <div class="panel-body">
+                <table class="table">
+                    <tr>
+                        <th>Fruits</th>
+                        <th>Vegetables</th>
+                    </tr>
+                    <tr>
+                        <td>apple</td>
+                        <td>spinach</td>
+                    </tr>
+                    <tr>
+                        <td>orange</td>
+                        <td>celery</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+
+        <h3 id="viz-linking" class="v-offset-above-3">Linking to Other
+            Visualizations</h3>
+
+        <p>One final thing you can do is link to other visualizations on
+            CourtListener. This can be done as follows:
+        </p>
+        <pre>As demonstrated in graph #2, the doctrine has a long history.</pre>
+        <p>Which creates a link to graph #2.</p>
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <p>As demonstrated in <a href="{% url "view_visualization" pk=2 slug=md %}">graph #2</a>, the doctrine has a long history.
+                </p>
+            </div>
+        </div>
+        <p>Whenever the word <em>graph</em> is followed by a pound sign and a number, it will automatically be made into a link.</p>
+    </div>
+
+
+
+    <div class="col-sm-4">
+        <h3>Markdown Cheat Sheet</h3>
+
+        <h4>Emphasis</h4>
+        <pre>
+*italic*
+**bold**
+***bold italic***</pre>
+        <p class="right"><a href="#umph">More detail&hellip;</a></p>
+
+        <h4 class="v-offset-above-2">Headers</h4>
+        <pre>
+# Biggest
+
+## Smaller
+
+### Smaller Still</pre>
+        <p class="right"><a href="#headers">More detail&hellip;</a></p>
+
+
+        <h4 class="v-offset-above-2">Lists</h4>
+        <pre>
+1. an ordered
+2. list
+
+* an unordered list
+* '-' bullets work too</pre>
+        <p class="right"><a href="#lists">More detail&hellip;</a></p>
+
+
+        <h4 class="v-offset-above-2">Links</h4>
+        <p>Inline:</p>
+        <pre>A [link](http://url.com/)</pre>
+
+        <p>Footnote-style:</p>
+        <pre>
+A [link][id]. Then, anywhere
+else, define the link:
+
+[id]: http://url.com/ "title"</pre>
+        <p class="right"><a href="#links">More detail&hellip;</a></p>
+
+
+        <h4 class="v-offset-above-2">Quotes</h4>
+        <pre>
+&gt; Email-style angle brackets
+&gt; are used for blockquotes.
+
+&gt; &gt; And, they can be nested.</pre>
+        <p class="right"><a href="#quotes">More detail&hellip;</a></p>
+
+
+        <h4 class="v-offset-above-2">Manual Line Breaks</h4>
+        <p>End a line with two or more spaces:</p>
+
+        <pre>
+Roses are red,␣␣
+Violets are blue.</pre>
+        <p class="right"><a href="#manual-link-break">More detail&hellip;</a></p>
+
+
+        <h3 class="v-offset-above-1"><a href="#special">Special Topics</a></h3>
+        <h4 class="v-offset-above-1"><a href="#images">Images</a></h4>
+        <h4 class="v-offset-above-1"><a href="#footnotes">Footnotes</a></h4>
+        <h4 class="v-offset-above-1"><a href="#tables">Tables</a></h4>
+        <h4 class="v-offset-above-1"><a href="#viz-linking">Linking to Other Visualizations</a></h4>
+    </div>
+{% endblock %}

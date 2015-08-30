@@ -1,9 +1,11 @@
 from django.conf.urls import url
 from django.views.generic import RedirectView
-from cl.simple_pages.views import tools_page, validate_for_google, \
-    validate_for_google2, validate_for_wot, validate_for_bing, robots, \
-    advanced_search, contact_thanks, contact, feeds, coverage_graph, faq, about, \
-    browser_warning, serve_static_file, old_terms, latest_terms, contribute
+from cl.simple_pages.views import (
+    tools_page, validate_for_google, validate_for_google2, validate_for_wot,
+    validate_for_bing, robots, advanced_search, contact_thanks, contact, feeds,
+    coverage_graph, faq, about, browser_warning, serve_static_file, old_terms,
+    latest_terms, contribute, markdown_help
+)
 
 mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html', 'mp3')
 
@@ -17,6 +19,7 @@ urlpatterns = [
     url(r'^contribute/$', contribute),
     url(r'^contact/$', contact),
     url(r'^contact/thanks/$', contact_thanks),
+    url(r'^help/markdown/$', markdown_help, name="markdown_help"),
 
     # Serve a static file
     url(r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$',
