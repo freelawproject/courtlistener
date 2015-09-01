@@ -352,12 +352,13 @@
         </form>
 
         <div id="check-info">
-            <p>To pay by check, simply make out a check to the "Free Law
-                Project", and send it to the address on our <a
-                        href="/contact/">contact page</a>.
+            <p>For instructions on donating by check, please get in touch on <a
+                    href="{% url "contact" %}">our contact page</a>.
+                Unfortunately, due to the nature of our work, we no longer have
+                a public mailing address.
             </p>
-            <p class="bold">We cannot accept starter checks, unnumbered checks or
-                non-personalized checks.
+            <p class="bold">We cannot accept starter checks, unnumbered checks
+                or non-personalized checks.
             </p>
 
             <p>Thanks so much for your donation.</p>
@@ -429,7 +430,7 @@
             are interested in sharing data with us that is free from copyright
             restrictions, please get in touch on our <a
                     href="/contact/">contact form</a> or simply send the data
-            on a USB drive to the address on the <a href="/contact/">contact
+            on a USB drive to the address on the <a href="{% url "contact" %}">contact
                 page</a>.
         </p>
         <p>We are not interested in copyrighted data, as it is a liability for

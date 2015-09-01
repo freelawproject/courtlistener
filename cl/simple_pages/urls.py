@@ -17,7 +17,7 @@ urlpatterns = [
     url(r'^coverage/$', coverage_graph),
     url(r'^feeds/$', feeds),
     url(r'^contribute/$', contribute),
-    url(r'^contact/$', contact),
+    url(r'^contact/$', contact, name="contact"),
     url(r'^contact/thanks/$', contact_thanks),
     url(r'^help/markdown/$', markdown_help, name="markdown_help"),
 

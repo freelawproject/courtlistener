@@ -71,7 +71,7 @@
             <p>Our coverage of the Supreme Court and the third series of the Federal Reporter is the best
                 available on the open Web. This page serves to show that fact, but also to share where we have known gaps
                 in our data. If you have questions about our data or would like more information, please
-                <a href="/contact/">get in touch</a>.</p>
+                <a href="{% url "contact" %}">get in touch</a>.</p>
 
             <p>For more information about our jurisdictions, see <a href="/api/jurisdictions/">our jurisdiction page</a>.
             </p>
@@ -115,7 +115,7 @@
             {% endif %}
 
             <p class="v-offset-above-2">This list continues to grow as we
-                receive <a href="{% url "donate" %}?referrer=coverage">support</a> and <a href="/contact/">requests</a>
+                receive <a href="{% url "donate" %}?referrer=coverage">support</a> and <a href="{% url "contact" %}">requests</a>
                 for additional jurisdictions. Your support helps make this project possible.
             </p>
         </div>
