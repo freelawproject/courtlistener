@@ -98,7 +98,7 @@ class SCOTUSMap(models.Model):
             end=get_best_case_name(self.cluster_end),
         )
 
-    def _build_graph(self, root_authority, max_depth=6):
+    def _build_digraph(self, root_authority, visited_nodes, max_depth=6):
         """Recursively build a networkx graph
 
         Process is:
@@ -110,12 +110,21 @@ class SCOTUSMap(models.Model):
             - we haven't exceeded a max_depth of six cases.
             - we haven't already followed this path
         """
-        g = networkx.Graph()
+        g = networkx.DiGraph()
+
+        is_already_handled = (root_authority.pk in visited_nodes)
+        is_past_max_depth = (max_depth <= 0)
         is_cluster_start_obj = (root_authority == self.cluster_start)
-        if max_depth > 0 and not is_cluster_start_obj:
-            # Make sure that we never try to get authorities for the start
-            # cluster.
-            assert root_authority.pk != self.cluster_start_id
+        blocking_conditions = [
+            is_past_max_depth,
+            is_cluster_start_obj,
+            is_already_handled,
+        ]
+        if not any(blocking_conditions):
+            # Python passes this list by reference, so updating it here takes
+            # care of updating the variable in all the recursive calls. More
+            # discussion: http://stackoverflow.com/q/32361493/64911
+            visited_nodes.append(root_authority.pk)
             for authority in root_authority.authorities.filter(
                     docket__court='scotus',
                     date_filed__gte=self.cluster_start.date_filed):
@@ -123,8 +132,9 @@ class SCOTUSMap(models.Model):
                 g.add_edge(root_authority.pk, authority.pk)
                 # Combine our present graph with the result of the next
                 # recursion
-                g = networkx.compose(g, self._build_graph(
+                g = networkx.compose(g, self._build_digraph(
                     authority,
+                    visited_nodes,
                     max_depth - 1,
                 ))
 
@@ -138,8 +148,9 @@ class SCOTUSMap(models.Model):
          - For all nodes in the graph, add them to self.clusters
         """
         t1 = time.time()
-        g = self._build_graph(
+        g = self._build_digraph(
             self.cluster_end,
+            [],
             max_depth=6,
         )
 
@@ -150,8 +161,48 @@ class SCOTUSMap(models.Model):
         self.generation_time = t2 - t1
         self.save()
 
+    def to_json(self):
+        """Make a JSON representation of self"""
+        j = {
+            "meta": {
+                "donate": "Please consider donating to support more projects "
+                          "from Free Law Project",
+                "version": 1.0,
+            },
+        }
+        g = self._build_digraph(
+            self.cluster_end,
+            [],
+            max_depth=6,
+        )
+
+        opinion_clusters = []
+        for cluster in self.clusters.all():
+            opinion_clusters.append({
+                "id": cluster.pk,
+                "absolute_url": cluster.get_absolute_url(),
+                "case_name": cluster.case_name,
+                "case_name_short": cluster.case_name_short,
+                "citation_count": g.in_degree(cluster.pk),
+                "date_filed": cluster.date_filed.isoformat(),
+                "decision_direction": cluster.scdb_decision_direction,
+                "votes_majority": cluster.scdb_votes_majority,
+                "votes_minority": cluster.scdb_votes_minority,
+                "sub_opinions": [{
+                    "type": "combined",
+                    "opinions_cited": g.neighbors(cluster.pk),
+                }]
+            })
+
+        j['opinion_clusters'] = opinion_clusters
+
+        return j
+
     def __unicode__(self):
-        return '{pk}: {title}'.format(self.pk, self.title)
+        return '{pk}: {title}'.format(
+            pk=getattr(self, 'pk', None),
+            title=self.title
+        )
 
     def get_absolute_url(self):
         return reverse('view_visualization', kwargs={'pk': self.pk,
