@@ -1,4 +1,7 @@
 # coding=utf-8
+import networkx
+import time
+
 from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
 from django.db import models
@@ -17,14 +20,17 @@ class SCOTUSMap(models.Model):
     cluster_start = models.ForeignKey(
         OpinionCluster,
         help_text="The starting cluster for the visualization",
+        related_name='visualizations_starting_here',
     )
     cluster_end = models.ForeignKey(
         OpinionCluster,
         help_text="The ending cluster for the visualization",
+        related_name='visualizations_ending_here',
     )
     clusters = models.ManyToManyField(
         OpinionCluster,
-        help_text="The clusters involved in this visualization",
+        help_text="The clusters involved in this visualization, including the "
+                  "start and end clusters.",
         related_name="visualizations",
         blank=True,
     )
@@ -54,9 +60,6 @@ class SCOTUSMap(models.Model):
     notes = models.TextField(
         help_text="Any notes that help explain the diagram, in Markdown format",
         blank=True,
-    )
-    degree_count = models.IntegerField(
-        help_text="The number of degrees to display between cases",
     )
     view_count = models.IntegerField(
         help_text="The number of times the visualization has been seen.",
@@ -90,11 +93,62 @@ class SCOTUSMap(models.Model):
             ]
             return next((_ for _ in case_name_preference if _), "Unknown")
 
-        return "{start} to {end} ({degrees} degrees)".format(
+        return "{start} to {end}".format(
             start=get_best_case_name(self.cluster_start),
             end=get_best_case_name(self.cluster_end),
-            degrees=self.degree_count,
         )
+
+    def _build_graph(self, root_authority, max_depth=6):
+        """Recursively build a networkx graph
+
+        Process is:
+         - Work backwards through the authorities for self.cluster_end and all
+           of its children.
+         - For each authority, add it to a networkx graph, if:
+            - it happened after self.cluster_start
+            - it's in the Supreme Court
+            - we haven't exceeded a max_depth of six cases.
+            - we haven't already followed this path
+        """
+        g = networkx.Graph()
+        is_cluster_start_obj = (root_authority == self.cluster_start)
+        if max_depth > 0 and not is_cluster_start_obj:
+            # Make sure that we never try to get authorities for the start
+            # cluster.
+            assert root_authority.pk != self.cluster_start_id
+            for authority in root_authority.authorities.filter(
+                    docket__court='scotus',
+                    date_filed__gte=self.cluster_start.date_filed):
+
+                g.add_edge(root_authority.pk, authority.pk)
+                # Combine our present graph with the result of the next
+                # recursion
+                g = networkx.compose(g, self._build_graph(
+                    authority,
+                    max_depth - 1,
+                ))
+
+        return g
+
+    def add_clusters(self):
+        """Do the network analysis to add clusters to the model.
+
+        Process is to:
+         - Build a networkx graph
+         - For all nodes in the graph, add them to self.clusters
+        """
+        t1 = time.time()
+        g = self._build_graph(
+            self.cluster_end,
+            max_depth=6,
+        )
+
+        # Add all items to self.clusters
+        self.clusters.add(*g.nodes())
+
+        t2 = time.time()
+        self.generation_time = t2 - t1
+        self.save()
 
     def __unicode__(self):
         return '{pk}: {title}'.format(self.pk, self.title)
@@ -105,15 +159,16 @@ class SCOTUSMap(models.Model):
 
     def save(self, *args, **kwargs):
         if self.pk is None:
-            self.title = trunc(self.make_title(), 75, ellipsis='…')
-            self.slug = trunc(slugify(self.title))
-        super(SCOTUSMaps, self).save(*args, **kwargs)
+            if not self.title:
+                self.title = trunc(self.make_title(), 200, ellipsis='…')
+            self.slug = trunc(slugify(self.title), 75)
+        super(SCOTUSMap, self).save(*args, **kwargs)
 
 
 class JSONVersions(models.Model):
     """Used for holding a variety of versions of the data."""
     map = models.ForeignKey(
-        SCOTUSMaps,
+        SCOTUSMap,
         help_text='The visualization that the json is affiliated with.',
         related_name="json_versions",
     )
