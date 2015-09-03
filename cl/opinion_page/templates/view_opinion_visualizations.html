@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load text_filters %}
+{% load humanize %}
+
+{# Shown on visualizations pages. #}
+
+{% block title %}List of Visualizations for {{ title }} –
+    CourtListener.com{% endblock %}
+{% block og_title %}List of Visualizations for {{ title }} –
+    CourtListener.com{% endblock %}
+{% block description %}List of Visualizations for {{ title }}{% endblock %}
+{% block og_description %}List of Visualizations for {{ title }}{% endblock %}
+
+{% block sidebar %}
+    <div class="col-sm-3" id="sidebar">
+        <div class="sidebar-section">
+            <h4 class="bottom">
+                <i class="fa fa-arrow-circle-o-left gray"></i>
+                <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">Back
+                    to Opinion</a>
+            </h4>
+        </div>
+    </div>
+{% endblock sidebar %}
+
+{% block content %}
+    <div class="col-sm-9">
+        <h2>
+            {{ cluster.caption|safe|v_wrapper }}
+        </h2>
+
+        <div id="visualizations">
+            <h3>This opinion is referenced
+                in {{ cluster.top_visualizations.count|intcomma }}
+                visualization{{ cluster.top_visualizations.count|pluralize }}.
+            </h3>
+            {% for viz in cluster.top_visualizations %}
+                <hr>
+                <div class="row">
+                    <div class="col-xs-9">
+                        <h4><a href="{{ viz.get_absolute_url }}">
+                            {{ viz.title }}
+                        </a>
+                        </h4>
+                        <p>{{ viz.subtitle }}</p>
+                    </div>
+                    <div class="col-xs-2 col-xs-offset-1">
+                        <h4 class="text-right caps gray">{{ viz.view_count|intcomma }} view{{ viz.view_count|pluralize }}</h4>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endblock %}

@@ -561,6 +561,13 @@ class OpinionCluster(models.Model):
             )
         ).order_by('-citation_count', '-date_filed')
 
+    def top_visualizations(self):
+        return self.visualizations.filter(
+            published=True, deleted=False
+        ).order_by(
+            '-view_count'
+        )
+
     def __unicode__(self):
         if self.case_name:
             return u'%s: %s' % (self.pk, self.case_name)
