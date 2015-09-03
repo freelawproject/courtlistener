@@ -61,13 +61,6 @@ SOURCES = (
     ('ZL', 'columbia merged with lawbox'),
 )
 
-OPINION_TYPES = (
-    ('010combined', 'Combined Opinion'),
-    ('020lead', 'Lead Opinion'),
-    ('030concurrence', 'Concurrence'),
-    ('040dissent', 'Dissent'),
-)
-
 
 class Docket(models.Model):
     """A class to sit above OpinionClusters and Audio files and link them
@@ -596,6 +589,12 @@ class OpinionCluster(models.Model):
 
 
 class Opinion(models.Model):
+    OPINION_TYPES = (
+        ('010combined', 'Combined Opinion'),
+        ('020lead', 'Lead Opinion'),
+        ('030concurrence', 'Concurrence'),
+        ('040dissent', 'Dissent'),
+    )
     cluster = models.ForeignKey(
         OpinionCluster,
         help_text="The cluster that the opinion is a part of",
@@ -727,8 +726,8 @@ class OpinionsCited(models.Model):
     )
 
     def __unicode__(self):
-        return u'%s ⤜--cites⟶ %s' % (self.citing_opinion.id,
-                                     self.cited_opinion.id)
+        return u'%s ⤜--cites⟶  %s' % (self.citing_opinion.id,
+                                        self.cited_opinion.id)
 
     class Meta:
         verbose_name_plural = 'Opinions cited'
