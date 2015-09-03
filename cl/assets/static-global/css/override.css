@@ -816,7 +816,12 @@ div.hopscotch-bubble .hopscotch-nav-button.prev:hover {
     background-image: none;
 }
 
+#notes.markdown img {
+    /* disable highlight border on images without height/width */
+    border: 0;
+}
+
 /* Highlights images that need height/width */
 img:not([width]):not([height]) {
-  border: 2px solid red !important;
+  border: 2px solid red;
 }
