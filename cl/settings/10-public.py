@@ -1,6 +1,5 @@
 # Celery imports
 import djcelery
-
 djcelery.setup_loader()
 import os
 import re
@@ -192,16 +191,16 @@ MARKDOWN_DEUX_STYLES = {
             "cuddled-lists": None,
             "footnotes": None,
             "header-ids": None,
-            "link-patterns": [
-                (re.compile('graph\s+(\d+)'. re.I),
-                 r'/visualization/scotus-mapper/\1/md/')
-            ],
+            "link-patterns": None,
             "nofollow": None,
             "smarty-pants": None,
-            "spoiler": None,
             "tables": None,
         },
         "safe_mode": "escape",
+        "link_patterns": [
+            (re.compile(r'graph\s+#?(\d+)\b', re.I),
+             r'/visualization/scotus-mapper/\1/md/')
+        ],
     },
 }
 
