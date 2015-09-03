@@ -75,11 +75,16 @@ def new_visualization(request):
         RequestContext(request),
     )
 
-def mapper_homepage(request):
-    """TODO: Make this page"""
+@login_required
+def edit_visualization(request, pk):
     pass
 
+
 @login_required
-def visualization_profile_page(request):
-    """TODO: Check what the appropriate decorators are for this."""
+def delete_visualization(request, pk):
+    pass
+
+
+def mapper_homepage(request):
+    """TODO: Make this page"""
     pass

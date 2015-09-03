@@ -4,13 +4,13 @@ from cl.users.forms import (
 from cl.users.views import (
     confirm_email, delete_account, delete_profile_done, email_confirm_success,
     password_change, register, register_success, request_email_confirmation,
-    view_favorites, view_alerts, view_settings,
+    view_favorites, view_alerts, view_settings, view_visualizations,
 )
 from django.conf.urls import url
 from django.contrib.auth.views import (
     login, logout, password_reset, password_reset_done, password_reset_confirm,
 )
-from django.views.generic import RedirectView
+
 
 
 urlpatterns = [
@@ -37,6 +37,8 @@ urlpatterns = [
     url(r'^profile/settings/$', view_settings, name='view_settings'),
     url(r'^profile/favorites/$', view_favorites),
     url(r'^profile/alerts/$', view_alerts),
+    url(r'^profile/visualizations/$', view_visualizations,
+        name='view_visualizations'),
     url(r'^profile/password/change/$', password_change),
     url(r'^profile/delete/$', delete_account),
     url(r'^profile/delete/done/$', delete_profile_done),

@@ -1,9 +1,10 @@
 from django.conf.urls import url
 from cl.visualizations.views import (
     view_visualization,
-    mapper_homepage,
     new_visualization,
-    visualization_profile_page,
+    edit_visualization,
+    delete_visualization,
+    mapper_homepage,
 )
 
 urlpatterns = [
@@ -18,13 +19,18 @@ urlpatterns = [
         name='new_visualization',
     ),
     url(
+        r'^visualizations/scotus-mapper/(?P<pk>\d*)/edit/$',
+        edit_visualization,
+        name='edit_visualization',
+    ),
+    url(
+        r'^visualizations/scotus-mapper/(?P<pk>\d*)/delete/$',
+        delete_visualization,
+        name='delete_visualization',
+    ),
+    url(
         r'^visualizations/scotus-mapper/(?P<pk>\d*)/(?P<slug>.*)/$',
         view_visualization,
         name='view_visualization',
-    ),
-    url(
-        r'^profile/visualizations/$',
-        visualization_profile_page,
-        name="visualization_profile_page",
     ),
 ]
