@@ -97,7 +97,7 @@
     <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/override.css" type="text/css"
           media="screen, projection">
     {% if DEBUG %}
-        <script src="{{ STATIC_PREFIX}}/js/bootlint.min.js"></script>
+        <!--<script src="{{ STATIC_PREFIX}}js/bootlint.min.js"></script>-->
     {% endif %}
 </head>
 
@@ -310,15 +310,18 @@
     </div>
 {% endblock %}
 
+<script type="text/javascript"
+        src="{{ STATIC_PREFIX }}js/jquery-1.11.1.min.js"></script>
+<script>
+    window.jQuery || document.write(
+            '<script src="{{ STATIC_PREFIX }}js/jquery-1.11.1.js"><\/script>'
+    );
+</script>
 {% if DEBUG %}
-    <script type="text/javascript" src="{{ STATIC_PREFIX }}/js/jquery-1.11.1.min.js"></script>
-    <script>window.jQuery || document.write('<script src="{{ STATIC_PREFIX }}js/jquery-1.11.1.js"><\/script>')</script>
     <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.js"></script>
     <script type="text/javascript"
             src="{{ STATIC_URL }}js/hopscotch.js"></script>
 {% else %}
-    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
-    <script>window.jQuery || document.write('<script src="{{ STATIC_PREFIX }}js/jquery-1.11.1.min.js"><\/script>')</script>
     <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.min.js"></script>
     <script type="text/javascript"
             src="{{ STATIC_URL }}js/hopscotch.min.js"></script>
@@ -349,7 +352,7 @@
     </script><noscript><p><img src="https://www.courtlistener.com/piwik/piwik.php?idsite=1" style="border:0" alt=""/></p></noscript>
     <!-- End Piwik Tag -->
 {% endif %}
-<!--[if lt IE 8 ]>
+<!--[if lt IE 10 ]>
     <script src="//ajax.googleapis.com/ajax/libs/chrome-frame/1.0.3/CFInstall.min.js"></script>
     <script>window.attachEvent('onload',function(){CFInstall.check({mode:'inline', url:'/bad-browser/', cssText: 'width: 100%; height: 200px;' })})</script>
 <![endif]-->
