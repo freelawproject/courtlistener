@@ -1,7 +1,15 @@
 {% extends "base.html" %}
 {% load markdown_deux_tags %}
+{% load text_filters %}
+{% load humanize %}
 
-{% block title %}Network Graph of {{ viz.title }}{% endblock %}
+{% block title %}Network Graph of {{ viz.title }} – CourtListener.com{% endblock %}
+{% block description %}
+    Network graph of {{ viz.title }} at CourtListener.com
+{% endblock %}
+{% block og_description %}
+    Network graph of {{ viz.title }} at CourtListener.com
+{% endblock %}
 {% block search-form %}{% endblock %}
 {% block sidebar %}{% endblock %}
 
@@ -45,21 +53,38 @@
             {% endif %}
         {% else %}
             {# Owner of an non-deleted viz. We're in business. #}
-            <div class="col-xs-12">
-                <h2 id="title">{{ vis.title }}</h2>
-                <h3 id="subtitle">{{ vis.subtitle }}</h3>
+            <div class="col-xs-12 v-offset-below-4">
+                <h2 id="title" class="text-center">{{ viz.title|v_wrapper }}</h2>
+                <h3 id="subtitle" class="text-center v-offset-below-3">{{ viz.subtitle }}</h3>
+                <h4 class="gray text-center">Starts at <a
+                        href="{{ viz.cluster_start.get_absolute_url }}">{{ viz.cluster_start.case_name|v_wrapper }}</a>,
+                    and goes to <a
+                            href="{{ viz.cluster_end.get_absolute_url }}">{{ viz.cluster_end.case_name|v_wrapper }}</a>
+                </h4>
+            </div>
+
+            <div class="col-xs-10">
+                <pre class="pre-scrollable">{{ viz.json_versions.all.0.json_data }}</pre>
+                <div id="notes" class="markdown">{{ viz.notes|markdown }}</div>
+            </div>
+
+            <div class="col-xs-2">
                 {% if not viz.published %}
-                    <!-- Throw a warning to the owner, encouraging publication -->
-                    <p>This is an unpublished viz. Click this thing over here to
-                        get it published (I still need to make the thing).
-                    </p>
+                    <div class="sidebar-section">
+                        <p><a class="btn btn-primary btn-lg">Publish</a>
+                    </div>
                 {% endif %}
-                <p>Created: {{ viz.date_created }}</p>
-                <p>Modified: {{ viz.date_modified }}</p>
-                <p>From: {{ viz.cluster_start.get_absolute_url }}</p>
-                <p>To: {{ viz.cluster_end.get_absolute_url }}</p>
-                <p>Views: {{ viz.view_count }}</p>
-                <p>{{ viz.notes|markdown }}</p>
+
+                <div class="sidebar-section">
+                    <h3><span>Created</span></h3>
+                    <p>{{ viz.date_created }}</p>
+
+                    <h3><span>Modified</span></h3>
+                    <p>{{ viz.date_modified }}</p>
+
+                    <h3><span>Views</span></h3>
+                    <p>{{ viz.view_count|intcomma }}</p>
+                </div>
             </div>
         {% endif %}
     {% endif %}
