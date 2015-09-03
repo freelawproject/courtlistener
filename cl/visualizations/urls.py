@@ -29,7 +29,7 @@ urlpatterns = [
         name='delete_visualization',
     ),
     url(
-        r'^visualizations/scotus-mapper/(?P<pk>\d*)/(?P<slug>.*)/$',
+        r'^visualizations/scotus-mapper/(?P<pk>\d*)/(?P<slug>[^/]*)/$',
         view_visualization,
         name='view_visualization',
     ),

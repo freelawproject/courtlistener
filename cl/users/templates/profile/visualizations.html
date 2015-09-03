@@ -27,7 +27,9 @@
                     <tbody>
                     {% for viz in user.scotus_maps.all %}
                         <tr>
-                            <td>{{ viz.title }}</td>
+                            <td>
+                                <a href="{{ viz.get_absolute_url }}">{{ viz.title }}</a>
+                            </td>
                             <td>
                                 {% if viz.cluster_start.case_name_short %}
                                     {{ viz.cluster_start.case_name_short }}

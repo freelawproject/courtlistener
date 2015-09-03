@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load text_filters %}
+{% load humanize %}
 
 {# Shown on authorities pages. #}
 
@@ -27,7 +28,7 @@
         </h2>
 
         <div id="authorities">
-            <h3>This opinion cites {{ authorities.count }} opinion{{ authorities.count|pluralize }}</h3>
+            <h3>This opinion cites {{ authorities.count|intcomma }} opinion{{ authorities.count|pluralize }}.</h3>
             <hr>
             {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
             <ul>

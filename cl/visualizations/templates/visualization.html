@@ -53,37 +53,44 @@
             {% endif %}
         {% else %}
             {# Owner of an non-deleted viz. We're in business. #}
-            <div class="col-xs-12 v-offset-below-4">
-                <h2 id="title" class="text-center">{{ viz.title|v_wrapper }}</h2>
-                <h3 id="subtitle" class="text-center v-offset-below-3">{{ viz.subtitle }}</h3>
-                <h4 class="gray text-center">Starts at <a
-                        href="{{ viz.cluster_start.get_absolute_url }}">{{ viz.cluster_start.case_name|v_wrapper }}</a>,
-                    and goes to <a
-                            href="{{ viz.cluster_end.get_absolute_url }}">{{ viz.cluster_end.case_name|v_wrapper }}</a>
-                </h4>
-            </div>
-
-            <div class="col-xs-10">
-                <pre class="pre-scrollable">{{ viz.json_versions.all.0.json_data }}</pre>
-                <div id="notes" class="markdown">{{ viz.notes|markdown }}</div>
-            </div>
-
-            <div class="col-xs-2">
-                {% if not viz.published %}
-                    <div class="sidebar-section">
-                        <p><a class="btn btn-primary btn-lg">Publish</a>
+            <div class="col-xs-12">
+                <div class="row v-offset-below-4">
+                    <div class="col-xs-12">
+                        <h2 id="title" class="text-center">{{ viz.title|v_wrapper }}</h2>
+                        <h3 id="subtitle" class="text-center v-offset-below-3">{{ viz.subtitle }}</h3>
+                        <h4 class="gray text-center">Starts at <a
+                                href="{{ viz.cluster_start.get_absolute_url }}">{{ viz.cluster_start.case_name|v_wrapper }}</a>,
+                            and goes to <a
+                                    href="{{ viz.cluster_end.get_absolute_url }}">{{ viz.cluster_end.case_name|v_wrapper }}</a>
+                        </h4>
                     </div>
-                {% endif %}
+                </div>
 
-                <div class="sidebar-section">
-                    <h3><span>Created</span></h3>
-                    <p>{{ viz.date_created }}</p>
+                <div class="row">
+                    <div class="col-xs-10">
+                        <pre class="pre-scrollable">{{ viz.json_versions.all.0.json_data }}</pre>
+                        <div id="notes" class="markdown">{{ viz.notes|markdown }}</div>
+                    </div>
 
-                    <h3><span>Modified</span></h3>
-                    <p>{{ viz.date_modified }}</p>
+                    <div class="col-xs-2">
+                        {% if not viz.published %}
+                            <div class="sidebar-section">
+                                <p><a class="btn btn-primary btn-lg">Publish</a>
+                            </div>
+                        {% endif %}
 
-                    <h3><span>Views</span></h3>
-                    <p>{{ viz.view_count|intcomma }}</p>
+                        <div class="sidebar-section">
+                            <h3><span>Created</span></h3>
+                            <p>{{ viz.date_created }}</p>
+
+                            <h3><span>Modified</span></h3>
+                            <p>{{ viz.date_modified }}</p>
+                        </div>
+                        <div class="sidebar-section">
+                            <h4 class="caps gray">{{ viz.view_count|intcomma }}
+                                view{{ viz.view_count|pluralize }}</h4>
+                        </div>
+                    </div>
                 </div>
             </div>
         {% endif %}
