@@ -1,4 +1,5 @@
 # coding=utf-8
+import json
 import networkx
 import time
 
@@ -146,6 +147,7 @@ class SCOTUSMap(models.Model):
         Process is to:
          - Build a networkx graph
          - For all nodes in the graph, add them to self.clusters
+         - Update self.generation_time once complete.
         """
         t1 = time.time()
         g = self._build_digraph(
@@ -196,7 +198,7 @@ class SCOTUSMap(models.Model):
 
         j['opinion_clusters'] = opinion_clusters
 
-        return j
+        return json.dumps(j, indent=2)
 
     def __unicode__(self):
         return '{pk}: {title}'.format(
@@ -216,7 +218,7 @@ class SCOTUSMap(models.Model):
         super(SCOTUSMap, self).save(*args, **kwargs)
 
 
-class JSONVersions(models.Model):
+class JSONVersion(models.Model):
     """Used for holding a variety of versions of the data."""
     map = models.ForeignKey(
         SCOTUSMap,
@@ -236,3 +238,6 @@ class JSONVersions(models.Model):
     json_data = models.TextField(
         help_text="The JSON data for a particular version of the visualization.",
     )
+
+    class Meta:
+        ordering = ['-date_modified']
