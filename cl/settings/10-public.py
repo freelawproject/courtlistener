@@ -212,7 +212,7 @@ if DEVELOPMENT:
     CSRF_COOKIE_SECURE = False
     SESSION_COOKIE_DOMAIN = None
     # For debug_toolbar
-    INSTALLED_APPS.append('debug_toolbar')
+    #INSTALLED_APPS.append('debug_toolbar')
     INTERNAL_IPS = ('127.0.0.1',)
     # For tests
     SOUTH_TESTS_MIGRATE = False
@@ -293,7 +293,7 @@ if DEVELOPMENT:
     LOGGING['loggers']['django.db.backends'] = {
         'handlers': ['log_file'],
         'level': 'DEBUG',
-        'propogate': True,
+        'propagate': True,
     }
 
 
