@@ -1,6 +1,8 @@
+import json
+from django.views.decorators.cache import never_cache
 from cl.lib.bot_detector import is_bot
 from cl.visualizations.models import SCOTUSMap, JSONVersion
-from cl.visualizations.forms import VizForm
+from cl.visualizations.forms import VizForm, VizEditForm, JSONEditForm
 from cl.visualizations.utils import reverse_endpoints_if_needed
 
 from django.contrib.auth.decorators import login_required
@@ -11,6 +13,7 @@ from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
 
 
+@never_cache
 def view_visualization(request, pk, slug):
     """A simple page for viewing a visualization."""
     viz = get_object_or_404(SCOTUSMap, pk=pk)
@@ -71,13 +74,46 @@ def new_visualization(request):
         form = VizForm()
     return render_to_response(
         'new_visualization.html',
-        {'form': form, 'private': False},
+        {'form': form, 'private': True},
         RequestContext(request),
     )
 
 @login_required
 def edit_visualization(request, pk):
-    pass
+    # This could apparently also be done with formsets? But they seem awful.
+    viz = get_object_or_404(SCOTUSMap, pk=pk, user=request.user)
+    if request.method == 'POST':
+        form_viz = VizEditForm(request.POST, instance=viz)
+        form_json = JSONEditForm(request.POST)
+        if form_viz.is_valid() and form_json.is_valid():
+            cd_viz = form_viz.cleaned_data
+            cd_json = form_json.cleaned_data
+
+            viz.title = cd_viz['title']
+            viz.subtitle = cd_viz['subtitle']
+            viz.notes = cd_viz['notes']
+            viz.published = cd_viz['published']
+            viz.save()
+
+            if json.loads(viz.json) != json.loads(cd_json['json_data']):
+                # Save a new version of the JSON
+                jv = JSONVersion(map=viz, json_data=cd_json['json_data'])
+                jv.save()
+
+            return HttpResponseRedirect(reverse(
+                'view_visualization',
+                kwargs={'pk': viz.pk, 'slug': viz.slug}
+            ))
+    else:
+        form_viz = VizEditForm(instance=viz)
+        form_json = JSONEditForm(instance=viz.json_versions.all()[0])
+    return render_to_response(
+        'edit_visualization.html',
+        {'form_viz': form_viz,
+         'form_json': form_json,
+         'private': True},
+        RequestContext(request),
+    )
 
 
 @login_required

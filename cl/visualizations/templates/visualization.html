@@ -30,7 +30,7 @@
 
     <script type="text/javascript">
         {# Gets the most recent version, by default ordering #}
-        var opinions = {{ viz.json_versions.all.0.json_data|safe }};
+        var opinions = {{ viz.json|safe }};
     </script>
 {% endblock %}
 
@@ -155,7 +155,7 @@
                         <!-- Tab panes -->
                         <div class="tab-content">
                             <div role="tabpanel" class="tab-pane active markdown"
-                                 id="notes">{{ viz.notes|markdown }}
+                                 id="notes">{{ viz.notes|default:"*(No comments from the creator.)*"|markdown }}
                             </div>
                             <div role="tabpanel" class="tab-pane" id="table">
 
@@ -182,7 +182,7 @@
 
                         <div class="sidebar-section">
                             {% if viz.user == user %}
-                                <p><a href="??"
+                                <p><a href="{% url "edit_visualization" pk=viz.pk %}"
                                       class="btn btn-primary btn-lg btn-block">Edit <span class="visible-lg-inline">Visualization</span></a>
                                     {% else %}
                                 <h3><span>Created By</span></h3>

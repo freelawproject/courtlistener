@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Visualization – CourtListener.com{% endblock %}
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    {% comment %}
+       This form only allows basic metadata to be changed about a viz.
+    {% endcomment %}
+    <div class="col-xs-2"></div>
+    <div class="col-xs-10">
+        <h2>Update Visualization</h2>
+        {% if form_viz.errors or form_json.errors %}
+            <div class="alert alert-danger">
+                <p class="bottom">There were errors with your
+                    submission.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="col-xs-12">
+        <form role="form"
+              action=""
+              method="post"
+              id="visualization-form"
+              class="form-horizontal">
+            {% csrf_token %}
+
+            <div class="form-group v-offset-above-3">
+                <label for="id_title"
+                       class="col-sm-2 control-label">Title</label>
+
+                <div class="col-sm-10">
+                    <p class="gray">Give your visualization a title. If left blank,
+                        this will be automatically generated using your start and
+                        end cases.
+                    </p>
+                    {% if form_viz.title.errors %}
+                        <p class="help-block">
+                            {% for error in form_viz.title.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </p>
+                    {% endif %}
+                    {{ form_viz.title }}
+                </div>
+            </div>
+
+            <div class="form-group v-offset-above-3">
+                <label for="id_subtitle"
+                       class="col-sm-2 control-label">Subtitle</label>
+
+                <div class="col-sm-10">
+                    {% if form_viz.subtitle.errors %}
+                        <p class="help-block">
+                            {% for error in form_viz.subtitle.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </p>
+                    {% endif %}
+                    {{ form_viz.subtitle }}
+                </div>
+            </div>
+
+            <div class="form-group v-offset-above-3">
+                <label for="id_notes"
+                       class="col-sm-2 control-label">Notes</label>
+
+                <div class="col-sm-10">
+                    <p class="gray">Provide any additional comments you have about
+                        this visualization, explaining the story it tells or why you
+                        created it. <a href="{% url "markdown_help" %}">Markdown
+                            syntax</a> allowed, but no raw HTML. Examples: **bold**,
+                        *italics*.
+                    </p>
+                    {% if form_viz.notes.errors %}
+                        <p class="help-block">
+                            {% for error in form_viz.notes.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </p>
+                    {% endif %}
+                    {{ form_viz.notes }}
+                </div>
+            </div>
+
+            <div class="form-group v-offset-above-3">
+                <label for="id_json_data"
+                       class="col-sm-2 control-label">JSON Data<br>(Advanced Users
+                    Only)</label>
+
+                <div class="col-sm-10">
+                    {% if form_json.json_data.errors %}
+                        <p class="help-block">
+                            {% for error in form_json.json_data.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </p>
+                    {% endif %}
+                    {{ form_json.json_data }}
+                </div>
+            </div>
+
+            <div class="form-group v-offset-above-1">
+                <div class="col-sm-offset-2 col-sm-10">
+                    <div class="checkbox">
+                        {% if form_viz.published.errors %}
+                            <p class="help-block">
+                                {% for error in form_viz.published.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </p>
+                        {% endif %}
+                        <label>
+                            {{ form_viz.published }} Published
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group v-offset-above-3">
+                <div class="col-sm-offset-2 col-sm-10">
+                    <button type="submit"
+                            class="btn btn-primary btn-lg"
+                            name="update-viz"
+                            id="update-viz-button">Update Visualization
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+{% endblock %}

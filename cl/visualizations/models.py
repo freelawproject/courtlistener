@@ -80,6 +80,11 @@ class SCOTUSMap(models.Model):
         default=0,
     )
 
+    @property
+    def json(self):
+        """Returns the most recent version"""
+        return self.json_versions.all()[0].json_data
+
     def make_title(self):
         """Make a title for the visualization
 
@@ -212,9 +217,9 @@ class SCOTUSMap(models.Model):
 
     def save(self, *args, **kwargs):
         if self.pk is None:
-            if not self.title:
-                self.title = trunc(self.make_title(), 200, ellipsis='…')
             self.slug = trunc(slugify(self.title), 75)
+        if not self.title:
+            self.title = trunc(self.make_title(), 200, ellipsis='…')
         super(SCOTUSMap, self).save(*args, **kwargs)
 
 

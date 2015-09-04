@@ -1,9 +1,9 @@
-from cl.visualizations.models import SCOTUSMap
+from cl.visualizations.models import SCOTUSMap, JSONVersion
 from django import forms
-from django.forms import ModelForm
 
 
-class VizForm(ModelForm):
+class VizForm(forms.ModelForm):
+    """NB: The VizEditForm subclasses this!"""
     def __init__(self, *args, **kwargs):
         super(VizForm, self).__init__(*args, **kwargs)
         self.fields['title'].required = False
@@ -23,4 +23,24 @@ class VizForm(ModelForm):
             'title': forms.TextInput(attrs={'class': 'form-control'}),
             'subtitle': forms.TextInput(attrs={'class': 'form-control'}),
             'notes': forms.Textarea(attrs={'class': 'form-control'}),
+        }
+
+
+class VizEditForm(VizForm):
+    class Meta(VizForm.Meta):
+        fields = [
+            'title',
+            'subtitle',
+            'notes',
+            'published',
+        ]
+
+class JSONEditForm(forms.ModelForm):
+    class Meta:
+        model = JSONVersion
+        fields = [
+            'json_data',
+        ]
+        widgets = {
+            'json_data': forms.Textarea(attrs={'class': 'form-control'})
         }
