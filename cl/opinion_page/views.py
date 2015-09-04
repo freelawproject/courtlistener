@@ -40,8 +40,6 @@ def view_opinion(request, pk, _):
         cluster.citation_string,
     )
     get_string = search_utils.make_get_string(request)
-    or_joined_sub_ids = ' OR '.join([str(sub_opinion.pk) for sub_opinion in
-                                     cluster.sub_opinions.all()])
 
     try:
         fave = Favorite.objects.get(
