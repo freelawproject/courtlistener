@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% load markdown_deux_tags %}
+{% load text_filters %}
+{% load humanize %}
+
+{% block title %}Network Graph of {{ viz.title }} – CourtListener.com{% endblock %}
+{% block description %}
+    Network graph of {{ viz.title }} at CourtListener.com
+{% endblock %}
+{% block og_description %}
+    Network graph of {{ viz.title }} at CourtListener.com
+{% endblock %}
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+{% block head %}
+    <link rel="stylesheet" href="{{ STATIC_URL }}css/plottable.css"/>
+{% endblock %}
+
+
+{% block footer-scripts %}
+    {% if DEBUG %}
+        <script src="{{ STATIC_URL }}js/d3.js"></script>
+        <script src="{{ STATIC_URL }}js/plottable.js"></script>
+    {% else %}
+        <script src="{{ STATIC_URL }}js/d3.min.js"></script>
+        <script src="{{ STATIC_URL }}js/plottable.min.js"></script>
+    {% endif %}
+
+    <script src="{{ STATIC_URL }}js/scotus_map.js"></script>
+
+    <script type="text/javascript">
+        {# Gets the most recent version, by default ordering #}
+        var opinions = {{ viz.json|safe }};
+    </script>
+{% endblock %}
+
+{% block content %}
+    {% if viz.deleted %}
+        <div class="col-xs-1 col-sm-2 col-md-3"></div>
+        <div class="col-xs-10 col-sm-8 col-md-6 well">
+            <h2 class="text-center">Deleted by Owner</h2>
+            <p>This visualization was deleted by the owner. If this was done in
+                error, and you are the owner, you can restore it from your <a
+                        href="{% url "view_visualizations" %}">profile
+                    page</a>.
+            </p>
+        </div>
+        <div class="col-xs-1 col-sm-2 col-md-3"></div>
+    {% else %}
+        {# Not deleted; Make decisions on owner/anon and unpub/published #}
+        <div class="col-xs-12">
+            <div class="row v-offset-below-4">
+                <div class="col-xs-12">
+                    {% if viz.published or viz.user == user %}
+                        <h2 id="title"
+                            class="text-center">{{ viz.title|v_wrapper }}
+                            {% if not viz.published and viz.user == user %}
+                                <span class="alt">(Unpublished)</span>
+                            {% endif %}
+                        </h2>
+
+                        <h3 id="subtitle"
+                            class="text-center v-offset-below-3">{{ viz.subtitle }}</h3>
+                        <h4 class="gray text-center">Starts at <a
+                                href="{{ viz.cluster_start.get_absolute_url }}">{{ viz.cluster_start.case_name|v_wrapper }}</a>,
+                            and goes to <a
+                                    href="{{ viz.cluster_end.get_absolute_url }}">{{ viz.cluster_end.case_name|v_wrapper }}</a>
+                        </h4>
+                    {% else %}
+                        <div class="row">
+                            <div class="col-xs-1 col-sm-2 col-md-3"></div>
+                            <div class="col-xs-10 col-sm-8 col-md-6 well">
+                                <h2 class="text-center">This Visualization is Unpublished</h2>
+                                {% if user.is_authenticated %}
+                                    <p>You don't appear to be the owner of this
+                                        visualization and it has not been
+                                        published by its owner. If you know the
+                                        creator of this visualization, ask them
+                                        to publish it to make it live.
+                                    </p>
+                                {% else %}
+                                    <p>You are not signed in and this an
+                                        unpublished visualization. If you're the
+                                        creator of this visualization and wish
+                                        to edit it, please <a
+                                                href="{% url "sign-in" %}?next={{ request.path }}">sign
+                                            in</a> and you will be able to
+                                        access it. If you are not the creator of
+                                        this visualization, and you know the
+                                        creator, ask them to publish it.
+                                    </p>
+                                {% endif %}
+                            </div>
+                            <div class="col-xs-1 col-sm-2 col-md-3"></div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if viz.published or viz.user == user %}
+                <div class="row">
+                    <div class="col-xs-12">
+                        <form action="" method="POST" role="form">
+                            <div class="row">
+                                <div class="form-group col-md-6">
+                                    <label for="degreesOfSeparation">Max Degrees
+                                        of Separation</label>
+                                    <select name="degreesOfSeparation"
+                                            id="degreesOfSeparationSelect"
+                                            class="form-control">
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                        <option value="5" selected="true">5</option>
+                                    </select>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label for="aspectRatio">Aspect
+                                        Ratio</label>
+                                    <select name="aspectRatio"
+                                            id="aspectRatioSelect"
+                                            class="form-control">
+                                        <option selected="true" value="9:16">
+                                            9:16
+                                        </option>
+                                        <option value="4:5">4:5</option>
+                                        <option value="3:5">3:5</option>
+                                        <option value="1:1">1:1</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </form>
+                        <div id="chart"></div>
+                    </div>
+                </div>
+
+                <div class="row v-offset-above-2">
+                    <div class="col-xs-10">
+                        <!-- Nav tabs -->
+                        <ul class="nav nav-tabs v-offset-below-3" role="tablist">
+                            <li role="presentation" class="active">
+                                <a href="#notes" aria-controls="notes"
+                                   role="tab"
+                                   data-toggle="tab">Comments</a>
+                            </li>
+                            <li role="presentation">
+                                <a href="#table" aria-controls="table"
+                                   role="tab"
+                                   data-toggle="tab">Cases</a>
+                            </li>
+                        </ul>
+
+                        <!-- Tab panes -->
+                        <div class="tab-content">
+                            <div role="tabpanel" class="tab-pane active markdown"
+                                 id="notes">{{ viz.notes|default:"*(No comments from the creator.)*"|markdown }}
+                            </div>
+                            <div role="tabpanel" class="tab-pane" id="table">
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xs-2">
+                        <div class="sidebar-section">
+                            <h3><span>Created</span></h3>
+
+                            <p>{{ viz.date_created }}</p>
+                        </div>
+
+                        <div class="sidebar-section">
+                            <h3><span>Modified</span></h3>
+
+                            <p>{{ viz.date_modified }}</p>
+                        </div>
+                        <div class="sidebar-section">
+                            <h4 class="caps gray">{{ viz.view_count|intcomma }}
+                                view{{ viz.view_count|pluralize }}</h4>
+                        </div>
+
+                        <div class="sidebar-section">
+                            {% if viz.user == user %}
+                                <p><a href="{% url "edit_visualization" pk=viz.pk %}"
+                                      class="btn btn-primary btn-lg btn-block">Edit <span class="visible-lg-inline">Visualization</span></a>
+                                    {% else %}
+                                <h3><span>Created By</span></h3>
+                                <p>{{ viz.user }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}

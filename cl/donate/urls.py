@@ -7,7 +7,7 @@ from django.conf.urls import url
 
 urlpatterns = [
     # Donations
-    url(r'^donate/$', donate),
+    url(r'^donate/$', donate, name="donate"),
 
     # Paypal
     url(r'^donate/paypal/complete/$', donate_complete),

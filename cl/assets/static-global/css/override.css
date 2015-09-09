@@ -17,12 +17,10 @@ Sets up all the overrides or additional CSS that the site uses.
   font-weight: normal;
 }
 
-.caps { /* not used by courtlistener code, is this used by data*/
+.caps {
   font-variant: small-caps;
   letter-spacing: 1px;
   text-transform: lowercase;
-  font-size:1.2em;
-  line-height:1%;
   font-weight:bold;
   padding:0 2px;
 }
@@ -395,18 +393,21 @@ div.shown ul {
 
 /* cited by and authorities styling */
 #authorities hr,
-#cited-by hr {
+#cited-by hr ,
+#visualizations hr {
     margin-bottom: 2px;
 }
 
 #authorities ul,
-#cited-by ul {
+#cited-by ul,
+#visualizations ul {
     padding: 0;
     margin: 0 0 1.5em 0;
 }
 
 #authorities ul li,
-#cited-by ul li {
+#cited-by ul li,
+#visualizations ul li {
     list-style-type: none;
     padding: 3px 0 2px 0;
     border-bottom: 1pt solid #DDD;
@@ -816,7 +817,12 @@ div.hopscotch-bubble .hopscotch-nav-button.prev:hover {
     background-image: none;
 }
 
+#notes.markdown img {
+    /* disable highlight border on images without height/width */
+    border: 0;
+}
+
 /* Highlights images that need height/width */
 img:not([width]):not([height]) {
-  border: 2px solid red !important;
+  border: 2px solid red;
 }

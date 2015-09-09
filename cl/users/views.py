@@ -68,9 +68,15 @@ def view_favorites(request):
 @never_cache
 def view_donations(request):
     return render_to_response('profile/donations.html',
-                              {'private': False},
+                              {'private': True},
                               RequestContext(request))
 
+@login_required
+@never_cache
+def view_visualizations(request):
+    return render_to_response('profile/visualizations.html',
+                              {'private': True},
+                              RequestContext(request))
 
 @sensitive_variables('salt', 'activation_key', 'email_body')
 @login_required

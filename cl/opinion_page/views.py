@@ -40,8 +40,6 @@ def view_opinion(request, pk, _):
         cluster.citation_string,
     )
     get_string = search_utils.make_get_string(request)
-    or_joined_sub_ids = ' OR '.join([str(sub_opinion.pk) for sub_opinion in
-                                     cluster.sub_opinions.all()])
 
     try:
         fave = Favorite.objects.get(
@@ -73,7 +71,7 @@ def view_opinion(request, pk, _):
     )
 
 
-def view_authorities(request, pk, _):
+def view_authorities(request, pk, slug):
     cluster = get_object_or_404(OpinionCluster, pk=pk)
 
     return render_to_response(
@@ -87,7 +85,24 @@ def view_authorities(request, pk, _):
             'private': cluster.blocked or cluster.has_private_authority,
             'authorities': cluster.authorities.order_by('case_name'),
         },
-        RequestContext(request))
+        RequestContext(request)
+    )
+
+
+def cluster_visualizations(request, pk, slug):
+    cluster = get_object_or_404(OpinionCluster, pk=pk)
+    return render_to_response(
+        'view_opinion_visualizations.html',
+        {
+            'title': '%s, %s' % (
+                trunc(cluster.case_name, 100),
+                cluster.citation_string
+            ),
+            'cluster': cluster,
+            'private': cluster.blocked or cluster.has_private_authority,
+        },
+        RequestContext(request)
+    )
 
 
 def redirect_opinion_pages(request, pk, slug):

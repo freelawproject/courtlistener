@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Create a New Visualization – CourtListener.com{% endblock %}
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+{% block footer-scripts %}
+    {# need lots of stuff here... #}
+{% endblock %}
+
+{% block content %}
+    {% comment %}
+       Basic idea of this page is to ask one question at a time, fading in the
+       next question after the previous one has been answered. So, first we ask
+       where the viz should start, then where it should end, then, the title
+       and subtitle, and finally, any notes.
+    {% endcomment %}
+    <div class="col-xs-12">
+        <h2>Create a New Visualization of Supreme Court Cases</h2>
+        <p>To create a new visualization, select two cases and optionally
+            provide a title, subtitle, and any notes.
+        </p>
+        <p>Once you've set these up, a visualization will be created and added
+            to your CourtListener profile.
+        </p>
+        <p>You can edit the visualization after you create it, and it won't be
+            published until you're ready to share it.
+        </p>
+    </div>
+
+    <form role="form"
+          action=""
+          method="post"
+          id="visualization-form">
+        {% csrf_token %}
+        <div class="col-xs-12" id="starting-cluster">
+            {% if form.errors %}
+                <div class="alert alert-danger">
+                    <p class="bottom">There were errors with your
+                        submission.</p>
+                </div>
+            {% endif %}
+            <h3>First Endpoint</h3>
+            <p class="gray">Select a case by filtering using any of <a
+                    href="{% url 'advanced_search' %}" target="_blank">the
+                CourtListener filter operators</a>. This can be the beginning
+                or end of your visualization.
+            </p>
+            {% if form.cluster_start.errors %}
+                <p class="help-block">
+                    {% for error in form.cluster_start.errors %}
+                        {{ error|escape }}
+                    {% endfor %}
+                </p>
+            {% endif %}
+            {{ form.cluster_start }}
+        </div>
+
+        <div class="col-xs-12" id="ending-cluster">
+            <h3>Second Endpoint</h3>
+
+            <p class="gray">Select another case. If this case occurs before your
+                first case, it will be the starting case. If not, it will be the
+                ending case.
+            </p>
+            {% if form.cluster_end.errors %}
+                <p class="help-block">
+                    {% for error in form.cluster_end.errors %}
+                        {{ error|escape }}
+                    {% endfor %}
+                </p>
+            {% endif %}
+            {{ form.cluster_end }}
+        </div>
+
+        <div class="col-xs-12" id="titles">
+            <h3>Title</h3>
+            <p class="gray">Give your visualization a title. If left blank, this
+                will be automatically generated using the cases you selected.
+            </p>
+            {% if form.title.errors %}
+                <p class="help-block">
+                    {% for error in form.title.errors %}
+                        {{ error|escape }}
+                    {% endfor %}
+                </p>
+            {% endif %}
+            {{ form.title }}
+
+            <h4>Subtitle</h4>
+            {% if form.subtitle.errors %}
+                <p class="help-block">
+                    {% for error in form.subtitle.errors %}
+                        {{ error|escape }}
+                    {% endfor %}
+                </p>
+            {% endif %}
+            {{ form.subtitle }}
+        </div>
+
+        <div class="col-xs-12" id="notes">
+            <h4>Notes</h4>
+
+            <p class="gray">Provide any additional comments you have about this
+                visualization, explaining the story it tells or why you created
+                it. <a href="{% url "markdown_help" %}">Markdown syntax</a>
+                allowed, but no raw HTML. Examples: **bold**, *italics*.
+            </p>
+            {% if form.notes.errors %}
+                <p class="help-block">
+                    {% for error in form.notes.errors %}
+                        {{ error|escape }}
+                    {% endfor %}
+                </p>
+            {% endif %}
+            {{ form.notes }}
+        </div>
+
+        <div class="col-xs-12 v-offset-above-2">
+            <p>
+                <button type="submit"
+                        class="btn btn-primary btn-lg pull-right"
+                        name="make-viz"
+                        id="make-viz-button">Make this Visualization</button>
+            </p>
+        </div>
+    </form>
+
+{% endblock %}

@@ -256,7 +256,7 @@
                             </p>
 
                             <p class="bottom">
-                                <a href="/donate?referrer=rt-alerts"
+                                <a href="{% url "donate" %}?referrer=rt-alerts"
                                    class="btn btn-danger"
                                    target="_blank">Donate Now</a>
                             </p>
@@ -369,7 +369,7 @@
                     </li>
                 </ul>
                 <p>Our <a href="/coverage/">coverage page</a> details which cases we
-                have. If you expected more results than this, <a href="/contact/">let us know</a>.
+                have. If you expected more results than this, <a href="{% url "contact" %}">let us know</a>.
                 We value your feedback.</p>
             {% else %}
                 <h2 class="alt">Your search
@@ -383,7 +383,7 @@
                     <li>Our system is down and can't respond</li>
                     <li>Some other reason</li>
                 </ul>
-                <p>We log these errors and work to resolve them, but if you think we can benefit from your experience, don't hesitate to    <a href="/contact/">let us know</a>! We value your feedback.</p>
+                <p>We log these errors and work to resolve them, but if you think we can benefit from your experience, don't hesitate to    <a href="{% url "contact" %}">let us know</a>! We value your feedback.</p>
             {% endif %}
         {% endif %}
 

@@ -2,6 +2,7 @@
 import djcelery
 djcelery.setup_loader()
 import os
+import re
 import sys
 from django.contrib.messages import constants as message_constants
 
@@ -64,6 +65,7 @@ INSTALLED_APPS = [
     'django.contrib.sitemaps',
     'django.contrib.staticfiles',
     'corsheaders',
+    'markdown_deux',
     'djcelery',
     'tastypie',
 
@@ -84,6 +86,7 @@ INSTALLED_APPS = [
     'cl.simple_pages',
     'cl.stats',
     'cl.users',
+    'cl.visualizations',
 ]
 
 
@@ -178,6 +181,28 @@ CORS_URLS_REGEX = r'^/api/.*$'
 CORS_ALLOW_METHODS = ('GET', 'OPTIONS', )
 CORS_ALLOW_CREDENTIALS = True
 
+############
+# Markdown #
+############
+MARKDOWN_DEUX_STYLES = {
+    "default": {
+        "extras": {
+            "code-friendly": None,
+            "cuddled-lists": None,
+            "footnotes": None,
+            "header-ids": None,
+            "link-patterns": None,
+            "nofollow": None,
+            "smarty-pants": None,
+            "tables": None,
+        },
+        "safe_mode": "escape",
+        "link_patterns": [
+            (re.compile(r'graph\s+#?(\d+)\b', re.I),
+             r'/visualization/scotus-mapper/\1/md/')
+        ],
+    },
+}
 
 ######################
 # Various and Sundry #
@@ -187,7 +212,7 @@ if DEVELOPMENT:
     CSRF_COOKIE_SECURE = False
     SESSION_COOKIE_DOMAIN = None
     # For debug_toolbar
-    INSTALLED_APPS.append('debug_toolbar')
+    #INSTALLED_APPS.append('debug_toolbar')
     INTERNAL_IPS = ('127.0.0.1',)
     # For tests
     SOUTH_TESTS_MIGRATE = False
@@ -268,7 +293,7 @@ if DEVELOPMENT:
     LOGGING['loggers']['django.db.backends'] = {
         'handlers': ['log_file'],
         'level': 'DEBUG',
-        'propogate': True,
+        'propagate': True,
     }
 
 

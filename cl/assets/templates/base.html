@@ -97,7 +97,7 @@
     <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/override.css" type="text/css"
           media="screen, projection">
     {% if DEBUG %}
-        <script src="{{ STATIC_PREFIX}}/js/bootlint.min.js"></script>
+        <!--<script src="{{ STATIC_PREFIX}}js/bootlint.min.js"></script>-->
     {% endif %}
 </head>
 
@@ -149,12 +149,15 @@
                                                    tabindex="304">Alerts</a></li>
                                             <li><a href="/profile/favorites/"
                                                    tabindex="305">Favorites</a></li>
+                                            <li><a href="{% url "view_visualizations" %}"
+                                                   tabindex="306">Visualizations</a>
+                                            </li>
                                             <li><a href="/profile/donations/"
-                                                   tabindex="306">Donations</a></li>
+                                                   tabindex="307">Donations</a></li>
                                             <li><a href="/profile/"
-                                                   tabindex="307">Account</a></li>
+                                                   tabindex="308">Account</a></li>
                                             <li><a href="/sign-out/"
-                                                   tabindex="308">Sign out</a></li>
+                                                   tabindex="309">Sign out</a></li>
                                         </ul>
                                     </li>
                                 </ul>
@@ -221,7 +224,7 @@
                                 <a href="" class="tour-link">Tour</a>
                             </div>
                             <div class="footer-item">
-                                <a href="/donate/?referrer=footer-link">Donate</a>
+                                <a href="{% url "donate" %}?referrer=footer-link">Donate</a>
                             </div>
                         </div>
 
@@ -247,7 +250,7 @@
                                 <a href="http://freelawproject.org">Blog</a>
                             </div>
                             <div class="footer-item">
-                                <a href="/contact/">Contact</a>
+                                <a href="{% url "contact" %}">Contact</a>
                             </div>
                             <div class="footer-item">
                                 <a href="/contribute/">Contribute</a>
@@ -266,7 +269,7 @@
                 </div>
             </div>
             <div class="col-sm-4 text-right" id="donate-image">
-                <a href="/donate/?referrer=footer-button">
+                <a href="{% url "donate" %}?referrer=footer-button">
                     <img src="{{ STATIC_PREFIX }}png/donate-button.png"
                          alt="Donate to support our work"
                          height="75"
@@ -307,15 +310,18 @@
     </div>
 {% endblock %}
 
+<script type="text/javascript"
+        src="{{ STATIC_PREFIX }}js/jquery-1.11.1.min.js"></script>
+<script>
+    window.jQuery || document.write(
+            '<script src="{{ STATIC_PREFIX }}js/jquery-1.11.1.js"><\/script>'
+    );
+</script>
 {% if DEBUG %}
-    <script type="text/javascript" src="{{ STATIC_PREFIX }}/js/jquery-1.11.1.min.js"></script>
-    <script>window.jQuery || document.write('<script src="{{ STATIC_PREFIX }}js/jquery-1.11.1.js"><\/script>')</script>
     <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.js"></script>
     <script type="text/javascript"
             src="{{ STATIC_URL }}js/hopscotch.js"></script>
 {% else %}
-    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
-    <script>window.jQuery || document.write('<script src="{{ STATIC_PREFIX }}js/jquery-1.11.1.min.js"><\/script>')</script>
     <script type="text/javascript" src="{{ STATIC_URL }}js/bootstrap.min.js"></script>
     <script type="text/javascript"
             src="{{ STATIC_URL }}js/hopscotch.min.js"></script>
@@ -346,7 +352,7 @@
     </script><noscript><p><img src="https://www.courtlistener.com/piwik/piwik.php?idsite=1" style="border:0" alt=""/></p></noscript>
     <!-- End Piwik Tag -->
 {% endif %}
-<!--[if lt IE 8 ]>
+<!--[if lt IE 10 ]>
     <script src="//ajax.googleapis.com/ajax/libs/chrome-frame/1.0.3/CFInstall.min.js"></script>
     <script>window.attachEvent('onload',function(){CFInstall.check({mode:'inline', url:'/bad-browser/', cssText: 'width: 100%; height: 200px;' })})</script>
 <![endif]-->

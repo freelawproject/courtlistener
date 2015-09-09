@@ -25,6 +25,7 @@ urlpatterns = [
     url('', include('cl.alerts.urls')),
     url('', include('cl.api.urls')),
     url('', include('cl.donate.urls')),
+    url('', include('cl.visualizations.urls')),
 
     # Sitemaps
     url(r'^sitemap\.xml$', index_sitemap_maker),

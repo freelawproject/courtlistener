@@ -17,7 +17,7 @@ from cl.lib import magic
 from cl.lib import search_utils
 from cl.lib.bot_detector import is_bot
 from cl.lib.sunburnt import sunburnt
-from cl.search.models import Court, Opinion
+from cl.search.models import Court, OpinionCluster
 from cl.search.forms import SearchForm
 from cl.simple_pages.forms import ContactForm
 from cl.stats import tally_stat
@@ -52,6 +52,13 @@ def faq(request):
         initial={'subject': 'FAQs'},
     )
 
+def markdown_help(request):
+    return render_to_response(
+        'markdown_help.html',
+        {'private': False},
+        RequestContext(request),
+    )
+
 
 def build_court_dicts(courts):
     """Takes the court objects, and manipulates them into a list of more useful
@@ -74,7 +81,7 @@ def coverage_graph(request):
         search_form.fields.keys() if field.startswith('stat_')]
 
     # Build up the sourcing stats.
-    counts = Opinion.objects.values('source').annotate(Count('source'))
+    counts = OpinionCluster.objects.values('source').annotate(Count('source'))
     count_pro = 0
     count_lawbox = 0
     count_scraper = 0

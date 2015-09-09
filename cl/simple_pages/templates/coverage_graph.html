@@ -66,17 +66,17 @@
                 <li>Our own <a href="https://github.com/freelawproject/juriscraper/">scraper framework</a>, which began in
                     2010, has contributed to <strong>{{ count_scraper|intcomma }}</strong> opinions.</li>
             </ul>
-            <p>We welcome additional data donations on our <a href="/donate/">donate</a> page of any public domain legal data.</p>
+            <p>We welcome additional data donations on our <a href="{% url "donate" %}?referrer=coverage">donate</a> page of any public domain legal data.</p>
 
             <p>Our coverage of the Supreme Court and the third series of the Federal Reporter is the best
                 available on the open Web. This page serves to show that fact, but also to share where we have known gaps
                 in our data. If you have questions about our data or would like more information, please
-                <a href="/contact/">get in touch</a>.</p>
+                <a href="{% url "contact" %}">get in touch</a>.</p>
 
             <p>For more information about our jurisdictions, see <a href="/api/jurisdictions/">our jurisdiction page</a>.
             </p>
 
-            <h4 id="scraped-jurisdictions">Realtime Coverage</h4>
+            <h4 id="scraped-jurisdictions">Real Time Coverage</h4>
             <p>We have realtime coverage of many courts, but if you are setting up an alert, it's important to
                 note that we do not yet have realtime coverage for all of the courts on CourtListener. The courts
                 for which we currently can provide realtime coverage and alerts are:
@@ -115,7 +115,7 @@
             {% endif %}
 
             <p class="v-offset-above-2">This list continues to grow as we
-                receive <a href="/donate/?referrer=coverage">support</a> and <a href="/contact/">requests</a>
+                receive <a href="{% url "donate" %}?referrer=coverage">support</a> and <a href="{% url "contact" %}">requests</a>
                 for additional jurisdictions. Your support helps make this project possible.
             </p>
         </div>

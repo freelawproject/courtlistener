@@ -18,10 +18,10 @@
             <li>Try filling out the form on the previous page more carefully,
                 or disabling any browser extensions that interact with forms.
             </li>
-            <li><a href="/contact/">Let us</a> know that you're having trouble using this form.</li>
+            <li><a href="{% url "contact" %}">Let us</a> know that you're having trouble using this form.</li>
             <li>Try something else, like a new <a href="/search/">search</a> or <a href="http://lists.freelawproject.org/cgi-bin/mailman/listinfo/dev">a post on our forum</a>.</li>
         </ul>
 
-        <p>Sorry about this. If you continue having problems, please do <a href="/contact/">let us know</a>.</p>
+        <p>Sorry about this. If you continue having problems, please do <a href="{% url "contact" %}">let us know</a>.</p>
     </div>
 {% endblock %}

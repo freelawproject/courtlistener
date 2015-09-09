@@ -61,13 +61,6 @@ SOURCES = (
     ('ZL', 'columbia merged with lawbox'),
 )
 
-OPINION_TYPES = (
-    ('010combined', 'Combined Opinion'),
-    ('020lead', 'Lead Opinion'),
-    ('030concurrence', 'Concurrence'),
-    ('040dissent', 'Dissent'),
-)
-
 
 class Docket(models.Model):
     """A class to sit above OpinionClusters and Audio files and link them
@@ -247,6 +240,11 @@ class Court(models.Model):
 
 class OpinionCluster(models.Model):
     """A class representing a cluster of court opinions."""
+    SCDB_DECISION_DIRECTIONS = (
+        (1, "Conservative"),
+        (2, "Liberal"),
+        (3, "Unspecifiable"),
+    )
     docket = models.ForeignKey(
         Docket,
         help_text="The docket that the opinion cluster is a part of",
@@ -376,11 +374,34 @@ class OpinionCluster(models.Model):
         max_length=50,
         blank=True,
     )
-    supreme_court_db_id = models.CharField(
+    scdb_id = models.CharField(
         help_text='The ID of the item in the Supreme Court Database',
         max_length=10,
         db_index=True,
         blank=True,
+    )
+    scdb_decision_direction = models.CharField(
+        help_text='the ideological "direction" of a decision in the Supreme '
+                  'Court database. More details at: http://scdb.wustl.edu/'
+                  'documentation.php?var=decisionDirection',
+        max_length=5,
+        choices=SCDB_DECISION_DIRECTIONS,
+        blank=True,
+        null=True,
+    )
+    scdb_votes_majority = models.IntegerField(
+        help_text='the number of justices voting in the majority in a Supreme '
+                  'Court decision. More details at: http://scdb.wustl.edu/'
+                  'documentation.php?var=majVotes',
+        blank=True,
+        null=True,
+    )
+    scdb_votes_minority = models.IntegerField(
+        help_text='the number of justices voting in the minority in a Supreme '
+                  'Court decision. More details at: http://scdb.wustl.edu/'
+                  'documentation.php?var=minVotes',
+        blank=True,
+        null=True,
     )
     source = models.CharField(
         help_text="the source of the cluster, one of: %s" %
@@ -540,6 +561,13 @@ class OpinionCluster(models.Model):
             )
         ).order_by('-citation_count', '-date_filed')
 
+    def top_visualizations(self):
+        return self.visualizations.filter(
+            published=True, deleted=False
+        ).order_by(
+            '-view_count'
+        )
+
     def __unicode__(self):
         if self.case_name:
             return u'%s: %s' % (self.pk, self.case_name)
@@ -568,6 +596,12 @@ class OpinionCluster(models.Model):
 
 
 class Opinion(models.Model):
+    OPINION_TYPES = (
+        ('010combined', 'Combined Opinion'),
+        ('020lead', 'Lead Opinion'),
+        ('030concurrence', 'Concurrence'),
+        ('040dissent', 'Dissent'),
+    )
     cluster = models.ForeignKey(
         OpinionCluster,
         help_text="The cluster that the opinion is a part of",
@@ -699,8 +733,8 @@ class OpinionsCited(models.Model):
     )
 
     def __unicode__(self):
-        return u'%s ⤜--cites⟶ %s' % (self.citing_opinion.id,
-                                     self.cited_opinion.id)
+        return u'%s ⤜--cites⟶  %s' % (self.citing_opinion.id,
+                                        self.cited_opinion.id)
 
     class Meta:
         verbose_name_plural = 'Opinions cited'
