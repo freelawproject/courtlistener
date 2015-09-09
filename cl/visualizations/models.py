@@ -216,10 +216,12 @@ class SCOTUSMap(models.Model):
                                                      'slug': self.slug})
 
     def save(self, *args, **kwargs):
-        if self.pk is None:
-            self.slug = trunc(slugify(self.title), 75)
+        # Note that the title needs to be made first, so that the slug can be
+        # generated from it.
         if not self.title:
             self.title = trunc(self.make_title(), 200, ellipsis='…')
+        if self.pk is None:
+            self.slug = trunc(slugify(self.title), 75)
         super(SCOTUSMap, self).save(*args, **kwargs)
 
 
