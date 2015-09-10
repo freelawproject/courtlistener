@@ -293,7 +293,7 @@ if DEVELOPMENT:
     LOGGING['loggers']['django.db.backends'] = {
         'handlers': ['log_file'],
         'level': 'DEBUG',
-        'propagate': True,
+        'propagate': False,
     }
 
 
