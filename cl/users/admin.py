@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from cl.alerts.admin import AlertInline
 from cl.donate.admin import DonationInline
 from cl.favorites.admin import FavoriteInline
-from cl.users.models import UserProfile
+from cl.users.models import UserProfile, BarMembership
 
 
 def get_email_confirmed(obj):
@@ -41,3 +41,4 @@ class UserAdmin(admin.ModelAdmin):
 # Replace the normal User admin with our better one.
 admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
+admin.site.register(BarMembership)
