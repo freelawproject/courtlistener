@@ -25,7 +25,7 @@ class Favorite(models.Model):
     )
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
-        #auto_now_add=True,
+        auto_now_add=True,
         db_index=True
     )
     date_modified = models.DateTimeField(

@@ -22,8 +22,6 @@ it as necessary along the way.
 #        share a single Citation object.
 #     2. date_modified fields are not updated (I hope?) because the data
 #        remained the same.
-#  5. Post data migartion:
-#     1. Uncomment auto_now and auto_now_add fields and migrate the fields.
 from cl.corpus_importer.models_legacy import (
     Docket as DocketOld,
     Document as DocumentOld,
@@ -41,6 +39,7 @@ from cl.donate.models import (
 from cl.favorites.models import (
     Favorite as FavoriteNew,
 )
+from cl.lib.model_helpers import disable_auto_now_fields
 from cl.search.models import (
     Docket as DocketNew,
     Opinion as OpinionNew,
@@ -58,6 +57,11 @@ from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from django.utils.timezone import make_aware, utc
 from juriscraper.lib.string_utils import CaseNameTweaker
+
+# Disable auto_now and auto_now_add fields so that they can be copied over from
+# the old database.
+disable_auto_now_fields(AlertNew, AudioNew, FavoriteNew, DocketNew, CourtNew,
+                        OpinionClusterNew, OpinionNew)
 
 
 class Command(BaseCommand):

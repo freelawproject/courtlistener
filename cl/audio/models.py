@@ -54,13 +54,13 @@ class Audio(models.Model):
     )
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
-        #auto_now_add=True,
+        auto_now_add=True,
         db_index=True,
     )
     date_modified = models.DateTimeField(
         help_text="The last moment when the item was modified. A value in year"
                   " 1750 indicates the value is unknown",
-        #auto_now=True,
+        auto_now=True,
         db_index=True,
     )
     sha1 = models.CharField(
