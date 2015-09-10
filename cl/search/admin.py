@@ -61,7 +61,7 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         'lexis_cite',
         'westlaw_cite',
         'neutral_cite',
-        'supreme_court_db_id',
+        'scdb_id',
         'source',
         'procedural_history',
         'attorneys',

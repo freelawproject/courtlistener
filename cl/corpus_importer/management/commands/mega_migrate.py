@@ -218,7 +218,7 @@ class Command(BaseCommand):
                     lexis_cite=self._none_to_blank(old_citation.lexis_cite),
                     westlaw_cite=self._none_to_blank(old_citation.westlaw_cite),
                     neutral_cite=self._none_to_blank(old_citation.neutral_cite),
-                    supreme_court_db_id=self._none_to_blank(
+                    scdb_id=self._none_to_blank(
                         old_document.supreme_court_db_id),
                     source=old_document.source,
                     nature_of_suit=old_document.nature_of_suit,

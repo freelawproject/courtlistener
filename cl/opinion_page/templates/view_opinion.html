@@ -197,9 +197,9 @@
         <p class="bottom">
             <span class="meta-data-header">Supreme Court Database ID:</span>
             <span class="meta-data-value">
-                {% if cluster.supreme_court_db_id %}
-                    <a href="http://supremecourtdatabase.org/analysisCaseDetail.php?cid={{ cluster.supreme_court_db_id }}" target="_blank">
-                    {{ cluster.supreme_court_db_id }}
+                {% if cluster.scdb_id %}
+                    <a href="http://supremecourtdatabase.org/analysisCaseDetail.php?cid={{ cluster.scdb_id }}" target="_blank">
+                    {{ cluster.scdb_id }}
                     </a><i class="gray fa fa-external-link"></i>
                 {% else %}
                     Unknown

@@ -64,7 +64,7 @@ class SearchDocument(object):
         self.lexisCite = item.cluster.lexis_cite
         self.citation = item.cluster.citation_string
         self.neutralCite = item.cluster.neutral_cite
-        self.scdb_id = item.cluster.supreme_court_db_id
+        self.scdb_id = item.cluster.scdb_id
         self.source = item.cluster.source
         self.attorney = item.cluster.attorneys
         self.suitNature = item.cluster.nature_of_suit

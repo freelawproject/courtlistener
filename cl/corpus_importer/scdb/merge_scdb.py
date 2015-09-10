@@ -3,7 +3,7 @@ Process here will be to iterate over every item in the SCDB and to locate it in
 CourtListener.
 
 Location is done by:
- - Looking in the `supreme_court_db_id` field. During the first run of this
+ - Looking in the `scdb_id` field. During the first run of this
    program we expect this to fail for all items since they will not have this
    field populated yet. During subsequent runs, this field will have hits and
    will provide improved performance.
@@ -13,7 +13,7 @@ Once located, we update items:
  - Case name -- will this automatically fix the docket as well?
  - Citations (Lexis, US, L.Ed., etc.)
  - Docket number?
- - supreme_court_db_id
+ - scdb_id
 """
 import os
 
@@ -61,7 +61,7 @@ def enhance_item_with_scdb(doc, scdb_info):
     doc.federal_cite_three = scdb_info['ledCite']
     doc.lexis_cite = scdb_info['lexisCite']
     doc.docket_number = scdb_info['docket']
-    doc.supreme_court_db_id = scdb_info['caseId']
+    doc.scdb_id = scdb_info['caseId']
 
     if not DEBUG:
         doc.save()
@@ -144,12 +144,12 @@ def iterate_scdb_and_take_actions(
             if len(docs) == 0:
                 print "  Checking by caseID...",
                 docs = Document.objects.filter(
-                    supreme_court_db_id=d['caseId'])
+                    scdb_id=d['caseId'])
                 print "%s matches found." % len(docs)
             if d['usCite'].strip():
                 # Only do these lookups if there is in fact a usCite value.
                 if len(docs) == 0:
-                    # None found by supreme_court_db_id. Try by citation number
+                    # None found by scdb_id. Try by citation number
                     print "  Checking by federal_cite_one..",
                     docs = Document.objects.filter(
                         citation__federal_cite_one=d['usCite'])

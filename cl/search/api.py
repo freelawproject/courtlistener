@@ -122,7 +122,7 @@ class DocumentResource(DeprecatedModelResourceWithFieldsFilter):
         max_limit = 20
         allowed_methods = ['get']
         include_absolute_url = True
-        excludes = ['opinions_cited', 'supreme_court_db_id',]
+        excludes = ['opinions_cited', 'scdb_id',]
         filtering = {
             'id': ('exact',),
             'date_created': good_time_filters,
@@ -168,7 +168,7 @@ class CitedByResource(DeprecatedModelResourceWithFieldsFilter):
         queryset = Document.objects.all()
         excludes = (
             'html', 'html_lawbox', 'html_with_citations', 'plain_text',
-            'supreme_court_db_id',
+            'scdb_id',
         )
         include_absolute_url = True
         max_limit = 20
@@ -238,7 +238,7 @@ class CitesResource(DeprecatedModelResourceWithFieldsFilter):
         queryset = Document.objects.all()
         excludes = (
             'html', 'html_lawbox', 'html_with_citations', 'plain_text',
-            'supreme_court_db_id',
+            'scdb_id',
         )
         include_absolute_url = True
         max_limit = 20

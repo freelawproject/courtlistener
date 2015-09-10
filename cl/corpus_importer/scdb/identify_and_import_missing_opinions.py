@@ -79,7 +79,7 @@ def main():
 
             print "  Checking by caseID...",
             docs = Document.objects.filter(
-                supreme_court_db_id=d['caseId'])
+                scdb_id=d['caseId'])
             print "%s matches found." % len(docs)
 
             if len(docs) == 0:

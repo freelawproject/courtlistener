@@ -193,7 +193,7 @@ class DocumentResource(ModelResourceWithFieldsFilter):
             'date_blocked': good_date_filters,
             'blocked': ALL,
             'extracted_by_ocr': ALL,
-            'supreme_court_db_id': ('exact',),
+            'scdb_id': ('exact',),
         }
         ordering = ['date_created', 'date_modified', 'date_filed',
                     'date_blocked']
