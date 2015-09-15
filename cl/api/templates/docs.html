@@ -17,18 +17,18 @@
         <h2>APIs and Bulk Data</h2>
         <p>We currently have two free APIs available to developers using our
             platform. If you are interested in obtaining large quantities of
-            our data, we recommend using our <a href="/api/bulk-info/">bulk
+            our data, we recommend using our <a href="{% url "bulk_data_index" %}">bulk
                 API</a>, which provides compressed JSON files of our entire
             collection, by jurisdiction. If you wish to query our data
             programatically, we recommend using our <a
-                    href="/api/rest-info/">REST APIs</a>.
+                    href="{% url "rest_index" %}">REST APIs</a>.
         </p>
         <div class="row">
             <div class="col-sm-6 text-center">
-                <h3><i class="fa fa-arrow-circle-o-right gray"></i> <a href="/api/bulk-info/">Check out our Bulk Data API</a></h3>
+                <h3><i class="fa fa-arrow-circle-o-right gray"></i> <a href="{% url "bulk_data_index" %}">Check out our Bulk Data API</a></h3>
             </div>
             <div class="col-sm-6 text-center">
-                <h3><i class="fa fa-arrow-circle-o-right gray"></i> <a href="/api/rest-info/">Check out our REST APIs</a></h3>
+                <h3><i class="fa fa-arrow-circle-o-right gray"></i> <a href="{% url "rest_index" %}">Check out our REST APIs</a></h3>
             </div>
         </div>
         <div class="row">
@@ -122,7 +122,7 @@
             <h3>Available Jurisdictions</h3>
                 <p>
                     We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs.
-                    Details about the jurisdictions that are available can be found <a href="/api/jurisdictions/">here</a>.
+                    Details about the jurisdictions that are available can be found <a href="{% url "court_index" %}">here</a>.
                 </p>
             </div>
             <div class="col-sm-4">

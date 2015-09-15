@@ -29,7 +29,7 @@
             <li><a href="/api/rest/v2/citation/">/api/rest/v2/citation/</a></li>
             <li><a href="/api/rest/v2/jurisdiction/">/api/rest/v2/jurisdiction/</a></li>
             <li><a href="/api/rest/v2/search/">/api/rest/v2/search/</a></li>
-            <li><a href="/api/rest/v2/coverage/all/">/api/rest/v2/coverage/</a></li>
+            <li><a href="{% url "coverage_api" version="2" court="all" %}">{% url "coverage_api" version="2" court="all" %}</a></li>
         </ol>
 
         <p>
@@ -632,7 +632,7 @@
             Appeals (<code>ca9</code>):
         </p>
         <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v2/coverage/ca9/</code>
+            <code>curl https://www.courtlistener.com{% url "coverage_api" version='2' court='ca9' %}</code>
         </blockquote>
     </div>
 
@@ -643,7 +643,7 @@
             <h3><span>Available Jurisdictions</span></h3>
             <p>
                 We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs.
-                Details about the jurisdictions that are available can be found <a href="/api/jurisdictions/">here</a>.
+                Details about the jurisdictions that are available can be found <a href="{% url "court_index" %}">here</a>.
             </p>
             <p>Below is a cheat sheet listing the abbreviations for all available jurisdictions.</p>
             <div id="scrollable-jurisdictions">
@@ -690,7 +690,7 @@
             <h3><span>CiteGeist Scores</span></h3>
 
             <p>If you are interested in the CiteGeist score for each opinion, it is now available via our
-                <a href="/api/bulk-info/#citegeist">bulk data API</a>.
+                <a href="{% url "bulk_data_index" %}#citegeist">bulk data API</a>.
             </p>
         </div>
 
@@ -719,7 +719,7 @@
 
             </p>
             <ul>
-                <li><strong>v1</strong> &ndash; <a href="/api/rest-info/v1/">/api/rest-info/v1/</a></li>
+                <li><strong>v1</strong> &ndash; <a href="{% url "rest_index_v1" %}">{% url "rest_index_v1" %}</a></li>
             </ul>
         </div>
 

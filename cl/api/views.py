@@ -48,38 +48,48 @@ def make_court_variable():
 def court_index(request):
     """Shows the information we have available for the courts."""
     courts = make_court_variable()
-    return render_to_response('jurisdictions.html',
-                              {'courts': courts,
-                               'private': False},
-                              RequestContext(request))
+    return render_to_response(
+        'jurisdictions.html',
+        {'courts': courts,
+         'private': False},
+        RequestContext(request)
+    )
 
 
 def rest_index(request):
     courts = make_court_variable()
     court_count = len(courts)
-    return render_to_response('rest-docs-latest.html',
-                              {'court_count': court_count,
-                               'courts': courts,
-                               'private': False},
-                              RequestContext(request))
+    return render_to_response(
+        'rest-docs-latest.html',
+        {'court_count': court_count,
+         'courts': courts,
+         'private': False},
+        RequestContext(request)
+    )
 
 
 def rest_index_v1(request):
     courts = make_court_variable()
     court_count = len(courts)
-    return render_to_response('rest-docs-v1.html',
-                              {'court_count': court_count,
-                               'courts': courts,
-                               'private': False},
-                              RequestContext(request))
+    return render_to_response(
+        'rest-docs-v1.html',
+        {'court_count': court_count,
+         'courts': courts,
+         'private': False},
+        RequestContext(request)
+    )
 
 
-def documentation_index(request):
-    court_count = Court.objects.exclude(jurisdiction='T').count()  # Non-testing courts
-    return render_to_response('docs.html',
-                              {'court_count': court_count,
-                               'private': False},
-                              RequestContext(request))
+def api_index(request):
+    court_count = Court.objects.exclude(
+        jurisdiction='T'
+    ).count()  # Non-testing courts
+    return render_to_response(
+        'docs.html',
+        {'court_count': court_count,
+         'private': False},
+        RequestContext(request)
+    )
 
 
 def bulk_data_index(request):
@@ -96,7 +106,7 @@ def bulk_data_index(request):
 
 
 def serve_pagerank_file(request):
-    """Find the pagerank file by interrogating Solr, then serve it up."""
+    """Serves the bulk pagerank file from the bulk data directory."""
     file_loc = settings.BULK_DATA_DIR + "external_pagerank"
     file_name = file_loc.split('/')[-1]
     try:
@@ -128,7 +138,7 @@ def strip_trailing_zeroes(data):
     return data[:i + 1]
 
 
-def coverage_data(request, court):
+def coverage_data(request, version, court):
     """Provides coverage data for a court.
 
     Responds to either AJAX or regular requests.
@@ -158,4 +168,4 @@ def coverage_data(request, court):
         'total': total_docs,
     }
 
-    return JsonResponse(json.dumps(response))
+    return JsonResponse(json.dumps(response), safe=False)

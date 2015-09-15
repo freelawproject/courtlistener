@@ -1,5 +1,6 @@
 import random
 from django.conf import settings
+from django.core.urlresolvers import reverse
 
 
 def inject_settings(request):
@@ -43,7 +44,7 @@ info_tips = (
     'Create alerts for any query to receive an email if the query has new results.',
     'There is an <a href="/feeds/">RSS feed</a> for every query so you can easily stay up to date.',
     'A podcast is created for every oral argument query that you make.',
-    'CourtListener has an <a href="/api/">API</a> so anybody can easily use our data.',
+    'CourtListener has an <a href="%s">API</a> so anybody can easily use our data.' % reverse("api_index"),
     'Oral Arguments are available in <a href="http://freelawproject.org/2014/11/09/more-oral-argument-news/">Stitcher Radio</a>.',
     'Search Relevancy on CourtListener is <a href="http://freelawproject.org/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/" target="_blank">powered by the citation network between cases.',
     'You can make sophisticated queries using a number of <a href="/search/advanced-techniques/">advanced search features</a>.',
