@@ -101,32 +101,56 @@
                 <div class="row">
                     <div class="col-xs-12">
                         <form action="" method="POST" role="form">
+                            <legend>Configure chart</legend>
                             <div class="row">
-                                <div class="form-group col-md-6">
-                                    <label for="degreesOfSeparation">Max Degrees
-                                        of Separation</label>
+                                <div class="form-group col-md-3">
+                                    <label for="chartType">Chart Type</label>
+                                    <select name="chartType"
+                                            id="chartTypeSelect"
+                                            class="form-control">
+                                        <option selected="true" value="dos">
+                                            Degrees of Separation
+                                        </option>
+                                        <option value="spaeth">Spaeth</option>
+                                        <option value="genealogy">Genealogy
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="form-group col-md-3">
+                                    <label for="axisType">axis Type</label>
+                                    <select name="axisType" id="axisTypeSelect"
+                                            class="form-control">
+                                        <option selected="true" value="cat">
+                                            Category
+                                        </option>
+                                        <option value="time">Timeline</option>
+                                    </select>
+                                </div>
+                                <div class="form-group col-md-3">
+                                    <label for="heightType">Height</label>
+                                    <select name="heightType"
+                                            id="heightTypeSelect"
+                                            class="form-control">
+                                        <option selected="true" value="400">
+                                            fixed 400
+                                        </option>
+                                        <option value="600">fixed 600</option>
+                                        <option value="screen">full screen
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="form-group col-md-3">
+                                    <label for="degreesOfSeparation">Degrees of
+                                        Separation</label>
                                     <select name="degreesOfSeparation"
                                             id="degreesOfSeparationSelect"
                                             class="form-control">
                                         <option value="1">1</option>
                                         <option value="2">2</option>
-                                        <option value="3">3</option>
-                                        <option value="4">4</option>
-                                        <option value="5" selected="true">5</option>
-                                    </select>
-                                </div>
-                                <div class="form-group col-md-6">
-                                    <label for="aspectRatio">Aspect
-                                        Ratio</label>
-                                    <select name="aspectRatio"
-                                            id="aspectRatioSelect"
-                                            class="form-control">
-                                        <option selected="true" value="9:16">
-                                            9:16
+                                        <option selected="true" value="3">3
                                         </option>
-                                        <option value="4:5">4:5</option>
-                                        <option value="3:5">3:5</option>
-                                        <option value="1:1">1:1</option>
+                                        <option value="4">4</option>
+                                        <option value="5">5</option>
                                     </select>
                                 </div>
                             </div>
