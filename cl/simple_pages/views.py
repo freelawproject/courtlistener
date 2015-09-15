@@ -151,11 +151,6 @@ def contact(
     overridden in various ways so that its logic can be called from other
     functions.
     """
-    # For why this is necessary, see
-    # https://stackoverflow.com/questions/24770130/ and the related link,
-    # http://effbot.org/zone/default-values.htm. Basically, you can't have a
-    # mutable data type like a dict as a default argument without its state
-    # being carried around from one function call to the next.
     if template_data is None:
         template_data = {}
     if initial is None:
@@ -237,10 +232,6 @@ def latest_terms(request):
     )
 
 
-class HttpResponseTemporaryUnavailable(HttpResponse):
-    status_code = 503
-
-
 @never_cache
 def show_maintenance_warning(request):
     """Blocks access to a URL, and instead loads a maintenance warning.
@@ -249,8 +240,10 @@ def show_maintenance_warning(request):
     https://plus.google.com/115984868678744352358/posts/Gas8vjZ5fmB
     """
     t = loader.get_template('maintenance.html')
-    return HttpResponseTemporaryUnavailable(
-        t.render({'private': True}))
+    return HttpResponse(
+        t.render({'private': True}),
+        status=503,  # Temporarily Unavailable
+    )
 
 
 @cache_page(60 * 60 * 12)  # 12 hours
