@@ -104,13 +104,14 @@ class Command(cl_scrape_opinions.Command):
                     site.cookies,
                     method=site.method
                 )
-                content = site.cleanup_content(r.content)
                 if msg:
                     logger.warn(msg)
                     ErrorLog(log_level='WARNING',
                              court=court,
                              message=msg).save()
                     continue
+
+                content = site.cleanup_content(r.content)
 
                 current_date = item['case_dates']
                 try:

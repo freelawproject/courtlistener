@@ -13,8 +13,7 @@ class Site(OralArgumentSite):
 
     def _get_download_urls(self):
         path = '//url/text()'
-        return ['assets/media/test_audio/%s' % url for
-                url in self.html.xpath(path)]
+        return ['test/audio/%s' % url for url in self.html.xpath(path)]
 
     def _get_case_names(self):
         path = '//name/text()'
