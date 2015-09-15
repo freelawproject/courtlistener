@@ -1,25 +1,24 @@
 import StringIO
+import datetime
+import json
 import os
 import shutil
-import json
 import time
 
 from collections import OrderedDict
 from datadiff import diff
-import datetime
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.test import TestCase
 from django.test.utils import override_settings
 from lxml import html
 
-
-from cl.lib.solr_core_admin import get_data_dir_location
+from cl.lib.solr_core_admin import get_data_dir
 from cl.lib.test_helpers import SolrTestCase
 from cl.search.models import Court, Docket
 from cl import settings
-#from cl.search.management.commands.cl_calculate_pagerank_networkx import \
-#    Command
+from cl.search.management.commands.cl_calculate_pagerank_networkx import \
+    Command
 
 
 class SetupException(Exception):
@@ -46,7 +45,8 @@ class UpdateIndexCommandTest(SolrTestCase):
         # First, we add everything to Solr.
         args = list(self.args)  # Make a copy of the list.
         args.extend([
-            '--solr-url', 'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
+            '--solr-url',
+            'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
             '--update',
             '--everything',
             '--do-commit',
@@ -81,7 +81,8 @@ class UpdateIndexCommandTest(SolrTestCase):
         # Next, we delete everything from Solr
         args = list(self.args)  # Make a copy of the list.
         args.extend([
-            '--solr-url', 'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
+            '--solr-url',
+            'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
             '--delete',
             '--everything',
             '--do-commit',
@@ -103,7 +104,8 @@ class UpdateIndexCommandTest(SolrTestCase):
         # Add things back, but do it by ID
         args = list(self.args)  # Make a copy of the list.
         args.extend([
-            '--solr-url', 'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
+            '--solr-url',
+            'http://127.0.0.1:8983/solr/%s' % self.core_name_opinion,
             '--update',
             '--items', '1', '2', '3',
             '--do-commit',
@@ -121,6 +123,7 @@ class UpdateIndexCommandTest(SolrTestCase):
                     expected_citation_count,
                 ),
         )
+
 
 class ModelTest(TestCase):
     fixtures = ['test_court.json']
@@ -331,7 +334,7 @@ class ApiTest(SolrTestCase):
             print "WARNING: Unable to delete %s. This probably means your " \
                   "/tmp directory is getting junked up." % settings.MEDIA_ROOT
 
-    def strip_varying_data(self, endpoint,  actual, correct):
+    def strip_varying_data(self, endpoint, actual, correct):
         """A number of metadata fields vary each time the tests are run and
         thus must be stripped so as to not cause issues.
         """
@@ -535,37 +538,38 @@ class FeedTest(SolrTestCase):
             )
 
 
-# class PagerankTest(TestCase):
-#     fixtures = ['test_objects_search.json']
-#
-#     def test_pagerank_calculation(self):
-#         """Create a few Documents and fake citation relation among them, then
-#         run the pagerank algorithm. Check whether this simple case can get the
-#         correct result.
-#         """
-#         #calculate pagerank of these 3 document
-#         comm = Command()
-#         self.verbosity = 1
-#         comm.do_pagerank(chown=False)
-#
-#         # read in the pagerank file, converting to a dict
-#         pr_values_from_file = {}
-#         with open(get_data_dir_location() + "external_pagerank") as f:
-#             for line in f:
-#                 pk, value = line.split('=')
-#                 pr_values_from_file[pk] = float(value.strip())
-#
-#         # Verify that whether the answer is correct, based on calculations in
-#         # Gephi
-#         answers = {
-#             '1': 0.387790,
-#             '2': 0.214811,
-#             '3': 0.397400,
-#         }
-#         for key, value in answers.items():
-#             self.assertTrue(
-#                 (abs(pr_values_from_file[key]) - value) < 0.0001,
-#                 msg="The answer for item %s was %s when it should have been "
-#                     "%s" % (key, pr_values_from_file[key],
-#                             answers[key], )
-#             )
+class PagerankTest(TestCase):
+    fixtures = ['test_objects_search.json', 'judge_judy.json']
+
+    def test_pagerank_calculation(self):
+        """Create a few items and fake citation relation among them, then
+        run the pagerank algorithm. Check whether this simple case can get the
+        correct result.
+        """
+        # calculate pagerank of these 3 document
+        comm = Command()
+        self.verbosity = 1
+        comm.do_pagerank(chown=False)
+
+        # read in the pagerank file, converting to a dict
+        pr_values_from_file = {}
+        data_path = get_data_dir('collection1') + "external_pagerank"
+        with open(data_path) as f:
+            for line in f:
+                pk, value = line.split('=')
+                pr_values_from_file[pk] = float(value.strip())
+
+        # Verify that whether the answer is correct, based on calculations in
+        # Gephi
+        answers = {
+            '1': 0.387790,
+            '2': 0.214811,
+            '3': 0.397400,
+        }
+        for key, value in answers.items():
+            self.assertTrue(
+                abs(pr_values_from_file[key] - value) < 0.0001,
+                msg="The answer for item %s was %s when it should have been "
+                    "%s" % (key, pr_values_from_file[key],
+                            answers[key],)
+            )

@@ -129,7 +129,7 @@ def get_term_frequency(count=500, result_type='dict', field='text'):
         raise ValueError("Unknown output type!")
 
 
-def get_data_dir_location(core='collection1'):
+def get_data_dir(core):
     """
     Interrogate Solr to get the location of its data directory.
 

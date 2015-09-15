@@ -1,128 +1,103 @@
-__author__ = 'Krist Jin'
-
-from cl import settings
-#from cl.search.models import Document
-from cl.lib.db_tools import queryset_generator
-from cl.lib.solr_core_admin import get_data_dir_location, reload_pagerank_external_file_cache
-from django.core.management.base import BaseCommand
 import logging
+import networkx as nx
 import os
 import pwd
 import shutil
-import sys
-import time
-import networkx as nx
+
+from cl import settings
+from cl.lib.solr_core_admin import get_data_dir, \
+    reload_pagerank_external_file_cache
+from cl.lib.utils import mkdir_p
+from cl.search.models import Opinion, OpinionsCited
+
+from django.core.management.base import BaseCommand
 
 logger = logging.getLogger(__name__)
+
+
+def make_and_populate_nx_graph():
+    """Create a new nx DiGraph and populate it.
+
+    This pulls all of the inter-opinion citations into memory then passes all of
+    them to nx's `add_edges_from` method. The alternate way to do this process
+    is to iterate over the citations calling `add_edge` on each of them. In
+    testing with 12M citations, that's marginally slower, however, the advantage
+    is that you don't need to pull all of the citations into memory at once.
+    """
+    g = nx.DiGraph()
+    g.add_edges_from(
+        list(OpinionsCited.objects.values_list(
+            'citing_opinion',
+            'cited_opinion',
+        ))
+    )
+    return g
+
+
+def make_sorted_pr_file(pr_result, result_file_path):
+    """Convert the pagerank results list into something Solr can use.
+
+    Solr uses a file of the form:
+
+        1=0.387789712299
+        2=0.214810626172
+        3=0.397399661529
+
+    The IDs must be sorted for performance, and every ID should be listed. This
+    function takes the pagerank results and converts them into a file like this,
+    using the os's `sort` executable for fastest sorting.
+    """
+    temp_extension = '.tmp'
+    result_file = open(result_file_path + temp_extension, 'w')
+
+    progress = 0
+    min_value = min(pr_result.values())
+    for pk in Opinion.objects.values_list('pk', flat=True):
+        progress += 1
+        try:
+            new_pr = pr_result[pk]
+        except KeyError:
+            # Not all nodes will be in the NX DiGraph, some will have no
+            # citations, and so will simply get the min-value.
+            new_pr = min_value
+        result_file.write('{}={}\n'.format(pk, new_pr))
+    result_file.close()
+
+    # For improved Solr performance, sort the temp file, creating a new file
+    # without the temp_extension value.
+    os.system('sort -n %s%s > %s' % (
+        result_file_path,
+        temp_extension,
+        result_file_path,
+    ))
+    os.remove(result_file_path + temp_extension)
+
+
+def cp_pr_file_to_bulk_dir(result_file_path, chown):
+    """Copy the pagerank file to the bulk data directory for public analysis.
+    """
+    mkdir_p(settings.BULK_DATA_DIR)  # The dir doesn't always already exist.
+    shutil.copy(result_file_path, settings.BULK_DATA_DIR)
+    if chown:
+        user_info = pwd.getpwnam('www-data')
+        os.chown(
+            settings.BULK_DATA_DIR + 'external_pagerank',
+            user_info.pw_uid,
+            user_info.pw_gid,
+        )
 
 
 class Command(BaseCommand):
     args = '<args>'
     help = 'Calculate pagerank value for every case'
-    RESULT_FILE_PATH = get_data_dir_location() + "external_pagerank"
-    TEMP_EXTENSION = '.tmp'
-    result_file = open(RESULT_FILE_PATH + TEMP_EXTENSION, 'w')
+    RESULT_FILE_PATH = get_data_dir('collection1') + "external_pagerank"
 
-    def do_pagerank(self, verbosity=1, chown=True):
-        #####################
-        #      Stage I      #
-        # Import Data to NX #
-        #####################
-        sys.stdout.write('Initializing...\n')
-        graph_size = Document.objects.all().count()
-        citing_graph = nx.DiGraph()
-        qs = Document.objects.only(
-            'pk',
-            'opinions_cited',
-        )
-        case_list = queryset_generator(qs, chunksize=10000)
-        case_count = 0
-        timings = []
-        average_per_s = 0
-
-        # Build up the network graph and a list of all valid ids
-        id_list = []
-        for source_case in case_list:
-            case_count += 1
-            if case_count % 100 == 1:
-                t1 = time.time()
-            if case_count % 100 == 0:
-                t2 = time.time()
-                timings.append(t2 - t1)
-                average_per_s = 100 / (sum(timings) / float(len(timings)))
-            sys.stdout.write("\rGenerating networkx graph...{:.0%} ({}/{}, {:.1f}/s)".format(
-                case_count * 1.0 / graph_size,
-                case_count,
-                graph_size,
-                average_per_s,
-            ))
-            sys.stdout.flush()
-            for target_case in source_case.opinions_cited.values_list('id'):
-                citing_graph.add_edge(str(source_case.pk), str(target_case[0]))
-
-            # Save all the keys since they get dropped by networkx in Stage II
-            id_list.append(str(source_case.pk))
-
-        ######################
-        #      Stage II      #
-        # Calculate Pagerank #
-        ######################
-        if verbosity >= 1:
-            sys.stdout.write('\n')
-            sys.stdout.write('NetworkX PageRank calculating...')
-            sys.stdout.flush()
-        pr_result = nx.pagerank(citing_graph)
-        if verbosity >= 1:
-            sys.stdout.write('Complete!\n')
-
-        ###################
-        #    Stage III    #
-        # Update Pagerank #
-        ###################
-        progress = 0
-        min_value = min(pr_result.values())
-        for id in id_list:
-            progress += 1
-            try:
-                new_pr = pr_result[id]
-            except KeyError:
-                # NetworkX removes the isolated nodes from the network, but they still need to go into the PR file.
-                new_pr = min_value
-            self.result_file.write('{}={}\n'.format(id, new_pr))
-
-            if verbosity >= 1:
-                sys.stdout.write('\rUpdating Pagerank in external file...{:.0%}'.format(
-                    progress * 1.0 / graph_size
-                ))
-                sys.stdout.flush()
-
-        self.result_file.close()
-
-        if verbosity >= 1:
-            sys.stdout.write('\nPageRank calculation finished!')
-            sys.stdout.write('See the django log for more details.\n')
-
-        ########################
-        #       Stage IV       #
-        # Maintenance Routines #
-        ########################
-        if verbosity >= 1:
-            sys.stdout.write('Sorting the temp pagerank file for improved Solr performance...\n')
-
-        # Sort the temp file, creating a new file without the TEMP_EXTENSION value, then delete the temp file.
-        os.system('sort -n %s%s > %s' % (self.RESULT_FILE_PATH, self.TEMP_EXTENSION, self.RESULT_FILE_PATH))
-        os.remove(self.RESULT_FILE_PATH + self.TEMP_EXTENSION)
-
-        if verbosity >= 1:
-            sys.stdout.write('Reloading the external file cache in Solr...\n')
+    def do_pagerank(self, chown=True):
+        g = make_and_populate_nx_graph()
+        pr_results = nx.pagerank(g)
+        make_sorted_pr_file(pr_results, self.RESULT_FILE_PATH)
         reload_pagerank_external_file_cache()
-
-        if verbosity >= 1:
-            sys.stdout.write('Copying pagerank file to %s, for bulk downloading...\n' % settings.BULK_DATA_DIR)
-        shutil.copy(self.RESULT_FILE_PATH, settings.BULK_DATA_DIR)
-        if chown:
-            user_info = pwd.getpwnam('www-data')
-            os.chown(settings.BULK_DATA_DIR + 'external_pagerank', user_info.pw_uid, user_info.pw_gid)
+        cp_pr_file_to_bulk_dir(self.RESULT_FILE_PATH, chown)
 
     def handle(self, *args, **options):
-        self.do_pagerank(verbosity=int(options.get('verbosity', 1)))
+        self.do_pagerank()
