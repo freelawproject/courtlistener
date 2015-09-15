@@ -169,3 +169,16 @@ def coverage_data(request, version, court):
     }
 
     return JsonResponse(json.dumps(response), safe=False)
+
+
+def deprecated_api(request):
+    return JsonResponse(
+        {
+            "meta": {
+                "status": "This endpoint is deprecated. Please upgrade to the "
+                          "newest version of the API.",
+            },
+            "objects": []
+        },
+        safe=False,
+    )
