@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}REST API, v2 - CourtListener.com{% endblock %}
+{% block title %}REST API, v2 &ndash; CourtListener.com{% endblock %}
 {% block description %}
     The first REST API for federal and state opinions and still the best.
     Provided free of charge from Free Law Project, a 501(c)(3) non-profit.
@@ -14,6 +14,16 @@
 {% block sidebar %}{% endblock %}
 
 {% block content %}
+    <div class="col-xs-12">
+        <div class="alert-danger alert">
+            <p class="bottom">These notes are for a version of the API that is
+                being phased out and will be disabled after October 15, 2016.
+                Please use the <a
+                        href="{% url "rest_index" %}">latest version</a>, as
+                these notes are only maintained to help with migrations.
+            </p>
+        </div>
+    </div>
     <div class="col-sm-7">
         <h2 id="about">REST API &ndash; V2</h2>
         <p>For developers that wish to have a more granular API for our data, we provide a RESTful API
@@ -21,14 +31,14 @@
         </p>
         <p>This API currently has nine endpoints that can be consumed via GET requests:</p>
         <ol>
-            <li><a href="/api/rest/v2/docket/">/api/rest/v2/docket/</a></li>
-            <li><a href="/api/rest/v2/audio/">/api/rest/v2/audio/</a></li>
-            <li><a href="/api/rest/v2/document/">/api/rest/v2/document/</a></li>
-            <li><a href="/api/rest/v2/cites/">/api/rest/v2/cites/</a></li>
-            <li><a href="/api/rest/v2/cited-by/">/api/rest/v2/cited-by/</a></li>
-            <li><a href="/api/rest/v2/citation/">/api/rest/v2/citation/</a></li>
-            <li><a href="/api/rest/v2/jurisdiction/">/api/rest/v2/jurisdiction/</a></li>
-            <li><a href="/api/rest/v2/search/">/api/rest/v2/search/</a></li>
+            <li><a href="{% url "api_dispatch_list" resource_name="docket" api_name="v2" %}">{% url "api_dispatch_list" resource_name="docket" api_name="v2" %}</a></li>
+            <li><a href="{% url "api_dispatch_list" resource_name="audio" api_name="v2" %}">{% url "api_dispatch_list" resource_name="audio" api_name="v2" %}</a></li>
+            <li><a href="{% url "api_dispatch_list" resource_name="document" api_name="v2" %}">{% url "api_dispatch_list" resource_name="document" api_name="v2" %}</a></li>
+            <li><a href="{% url "api_dispatch_list" resource_name="cites" api_name="v2" %}">{% url "api_dispatch_list" resource_name="cites" api_name="v2" %}</a></li>
+            <li><a href="{% url "api_dispatch_list" resource_name="cited-by" api_name="v2" %}">{% url "api_dispatch_list" resource_name="cited-by" api_name="v2" %}</a></li>
+            <li><a href="{% url "api_dispatch_list" resource_name="citation" api_name="v2" %}">{% url "api_dispatch_list" resource_name="citation" api_name="v2" %}</a></li>
+            <li><a href="{% url "api_dispatch_list" resource_name="jurisdiction" api_name="v2" %}">{% url "api_dispatch_list" resource_name="jurisdiction" api_name="v2" %}</a></li>
+            <li><a href="{% url "api_dispatch_list" resource_name="search" api_name="v2" %}">{% url "api_dispatch_list" resource_name="search" api_name="v2" %}</a></li>
             <li><a href="{% url "coverage_api" version="2" court="all" %}">{% url "coverage_api" version="2" court="all" %}</a></li>
         </ol>
 
@@ -713,15 +723,7 @@
             </p>
         </div>
 
-        <div class="sidebar-section">
-            <h3><span>Deprecated API Documentation</span></h3>
-            <p>If you are using an old version of the API and are looking for the notes for that version, please see:
-
-            </p>
-            <ul>
-                <li><strong>v1</strong> &ndash; <a href="{% url "rest_index_v1" %}">{% url "rest_index_v1" %}</a></li>
-            </ul>
-        </div>
+        {% include "includes/deprecated_sidebar_section.html" %}
 
         <div class="sidebar-section">
             <h3 id="copyright"><span>Copyright</span></h3>

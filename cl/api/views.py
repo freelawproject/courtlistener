@@ -56,23 +56,13 @@ def court_index(request):
     )
 
 
-def rest_index(request):
+def rest_index(request, version):
     courts = make_court_variable()
     court_count = len(courts)
+    if version is None:
+        version = 'latest'
     return render_to_response(
-        'rest-docs-latest.html',
-        {'court_count': court_count,
-         'courts': courts,
-         'private': False},
-        RequestContext(request)
-    )
-
-
-def rest_index_v1(request):
-    courts = make_court_variable()
-    court_count = len(courts)
-    return render_to_response(
-        'rest-docs-v1.html',
+        'rest-docs-v%s.html' % version,
         {'court_count': court_count,
          'courts': courts,
          'private': False},

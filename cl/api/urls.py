@@ -1,6 +1,6 @@
 from cl.api.views import (
     court_index, api_index, bulk_data_index, rest_index, serve_pagerank_file,
-    coverage_data, rest_index_v1, deprecated_api,
+    coverage_data, deprecated_api,
 )
 from django.conf.urls import url
 
@@ -17,14 +17,9 @@ urlpatterns = [
         name='court_index',
     ),
     url(
-        r'^api/rest-info/$',
+        r'^api/rest-info/(?:v(?P<version>[12])/)?$',
         rest_index,
         name='rest_index',
-    ),
-    url(
-        r'^api/rest-info/v1/$',
-        rest_index_v1,
-        name='rest_index_v1',
     ),
     url(
         r'^api/bulk-info/$',
@@ -46,6 +41,8 @@ urlpatterns = [
         name='coverage_api',
     ),
     url(
+        # Deprecation Dates:
+        # v1: 2015-10-01
         r'^api/rest/v(?P<v>[1])/.*',
         deprecated_api,
         name='deprecated_api',
