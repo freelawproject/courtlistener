@@ -47,7 +47,6 @@ class ModelResourceWithFieldsFilter(ModelResource):
         data['meta']['request_uri'] = request.get_full_path()
         data['meta']['donate'] = 'Please donate today to support more ' \
                                  'projects from Free Law Project.'
-
         return data
 
     def full_dehydrate(self, bundle, *args, **kwargs):
@@ -70,24 +69,22 @@ class ModelResourceWithFieldsFilter(ModelResource):
         return bundle
 
     def dispatch(self, request_type, request, **kwargs):
-        """Simple override here to tally stats before sending off the
-        results."""
+        """Simple override here to tally stats before sending off the results.
+        """
         tally_stat(self.tally_name)
         return super(ModelResourceWithFieldsFilter, self).dispatch(request_type, request, **kwargs)
 
 
-class DeprecatedModelResourceWithFieldsFilter(ModelResourceWithFieldsFilter):
+class DeprecationWarningModelResource(ModelResourceWithFieldsFilter):
     def __init__(self, tally_name=None):
-        super(DeprecatedModelResourceWithFieldsFilter, self).__init__(tally_name=tally_name)
+        super(DeprecationWarningModelResource, self).__init__(tally_name=tally_name)
 
     def alter_list_data_to_serialize(self, request, data):
         data['meta']['status'] = 'This endpoint is deprecated. Please ' \
                                  'upgrade to the newest version of the API.'
 
-        return super(
-            DeprecatedModelResourceWithFieldsFilter,
-            self
-        ).alter_list_data_to_serialize(request, data)
+        return super(DeprecationWarningModelResource,
+                     self).alter_list_data_to_serialize(request, data)
 
 
 class BasicAuthenticationWithUser(BasicAuthentication):

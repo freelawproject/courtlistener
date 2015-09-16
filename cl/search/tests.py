@@ -9,8 +9,8 @@ from collections import OrderedDict
 from datadiff import diff
 from django.core.files.base import ContentFile
 from django.core.management import call_command
-from django.test import TestCase
-from django.test.utils import override_settings
+from django.core.urlresolvers import reverse
+from django.test import TestCase, override_settings
 from lxml import html
 
 from cl.lib.solr_core_admin import get_data_dir
@@ -329,7 +329,7 @@ class ApiTest(SolrTestCase):
         """
         super(ApiTest, self).tearDown()
         try:
-            shutil.rmtree(self.settings().wrapped.MEDIA_ROOT)
+            shutil.rmtree(settings.MEDIA_ROOT)
         except OSError:
             print "WARNING: Unable to delete %s. This probably means your " \
                   "/tmp directory is getting junked up." % settings.MEDIA_ROOT
@@ -364,20 +364,44 @@ class ApiTest(SolrTestCase):
             actual['meta']['total_count'] = 1
         return actual, correct
 
+    def test_deprecated_api_versions(self):
+        deprecated_versions = ('1',)
+        # Make sure all the subpaths are deprecated too.
+        paths = ['', 'asdf/', 'schema/']
+        for v in deprecated_versions:
+            for path in paths:
+                r = self.client.get(
+                    reverse('deprecated_api', kwargs={'v': v}) + path
+                )
+                actual = json.loads(r.content)
+                with open(os.path.join(
+                    settings.INSTALL_ROOT,
+                    'cl',
+                    'search',
+                    'test_assets',
+                    'api_deprecated.json'
+                ), 'r') as f:
+                    correct = json.load(f)
+                    self.assertEqual(
+                        actual,
+                        correct,
+                        "Deprecated API did not return the expected result. "
+                        "Instead, returned:\n %s" % actual
+                    )
+
     def test_api_meta_data(self):
         """Does the content of the search API have the right meta data?"""
         self.client.login(username='pandora', password='password')
         api_endpoints = {
             'audio': {'params': '', 'api_versions': ('v2',)},
-            'citation': {'params': '', 'api_versions': ('v1', 'v2',)},
-            'cited-by': {'params': '&id=1', 'api_versions': ('v1', 'v2',)},
-            'cites': {'params': '&id=1', 'api_versions': ('v1', 'v2',)},
+            'citation': {'params': '', 'api_versions': ('v2',)},
+            'cited-by': {'params': '&id=1', 'api_versions': ('v2',)},
+            'cites': {'params': '&id=1', 'api_versions': ('v2',)},
             'docket': {'params': '', 'api_versions': ('v2',)},
             # opinion --> document in v2.
-            'opinion': {'params': '', 'api_versions': ('v1',)},
             'document': {'params': '', 'api_versions': ('v2',)},
-            'jurisdiction': {'params': '', 'api_versions': ('v1', 'v2',)},
-            'search': {'params': '', 'api_versions': ('v1', 'v2',)},
+            'jurisdiction': {'params': '', 'api_versions': ('v2',)},
+            'search': {'params': '', 'api_versions': ('v2',)},
         }
         # Alphabetical ordering makes the tests run consistently
         api_endpoints_ordered = OrderedDict(sorted(
@@ -394,7 +418,7 @@ class ApiTest(SolrTestCase):
                 with open(
                         os.path.join(
                             settings.INSTALL_ROOT,
-                            'alert',
+                            'cl',
                             'search',
                             'test_assets',
                             'api_%s_%s_test_results.json' % (v, endpoint)

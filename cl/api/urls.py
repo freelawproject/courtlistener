@@ -46,7 +46,7 @@ urlpatterns = [
         name='coverage_api',
     ),
     url(
-        r'^api/rest/v1/.*',
+        r'^api/rest/v(?P<v>[1])/.*',
         deprecated_api,
         name='deprecated_api',
     ),

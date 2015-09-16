@@ -171,7 +171,7 @@ def coverage_data(request, version, court):
     return JsonResponse(json.dumps(response), safe=False)
 
 
-def deprecated_api(request):
+def deprecated_api(request, v):
     return JsonResponse(
         {
             "meta": {

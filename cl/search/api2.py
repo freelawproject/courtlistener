@@ -1,12 +1,16 @@
 import logging
 
 from cl.audio.models import Audio
-from cl.lib.api import ModelResourceWithFieldsFilter, \
-    BasicAuthenticationWithUser, PerUserCacheThrottle, SolrList, \
-    good_time_filters, numerical_filters, good_date_filters
+from cl.lib.api import (
+    ModelResourceWithFieldsFilter, BasicAuthenticationWithUser,
+    PerUserCacheThrottle, SolrList, good_time_filters, numerical_filters,
+    good_date_filters,
+)
 from cl.lib.search_utils import build_main_query
 from cl.search import forms
-from cl.search.models import Court, Docket, SOURCES, DOCUMENT_STATUSES
+from cl.search.models import (
+    Court, Docket, SOURCES, DOCUMENT_STATUSES, OpinionCluster,
+)
 from tastypie import fields
 from tastypie import authentication
 from tastypie.constants import ALL
@@ -90,7 +94,7 @@ class CitationResource(ModelResourceWithFieldsFilter):
             BasicAuthenticationWithUser(realm="courtlistener.com"),
             authentication.SessionAuthentication())
         throttle = PerUserCacheThrottle(throttle_at=1000)
-        queryset = Citation.objects.all()
+        queryset = OpinionCluster.objects.all()
         max_limit = 20
         excludes = ['slug', ]  # Why?
 
@@ -176,7 +180,7 @@ class DocumentResource(ModelResourceWithFieldsFilter):
             authentication.SessionAuthentication())
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'document'
-        queryset = Document.objects.all().select_related('docket', 'citation')
+        queryset = OpinionCluster.objects.all().select_related('docket', 'citation')
         max_limit = 20
         allowed_methods = ['get']
         include_absolute_url = True
@@ -227,7 +231,7 @@ class CitedByResource(ModelResourceWithFieldsFilter):
             authentication.SessionAuthentication())
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'cited-by'
-        queryset = Document.objects.all()
+        queryset = OpinionCluster.objects.all()
         excludes = ('html', 'html_lawbox', 'html_with_citations', 'plain_text')
         include_absolute_url = True
         max_limit = 20
@@ -240,7 +244,7 @@ class CitedByResource(ModelResourceWithFieldsFilter):
     def get_object_list(self, request):
         pk = request.GET.get('id')
         if pk:
-            return Document.objects.get(pk=pk).citing_opinions.all()
+            return OpinionCluster.objects.get(pk=pk).citing_opinions.all()
         else:
             # No ID field --> no results.
             return super(CitedByResource, self).get_object_list(request).none()
@@ -298,7 +302,7 @@ class CitesResource(ModelResourceWithFieldsFilter):
             authentication.SessionAuthentication())
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'cites'
-        queryset = Document.objects.all()
+        queryset = OpinionCluster.objects.all()
         excludes = (
             'html', 'html_lawbox', 'html_with_citations', 'plain_text',
         )
@@ -316,7 +320,7 @@ class CitesResource(ModelResourceWithFieldsFilter):
         """
         pk = request.GET.get('id')
         if pk:
-            return Document.objects.get(pk=pk).opinions_cited.all()
+            return OpinionCluster.objects.get(pk=pk).opinions_cited.all()
         else:
             # No ID field --> no results.
             return super(CitesResource, self).get_object_list(request).none()
