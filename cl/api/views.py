@@ -181,4 +181,5 @@ def deprecated_api(request, v):
             "objects": []
         },
         safe=False,
+        status=410,  # Gone
     )
