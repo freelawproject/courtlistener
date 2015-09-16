@@ -7,6 +7,7 @@ import time
 
 from collections import OrderedDict
 from datadiff import diff
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.core.urlresolvers import reverse
@@ -16,7 +17,6 @@ from lxml import html
 from cl.lib.solr_core_admin import get_data_dir
 from cl.lib.test_helpers import SolrTestCase
 from cl.search.models import Court, Docket
-from cl import settings
 from cl.search.management.commands.cl_calculate_pagerank_networkx import \
     Command
 
