@@ -1,48 +1,70 @@
-{"meta": {
-    "donate": "Please donate today to support more projects from Free Law Project.",
-    "limit": 20,
-    "next": null,
-    "offset": 0,
-    "previous": null,
-    "request_uri": "/api/rest/v2/audio/?format=json",
-    "total_count": 2
-}, "objects": [
-    {
-        "absolute_url": "/audio/2/ander-v-leo/",
-        "blocked": false,
-        "case_name": "Ander v. Leo",
-        "date_blocked": null,
-        "date_modified": "2014-10-21T19:55:20.393779",
-        "docket": "/api/rest/v2/docket/5/",
-        "download_url": "scrapers/test_assets/2.mp3",
-        "duration": 15,
-        "id": 2,
-        "judges": "",
-        "local_path_mp3": "mp3/2014/06/09/ander_v._leo_cl.mp3",
-        "local_path_original_file": "mp3/2014/06/09/ander_v._leo.mp3",
-        "processing_complete": true,
-        "resource_uri": "/api/rest/v2/audio/2/",
-        "sha1": "34046093c40440b3315be06120c8cf792483aa2c",
-        "source": "C",
-        "time_retrieved": "2014-10-21T19:55:19.808690"
+{
+    "meta": {
+        "donate": "Please donate today to support more projects from Free Law Project.",
+        "limit": 20,
+        "next": null,
+        "offset": 0,
+        "previous": null,
+        "request_uri": "/api/rest/v2/audio/?format=json",
+        "total_count": 3
     },
-    {
-        "absolute_url": "/audio/1/jeremy-v-julian/",
-        "blocked": false,
-        "case_name": "Jeremy v. Julian",
-        "date_blocked": null,
-        "date_modified": "2014-10-21T19:55:19.646240",
-        "docket": "/api/rest/v2/docket/4/",
-        "download_url": "scrapers/test_assets/1.wma",
-        "duration": 60,
-        "id": 1,
-        "judges": "",
-        "local_path_mp3": "mp3/2014/06/10/jeremy_v._julian_cl.mp3",
-        "local_path_original_file": "wma/2014/06/10/jeremy_v._julian.wma",
-        "processing_complete": true,
-        "resource_uri": "/api/rest/v2/audio/1/",
-        "sha1": "36f369385530a49150cc0aa1e91c1ba76e3d7f12",
-        "source": "C",
-        "time_retrieved": "2014-10-21T19:55:18.454460"
-    }
-]}
+    "objects": [
+        {
+            "absolute_url": "/audio/3/case-name/",
+            "blocked": false,
+            "case_name": "Hong Liu Yang v. Loretta E. Lynch",
+            "date_blocked": null,
+            "date_modified": null,
+            "docket": "/api/rest/v2/docket/3/",
+            "download_url": "http://media.ca7.uscourts.gov/sound/external/gw.14-2631.14-2631_07_08_2015.mp3",
+            "duration": 653,
+            "id": 3,
+            "judges": "",
+            "local_path_mp3": "test/audio/2.mp3",
+            "local_path_original_file": "mp3/2015/07/08/hong_liu_yang_v._loretta_e._lynch.mp3",
+            "processing_complete": true,
+            "resource_uri": "/api/rest/v2/audio/3/",
+            "sha1": "f540838e606f15585e713812c67537affc0df944",
+            "source": "C",
+            "time_retrieved": "2015-08-07T18:24:26.633000"
+        },
+        {
+            "absolute_url": "/audio/2/case-name/",
+            "blocked": false,
+            "case_name": "Jose A. Dominguez v. Loretta E. Lynch",
+            "date_blocked": null,
+            "date_modified": null,
+            "docket": "/api/rest/v2/docket/2/",
+            "download_url": "http://media.ca7.uscourts.gov/sound/external/gw.14-3661.14-3661_07_08_2015.mp3",
+            "duration": 837,
+            "id": 2,
+            "judges": "",
+            "local_path_mp3": "test/audio/2.mp3",
+            "local_path_original_file": "mp3/2015/07/08/jose_a._dominguez_v._loretta_e._lynch.mp3",
+            "processing_complete": true,
+            "resource_uri": "/api/rest/v2/audio/2/",
+            "sha1": "daadaf6cc018114259f7eba27c4c2e6bba9bd0d7",
+            "source": "C",
+            "time_retrieved": "2015-08-07T18:24:26.633000"
+        },
+        {
+            "absolute_url": "/audio/1/case-name/",
+            "blocked": false,
+            "case_name": "SEC v. Frank J. Custable, Jr.",
+            "date_blocked": null,
+            "date_modified": null,
+            "docket": "/api/rest/v2/docket/1/",
+            "download_url": "http://media.ca7.uscourts.gov/sound/external/gw.15-1442.15-1442_07_08_2015.mp3",
+            "duration": 1290,
+            "id": 1,
+            "judges": "",
+            "local_path_mp3": "test/audio/2.mp3",
+            "local_path_original_file": "mp3/2015/07/08/sec_v._frank_j._custable_jr..mp3",
+            "processing_complete": true,
+            "resource_uri": "/api/rest/v2/audio/1/",
+            "sha1": "de8cff186eb263dc06bdc5340860eb6809f898d3",
+            "source": "C",
+            "time_retrieved": "2015-08-07T18:24:26.633000"
+        }
+    ]
+}

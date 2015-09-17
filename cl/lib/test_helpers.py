@@ -57,7 +57,8 @@ class SolrTestCase(EmptySolrTestCase):
     yet indexed into the database.
     """
     fixtures = ['test_court.json', 'judge_judy.json',
-                'test_objects_search.json', 'test_objects_audio.json']
+                'test_objects_search.json', 'test_objects_audio.json',
+                'authtest_data.json']
 
     def setUp(self):
         # Set up some handy variables

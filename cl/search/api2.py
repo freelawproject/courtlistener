@@ -104,6 +104,9 @@ class AudioResource(ModelResourceWithFieldsFilter):
         DocketResource,
         'docket'
     )
+    time_retrieved = fields.DateTimeField(
+        attribute='date_created',
+    )
 
     class Meta:
         authentication = authentication.MultiAuthentication(
@@ -124,6 +127,7 @@ class AudioResource(ModelResourceWithFieldsFilter):
             'blocked': ALL,
         }
         ordering = ['date_created', 'date_modified', 'date_blocked']
+        excludes = ['case_name_full', 'case_name_short', 'date_created',]
 
 
 class DocumentResource(ModelResourceWithFieldsFilter):

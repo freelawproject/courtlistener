@@ -1,3 +1,4 @@
+# coding=utf-8
 import StringIO
 import datetime
 import json
@@ -320,7 +321,6 @@ class SearchTest(SolrTestCase):
 
 @override_settings(MEDIA_ROOT='/tmp/%s' % time.time())
 class ApiTest(SolrTestCase):
-    fixtures = ['test_court.json', 'authtest_data.json']
 
     def tearDown(self):
         """For these tests we change MEDIA_ROOT so we have a safe place to put
@@ -365,14 +365,15 @@ class ApiTest(SolrTestCase):
         return actual, correct
 
     def test_deprecated_api_versions(self):
+        print("Testing deprecated API paths...")
         deprecated_versions = ('1',)
         # Make sure all the subpaths are deprecated too.
         paths = ['', 'asdf/', 'schema/']
         for v in deprecated_versions:
             for path in paths:
-                r = self.client.get(
-                    reverse('deprecated_api', kwargs={'v': v}) + path
-                )
+                path = reverse('deprecated_api', kwargs={'v': v}) + path
+                print("  %s..." % path),
+                r = self.client.get(path)
                 actual = json.loads(r.content)
                 with open(os.path.join(
                     settings.INSTALL_ROOT,
@@ -388,64 +389,63 @@ class ApiTest(SolrTestCase):
                         "Deprecated API did not return the expected result. "
                         "Instead, returned:\n %s" % actual
                     )
+                print('✓')
 
     def test_api_meta_data(self):
         """Does the content of the search API have the right meta data?"""
+        print "Trying various API endpoints..."
         self.client.login(username='pandora', password='password')
-        api_endpoints = {
-            'audio': {'params': '', 'api_versions': ('v2',)},
-            'citation': {'params': '', 'api_versions': ('v2',)},
-            'cited-by': {'params': '&id=1', 'api_versions': ('v2',)},
-            'cites': {'params': '&id=1', 'api_versions': ('v2',)},
-            'docket': {'params': '', 'api_versions': ('v2',)},
-            # opinion --> document in v2.
-            'document': {'params': '', 'api_versions': ('v2',)},
-            'jurisdiction': {'params': '', 'api_versions': ('v2',)},
-            'search': {'params': '', 'api_versions': ('v2',)},
-        }
-        # Alphabetical ordering makes the tests run consistently
-        api_endpoints_ordered = OrderedDict(sorted(
-            api_endpoints.items(),
-            key=lambda t: t[0])
-        )
+        api_endpoints = [
+            ({'resource_name': 'audio', 'api_name': 'v2'}, ''),
+            ({'resource_name': 'citation', 'api_name': 'v2'}, ''),
+            ({'resource_name': 'cited_by', 'api_name': 'v2'}, '&id=1'),
+            ({'resource_name': 'cites', 'api_name': 'v2'}, '&id=1'),
+            ({'resource_name': 'docket', 'api_name': 'v2'}, ''),
+            ({'resource_name': 'document', 'api_name': 'v2'}, ''),
+            ({'resource_name': 'jurisdiction', 'api_name': 'v2'}, ''),
+            ({'resource_name': 'search', 'api_name': 'v2'}, ''),
+        ]
+        for reverse_params, get_params in api_endpoints:
+            path = reverse(
+                'api_dispatch_list',
+                kwargs=reverse_params
+            ) + '?format=json%s' % get_params
+            print("  Testing %s..." % path),
+            r = self.client.get(path)
+            actual = json.loads(r.content)
 
-        for endpoint, endpoint_dict in api_endpoints_ordered.items():
-            for v in endpoint_dict['api_versions']:
-                r = self.client.get('/api/rest/%s/%s/?format=json%s' %
-                                    (v, endpoint, endpoint_dict['params']))
-                actual = json.loads(r.content)
+            with open(os.path.join(
+                    settings.INSTALL_ROOT, 'cl', 'search', 'test_assets',
+                    'api_{}_{}_test_results.json'.format(
+                        reverse_params['api_name'],
+                        reverse_params['resource_name']
+                    )), 'r') as f:
+                correct = json.load(f)
 
-                with open(
-                        os.path.join(
-                            settings.INSTALL_ROOT,
-                            'cl',
-                            'search',
-                            'test_assets',
-                            'api_%s_%s_test_results.json' % (v, endpoint)
-                        ),
-                        'r') as f:
-                    correct = json.load(f)
+                actual, correct = self.strip_varying_data(
+                    reverse_params['resource_name'],
+                    actual,
+                    correct
+                )
 
-                    actual, correct = self.strip_varying_data(
-                        endpoint,
-                        actual,
-                        correct
-                    )
-
-                    msg = "Response from API did not match expected " \
-                          "results (api version: %s, endpoint: %s):\n%s" % (
-                              v,
-                              endpoint,
-                              diff(actual,
-                                   correct,
-                                   fromfile='actual',
-                                   tofile='correct')
-                          )
-                    self.assertEqual(
-                        actual,
-                        correct,
-                        msg=msg,
-                    )
+                msg = "Response from API did not match expected " \
+                      "results (api version: {}, endpoint: {}):\n" \
+                      "{}\n\n" \
+                      "{}".format(
+                          reverse_params['api_name'],
+                          reverse_params['resource_name'],
+                          diff(actual,
+                               correct,
+                               fromfile='actual',
+                               tofile='correct'),
+                          json.dumps(actual, indent=2, sort_keys=True),
+                      )
+                self.assertEqual(
+                    actual,
+                    correct,
+                    msg=msg,
+                )
+                print "✓"
 
     def test_api_pagination(self):
         """Do the cited-by and cites endpoints paginate properly?"""
