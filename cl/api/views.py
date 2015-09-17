@@ -56,7 +56,7 @@ def court_index(request):
     )
 
 
-def rest_index(request, version):
+def rest_docs(request, version):
     """Show the correct version of the rest docs"""
     courts = make_court_variable()
     court_count = len(courts)

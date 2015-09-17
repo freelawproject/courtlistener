@@ -1,5 +1,5 @@
 from cl.api.views import (
-    court_index, api_index, bulk_data_index, rest_index, serve_pagerank_file,
+    court_index, api_index, bulk_data_index, rest_docs, serve_pagerank_file,
     coverage_data, deprecated_api,
 )
 from django.conf.urls import url
@@ -19,8 +19,8 @@ urlpatterns = [
     url(
         # non-capturing group containing a named group, ugh.
         r'^api/rest-info/(?:v(?P<version>[12])/)?$',
-        rest_index,
-        name='rest_index',
+        rest_docs,
+        name='rest_docs',
     ),
     url(
         r'^api/bulk-info/$',

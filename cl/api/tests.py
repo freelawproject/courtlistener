@@ -59,8 +59,8 @@ class BasicAPIPageTest(TestCase):
         r = self.client.get(reverse('court_index'))
         self.assertEqual(r.status_code, 200)
 
-    def test_rest_index(self):
-        r = self.client.get(reverse('rest_index'))
+    def test_rest_docs(self):
+        r = self.client.get(reverse('rest_docs'))
         self.assertEqual(r.status_code, 200)
 
     def test_bulk_data_index(self):
