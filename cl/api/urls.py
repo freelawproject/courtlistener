@@ -17,6 +17,7 @@ urlpatterns = [
         name='court_index',
     ),
     url(
+        # non-capturing group containing a named group, ugh.
         r'^api/rest-info/(?:v(?P<version>[12])/)?$',
         rest_index,
         name='rest_index',

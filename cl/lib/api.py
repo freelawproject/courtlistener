@@ -4,6 +4,7 @@ from django.core.cache import cache
 from lxml import etree
 from tastypie import http
 from tastypie.authentication import BasicAuthentication
+from tastypie.fields import ApiField
 from tastypie.resources import ModelResource
 from tastypie.throttle import CacheThrottle
 
@@ -16,6 +17,39 @@ good_time_filters = ('exact', 'gte', 'gt', 'lte', 'lt', 'range',
                      'year', 'month', 'day', 'hour', 'minute', 'second',)
 good_date_filters = good_time_filters[:-3]
 numerical_filters = ('exact', 'gte', 'gt', 'lte', 'lt', 'range',)
+
+
+class FakeToManyField(ApiField):
+    """
+    This is a hideous hack used to support old versions of the API. The basic
+    problem, as you'll undoubtedly recall, is that we used to have Citation
+    objects hanging off of Document objects. When this was true, and you called
+    the Citation endpoint of the API, you'd get back a field like...
+
+        "document_uris": ["/api/rest/v2/document/1/"],
+
+    ...which served to indicate the Documents that were associated with your
+    Citation. Fair enough.
+
+    When we merged the Citation and Document tables during the upgrade to v3,
+    we needed a way to support this old functionality, but, alas, we didn't have
+    a table to join to anymore.
+
+    This hack replicates this functionality, making the result be the same, but
+    instead of joining to the Document table, it just gives you the URI for the
+    same ID as the present one that you're looking at, which, in truth, is the
+    item that has the rest of the metadata.
+
+    A terrible hack, but it keeps the old version going, in its own way.
+    """
+    dehydrated_type = 'list'
+    help_text = "A list of data. Ex: ['abc', 26.73, 8]"
+
+    def convert(self, value):
+        if value is None:
+            return None
+
+        return ["/api/rest/v2/document/{}/".format(value)]
 
 
 class ModelResourceWithFieldsFilter(ModelResource):

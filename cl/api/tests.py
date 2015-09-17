@@ -1,6 +1,7 @@
 from datetime import timedelta
 import shutil
-from django.test import TestCase
+from django.core.urlresolvers import reverse
+from django.test import Client, TestCase
 from django.test.utils import override_settings
 from django.utils.timezone import now
 
@@ -43,3 +44,34 @@ class BulkDataTest(TestCase):
     def test_make_all_bulk_files(self):
         """Can we successfully generate all bulk files?"""
         Command().execute()
+
+class BasicAPIPageTest(TestCase):
+    """Test the basic views"""
+
+    def setUp(self):
+        self.client = Client()
+
+    def test_api_index(self):
+        r = self.client.get(reverse('api_index'))
+        self.assertEqual(r.status_code, 200)
+
+    def test_court_index(self):
+        r = self.client.get(reverse('court_index'))
+        self.assertEqual(r.status_code, 200)
+
+    def test_rest_index(self):
+        r = self.client.get(reverse('rest_index'))
+        self.assertEqual(r.status_code, 200)
+
+    def test_bulk_data_index(self):
+        r = self.client.get(reverse('bulk_data_index'))
+        self.assertEqual(r.status_code, 200)
+
+    def test_pagerank_file(self):
+        r = self.client.get(reverse('pagerank_file'))
+        self.assertEqual(r.status_code, 200)
+
+    def test_coverage_api(self):
+        r = self.client.get(reverse('coverage_api',
+                                    kwargs={'version': 2, 'court': 'ca9'}))
+        self.assertEqual(r.status_code, 200)

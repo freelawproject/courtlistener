@@ -4,7 +4,7 @@ from cl.audio.models import Audio
 from cl.lib.api import (
     ModelResourceWithFieldsFilter, BasicAuthenticationWithUser,
     PerUserCacheThrottle, SolrList, good_time_filters, numerical_filters,
-    good_date_filters,
+    good_date_filters, FakeToManyField
 )
 from cl.lib.search_utils import build_main_query
 from cl.search import forms
@@ -84,19 +84,36 @@ class DocketResource(ModelResourceWithFieldsFilter):
 
 
 class CitationResource(ModelResourceWithFieldsFilter):
-    document_uris = fields.ToManyField(
-        'search.api2.DocumentResource',
-        'parent_documents'
+    document_uris = FakeToManyField(
+        attribute='pk',
     )
 
     class Meta:
         authentication = authentication.MultiAuthentication(
             BasicAuthenticationWithUser(realm="courtlistener.com"),
             authentication.SessionAuthentication())
+        resource_name = 'citation'
         throttle = PerUserCacheThrottle(throttle_at=1000)
         queryset = OpinionCluster.objects.all()
         max_limit = 20
-        excludes = ['slug', ]  # Why?
+        excludes = ['slug', ]
+        fields = [
+            'case_name',
+            'document_uris',
+            'federal_cite_one',
+            'federal_cite_two',
+            'federal_cite_three',
+            'lexis_cite',
+            'neutral_cite',
+            'scotus_early_cite',
+            'specialty_cite_one',
+            'state_cite_one',
+            'state_cite_two',
+            'state_cite_three',
+            'state_cite_regional',
+            'westlaw_cite',
+            'id',
+        ]
 
 
 class AudioResource(ModelResourceWithFieldsFilter):
