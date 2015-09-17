@@ -37,14 +37,15 @@ urlpatterns = [
 
     # Coverage API
     url(
-        r'^api/rest/v(?P<version>[2])/coverage/(?P<court>\w{1,15})/',
+        r'^api/rest/v(?P<version>[3])/coverage/(?P<court>\w{1,15})/',
         coverage_data,
         name='coverage_api',
     ),
     url(
         # Deprecation Dates:
         # v1: 2015-10-01
-        r'^api/rest/v(?P<v>[1])/.*',
+        # v2: 2015-10-01
+        r'^api/rest/v(?P<v>[12])/.*',
         deprecated_api,
         name='deprecated_api',
     ),

@@ -4,7 +4,7 @@
     "next": null,
     "offset": 0,
     "previous": null,
-    "request_uri": "/api/rest/v2/search/?format=json",
+    "request_uri": "/api/rest/v3/search/?format=json",
     "total_count": 3
 }, "objects": [
     {
@@ -23,7 +23,7 @@
         "id": "1",
         "judge": "david",
         "local_path": "",
-        "resource_uri": "/api/rest/v2/document/1/",
+        "resource_uri": "/api/rest/v3/document/1/",
         "score": 1.0,
         "snippet": "\n\n    \n\n\n\nTarrant Regional Water District v. Herrmann\nPublished\n\nTesting Supreme Court\nTest\ntest\ndavid\ncopyright\n 2013 SCOTUS 44, 4 fake_west 44, 11-889",
         "source": "",
@@ -47,7 +47,7 @@
         "duration": null,
         "judge": "Jalal",
         "local_path": "",
-        "resource_uri": "/api/rest/v2/document/2/",
+        "resource_uri": "/api/rest/v3/document/2/",
         "score": 1.0,
         "snippet": "\n\n    \n\n\n\nIn Re Motion for Consent to Disclosure of Court Records\nPublished\n\nTesting Supreme Court\nTest\ntest\nJalal\nsocial welfare\n 2013 FISC 1, 2 fake_west 4, Misc. 13-01",
         "source": "",
@@ -71,7 +71,7 @@
         "id": "3",
         "judge": "gaby",
         "local_path": "",
-        "resource_uri": "/api/rest/v2/document/3/",
+        "resource_uri": "/api/rest/v3/document/3/",
         "score": 0.0,
         "snippet": "\n\n    \n\n\n\nState of Indiana v. Charles Barker\nPublished\n\nTesting Supreme Court\nTest\ntest\ngaby\nfamily relations\n 2005 IN 442, 23 fake_west 449, 49S00-0308-DP-392",
         "source": "",

@@ -14,14 +14,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         courts = Court.objects.all()
 
-        from cl.search import api2
+        from cl.search import api3
 
         # Make the main bulk files
         arg_tuples = (
-            ('document', Opinion, 'docket.court_id', api2.DocumentResource),
-            ('audio', Audio, 'docket.court_id', api2.AudioResource),
-            ('docket', Docket, 'court_id', api2.DocketResource),
-            ('jurisdiction', Court, 'pk', api2.JurisdictionResource),
+            ('document', Opinion, 'docket.court_id', api3.DocumentResource),
+            ('audio', Audio, 'docket.court_id', api3.AudioResource),
+            ('docket', Docket, 'court_id', api3.DocketResource),
+            ('jurisdiction', Court, 'pk', api3.JurisdictionResource),
         )
 
         print 'Starting bulk file creation with %s celery tasks...' % \

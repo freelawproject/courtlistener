@@ -366,7 +366,7 @@ class ApiTest(SolrTestCase):
 
     def test_deprecated_api_versions(self):
         print("Testing deprecated API paths...")
-        deprecated_versions = ('1',)
+        deprecated_versions = ('1', '2')
         # Make sure all the subpaths are deprecated too.
         paths = ['', 'asdf/', 'schema/']
         for v in deprecated_versions:
@@ -396,14 +396,14 @@ class ApiTest(SolrTestCase):
         print "Trying various API endpoints..."
         self.client.login(username='pandora', password='password')
         api_endpoints = [
-            ({'resource_name': 'audio', 'api_name': 'v2'}, ''),
-            ({'resource_name': 'citation', 'api_name': 'v2'}, ''),
-            ({'resource_name': 'cited_by', 'api_name': 'v2'}, '&id=1'),
-            ({'resource_name': 'cites', 'api_name': 'v2'}, '&id=1'),
-            ({'resource_name': 'docket', 'api_name': 'v2'}, ''),
-            ({'resource_name': 'document', 'api_name': 'v2'}, ''),
-            ({'resource_name': 'jurisdiction', 'api_name': 'v2'}, ''),
-            ({'resource_name': 'search', 'api_name': 'v2'}, ''),
+            ({'resource_name': 'docket', 'api_name': 'v3'}, ''),
+            ({'resource_name': 'audio', 'api_name': 'v3'}, ''),
+            ({'resource_name': 'cluster', 'api_name': 'v3'}, ''),
+            ({'resource_name': 'document', 'api_name': 'v3'}, ''),
+            ({'resource_name': 'cited-by', 'api_name': 'v3'}, '&id=1'),
+            ({'resource_name': 'cites', 'api_name': 'v3'}, '&id=1'),
+            ({'resource_name': 'jurisdiction', 'api_name': 'v3'}, ''),
+            ({'resource_name': 'search', 'api_name': 'v3'}, ''),
         ]
         for reverse_params, get_params in api_endpoints:
             path = reverse(
@@ -448,19 +448,27 @@ class ApiTest(SolrTestCase):
                 print "✓"
 
     def test_api_pagination(self):
-        """Do the cited-by and cites endpoints paginate properly?"""
+        print("Testing if the cited-by and cites endpoints paginate properly")
         self.client.login(username='pandora', password='password')
-
-        r = self.client.get('/api/rest/v2/cites/?id=1')
+        simple_path = reverse('api_dispatch_list',
+                              kwargs={'resource_name': 'cites',
+                                      'api_name': 'v3'}) + '?id=1'
+        print "  Testing no pagination, no limits: {}...".format(simple_path),
+        r = self.client.get(simple_path)
         json_no_offset_no_limit = json.loads(r.content)
         self.assertEqual(
             len(json_no_offset_no_limit['objects']),
             2,
             msg="Did not get the expected result count on the cites endpoint."
         )
+        print '✓'
 
-        # Offset 1.
-        r = self.client.get('/api/rest/v2/cites/?id=1&offset=1')
+        offset_1 = reverse(
+            'api_dispatch_list',
+            kwargs={'resource_name': 'cites', 'api_name': 'v3'}
+        ) + '?id=1&offset=1'
+        print("  Testing offset value of 1: {}".format(offset_1)),
+        r = self.client.get(offset_1)
         json_offset_1 = json.loads(r.content)
 
         # Do we get back one fewer results with the offset?
@@ -468,46 +476,55 @@ class ApiTest(SolrTestCase):
             len(json_offset_1['objects']),
             len(json_no_offset_no_limit['objects']) - 1
         )
+        print '✓'
 
-        # Does the first item of the offset query match the second in the query
-        # with no offset?
+        print("  Does the first item of the offset query match the second in "
+              "the query without an offset..."),
         self.assertEqual(
             json_offset_1['objects'][0]['absolute_url'],
             json_no_offset_no_limit['objects'][1]['absolute_url'],
         )
+        print '✓'
 
-        # (1) Does the first item in a query limited to one result match the
-        # first item in an unlimited query, and (2) does the first item in a
-        # query limited to one result and offset by one match the second item
-        # in an unlimited query?
-        r = self.client.get('/api/rest/v2/cites/?id=1&limit=1')
+        print("  Does the first item in a query limited to one result match the"
+              "first item in an unlimited query..."),
+        r = self.client.get('/api/rest/v3/cites/?id=1&limit=1')
         json_limit_1 = json.loads(r.content)
-        r = self.client.get('/api/rest/v2/cites/?id=1&limit=1&offset=1')
+        r = self.client.get('/api/rest/v3/cites/?id=1&limit=1&offset=1')
         json_limit_1_offset_1 = json.loads(r.content)
         self.assertEqual(
             json_limit_1['objects'][0]['absolute_url'],
             json_no_offset_no_limit['objects'][0]['absolute_url']
         )
+        print '✓'
+
+        print("  Does the first item in a query limited to one result and "
+              "offset by one match the second item in an unlimited query..."),
         self.assertEqual(
             json_limit_1_offset_1['objects'][0]['absolute_url'],
             json_no_offset_no_limit['objects'][1]['absolute_url']
         )
+        print '✓'
 
-        # Are the results of a limit 1 and an offset 1 different?
+        print("  Are the results of a limit 1 and an offset 1 different..."),
         self.assertNotEqual(
             json_limit_1['objects'][0]['absolute_url'],
             json_limit_1_offset_1['objects'][0]['absolute_url']
         )
+        print '✓'
 
     def test_api_result_count(self):
-        """Do we get back the number of results we expect in the meta data and
-        in 'objects'?"""
+        print("Testing result counts from metadata and objects...")
         self.client.login(username='pandora', password='password')
-        api_versions = ['v1', 'v2']
+        api_versions = ['v3']
         for v in api_versions:
-            r = self.client.get('/api/rest/%s/search/?q=*:*&format=json' % v)
+            path = reverse(
+                'api_dispatch_list',
+                kwargs={'resource_name': 'search', 'api_name': v}
+            ) + '?q=*:*&format=json'
+            r = self.client.get(path)
             json = json.loads(r.content)
-            # Test the meta data
+            print("  Does the metadata count match the result count..."),
             self.assertEqual(
                 self.expected_num_results_opinion,
                 json['meta']['total_count'],
@@ -517,7 +534,10 @@ class ApiTest(SolrTestCase):
                     (v, json['meta']['total_count'],
                      self.expected_num_results_opinion,)
             )
-            # Test the actual data
+            print '✓'
+
+            print("  Does the number of results returned match the expected "
+                  "number...")
             num_actual_results = len(json['objects'])
             self.assertEqual(
                 self.expected_num_results_opinion,
@@ -527,17 +547,22 @@ class ApiTest(SolrTestCase):
                     "  Got:\t%s\n"
                     "  Expected:\t%s\n" %
                     (v, num_actual_results,
-                     self.expected_num_results_opinion))
+                     self.expected_num_results_opinion)
+            )
+            print '✓'
 
     def test_api_able_to_login(self):
-        """Can we login properly?"""
+        print("Testing can we log in properly..."),
         username, password = 'pandora', 'password'
         logged_in_successfully = self.client.login(
             username=username, password=password)
-        self.assertTrue(logged_in_successfully,
-                        msg="Unable to log into the test client with:\n"
-                            "  Username:\t%s\n"
-                            "  Password:\t%s\n" % (username, password))
+        self.assertTrue(
+            logged_in_successfully,
+            msg="Unable to log into the test client with:\n"
+                "  Username:\t%s\n"
+                "  Password:\t%s\n" % (username, password)
+        )
+        print '✓'
 
 
 class FeedTest(SolrTestCase):

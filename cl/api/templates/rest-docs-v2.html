@@ -16,10 +16,9 @@
 {% block content %}
     <div class="col-xs-12">
         <div class="alert-danger alert">
-            <p class="bottom">These notes are for a version of the API that is
-                being phased out and will be disabled after October 15, 2016.
-                Please use the <a
-                        href="{% url "rest_index" %}">latest version</a>, as
+            <p class="bottom">These notes are for a version of the API that has
+                been deprecated and will soon be disabled completely. Please use
+                the <a href="{% url "rest_index" %}">latest version</a>, as
                 these notes are only maintained to help with migrations.
             </p>
         </div>
@@ -31,15 +30,15 @@
         </p>
         <p>This API currently has nine endpoints that can be consumed via GET requests:</p>
         <ol>
-            <li><a href="{% url "api_dispatch_list" resource_name="docket" api_name="v2" %}">{% url "api_dispatch_list" resource_name="docket" api_name="v2" %}</a></li>
-            <li><a href="{% url "api_dispatch_list" resource_name="audio" api_name="v2" %}">{% url "api_dispatch_list" resource_name="audio" api_name="v2" %}</a></li>
-            <li><a href="{% url "api_dispatch_list" resource_name="document" api_name="v2" %}">{% url "api_dispatch_list" resource_name="document" api_name="v2" %}</a></li>
-            <li><a href="{% url "api_dispatch_list" resource_name="cites" api_name="v2" %}">{% url "api_dispatch_list" resource_name="cites" api_name="v2" %}</a></li>
-            <li><a href="{% url "api_dispatch_list" resource_name="cited-by" api_name="v2" %}">{% url "api_dispatch_list" resource_name="cited-by" api_name="v2" %}</a></li>
-            <li><a href="{% url "api_dispatch_list" resource_name="citation" api_name="v2" %}">{% url "api_dispatch_list" resource_name="citation" api_name="v2" %}</a></li>
-            <li><a href="{% url "api_dispatch_list" resource_name="jurisdiction" api_name="v2" %}">{% url "api_dispatch_list" resource_name="jurisdiction" api_name="v2" %}</a></li>
-            <li><a href="{% url "api_dispatch_list" resource_name="search" api_name="v2" %}">{% url "api_dispatch_list" resource_name="search" api_name="v2" %}</a></li>
-            <li><a href="{% url "coverage_api" version="2" court="all" %}">{% url "coverage_api" version="2" court="all" %}</a></li>
+            <li><a href="/api/rest/v2/docket/">/api/rest/v2/docket/</a></li>
+            <li><a href="/api/rest/v2/audio/">/api/rest/v2/audio/</a></li>
+            <li><a href="/api/rest/v2/document/">/api/rest/v2/document/</a></li>
+            <li><a href="/api/rest/v2/cites/">/api/rest/v2/cites/</a></li>
+            <li><a href="/api/rest/v2/cited-by/">/api/rest/v2/cited-by/</a></li>
+            <li><a href="/api/rest/v2/citation/">/api/rest/v2/citation/</a></li>
+            <li><a href="/api/rest/v2/jurisdiction/">/api/rest/v2/jurisdiction/</a></li>
+            <li><a href="/api/rest/v2/search/">/api/rest/v2/search/</a></li>
+            <li><a href="/api/rest/v2/coverage/all/">/api/rest/v2/coverage/all/</a></li>
         </ol>
 
         <p>
@@ -642,7 +641,7 @@
             Appeals (<code>ca9</code>):
         </p>
         <blockquote>
-            <code>curl https://www.courtlistener.com{% url "coverage_api" version='2' court='ca9' %}</code>
+            <code>curl https://www.courtlistener.com/api/rest/v2/coverage/ca9/</code>
         </blockquote>
     </div>
 

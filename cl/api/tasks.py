@@ -113,6 +113,7 @@ def write_json_to_disk(obj_type_str, obj_type, court_attr,
         print "   - Incremental data not found. Working from scratch..."
         qs = obj_type.objects.all()
     item_resource = api_resource_obj()
+    assert qs.count() > 0, "No %s-type items in the DB!" % obj_type_str
     if type(qs[0].pk) == int:
         item_list = queryset_generator(qs)
     else:

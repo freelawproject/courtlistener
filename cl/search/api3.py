@@ -10,6 +10,7 @@ from cl.lib.search_utils import build_main_query
 from cl.search import forms
 from cl.search.models import (
     Court, Docket, SOURCES, DOCUMENT_STATUSES, OpinionCluster,
+    OpinionsCited
 )
 from tastypie import fields
 from tastypie import authentication
@@ -252,7 +253,7 @@ class CitedByResource(ModelResourceWithFieldsFilter):
             authentication.SessionAuthentication())
         throttle = PerUserCacheThrottle(throttle_at=1000)
         resource_name = 'cited-by'
-        queryset = OpinionCluster.objects.all()
+        queryset = OpinionsCited.objects.all()
         excludes = ('html', 'html_lawbox', 'html_with_citations', 'plain_text')
         include_absolute_url = True
         max_limit = 20
@@ -287,7 +288,7 @@ class CitedByResource(ModelResourceWithFieldsFilter):
         url_str = '/api/rest/%s/%s/%s/'
         if bundle_or_obj:
             return url_str % (
-                'v2',
+                'v3',
                 'document',
                 bundle_or_obj.obj.id,
             )
@@ -363,7 +364,7 @@ class CitesResource(ModelResourceWithFieldsFilter):
         url_str = '/api/rest/%s/%s/%s/'
         if bundle_or_obj:
             return url_str % (
-                'v2',
+                'v3',
                 'document',
                 bundle_or_obj.obj.id,
             )

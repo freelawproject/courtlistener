@@ -92,8 +92,8 @@ function drawGraph(data) {
                 prec += '&' + precedentTypes[i] + '=on';
             }
             window.location.href = '/?filed_after=' + year +
-                '&filed_before=' + year + 
-                prec + 
+                '&filed_before=' + year +
+                prec +
                 ((hash !== 'all') ? '&court=' + hash : '');
         }
     });
@@ -111,7 +111,7 @@ $(window).hashchange(function() {
     }
     $.ajax({
         type: 'GET',
-        url: '/api/rest/v2/coverage/' + hash + '/',
+        url: '/api/rest/v3/coverage/' + hash + '/',
         success: function(data) {
             // Update the drawing area
             drawGraph(data);
