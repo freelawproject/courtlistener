@@ -67,6 +67,7 @@ class Command(cl_scrape_opinions.Command):
                 msg, r = get_binary_content(
                     site.download_urls[i],
                     site.cookies,
+                    site._get_adapter_instance(),
                     method=site.method
                 )
                 if msg:
