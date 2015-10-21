@@ -47,7 +47,7 @@ info_tips = (
     'A podcast is created for every oral argument query that you make.',
     'CourtListener has an <a href="/api/">API</a> so anybody can easily use our data.',
     'Oral Arguments are available in <a href="http://freelawproject.org/2014/11/09/more-oral-argument-news/">Stitcher Radio</a>.',
-    'Search Relevancy on CourtListener is <a href="http://freelawproject.org/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/" target="_blank">powered by the citation network between cases.',
+    'Search Relevancy on CourtListener is <a href="http://freelawproject.org/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/" target="_blank">powered by the citation network between cases.</a>',
     'You can make sophisticated queries using a number of <a href="/search/advanced-techniques/">advanced search features</a>.',
 )
 def inject_random_tip(request):
