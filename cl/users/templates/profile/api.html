@@ -1,0 +1,22 @@
+{% extends "profile/nav.html" %}
+{% block title %}API &ndash; CourtListener.com{% endblock %}
+
+{% block search-form %}{% endblock %}
+
+{% block nav-api %}active{% endblock %}
+
+{% block content %}
+    <div class="col-sm-3"></div>
+    <div class="col-xs-12 col-sm-6">
+        <h3>CourtListener API</h3>
+        <p>The CourtListener API is a powerful, first-of-its-kind tool that programmers can use to access the contents of the CourtListener database.
+        </p>
+        <p>By allowing programmers to access this data, we hope to fulfill our mission of stimulating legal innovation.
+        </p>
+        <h3>Your API Token</h3>
+        <p>To get started, you need an API token. Yours is:</p>
+        <h4><code>{{ user.auth_token }}</code></h4>
+        <p class="v-offset-above-3"><a href="{% url "api_index" %}" class="btn btn-primary btn-lg">Read the Documentation</a></p>
+    </div>
+    <div class="col-sm-3"></div>
+{% endblock %}

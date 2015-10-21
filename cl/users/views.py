@@ -78,6 +78,14 @@ def view_visualizations(request):
                               {'private': True},
                               RequestContext(request))
 
+
+@login_required
+@never_cache
+def view_api(request):
+    return render_to_response('profile/api.html',
+                              {'private': True},
+                              RequestContext(request))
+
 @sensitive_variables('salt', 'activation_key', 'email_body')
 @login_required
 @never_cache
