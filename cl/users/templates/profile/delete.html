@@ -18,7 +18,7 @@
             possible.
         </p>
 
-        <a href="/profile/settings/" class="btn btn-primary">Cancel and Go
+        <a href="{% url "view_settings" %}" class="btn btn-primary">Cancel and Go
             Back</a>&nbsp;&nbsp;
         <form action="" method="post" class="float-right">{% csrf_token %}
             <button type="submit" class="btn btn-danger">Delete My Account Now</button>

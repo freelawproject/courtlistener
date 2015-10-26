@@ -18,7 +18,7 @@
                 <a href="/profile/donations/"><i class="fa fa-money gray"></i>&nbsp;Donations</a>
             </li>
             <li class="{% block nav-account %}inactive{% endblock %}">
-                <a href="/profile/settings/"><i class="fa fa-user gray"></i>&nbsp;Account</a>
+                <a href="{% url "view_settings" %}"><i class="fa fa-user gray"></i>&nbsp;Account</a>
             </li>
             <li class="{% block nav-password %}inactive{% endblock %}">
                 <a href="/profile/password/change"><i class="fa fa-lock gray"></i>&nbsp;Password</a>
