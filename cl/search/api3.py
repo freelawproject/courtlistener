@@ -4,7 +4,7 @@ from cl.audio.models import Audio
 from cl.lib.api import (
     ModelResourceWithFieldsFilter, BasicAuthenticationWithUser,
     PerUserCacheThrottle, SolrList, good_time_filters, numerical_filters,
-    good_date_filters, FakeToManyField
+    good_date_filters
 )
 from cl.lib.search_utils import build_main_query
 from cl.search import forms
@@ -85,7 +85,7 @@ class DocketResource(ModelResourceWithFieldsFilter):
 
 
 class CitationResource(ModelResourceWithFieldsFilter):
-    document_uris = FakeToManyField(
+    document_uris = fields.ListField(
         attribute='pk',
     )
 

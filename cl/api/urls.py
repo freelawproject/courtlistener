@@ -1,52 +1,57 @@
-from cl.api.views import (
-    court_index, api_index, bulk_data_index, rest_docs, serve_pagerank_file,
-    coverage_data, deprecated_api,
-)
-from django.conf.urls import url
+from cl.api import views
+
+from django.conf.urls import url, include
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+router.register(r'dockets', views.DocketViewSet)
+router.register(r'courts', views.CourtViewSet)
+router.register(r'audio', views.AudioViewSet)
+router.register(r'clusters', views.OpinionClusterViewSet)
+router.register(r'opinions', views.OpinionViewSet)
+router.register(r'cited-by', views.OpinionsCitedViewSet)
+
+from django.conf.urls import url, include
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+router.register(r'dockets', views.DocketViewSet)
+router.register(r'courts', views.CourtViewSet)
+router.register(r'audio', views.AudioViewSet)
+router.register(r'clusters', views.OpinionClusterViewSet)
+router.register(r'opinions', views.OpinionViewSet)
+router.register(r'cited-by', views.OpinionsCitedViewSet)
 
 urlpatterns = [
+    # url(r'^api/rest/(?P<version>[v3]+)/', include(router.urls)),
+    url(r'^api-auth/',
+        include('rest_framework.urls', namespace='rest_framework')),
+    url(r'^api/rest/(?P<version>[v3]+)/', include(router.urls)),
+    url(r'^api/rest/search/', views.search_list),
+
     # Documentation
-    url(
-        r'^api/$',
-        api_index,
-        name='api_index',
-    ),
-    url(
-        r'^api/jurisdictions/$',
-        court_index,
-        name='court_index',
-    ),
-    url(
-        # non-capturing group containing a named group, ugh.
-        r'^api/rest-info/(?:v(?P<version>[12])/)?$',
-        rest_docs,
-        name='rest_docs',
-    ),
-    url(
-        r'^api/bulk-info/$',
-        bulk_data_index,
-        name='bulk_data_index',
-    ),
+    url(r'^api/$',
+        views.api_index,
+        name='api_index'),
+    url(r'^api/jurisdictions/$',
+        views.court_index,
+        name='court_index'),
+    url(r'^api/rest-info/(?P<version>v[12])?/?$',
+        views.rest_docs,
+        name='rest_docs'),
+    url(r'^api/bulk-info/$',
+        views.bulk_data_index,
+        name='bulk_data_index'),
 
     # Pagerank file
-    url(
-        r'^api/bulk/external_pagerank/$',
-        serve_pagerank_file,
-        name='pagerank_file',
-    ),
+    url(r'^api/bulk/external_pagerank/$',
+        views.serve_pagerank_file,
+        name='pagerank_file'),
 
-    # Coverage API
-    url(
-        r'^api/rest/v(?P<version>[3])/coverage/(?P<court>\w{1,15})/',
-        coverage_data,
-        name='coverage_api',
-    ),
-    url(
-        # Deprecation Dates:
-        # v1: 2015-10-01
-        # v2: 2015-10-01
-        r'^api/rest/v(?P<v>[12])/.*',
-        deprecated_api,
-        name='deprecated_api',
-    ),
+    # Deprecation Dates:
+    # v1: 2015-11-01
+    # v2: 2015-11-01
+    url(r'^api/rest/v(?P<v>[12])/.*',
+        views.deprecated_api,
+        name='deprecated_api'),
 ]

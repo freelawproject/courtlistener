@@ -67,7 +67,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'markdown_deux',
     'djcelery',
-    'tastypie',
+    'rest_framework',
+    'rest_framework.authtoken',
 
     # CourtListener Apps
     'cl.alerts',
@@ -175,8 +176,58 @@ MIN_DONATION = {
 #######
 # API #
 #######
-TASTYPIE_DEFAULT_FORMATS = ['json', 'jsonp', 'xml']
-TASTYPIE_FULL_DEBUG = True
+REST_FRAMEWORK = {
+    # Use Django's standard `django.contrib.auth` permissions,
+    # or allow read-only access for unauthenticated users.
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
+    ],
+
+    # Versioning
+    'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
+    'DEFAULT_VERSION': 'v3',
+    'ALLOWED_VERSIONS': {'v3'},
+
+    # Throttles
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/day',
+        'user': '1000/hour',
+    },
+
+    # Auth
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ),
+
+    # Rendering and Parsing
+    'DEFAULT_PARSER_CLASSES': (
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+        'rest_framework_xml.parsers.XMLParser',
+    ),
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.BrowsableAPIRenderer',
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework_xml.renderers.XMLRenderer',
+    ),
+
+    # Filtering
+    'DEFAULT_FILTER_BACKENDS': (
+        'rest_framework_filters.backends.DjangoFilterBackend',
+    ),
+
+    # Assorted & Sundry
+    'PAGE_SIZE': 20,
+    'URL_FIELD_NAME': 'resource_uri',
+}
+
 # CORS
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_URLS_REGEX = r'^/api/.*$'

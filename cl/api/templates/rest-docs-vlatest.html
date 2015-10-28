@@ -15,7 +15,7 @@
 
 {% block content %}
     <div class="col-sm-7">
-        <h2 id="about">REST API &ndash; V3</h2>
+        <h1 id="about">REST API &ndash; V3</h1>
         <p>For developers that wish to have a granular API for our data, we
             provide a RESTful API based on the <a
                     href="http://django-tastypie.readthedocs.org/en/latest/">tastypie
@@ -24,34 +24,28 @@
         <p>This API currently has the following endpoints that can be consumed via GET requests:</p>
         <ol>
             <li>
-                <a href="{% url "api_dispatch_list" resource_name="docket" api_name="v3" %}">{% url "api_dispatch_list" resource_name="docket" api_name="v3" %}</a>
+
             </li>
             <li>
-                <a href="{% url "api_dispatch_list" resource_name="audio" api_name="v3" %}">{% url "api_dispatch_list" resource_name="audio" api_name="v3" %}</a>
+
             </li>
             <li>
-                <a href="{% url "api_dispatch_list" resource_name="cluster" api_name="v3" %}">{% url "api_dispatch_list" resource_name="cluster" api_name="v3" %}</a>
+
             </li>
             <li>
-                <a href="{% url "api_dispatch_list" resource_name="opinion" api_name="v3" %}">{% url "api_dispatch_list" resource_name="opinion" api_name="v3" %}</a>
+
             </li>
             <li>
-                <a href="{% url "api_dispatch_list" resource_name="cites" api_name="v3" %}">{% url "api_dispatch_list" resource_name="cites" api_name="v3" %}</a>
+
             </li>
             <li>
-                <a href="{% url "api_dispatch_list" resource_name="cited-by" api_name="v3" %}">{% url "api_dispatch_list" resource_name="cited-by" api_name="v3" %}</a>
+
             </li>
             <li>
-                <a href="{% url "api_dispatch_list" resource_name="citation" api_name="v3" %}">{% url "api_dispatch_list" resource_name="citation" api_name="v3" %}</a>
+
             </li>
             <li>
-                <a href="{% url "api_dispatch_list" resource_name="jurisdiction" api_name="v3" %}">{% url "api_dispatch_list" resource_name="jurisdiction" api_name="v3" %}</a>
-            </li>
-            <li>
-                <a href="{% url "api_dispatch_list" resource_name="search" api_name="v3" %}">{% url "api_dispatch_list" resource_name="search" api_name="v3" %}</a>
-            </li>
-            <li>
-                <a href="{% url "coverage_api" version="3" court="all" %}">{% url "coverage_api" version="2" court="all" %}</a>
+
             </li>
         </ol>
 
@@ -92,77 +86,163 @@
             </li>
         </ul>
 
-        <h3>Overview of Endpoints</h3>
+        <h2>Overview of Endpoints</h2>
         <p>
             This section explains general principles of the API and rules that apply to all of our RESTful endpoints.
         </p>
 
 
 
-        <h4>Authentication</h4>
+        <h3>Authentication</h3>
         <p>
-            With the exception of the coverage endpoint, all of the endpoints use either
-            <a href="http://en.wikipedia.org/wiki/Basic_access_authentication">HTTP Basic Authentication</a> or
-            Django Session Authentication. To use the API, you must therefore either be logged into the CourtListener
-            website (Session Authentication) or you must use your CourtListener credentials to set up HTTP Basic
-            Authentication. Both of these authentication mechanisms protect your credentials on the wire via HTTPS.
+            Authentication is necessary so we can monitor usage of the system
+            and so we can assist with any errors that may occur. Per our <a
+                href="/terms/#privacy">privacy policy</a>, we do not track your
+            queries in the API, though we may collect statistical information
+            for system monitoring.
         </p>
+        <p>There are currently three types of authentication available on the
+            API:
+        </p>
+        <ol>
+            <li>
+                <a href="http://en.wikipedia.org/wiki/Basic_access_authentication">HTTP Basic Authentication</a>
+            </li>
+            <li>Django Session Authentication (using cookies)</li>
+            <li>
+                <a href="http://www.django-rest-framework.org/api-guide/authentication/#tokenauthentication">Django REST Framework Token Authentication</a>
+            </li>
+        </ol>
+        <p>One form of authentication that is currently not supported is <a href="http://tools.ietf.org/html/rfc6749">OAuth2</a>.
+            If this is a valuable form of authentication for your service,
+            please get in touch using <a href="{% url "contact" %}">our contact
+                form</a>, or chime in to <a
+                    href="https://github.com/freelawproject/courtlistener/issues/371">the
+                issue where we're tracking this feature</a>. If there is enough
+            demand, or if somebody steps forward to develop this feature, it
+            will be added.
+        </p>
+        <p>All communication with the CourtListener servers is over HTTPS, and
+            so the choice of which form of authentication to use is generally a
+            question of what's most convenient for the context of your work. Our
+            recommendations are:
+        </p>
+        <ul>
+            <li>Use Basic Authentication for testing;</li>
+            <li>Use Django Session Authentication if you already have a user's
+                cookie or are developing a system where you can ask the user to
+                log in; and
+            </li>
+            <li>Use Token Authentication for all normal programmatic API access.</li>
+        </ul>
+
+        <h4>HTTP Basic Authentication</h4>
         <p>
-            To do HTTP Basic Authentication using cURL, you might do something like this:
+            To do HTTP Basic Authentication using cURL, you might do something
+            like this:
         </p>
         <blockquote>
-            <code>curl --user "harvey:your-password" "https://www.courtlistener.com/api/rest/v2/document/"</code>
+            <code>curl --user "harvey:your-password"
+                "https://www.courtlistener.com/api/rest/v3/opinion/"</code>
         </blockquote>
         <p>
             You can also do it in your browser with a url like:
         </p>
         <blockquote>
-            <code>https://harvey:your-password@www.courtlistener.com/api/rest/v2/document/</code>
+            <code>https://harvey:your-password@www.courtlistener.com/api/rest/v3/opinion/</code>
         </blockquote>
         <p>
-            But that's not normally necessary because most browsers will provide you with a popup if you need to
-            authenticate using HTTP Basic Authentication.
-        </p>
-        <p>
-            Authentication is necessary so we can monitor usage of the system and so we can assist with any errors that
-            may occur. Per our <a href="/terms/#privacy">privacy policy</a>, we do not track your queries in the API,
-            though we may collect statistical information for system monitoring.
+            But that's not normally necessary because most browsers will provide
+            you with a popup if you need to authenticate using HTTP Basic
+            Authentication.
         </p>
 
+        <h4>Django Session Authentication</h4>
+        <p>To use Django Session Authentication, simply log into the website.</p>
 
-
-        <h4>Serialization Formats</h4>
-        <p>
-            With the exception of the coverage endpoint (which is only available as JSON), requests may be serialized
-            as JSON, JSONP, or XML, with JSON as the default. The format you wish to receive may be requested via the
-            HTTP <code>Accept</code> header or via the <code>format</code> GET parameter.
+        <h4 id="token-auth">Token Authentication</h4>
+        <p>To use your token, use the <code>Authentication</code> HTTP Header.
+            The key should be prefixed by the string literal <code>Token</code>, with whitespace separating the two strings. For example:
         </p>
-        <p>
-            Note that because your browser prioritizes <code>application/xml</code> over <code>application/json</code>,
-            you'll always receive XML when using your browser to explore our APIs. If you wish to override this, you
-            may wish to use a less opinionated way of GETting resources such as cURL or you can override it using the
-            <code>format</code> GET parameter, like so:
+        <p>The following media types and parameters can be used:
+        </p>
+        <ul>
+            <li><strong>HTML</strong>: The media type for HTML is <code>text/html</code>.</li>
+            <li><strong>JSON</strong>: The media type for JSON is <code>application/json</code>. Providing the <code>indent</code> media type parameter allows clients to set the indenting for the response, for example: <code>Accept: application/json; indent=2</code>.
+            </li>
+            <li><strong>XML</strong>: The media type for XML is <code>application/xml</code>.
+            </li>
+        </ul>
+        <p>JSONP, a clever browser hack, is no longer provided due to the wide support of <a href="http://www.w3.org/TR/cors/">CORS</a>. YAML is no longer supported due to the ubiquitous availability of JSON parsers.
+        </p>
+        <p>Take note that by default, browsers send an <code>Accept</code> header similar to:
         </p>
         <blockquote>
-            <code>https://www.courtlistener.com/api/rest/v2/document/?<strong>format=json</strong></code>
+            <code>Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}</code>
         </blockquote>
+        <p>Using curl, this looks like:</p>
+        <blockquote>
+            <code>curl -X GET http://127.0.0.1:8000/rest/api/v3/opinion/ --header
+                'Authorization: Token
+                {% if user.is_authenticated %}{{ user.auth_token }}{% else %}
+                    &lt;your-token-here&gt;{% endif %}
+            </code>
+        </blockquote>
+        <p>Note that quotes are used to enclose the whitespace in the header.</p>
+        {% if user.is_authenticated %}
+            <p>Your permanent token for use with this API is:</p>
+            <blockquote>
+                <code>{{ user.auth_token }}</code>
+            </blockquote>
+        {% else %}
+            <p><a
+                    href="{% url "sign-in" %}?next={{ request.path }}#token-auth"
+                    class="btn btn-primary">Sign
+                In To See Your Token</a>
+            </p>
+        {% endif %}
 
-        <p>
-            If you wish to receive XML via a tool such as cURL, set the Accept header manually, like so:
+        <h4>Django Session Authentication</h4>
+        <p>To use Django Session Authentication, simply log into the website.</p>
+
+
+        <h3>Serialization Formats</h3>
+        <p>Requests may be serialized as HTML, JSON, or XML, with JSON as the default if no format is specified. The format you wish to receive may be requested via the HTTP <code>Accept</code> header.
+        </p>
+        <p>The following media types and parameters can be used:
+        </p>
+        <ul>
+            <li><strong>HTML</strong>: The media type for HTML is <code>text/html</code>.</li>
+            <li><strong>JSON</strong>: The media type for JSON is <code>application/json</code>. Providing the <code>indent</code> media type parameter allows clients to set the indenting for the response, for example: <code>Accept: application/json; indent=2</code>.
+            </li>
+            <li><strong>XML</strong>: The media type for XML is <code>application/xml</code>.
+            </li>
+        </ul>
+        <p>JSONP, a clever browser hack, is no longer provided due to the wide support of <a href="http://www.w3.org/TR/cors/">CORS</a>. YAML is no longer supported due to the ubiquitous availability of JSON parsers.
+        </p>
+        <p>Take note that by default, browsers send an <code>Accept</code> header similar to:
+        </p>
+        <p>If you wish to set the <code>Accept</code> header using cURL, you can do so using the <code>--header</code> flag:
         </p>
         <blockquote>
-            <code>curl <strong>-H "Accept: application/xml"</strong> https://www.courtlistener.com/api/rest/v2/document/</code>
+            <code>Accept: text/html,application/xhtml+xml,application/xml;</code>
         </blockquote>
-        <p>
-            Or again, you can use the <code>format</code> GET parameter:
+        <p>Thus, if you are using your browser to view the API you will see the browsable HTML API by default unless you specify one of the other  <code>Accept</code> headers noted above.
+        </p>
+        <p>If you wish to set the <code>Accept</code> header using cURL, you can do so using the <code>--header</code> flag:
         </p>
         <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v2/document/?<strong>format=xml</strong></code>
+            <code>curl <strong>--header "Accept: application/xml"</strong> https://www.courtlistener.com/api/rest/v3/opinion/</code>
         </blockquote>
+        <p>All data is serialized using the utf-8 charset.</p>
 
 
+        <h3>Parsing Uploaded Content</h3>
+        <p>If you are a user that has write access to these APIs (most users do not), you will need to use the <code>Content-Type</code> HTTP header to explicitly set the format of the content you are uploading. The header can be set to any of the values that are available for serialization or to <code>application/x-www-form-urlencoded</code> or <code>multipart/form-data</code>, if you are sending form data.
+        </p>
 
-        <h4>Views, Pagination and Subset Selection</h4>
+
+        <h3>Views, Pagination and Subset Selection</h3>
         <p>
             Each endpoint provides a list view, a detail view and a set view. The <em>list</em> view is what you see
             when you visit an endpoint, when it shows a list of results.  The <em>detail</em> view shows all meta
@@ -171,6 +251,42 @@
             available on the detail view. With the exception of the coverage API, links to the next and previous pages
             are available in the <code>meta</code> section of the results.
         </p>
+        <p>There are currently three types of authentication available on the
+            API:
+        </p>
+        <ol>
+            <li>
+                <a href="http://en.wikipedia.org/wiki/Basic_access_authentication">HTTP Basic Authentication</a>
+            </li>
+            <li>Django Session Authentication (using cookies)</li>
+            <li>
+                <a href="http://www.django-rest-framework.org/api-guide/authentication/#tokenauthentication">Django REST Framework Token Authentication</a>
+            </li>
+        </ol>
+        <p>One form of authentication that is currently not supported is <a href="http://tools.ietf.org/html/rfc6749">OAuth2</a>.
+            If this is a valuable form of authentication for your service,
+            please get in touch using <a href="{% url "contact" %}">our contact
+                form</a>, or chime in to <a
+                    href="https://github.com/freelawproject/courtlistener/issues/371">the
+                issue where we're tracking this feature</a>. If there is enough
+            demand, or if somebody steps forward to develop this feature, it
+            will be added.
+        </p>
+        <p>All communication with the CourtListener servers is over HTTPS, and
+            so the choice of which form of authentication to use is generally a
+            question of what's most convenient for the context of your work. Our
+            recommendations are:
+        </p>
+        <ul>
+            <li>Use Basic Authentication for testing;</li>
+            <li>Use Django Session Authentication if you already have a user's
+                cookie or are developing a system where you can ask the user to
+                log in; and
+            </li>
+            <li>Use Token Authentication for all normal programmatic API access.</li>
+        </ul>
+
+        <h4>HTTP Basic Authentication</h4>
         <p>
             A subset of results may be selected by using the <em>set</em> view, and separating the IDs you wish to
             receive with semi-colons. For example this returns three jurisdictions using the <code>jurisdiction</code>
@@ -184,8 +300,11 @@
         </p>
 
 
+        <h3>Parsing Uploaded Content</h3>
+        <p>If you are a user that has write access to these APIs (most users do not), you will need to use the <code>Content-Type</code> HTTP header to explicitly set the format of the content you are uploading. The header can be set to any of the values that are available for serialization or to <code>application/x-www-form-urlencoded</code> or <code>multipart/form-data</code>, if you are sending form data.
+        </p>
 
-        <h4>Filtering</h4>
+        <h3>Filtering</h3>
         <p>
             With the exception of the coverage endpoint, each endpoint can be filtered in various ways, as
             defined in their schema (available at <code>/api/rest/v2/$endpoint/schema/</code>). In the schemas you will
@@ -201,7 +320,7 @@
 
 
 
-        <h4>Ordering</h4>
+        <h3>Ordering</h3>
         <p>
             With the exception of the coverage endpoint, ordering can be done on fields defined in the <em>ordering</em>
             section of an endpoint's schema. Ordering is done using the <code>order_by</code> GET parameter, with
@@ -213,7 +332,7 @@
 
 
 
-        <h4>Field Selection</h4>
+        <h3>Field Selection</h3>
         <p>
             To save bandwidth and speed up your queries, fields can be limited by using the <code>fields</code> GET
             parameter with a comma-separated list of fields you wish to receive.
@@ -242,11 +361,28 @@
 
 
 
-        <h4>Limitations</h4>
-        <p>
-            At present, this API is throttled to 1,000 queries per endpoint per user per hour, while we learn where our
-            performance bottlenecks are. If you are hitting this limit or anticipate doing so, please get in touch so
-            we can investigate easing your thresholds.
+        <h3>Limitations &amp; Throttles</h3>
+        <p>At present, this API is throttled to 1,000 queries per hour per
+            user. Anonymous users (those that are not logged in), are allowed
+            100 queries per day for testing purposes. This number is counted by
+            using the <code>X-Forwarded-For</code> and <code>Remote-Addr</code>
+            HTTP headers, which can create problems for users that are behind
+            a gateway that uses <a
+                    href="http://en.wikipedia.org/wiki/Network_address_translation">Network
+                Address Translation</a>. For more information about how this
+            works, <a
+                    href="http://www.django-rest-framework.org/api-guide/throttling/#how-clients-are-identified">read
+                the documentation on the Django REST Framework website</a>, but
+            in general, the simplest solution is to log in. Note that using
+            the browsable HTML API counts towards these thresholds.
+        </p>
+        <p>If you are hitting these limits or anticipate doing so, <a
+                href="{% url "contact" %}">please get in touch</a> so we can
+            investigate easing your thresholds.
+        </p>
+        <p>If you are hitting these limits or anticipate doing so, <a
+                href="{% url "contact" %}">please get in touch</a> so we can
+            investigate easing your thresholds.
         </p>
         <p>
             On the list view, 20 results are shown at a time by default. This can be limited to show fewer results, but
@@ -256,10 +392,31 @@
         <blockquote>
             <code>curl https://www.courtlistener.com/api/rest/v2/jurisdiction/?<strong>limit=50</strong></code>
         </blockquote>
+        <p>Using curl, this looks like:</p>
+        <blockquote>
+            <code>curl -X GET http://127.0.0.1:8000/rest/api/v3/opinion/ --header
+                'Authorization: Token
+                {% if user.is_authenticated %}{{ user.auth_token }}{% else %}
+                    &lt;your-token-here&gt;{% endif %}
+            </code>
+        </blockquote>
+        <p>Note that quotes are used to enclose the whitespace in the header.</p>
+        {% if user.is_authenticated %}
+            <p>Your permanent token for use with this API is:</p>
+            <blockquote>
+                <code>{{ user.auth_token }}</code>
+            </blockquote>
+        {% else %}
+            <p><a
+                    href="{% url "sign-in" %}?next={{ request.path }}#token-auth"
+                    class="btn btn-primary">Sign
+                In To See Your Token</a>
+            </p>
+        {% endif %}
 
 
 
-        <h4>Date Formats</h4>
+        <h3>Date Formats</h3>
         <p>
             As <a href="http://xkcd.com/1179/">required by influential comic
             strips</a>, all date formats are set to <a
@@ -269,7 +426,7 @@
 
 
 
-        <h4>The <code>absolute_url</code> Field</h4>
+        <h3>The <code>absolute_url</code> Field</h3>
         <p>
             The <code>absolute_url</code> field shows the URL where a resource
             can be seen live on the site. It is absolute in the sense that it
@@ -310,7 +467,7 @@
 
 
 
-        <h4>IDs and SHA1 Sums</h4>
+        <h3>IDs and SHA1 Sums</h3>
         <p>
             Because of the way the data is organized in our backend, there is a unique ID for each citation and each
             document. This means that when you are working with the <code>citation</code> endpoint, you cannot use the
@@ -342,7 +499,7 @@
 
 
 
-        <h4>Upgrades and Fixes</h4>
+        <h3>Upgrades and Fixes</h3>
         <p>
             Like the rest of the CourtListener platform, this API and its documentation are
             <a href="https://github.com/freelawproject/courtlistener/tree/master/alert/search/api2.py">open
@@ -355,7 +512,7 @@
 
 
 
-        <h3 id="document-endpoint">/api/rest/v2/document/</h3>
+        <h2 id="document-endpoint">/api/rest/v2/document/</h2>
         <p>
             This can be considered the main endpoint for many users. It provides access to the documents in our database
             and can be filtered or ordered in various ways as mentioned above. As with all endpoints, field descriptions
@@ -406,7 +563,7 @@
 
 
 
-        <h3 id="audio-endpoint">/api/rest/v2/audio/</h3>
+        <h2 id="audio-endpoint">/api/rest/v2/audio/</h2>
         <p>
             The <code>audio</code> endpoint is modeled after the <code>document</code> endpoint and has very similar behavior, except
             instead of serving documents, it currently serves oral arguments and may later serve other similar audio files. As with the
@@ -419,7 +576,7 @@
 
 
 
-        <h3 id='cites-endpoint'>/api/rest/v2/cites/ <span class="alt bold">and</span> /api/rest/v2/cited-by/</h3>
+        <h2 id='cites-endpoint'>/api/rest/v2/cites/ <span class="alt bold">and</span> /api/rest/v2/cited-by/</h2>
         <p>
             These endpoints provide interfaces into the citation graph that CourtListener provides between documents.
             <code>/cites/</code> provides a paginated display of the documents that a document <em>cites</em>, and
@@ -447,7 +604,7 @@
 
 
 
-        <h3 id="citation-endpoint">/api/rest/v2/citation/</h3>
+        <h2 id="citation-endpoint">/api/rest/v2/citation/</h2>
         <p>
             This endpoint is integrated into the <code>document</code> endpoint and is also available individually.
             This endpoint provides each of the many citations that an opinion can have. Since opinions are often included
@@ -485,7 +642,7 @@
 
 
 
-        <h3 id="jurisdiction-endpoint">/api/rest/v2/jurisdiction/</h3>
+        <h2 id="jurisdiction-endpoint">/api/rest/v2/jurisdiction/</h2>
         <p>
             This is the simplest of our REST endpoints and currently provides basic information about the
             <strong>{{ court_count }}</strong> jurisdictions in the American court system that we support.
@@ -504,7 +661,7 @@
 
 
 
-        <h3 id="search-endpoint">/api/rest/v2/search/</h3>
+        <h2 id="search-endpoint">/api/rest/v2/search/</h2>
         <p>
             This endpoint allows you to query our search engine in a similar manner as is possible in our front end.
             Because this endpoint does not use the Django models directly, this endpoint is quite different than any
@@ -635,7 +792,7 @@
 
 
 
-        <h3 id="coverage-endpoint">/api/rest/v2/coverage/</h3>
+        <h2 id="coverage-endpoint">/api/rest/v2/coverage/</h2>
         <p>
             Unlike the other endpoints in this API, the coverage endpoint is
             not based on the <a
@@ -655,13 +812,27 @@
             Appeals (<code>ca9</code>):
         </p>
         <blockquote>
-            <code>curl https://www.courtlistener.com{% url "coverage_api" version='2' court='ca9' %}</code>
+            <code>curl https://www.courtlistener.com url "coverage_api" version='2' court='ca9' </code>
         </blockquote>
     </div>
 
 
 
     <div class="col-sm-5">
+        <div class="well">
+            <h3 class="top">Your Authorization Token</h3>
+            {% if user.is_authenticated %}
+                <p>Your permanent token for use with this API is:</p>
+                <h4><code>{{ user.auth_token }}</code></h4>
+            {% else %}
+                <p><a
+                        href="{% url "sign-in" %}?next={{ request.path }}"
+                        class="btn btn-primary btn-lg">Sign
+                    In To See Your Token</a>
+                </p>
+            {% endif %}
+        </div>
+
         <div class="sidebar-section">
             <h3><span>Available Jurisdictions</span></h3>
             <p>
