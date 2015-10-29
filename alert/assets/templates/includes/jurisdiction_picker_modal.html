@@ -180,7 +180,7 @@
                                     <div class="col-sm-4">
                                         {% for court_bundle in col_bundle %}
                                             {% for court in court_bundle %}
-                                                <div class="checkbox {% if court.jurisdiction == 'SA' or court.jurisdiction == 'SS' %}appeals-court{% endif %}">
+                                                <div class="checkbox {% if court.jurisdiction == 'SA' or court.jurisdiction == 'SS' or court.jurisdiction == 'ST' %}appeals-court{% endif %}">
                                                     <label for="id_{{ court.pk }}">
                                                     <input
                                                             id="id_{{ court.pk }}"
