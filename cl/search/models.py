@@ -22,6 +22,7 @@ JURISDICTIONS = (
     ('FS',  'Federal Special'),
     ('S',   'State Supreme'),
     ('SA',  'State Appellate'),
+    ('ST',  'State Trial'),
     ('SS',  'State Special'),
     ('C',   'Committee'),
     ('T',   'Testing'),
