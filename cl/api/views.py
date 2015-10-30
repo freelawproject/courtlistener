@@ -1,27 +1,21 @@
 import json
 import os
-import rest_framework_filters as filters
 
 from cl import settings
 from cl.api import serializers
 from cl.audio.models import Audio
-from cl.lib import magic
-from cl.lib import search_utils
-from cl.lib.api import SolrList
-from cl.lib.sunburnt import sunburnt
+from cl.lib import api, magic, search_utils, sunburnt
 from cl.search import forms
-from cl.search.models import Court, OpinionCluster, Docket, OpinionsCited, \
-    Opinion, JURISDICTIONS
+from cl.search.models import (
+    Court, OpinionCluster, Docket, OpinionsCited, Opinion
+)
 from cl.stats import tally_stat
 
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
-from rest_framework import viewsets
-
-
-
-
+from rest_framework import status, pagination, viewsets, permissions, response
+import rest_framework_filters as filters
 
 
 def annotate_courts_with_counts(courts, court_count_tuples):
@@ -183,7 +177,7 @@ def deprecated_api(request, v):
             "objects": []
         },
         safe=False,
-        status=410,  # Gone
+        status=status.HTTP_410_GONE
     )
 
 
@@ -261,6 +255,7 @@ class OpinionFilter(filters.FilterSet):
 
 
 class DocketViewSet(viewsets.ModelViewSet):
+    """Does this show up somewhere?"""
     queryset = Docket.objects.all()
     serializer_class = serializers.DocketSerializer
     filter_class = DocketFilter
@@ -296,202 +291,31 @@ class OpinionsCitedViewSet(viewsets.ModelViewSet):
     filter_fields = ('id',)
 
 
-def get_object_list(request=None, **kwargs):
-    """Perform the Solr work"""
-    main_query = {'caller': 'api_search'}
-    try:
-        main_query.update(search_utils.build_main_query(
-            kwargs['cd'],
-            highlight='text'
-        ))
-        sl = SolrList(
-            main_query=main_query,
-            offset=request.GET.get('offset', 0),
-            limit=request.GET.get('limit', 20),
-            type=kwargs['cd']['type'],
-        )
-    except KeyError:
-        sf = forms.SearchForm({'q': '*:*'})
-        if sf.is_valid():
-            main_query.update(search_utils.build_main_query(
-                sf.cleaned_data,
-                highlight='text',
-            ))
-        sl = SolrList(
-            main_query=main_query,
-            offset=request.GET.get('offset', 0),
-            limit=request.GET.get('limit', 20),
-        )
-    return sl
+class SearchViewSet(viewsets.ViewSet):
+    # Default permissions use Django permissions, so here we AllowAny, but folks
+    # will need to log in to get past the thresholds.
+    permission_classes = (permissions.AllowAny, )
 
-
-def search_list(request):
-    if request.method == 'GET':
+    def list(self, request, *args, **kwargs):
         search_form = forms.SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
             if cd['q'] == '':
                 cd['q'] = '*:*'  # Get everything
-            sl = get_object_list(request, cd=cd)
-            serializer = serializers.SearchResultSerializer(sl, many=True)
-            return JsonResponse(serializer.data)
-        else:
-            # XXX: Throw some kind of warning here
-            pass
 
+            paginator = pagination.PageNumberPagination()
+            sl = api.get_object_list(request, cd=cd, paginator=paginator)
 
+            result_page = paginator.paginate_queryset(sl, request)
+            serializer = serializers.SearchResultSerializer(
+                result_page,
+                many=True,
+                context={'schema': sl.conn.schema}
+            )
+            return paginator.get_paginated_response(serializer.data)
 
-
-class CourtFilter(filters.FilterSet):
-    date_modified = filters.AllLookupsFilter(name='date_modified')
-    position = filters.AllLookupsFilter(name='position')
-    start_date = filters.AllLookupsFilter(name='start_date')
-    end_date = filters.AllLookupsFilter(name='end_date')
-
-    class Meta:
-        model = Court
-        fields = (
-            'id', 'date_modified', 'in_use', 'has_opinion_scraper',
-            'has_oral_argument_scraper', 'position', 'start_date', 'end_date',
-            'jurisdiction',
+        # Invalid search.
+        return response.Response(
+            serializers.errors,
+            status=status.HTTP_400_BAD_REQUEST
         )
-
-
-class DocketFilter(filters.FilterSet):
-    date_modified = filters.AllLookupsFilter(name='date_modified')
-    date_created = filters.AllLookupsFilter(name='date_created')
-    date_argued = filters.AllLookupsFilter(name='date_argued')
-    date_reargued = filters.AllLookupsFilter(name='date_reargued')
-    date_reargument_denied = filters.AllLookupsFilter(name='date_reargument_denied')
-    court = filters.RelatedFilter(CourtFilter, name='court')
-    date_blocked = filters.AllLookupsFilter(name='date_blocked')
-
-    class Meta:
-        model = Docket
-        fields = (
-            'id', 'blocked',
-        )
-
-
-class AudioFilter(filters.FilterSet):
-    date_modified = filters.AllLookupsFilter(name='date_modified')
-    date_created = filters.AllLookupsFilter(name='date_created')
-    date_blocked = filters.AllLookupsFilter(name='date_blocked')
-    docket = filters.RelatedFilter(DocketFilter, name='docket')
-
-    class Meta:
-        model = Audio
-        fields = (
-            'id', 'source', 'sha1', 'blocked', 'processing_complete',
-        )
-
-
-class OpinionClusterFilter(filters.FilterSet):
-    date_modified = filters.AllLookupsFilter(name='date_modified')
-    date_created = filters.AllLookupsFilter(name='date_created')
-    date_blocked = filters.AllLookupsFilter(name='date_blocked')
-    date_filed = filters.AllLookupsFilter(name='date_filed')
-    docket = filters.RelatedFilter(DocketFilter, name='docket')
-
-    class Meta:
-        model = OpinionCluster
-        fields = (
-            'id', 'per_curiam', 'citation_id', 'citation_count', 'scdb_id',
-            'scdb_decision_direction', 'scdb_votes_majority',
-            'scdb_votes_minority', 'source', 'precedential_status', 'blocked',
-        )
-
-
-class OpinionFilter(filters.FilterSet):
-    date_modified = filters.AllLookupsFilter(name='date_modified')
-    date_created = filters.AllLookupsFilter(name='date_created')
-    date_blocked = filters.AllLookupsFilter(name='date_blocked')
-    cluster = filters.RelatedFilter(OpinionClusterFilter, name='cluster')
-
-    class Meta:
-        model = Opinion
-        fields = (
-            'id', 'type', 'sha1', 'extracted_by_ocr'
-        )
-
-
-class DocketViewSet(viewsets.ModelViewSet):
-    queryset = Docket.objects.all()
-    serializer_class = serializers.DocketSerializer
-    filter_class = DocketFilter
-
-
-class CourtViewSet(viewsets.ModelViewSet):
-    queryset = Court.objects.exclude(jurisdiction='T')
-    serializer_class = serializers.CourtSerializer
-    filter_class = CourtFilter
-
-
-class AudioViewSet(viewsets.ModelViewSet):
-    queryset = Audio.objects.all()
-    serializer_class = serializers.AudioSerializer
-    filter_class = AudioFilter
-
-
-class OpinionClusterViewSet(viewsets.ModelViewSet):
-    queryset = OpinionCluster.objects.all()
-    serializer_class = serializers.OpinionClusterSerializer
-    filter_class = OpinionClusterFilter
-
-
-class OpinionViewSet(viewsets.ModelViewSet):
-    queryset = Opinion.objects.all()
-    serializer_class = serializers.OpinionSerializer
-    filter_class = OpinionFilter
-
-
-class OpinionsCitedViewSet(viewsets.ModelViewSet):
-    queryset = OpinionsCited.objects.all()
-    serializer_class = serializers.OpinionsCitedSerializer
-    filter_fields = ('id',)
-
-
-def get_object_list(request=None, **kwargs):
-    """Perform the Solr work"""
-    main_query = {'caller': 'api_search'}
-    try:
-        main_query.update(search_utils.build_main_query(
-            kwargs['cd'],
-            highlight='text'
-        ))
-        sl = SolrList(
-            main_query=main_query,
-            offset=request.GET.get('offset', 0),
-            limit=request.GET.get('limit', 20),
-            type=kwargs['cd']['type'],
-        )
-    except KeyError:
-        sf = forms.SearchForm({'q': '*:*'})
-        if sf.is_valid():
-            main_query.update(search_utils.build_main_query(
-                sf.cleaned_data,
-                highlight='text',
-            ))
-        sl = SolrList(
-            main_query=main_query,
-            offset=request.GET.get('offset', 0),
-            limit=request.GET.get('limit', 20),
-        )
-    return sl
-
-
-def search_list(request):
-    if request.method == 'GET':
-        search_form = forms.SearchForm(request.GET)
-        if search_form.is_valid():
-            cd = search_form.cleaned_data
-            if cd['q'] == '':
-                cd['q'] = '*:*'  # Get everything
-            sl = get_object_list(request, cd=cd)
-            serializer = serializers.SearchResultSerializer(sl, many=True)
-            return JsonResponse(serializer.data)
-        else:
-            # XXX: Throw some kind of warning here
-            pass
-
-

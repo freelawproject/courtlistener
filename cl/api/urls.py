@@ -10,24 +10,14 @@ router.register(r'audio', views.AudioViewSet)
 router.register(r'clusters', views.OpinionClusterViewSet)
 router.register(r'opinions', views.OpinionViewSet)
 router.register(r'cited-by', views.OpinionsCitedViewSet)
+router.register(r'search', views.SearchViewSet, base_name='search')
 
-from django.conf.urls import url, include
-from rest_framework.routers import DefaultRouter
-
-router = DefaultRouter()
-router.register(r'dockets', views.DocketViewSet)
-router.register(r'courts', views.CourtViewSet)
-router.register(r'audio', views.AudioViewSet)
-router.register(r'clusters', views.OpinionClusterViewSet)
-router.register(r'opinions', views.OpinionViewSet)
-router.register(r'cited-by', views.OpinionsCitedViewSet)
 
 urlpatterns = [
     # url(r'^api/rest/(?P<version>[v3]+)/', include(router.urls)),
     url(r'^api-auth/',
         include('rest_framework.urls', namespace='rest_framework')),
     url(r'^api/rest/(?P<version>[v3]+)/', include(router.urls)),
-    url(r'^api/rest/search/', views.search_list),
 
     # Documentation
     url(r'^api/$',
