@@ -46,6 +46,7 @@ svg.plottable {
 
 .plottable .background-fill {
   fill: none;
+  pointer-events: none;
 }
 
 .plottable .bounding-box {
@@ -78,6 +79,15 @@ svg.plottable {
   fill: #32313F;
 }
 
+.plottable .off-bar-label text {
+  fill: #32313F;
+}
+
+.plottable .stacked-bar-plot .off-bar-label {
+  /* HACKHACK #2795: correct off-bar label logic to be implemented on StackedBar */
+  visibility: hidden !important;
+}
+
 .plottable .axis-label text {
   font-size: 10px;
   font-weight: bold;
@@ -107,6 +117,23 @@ svg.plottable {
   font-size: 12px;
   font-weight: 200;
   line-height: normal;
+}
+
+.plottable .axis .annotation-circle {
+  fill: white;
+  stroke-width: 1px;
+  stroke: #CCC;
+}
+
+.plottable .axis .annotation-line {
+  stroke: #CCC;
+  stroke-width: 1px;
+}
+
+.plottable .axis .annotation-rect {
+  stroke: #CCC;
+  stroke-width: 1px;
+  fill: white;
 }
 
 .plottable .bar-plot .baseline {
@@ -164,6 +191,14 @@ svg.plottable {
   stroke-width: 1px;
 }
 
+.plottable .drag-line-layer.enabled.vertical line.drag-edge {
+  cursor: ew-resize;
+}
+
+.plottable .drag-line-layer.enabled.horizontal line.drag-edge {
+  cursor: ns-resize;
+}
+
 .plottable .legend text {
   fill: #32313F;
   font-family: "Helvetica Neue", sans-serif;
@@ -176,9 +211,14 @@ svg.plottable {
   fill: none;
   stroke: #CCC;
   stroke-width: 1px;
+  pointer-events: none;
 }
 
 .plottable .waterfall-plot line.connector {
   stroke: #CCC;
   stroke-width: 1px;
+}
+
+.plottable .pie-plot .arc.outline {
+  stroke-linejoin: round;
 }
