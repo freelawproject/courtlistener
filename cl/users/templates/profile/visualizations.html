@@ -13,6 +13,7 @@
                 <table class="table settings-table">
                     <thead>
                         <tr>
+                            <th>ID</th>
                             <th>Title</th>
                             <th>From</th>
                             <th>To</th>
@@ -27,6 +28,7 @@
                     <tbody>
                     {% for viz in user.scotus_maps.all %}
                         <tr>
+                            <td>{{ viz.pk }}</td>
                             <td>
                                 <a href="{{ viz.get_absolute_url }}">{{ viz.title }}</a>
                             </td>

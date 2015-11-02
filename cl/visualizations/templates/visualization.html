@@ -55,7 +55,7 @@
                 <div class="col-xs-12">
                     {% if viz.published or viz.user == user %}
                         <h2 id="title"
-                            class="text-center">{{ viz.title|v_wrapper }}
+                            class="text-center"><span class="alt">{{ viz.id }}.&nbsp;</span>{{ viz.title|v_wrapper }}
                             {% if not viz.published and viz.user == user %}
                                 <span class="alt">(Unpublished)</span>
                             {% endif %}
@@ -104,65 +104,74 @@
             {% if viz.published or viz.user == user %}
                 <div class="row">
                     <div class="col-xs-12">
-                        {% block vis-forms %}
-                        <form action="" method="POST" role="form">
-                            <legend>Configure chart</legend>
-                            <div class="row">
-                                <div class="form-group col-md-3">
-                                    <label for="chartType">Chart Type</label>
-                                    <select name="chartType"
-                                            id="chartTypeSelect"
-                                            class="form-control">
-                                        <option selected="true" value="dos">
-                                            Degrees of Separation
-                                        </option>
-                                        <option value="spaeth">Spaeth</option>
-                                        <option value="genealogy">Genealogy
-                                        </option>
-                                    </select>
-                                </div>
-                                <div class="form-group col-md-3">
-                                    <label for="axisType">axis Type</label>
-                                    <select name="axisType" id="axisTypeSelect"
-                                            class="form-control">
-                                        <option selected="true" value="cat">
-                                            Category
-                                        </option>
-                                        <option value="time">Timeline</option>
-                                    </select>
-                                </div>
-                                <div class="form-group col-md-3">
-                                    <label for="heightType">Height</label>
-                                    <select name="heightType"
-                                            id="heightTypeSelect"
-                                            class="form-control">
-                                        <option selected="true" value="400">
-                                            fixed 400
-                                        </option>
-                                        <option value="600">fixed 600</option>
-                                        <option value="screen">full screen
-                                        </option>
-                                    </select>
-                                </div>
-                                <div class="form-group col-md-3">
-                                    <label for="degreesOfSeparation">Degrees of
-                                        Separation</label>
-                                    <select name="degreesOfSeparation"
-                                            id="degreesOfSeparationSelect"
-                                            class="form-control">
-                                        <option value="1">1</option>
-                                        <option value="2">2</option>
-                                        <option selected="true" value="3">3
-                                        </option>
-                                        <option value="4">4</option>
-                                        <option value="5">5</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </form>
-                        {% endblock %}
                         <div id="chart"></div>
                         {% block vis-caption %}{% endblock %}
+                        {% block vis-forms %}
+                            <form action=""
+                                  method="POST"
+                                  role="form"
+                                  class="v-offset-above-4 v-offset-below-3">
+                                <div class="row">
+                                    <div class="form-group col-md-3">
+                                        <label for="chartType">Chart
+                                            Type</label>
+                                        <select name="chartType"
+                                                id="chartTypeSelect"
+                                                class="form-control">
+                                            <option selected="true" value="dos">
+                                                Degrees of Separation
+                                            </option>
+                                            <option value="spaeth">Spaeth
+                                            </option>
+                                            <option value="genealogy">Genealogy
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group col-md-3">
+                                        <label for="axisType">axis Type</label>
+                                        <select name="axisType"
+                                                id="axisTypeSelect"
+                                                class="form-control">
+                                            <option selected="true" value="cat">
+                                                Category
+                                            </option>
+                                            <option value="time">Timeline
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group col-md-3">
+                                        <label for="heightType">Height</label>
+                                        <select name="heightType"
+                                                id="heightTypeSelect"
+                                                class="form-control">
+                                            <option value="400">
+                                                fixed 400
+                                            </option>
+                                            <option value="600" selected="true">
+                                                fixed 600
+                                            </option>
+                                            <option value="screen">full screen
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group col-md-3">
+                                        <label for="degreesOfSeparation">Degrees
+                                            of
+                                            Separation</label>
+                                        <select name="degreesOfSeparation"
+                                                id="degreesOfSeparationSelect"
+                                                class="form-control">
+                                            <option value="1">1</option>
+                                            <option value="2">2</option>
+                                            <option selected="true" value="3">3
+                                            </option>
+                                            <option value="4">4</option>
+                                            <option value="5">5</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </form>
+                        {% endblock %}
                     </div>
                 </div>
 
