@@ -185,6 +185,10 @@ class SCOTUSMap(models.Model):
 
         opinion_clusters = []
         for cluster in self.clusters.all():
+            opinions_cited = {}
+            for node in g.neighbors(cluster.pk):
+                opinions_cited[node] = {'opacitiy': 1}
+
             opinion_clusters.append({
                 "id": cluster.pk,
                 "absolute_url": cluster.get_absolute_url(),
@@ -197,7 +201,7 @@ class SCOTUSMap(models.Model):
                 "votes_minority": cluster.scdb_votes_minority,
                 "sub_opinions": [{
                     "type": "combined",
-                    "opinions_cited": g.neighbors(cluster.pk),
+                    "opinions_cited": opinions_cited,
                 }]
             })
 
