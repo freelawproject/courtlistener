@@ -2,6 +2,27 @@
 Sets up all the overrides or additional CSS that the site uses.
 ---------------------------------------------------------------------------*/
 
+/* Visualization CSS */
+/* Nukes various styles to make the body very lean */
+body.embed{
+    background-color: white;
+
+}
+body.embed div.container {
+    border: 0 none;
+    margin: 0;
+}
+body.embed form {
+    display: none;
+}
+body.embed div#title-block {
+    margin-bottom: 0;
+}
+.plottable .light-label .text-line {
+    fill: #000;
+}
+
+
 .navbar-brand {
     padding: 16px 15px;
 }

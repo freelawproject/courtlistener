@@ -1,5 +1,4 @@
 import json
-from django.views.decorators.cache import never_cache
 from cl.lib.bot_detector import is_bot
 from cl.visualizations.models import SCOTUSMap, JSONVersion
 from cl.visualizations.forms import VizForm, VizEditForm, JSONEditForm
@@ -11,11 +10,12 @@ from django.db.models import F
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
+from django.views.decorators.clickjacking import xframe_options_exempt
+
+from rest_framework import status as statuses
 
 
-@never_cache
-def view_visualization(request, pk, slug):
-    """A simple page for viewing a visualization."""
+def render_visualization_page(request, pk, embed):
     viz = get_object_or_404(SCOTUSMap, pk=pk)
 
     if not is_bot(request):
@@ -23,23 +23,42 @@ def view_visualization(request, pk, slug):
         viz.view_count = F('view_count') + 1
         viz.save()
         # To get the new value, you either need to get the item from the DB a
-        # second time, or just manipuate it manually....
+        # second time, or just manipulate it manually....
         viz.view_count = cached_value + 1
 
     status = None
     if viz.deleted:
-        status = 410  # Gone
+        status = statuses.HTTP_410_GONE
     else:
         if viz.published is False and viz.user != request.user:
             # Not deleted, unpublished and not the owner
-            status = 401  # Unauthorized
+            status = statuses.HTTP_401_UNAUTHORIZED
 
+    if embed:
+        template = 'visualization_embedded.html'
+    else:
+        template = 'visualization.html'
     return render_to_response(
-        'visualization.html',
+        template,
         {'viz': viz, 'private': False},
         RequestContext(request),
         status=status,
     )
+
+
+@xframe_options_exempt
+def view_embedded_visualization(request, pk):
+    """Return the embedded visualization page.
+
+    Exempts the default xframe options, and allows standard caching.
+    """
+    return render_visualization_page(request, pk, embed=True)
+
+
+def view_visualization(request, pk, slug):
+    """Return the visualization page.
+    """
+    return render_visualization_page(request, pk, embed=False)
 
 
 @login_required

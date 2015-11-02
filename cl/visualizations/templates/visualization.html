@@ -49,7 +49,7 @@
     {% else %}
         {# Not deleted; Make decisions on owner/anon and unpub/published #}
         <div class="col-xs-12">
-            <div class="row v-offset-below-4">
+            <div class="row v-offset-below-4" id="title-block">
                 <div class="col-xs-12">
                     {% if viz.published or viz.user == user %}
                         <h2 id="title"
@@ -59,6 +59,7 @@
                             {% endif %}
                         </h2>
 
+                        {% block vis-subtitles %}
                         <h3 id="subtitle"
                             class="text-center v-offset-below-3">{{ viz.subtitle }}</h3>
                         <h4 class="gray text-center">Starts at <a
@@ -66,6 +67,7 @@
                             and goes to <a
                                     href="{{ viz.cluster_end.get_absolute_url }}">{{ viz.cluster_end.case_name|v_wrapper }}</a>
                         </h4>
+                        {% endblock %}
                     {% else %}
                         <div class="row">
                             <div class="col-xs-1 col-sm-2 col-md-3"></div>
@@ -100,6 +102,7 @@
             {% if viz.published or viz.user == user %}
                 <div class="row">
                     <div class="col-xs-12">
+                        {% block vis-forms %}
                         <form action="" method="POST" role="form">
                             <legend>Configure chart</legend>
                             <div class="row">
@@ -155,10 +158,13 @@
                                 </div>
                             </div>
                         </form>
+                        {% endblock %}
                         <div id="chart"></div>
+                        {% block vis-caption %}{% endblock %}
                     </div>
                 </div>
 
+                {% block vis-lower-content %}
                 <div class="row v-offset-above-2">
                     <div class="col-xs-10">
                         <!-- Nav tabs -->
@@ -204,16 +210,24 @@
                         </div>
 
                         <div class="sidebar-section">
+                            <h3><span>Embed</span></h3>
+                            <div>
+                                <input type="text" value="&lt;iframe height=&quot;500&quot; width=&quot;560&quot; src=&quot;{% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "view_embedded_visualization" viz.pk %}&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;" onclick="this.select()">
+                            </div>
+                        </div>
+
+                        <div class="sidebar-section">
                             {% if viz.user == user %}
                                 <p><a href="{% url "edit_visualization" pk=viz.pk %}"
                                       class="btn btn-primary btn-lg btn-block">Edit <span class="visible-lg-inline">Visualization</span></a>
-                                    {% else %}
+                            {% else %}
                                 <h3><span>Created By</span></h3>
                                 <p>{{ viz.user }}</p>
                             {% endif %}
                         </div>
                     </div>
                 </div>
+                {% endblock %}
             {% endif %}
         </div>
     {% endif %}

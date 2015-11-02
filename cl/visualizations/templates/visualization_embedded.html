@@ -1,0 +1,39 @@
+{% extends "visualization.html" %}
+{% load markdown_deux_tags %}
+{% load text_filters %}
+{% load humanize %}
+
+{% block title %}Embedded Network Graph of {{ viz.title }} –
+    CourtListener.com{% endblock %}
+
+{# Disable a number of blocks #}
+{% block description %}{% endblock %}
+{% block meta %}{% endblock %}
+{% block icons %}{% endblock %}
+{% block header %}{% endblock %}
+{% block footer %}{% endblock %}
+{% block social %}{% endblock %}
+
+{% block vis-subtitles %}{% endblock %}
+{% block vis-lower-content %}{% endblock %}
+{#{% block vis-forms %}{% endblock %}#}
+
+{# Add en embed class to the body so that it gets minimized. #}
+{% block body-classes %}embed{% endblock %}
+
+{% block vis-caption %}
+    <div class="row">
+        <div class="col-xs-6">
+            <p>Created by {{ viz.user }} at <a
+                    href="https://www.courtlistener.com/"
+                    target="_blank">CourtListener.com</a>.
+            </p>
+        </div>
+        <div class="col-xs-6 text-right">
+            <p>
+                <a href="{{ request.path }}" class="btn btn-primary btn-sm"
+                   target="_blank">View Original</a>
+            </p>
+        </div>
+    </div>
+{% endblock %}

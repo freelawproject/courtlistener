@@ -1,4 +1,4 @@
-/* global $, document, d3, Plottable, opinions */
+/* global $, document, d3, Plottable*/
 
 /*
 For drawing the degrees of separation graph.
@@ -48,7 +48,7 @@ var citationJSON = {};
  */
 function drawGraph(target, chartType, axisType, height, maxDoS) {
 	var workingJSON = [],
-		parseDate = {}, // to parse dates in the JSON into d3 dates
+		parseDate = d3.time.format('%Y-%m-%d').parse, // to parse dates in the JSON into d3 dates
 		chartMode = (typeof chartType !== 'undefined') ? chartType : 'dos',
 		heightValue = '400px',
 		chartWidth = 0,
@@ -74,6 +74,7 @@ function drawGraph(target, chartType, axisType, height, maxDoS) {
 		cases = {}, // reference to the case circles used to attach interactions
 		connections = {}, // reference to the connection lines used to attach interactions
 		plot = {}, // the plot area of the chart
+		labels = {},
 
 		caseCount = 0, // number of opinions
 		flagSize = 0, // square root of 2 less than the number of opinions
@@ -105,8 +106,8 @@ function drawGraph(target, chartType, axisType, height, maxDoS) {
 		JSONCount = 0,
 
 		caseHover = {}, // interaction behavior
-		defaultCaseHoverText = '',
-		caseHoverText = {}, // reference to the text in the object shown when hovering
+		// defaultCaseHoverText = '',
+		// caseHoverText = {}, // reference to the text in the object shown when hovering
 		caseHoverGroup = {}, // reference to the hover show object
 		caseClick = {}, // interaction behavior
 		//connectionHover
@@ -269,7 +270,6 @@ function drawGraph(target, chartType, axisType, height, maxDoS) {
 		}
 	}
 
-	parseDate = d3.time.format('%Y-%m-%d').parse;
 	xDate = d3.time.format('%b-%Y');
 
 	prepJSON();
@@ -372,9 +372,12 @@ function drawGraph(target, chartType, axisType, height, maxDoS) {
 
 	legend = new Plottable.Components.Legend(colorScale).maxEntriesPerRow(5);
 
-	xGrid = new Plottable.Scales.Linear()
-		.domain([0, caseCount]);
-		// .range([0, xAxis.width()]);
+	if (xAxisMode === 'cat') {
+		xGrid = new Plottable.Scales.Linear()
+			.domain([0, caseCount]);
+	} else {
+		xGrid = xScaleTime;
+	}
 	yGrid = new Plottable.Scales.Linear()
 		.domain([0, d3.max(distribution) + 2]);
 		// .range([yAxis.height(), 0]);
@@ -419,8 +422,17 @@ function drawGraph(target, chartType, axisType, height, maxDoS) {
 		.y(function (d) {
 			return (chartMode === 'dos') ? dosYSpread(d) : spaethYSpread(d);
 		}, yScale)
-		.size(function (d) {
-			return d.citation_count;
+		.size(function (d, i) {
+			var value = 0,
+				domain = [];
+
+			if (i === caseCount - 1) {
+				domain = sizeScale.domain();
+				value = (domain[0] + domain[1]) / 2; // set the most recent case size to half
+			} else {
+				value = d.citation_count;
+			}
+			return value;
 		}, sizeScale)
 		.attr('stroke', function (d) {
 			return colorScale.scale(d.order);
@@ -445,6 +457,24 @@ function drawGraph(target, chartType, axisType, height, maxDoS) {
 		})
 		.attr('opacity', 0.5);
 	plot.append(connections);
+
+	labels = new Plottable.Plots.Rectangle()
+		.addDataset(new Plottable.Dataset(workingJSON))
+		.x(function (d) {
+			return parseDate(d.date_filed);
+		}, (xAxisMode === 'cat') ? xScaleCat : xScaleTime)
+		.y(function (d) {
+			return (chartMode === 'dos') ? dosYSpread(d) : spaethYSpread(d);
+		}, yScale)
+		.attr('fill', 'rgba(0, 0, 0, 0)')
+		.attr('stroke-width', 0)
+		.labelsEnabled(function () {
+			return true;
+		})
+		.label(function (d) {
+			return d.case_name_short;
+		});
+	plot.append(labels);
 
 	if (chartMode === 'dos') {
 		workingJSON.forEach(function (cluster) {
@@ -529,11 +559,11 @@ function drawGraph(target, chartType, axisType, height, maxDoS) {
 			'cx': 0,
 			'cy': 0
 		});
-	caseHoverText = caseHoverGroup
-		.append('text')
-		.attr('text-anchor', 'middle')
-		.attr('transform', 'translate(0,-17)')
-		.text(defaultCaseHoverText);
+	// caseHoverText = caseHoverGroup
+	// 	.append('text')
+	// 	.attr('text-anchor', 'middle')
+	// 	.attr('transform', 'translate(0,0)')
+	// 	.text(defaultCaseHoverText);
 
 	caseHover.onPointerMove(function (p) {
 		var datum = null,
@@ -555,17 +585,19 @@ function drawGraph(target, chartType, axisType, height, maxDoS) {
 			}
 		}
 		if (datum !== null) {
-			caseHoverText.text(datum.case_name_short);
+			// caseHoverText.text(datum.case_name_short);
 			caseHoverGroup
 				.attr('transform', 'translate(' + position.x + ',' + position.y + ')')
-				.style('visibility', 'visible');
+				.style('visibility', 'visible')
+				.select('circle')
+				.attr('r', d3.max([5, sizeScale.scale(datum.citation_count) / 2]));
 		} else {
-			caseHoverText.text(defaultCaseHoverText);
+			// caseHoverText.text(defaultCaseHoverText);
 			caseHoverGroup.style('visibility', 'hidden');
 		}
 	});
 	caseHover.onPointerExit(function () {
-		caseHoverText.text(defaultCaseHoverText);
+		// caseHoverText.text(defaultCaseHoverText);
 		caseHoverGroup.style('visibility', 'hidden');
 	});
 	caseHover.attachTo(cases);
@@ -590,7 +622,8 @@ function drawGraph(target, chartType, axisType, height, maxDoS) {
 			}
 		}
 		if (datum !== null) {
-			console.log(datum.absolute_url);
+//			console.log(datum.absolute_url);
+			window.location.assign(datum.absolute_url);
 		}
 	});
 
@@ -712,46 +745,45 @@ $(document).ready(function () {
 			maxDoS = $('#degreesOfSeparationSelect').val(),
 			JSONpath = $('#dataSourceSelect').val();
 
+		var used = {};
 
-        var used = {};
+		// citationJSON = json;
+		citationJSON = JSON.parse(JSON.stringify(opinions));
+		d3.select(chartTarget).select('svg').remove();
+		d3.select(tableTarget).select('table').remove();
 
-        //citationJSON = json;
-        citationJSON = JSON.parse(JSON.stringify(opinions));
-        d3.select(chartTarget).select('svg').remove();
-        d3.select(tableTarget).select('table').remove();
+			// drawGraph (
+			// 	target -- where to draw it
+			// 	type -- which type or default to DoS 'dos', 'spaeth', 'genealogy'
+			// 	xAxis type -- timeline or time category 'time' or 'cat'
+			// 	height -- how tall to make it instead of aspect ratio
+			// 	maxDoS -- maximum degree of separation to show, is this only DoS
+			// )
 
-            // drawGraph (
-            // 	target -- where to draw it
-            // 	type -- which type or default to DoS 'dos', 'spaeth', 'genealogy'
-            // 	xAxis type -- timeline or time category 'time' or 'cat'
-            // 	height -- how tall to make it instead of aspect ratio
-            // 	maxDoS -- maximum degree of separation to show, is this only DoS
-            // )
-
-        used = drawGraph(chartTarget, chartType, axisType, heightType, maxDoS);
-        citationTable(tableTarget, used,
-            [
-                {s: 'id', f: bold},
-                {s: 'case_name_short', l: 'Case Name', a: 'absolute_url'},
-                {s: 'citation_count', l: 'Total Citations'},
-                {s: 'order', l: 'Degrees of Separation'},
-                {s: 'date_filed', l: 'Date Filed', f: dateFormat}
-            ]
-        );
+		used = drawGraph(chartTarget, chartType, axisType, heightType, maxDoS);
+		citationTable(tableTarget, used,
+			[
+				{s: 'id', f: bold},
+				{s: 'case_name_short', l: 'Case Name', a: 'absolute_url'},
+				{s: 'citation_count', l: 'Total Citations'},
+				{s: 'order', l: 'Degrees of Separation'},
+				{s: 'date_filed', l: 'Date Filed', f: dateFormat}
+			]
+		);
 	}
 
 	// on select JSON in the data and then call drawGraph()
-    $('#chartTypeSelect').change(function () {
-        trigger();
-    });
-    $('#axisTypeSelect').change(function () {
-        trigger();
-    });
-    $('#heightTypeSelect').change(function () {
-        trigger();
-    });
-    $('#degreesOfSeparationSelect').change(function () {
-        trigger();
-    });
-    trigger();
+	$('#chartTypeSelect').change(function () {
+		trigger();
+	});
+	$('#axisTypeSelect').change(function () {
+		trigger();
+	});
+	$('#heightTypeSelect').change(function () {
+		trigger();
+	});
+	$('#degreesOfSeparationSelect').change(function () {
+		trigger();
+	});
+	trigger();
 });
