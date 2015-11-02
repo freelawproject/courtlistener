@@ -4,7 +4,57 @@
 {% block search-form %}{% endblock %}
 {% block sidebar %}{% endblock %}
 {% block footer-scripts %}
-    {# need lots of stuff here... #}
+    {% if DEBUG %}
+        <script src="{{ STATIC_URL }}js/typeahead.bundle.js"></script>
+    {% else %}
+        <script src="{{ STATIC_URL }}js/typeahead.bundle.min.js"></script>
+    {% endif %}
+    <script type="application/javascript">
+        var searchResults = new Bloodhound({
+            datumTokenizer: Bloodhound.tokenizers.obj.whitespace('value'),
+            queryTokenizer: Bloodhound.tokenizers.whitespace,
+            identify: function(obj){
+                // Return the item ID so the system can have a unique id for it
+                // in its caches.
+                return obj.id;
+            },
+            remote: {
+                url: '/api/rest/v3/search/?case_name=(%QUERY) OR (%QUERY*)&filed_after=1946&court=scotus',
+                prepare: function(query, settings){
+                    // This function is needed b/c it needs to do both a prefix
+                    // search and a non-prefix search.
+                    settings.url = settings.url.replace(/%QUERY/g, query);
+                    return settings;
+                },
+                transform: function(response){
+                    return response.results
+                }
+            }
+        });
+
+        var typeahead = $('.typeahead');
+        typeahead.typeahead({
+          'hint': false,
+          'highlight': true,
+          'minLength': 3
+        },
+        {
+          name: 'case-names',
+          display: 'caseName',
+          limit: 20,
+          source: searchResults
+        });
+        $('#starting-cluster-typeahead').bind(
+                'typeahead:select',
+                function (ev, suggestion) {
+            $('#id_cluster_start').val(suggestion.id);
+        });
+        $('#ending-cluster-typeahead').bind(
+                'typeahead:select',
+                function (ev, suggestion) {
+            $('#id_cluster_end').val(suggestion.id);
+        });
+    </script>
 {% endblock %}
 
 {% block content %}
@@ -52,7 +102,16 @@
                     {% endfor %}
                 </p>
             {% endif %}
-            {{ form.cluster_start }}
+            <div class="row">
+                <div class="col-xs-12">
+                    <div class="form-group">
+                        <input class="form-control typeahead"
+                               type="text"
+                               id="starting-cluster-typeahead">
+                        {{ form.cluster_start }}
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="col-xs-12" id="ending-cluster">
@@ -69,6 +128,9 @@
                     {% endfor %}
                 </p>
             {% endif %}
+            <input class="form-control typeahead"
+                   type="text"
+                   id="ending-cluster-typeahead">
             {{ form.cluster_end }}
         </div>
 

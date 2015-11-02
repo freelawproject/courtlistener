@@ -30,7 +30,9 @@
 
     <script type="text/javascript">
         {# Gets the most recent version, by default ordering #}
-        var opinions = {{ viz.json|safe }};
+        var opinions = {{ viz.json|safe }},
+            embedUrl = '{% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "view_embedded_visualization" viz.pk %}';
+
     </script>
 {% endblock %}
 
@@ -166,7 +168,7 @@
 
                 {% block vis-lower-content %}
                 <div class="row v-offset-above-2">
-                    <div class="col-xs-10">
+                    <div class="col-md-10">
                         <!-- Nav tabs -->
                         <ul class="nav nav-tabs v-offset-below-3" role="tablist">
                             <li role="presentation" class="active">
@@ -192,38 +194,44 @@
                         </div>
                     </div>
 
-                    <div class="col-xs-2">
-                        <div class="sidebar-section">
-                            <h3><span>Created</span></h3>
+                    <div class="col-md-2">
+                        <div class="row">
+                            <div class="sidebar-section col-md-12 hidden-sm hidden-xs">
+                                <h4 class="caps gray">{{ viz.view_count|intcomma }}
+                                    view{{ viz.view_count|pluralize }}</h4>
+                            </div>
 
-                            <p>{{ viz.date_created }}</p>
-                        </div>
+                            <div class="sidebar-section col-xs-6 col-md-12">
+                                <h3><span>Created</span></h3>
+                                <p>{{ viz.date_created }}</p>
+                            </div>
 
-                        <div class="sidebar-section">
-                            <h3><span>Modified</span></h3>
-
-                            <p>{{ viz.date_modified }}</p>
-                        </div>
-                        <div class="sidebar-section">
-                            <h4 class="caps gray">{{ viz.view_count|intcomma }}
-                                view{{ viz.view_count|pluralize }}</h4>
-                        </div>
-
-                        <div class="sidebar-section">
-                            <h3><span>Embed</span></h3>
-                            <div>
-                                <input type="text" value="&lt;iframe height=&quot;500&quot; width=&quot;560&quot; src=&quot;{% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "view_embedded_visualization" viz.pk %}&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;" onclick="this.select()">
+                            <div class="sidebar-section col-xs-6 col-md-12">
+                                <h3><span>Modified</span></h3>
+                                <p>{{ viz.date_modified }}</p>
                             </div>
                         </div>
+                        <div class="row">
+                            <div class="sidebar-section col-sm-12">
+                                <h3><span>Embed</span></h3>
+                                <div class="form-group">
+                                    <input type="text"
+                                           value="&lt;iframe height=&quot;500&quot; width=&quot;560&quot; src=&quot;{% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "view_embedded_visualization" viz.pk %}&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;"
+                                           onclick="this.select()"
+                                           class="form-control"
+                                           id="embed-input">
+                                </div>
+                            </div>
 
-                        <div class="sidebar-section">
-                            {% if viz.user == user %}
-                                <p><a href="{% url "edit_visualization" pk=viz.pk %}"
-                                      class="btn btn-primary btn-lg btn-block">Edit <span class="visible-lg-inline">Visualization</span></a>
-                            {% else %}
-                                <h3><span>Created By</span></h3>
-                                <p>{{ viz.user }}</p>
-                            {% endif %}
+                            <div class="sidebar-section col-xs-12">
+                                {% if viz.user == user %}
+                                    <p><a href="{% url "edit_visualization" pk=viz.pk %}"
+                                          class="btn btn-primary btn-lg btn-block">Edit <span class="visible-lg-inline">Visualization</span></a>
+                                {% else %}
+                                    <h3><span>Created By</span></h3>
+                                    <p>{{ viz.user }}</p>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>

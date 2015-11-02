@@ -18,8 +18,8 @@ class VizForm(forms.ModelForm):
             'notes',
         ]
         widgets = {
-            'cluster_start': forms.TextInput(attrs={'class': 'form-control'}),
-            'cluster_end': forms.TextInput(attrs={'class': 'form-control'}),
+            'cluster_start': forms.HiddenInput(),
+            'cluster_end': forms.HiddenInput(),
             'title': forms.TextInput(attrs={'class': 'form-control'}),
             'subtitle': forms.TextInput(attrs={'class': 'form-control'}),
             'notes': forms.Textarea(attrs={'class': 'form-control'}),

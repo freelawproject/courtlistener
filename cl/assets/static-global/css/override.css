@@ -1,35 +1,12 @@
 /* --------------------------------------------------------------------------
 Sets up all the overrides or additional CSS that the site uses.
 ---------------------------------------------------------------------------*/
-
-/* Visualization CSS */
-/* Nukes various styles to make the body very lean */
-body.embed{
-    background-color: white;
-
-}
-body.embed div.container {
-    border: 0 none;
-    margin: 0;
-}
-body.embed form {
-    display: none;
-}
-body.embed div#title-block {
-    margin-bottom: 0;
-}
-.plottable .light-label .text-line {
-    fill: #000;
-}
-
+::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
+::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 
 .navbar-brand {
     padding: 16px 15px;
 }
-
-/* Some good stuff from h4pl.com */
-::-moz-selection { background: #AE0B0B; color: #fff; text-shadow: none; }
-::selection { background: #AE0B0B; color: #fff; text-shadow: none; }
 
 .alt {
   color: #666;
@@ -810,6 +787,61 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 
 .help-block {
     color: #8a1f11;
+}
+
+/* Visualization CSS */
+body.embed {
+    background-color: white;
+}
+body.embed div.container {
+    border: 0 none;
+    margin: 0;
+}
+body.embed div#title-block {
+    margin-bottom: 0;
+}
+.plottable .light-label .text-line {
+    fill: #000;
+}
+#table {
+    overflow-y: auto;
+    max-height: 450px;
+}
+
+/* Typeahead */
+.twitter-typeahead .tt-query,
+.twitter-typeahead .tt-hint {
+    margin-bottom: 0;
+}
+.tt-menu {
+    max-height: 150px;
+    overflow-y: auto;
+    margin-top: 2px;
+    padding: 5px 0;
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    -webkit-box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
+    background-clip: padding-box;
+}
+.tt-suggestion {
+    display: block;
+    padding: 3px 20px;
+}
+.tt-suggestion:hover {
+    color: #fff;
+    background-color: #AE0B0B;
+}
+.tt-suggestion.tt-is-under-cursor a {
+    color: #fff;
+}
+.tt-suggestion p {
+    margin: 0;
+}
+.twitter-typeahead, .tt-hint, .tt-input, .tt-menu {
+    width: 100%;
 }
 
 /* Charts */
