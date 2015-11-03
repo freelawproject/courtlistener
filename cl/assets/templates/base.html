@@ -138,7 +138,7 @@
                         {% if user.is_authenticated %}
                             <ul class="nav navbar-nav">
                                 <li><a href="/about/" tabindex="300">About</a></li>
-                                <li><a href="/faq/" tabindex="301">FAQ</a></li>
+                                <li><a href="{% url "faq" %}" tabindex="301">FAQ</a></li>
                                 <li><a href="/coverage/" tabindex="302">Coverage</a></li>
                                 <li class="dropdown">
                                     <a href="#"
@@ -165,7 +165,7 @@
                         {% else %}
                             <ul class="nav navbar-nav">
                                 <li><a href="/about/">About</a></li>
-                                <li><a href="/faq/">FAQ</a></li>
+                                <li><a href="{% url "faq" %}">FAQ</a></li>
                                 <li><a href="" class="tour-link">Tour</a></li>
                                 <li><a href="/coverage/">Coverage</a></li>
                                 {% if request.path != "/sign-out/" %}
@@ -219,7 +219,7 @@
                             <a href="/about/">About</a>
                         </div>
                         <div class="footer-item">
-                            <a href="/faq/">FAQ</a>
+                            <a href="{% url "faq" %}">FAQ</a>
                         </div>
                         <div class="footer-item">
                             <a href="" class="tour-link">Tour</a>

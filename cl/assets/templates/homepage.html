@@ -44,7 +44,7 @@
         <div class="navbar-right">
             <ul class="nav navbar-nav">
                 <li><a href="/about/" tabindex="300">About</a></li>
-                <li><a href="/faq/" tabindex="301">FAQ</a></li>
+                <li><a href="{% url "faq" %}" tabindex="301">FAQ</a></li>
                 <li><a href="/coverage/" tabindex="302">Coverage</a></li>
                 <li class="dropdown">
                     <a href="#"
@@ -69,7 +69,7 @@
     {% else %}
         <ul class="nav navbar-nav">
             <li><a href="/about/">About</a></li>
-            <li><a href="/faq/">FAQ</a></li>
+            <li><a href="{% url "faq" %}">FAQ</a></li>
             <li><a href="" class="tour-link">Tour</a></li>
             <li><a href="/coverage/">Coverage</a></li>
         {% if request.path != "/sign-out/" %}
@@ -338,7 +338,7 @@
                               id="stat-num-alerts-in-last-ten">{{ alerts_in_last_ten|intcomma }}</span>
                     </div>
                     <div class="col-xs-9"><p>Number of <a
-                            href="/faq/#explain-alerts">alerts</a> sent in last ten
+                            href="{% url "faq" %}#explain-alerts">alerts</a> sent in last ten
                         days.</p>
                     </div>
                 </div>

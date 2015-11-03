@@ -13,7 +13,7 @@ mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html', 'mp3')
 urlpatterns = [
     # Footer stuff
     url(r'^about/$', about),
-    url(r'^faq/$', faq),
+    url(r'^faq/$', faq, name="faq"),
     url(r'^coverage/$', coverage_graph),
     url(r'^feeds/$', feeds),
     url(r'^contribute/$', contribute),
