@@ -244,7 +244,6 @@ class OpinionClusterFilter(filters.FilterSet):
 class OpinionFilter(filters.FilterSet):
     date_modified = filters.AllLookupsFilter(name='date_modified')
     date_created = filters.AllLookupsFilter(name='date_created')
-    date_blocked = filters.AllLookupsFilter(name='date_blocked')
     cluster = filters.RelatedFilter(OpinionClusterFilter, name='cluster')
 
     class Meta:
