@@ -15,7 +15,6 @@ it as necessary along the way.
 #     1. Do we need to regenerate html_with_citations?
 #     2. Is it so easy to copy FileFields around?
 #     3. Does the `save` method return the object?
-#  3. Add school data as school_data.json with a migration.
 #  4. Documentation:
 #     1. citation_id is the old citation ID. Note that it is not necessarily
 #        unique because in prior iterations of the DB, multiple opinions could
