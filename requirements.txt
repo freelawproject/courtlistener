@@ -19,6 +19,7 @@ django-localflavor==1.1
 django-markdown-deux
 django-tastypie==0.12.2
 djangorestframework==3.2.3
+djangorestframework-filters==0.5.0
 djangorestframework-xml==1.2.0
 docutils==0.12
 eyeD3==0.7.8
