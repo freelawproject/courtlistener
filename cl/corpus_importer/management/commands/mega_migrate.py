@@ -51,6 +51,7 @@ from cl.users.models import (
     UserProfile as UserProfileNew
 )
 
+from collections import Counter
 from datetime import datetime
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
@@ -132,10 +133,25 @@ class Command(BaseCommand):
         return case_name, case_name_full, case_name_short
 
     def _print_progress(self, progress, total, errors=None):
+        """Print the progress of a migration subcomponent.
+
+        If errors is provided it should be a dict of the form:
+
+          errors = {
+            'KeyError': 1982,
+            'SomeOtherError': 42,
+          }
+
+        That is, error keys should be descriptive strings, and their values
+        should be counts of how many times it happened.
+
+        Note that using a collections.Counter object for this is very handy.
+        """
         if not errors:
             errors = {}
         self.stdout.write("\r\tMigrated %s of %s (%d%%). Skipped %s: (%s)." % (
-            progress, total,
+            progress,
+            total,
             float(progress) / total * 100,
             sum(errors.values()),
             ', '.join(['%s: %s' % (k, v) for k, v in errors.items()]),
@@ -150,8 +166,7 @@ class Command(BaseCommand):
         num_dockets = q.count()
 
         progress = 0
-        errors = {}
-        self._print_progress(progress, num_dockets, errors)
+        self._print_progress(progress, num_dockets)
         for old_docket in old_dockets:
             # First do the docket, then create the cluster and opinion objects.
             try:
@@ -281,7 +296,7 @@ class Command(BaseCommand):
                 )
 
             progress += 1
-            self._print_progress(progress, num_dockets, errors)
+            self._print_progress(progress, num_dockets)
         self.stdout.write(u'')  # Newline
 
     def migrate_intra_object_citations(self):
@@ -333,6 +348,18 @@ class Command(BaseCommand):
             'citation_id',
             'pk'
         )
+        # This dict takes the form of:
+        #   {
+        #      citation_id: [
+        #        document_id1,
+        #        document_id2,
+        #        ...
+        #      ],
+        #      ...
+        #   }
+        #
+        # The basic idea is that for any citation object's ID, you can lookup a
+        # list of the documents that have it associated with them.
         cite_to_doc_dict = {}
         for citation_id, document_pk in citation_document_pairs:
             if citation_id in cite_to_doc_dict:
@@ -352,10 +379,17 @@ class Command(BaseCommand):
             'citation_id'
         )
         progress = 0
-        self._print_progress(progress, total_count)
+        errors = Counter()
+        self._print_progress(progress, total_count, errors)
         new_citations = []
         for document_id, citation_id in citation_values:
-            for cited_document in cite_to_doc_dict[citation_id]:
+            # Early abort if the Citation object has been deleted from the DB.
+            try:
+                cited_documents = cite_to_doc_dict[citation_id]
+            except KeyError:
+                errors.update(['KeyError:OrphanCitation'])
+                continue
+            for cited_document in cited_documents:
                 new_citations.append(
                     OpinionsCitedNew(
                         citing_opinion_id=document_id,
@@ -371,7 +405,7 @@ class Command(BaseCommand):
                     new_citations = []
 
             progress += 1
-            self._print_progress(progress, total_count)
+            self._print_progress(progress, total_count, errors)
 
         # One final push if there's anything left.
         if len(new_citations) > 0:
