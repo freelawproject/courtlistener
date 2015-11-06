@@ -55,6 +55,7 @@ from collections import Counter
 from datetime import datetime
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
+from django.db import IntegrityError
 from django.utils.timezone import make_aware, utc
 from juriscraper.lib.string_utils import CaseNameTweaker
 
@@ -380,9 +381,14 @@ class Command(BaseCommand):
         )
         progress = 0
         errors = Counter()
+        starting_point = 14514268  # For use with failed scripts.
         self._print_progress(progress, total_count, errors)
         new_citations = []
         for document_id, citation_id in citation_values:
+            if progress < starting_point:
+                errors.update(['AlreadyDone'])
+                progress += 1
+                continue
             # Early abort if the Citation object has been deleted from the DB.
             try:
                 cited_documents = cite_to_doc_dict[citation_id]
@@ -397,11 +403,22 @@ class Command(BaseCommand):
                     )
                 )
                 if len(new_citations) % 100 == 0:
-                    OpinionsCitedNew.objects.using(
-                        'default'
-                    ).bulk_create(
-                        new_citations
-                    )
+                    try:
+                        OpinionsCitedNew.objects.using(
+                            'default'
+                        ).bulk_create(
+                            new_citations
+                        )
+                    except IntegrityError:
+                        # Loop through each opinion and save it, marking the
+                        # failures. Could do this in the first place, but it's
+                        # slower.
+                        for new_citation in new_citations:
+                            try:
+                                new_citation.save()
+                            except IntegrityError:
+                                errors.update(['IntegrityError:CiteFromOrToMissingOpinionID'])
+                                continue
                     new_citations = []
 
             progress += 1
