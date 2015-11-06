@@ -510,8 +510,8 @@ class Command(BaseCommand):
                     user=new_user,
                     cluster_id=cluster,
                     audio_id=audio,
-                    date_created=getattr(old_favorite, 'date_modified', now()),
-                    date_modified=getattr(old_favorite, 'date_modified', now()),
+                    date_created=old_favorite.date_modified or now(),
+                    date_modified=old_favorite.date_modified or now(),
                     name=old_favorite.name,
                     notes=old_favorite.notes,
                 )
