@@ -56,7 +56,7 @@ from datetime import datetime
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from django.db import IntegrityError
-from django.utils.timezone import make_aware, utc
+from django.utils.timezone import make_aware, utc, now
 from juriscraper.lib.string_utils import CaseNameTweaker
 
 # Disable auto_now and auto_now_add fields so that they can be copied over from
@@ -510,8 +510,8 @@ class Command(BaseCommand):
                     user=new_user,
                     cluster_id=cluster,
                     audio_id=audio,
-                    date_created=old_favorite.date_modified,
-                    date_modified=old_favorite.date_modified,
+                    date_created=getattr(old_favorite, 'date_modified', now()),
+                    date_modified=getattr(old_favorite, 'date_modified', now()),
                     name=old_favorite.name,
                     notes=old_favorite.notes,
                 )
