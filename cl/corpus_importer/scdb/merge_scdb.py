@@ -20,6 +20,9 @@ Once located, we update items:
 import sys
 sys.path.insert(0, "/var/www/courtlistener")
 
+import django
+django.setup()
+
 import csv
 import os
 from cl.search.models import OpinionCluster
@@ -49,7 +52,7 @@ def set_if_falsy(obj, attribute, new_value):
         setattr(obj, attribute, new_value)
     else:
         # Report if there's a difference -- that might spell trouble.
-        if current_value != new_value:
+        if ''.join(current_value.split()) != ''.join(new_value.split()):
             print ("      WARNING: Didn't set '{attr}' attribute on obj "
                    "{obj_id} because it already had a value, but the new "
                    "value ('{new}') differs from current value "
