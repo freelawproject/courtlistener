@@ -1,6 +1,3 @@
-# Celery imports
-import djcelery
-djcelery.setup_loader()
 import os
 import re
 import sys
@@ -66,7 +63,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'markdown_deux',
-    'djcelery',
     'rest_framework',
     'rest_framework.authtoken',
 
@@ -124,9 +120,17 @@ if DEVELOPMENT:
     CELERYD_CONCURRENCY = 2
 else:
     # Celery settings for production sites
-    BROKER_URL = 'amqp://celery:%s@localhost:5672//celery' % CELERY_PASSWORD
-    CELERY_RESULT_BACKEND = 'amqp'
-    CELERYD_CONCURRENCY = 18
+    BROKER_URL = 'redis://'
+    CELERY_RESULT_BACKEND = 'redis://'
+    CELERYD_CONCURRENCY = 20
+    BROKER_POOL_LIMIT = 30
+    BROKER_TRANSPORT_OPTIONS = {
+        # This is the length of time a task will wait to be acknowledged by a
+        # worker. This value *must* be greater than the largest ETA/countdown
+        # that a task may be assigned with, or else it will be run over and over
+        # in a loop. Our countdowns never tend to exceed one hour.
+        'visibility_timeout': 7200,  # two hours
+    }
 
 # Rate limits aren't ever used, so disable them across the board for better
 # performance
@@ -267,8 +271,7 @@ if DEVELOPMENT:
     # For debug_toolbar
     #INSTALLED_APPS.append('debug_toolbar')
     INTERNAL_IPS = ('127.0.0.1',)
-    # For tests
-    SOUTH_TESTS_MIGRATE = False
+
     if 'test' in sys.argv:
         # Does DB in memory during tests
         DATABASES['default'] = {

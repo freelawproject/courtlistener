@@ -28,8 +28,7 @@ DATABASES = {
 
 # Make these unique, and don't share it with anybody.
 SECRET_KEY = 'your-secret-key'
-if not DEVELOPMENT:
-    CELERY_PASSWORD = 'your-celery-password'
+
 
 # Payment secrets
 EIN = ''  # The business tax ID.
