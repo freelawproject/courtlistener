@@ -80,6 +80,10 @@ def new_visualization(request):
                 notes=cd['notes'],
             )
             viz.save()
+            g = viz.add_clusters()
+            j = viz.to_json(g)
+            jv = JSONVersion(map=viz, json_data=j)
+            jv.save()
 
             return HttpResponseRedirect(reverse(
                 'view_visualization',

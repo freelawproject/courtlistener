@@ -257,10 +257,8 @@ class SCOTUSMap(models.Model):
             self.title = trunc(self.make_title(), 200, ellipsis='…')
         if self.pk is None:
             self.slug = trunc(slugify(self.title), 75)
-            g = self.add_clusters()
-            j = self.to_json(g)
-            jv = JSONVersion(map=self, json_data=j)
-            jv.save()
+            # If we could, we'd add clusters and json here, but you can't do
+            # that kind of thing until the first object has been saved.
         super(SCOTUSMap, self).save(*args, **kwargs)
 
 
