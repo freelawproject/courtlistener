@@ -17,6 +17,8 @@ Once located, we update items:
  - votes_majority & votes_minority
  - decision_direction
 """
+import sys
+sys.path.insert(0, "/var/www/courtlistener/cl")
 
 import csv
 import os
