@@ -1,5 +1,7 @@
 # coding=utf-8
 import json
+
+import itertools
 import networkx
 import time
 
@@ -149,19 +151,22 @@ class SCOTUSMap(models.Model):
     def _trim_branches(self, g):
         """Find all the paths from start to finish, and nuke any nodes that
         aren't in those paths.
+
+        See for more details: http://stackoverflow.com/questions/33586342/
         """
-        good_nodes = set()
-        for path in networkx.all_simple_paths(
-                g,
-                source=self.cluster_start.pk,
-                target=self.cluster_end.pk):
-            good_nodes.add(*path)
+        all_path_nodes = set(
+            itertools.chain(  # chains iterables as if they're one iterable
+                *list(  # force evaluation of all_simple_paths generator
+                    networkx.all_simple_paths(
+                        g,
+                        source=self.cluster_end.pk,
+                        target=self.cluster_start.pk
+                    )
+                )
+            )
+        )
 
-        for node in g.nodes_iter():
-            if node not in good_nodes:
-                g.remove_node(node)
-
-        return g
+        return g.subgraph(all_path_nodes)
 
     def add_clusters(self):
         """Do the network analysis to add clusters to the model.
