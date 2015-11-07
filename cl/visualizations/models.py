@@ -154,17 +154,10 @@ class SCOTUSMap(models.Model):
 
         See for more details: http://stackoverflow.com/questions/33586342/
         """
-        all_path_nodes = set(
-            itertools.chain(  # chains iterables as if they're one iterable
-                *list(  # force evaluation of all_simple_paths generator
-                    networkx.all_simple_paths(
-                        g,
-                        source=self.cluster_end.pk,
-                        target=self.cluster_start.pk
-                    )
-                )
-            )
-        )
+        all_path_nodes = set(itertools.chain(
+            *list(networkx.all_simple_paths(g, source=self.cluster_end.pk,
+                                            target=self.cluster_start.pk))
+        ))
 
         return g.subgraph(all_path_nodes)
 
