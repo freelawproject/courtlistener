@@ -18,7 +18,7 @@ Once located, we update items:
  - decision_direction
 """
 import sys
-sys.path.insert(0, "/var/www/courtlistener/cl")
+sys.path.insert(0, "/var/www/courtlistener")
 
 import csv
 import os
@@ -42,7 +42,9 @@ def set_if_falsy(obj, attribute, new_value):
     """Check if the value passed in is Falsy. If so, set it to the value of
     new_value.
     """
-    current_value = getattr(obj, attribute).strip()
+    current_value = getattr(obj, attribute)
+    if current_value is not None:
+        current_value = current_value.strip()
     if not current_value:
         setattr(obj, attribute, new_value)
     else:
