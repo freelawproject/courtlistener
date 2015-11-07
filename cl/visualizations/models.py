@@ -205,6 +205,7 @@ class SCOTUSMap(models.Model):
             [],
             max_depth=6,
         )
+        g = self._trim_branches(g)
 
         opinion_clusters = []
         for cluster in self.clusters.all():
