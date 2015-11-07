@@ -57,7 +57,7 @@ def set_if_falsy(obj, attribute, new_value):
                 attr=attribute,
                 obj_id=obj.pk,
                 new=new_value,
-                old=current_value,
+                current=current_value,
             ))
 
 
