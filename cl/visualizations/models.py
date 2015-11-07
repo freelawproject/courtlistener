@@ -146,6 +146,23 @@ class SCOTUSMap(models.Model):
 
         return g
 
+    def _trim_branches(self, g, start, end):
+        """Find all the paths from start to finish, and nuke any nodes that
+        aren't in those paths.
+        """
+        good_nodes = set()
+        for path in networkx.all_simple_paths(
+                g,
+                source=self.cluster_start.pk,
+                target=self.cluster_end.pk):
+            good_nodes.add(*path)
+
+        for node in g.nodes_iter():
+            if node not in good_nodes:
+                g.remove_node(node)
+
+        return g
+
     def add_clusters(self):
         """Do the network analysis to add clusters to the model.
 
@@ -160,6 +177,7 @@ class SCOTUSMap(models.Model):
             [],
             max_depth=6,
         )
+        g = self._trim_branches(g)
 
         # Add all items to self.clusters
         self.clusters.add(*g.nodes())
