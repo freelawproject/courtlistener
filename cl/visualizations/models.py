@@ -146,7 +146,7 @@ class SCOTUSMap(models.Model):
 
         return g
 
-    def _trim_branches(self, g, start, end):
+    def _trim_branches(self, g):
         """Find all the paths from start to finish, and nuke any nodes that
         aren't in those paths.
         """
