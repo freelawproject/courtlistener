@@ -191,8 +191,14 @@ class SCOTUSMap(models.Model):
         self.generation_time = t2 - t1
         self.save()
 
-    def to_json(self):
-        """Make a JSON representation of self"""
+        return g
+
+    def to_json(self, g=None):
+        """Make a JSON representation of self
+
+        :param g: Optionally, you can provide a network graph. If provided, it
+        will be used instead of generating one anew.
+        """
         j = {
             "meta": {
                 "donate": "Please consider donating to support more projects "
@@ -200,12 +206,13 @@ class SCOTUSMap(models.Model):
                 "version": 1.0,
             },
         }
-        g = self._build_digraph(
-            self.cluster_end,
-            [],
-            max_depth=6,
-        )
-        g = self._trim_branches(g)
+        if g is not None:
+            g = self._build_digraph(
+                self.cluster_end,
+                [],
+                max_depth=6,
+            )
+            g = self._trim_branches(g)
 
         opinion_clusters = []
         for cluster in self.clusters.all():
@@ -250,6 +257,10 @@ class SCOTUSMap(models.Model):
             self.title = trunc(self.make_title(), 200, ellipsis='…')
         if self.pk is None:
             self.slug = trunc(slugify(self.title), 75)
+            g = self.add_clusters()
+            j = self.to_json(g)
+            jv = JSONVersion(map=self, json_data=j)
+            jv.save()
         super(SCOTUSMap, self).save(*args, **kwargs)
 
 
