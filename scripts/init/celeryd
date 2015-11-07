@@ -230,7 +230,8 @@ _get_pids() {
 
 
 _chuid () {
-    su "$CELERYD_USER" -c "$CELERYD_MULTI $*"
+    # mlr -- changed this line to fix: https://github.com/celery/celery/issues/2390
+    su -s /bin/bash "$CELERYD_USER" -c "$CELERYD_MULTI $*"
 }
 
 
