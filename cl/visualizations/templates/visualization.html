@@ -186,9 +186,14 @@
                                    data-toggle="tab">Comments</a>
                             </li>
                             <li role="presentation">
-                                <a href="#table" aria-controls="table"
+                                <a href="#case-table" aria-controls="case-table"
                                    role="tab"
-                                   data-toggle="tab">Cases</a>
+                                   data-toggle="tab">Cases (<span id="case-count"></span>)</a>
+                            </li>
+                            <li role="presentation">
+                                <a href="#case-metadata" aria-controls="case-metadata"
+                                   role="tab"
+                                   data-toggle="tab">Analysis</a>
                             </li>
                         </ul>
 
@@ -197,7 +202,11 @@
                             <div role="tabpanel" class="tab-pane active markdown"
                                  id="notes">{{ viz.notes|default:"*(No comments from the creator.)*"|markdown }}
                             </div>
-                            <div role="tabpanel" class="tab-pane" id="table">
+                            <div role="tabpanel" class="tab-pane" id="case-table">
+
+                            </div>
+                            <div role="tabpanel" class="tab-pane"
+                                 id="case-metadata">
 
                             </div>
                         </div>
