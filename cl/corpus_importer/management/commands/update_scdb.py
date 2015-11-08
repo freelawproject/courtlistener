@@ -46,6 +46,12 @@ class Command(BaseCommand):
             default=False,
             help="Don't change the data. Only pretend."
         )
+        parser.add_argument(
+            '--start_at',
+            type=int,
+            default=0,
+            help="The row number you wish to begin at in the SCDB CSV"
+        )
 
     def handle(self, *args, **options):
         self.debug = options['debug']
@@ -53,6 +59,7 @@ class Command(BaseCommand):
             action_zero=lambda *args, **kwargs: None,
             action_one=self.enhance_item_with_scdb,
             action_many=self.get_human_review,
+            start_row=options['start_at'],
         )
 
     @staticmethod
@@ -182,21 +189,28 @@ class Command(BaseCommand):
                     print "%s matches found." % clusters.count()
                 if d['usCite'].strip():
                     # Only do these lookups if there is in fact a usCite value.
+                    # Newer additions don't yet have citations.
                     if clusters.count() == 0:
                         # None found by scdb_id. Try by citation number
                         print "  Checking by federal_cite_one..",
                         clusters = OpinionCluster.objects.filter(
-                            federal_cite_one=d['usCite'])
+                            federal_cite_one=d['usCite'],
+                            scdb_id='',
+                        )
                         print "%s matches found." % clusters.count()
                     if clusters.count() == 0:
                         print "  Checking by federal_cite_two...",
                         clusters = OpinionCluster.objects.filter(
-                            federal_cite_two=d['usCite'])
+                            federal_cite_two=d['usCite'],
+                            scdb_id='',
+                        )
                         print "%s matches found." % clusters.count()
                     if clusters.count() == 0:
                         print "  Checking by federal_cite_three...",
                         clusters = OpinionCluster.objects.filter(
-                            federal_cite_three=d['usCite'])
+                            federal_cite_three=d['usCite'],
+                            scdb_id='',
+                        )
                         print "%s matches found." % clusters.count()
 
                 # At this point, we need to start getting more experimental b/c
@@ -210,6 +224,7 @@ class Command(BaseCommand):
                             d['dateDecision'], '%m/%d/%Y'
                         ),
                         docket__court_id='scotus',
+                        scdb_id='',
                     )
                     print "%s matches found." % clusters.count()
                     print "    Winnowing by docket number...",
