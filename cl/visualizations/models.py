@@ -2,6 +2,7 @@
 import json
 
 import itertools
+import logging
 import networkx
 import time
 
@@ -12,6 +13,8 @@ from django.utils.text import slugify
 
 from cl.lib.string_utils import trunc
 from cl.search.models import OpinionCluster
+
+logger = logging.getLogger(__name__)
 
 
 class TooManyNodes(Exception):
@@ -229,7 +232,8 @@ class SCOTUSMap(models.Model):
                 max_depth=4,
             )
         except TooManyNodes, e:
-            pass
+            logger.critical("Too many nodes while building "
+                            "visualization %s" % self.pk)
 
         # Add all items to self.clusters
         self.clusters.add(*g.nodes())
