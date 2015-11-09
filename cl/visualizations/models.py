@@ -168,16 +168,22 @@ class SCOTUSMap(models.Model):
         nodes in the network, the sooner we will hit max_nodes and be able to
         abort if the job is too big.
         """
-        logger.info("Now using root_authority of: %s" % root_authority)
+        logger.info("Now using root_authority of: %s, and max_depth of %s." % (
+            root_authority,
+            max_depth,
+        ))
         g = networkx.DiGraph()
+
+        is_cluster_start_obj = (root_authority == self.cluster_start)
+        if is_cluster_start_obj:
+            g.add_node(root_authority.pk)
 
         is_already_handled = (root_authority.pk in visited_nodes)
         is_past_max_depth = (max_depth == 0)
-        is_cluster_start_obj = (root_authority == self.cluster_start)
         blocking_conditions = [
-            is_past_max_depth,
             is_cluster_start_obj,
             is_already_handled,
+            is_past_max_depth,
         ]
         logger.info("Blocking conditions are: %s" % blocking_conditions)
         if not any(blocking_conditions):
@@ -185,6 +191,7 @@ class SCOTUSMap(models.Model):
             # care of updating the variable in all the recursive calls. More
             # discussion: http://stackoverflow.com/q/32361493/64911
             visited_nodes.append(root_authority.pk)
+            logger.info("We have visited %s nodes so far." % len(visited_nodes))
             for authority in root_authority.authorities.filter(
                     docket__court='scotus',
                     date_filed__gte=self.cluster_start.date_filed):
