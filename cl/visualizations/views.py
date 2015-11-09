@@ -1,5 +1,6 @@
 import json
 from cl.lib.bot_detector import is_bot
+from cl.stats import tally_stat
 from cl.visualizations.models import SCOTUSMap, JSONVersion
 from cl.visualizations.forms import VizForm, VizEditForm, JSONEditForm
 from cl.visualizations.utils import reverse_endpoints_if_needed
@@ -13,6 +14,7 @@ from django.template import RequestContext
 from django.views.decorators.clickjacking import xframe_options_exempt
 
 from rest_framework import status as statuses
+
 
 
 def render_visualization_page(request, pk, embed):
@@ -141,5 +143,11 @@ def delete_visualization(request, pk):
 
 
 def mapper_homepage(request):
-    """TODO: Make this page"""
-    pass
+    if not is_bot(request):
+        tally_stat('search.visualization_scotus_homepage_loaded')
+
+    return render_to_response(
+        'visualization_home.html',
+        {'private': False},
+        RequestContext(request),
+    )

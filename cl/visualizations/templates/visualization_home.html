@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load cache %}
+
+{% block title %}Non-Profit Free Legal Search Engine and Alert System -
+    CourtListener.com{% endblock %}
+
+{% block search-form %}{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div id="visualization_scotus_homepage" class="col-xs-12">
+        <div class="row v-offset-above-3">
+            <div class="col-xs-12">
+                <p class="text-center x-large bottom">Supreme Court Doctrinal Network
+                    Visualizations</p>
+                <p class="text-center large gray">A collaboration between Free Law Project and the University of Baltimore School of Law
+                </p>
+            </div>
+        </div>
+        <div class="row v-offset-above-3">
+            <div class="col-xs-4"><img src="{{ STATIC_PREFIX }}png/prototype-vis-1.png" class="img-responsive"></div>
+            <div class="col-xs-4"><img
+                    src="{{ STATIC_PREFIX }}png/prototype-vis-1.png"
+                    class="img-responsive">
+            </div>
+            <div class="col-xs-4"><img
+                    src="{{ STATIC_PREFIX }}png/prototype-vis-1.png"
+                    class="img-responsive">
+            </div>
+        </div>
+        <div class="row v-offset-above-4">
+            <div class="col-xs-12">
+                <p class="lead">With this free tool you can create, save and curate your own visualizations of Supreme Court citation networks, and embed them in your website or blog. Learn more by looking below at our curated gallery, watching our videos or by making one yourself.
+                </p>
+                <div class="text-center v-offset-above-3"><a href="{% url "new_visualization" %}" class="btn btn-sm btn-xl btn-primary">Make a Visualization</a>
+                </div>
+            </div>
+        </div>
+        <div class="row v-offset-above-3">
+            <div class="col-xs-6">
+                <h3 class="text-center">How it All Works</h3>
+                <p>
+
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+                    Mauris eget pulvinar risus. Fusce laoreet vestibulum massa
+                    vel condimentum. Proin at posuere lacus, ac interdum arcu.
+                    Quisque sed tincidunt neque. Vivamus non lorem et risus
+                    pulvinar varius. Nunc ultricies risus at magna iaculis,
+                    vitae varius nibh vestibulum. Integer nunc nibh, laoreet ut
+                    urna vitae, pulvinar facilisis turpis. Quisque mollis velit
+                    nec mauris rutrum, eu maximus enim ornare. Mauris mauris
+                    tellus, iaculis ut est eget, sagittis tincidunt ipsum.
+                    Aenean ullamcorper efficitur enim, blandit rhoncus nisi.
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+                </p>
+
+                <p>
+                    Nullam pretium porta ligula, non eleifend nisl facilisis at.
+                    Phasellus arcu nulla, mattis in tempor nec, commodo id nisi.
+                    Fusce consequat orci et tristique consectetur. Sed mi lorem,
+                    fermentum in sagittis aliquet, aliquet a purus. Suspendisse
+                    augue nulla, molestie in erat non, viverra tristique justo.
+                    Aliquam non tempus sem. Suspendisse malesuada volutpat
+                    justo, vel bibendum nulla fringilla eget. Nulla porta eros
+                    at nulla fermentum, in dictum enim porttitor. Nam enim
+                    libero, lacinia vitae consequat eget, tristique vitae elit.
+                    Quisque suscipit dui nibh, ac venenatis ex bibendum nec.
+                    Nulla facilisi. Nullam porta turpis at est euismod consequat
+                    in a purus. Etiam euismod magna et fringilla viverra.
+                </p>
+                <p>
+                    Duis bibendum finibus ultricies. Vivamus eu lorem neque.
+                    Quisque nisl metus, egestas at faucibus ac, accumsan
+                    vulputate ligula. Praesent quis pellentesque ex, ac maximus
+                    lorem. Pellentesque malesuada, neque non elementum bibendum,
+                    orci sem dapibus elit, vitae elementum neque ipsum et
+                    sapien. Vivamus convallis diam mauris, at dapibus metus
+                    imperdiet vel. Fusce in efficitur ipsum. Nam euismod dolor
+                    quis augue mattis eleifend. Cras laoreet sodales dolor nec
+                    convallis. Quisque mattis lacinia enim, vitae ultricies
+                    velit accumsan eget. Fusce molestie ipsum vel feugiat
+                    molestie.
+                </p>
+                <p>
+                    Remember to put links here to FLP UB.
+                </p>
+            </div>
+            <div class="col-xs-6">
+                <h3 class="text-center">Galleries</h3>
+                <h4>On the Open Web</h4>
+                <h4>Latest</h4>
+                <h4>Featured Users</h4>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}

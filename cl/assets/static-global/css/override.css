@@ -137,6 +137,12 @@ a.button:active{
     font-size: 21px;
 }
 
+.btn-xl {
+    padding: 15px 22px;
+    font-size: 20px;
+    border-radius: 9px;
+}
+
 #homepage #jurisdiction-count {
     -webkit-transition: all 0.5s ease;
     -moz-transition: all 0.5s ease;
