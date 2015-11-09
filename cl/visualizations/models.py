@@ -14,6 +14,12 @@ from cl.lib.string_utils import trunc
 from cl.search.models import OpinionCluster
 
 
+class TooManyNodes(Exception):
+    class SetupException(Exception):
+        def __init__(self, message):
+            Exception.__init__(self, message)
+
+
 class SCOTUSMap(models.Model):
     user = models.ForeignKey(
         User,
@@ -106,7 +112,8 @@ class SCOTUSMap(models.Model):
             end=get_best_case_name(self.cluster_end),
         )
 
-    def _build_digraph(self, root_authority, visited_nodes, max_depth=6):
+    def _build_digraph(self, root_authority, visited_nodes, max_depth,
+                       max_nodes=70):
         """Recursively build a networkx graph
 
         Process is:
@@ -115,13 +122,53 @@ class SCOTUSMap(models.Model):
          - For each authority, add it to a networkx graph, if:
             - it happened after self.cluster_start
             - it's in the Supreme Court
-            - we haven't exceeded a max_depth of six cases.
+            - we haven't exceeded max_depth cases.
             - we haven't already followed this path
+            - it is on a simple path between the beginning and end
+            - fewer than max_nodes nodes are in the network
+
+        The last point above is a complicated one. The algorithm below is
+        implemented in a depth-first fashion, so we quickly can create simple
+        paths between the first and last node. If it were in a breadth-first
+        algorithm, we would fan out and have to do many more queries before we
+        learned that a line of citations was needed or not. For example,
+        consider this network:
+
+            START
+               ├─-> A--> B--> C--> D--> END
+               └--> E    ├─-> F
+                         └--> G
+
+        The only nodes that we should include are A, B, C, and D. In a depth-
+        first approach, you do:
+
+            START
+               ├─1-> A-2-> B-3-> C-4-> D-5-> END
+               └-8-> E     ├─6-> F
+                           └-7-> G
+
+        After five hops, we know that A, B, C, and D are relevant and should be
+        kept.
+
+        Compare to a breadth-first:
+
+             START
+                ├─1-> A-3-> B-4-> C-7-> D-8-> END
+                └-2-> E     ├─5-> F
+                            └-6-> G
+
+        In this case, it takes eight hops to know the same thing, and in a real
+        network, it would be many more than two or three citations from each
+        node.
+
+        This matters a great deal because the sooner we can count the number of
+        nodes in the network, the sooner we will hit max_nodes and be able to
+        abort if the job is too big.
         """
         g = networkx.DiGraph()
 
         is_already_handled = (root_authority.pk in visited_nodes)
-        is_past_max_depth = (max_depth <= 0)
+        is_past_max_depth = (max_depth == 0)
         is_cluster_start_obj = (root_authority == self.cluster_start)
         blocking_conditions = [
             is_past_max_depth,
@@ -140,11 +187,16 @@ class SCOTUSMap(models.Model):
                 g.add_edge(root_authority.pk, authority.pk)
                 # Combine our present graph with the result of the next
                 # recursion
-                g = networkx.compose(g, self._build_digraph(
+                sub_graph = self._build_digraph(
                     authority,
                     visited_nodes,
                     max_depth - 1,
-                ))
+                    max_nodes=max_nodes,
+                )
+                if self.cluster_start_id in sub_graph:
+                    g = networkx.compose(g, sub_graph)
+                if len(g) > max_nodes:
+                    raise TooManyNodes()
 
         return g
 
@@ -170,12 +222,14 @@ class SCOTUSMap(models.Model):
          - Update self.generation_time once complete.
         """
         t1 = time.time()
-        g = self._build_digraph(
-            self.cluster_end,
-            [],
-            max_depth=6,
-        )
-        g = self._trim_branches(g)
+        try:
+            g = self._build_digraph(
+                self.cluster_end,
+                [],
+                max_depth=4,
+            )
+        except TooManyNodes, e:
+            pass
 
         # Add all items to self.clusters
         self.clusters.add(*g.nodes())
@@ -203,7 +257,7 @@ class SCOTUSMap(models.Model):
             g = self._build_digraph(
                 self.cluster_end,
                 [],
-                max_depth=6,
+                max_depth=4,
             )
             g = self._trim_branches(g)
 
