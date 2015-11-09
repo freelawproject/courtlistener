@@ -200,7 +200,10 @@ class SCOTUSMap(models.Model):
                 )
                 logger.info("Subgraph has %s nodes" % len(sub_graph))
                 if self.cluster_start_id in sub_graph:
+                    logger.info("Made it back to cluster_start. Merging graphs. g has %s nodes and sub_graph has %s nodes." % (len(g), len(sub_graph)))
                     g = networkx.compose(g, sub_graph)
+                else:
+                    logger.info("Reached a dead end. Ditching subgraph of %s nodes." % len(sub_graph))
                 if len(g) > max_nodes:
                     raise TooManyNodes()
 
