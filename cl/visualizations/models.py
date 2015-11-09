@@ -168,6 +168,7 @@ class SCOTUSMap(models.Model):
         nodes in the network, the sooner we will hit max_nodes and be able to
         abort if the job is too big.
         """
+        logger.info("Now using root_authority of: %s" % root_authority)
         g = networkx.DiGraph()
 
         is_already_handled = (root_authority.pk in visited_nodes)
@@ -178,6 +179,7 @@ class SCOTUSMap(models.Model):
             is_cluster_start_obj,
             is_already_handled,
         ]
+        logger.info("Blocking conditions are: %s" % blocking_conditions)
         if not any(blocking_conditions):
             # Python passes this list by reference, so updating it here takes
             # care of updating the variable in all the recursive calls. More
@@ -196,6 +198,7 @@ class SCOTUSMap(models.Model):
                     max_depth - 1,
                     max_nodes=max_nodes,
                 )
+                logger.info("Subgraph has %s nodes" % len(sub_graph))
                 if self.cluster_start_id in sub_graph:
                     g = networkx.compose(g, sub_graph)
                 if len(g) > max_nodes:
@@ -232,7 +235,7 @@ class SCOTUSMap(models.Model):
                 max_depth=4,
             )
         except TooManyNodes, e:
-            logger.critical("Too many nodes while building "
+            logger.warn("Too many nodes while building "
                             "visualization %s" % self.pk)
 
         # Add all items to self.clusters
