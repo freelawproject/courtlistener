@@ -47,6 +47,7 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         'date_filed',
         'slug',
         'citation_id',
+        'case_name_short',
         'case_name',
         'case_name_full',
         'federal_cite_one',
@@ -62,6 +63,9 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         'westlaw_cite',
         'neutral_cite',
         'scdb_id',
+        'scdb_decision_direction',
+        'scdb_votes_majority',
+        'scdb_votes_minority',
         'source',
         'procedural_history',
         'attorneys',
@@ -73,6 +77,7 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         'blocked',
         'date_blocked',
         'date_modified',
+        'date_created',
     )
     raw_id_fields = (
         'docket',
