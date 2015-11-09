@@ -986,7 +986,7 @@ $(document).ready(function () {
 		citationTable(tableTarget, used,
 			[
 				// {s: 'id', f: bold},
-				{s: 'case_name_short', l: 'Case Name', a: 'absolute_url'},
+				{s: 'case_name', l: 'Case Name', a: 'absolute_url'},
 				{s: 'citation_count', l: 'Total Citations'},
 				{s: 'order', l: 'Degrees of Separation'},
 				{s: 'date_filed', l: 'Date Filed', f: dateFormat}
