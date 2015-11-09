@@ -42,7 +42,7 @@ def render_visualization_page(request, pk, embed):
         template = 'visualization.html'
     return render_to_response(
         template,
-        {'viz': viz, 'private': False},
+        {'viz': viz, 'private': True},
         RequestContext(request),
         status=status,
     )
@@ -148,6 +148,6 @@ def mapper_homepage(request):
 
     return render_to_response(
         'visualization_home.html',
-        {'private': False},
+        {'private': True},
         RequestContext(request),
     )
