@@ -185,7 +185,15 @@ class SCOTUSMap(models.Model):
             is_already_handled,
             is_past_max_depth,
         ]
-        logger.info("Blocking conditions are: %s" % blocking_conditions)
+        logger.info(
+            "Blocking conditions are:\n"
+            "  is_cluster_start_obj: %s\n"
+            "  is_already_handled:   %s\n"
+            "  is_past_max_depth:    %s" % (
+                is_cluster_start_obj,
+                is_already_handled,
+                is_past_max_depth
+        ))
         if not any(blocking_conditions):
             # Python passes objects by reference, so updating it here takes
             # care of updating the variable in all the recursive calls. More
