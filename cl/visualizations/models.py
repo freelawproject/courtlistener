@@ -187,10 +187,10 @@ class SCOTUSMap(models.Model):
         ]
         logger.info("Blocking conditions are: %s" % blocking_conditions)
         if not any(blocking_conditions):
-            # Python passes this list by reference, so updating it here takes
+            # Python passes objects by reference, so updating it here takes
             # care of updating the variable in all the recursive calls. More
             # discussion: http://stackoverflow.com/q/32361493/64911
-            visited_nodes.append(root_authority.pk)
+            visited_nodes.add(root_authority.pk)
             logger.info("We have visited %s nodes so far." % len(visited_nodes))
             for authority in root_authority.authorities.filter(
                     docket__court='scotus',
@@ -213,6 +213,8 @@ class SCOTUSMap(models.Model):
                     logger.info("Reached a dead end. Ditching subgraph of %s nodes." % len(sub_graph))
                 if len(g) > max_nodes:
                     raise TooManyNodes()
+            else:
+                logger.info("No authorities in %s" % root_authority)
 
         return g
 
@@ -241,7 +243,7 @@ class SCOTUSMap(models.Model):
         try:
             g = self._build_digraph(
                 self.cluster_end,
-                [],
+                set(),
                 max_depth=4,
             )
         except TooManyNodes, e:
@@ -273,7 +275,7 @@ class SCOTUSMap(models.Model):
         if g is not None:
             g = self._build_digraph(
                 self.cluster_end,
-                [],
+                set(),
                 max_depth=4,
             )
             g = self._trim_branches(g)

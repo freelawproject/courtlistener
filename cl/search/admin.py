@@ -76,8 +76,6 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         'precedential_status',
         'blocked',
         'date_blocked',
-        'date_modified',
-        'date_created',
     )
     raw_id_fields = (
         'docket',
@@ -86,8 +84,9 @@ class OpinionClusterAdmin(admin.ModelAdmin):
         'source',
     )
     readonly_fields = (
-        'date_modified',
         'citation_count',
+        'date_modified',
+        'date_created',
     )
 
 
