@@ -210,7 +210,10 @@ class SCOTUSMap(models.Model):
                     max_depth - 1,
                     max_nodes=max_nodes,
                 )
-                logger.info("Subgraph has %s nodes" % len(sub_graph))
+                logger.info("Subgraph of %s and its children has %s nodes" % (
+                    authority,
+                    len(sub_graph),
+                ))
                 if self.cluster_start_id in sub_graph:
                     logger.info("Made it back to cluster_start. Merging graphs. g has %s nodes and sub_graph has %s nodes." % (len(g), len(sub_graph)))
                     g = networkx.compose(g, sub_graph)
