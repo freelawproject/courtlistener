@@ -192,10 +192,15 @@ class SCOTUSMap(models.Model):
             # discussion: http://stackoverflow.com/q/32361493/64911
             visited_nodes.add(root_authority.pk)
             logger.info("We have visited %s nodes so far." % len(visited_nodes))
-            for authority in root_authority.authorities.filter(
-                    docket__court='scotus',
-                    date_filed__gte=self.cluster_start.date_filed):
-
+            authorities = root_authority.authorities.filter(
+                docket__court='scotus',
+                date_filed__gte=self.cluster_start.date_filed
+            )
+            logger.info("Found %s sub_authories to root node: %s" % (
+                authorities.count(),
+                root_authority,
+            ))
+            for authority in authorities:
                 g.add_edge(root_authority.pk, authority.pk)
                 # Combine our present graph with the result of the next
                 # recursion
@@ -213,8 +218,6 @@ class SCOTUSMap(models.Model):
                     logger.info("Reached a dead end. Ditching subgraph of %s nodes." % len(sub_graph))
                 if len(g) > max_nodes:
                     raise TooManyNodes()
-            else:
-                logger.info("No authorities in %s" % root_authority)
 
         return g
 
