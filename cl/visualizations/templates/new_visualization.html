@@ -48,6 +48,7 @@
                 'typeahead:select',
                 function (ev, suggestion) {
             $('#id_cluster_start').val(suggestion.id);
+            $('#first-selection').text(suggestion.caseName);
         });
         $('#ending-cluster-typeahead').bind(
                 'typeahead:select',
@@ -58,15 +59,11 @@
 {% endblock %}
 
 {% block content %}
-    {% comment %}
-       Basic idea of this page is to ask one question at a time, fading in the
-       next question after the previous one has been answered. So, first we ask
-       where the viz should start, then where it should end, then, the title
-       and subtitle, and finally, any notes.
-    {% endcomment %}
-    <div class="col-xs-12">
-        <h2>Create a New Visualization of Supreme Court Cases</h2>
-        <p>To create a new visualization, select two cases and optionally
+    <div class="col-xs-2"></div>
+    <div class="col-xs-8 text-center">
+        <h2>Create a New Visualization</h2>
+        <h3 class="gray v-offset-above-1">Visualizations show citation networks between Supreme Court cases</h3>
+        <p class="v-offset-above-3">To create a new visualization, select two cases and optionally
             provide a title, subtitle, and any notes.
         </p>
         <p>Once you've set these up, a visualization will be created and added
@@ -76,6 +73,7 @@
             published until you're ready to share it.
         </p>
     </div>
+    <div class="col-xs-2"></div>
 
     <form role="form"
           action=""
@@ -89,11 +87,13 @@
                         submission.</p>
                 </div>
             {% endif %}
-            <h3>First Endpoint</h3>
-            <p class="gray">Select a case by filtering using any of <a
-                    href="{% url 'advanced_search' %}" target="_blank">the
-                CourtListener filter operators</a>. This can be the beginning
-                or end of your visualization.
+            <h3>First Case</h3>
+
+            <p class="gray">Enter all or part of a case name to serve as the
+                beginning or end of your visualization. Cases will be
+                automatically suggested with the most relevant cases listed
+                first. For example, try typing "Miranda", "Citizens United", or
+                "Obergefell".
             </p>
             {% if form.cluster_start.errors %}
                 <p class="help-block">
@@ -115,11 +115,9 @@
         </div>
 
         <div class="col-xs-12" id="ending-cluster">
-            <h3>Second Endpoint</h3>
+            <h3>Second Case</h3>
 
-            <p class="gray">Select another case. If this case occurs before your
-                first case, it will be the starting case. If not, it will be the
-                ending case.
+            <p class="gray">Select another case to connect to <span id="first-selection">your first case</span>.
             </p>
             {% if form.cluster_end.errors %}
                 <p class="help-block">
