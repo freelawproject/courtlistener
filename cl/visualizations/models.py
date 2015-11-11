@@ -170,9 +170,8 @@ class SCOTUSMap(models.Model):
         abort if the job is too big.
         """
         if len(good_nodes) == 0:
-            # Add the start point, assuming it will take max_dod to get to it
-            # (hops_taken will get lowered later if there's a shorter route).
-            good_nodes.add(self.cluster_start_id, hops_taken=max_dod)
+            # Add the start point
+            good_nodes.add(self.cluster_start_id)
 
         g = networkx.DiGraph()
 
@@ -196,7 +195,13 @@ class SCOTUSMap(models.Model):
                 if authority.pk in good_nodes:
                     # This is a path to a good node in the network, such as the
                     # start node or another node that we know gets there.
-                    hops_taken_last_time = g.node[authority.pk]['hops_taken']
+                    # Using .get() guards against the first node, which will
+                    # lack this attribute. In that case, we assume it took the
+                    # max possible number of hops (this will get lowered, if
+                    # possible).
+                    hops_taken_last_time = g.node[authority.pk].get(
+                        'hops_taken', max_dod
+                    )
                     hops_taken_this_route = max_dod - allowed_hops_remaining
                     if (hops_taken_last_time + hops_taken_this_route) <= max_dod:
                         # Only add the path if its route + the existing route
@@ -222,7 +227,7 @@ class SCOTUSMap(models.Model):
 
                         good_nodes.add(authority.pk)
                         g.add_edge(root_authority.pk, authority.pk)
-                        g.node[authority.pk]['hops_taken'] = allowed_hops_remaining
+                        g.node[authority.pk]['hops_taken'] = max_dod - allowed_hops_remaining
                         g = networkx.compose(g, sub_graph)
 
                     if len(g) > max_nodes:
