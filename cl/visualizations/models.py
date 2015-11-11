@@ -215,7 +215,7 @@ class SCOTUSMap(models.Model):
                 if authority.pk in good_nodes:
                     # This is a path to a good node in the network, such as the
                     # start node or another node that we know gets there.
-                    logger.info("Found a path to %s, starting from %s" % (authority, root_authority))
+                    logger.info("Found a path to a good node, %s, starting from %s" % (authority, root_authority))
                     g.add_edge(root_authority.pk, authority.pk)
                 else:
                     sub_graph = self._build_digraph(
@@ -225,7 +225,7 @@ class SCOTUSMap(models.Model):
                         max_depth - 1,
                         max_nodes=max_nodes,
                     )
-                    logger.info("Subgraph of %s and its children has %s nodes" % (
+                    logger.info("  Subgraph of %s and its children has %s nodes" % (
                         authority,
                         len(sub_graph),
                     ))
@@ -233,12 +233,15 @@ class SCOTUSMap(models.Model):
                         # If there is an intersection between known good nodes
                         # and the current sub_graph, merge the current sub_graph
                         # with the main graph object.
-                        logger.info("Found an intersection between current subgraph of %s nodes and our set of known good_nodes." % len(sub_graph))
+                        logger.info("  Found an intersection between current subgraph of %s nodes and our set of known good_nodes." % len(sub_graph))
                         good_nodes.add(authority.pk)
                         g.add_edge(root_authority.pk, authority.pk)
                         g = networkx.compose(g, sub_graph)
+                        logger.info("    g now has %s nodes" % len(g))
+                        logger.info("    good_nodes now has %s nodes" % len(good_nodes))
                     else:
-                        logger.info("Reached a dead end. Ditching subgraph of %s nodes." % len(sub_graph))
+                        logger.info("  Reached a dead end. Ditching subgraph of %s nodes." % len(sub_graph))
+
                     if len(g) > max_nodes:
                         raise TooManyNodes()
 
