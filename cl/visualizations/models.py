@@ -218,6 +218,7 @@ class SCOTUSMap(models.Model):
                     logger.info("Found a path to a good node, %s, starting from %s" % (authority, root_authority))
                     g.add_edge(root_authority.pk, authority.pk)
                 else:
+                    logger.info("Haven't yet reached a good node. Recursing.")
                     sub_graph = self._build_digraph(
                         authority,
                         visited_nodes,
@@ -229,7 +230,20 @@ class SCOTUSMap(models.Model):
                         authority,
                         len(sub_graph),
                     ))
-                    if any([node in sub_graph for node in good_nodes]):
+                    intersects_with_good_nodes = any([node in sub_graph for
+                                                      node in good_nodes])
+                    logger.info("Authority, %s, is %s hops from the end and has a max_depth of %s." % (
+                        authority,
+                        networkx.shortest_path_length(
+                            g,
+                            authority.pk,
+                            self.cluster_end_id
+                        ),
+                        max_depth,
+                    ))
+                    if all([intersects_with_good_nodes]):
+
+
                         # If there is an intersection between known good nodes
                         # and the current sub_graph, merge the current sub_graph
                         # with the main graph object.
