@@ -295,9 +295,10 @@ class SCOTUSMap(models.Model):
                 "version": 1.0,
             },
         }
-        if g is not None:
+        if g is None:
             g = self._build_digraph(
                 self.cluster_end,
+                set(),
                 set(),
                 max_depth=4,
             )
