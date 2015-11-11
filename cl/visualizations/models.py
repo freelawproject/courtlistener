@@ -115,8 +115,8 @@ class SCOTUSMap(models.Model):
             end=get_best_case_name(self.cluster_end),
         )
 
-    def _build_digraph(self, root_authority, visited_nodes, max_depth,
-                       max_nodes=70):
+    def _build_digraph(self, root_authority, visited_nodes, good_nodes,
+                       max_depth, max_nodes=70):
         """Recursively build a networkx graph
 
         Process is:
@@ -211,9 +211,16 @@ class SCOTUSMap(models.Model):
             for authority in authorities:
                 # Combine our present graph with the result of the next
                 # recursion
+                if authority.pk in good_nodes:
+                    # This is a second path to a good node in the network.
+                    logger.info("Found a second path to %s, starting from %s" % (root_authority, authority))
+                    g.add_edge(root_authority.pk, authority.pk)
+                    break
+
                 sub_graph = self._build_digraph(
                     authority,
                     visited_nodes,
+                    good_nodes,
                     max_depth - 1,
                     max_nodes=max_nodes,
                 )
@@ -223,6 +230,7 @@ class SCOTUSMap(models.Model):
                 ))
                 if self.cluster_start_id in sub_graph:
                     logger.info("Made it back to cluster_start. Merging graphs. g has %s nodes and sub_graph has %s nodes." % (len(g), len(sub_graph)))
+                    good_nodes.add(authority.pk)
                     g.add_edge(root_authority.pk, authority.pk)
                     g = networkx.compose(g, sub_graph)
                 else:
@@ -257,6 +265,7 @@ class SCOTUSMap(models.Model):
         try:
             g = self._build_digraph(
                 self.cluster_end,
+                set(),
                 set(),
                 max_depth=4,
             )
