@@ -199,9 +199,10 @@ class SCOTUSMap(models.Model):
                     # lack this attribute. In that case, we assume it took the
                     # max possible number of hops (this will get lowered, if
                     # possible).
-                    hops_taken_last_time = g.node[authority.pk].get(
-                        'hops_taken', max_dod
-                    )
+                    hops_taken_last_time = g.node.get(
+                        authority.pk,
+                        {'hops_taken': max_dod}
+                    )['hops_taken']
                     hops_taken_this_route = max_dod - allowed_hops_remaining
                     if (hops_taken_last_time + hops_taken_this_route) <= max_dod:
                         # Only add the path if its route + the existing route
