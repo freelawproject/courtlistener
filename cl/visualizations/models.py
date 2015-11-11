@@ -175,9 +175,6 @@ class SCOTUSMap(models.Model):
         g = networkx.DiGraph()
 
         is_cluster_start_obj = (root_authority == self.cluster_start)
-        if is_cluster_start_obj:
-            g.add_node(root_authority.pk)
-
         is_already_handled = (root_authority.pk in visited_nodes)
         is_past_max_depth = (max_depth == 0)
         blocking_conditions = [
@@ -199,12 +196,12 @@ class SCOTUSMap(models.Model):
             # care of updating the variable in all the recursive calls. More
             # discussion: http://stackoverflow.com/q/32361493/64911
             visited_nodes.add(root_authority.pk)
-            logger.info("We have visited %s nodes so far." % len(visited_nodes))
+            logger.info("We have visited %s unique nodes so far." % len(visited_nodes))
             authorities = root_authority.authorities.filter(
                 docket__court='scotus',
                 date_filed__gte=self.cluster_start.date_filed
             )
-            logger.info("Found %s sub_authories to root node: %s" % (
+            logger.info("Found %s sub_authorities to root node: %s" % (
                 authorities.count(),
                 root_authority,
             ))
@@ -212,8 +209,9 @@ class SCOTUSMap(models.Model):
                 # Combine our present graph with the result of the next
                 # recursion
                 if authority.pk in good_nodes:
-                    # This is a second path to a good node in the network.
-                    logger.info("Found a second path to %s, starting from %s" % (root_authority, authority))
+                    # This is a path to a good node in the network, such as the
+                    # start node or another node that we know gets there.
+                    logger.info("Found a path to %s, starting from %s" % (authority, root_authority))
                     g.add_edge(root_authority.pk, authority.pk)
                 else:
                     sub_graph = self._build_digraph(
@@ -227,8 +225,11 @@ class SCOTUSMap(models.Model):
                         authority,
                         len(sub_graph),
                     ))
-                    if self.cluster_start_id in sub_graph:
-                        logger.info("Made it back to cluster_start. Merging graphs. g has %s nodes and sub_graph has %s nodes." % (len(g), len(sub_graph)))
+                    if any([node in sub_graph for node in good_nodes]):
+                        # If there is an intersection between known good nodes
+                        # and the current sub_graph, merge the current sub_graph
+                        # with the main graph object.
+                        logger.info("Found an intersection between current subgraph of %s nodes and our set of known good_nodes." % len(sub_graph))
                         good_nodes.add(authority.pk)
                         g.add_edge(root_authority.pk, authority.pk)
                         g = networkx.compose(g, sub_graph)
@@ -239,18 +240,18 @@ class SCOTUSMap(models.Model):
 
         return g
 
-    def _trim_branches(self, g):
-        """Find all the paths from start to finish, and nuke any nodes that
-        aren't in those paths.
-
-        See for more details: http://stackoverflow.com/questions/33586342/
-        """
-        all_path_nodes = set(itertools.chain(
-            *list(networkx.all_simple_paths(g, source=self.cluster_end.pk,
-                                            target=self.cluster_start.pk))
-        ))
-
-        return g.subgraph(all_path_nodes)
+    # def _trim_branches(self, g):
+    #     """Find all the paths from start to finish, and nuke any nodes that
+    #     aren't in those paths.
+    #
+    #     See for more details: http://stackoverflow.com/questions/33586342/
+    #     """
+    #     all_path_nodes = set(itertools.chain(
+    #         *list(networkx.all_simple_paths(g, source=self.cluster_end.pk,
+    #                                         target=self.cluster_start.pk))
+    #     ))
+    #
+    #     return g.subgraph(all_path_nodes)
 
     def add_clusters(self):
         """Do the network analysis to add clusters to the model.
@@ -298,7 +299,7 @@ class SCOTUSMap(models.Model):
             g = self._build_digraph(
                 self.cluster_end,
                 set(),
-                set(),
+                good_nodes=set(self.cluster_start_id),
                 max_depth=4,
             )
             # XXX g = self._trim_branches(g)
