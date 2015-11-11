@@ -215,28 +215,27 @@ class SCOTUSMap(models.Model):
                     # This is a second path to a good node in the network.
                     logger.info("Found a second path to %s, starting from %s" % (root_authority, authority))
                     g.add_edge(root_authority.pk, authority.pk)
-                    break
-
-                sub_graph = self._build_digraph(
-                    authority,
-                    visited_nodes,
-                    good_nodes,
-                    max_depth - 1,
-                    max_nodes=max_nodes,
-                )
-                logger.info("Subgraph of %s and its children has %s nodes" % (
-                    authority,
-                    len(sub_graph),
-                ))
-                if self.cluster_start_id in sub_graph:
-                    logger.info("Made it back to cluster_start. Merging graphs. g has %s nodes and sub_graph has %s nodes." % (len(g), len(sub_graph)))
-                    good_nodes.add(authority.pk)
-                    g.add_edge(root_authority.pk, authority.pk)
-                    g = networkx.compose(g, sub_graph)
                 else:
-                    logger.info("Reached a dead end. Ditching subgraph of %s nodes." % len(sub_graph))
-                if len(g) > max_nodes:
-                    raise TooManyNodes()
+                    sub_graph = self._build_digraph(
+                        authority,
+                        visited_nodes,
+                        good_nodes,
+                        max_depth - 1,
+                        max_nodes=max_nodes,
+                    )
+                    logger.info("Subgraph of %s and its children has %s nodes" % (
+                        authority,
+                        len(sub_graph),
+                    ))
+                    if self.cluster_start_id in sub_graph:
+                        logger.info("Made it back to cluster_start. Merging graphs. g has %s nodes and sub_graph has %s nodes." % (len(g), len(sub_graph)))
+                        good_nodes.add(authority.pk)
+                        g.add_edge(root_authority.pk, authority.pk)
+                        g = networkx.compose(g, sub_graph)
+                    else:
+                        logger.info("Reached a dead end. Ditching subgraph of %s nodes." % len(sub_graph))
+                    if len(g) > max_nodes:
+                        raise TooManyNodes()
 
         return g
 
@@ -302,7 +301,7 @@ class SCOTUSMap(models.Model):
                 set(),
                 max_depth=4,
             )
-            g = self._trim_branches(g)
+            # XXX g = self._trim_branches(g)
 
         opinion_clusters = []
         for cluster in self.clusters.all():
