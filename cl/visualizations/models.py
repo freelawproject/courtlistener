@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils.text import slugify
+from networkx.exception import NetworkXError
 
 from cl.lib.string_utils import trunc
 from cl.search.models import OpinionCluster
@@ -116,7 +117,7 @@ class SCOTUSMap(models.Model):
         )
 
     def _build_digraph(self, root_authority, visited_nodes, good_nodes,
-                       max_depth, max_nodes=700):
+                       allowed_hops_remaining, max_dod, max_nodes=700):
         """Recursively build a networkx graph
 
         Process is:
@@ -125,7 +126,7 @@ class SCOTUSMap(models.Model):
          - For each authority, add it to a networkx graph, if:
             - it happened after self.cluster_start
             - it's in the Supreme Court
-            - we haven't exceeded max_depth cases.
+            - we haven't exceeded allowed_hops_remaining
             - we haven't already followed this path
             - it is on a simple path between the beginning and end
             - fewer than max_nodes nodes are in the network
@@ -169,89 +170,60 @@ class SCOTUSMap(models.Model):
         abort if the job is too big.
         """
         if len(good_nodes) == 0:
-            # Add the start point
-            good_nodes.add(self.cluster_start_id)
+            # Add the start point, assuming it will take max_dod to get to it
+            # (hops_taken will get lowered later if there's a shorter route).
+            good_nodes.add(self.cluster_start_id, hops_taken=max_dod)
 
-        logger.info("Now using root_authority of: %s, and max_depth of %s." % (
-            root_authority,
-            max_depth,
-        ))
         g = networkx.DiGraph()
 
         is_cluster_start_obj = (root_authority == self.cluster_start)
         is_already_handled = (root_authority.pk in visited_nodes)
-        is_past_max_depth = (max_depth == 0)
+        has_no_more_hops_remaining = (allowed_hops_remaining == 0)
         blocking_conditions = [
             is_cluster_start_obj,
             is_already_handled,
-            is_past_max_depth,
+            has_no_more_hops_remaining,
         ]
-        logger.info(
-            "Blocking conditions are:\n"
-            "  is_cluster_start_obj: %s\n"
-            "  is_already_handled:   %s\n"
-            "  is_past_max_depth:    %s" % (
-                is_cluster_start_obj,
-                is_already_handled,
-                is_past_max_depth
-        ))
         if not any(blocking_conditions):
-            # Python passes objects by reference, so updating it here takes
-            # care of updating the variable in all the recursive calls. More
-            # discussion: http://stackoverflow.com/q/32361493/64911
             visited_nodes.add(root_authority.pk)
-            logger.info("We have visited %s unique nodes so far." % len(visited_nodes))
             authorities = root_authority.authorities.filter(
                 docket__court='scotus',
                 date_filed__gte=self.cluster_start.date_filed
             )
-            logger.info("Found %s sub_authorities to root node: %s" % (
-                authorities.count(),
-                root_authority,
-            ))
             for authority in authorities:
                 # Combine our present graph with the result of the next
                 # recursion
                 if authority.pk in good_nodes:
                     # This is a path to a good node in the network, such as the
                     # start node or another node that we know gets there.
-                    logger.info("Found a path to a good node, %s, starting from %s" % (authority, root_authority))
-                    g.add_edge(root_authority.pk, authority.pk)
+                    hops_taken_last_time = g.node[authority.pk]['hops_taken']
+                    hops_taken_this_route = max_dod - allowed_hops_remaining
+                    if (hops_taken_last_time + hops_taken_this_route) <= max_dod:
+                        # Only add the path if its route + the existing route
+                        # don't create a path that's more than max_dod edges.
+                        g.add_edge(root_authority.pk, authority.pk)
+                        g.node[authority.pk]['hops_taken'] = min(
+                            hops_taken_this_route,
+                            hops_taken_last_time,
+                        )
                 else:
-                    logger.info("Haven't yet reached a good node. Recursing.")
                     sub_graph = self._build_digraph(
                         authority,
                         visited_nodes,
                         good_nodes,
-                        max_depth - 1,
+                        allowed_hops_remaining - 1,
                         max_nodes=max_nodes,
+                        max_dod=max_dod,
                     )
-                    logger.info("  Subgraph of %s and its children has %s nodes" % (
-                        authority,
-                        len(sub_graph),
-                    ))
-                    if any([node in sub_graph for node in good_nodes]):
+                    if any([(node in sub_graph) for node in good_nodes]):
                         # If there is an intersection between known good nodes
                         # and the current sub_graph, consider merging the
                         # current sub_graph with the main graph object.
-                        logger.info("Authority, %s, is %s hops from the end and has a max_depth of %s." % (
-                            authority,
-                            networkx.shortest_path_length(
-                                g,
-                                authority.pk,
-                                self.cluster_end_id
-                            ),
-                            max_depth,
-                        ))
 
-                        logger.info("  Found an intersection between current subgraph of %s nodes and our set of known good_nodes." % len(sub_graph))
                         good_nodes.add(authority.pk)
                         g.add_edge(root_authority.pk, authority.pk)
+                        g.node[authority.pk]['hops_taken'] = allowed_hops_remaining
                         g = networkx.compose(g, sub_graph)
-                        logger.info("    g now has %s nodes" % len(g))
-                        logger.info("    good_nodes now has %s nodes" % len(good_nodes))
-                    else:
-                        logger.info("  Reached a dead end. Ditching subgraph of %s nodes." % len(sub_graph))
 
                     if len(g) > max_nodes:
                         raise TooManyNodes()
@@ -285,7 +257,8 @@ class SCOTUSMap(models.Model):
                 self.cluster_end,
                 set(),
                 set(),
-                max_depth=4,
+                allowed_hops_remaining=4,
+                max_dod=4,
             )
         except TooManyNodes, e:
             logger.warn("Too many nodes while building "
@@ -318,7 +291,8 @@ class SCOTUSMap(models.Model):
                 self.cluster_end,
                 set(),
                 set(),
-                max_depth=4,
+                allowed_hops_remaining=4,
+                max_dod=4,
             )
             # XXX g = self._trim_branches(g)
 
