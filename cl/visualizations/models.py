@@ -209,7 +209,6 @@ class SCOTUSMap(models.Model):
                 root_authority,
             ))
             for authority in authorities:
-                g.add_edge(root_authority.pk, authority.pk)
                 # Combine our present graph with the result of the next
                 # recursion
                 sub_graph = self._build_digraph(
@@ -224,6 +223,7 @@ class SCOTUSMap(models.Model):
                 ))
                 if self.cluster_start_id in sub_graph:
                     logger.info("Made it back to cluster_start. Merging graphs. g has %s nodes and sub_graph has %s nodes." % (len(g), len(sub_graph)))
+                    g.add_edge(root_authority.pk, authority.pk)
                     g = networkx.compose(g, sub_graph)
                 else:
                     logger.info("Reached a dead end. Ditching subgraph of %s nodes." % len(sub_graph))
