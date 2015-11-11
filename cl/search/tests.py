@@ -6,7 +6,6 @@ import os
 import shutil
 import time
 
-from collections import OrderedDict
 from datadiff import diff
 from django.conf import settings
 from django.core.files.base import ContentFile

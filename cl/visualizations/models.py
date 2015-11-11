@@ -230,23 +230,20 @@ class SCOTUSMap(models.Model):
                         authority,
                         len(sub_graph),
                     ))
-                    intersects_with_good_nodes = any([node in sub_graph for
-                                                      node in good_nodes])
-                    logger.info("Authority, %s, is %s hops from the end and has a max_depth of %s." % (
-                        authority,
-                        networkx.shortest_path_length(
-                            g,
-                            authority.pk,
-                            self.cluster_end_id
-                        ),
-                        max_depth,
-                    ))
-                    if all([intersects_with_good_nodes]):
-
-
+                    if any([node in sub_graph for node in good_nodes]):
                         # If there is an intersection between known good nodes
-                        # and the current sub_graph, merge the current sub_graph
-                        # with the main graph object.
+                        # and the current sub_graph, consider merging the
+                        # current sub_graph with the main graph object.
+                        logger.info("Authority, %s, is %s hops from the end and has a max_depth of %s." % (
+                            authority,
+                            networkx.shortest_path_length(
+                                g,
+                                authority.pk,
+                                self.cluster_end_id
+                            ),
+                            max_depth,
+                        ))
+
                         logger.info("  Found an intersection between current subgraph of %s nodes and our set of known good_nodes." % len(sub_graph))
                         good_nodes.add(authority.pk)
                         g.add_edge(root_authority.pk, authority.pk)
