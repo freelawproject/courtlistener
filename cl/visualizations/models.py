@@ -168,6 +168,10 @@ class SCOTUSMap(models.Model):
         nodes in the network, the sooner we will hit max_nodes and be able to
         abort if the job is too big.
         """
+        if len(good_nodes) == 0:
+            # Add the start point
+            good_nodes.add(self.cluster_start_id)
+
         logger.info("Now using root_authority of: %s, and max_depth of %s." % (
             root_authority,
             max_depth,
@@ -299,7 +303,7 @@ class SCOTUSMap(models.Model):
             g = self._build_digraph(
                 self.cluster_end,
                 set(),
-                good_nodes=set(self.cluster_start_id),
+                set(),
                 max_depth=4,
             )
             # XXX g = self._trim_branches(g)
