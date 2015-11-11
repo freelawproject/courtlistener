@@ -116,7 +116,7 @@ class SCOTUSMap(models.Model):
         )
 
     def _build_digraph(self, root_authority, visited_nodes, good_nodes,
-                       max_depth, max_nodes=70):
+                       max_depth, max_nodes=700):
         """Recursively build a networkx graph
 
         Process is:
