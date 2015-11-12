@@ -216,7 +216,7 @@
              type="text_en_splitting_cl"
              indexed="true"
              stored="true"
-             multiValued="false"
+             multiValued="true"
              termVectors="true"
              termPositions="true"
              termOffsets="true"/>
