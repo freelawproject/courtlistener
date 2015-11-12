@@ -495,22 +495,24 @@ class OpinionCluster(models.Model):
         return caption
 
     @property
-    def citation_string(self):
-        """Make a citation string, joined by commas
+    def citation_list(self):
+        """Make a citation list
 
-        This function creates a series of citations separated by commas that
-        can be listed as meta data for an opinion. The order of the items in
-        this list follows BlueBook order, so our citations aren't just willy
-        nilly.
+        This function creates a series of citations that can be listed as meta
+        data for an opinion. The order of the items in this list follows
+        BlueBook order, so our citations aren't just willy nilly.
         """
-        cites = [self.neutral_cite, self.federal_cite_one,
-                 self.federal_cite_two, self.federal_cite_three,
-                 self.specialty_cite_one, self.state_cite_regional,
-                 self.state_cite_one, self.state_cite_two,
-                 self.state_cite_three, self.westlaw_cite,
-                 self.lexis_cite]
+        return [self.neutral_cite, self.federal_cite_one,
+                self.federal_cite_two, self.federal_cite_three,
+                self.specialty_cite_one, self.state_cite_regional,
+                self.state_cite_one, self.state_cite_two,
+                self.state_cite_three, self.westlaw_cite,
+                self.lexis_cite]
 
-        return ', '.join([cite for cite in cites if cite])
+    @property
+    def citation_string(self):
+        """Make a citation string, joined by commas"""
+        return ', '.join([cite for cite in self.citation_list if cite])
 
     @property
     def authorities(self):

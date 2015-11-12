@@ -62,7 +62,7 @@ class SearchDocument(object):
                 time()
             )  # Midnight, PST
         self.lexisCite = item.cluster.lexis_cite
-        self.citation = item.cluster.citation_string
+        self.citation = item.cluster.citation_list
         self.neutralCite = item.cluster.neutral_cite
         self.scdb_id = item.cluster.scdb_id
         self.source = item.cluster.source
