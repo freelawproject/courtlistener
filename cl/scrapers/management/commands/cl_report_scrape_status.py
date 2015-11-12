@@ -39,8 +39,13 @@ def calculate_counts():
 
     # Needed because annotation calls above don't return courts with no new
     # opinions
-    all_active_courts = Court.objects.filter(has_opinion_scraper=True) \
-        .values_list('pk', flat=True).order_by('position')
+    all_active_courts = Court.objects.filter(
+        has_opinion_scraper=True
+    ).values_list(
+        'pk', flat=True
+    ).order_by(
+        'position'
+    )
 
     # Reformat the results into dicts...
     cts_more_than_30_days = _make_query_dict(cts_more_than_30_days)
@@ -58,11 +63,13 @@ def calculate_counts():
         if cts_more_than_30_days.get(court, 0) == 0:
             # No results in newer than 35 days. Get date of most recent
             # item.
-            date_filed = OpinionCluster.objects.filter(
-                docket__court_id=court
-            ).order_by(
-                '-date_filed'
-            )[0].date_filed
+            try:
+                date_filed = OpinionCluster.objects.filter(
+                    docket__court_id=court
+                ).latest('date_filed').date_filed
+            except OpinionCluster.DoesNotExist:
+                # New jurisdiction without any results. Punt.
+                continue
             try:
                 mod = __import__(
                     mod_dict[court],
