@@ -138,14 +138,17 @@ class SCOTUSMap(models.Model):
             return True
         return False
 
-    @staticmethod
-    def __graphs_intersect(g1, g2):
+    def __graphs_intersect(self, g1, g2):
         """Test if two graphs have common nodes.
 
         networkx has a function for this, but it seems to fail on DiGraphs for
         reasons unknown and undocumented.
+
+        Do not consider it an intersection if the only intersection is the first
+        node.
         """
-        return any([node in g2 for node in g1.nodes()])
+        return any([node in g2 for node in g1.nodes() if
+                    node != self.cluster_end_id])
 
     def _build_digraph(self, parent_authority, visited_nodes, good_nodes,
                        max_dos, hops_taken=0, max_nodes=700):
