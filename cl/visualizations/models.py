@@ -200,14 +200,16 @@ class SCOTUSMap(models.Model):
         nodes in the network, the sooner we will hit max_nodes and be able to
         abort if the job is too big.
         """
+        # Always create a graph with the start and end nodes.
         g = networkx.DiGraph()
-        hops_taken += 1
+        g.add_nodes_from([self.cluster_end_id, self.cluster_start_id])
         if len(good_nodes) == 0:
             # Add the beginning and end.
             good_nodes = {
                 self.cluster_end: {'hops_taken': 0},
                 self.cluster_start: {'hops_taken': 4},
             }
+        hops_taken += 1
 
         is_cluster_start_obj = (parent_authority == self.cluster_start)
         is_already_handled = (parent_authority in visited_nodes)
@@ -227,6 +229,7 @@ class SCOTUSMap(models.Model):
                 # Combine our present graph with the result of the next
                 # recursion
                 if child_authority == self.cluster_start:
+                    print "Reached cluster_start with child_authority: %s and parent_authority: %s" % (child_authority, parent_authority)
                     # Parent links to the starting point. Add an edge. No need
                     # to check distance here because we're already at the start
                     # node.
@@ -257,12 +260,18 @@ class SCOTUSMap(models.Model):
                         max_nodes=max_nodes,
                     )
 
+                    if len(sub_graph) > 0:
+                        print "Subgraph has %s nodes" % len(sub_graph)
+                        print "g has %s nodes" % len(g)
                     if self.__graphs_intersect(sub_graph, g):
                         # The graphs intersect. Merge them.
+                        print "The graphs intersected!"
                         g.add_edge(parent_authority.pk, child_authority.pk)
                         self.__update_hops_taken(good_nodes, child_authority,
                                                  hops_taken)
                         g = networkx.compose(g, sub_graph)
+                    else:
+                        print "The graphs didn't intersect. Boo."
 
                 if len(g) > max_nodes:
                     raise TooManyNodes()
