@@ -200,6 +200,16 @@ class SCOTUSMap(models.Model):
         nodes in the network, the sooner we will hit max_nodes and be able to
         abort if the job is too big.
         """
+        happiness = [110973, 111014, 111113, 111464, 111488, 111506, 111509,
+                     111505, 111561, 111616, 111756, 111924, 111944, 111979,
+                     112138, 112173, 112194, 112331, 112451, 112646, 112779,
+                     112874, 112881, 112887, 117870, 117927, 117966, 117967,
+                     118133, 118140, 118377, 118386, 118446, 121168, 131166,
+                     136984, 137749, 142900, 799993, 799990, 2674862]
+
+        if parent_authority.id not in happiness:
+            print "Skipping node known to be out of network."
+            return networkx.DiGraph()
         g = networkx.DiGraph()
         if len(good_nodes) == 0:
             # Add the beginning and end.
@@ -224,6 +234,9 @@ class SCOTUSMap(models.Model):
                 date_filed__gte=self.cluster_start.date_filed
             )
             for child_authority in child_authorities:
+                if child_authority.pk not in happiness:
+                    print "Skipping child_authority not in network: %s" % child_authority
+                    return networkx.DiGraph()
                 # Combine our present graph with the result of the next
                 # recursion
                 if child_authority == self.cluster_start:
@@ -231,7 +244,7 @@ class SCOTUSMap(models.Model):
                     # Parent links to the starting point. Add an edge. No need
                     # to check distance here because we're already at the start
                     # node.
-                    if hops_taken < max_dos:
+                    #if hops_taken <= max_dos:
                         # This connection would add one more hop, so only do
                         # this if it won't generate a hop of more than max_dos.
                         g.add_edge(parent_authority.pk, child_authority.pk)
@@ -243,7 +256,7 @@ class SCOTUSMap(models.Model):
                     # could make it to the end in max_dod hops. Update
                     # hops_taken if necessary.
                     if self.__within_max_dos(good_nodes, child_authority,
-                                             hops_taken + 1, max_dos):
+                                             hops_taken, max_dos):
                         g.add_edge(parent_authority.pk, child_authority.pk)
                         self.__update_hops_taken(good_nodes, child_authority,
                                                  hops_taken)
