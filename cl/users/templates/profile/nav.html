@@ -8,11 +8,12 @@
             <li class="{% block nav-alerts %}inactive{% endblock %}">
                 <a href="/profile/alerts/"><i class="fa fa-bell-o gray"></i>&nbsp;Alerts</a>
             </li>
+            <li class="{% block nav-visualizations %}inactive{% endblock %}">
+                <a href="{% url "view_visualizations" %}"><i
+                        class="fa fa-line-chart gray"></i>&nbsp;Visualizations</a>
+            </li>
             <li class="{% block nav-favorites %}inactive{% endblock %}">
                 <a href="/profile/favorites/"><i class="fa fa-star-o gray"></i>&nbsp;Favorites</a>
-            </li>
-            <li class="{% block nav-visualizations %}inactive{% endblock %}">
-                <a href="{% url "view_visualizations" %}"><i class="fa fa-line-chart gray"></i>&nbsp;Visualizations</a>
             </li>
             <li class="{% block nav-donations %}inactive{% endblock %}">
                 <a href="/profile/donations/"><i class="fa fa-money gray"></i>&nbsp;Donations</a>
