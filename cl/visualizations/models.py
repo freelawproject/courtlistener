@@ -145,7 +145,7 @@ class SCOTUSMap(models.Model):
         reasons unknown and undocumented.
         """
         return (any([(node in main_graph) for node in sub_graph.nodes()]) or
-                self.cluster_end in sub_graph)
+                self.cluster_start.pk in sub_graph)
 
     def _build_digraph(self, parent_authority, visited_nodes, good_nodes,
                        max_dos, hops_taken=0, max_nodes=700):
