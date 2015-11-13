@@ -1,7 +1,6 @@
 # coding=utf-8
 import json
 
-import itertools
 import logging
 import networkx
 import time
@@ -116,17 +115,49 @@ class SCOTUSMap(models.Model):
             end=get_best_case_name(self.cluster_end),
         )
 
-    def _build_digraph(self, root_authority, visited_nodes, good_nodes,
-                       allowed_hops_remaining, max_dod, max_nodes=700):
-        """Recursively build a networkx graph
+    def __update_hops_taken(self, good_nodes, node, hops_taken_this_time):
+        if node in good_nodes:
+            hops_taken_last_time = good_nodes[node]['hops_taken']
+            good_nodes[node]['hops_taken'] = min(
+                hops_taken_this_time,
+                hops_taken_last_time,
+            )
+        else:
+            good_nodes[node] = {'hops_taken': hops_taken_this_time}
+
+    def __within_max_dos(self, good_nodes, child_authority,
+                         hops_taken_this_time, max_dos):
+        """Determine if a new route to a node that's already in the network
+        is within the max_dos of the start point.
+        """
+        # This is a new path to a node that's already in the network. Add it
+        # if it wouldn't take too many hops.
+        hops_taken_last_time = good_nodes[child_authority]['hops_taken']
+        if (hops_taken_last_time + hops_taken_this_time) <= max_dos or \
+                (hops_taken_this_time <= hops_taken_last_time):
+            return True
+        return False
+
+    @staticmethod
+    def __graphs_intersect(g1, g2):
+        """Test if two graphs have common nodes.
+
+        networkx has a function for this, but it seems to fail on DiGraphs for
+        reasons unknown and undocumented.
+        """
+        return any([node in g2 for node in g1.nodes()])
+
+    def _build_digraph(self, parent_authority, visited_nodes, good_nodes,
+                       max_dos, hops_taken=0, max_nodes=700):
+        """Recursively build a nx graph
 
         Process is:
          - Work backwards through the authorities for self.cluster_end and all
            of its children.
-         - For each authority, add it to a networkx graph, if:
+         - For each authority, add it to a nx graph, if:
             - it happened after self.cluster_start
             - it's in the Supreme Court
-            - we haven't exceeded allowed_hops_remaining
+            - we haven't exceeded max_dos
             - we haven't already followed this path
             - it is on a simple path between the beginning and end
             - fewer than max_nodes nodes are in the network
@@ -169,102 +200,90 @@ class SCOTUSMap(models.Model):
         nodes in the network, the sooner we will hit max_nodes and be able to
         abort if the job is too big.
         """
-        if len(good_nodes) == 0:
-            # Add the start point
-            good_nodes.add(self.cluster_start_id)
-
         g = networkx.DiGraph()
+        hops_taken += 1
+        if len(good_nodes) == 0:
+            # Add the beginning and end.
+            good_nodes = {
+                self.cluster_end: {'hops_taken': 0},
+                self.cluster_start: {'hops_taken': 4},
+            }
 
-        is_cluster_start_obj = (root_authority == self.cluster_start)
-        is_already_handled = (root_authority.pk in visited_nodes)
-        has_no_more_hops_remaining = (allowed_hops_remaining == 0)
+        is_cluster_start_obj = (parent_authority == self.cluster_start)
+        is_already_handled = (parent_authority in visited_nodes)
+        has_no_more_hops_remaining = (hops_taken > max_dos)
         blocking_conditions = [
             is_cluster_start_obj,
             is_already_handled,
             has_no_more_hops_remaining,
         ]
         if not any(blocking_conditions):
-            visited_nodes.add(root_authority.pk)
-            authorities = root_authority.authorities.filter(
+            visited_nodes.add(parent_authority)
+            child_authorities = parent_authority.authorities.filter(
                 docket__court='scotus',
                 date_filed__gte=self.cluster_start.date_filed
             )
-            for authority in authorities:
+            for child_authority in child_authorities:
                 # Combine our present graph with the result of the next
                 # recursion
-                if authority.pk in good_nodes:
-                    # This is a path to a good node in the network, such as the
-                    # start node or another node that we know gets there.
-                    # Using .get() guards against the first node, which will
-                    # lack this attribute. In that case, we assume it took the
-                    # max possible number of hops (this will get lowered, if
-                    # possible).
-                    hops_taken_last_time = g.node.get(
-                        authority.pk,
-                        {'hops_taken': max_dod}
-                    )['hops_taken']
-                    hops_taken_this_route = max_dod - allowed_hops_remaining
-                    if (hops_taken_last_time + hops_taken_this_route) <= max_dod:
-                        # Only add the path if its route + the existing route
-                        # don't create a path that's more than max_dod edges.
-                        g.add_edge(root_authority.pk, authority.pk)
-                        g.node[authority.pk]['hops_taken'] = min(
-                            hops_taken_this_route,
-                            hops_taken_last_time,
-                        )
-                else:
-                    sub_graph = self._build_digraph(
-                        authority,
-                        visited_nodes,
-                        good_nodes,
-                        allowed_hops_remaining - 1,
-                        max_nodes=max_nodes,
-                        max_dod=max_dod,
-                    )
-                    if any([(node in sub_graph) for node in good_nodes]):
-                        # If there is an intersection between known good nodes
-                        # and the current sub_graph, consider merging the
-                        # current sub_graph with the main graph object.
+                if child_authority == self.cluster_start:
+                    # Parent links to the starting point. Add an edge. No need
+                    # to check distance here because we're already at the start
+                    # node.
+                    if hops_taken < max_dos:
+                        # This connection would add one more hop, so only do
+                        # this if it won't generate a hop of more than max_dos.
+                        g.add_edge(parent_authority.pk, child_authority.pk)
+                        self.__update_hops_taken(good_nodes, child_authority,
+                                                 hops_taken)
 
-                        good_nodes.add(authority.pk)
-                        g.add_edge(root_authority.pk, authority.pk)
-                        g.node[authority.pk]['hops_taken'] = max_dod - allowed_hops_remaining
+                elif child_authority in good_nodes:
+                    # Parent links to a node already in the network. Check if we
+                    # could make it to the end in max_dod hops. Update
+                    # hops_taken if necessary.
+                    if self.__within_max_dos(good_nodes, child_authority,
+                                             hops_taken + 1, max_dos):
+                        g.add_edge(parent_authority.pk, child_authority.pk)
+                        self.__update_hops_taken(good_nodes, child_authority,
+                                                 hops_taken)
+                else:
+                    # No easy shortcuts. Recurse.
+                    sub_graph = self._build_digraph(
+                        parent_authority=child_authority,
+                        visited_nodes=visited_nodes,
+                        good_nodes=good_nodes,
+                        max_dos=max_dos,
+                        hops_taken=hops_taken,
+                        max_nodes=max_nodes,
+                    )
+
+                    if self.__graphs_intersect(sub_graph, g):
+                        # The graphs intersect. Merge them.
+                        g.add_edge(parent_authority.pk, child_authority.pk)
+                        self.__update_hops_taken(good_nodes, child_authority,
+                                                 hops_taken)
                         g = networkx.compose(g, sub_graph)
 
-                    if len(g) > max_nodes:
-                        raise TooManyNodes()
+                if len(g) > max_nodes:
+                    raise TooManyNodes()
 
         return g
-
-    # def _trim_branches(self, g):
-    #     """Find all the paths from start to finish, and nuke any nodes that
-    #     aren't in those paths.
-    #
-    #     See for more details: http://stackoverflow.com/questions/33586342/
-    #     """
-    #     all_path_nodes = set(itertools.chain(
-    #         *list(networkx.all_simple_paths(g, source=self.cluster_end.pk,
-    #                                         target=self.cluster_start.pk))
-    #     ))
-    #
-    #     return g.subgraph(all_path_nodes)
 
     def add_clusters(self):
         """Do the network analysis to add clusters to the model.
 
         Process is to:
-         - Build a networkx graph
+         - Build a nx graph
          - For all nodes in the graph, add them to self.clusters
          - Update self.generation_time once complete.
         """
         t1 = time.time()
         try:
             g = self._build_digraph(
-                self.cluster_end,
-                set(),
-                set(),
-                allowed_hops_remaining=4,
-                max_dod=4,
+                parent_authority=self.cluster_end,
+                visited_nodes=set(),
+                good_nodes=dict(),
+                max_dos=4,
             )
         except TooManyNodes, e:
             logger.warn("Too many nodes while building "
@@ -293,14 +312,9 @@ class SCOTUSMap(models.Model):
             },
         }
         if g is None:
-            g = self._build_digraph(
-                self.cluster_end,
-                set(),
-                set(),
-                allowed_hops_remaining=4,
-                max_dod=4,
-            )
+            # XXX build the digraph here if you want to.
             # XXX g = self._trim_branches(g)
+            pass
 
         opinion_clusters = []
         for cluster in self.clusters.all():
