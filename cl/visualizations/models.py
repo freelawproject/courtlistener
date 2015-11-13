@@ -244,11 +244,8 @@ class SCOTUSMap(models.Model):
                     # Parent links to the starting point. Add an edge. No need
                     # to check distance here because we're already at the start
                     # node.
-                    #if hops_taken <= max_dos:
-                        # This connection would add one more hop, so only do
-                        # this if it won't generate a hop of more than max_dos.
-                        g.add_edge(parent_authority.pk, child_authority.pk)
-                        self.__update_hops_taken(good_nodes, child_authority,
+                    g.add_edge(parent_authority.pk, child_authority.pk)
+                    self.__update_hops_taken(good_nodes, child_authority,
                                                  hops_taken)
 
                 elif child_authority in good_nodes:

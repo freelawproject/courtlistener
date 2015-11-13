@@ -29,7 +29,7 @@ kombu==3.0.29
 logilab-common==0.63.2
 lxml==3.4.4
 markdown2==2.3.0
-networkx==1.8.1
+networkx==1.10
 nose
 psycopg2==2.6.1
 pyinotify==0.9.6
