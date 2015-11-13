@@ -200,16 +200,6 @@ class SCOTUSMap(models.Model):
         nodes in the network, the sooner we will hit max_nodes and be able to
         abort if the job is too big.
         """
-        happiness = [110973, 111014, 111113, 111464, 111488, 111506, 111509,
-                     111505, 111561, 111616, 111756, 111924, 111944, 111979,
-                     112138, 112173, 112194, 112331, 112451, 112646, 112779,
-                     112874, 112881, 112887, 117870, 117927, 117966, 117967,
-                     118133, 118140, 118377, 118386, 118446, 121168, 131166,
-                     136984, 137749, 142900, 799993, 799990, 2674862]
-
-        if parent_authority.id not in happiness:
-            print "Skipping node known to be out of network."
-            return networkx.DiGraph()
         g = networkx.DiGraph()
         if len(good_nodes) == 0:
             # Add the beginning and end.
@@ -234,9 +224,6 @@ class SCOTUSMap(models.Model):
                 date_filed__gte=self.cluster_start.date_filed
             )
             for child_authority in child_authorities:
-                if child_authority.pk not in happiness:
-                    print "Skipping child_authority not in network: %s" % child_authority
-                    return networkx.DiGraph()
                 # Combine our present graph with the result of the next
                 # recursion
                 if child_authority == self.cluster_start:
