@@ -333,7 +333,7 @@ class SCOTUSMap(models.Model):
                 if len(g) > max_nodes:
                     raise TooManyNodes()
 
-        return g, hops_from_end
+        return g
 
     def add_clusters(self):
         """Do the network analysis to add clusters to the model.
