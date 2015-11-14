@@ -138,14 +138,14 @@ class SCOTUSMap(models.Model):
             return True
         return False
 
-    def __graphs_intersect(self, main_graph, sub_graph):
+    def __graphs_intersect(self, good_nodes, main_graph, sub_graph):
         """Test if two graphs have common nodes.
 
-        networkx has a function for this, but it seems to fail on DiGraphs for
-        reasons unknown and undocumented.
+        First check if it's in the main graph, then check if it's in good_nodes,
+        indicating a second path to the start node.
         """
         return (any([(node in main_graph) for node in sub_graph.nodes()]) or
-                self.cluster_start.pk in sub_graph)
+                any([(node in good_nodes) for node in sub_graph.nodes()]))
 
     def _build_digraph(self, parent_authority, visited_nodes, good_nodes,
                        max_dos, hops_taken=0, max_nodes=700):
@@ -258,7 +258,7 @@ class SCOTUSMap(models.Model):
                     if len(sub_graph) > 0:
                         print "Subgraph has %s nodes" % len(sub_graph)
                         print "g has %s nodes" % len(g)
-                    if self.__graphs_intersect(g, sub_graph):
+                    if self.__graphs_intersect(good_nodes, g, sub_graph):
                         # The graphs intersect. Merge them.
                         print "The graphs intersected!"
                         g.add_edge(parent_authority.pk, child_authority.pk)
