@@ -244,7 +244,7 @@ class SCOTUSMap(models.Model):
             good_nodes = {
                 # self.cluster_end_id: {'hops_taken': 0},
                 # self.cluster_start_id: {'hops_taken': 4},  # min_hops_to_start_node = 0
-                self.cluster.start_id: {'shortest_path': 0},
+                self.cluster_start_id: {'shortest_path': 0},
             }
         hops_taken += 1
 
