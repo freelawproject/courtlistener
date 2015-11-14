@@ -166,13 +166,13 @@ class SCOTUSMap(models.Model):
             return True
         return False
 
-    def __within_max_dos_2(self, good_nodes, child_authority_id,
-                           hops_taken_this_time, max_dos):
+    def __within_max_dos_2(self, good_nodes, child_authority_id, hops_taken,
+                           max_dos):
         """Determine if a new route to a node that's already in the network is
         within the max_dos of the start_point.
         """
         shortest_path = good_nodes[child_authority_id]['shortest_path']
-        if (shortest_path + hops_taken_this_time) > max_dos:
+        if (shortest_path + hops_taken) > max_dos:
             return False
         return True
 
@@ -303,7 +303,7 @@ class SCOTUSMap(models.Model):
                         )
                 else:
                     # No easy shortcuts. Recurse.
-                    sub_graph, hops_from_end = self._build_digraph(
+                    sub_graph = self._build_digraph(
                         parent_authority=child_authority,
                         visited_nodes=visited_nodes,
                         good_nodes=good_nodes,
