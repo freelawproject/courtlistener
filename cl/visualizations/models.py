@@ -115,24 +115,24 @@ class SCOTUSMap(models.Model):
             end=get_best_case_name(self.cluster_end),
         )
 
-    def __update_hops_taken(self, good_nodes, node, hops_taken_this_time):
-        if node in good_nodes:
-            hops_taken_last_time = good_nodes[node]['hops_taken']
-            good_nodes[node]['hops_taken'] = min(
+    def __update_hops_taken(self, good_nodes, node_id, hops_taken_this_time):
+        if node_id in good_nodes:
+            hops_taken_last_time = good_nodes[node_id]['hops_taken']
+            good_nodes[node_id]['hops_taken'] = min(
                 hops_taken_this_time,
                 hops_taken_last_time,
             )
         else:
-            good_nodes[node] = {'hops_taken': hops_taken_this_time}
+            good_nodes[node_id] = {'hops_taken': hops_taken_this_time}
 
-    def __within_max_dos(self, good_nodes, child_authority,
+    def __within_max_dos(self, good_nodes, child_authority_id,
                          hops_taken_this_time, max_dos):
         """Determine if a new route to a node that's already in the network
         is within the max_dos of the start point.
         """
         # This is a new path to a node that's already in the network. Add it
         # if it wouldn't take too many hops.
-        hops_taken_last_time = good_nodes[child_authority]['hops_taken']
+        hops_taken_last_time = good_nodes[child_authority_id]['hops_taken']
         if (hops_taken_last_time + hops_taken_this_time) <= max_dos or \
                 (hops_taken_this_time <= hops_taken_last_time):
             return True
@@ -204,8 +204,8 @@ class SCOTUSMap(models.Model):
         if len(good_nodes) == 0:
             # Add the beginning and end.
             good_nodes = {
-                self.cluster_end: {'hops_taken': 0},
-                self.cluster_start: {'hops_taken': 4},
+                self.cluster_end_id: {'hops_taken': 0},
+                self.cluster_start_id: {'hops_taken': 4},
             }
         hops_taken += 1
 
@@ -232,17 +232,17 @@ class SCOTUSMap(models.Model):
                     # to check distance here because we're already at the start
                     # node.
                     g.add_edge(parent_authority.pk, child_authority.pk)
-                    self.__update_hops_taken(good_nodes, child_authority,
-                                                 hops_taken)
+                    self.__update_hops_taken(good_nodes, child_authority.pk,
+                                             hops_taken)
 
-                elif child_authority in good_nodes:
+                elif child_authority.pk in good_nodes:
                     # Parent links to a node already in the network. Check if we
                     # could make it to the end in max_dod hops. Update
                     # hops_taken if necessary.
-                    if self.__within_max_dos(good_nodes, child_authority,
+                    if self.__within_max_dos(good_nodes, child_authority.pk,
                                              hops_taken, max_dos):
                         g.add_edge(parent_authority.pk, child_authority.pk)
-                        self.__update_hops_taken(good_nodes, child_authority,
+                        self.__update_hops_taken(good_nodes, child_authority.pk,
                                                  hops_taken)
                 else:
                     # No easy shortcuts. Recurse.
@@ -262,7 +262,7 @@ class SCOTUSMap(models.Model):
                         # The graphs intersect. Merge them.
                         print "The graphs intersected!"
                         g.add_edge(parent_authority.pk, child_authority.pk)
-                        self.__update_hops_taken(good_nodes, child_authority,
+                        self.__update_hops_taken(good_nodes, child_authority.pk,
                                                  hops_taken)
                         g = networkx.compose(g, sub_graph)
                     else:
