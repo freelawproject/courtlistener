@@ -260,7 +260,7 @@ class SCOTUSMap(models.Model):
             has_no_more_hops_remaining,
         ]
         if not any(blocking_conditions):
-            visited_nodes[parent_authority.pk] = {'hops_taken': hops_taken}
+            visited_nodes[parent_authority.pk] = {'hops_taken': hops_taken - 1}
             child_authorities = parent_authority.authorities.filter(
                 docket__court='scotus',
                 date_filed__gte=self.cluster_start.date_filed
