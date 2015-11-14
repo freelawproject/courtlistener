@@ -246,19 +246,19 @@ class SCOTUSMap(models.Model):
                 # self.cluster_start_id: {'hops_taken': 4},  # min_hops_to_start_node = 0
                 self.cluster_start_id: {'shortest_path': 0},
             }
-        hops_taken += 1
 
         is_cluster_start_obj = (parent_authority == self.cluster_start)
-        is_already_handled_with_equal_or_longer_path = (
+        is_already_handled_with_shorter_path = (
             parent_authority.pk in visited_nodes and
-            visited_nodes[parent_authority.pk]['hops_taken'] >= hops_taken
+            visited_nodes[parent_authority.pk]['hops_taken'] < hops_taken
         )
-        has_no_more_hops_remaining = (hops_taken > max_dos)
+        has_no_more_hops_remaining = (hops_taken == max_dos)
         blocking_conditions = [
             is_cluster_start_obj,
-            is_already_handled_with_equal_or_longer_path,
+            is_already_handled_with_shorter_path,
             has_no_more_hops_remaining,
         ]
+        hops_taken += 1
         if not any(blocking_conditions):
             visited_nodes[parent_authority.pk] = {'hops_taken': hops_taken - 1}
             child_authorities = parent_authority.authorities.filter(
@@ -269,7 +269,7 @@ class SCOTUSMap(models.Model):
                 # Combine our present graph with the result of the next
                 # recursion
                 if child_authority == self.cluster_start:
-                    print "Reached cluster_start with child_authority: %s and parent_authority: %s" % (child_authority, parent_authority)
+                    # print "Reached cluster_start with child_authority: %s and parent_authority: %s" % (child_authority, parent_authority)
                     # Parent links to the starting point. Add an edge. No need
                     # to check distance here because we're already at the start
                     # node.
