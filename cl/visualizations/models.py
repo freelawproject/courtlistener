@@ -114,16 +114,44 @@ class SCOTUSMap(models.Model):
             start=get_best_case_name(self.cluster_start),
             end=get_best_case_name(self.cluster_end),
         )
+    #
+    # def __set_shortest_path_to_end(self, g, good_nodes, source, target):
+    #     """Compute and log the shortest path from source to target, updating the
+    #     value for source.
+    #     """
+    #     length = networkx.shortest_path_length(g, source=source, target=target)
+    #     if source in good_nodes:
+    #         length_last_time = good_nodes[source]['shortest_path']
+    #         good_nodes[source]['shortest_path'] = min(
+    #             length,
+    #             length_last_time,
+    #         )
+    #     else:
+    #         good_nodes[source]['shortest_path'] = {
+    #             'shortest_path': length,
+    #         }
 
-    def __update_hops_taken(self, good_nodes, node_id, hops_taken_this_time):
+    def __set_shortest_path_to_end_2(self, good_nodes, node_id, target_id):
         if node_id in good_nodes:
-            hops_taken_last_time = good_nodes[node_id]['hops_taken']
-            good_nodes[node_id]['hops_taken'] = min(
-                hops_taken_this_time,
-                hops_taken_last_time,
+            current_length = good_nodes[node_id]['shortest_path']
+            good_nodes[node_id]['shortest_path'] = min(
+                current_length,
+                good_nodes[target_id]['shortest_path'] + 1,
             )
         else:
-            good_nodes[node_id] = {'hops_taken': hops_taken_this_time}
+            good_nodes[node_id] = {
+                'shortest_path': good_nodes[target_id]['shortest_path'] + 1
+            }
+
+    # def __update_hops_taken(self, good_nodes, node_id, hops_taken_this_time):
+    #     if node_id in good_nodes:
+    #         hops_taken_last_time = good_nodes[node_id]['hops_taken']
+    #         good_nodes[node_id]['hops_taken'] = min(
+    #             hops_taken_this_time,
+    #             hops_taken_last_time,
+    #         )
+    #     else:
+    #         good_nodes[node_id] = {'hops_taken': hops_taken_this_time}
 
     def __within_max_dos(self, good_nodes, child_authority_id,
                          hops_taken_this_time, max_dos):
@@ -137,6 +165,16 @@ class SCOTUSMap(models.Model):
                 (hops_taken_this_time <= hops_taken_last_time):
             return True
         return False
+
+    def __within_max_dos_2(self, good_nodes, child_authority_id,
+                           hops_taken_this_time, max_dos):
+        """Determine if a new route to a node that's already in the network is
+        within the max_dos of the start_point.
+        """
+        shortest_path = good_nodes[child_authority_id]['shortest_path']
+        if (shortest_path + hops_taken_this_time) > max_dos:
+            return False
+        return True
 
     def __graphs_intersect(self, good_nodes, main_graph, sub_graph):
         """Test if two graphs have common nodes.
@@ -204,8 +242,9 @@ class SCOTUSMap(models.Model):
         if len(good_nodes) == 0:
             # Add the beginning and end.
             good_nodes = {
-                self.cluster_end_id: {'hops_taken': 0},
-                self.cluster_start_id: {'hops_taken': 4},
+                # self.cluster_end_id: {'hops_taken': 0},
+                # self.cluster_start_id: {'hops_taken': 4},  # min_hops_to_start_node = 0
+                self.cluster.start_id: {'shortest_path': 0},
             }
         hops_taken += 1
 
@@ -232,21 +271,39 @@ class SCOTUSMap(models.Model):
                     # to check distance here because we're already at the start
                     # node.
                     g.add_edge(parent_authority.pk, child_authority.pk)
-                    self.__update_hops_taken(good_nodes, child_authority.pk,
-                                             hops_taken)
-
+                    # self.__update_hops_taken(
+                    #     good_nodes,
+                    #     child_authority.pk,
+                    #     hops_taken
+                    # )
+                    # self.__set_shortest_path_to_end(
+                    #     g,
+                    #     good_nodes,
+                    #     source=parent_authority.pk,
+                    #     target=child_authority.pk,
+                    # )
+                    self.__set_shortest_path_to_end_2(
+                        good_nodes,
+                        node_id=parent_authority.pk,
+                        target_id=child_authority.pk,
+                    )
                 elif child_authority.pk in good_nodes:
                     # Parent links to a node already in the network. Check if we
-                    # could make it to the end in max_dod hops. Update
-                    # hops_taken if necessary.
-                    if self.__within_max_dos(good_nodes, child_authority.pk,
-                                             hops_taken, max_dos):
+                    # could make it to the end in max_dod hops. Set
+                    # shortest_path for the child_authority
+                    if self.__within_max_dos_2(good_nodes, child_authority.pk,
+                                               hops_taken, max_dos):
                         g.add_edge(parent_authority.pk, child_authority.pk)
-                        self.__update_hops_taken(good_nodes, child_authority.pk,
-                                                 hops_taken)
+                        # self.__update_hops_taken(good_nodes, child_authority.pk,
+                        #                          hops_taken)
+                        self.__set_shortest_path_to_end_2(
+                            good_nodes,
+                            node_id=parent_authority.pk,
+                            target_id=child_authority.pk,
+                        )
                 else:
                     # No easy shortcuts. Recurse.
-                    sub_graph = self._build_digraph(
+                    sub_graph, hops_from_end = self._build_digraph(
                         parent_authority=child_authority,
                         visited_nodes=visited_nodes,
                         good_nodes=good_nodes,
@@ -262,8 +319,13 @@ class SCOTUSMap(models.Model):
                         # The graphs intersect. Merge them.
                         print "The graphs intersected!"
                         g.add_edge(parent_authority.pk, child_authority.pk)
-                        self.__update_hops_taken(good_nodes, child_authority.pk,
-                                                 hops_taken)
+                        # self.__update_hops_taken(good_nodes, child_authority.pk,
+                        #                          hops_taken)
+                        self.__set_shortest_path_to_end_2(
+                            good_nodes,
+                            node_id=parent_authority.pk,
+                            target_id=child_authority.pk,
+                        )
                         g = networkx.compose(g, sub_graph)
                     else:
                         print "The graphs didn't intersect. Boo."
@@ -271,7 +333,7 @@ class SCOTUSMap(models.Model):
                 if len(g) > max_nodes:
                     raise TooManyNodes()
 
-        return g
+        return g, hops_from_end
 
     def add_clusters(self):
         """Do the network analysis to add clusters to the model.
