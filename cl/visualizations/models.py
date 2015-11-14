@@ -153,18 +153,18 @@ class SCOTUSMap(models.Model):
     #     else:
     #         good_nodes[node_id] = {'hops_taken': hops_taken_this_time}
 
-    def __within_max_dos(self, good_nodes, child_authority_id,
-                         hops_taken_this_time, max_dos):
-        """Determine if a new route to a node that's already in the network
-        is within the max_dos of the start point.
-        """
-        # This is a new path to a node that's already in the network. Add it
-        # if it wouldn't take too many hops.
-        hops_taken_last_time = good_nodes[child_authority_id]['hops_taken']
-        if (hops_taken_last_time + hops_taken_this_time) <= max_dos or \
-                (hops_taken_this_time <= hops_taken_last_time):
-            return True
-        return False
+    # def __within_max_dos(self, good_nodes, child_authority_id,
+    #                      hops_taken_this_time, max_dos):
+    #     """Determine if a new route to a node that's already in the network
+    #     is within the max_dos of the start point.
+    #     """
+    #     # This is a new path to a node that's already in the network. Add it
+    #     # if it wouldn't take too many hops.
+    #     hops_taken_last_time = good_nodes[child_authority_id]['hops_taken']
+    #     if (hops_taken_last_time + hops_taken_this_time) <= max_dos or \
+    #             (hops_taken_this_time <= hops_taken_last_time):
+    #         return True
+    #     return False
 
     def __within_max_dos_2(self, good_nodes, child_authority_id, hops_taken,
                            max_dos):
@@ -249,15 +249,18 @@ class SCOTUSMap(models.Model):
         hops_taken += 1
 
         is_cluster_start_obj = (parent_authority == self.cluster_start)
-        is_already_handled = (parent_authority in visited_nodes)
+        is_already_handled_with_equal_or_longer_path = (
+            parent_authority.pk in visited_nodes and
+            visited_nodes[parent_authority.pk]['hops_taken'] >= hops_taken
+        )
         has_no_more_hops_remaining = (hops_taken > max_dos)
         blocking_conditions = [
             is_cluster_start_obj,
-            is_already_handled,
+            is_already_handled_with_equal_or_longer_path,
             has_no_more_hops_remaining,
         ]
         if not any(blocking_conditions):
-            visited_nodes.add(parent_authority)
+            visited_nodes[parent_authority.pk] = {'hops_taken': hops_taken}
             child_authorities = parent_authority.authorities.filter(
                 docket__court='scotus',
                 date_filed__gte=self.cluster_start.date_filed
@@ -327,8 +330,6 @@ class SCOTUSMap(models.Model):
                             target_id=child_authority.pk,
                         )
                         g = networkx.compose(g, sub_graph)
-                    else:
-                        print "The graphs didn't intersect. Boo."
 
                 if len(g) > max_nodes:
                     raise TooManyNodes()
@@ -347,8 +348,8 @@ class SCOTUSMap(models.Model):
         try:
             g = self._build_digraph(
                 parent_authority=self.cluster_end,
-                visited_nodes=set(),
-                good_nodes=dict(),
+                visited_nodes={},
+                good_nodes={},
                 max_dos=4,
             )
         except TooManyNodes, e:
