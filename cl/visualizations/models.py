@@ -152,8 +152,8 @@ class SCOTUSMap(models.Model):
                 any([(node in good_nodes) for node in sub_graph.nodes()]))
 
     def _build_digraph(self, parent_authority, visited_nodes, good_nodes,
-                       max_dos, hops_taken=0, max_nodes=700):
-        """Recursively build a nx graph
+                       max_dos, hops_taken=0, max_nodes=70):
+        """Recursively build a networkx graph
 
         Process is:
          - Work backwards through the authorities for self.cluster_end and all
@@ -162,16 +162,15 @@ class SCOTUSMap(models.Model):
             - it happened after self.cluster_start
             - it's in the Supreme Court
             - we haven't exceeded max_dos
-            - we haven't already followed this path
+            - we haven't already followed this path in a longer or equal route
             - it is on a simple path between the beginning and end
             - fewer than max_nodes nodes are in the network
 
-        The last point above is a complicated one. The algorithm below is
-        implemented in a depth-first fashion, so we quickly can create simple
-        paths between the first and last node. If it were in a breadth-first
-        algorithm, we would fan out and have to do many more queries before we
-        learned that a line of citations was needed or not. For example,
-        consider this network:
+        The last point above is a complicated one. The algorithm is implemented
+        in a depth-first fashion, so we quickly can create simple paths between
+        the first and last node. If it were in a breadth-first algorithm, we
+        would fan out and have to do many more queries before we learned that a
+        line of citations was needed or not. For example, consider this network:
 
             START
                ├─-> A--> B--> C--> D--> END
@@ -203,6 +202,10 @@ class SCOTUSMap(models.Model):
         This matters a great deal because the sooner we can count the number of
         nodes in the network, the sooner we will hit max_nodes and be able to
         abort if the job is too big.
+
+        The other complicated part of this algorithm is keeping track of
+        shortest routes and avoiding unneeded graph traversal. For example, it's
+        quite possible to traverse
         """
         g = networkx.DiGraph()
         if len(good_nodes) == 0:
@@ -222,14 +225,14 @@ class SCOTUSMap(models.Model):
             is_already_handled_with_shorter_path,
             has_no_more_hops_remaining,
         ]
-        hops_taken += 1
+        print "Blocking conditions are: %s" % blocking_conditions
         if not any(blocking_conditions):
-            visited_nodes[parent_authority.pk] = {'hops_taken': hops_taken - 1}
-            child_authorities = parent_authority.authorities.filter(
-                docket__court='scotus',
-                date_filed__gte=self.cluster_start.date_filed
-            ).order_by('date_filed')
-            for child_authority in child_authorities:
+            visited_nodes[parent_authority.pk] = {'hops_taken': hops_taken}
+            hops_taken += 1
+            for child_authority in parent_authority.authorities.filter(
+                        docket__court='scotus',
+                        date_filed__gte=self.cluster_start.date_filed
+                    ).order_by('date_filed'):
                 # Combine our present graph with the result of the next
                 # recursion
                 sub_graph = networkx.DiGraph()
@@ -258,6 +261,7 @@ class SCOTUSMap(models.Model):
                         if is_shorter:
                             # New route to a node that's shorter than the old
                             # route. Thus, we must re-recurse its children.
+                            print "Found shorter route from %s to %s" % (parent_authority, child_authority)
                             sub_graph = self._build_digraph(
                                 parent_authority=child_authority,
                                 visited_nodes=visited_nodes,
@@ -276,10 +280,6 @@ class SCOTUSMap(models.Model):
                         hops_taken=hops_taken,
                         max_nodes=max_nodes,
                     )
-
-                if len(sub_graph) > 0:
-                    print "Subgraph has %s nodes" % len(sub_graph)
-                    print "g has %s nodes" % len(g)
 
                 if self.__graphs_intersect(good_nodes, g, sub_graph):
                     # The graphs intersect. Merge them.
@@ -325,11 +325,8 @@ class SCOTUSMap(models.Model):
 
         return g
 
-    def to_json(self, g=None):
-        """Make a JSON representation of self
-
-        :param g: Optionally, you can provide a network graph. If provided, it
-        will be used instead of generating one anew.
+    def to_json(self, g):
+        """Make a JSON representation of a NetworkX graph of the data.
         """
         j = {
             "meta": {
@@ -338,10 +335,6 @@ class SCOTUSMap(models.Model):
                 "version": 1.0,
             },
         }
-        if g is None:
-            # XXX build the digraph here if you want to.
-            # XXX g = self._trim_branches(g)
-            pass
 
         opinion_clusters = []
         for cluster in self.clusters.all():
