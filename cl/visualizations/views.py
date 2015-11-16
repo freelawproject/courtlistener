@@ -111,6 +111,7 @@ def new_visualization(request):
                     RequestContext(request),
                 )
 
+            viz.save()
             viz.add_clusters(g)
             j = viz.to_json(g)
             jv = JSONVersion(map=viz, json_data=j)
