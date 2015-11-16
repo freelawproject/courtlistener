@@ -224,21 +224,21 @@ class SCOTUSMap(models.Model):
                         if is_shorter:
                             # New route to a node that's shorter than the old
                             # route. Thus, we must re-recurse its children.
-                            sub_graph = self._build_digraph(
+                            sub_graph = self.build_nx_digraph(
                                 parent_authority=child_authority,
                                 visited_nodes=visited_nodes,
                                 good_nodes=good_nodes,
-                                max_dos=max_hops,
+                                max_hops=max_hops,
                                 hops_taken=hops_taken,
                                 max_nodes=max_nodes,
                             )
                 else:
                     # No easy shortcuts. Recurse.
-                    sub_graph = self._build_digraph(
+                    sub_graph = self.build_nx_digraph(
                         parent_authority=child_authority,
                         visited_nodes=visited_nodes,
                         good_nodes=good_nodes,
-                        max_dos=max_hops,
+                        max_hops=max_hops,
                         hops_taken=hops_taken,
                         max_nodes=max_nodes,
                     )

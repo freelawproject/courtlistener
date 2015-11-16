@@ -86,11 +86,11 @@ def new_visualization(request):
 
             try:
                 t1 = time.time()
-                g = viz.build_digraph(
+                g = viz.build_nx_digraph(
                     parent_authority=end,
                     visited_nodes={},
                     good_nodes={},
-                    max_dos=4,
+                    max_hops=4,
                 )
                 t2 = time.time()
                 viz.generation_time = t2 - t1
