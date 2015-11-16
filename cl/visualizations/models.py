@@ -228,7 +228,7 @@ class SCOTUSMap(models.Model):
             child_authorities = parent_authority.authorities.filter(
                 docket__court='scotus',
                 date_filed__gte=self.cluster_start.date_filed
-            )
+            ).order_by('date_filed')
             for child_authority in child_authorities:
                 # Combine our present graph with the result of the next
                 # recursion
