@@ -1,26 +1,18 @@
 # coding=utf-8
 import json
 
-import logging
 import networkx
-import time
 
 from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils.text import slugify
-from networkx.exception import NetworkXError
 
 from cl.lib.string_utils import trunc
 from cl.search.models import OpinionCluster
-
-logger = logging.getLogger(__name__)
-
-
-class TooManyNodes(Exception):
-    class SetupException(Exception):
-        def __init__(self, message):
-            Exception.__init__(self, message)
+from cl.visualizations.utils import (
+    set_shortest_path_to_end, graphs_intersect, within_max_hops, TooManyNodes
+)
 
 
 class SCOTUSMap(models.Model):
@@ -115,44 +107,8 @@ class SCOTUSMap(models.Model):
             end=get_best_case_name(self.cluster_end),
         )
 
-    def __set_shortest_path_to_end(self, good_nodes, node_id, target_id):
-        is_shorter = False
-        if node_id in good_nodes:
-            current_length = good_nodes[node_id]['shortest_path']
-            previous_length = good_nodes[target_id]['shortest_path'] + 1
-            if current_length < previous_length:
-                is_shorter = True
-            good_nodes[node_id]['shortest_path'] = min(
-                current_length,
-                previous_length,
-            )
-        else:
-            good_nodes[node_id] = {
-                'shortest_path': good_nodes[target_id]['shortest_path'] + 1
-            }
-        return is_shorter
-
-    def __within_max_dos_2(self, good_nodes, child_authority_id, hops_taken,
-                           max_dos):
-        """Determine if a new route to a node that's already in the network is
-        within the max_dos of the start_point.
-        """
-        shortest_path = good_nodes[child_authority_id]['shortest_path']
-        if (shortest_path + hops_taken) > max_dos:
-            return False
-        return True
-
-    def __graphs_intersect(self, good_nodes, main_graph, sub_graph):
-        """Test if two graphs have common nodes.
-
-        First check if it's in the main graph, then check if it's in good_nodes,
-        indicating a second path to the start node.
-        """
-        return (any([(node in main_graph) for node in sub_graph.nodes()]) or
-                any([(node in good_nodes) for node in sub_graph.nodes()]))
-
-    def _build_digraph(self, parent_authority, visited_nodes, good_nodes,
-                       max_dos, hops_taken=0, max_nodes=70):
+    def build_nx_digraph(self, parent_authority, visited_nodes, good_nodes,
+                         max_hops, hops_taken=0, max_nodes=70):
         """Recursively build a networkx graph
 
         Process is:
@@ -161,7 +117,7 @@ class SCOTUSMap(models.Model):
          - For each authority, add it to a nx graph, if:
             - it happened after self.cluster_start
             - it's in the Supreme Court
-            - we haven't exceeded max_dos
+            - we haven't exceeded max_hops
             - we haven't already followed this path in a longer or equal route
             - it is on a simple path between the beginning and end
             - fewer than max_nodes nodes are in the network
@@ -206,6 +162,16 @@ class SCOTUSMap(models.Model):
         The other complicated part of this algorithm is keeping track of
         shortest routes and avoiding unneeded graph traversal. For example, it's
         quite possible to traverse
+
+        :param parent_authority: The starting point for the recursion. At first,
+        this will be self.cluster_end, but in recursive calls, it will be the
+        child of the current parent.
+        :param visited_nodes: A dict of nodes that have already been visited.
+        :param good_nodes: A dict of nodes that have been identified as good.
+        :param hops_taken: The number of hops taken so far, from
+        self.cluster_end
+        :param max_hops: The maximum degree of separation for the network.
+        :param max_nodes: The maximum number of nodes a network can contain.
         """
         g = networkx.DiGraph()
         if len(good_nodes) == 0:
@@ -214,18 +180,15 @@ class SCOTUSMap(models.Model):
                 self.cluster_start_id: {'shortest_path': 0},
             }
 
-        is_cluster_start_obj = (parent_authority == self.cluster_start)
         is_already_handled_with_shorter_path = (
             parent_authority.pk in visited_nodes and
             visited_nodes[parent_authority.pk]['hops_taken'] < hops_taken
         )
-        has_no_more_hops_remaining = (hops_taken == max_dos)
+        has_no_more_hops_remaining = (hops_taken == max_hops)
         blocking_conditions = [
-            is_cluster_start_obj,
             is_already_handled_with_shorter_path,
             has_no_more_hops_remaining,
         ]
-        print "Blocking conditions are: %s" % blocking_conditions
         if not any(blocking_conditions):
             visited_nodes[parent_authority.pk] = {'hops_taken': hops_taken}
             hops_taken += 1
@@ -241,7 +204,7 @@ class SCOTUSMap(models.Model):
                     # to check distance here because we're already at the start
                     # node.
                     g.add_edge(parent_authority.pk, child_authority.pk)
-                    _ = self.__set_shortest_path_to_end(
+                    _ = set_shortest_path_to_end(
                         good_nodes,
                         node_id=parent_authority.pk,
                         target_id=child_authority.pk,
@@ -250,10 +213,10 @@ class SCOTUSMap(models.Model):
                     # Parent links to a node already in the network. Check if we
                     # could make it to the end in max_dod hops. Set
                     # shortest_path for the child_authority
-                    if self.__within_max_dos_2(good_nodes, child_authority.pk,
-                                               hops_taken, max_dos):
+                    if within_max_hops(good_nodes, child_authority.pk,
+                                       hops_taken, max_hops):
                         g.add_edge(parent_authority.pk, child_authority.pk)
-                        is_shorter = self.__set_shortest_path_to_end(
+                        is_shorter = set_shortest_path_to_end(
                             good_nodes,
                             node_id=parent_authority.pk,
                             target_id=child_authority.pk,
@@ -261,12 +224,11 @@ class SCOTUSMap(models.Model):
                         if is_shorter:
                             # New route to a node that's shorter than the old
                             # route. Thus, we must re-recurse its children.
-                            print "Found shorter route from %s to %s" % (parent_authority, child_authority)
                             sub_graph = self._build_digraph(
                                 parent_authority=child_authority,
                                 visited_nodes=visited_nodes,
                                 good_nodes=good_nodes,
-                                max_dos=max_dos,
+                                max_dos=max_hops,
                                 hops_taken=hops_taken,
                                 max_nodes=max_nodes,
                             )
@@ -276,15 +238,15 @@ class SCOTUSMap(models.Model):
                         parent_authority=child_authority,
                         visited_nodes=visited_nodes,
                         good_nodes=good_nodes,
-                        max_dos=max_dos,
+                        max_dos=max_hops,
                         hops_taken=hops_taken,
                         max_nodes=max_nodes,
                     )
 
-                if self.__graphs_intersect(good_nodes, g, sub_graph):
+                if graphs_intersect(good_nodes, g, sub_graph):
                     # The graphs intersect. Merge them.
                     g.add_edge(parent_authority.pk, child_authority.pk)
-                    _ = self.__set_shortest_path_to_end(
+                    _ = set_shortest_path_to_end(
                         good_nodes,
                         node_id=parent_authority.pk,
                         target_id=child_authority.pk,
@@ -296,34 +258,11 @@ class SCOTUSMap(models.Model):
 
         return g
 
-    def add_clusters(self):
-        """Do the network analysis to add clusters to the model.
-
-        Process is to:
-         - Build a nx graph
-         - For all nodes in the graph, add them to self.clusters
-         - Update self.generation_time once complete.
+    def add_clusters(self, g):
+        """Add clusters to the model using an existing nx graph.
         """
-        t1 = time.time()
-        try:
-            g = self._build_digraph(
-                parent_authority=self.cluster_end,
-                visited_nodes={},
-                good_nodes={},
-                max_dos=4,
-            )
-        except TooManyNodes, e:
-            logger.warn("Too many nodes while building "
-                            "visualization %s" % self.pk)
-
-        # Add all items to self.clusters
         self.clusters.add(*g.nodes())
-
-        t2 = time.time()
-        self.generation_time = t2 - t1
         self.save()
-
-        return g
 
     def to_json(self, g):
         """Make a JSON representation of a NetworkX graph of the data.

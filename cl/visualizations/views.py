@@ -1,10 +1,13 @@
 import json
+import time
+
+from django.contrib import messages
+
 from cl.lib.bot_detector import is_bot
 from cl.stats import tally_stat
 from cl.visualizations.models import SCOTUSMap, JSONVersion
 from cl.visualizations.forms import VizForm, VizEditForm, JSONEditForm
-from cl.visualizations.utils import reverse_endpoints_if_needed
-
+from cl.visualizations.utils import reverse_endpoints_if_needed, TooManyNodes
 from django.contrib.auth.decorators import login_required
 from django.core.urlresolvers import reverse
 from django.db.models import F
@@ -14,7 +17,6 @@ from django.template import RequestContext
 from django.views.decorators.clickjacking import xframe_options_exempt
 
 from rest_framework import status as statuses
-
 
 
 def render_visualization_page(request, pk, embed):
@@ -81,8 +83,35 @@ def new_visualization(request):
                 subtitle=cd['subtitle'],
                 notes=cd['notes'],
             )
-            viz.save()
-            g = viz.add_clusters()
+
+            try:
+                t1 = time.time()
+                g = viz.build_digraph(
+                    parent_authority=end,
+                    visited_nodes={},
+                    good_nodes={},
+                    max_dos=4,
+                )
+                t2 = time.time()
+                viz.generation_time = t2 - t1
+            except TooManyNodes, e:
+                messages.add_message(
+                    request,
+                    messages.WARNING,
+                    '<strong>Woah there, that network has too many nodes.'
+                    '</strong> We were unable to create your visualization '
+                    'because the finished product would contain more than 70 '
+                    'nodes. We\'ve found that in practice, such networks are '
+                    'difficult to read and take far too long for our servers '
+                    'to build. Try building a smaller network.',
+                )
+                return render_to_response(
+                    'new_visualization.html',
+                    {'form': form, 'private': True},
+                    RequestContext(request),
+                )
+
+            viz.add_clusters(g)
             j = viz.to_json(g)
             jv = JSONVersion(map=viz, json_data=j)
             jv.save()

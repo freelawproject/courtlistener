@@ -31,6 +31,7 @@ def create_stub_account(user_data, profile_data):
     )
     return new_user, profile
 
+
 def convert_to_stub_account(user):
     """ Set all fields to as blank as possible.
 
