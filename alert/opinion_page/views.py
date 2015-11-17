@@ -1,16 +1,19 @@
 from django.core.urlresolvers import reverse
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db.models import Q
 from django.http import HttpResponsePermanentRedirect
 from django.shortcuts import render_to_response
 from django.shortcuts import get_object_or_404
 from django.template import RequestContext
 from django.views.decorators.cache import never_cache
 
+from alert.citations.find_citations import get_citations
 from alert.lib import search_utils
 from alert.lib.encode_decode import ascii_to_num
+from alert.lib.import_lib import map_citations_to_models
 from alert.lib.string_utils import trunc
-from alert.search.models import Document, Docket
+from alert.search.models import Document, Docket, Citation
 from alert.favorites.forms import FavoriteForm
 from alert.favorites.models import Favorite
 
@@ -153,6 +156,78 @@ def view_authorities(request, pk, _):
                                'private': private,
                                'authorities': authorities},
                               RequestContext(request))
+
+
+def citation_redirector(request, reporter, volume, page):
+    """Take a citation URL and use it to redirect the user to the canonical page
+    for that citation.
+
+    This uses the same infrastructure as the thing that identifies citations in
+    the text of opinions.
+    """
+    citation_str = " ".join([volume, reporter, page])
+    try:
+        citation = get_citations(citation_str)[0]
+        lookup_fields = [map_citations_to_models([citation]).keys()[0]]
+    except IndexError:
+        # Unable to disambiguate the citation. Try looking in *all* citation
+        # fields.
+        lookup_fields = [
+            'neutral_cite', 'federal_cite_one', 'federal_cite_two',
+            'federal_cite_three', 'specialty_cite_one', 'state_cite_regional',
+            'state_cite_one', 'state_cite_two', 'state_cite_three',
+            'westlaw_cite', 'lexis_cite'
+        ]
+
+    # We were able to get a match, expand it if it's a federal/state match.
+    if len(lookup_fields) == 1 and lookup_fields[0] == 'federal_cite_one':
+        lookup_fields = ['federal_cite_one', 'federal_cite_two',
+                         'federal_cite_three']
+    elif len(lookup_fields) == 1 and lookup_fields[0] == 'state_cite_one':
+        lookup_fields = ['state_cite_one', 'state_cite_two',
+                         'state_cite_three']
+    q = Q()
+    for lookup_field in lookup_fields:
+        q |= Q(**{'citation__' + lookup_field: citation_str})
+    documents = Document.objects.filter(q)
+
+    # Show the correct page....
+    if documents.count() == 0:
+        # No results for an otherwise valid citation.
+        response = render_to_response(
+            'casepage/citation_redirect_info_page.html',
+            {
+                'none_found': True,
+                'citation_str': citation_str,
+                'private': True,
+            },
+            RequestContext(request),
+            #status=404,
+        )
+        response.status_code = 404
+        return response
+
+    elif documents.count() == 1:
+        # Total success. Redirect to correct location.
+        return HttpResponsePermanentRedirect(
+            documents[0].get_absolute_url()
+        )
+
+    elif documents.count() > 1:
+        # Multiple results. Show them.
+        response = render_to_response(
+            'casepage/citation_redirect_info_page.html',
+            {
+                'too_many': True,
+                'citation_str': citation_str,
+                'documents': documents,
+                'private': True,
+            },
+            RequestContext(request),
+            #status=300,
+        )
+        response.status_code = 300
+        return response
 
 
 def redirect_opinion_pages(request, pk, slug):

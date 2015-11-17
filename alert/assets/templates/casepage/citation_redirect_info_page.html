@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load text_filters %}
+
+{% block sidebar %}{% endblock %}
+{% block search-form %}{% endblock %}
+
+{% block title %}Citation Not Found (404) – CourtListener.com{% endblock %}
+
+
+{% block content %}
+    <div class="col-md-3"></div>
+    <div class="col-md-6">
+        {% if none_found %}
+            <h2>Unable to Find Citation "{{ citation_str }}"</h2>
+            <p>This usually happens because although we might have an opinion in CourtListener, we might lack its official citation or an official parallel citation.
+            </p>
+            <p>In most jurisdictions, citations are unavailable at the time of publication, making this a particularly thorny problem.
+            </p>
+        {% elif too_many %}
+            <h2>Found Several Results for "{{ citation_str }}"</h2>
+            <ul>
+                {% for document in documents %}
+                    <li>
+                        <a href="{{ document.get_absolute_url }}">{{ document.caption|safe|v_wrapper }}</a>
+                        <br>
+                        {{ document.docket.court }} |
+                        {{ document.date_filed }}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+    <div class="col-md-3"></div>
+{% endblock %}

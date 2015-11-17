@@ -1,7 +1,9 @@
 from alert.citations.feeds import CitedByFeed
 from alert.opinion_page.sitemap import opinion_sitemap_maker
 from alert.opinion_page.views import (
-    view_opinion, view_opinion_citations, view_authorities, view_docket)
+    view_opinion, view_opinion_citations, view_authorities, view_docket,
+    citation_redirector
+)
 from django.conf.urls import patterns, url
 
 
@@ -12,6 +14,7 @@ urlpatterns = patterns('',
         name='view_authorities'),
     url(r'^opinion/(\d*)/(.*)/$', view_opinion, name="view_case"),
     url(r'^docket/(\d*)/(.*)/$', view_docket, name="view_docket"),
+    url(r'^c/(.*)/(\d{1,4})/(\d{1,4})/$', citation_redirector),
 
     # Feeds
     url(r'^feed/(?P<doc_id>\d*)/cited-by/$', CitedByFeed(),
