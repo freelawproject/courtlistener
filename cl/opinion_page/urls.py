@@ -1,6 +1,7 @@
 from cl.opinion_page.sitemap import opinion_sitemap_maker
 from cl.opinion_page.views import (
-    view_opinion, view_authorities, view_docket, cluster_visualizations
+    view_opinion, view_authorities, view_docket, cluster_visualizations,
+    citation_redirector
 )
 from django.conf.urls import url
 
@@ -25,6 +26,10 @@ urlpatterns = [
         r'^docket/(\d*)/([^/]*)/$',
         view_docket,
         name="view_docket"
+    ),
+    url(
+        r'^c/(.*)/(\d{1,4})/(\d{1,4})/$',
+        citation_redirector
     ),
 
     # Sitemap

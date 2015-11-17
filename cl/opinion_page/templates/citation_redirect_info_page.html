@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load text_filters %}
+
+{% block sidebar %}{% endblock %}
+{% block search-form %}{% endblock %}
+
+
+{% block title %}
+    {% if none_found %}
+        Citation Not Found (404) – CourtListener.com
+    {% elif too_many %}
+        Several Citations Found – CourtListener.com
+    {% endif %}
+{% endblock %}
+
+
+{% block content %}
+    <div class="col-md-3"></div>
+    <div class="col-md-6" id="citation-redirect">
+        {% if none_found %}
+            <h2>Unable to Find Citation "{{ citation_str }}"</h2>
+            <p>This usually happens because although we might have an opinion in
+                CourtListener, we might lack its official citation or an
+                official parallel citation.
+            </p>
+            <p>In most jurisdictions, citations are unavailable at the time of
+                publication, making this a particularly thorny problem.
+            </p>
+        {% elif too_many %}
+            <h2 class="v-offset-below-2">Found More than One Result for "{{ citation_str }}"</h2>
+            <ul>
+                {% for cluster in clusters %}
+                    <li>
+                        <a href="{{ cluster.get_absolute_url }}">{{ cluster.caption|safe|v_wrapper }}</a>
+                        <br>
+                        {{ cluster.docket.court }} |
+                        {{ cluster.date_filed }}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+    <div class="col-md-3"></div>
+{% endblock %}

@@ -381,11 +381,10 @@ class OpinionCluster(models.Model):
         db_index=True,
         blank=True,
     )
-    scdb_decision_direction = models.CharField(
+    scdb_decision_direction = models.IntegerField(
         help_text='the ideological "direction" of a decision in the Supreme '
                   'Court database. More details at: http://scdb.wustl.edu/'
                   'documentation.php?var=decisionDirection',
-        max_length=5,
         choices=SCDB_DECISION_DIRECTIONS,
         blank=True,
         null=True,
@@ -495,19 +494,27 @@ class OpinionCluster(models.Model):
         return caption
 
     @property
+    def citation_fields(self):
+        """The fields that are used for citations, as a list.
+
+        The order of the items in this list follows BlueBook order, so our
+        citations aren't just willy nilly.
+        """
+        return [
+            'neutral_cite', 'federal_cite_one', 'federal_cite_two',
+            'federal_cite_three', 'specialty_cite_one', 'state_cite_regional',
+            'state_cite_one', 'state_cite_two', 'state_cite_three',
+            'westlaw_cite', 'lexis_cite'
+        ]
+
+    @property
     def citation_list(self):
         """Make a citation list
 
         This function creates a series of citations that can be listed as meta
-        data for an opinion. The order of the items in this list follows
-        BlueBook order, so our citations aren't just willy nilly.
+        data for an opinion.
         """
-        return [self.neutral_cite, self.federal_cite_one,
-                self.federal_cite_two, self.federal_cite_three,
-                self.specialty_cite_one, self.state_cite_regional,
-                self.state_cite_one, self.state_cite_two,
-                self.state_cite_three, self.westlaw_cite,
-                self.lexis_cite]
+        return [getattr(self, field) for field in self.citation_fields]
 
     @property
     def citation_string(self):

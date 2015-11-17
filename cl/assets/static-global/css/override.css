@@ -404,14 +404,16 @@ div.shown ul {
 
 #authorities ul,
 #cited-by ul,
-#visualizations ul {
+#visualizations ul,
+#citation-redirect ul {
     padding: 0;
     margin: 0 0 1.5em 0;
 }
 
 #authorities ul li,
 #cited-by ul li,
-#visualizations ul li {
+#visualizations ul li,
+#citation-redirect ul li {
     list-style-type: none;
     padding: 3px 0 2px 0;
     border-bottom: 1pt solid #DDD;

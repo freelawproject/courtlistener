@@ -1,13 +1,16 @@
 from django.core.urlresolvers import reverse
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q
 from django.http import HttpResponsePermanentRedirect
 from django.shortcuts import render_to_response
 from django.shortcuts import get_object_or_404
 from django.template import RequestContext
 from django.views.decorators.cache import never_cache
 
+from cl.citations.find_citations import get_citations
 from cl.lib import search_utils
 from cl.lib.encode_decode import ascii_to_num
+from cl.lib.import_lib import map_citations_to_models
 from cl.lib.string_utils import trunc
 from cl.search.models import Docket, OpinionCluster
 from cl.favorites.forms import FavoriteForm
@@ -103,6 +106,70 @@ def cluster_visualizations(request, pk, slug):
         },
         RequestContext(request)
     )
+
+
+def citation_redirector(request, reporter, volume, page):
+    """Take a citation URL and use it to redirect the user to the canonical page
+    for that citation.
+
+    This uses the same infrastructure as the thing that identifies citations in
+    the text of opinions.
+    """
+    citation_str = " ".join([volume, reporter, page])
+    try:
+        citation = get_citations(citation_str)[0]
+        citation_str = citation.base_citation()  # Corrects typos/variations.
+        lookup_fields = [map_citations_to_models([citation]).keys()[0]]
+    except IndexError:
+        # Unable to disambiguate the citation. Try looking in *all* citation
+        # fields.
+        lookup_fields = OpinionCluster().citation_fields
+
+    # We were able to get a match, expand it if it's a federal/state match.
+    if len(lookup_fields) == 1 and lookup_fields[0] == 'federal_cite_one':
+        lookup_fields = ['federal_cite_one', 'federal_cite_two',
+                         'federal_cite_three']
+    elif len(lookup_fields) == 1 and lookup_fields[0] == 'state_cite_one':
+        lookup_fields = ['state_cite_one', 'state_cite_two',
+                         'state_cite_three']
+    q = Q()
+    for lookup_field in lookup_fields:
+        q |= Q(**{lookup_field: citation_str})
+    clusters = OpinionCluster.objects.filter(q)
+
+    # Show the correct page....
+    if clusters.count() == 0:
+        # No results for an otherwise valid citation.
+        return render_to_response(
+            'citation_redirect_info_page.html',
+            {
+                'none_found': True,
+                'citation_str': citation_str,
+                'private': True,
+            },
+            RequestContext(request),
+            status=404,
+        )
+
+    elif clusters.count() == 1:
+        # Total success. Redirect to correct location.
+        return HttpResponsePermanentRedirect(
+            clusters[0].get_absolute_url()
+        )
+
+    elif clusters.count() > 1:
+        # Multiple results. Show them.
+        return render_to_response(
+            'citation_redirect_info_page.html',
+            {
+                'too_many': True,
+                'citation_str': citation_str,
+                'clusters': clusters,
+                'private': True,
+            },
+            RequestContext(request),
+            status=300,
+        )
 
 
 def redirect_opinion_pages(request, pk, slug):
