@@ -168,6 +168,7 @@ def citation_redirector(request, reporter, volume, page):
     citation_str = " ".join([volume, reporter, page])
     try:
         citation = get_citations(citation_str)[0]
+        citation_str = citation.base_citation()  # Corrects typos/variations.
         lookup_fields = [map_citations_to_models([citation]).keys()[0]]
     except IndexError:
         # Unable to disambiguate the citation. Try looking in *all* citation
