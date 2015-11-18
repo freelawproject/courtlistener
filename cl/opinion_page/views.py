@@ -1,7 +1,7 @@
 from django.core.urlresolvers import reverse
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
-from django.http import HttpResponsePermanentRedirect
+from django.http import HttpResponsePermanentRedirect, HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.shortcuts import get_object_or_404
 from django.template import RequestContext
@@ -153,7 +153,7 @@ def citation_redirector(request, reporter, volume, page):
 
     elif clusters.count() == 1:
         # Total success. Redirect to correct location.
-        return HttpResponsePermanentRedirect(
+        return HttpResponseRedirect(
             clusters[0].get_absolute_url()
         )
 
