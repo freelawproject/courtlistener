@@ -6,14 +6,12 @@ from django.db import models, migrations
 
 ALTER_COLUMN = """
     BEGIN;
-    ALTER TABLE
-        "search_opinioncluster"
-    ALTER COLUMN
-        "scdb_decision_direction"
-    TYPE
-        integer
-    USING
-        scdb_decision_direction::integer;
+    UPDATE search_opinioncluster
+        SET scdb_decision_direction = Null
+        WHERE scdb_decision_direction = '';
+    ALTER TABLE "search_opinioncluster"
+        ALTER COLUMN "scdb_decision_direction" TYPE integer
+        USING scdb_decision_direction::integer;
     COMMIT;
 """
 
