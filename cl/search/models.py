@@ -535,7 +535,7 @@ class OpinionCluster(models.Model):
         #    queryset object to evaluate it here and now.
         return OpinionCluster.objects.filter(
             sub_opinions__in=sum(
-                [list(sub_opinion.opinions_cited.all()) for
+                [list(sub_opinion.opinions_cited.all().only('pk')) for
                  sub_opinion in
                  self.sub_opinions.all()],
                 []
