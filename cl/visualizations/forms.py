@@ -14,14 +14,12 @@ class VizForm(forms.ModelForm):
             'cluster_start',
             'cluster_end',
             'title',
-            'subtitle',
             'notes',
         ]
         widgets = {
             'cluster_start': forms.HiddenInput(),
             'cluster_end': forms.HiddenInput(),
             'title': forms.TextInput(attrs={'class': 'form-control'}),
-            'subtitle': forms.TextInput(attrs={'class': 'form-control'}),
             'notes': forms.Textarea(attrs={'class': 'form-control'}),
         }
 
@@ -30,7 +28,6 @@ class VizEditForm(VizForm):
     class Meta(VizForm.Meta):
         fields = [
             'title',
-            'subtitle',
             'notes',
             'published',
         ]

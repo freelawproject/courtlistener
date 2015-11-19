@@ -61,15 +61,6 @@
                             {% endif %}
                         </h2>
 
-                        {% block vis-subtitles %}
-                        <h3 id="subtitle"
-                            class="text-center v-offset-below-3">{{ viz.subtitle }}</h3>
-                        <h4 class="gray text-center">Starts at <a
-                                href="{{ viz.cluster_start.get_absolute_url }}">{{ viz.cluster_start.case_name|v_wrapper }}</a>,
-                            and goes to <a
-                                    href="{{ viz.cluster_end.get_absolute_url }}">{{ viz.cluster_end.case_name|v_wrapper }}</a>
-                        </h4>
-                        {% endblock %}
                     {% else %}
                         <div class="row">
                             <div class="col-xs-1 col-sm-2 col-md-3"></div>
@@ -223,15 +214,12 @@
                                         class="fa fa-question-circle gray"></i></a></h4>
                             </div>
 
-                            <div class="sidebar-section col-xs-6 col-md-12">
-                                <h3><span>Created</span></h3>
-                                <p>{{ viz.date_created }}</p>
-                            </div>
-
-                            <div class="sidebar-section col-xs-6 col-md-12">
-                                <h3><span>Modified</span></h3>
-                                <p>{{ viz.date_modified }}</p>
-                            </div>
+                            {% if viz.published %}
+                                <div class="sidebar-section col-xs-6 col-md-12">
+                                    <h3><span>Published</span></h3>
+                                    <p>{{ viz.date_published }}</p>
+                                </div>
+                            {% endif %}
                         </div>
                         <div class="row">
                             <div class="sidebar-section col-sm-12">

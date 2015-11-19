@@ -48,22 +48,6 @@
             </div>
 
             <div class="form-group v-offset-above-3">
-                <label for="id_subtitle"
-                       class="col-sm-2 control-label">Subtitle</label>
-
-                <div class="col-sm-10">
-                    {% if form_viz.subtitle.errors %}
-                        <p class="help-block">
-                            {% for error in form_viz.subtitle.errors %}
-                                {{ error|escape }}
-                            {% endfor %}
-                        </p>
-                    {% endif %}
-                    {{ form_viz.subtitle }}
-                </div>
-            </div>
-
-            <div class="form-group v-offset-above-3">
                 <label for="id_notes"
                        class="col-sm-2 control-label">Notes</label>
 

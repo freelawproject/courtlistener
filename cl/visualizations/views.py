@@ -80,7 +80,6 @@ def new_visualization(request):
                 cluster_start=start,
                 cluster_end=end,
                 title=cd['title'],
-                subtitle=cd['subtitle'],
                 notes=cd['notes'],
             )
 
@@ -141,7 +140,6 @@ def edit_visualization(request, pk):
             cd_json = form_json.cleaned_data
 
             viz.title = cd_viz['title']
-            viz.subtitle = cd_viz['subtitle']
             viz.notes = cd_viz['notes']
             viz.published = cd_viz['published']
             viz.save()

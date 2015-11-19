@@ -11,9 +11,11 @@ class JSONVersionAdmin(admin.ModelAdmin):
         'map',
     )
 
+
 class JSONVersionInline(admin.StackedInline):
     model = JSONVersion
     extra = 1
+
 
 class SCOTUSMapAdmin(admin.ModelAdmin):
     inlines = (
@@ -27,6 +29,7 @@ class SCOTUSMapAdmin(admin.ModelAdmin):
     readonly_fields = (
         'date_created',
         'date_modified',
+        'date_published',
         'generation_time',
     )
     list_display = (

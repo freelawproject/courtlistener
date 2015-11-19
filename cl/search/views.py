@@ -22,7 +22,7 @@ from cl.search.forms import SearchForm, _clean_form
 from cl import settings
 from cl.search.models import Court, Opinion
 from cl.stats import tally_stat, Stat
-
+from cl.visualizations.models import SCOTUSMap
 
 logger = logging.getLogger(__name__)
 
@@ -182,36 +182,41 @@ def show_results(request):
             render_dict.update({'search_form': SearchForm(request.GET)})
             ten_days_ago = make_aware(datetime.today() - timedelta(days=10),
                                       utc)
-            alerts_in_last_ten = Stat.objects\
-                .filter(
+            alerts_in_last_ten = Stat.objects.filter(
                     name__contains='alerts.sent',
-                    date_logged__gte=ten_days_ago)\
-                .aggregate(Sum('count'))['count__sum']
-            queries_in_last_ten = Stat.objects\
-                .filter(
+                    date_logged__gte=ten_days_ago
+                ).aggregate(Sum('count'))['count__sum']
+            queries_in_last_ten = Stat.objects.filter(
                     name='search.results',
-                    date_logged__gte=ten_days_ago) \
-                .aggregate(Sum('count'))['count__sum']
-            bulk_in_last_ten = Stat.objects\
-                .filter(
+                    date_logged__gte=ten_days_ago
+                ).aggregate(Sum('count'))['count__sum']
+            bulk_in_last_ten = Stat.objects.filter(
                     name__contains='bulk_data',
-                    date_logged__gte=ten_days_ago)\
-                .aggregate(Sum('count'))['count__sum']
-            api_in_last_ten = Stat.objects \
-                .filter(
+                    date_logged__gte=ten_days_ago
+                ).aggregate(Sum('count'))['count__sum']
+            api_in_last_ten = Stat.objects.filter(
                     name__contains='api',
-                    date_logged__gte=ten_days_ago) \
-                .aggregate(Sum('count'))['count__sum']
-            users_in_last_ten = User.objects\
-                .filter(date_joined__gte=ten_days_ago).count()
-            opinions_in_last_ten = Opinion.objects\
-                .filter(date_created__gte=ten_days_ago).count()
-            oral_arguments_in_last_ten = Audio.objects\
-                .filter(date_created__gte=ten_days_ago).count()
+                    date_logged__gte=ten_days_ago
+                ).aggregate(Sum('count'))['count__sum']
+            users_in_last_ten = User.objects.filter(
+                    date_joined__gte=ten_days_ago
+                ).count()
+            opinions_in_last_ten = Opinion.objects.filter(
+                    date_created__gte=ten_days_ago
+                ).count()
+            oral_arguments_in_last_ten = Audio.objects.filter(
+                    date_created__gte=ten_days_ago
+                ).count()
             days_of_oa = naturalduration(
-                Audio.objects.aggregate(Sum('duration'))['duration__sum'],
-                as_dict=True,
-            )['d']
+                    Audio.objects.aggregate(
+                        Sum('duration')
+                    )['duration__sum'],
+                    as_dict=True,
+                )['d']
+            viz_in_last_ten = SCOTUSMap.objects.filter(
+                    date_published__gte=ten_days_ago,
+                    published=True,
+                ).count()
             render_dict.update({
                 'alerts_in_last_ten': alerts_in_last_ten,
                 'queries_in_last_ten': queries_in_last_ten,
@@ -221,7 +226,8 @@ def show_results(request):
                 'api_in_last_ten': api_in_last_ten,
                 'users_in_last_ten': users_in_last_ten,
                 'days_of_oa': days_of_oa,
-                'private': False
+                'viz_in_last_ten': viz_in_last_ten,
+                'private': False,  # VERY IMPORTANT!
             })
             return render_to_response(
                 'homepage.html',

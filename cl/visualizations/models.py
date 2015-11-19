@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils.text import slugify
+from django.utils.timezone import now
 
 from cl.lib.string_utils import trunc
 from cl.search.models import OpinionCluster
@@ -48,14 +49,15 @@ class SCOTUSMap(models.Model):
         auto_now=True,
         db_index=True,
     )
+    date_published = models.DateTimeField(
+        help_text="The moment when the visualization was first published",
+        db_index=True,
+        blank=True,
+        null=True,
+    )
     title = models.CharField(
         help_text="The title of the visualization that you're creating.",
         max_length=200,
-    )
-    subtitle = models.CharField(
-        help_text="The subtitle of the visualization that you're creating.",
-        max_length=300,
-        blank=True,
     )
     slug = models.SlugField(
         help_text="The URL path that the visualization will map to (the slug)",
@@ -316,7 +318,13 @@ class SCOTUSMap(models.Model):
         # generated from it.
         if not self.title:
             self.title = trunc(self.make_title(), 200, ellipsis='…')
+
+        if self.published is True and self.date_published is None:
+            # First time published.
+            self.date_published = now()
+
         if self.pk is None:
+            # First time being saved.
             self.slug = trunc(slugify(self.title), 75)
             # If we could, we'd add clusters and json here, but you can't do
             # that kind of thing until the first object has been saved.

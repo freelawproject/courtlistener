@@ -64,7 +64,7 @@
         <h2>Create a New Visualization</h2>
         <h3 class="gray v-offset-above-1">Visualizations show citation networks between Supreme Court cases</h3>
         <p class="v-offset-above-3">To create a new visualization, select two cases and optionally
-            provide a title, subtitle, and any notes.
+            provide a title and any notes.
         </p>
         <p>Once you've set these up, a visualization will be created and added
             to your CourtListener profile.
@@ -145,16 +145,6 @@
                 </p>
             {% endif %}
             {{ form.title }}
-
-            <h4>Subtitle</h4>
-            {% if form.subtitle.errors %}
-                <p class="help-block">
-                    {% for error in form.subtitle.errors %}
-                        {{ error|escape }}
-                    {% endfor %}
-                </p>
-            {% endif %}
-            {{ form.subtitle }}
         </div>
 
         <div class="col-xs-12" id="notes">
