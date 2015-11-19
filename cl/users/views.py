@@ -5,7 +5,7 @@ import re
 from datetime import timedelta
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.core.urlresolvers import reverse
@@ -72,6 +72,8 @@ def view_donations(request):
                               {'private': True},
                               RequestContext(request))
 
+
+@permission_required('visualizations.has_beta_access')
 @login_required
 @never_cache
 def view_visualizations(request):
@@ -286,7 +288,7 @@ def register(request):
                     '/register/success/?next=%s' % redirect_to)
         else:
             form = UserCreationFormExtended()
-        return render_to_response("profile/register.html",
+        return render_to_response("register/register.html",
                                   {'form': form, 'private': False},
                                   RequestContext(request))
     else:
@@ -300,7 +302,7 @@ def register_success(request):
     """Tell the user they have been registered and allow them to continue where
     they left off."""
     redirect_to = request.REQUEST.get('next', '')
-    return render_to_response('registration/registration_complete.html',
+    return render_to_response('register/registration_complete.html',
                               {'redirect_to': redirect_to, 'private': True},
                               RequestContext(request))
 
@@ -314,7 +316,7 @@ def confirm_email(request, activation_key):
     """
     ups = UserProfile.objects.filter(activation_key=activation_key)
     if not len(ups):
-        return render_to_response('registration/confirm.html',
+        return render_to_response('register/confirm.html',
                                   {'invalid': True, 'private': True},
                                   RequestContext(request))
 
@@ -328,12 +330,12 @@ def confirm_email(request, activation_key):
 
     if confirmed_accounts_count == len(ups):
         # All the accounts were already confirmed.
-        return render_to_response('registration/confirm.html',
+        return render_to_response('register/confirm.html',
                                   {'already_confirmed': True, 'private': True},
                                   RequestContext(request))
 
     if expired_key_count > 0:
-        return render_to_response('registration/confirm.html',
+        return render_to_response('register/confirm.html',
                                   {'expired': True, 'private': True},
                                   RequestContext(request))
 
@@ -342,7 +344,7 @@ def confirm_email(request, activation_key):
         up.email_confirmed = True
         up.save()
 
-    return render_to_response('registration/confirm.html',
+    return render_to_response('register/confirm.html',
                               {'success': True, 'private': True},
                               RequestContext(request))
 
@@ -395,7 +397,7 @@ def request_email_confirmation(request):
             return HttpResponseRedirect('/email-confirmation/success/')
     else:
         form = EmailConfirmationForm()
-    return render_to_response('registration/request_email_confirmation.html',
+    return render_to_response('register/request_email_confirmation.html',
                               {'private': True, 'form': form},
                               RequestContext(request))
 
@@ -403,7 +405,7 @@ def request_email_confirmation(request):
 @never_cache
 def email_confirm_success(request):
     return render_to_response(
-        'registration/request_email_confirmation_success.html',
+        'register/request_email_confirmation_success.html',
         {'private': False},
         RequestContext(request))
 

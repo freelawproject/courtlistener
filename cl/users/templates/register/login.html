@@ -31,7 +31,7 @@
             {% endfor %}
         {% endif %}
 
-        <form action="" method="post">{% csrf_token %}
+        <form action="{% url "sign-in" %}" method="post">{% csrf_token %}
             <div class="form-group">
                 <label for="username">Username</label><br>
                 <input type="text" name="username" value="" id="username" class="auto-focus form-control">

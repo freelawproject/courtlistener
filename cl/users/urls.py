@@ -8,23 +8,59 @@ from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     # Sign in/out and password pages
-    url(r'^sign-in/$', auth_views.login, {
-        'extra_context': {'private': False}},
+    url(
+        r'^sign-in/$',
+        auth_views.login,
+        {
+            'template_name': 'register/login.html',
+            'extra_context': {'private': False}
+        },
         name="sign-in"),
-    url(r'^sign-out/$', auth_views.logout, {'extra_context': {'private': False}}),
-    url(r'^reset-password/$', auth_views.password_reset,
-        {'extra_context': {'private': False},
-         'password_reset_form': CustomPasswordResetForm}),
-    url(r'^reset-password/instructions-sent/$', auth_views.password_reset_done,
-        {'extra_context': {'private': False}}),
-    url(r'^confirm-password/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>.+)/$',
+    url(
+        r'^sign-out/$',
+        auth_views.logout,
+        {
+            'template_name': 'register/logged_out.html',
+            'extra_context': {'private': False}
+        },
+    ),
+    url(
+        r'^reset-password/$',
+        auth_views.password_reset,
+        {
+            'template_name': 'register/password_reset_form.html',
+            'email_template_name': 'register/password_reset_email.html',
+            'extra_context': {'private': False},
+            'password_reset_form': CustomPasswordResetForm
+        }
+    ),
+    url(
+        r'^reset-password/instructions-sent/$',
+        auth_views.password_reset_done,
+        {
+            'template_name': 'register/password_reset_done.html',
+            'extra_context': {'private': False}
+        },
+        name='password_reset_done',
+    ),
+    url(
+        r'^confirm-password/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>.+)/$',
         auth_views.password_reset_confirm,
-        {'post_reset_redirect': '/reset-password/complete/',
-         'set_password_form': CustomSetPasswordForm,
-         'extra_context': {'private': False}}),
-    url(r'^reset-password/complete/$', auth_views.login, {
-        'template_name': 'registration/password_reset_complete.html',
-        'extra_context': {'private': False}}),
+        {
+            'template_name': 'register/password_reset_confirm.html',
+            'set_password_form': CustomSetPasswordForm,
+            'extra_context': {'private': False}
+        }
+    ),
+    url(
+        r'^reset-password/complete/$',
+        auth_views.password_reset_complete,
+        {
+            'template_name': 'register/password_reset_complete.html',
+            'extra_context': {'private': False}
+        },
+        name='password_reset_complete',
+    ),
 
     # Settings pages
     url(r'^profile/settings/$', views.view_settings, name='view_settings'),
