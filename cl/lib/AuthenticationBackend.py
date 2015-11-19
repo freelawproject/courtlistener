@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate
 from django.contrib.auth.forms import AuthenticationForm
-from django.utils.translation import ugettext_lazy as _
 from django import forms
+from django.core.urlresolvers import reverse
 
 
 class ConfirmedEmailAuthenticationForm(AuthenticationForm):
@@ -24,11 +24,19 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
             self.user_cache = authenticate(username=username, password=password)
             if self.user_cache is None:
                 raise forms.ValidationError(
-                    _("Please enter a correct username and password. Note that"
-                      " both fields are case-sensitive."))
+                    self.error_messages['invalid_login'],
+                    code='invalid_login',
+                    params={'username': self.username_field.verbose_name},
+                )
             elif not self.user_cache.is_active:
-                raise forms.ValidationError(_("This account is inactive."))
+                raise forms.ValidationError(
+                    self.error_messages['inactive'],
+                    code='inactive',
+                )
             elif not self.user_cache.profile.email_confirmed:
-                raise forms.ValidationError('Please <a href="/email-confirmation/request/">validate your email address</a> to log in.')
-        self.check_for_test_cookie()
+                raise forms.ValidationError(
+                    'Please <a href="%s">validate your email address</a> to '
+                    'log in.' % reverse('email_confirmation_request')
+                )
+
         return self.cleaned_data

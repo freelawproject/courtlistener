@@ -1,3 +1,4 @@
+from cl.lib.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from cl.users.forms import (
     CustomPasswordResetForm, CustomSetPasswordForm,
 )
@@ -13,6 +14,7 @@ urlpatterns = [
         auth_views.login,
         {
             'template_name': 'register/login.html',
+            'authentication_form': ConfirmedEmailAuthenticationForm,
             'extra_context': {'private': False}
         },
         name="sign-in"),
@@ -72,11 +74,25 @@ urlpatterns = [
     url(r'^profile/password/change/$', views.password_change),
     url(r'^profile/delete/$', views.delete_account),
     url(r'^profile/delete/done/$', views.delete_profile_done),
-    url(r'^register/$', views.register, name="register"),
+    url(
+        r'^register/$',
+        views.register,
+        name="register"
+    ),
     url(r'^register/success/$', views.register_success),
 
     # Registration pages
-    url(r'^email/confirm/([0-9a-f]{40})/$', views.confirm_email),
-    url(r'^email-confirmation/request/$', views.request_email_confirmation),
-    url(r'^email-confirmation/success/$', views.email_confirm_success),
+    url(
+        r'^email/confirm/([0-9a-f]{40})/$',
+        views.confirm_email
+    ),
+    url(
+        r'^email-confirmation/request/$',
+        views.request_email_confirmation,
+        name='email_confirmation_request'
+    ),
+    url(
+        r'^email-confirmation/success/$',
+        views.email_confirm_success
+    ),
 ]

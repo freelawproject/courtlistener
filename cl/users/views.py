@@ -4,7 +4,7 @@ import random
 import re
 from datetime import timedelta
 from django.contrib import messages
-from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth import update_session_auth_hash, logout
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
@@ -123,24 +123,29 @@ def view_settings(request):
                           "For questions or comments, please see our contact page, "
                           "https://www.courtlistener.com/contact/." % (
                 user.username, up.activation_key))
-            send_mail(email_subject, email_body,
-                      'CourtListener <noreply@courtlistener.com>', [new_email])
+            send_mail(
+                email_subject,
+                email_body,
+                'CourtListener <noreply@courtlistener.com>',
+                [new_email]
+            )
 
-            messages.add_message(request, messages.SUCCESS,
-                                 (
-                                     'Your settings were saved successfully. To continue '
-                                 'receiving emails, please confirm your new email address '
-                                 'by checking your email within five days.'))
-        elif not up.email_confirmed:
-            # they didn't just change their email, but it isn't confirmed.
-            messages.add_message(request, messages.INFO,
-                                 'Your email address has not been confirmed. To receive ' +
-                                 'alerts, you must <a href="/email-confirmation/request/">' +
-                                 'confirm your email address</a>.')
+            messages.add_message(
+                request,
+                messages.SUCCESS,
+                ('Your settings were saved successfully and you have been '
+                 'logged out. To sign back in and continue using '
+                 'CourtListener, please confirm your new email address by '
+                 'checking your email within five days.')
+            )
+            logout(request)
         else:
             # if the email wasn't changed, simply inform of success.
-            messages.add_message(request, messages.SUCCESS,
-                                 'Your settings were saved successfully.')
+            messages.add_message(
+                request,
+                messages.SUCCESS,
+                'Your settings were saved successfully.'
+            )
 
         # New email address and changes above are saved here.
         profile_form.save()
@@ -205,8 +210,10 @@ def register(request):
         if request.method == 'POST':
             try:
                 stub_account = User.objects.filter(
-                    profile__stub_account=True).get(
-                    email__iexact=request.POST.get('email'))
+                    profile__stub_account=True,
+                ).get(
+                    email__iexact=request.POST.get('email'),
+                )
             except User.DoesNotExist:
                 stub_account = False
 
