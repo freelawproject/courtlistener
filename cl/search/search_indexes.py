@@ -62,7 +62,8 @@ class SearchDocument(object):
                 time()
             )  # Midnight, PST
         self.lexisCite = item.cluster.lexis_cite
-        self.citation = item.cluster.citation_list
+        self.citation = [cite for cite in
+                         item.cluster.citation_list if cite]  # Nuke '' and None
         self.neutralCite = item.cluster.neutral_cite
         self.scdb_id = item.cluster.scdb_id
         self.source = item.cluster.source
@@ -90,7 +91,7 @@ class SearchDocument(object):
 
         # Load the document text using a template for cleanup and concatenation
         text_template = loader.get_template('indexes/opinion_text.txt')
-        context = {'item': item, 'citation_string': self.citation}
+        context = {'item': item, 'citation_string': item.cluster.citation_string}
         self.text = text_template.render(context).translate(null_map)
 
         # Faceting fields

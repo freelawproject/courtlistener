@@ -201,9 +201,12 @@ def make_fq(cd, field, key):
     around this bug, we do some minimal query parsing ourselves.
     """
     if '"' in cd[key]:
+        # User used quotes. Just pass it through.
         fq = '%s:(%s)' % (field, cd[key])
     else:
-
+        # Iterate over the query word by word. If the word is a conjunction
+        # word, detect that and use the user's request. Else, make sure there's
+        # an AND everywhere there should be.
         words = cd[key].split()
         q = [words[0]]
         needs_default_conjunction = True
