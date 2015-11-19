@@ -148,10 +148,12 @@
                                     <ul class="dropdown-menu" role="menu">
                                         <li><a href="/profile/alerts/"
                                                tabindex="304">Alerts</a></li>
+                                        {% if perms.visualizations.has_beta_access %}
                                         <li>
                                             <a href="{% url "view_visualizations" %}"
                                                tabindex="306">Visualizations</a>
                                         </li>
+                                        {% endif %}
                                         <li><a href="/profile/favorites/"
                                                tabindex="305">Favorites</a></li>
                                         <li><a href="/profile/donations/"

@@ -330,6 +330,11 @@ class SCOTUSMap(models.Model):
             # that kind of thing until the first object has been saved.
         super(SCOTUSMap, self).save(*args, **kwargs)
 
+    class Meta:
+        permissions = (
+            ('has_beta_access', 'Can access features during beta period.'),
+        )
+
 
 class JSONVersion(models.Model):
     """Used for holding a variety of versions of the data."""

@@ -54,9 +54,11 @@
                     <ul class="dropdown-menu" role="menu">
                         <li><a href="/profile/alerts/"
                                tabindex="304">Alerts</a></li>
+                        {% if perms.visualizations.has_beta_access %}
                         <li><a href="{% url "view_visualizations" %}"
                                tabindex="306">Visualizations</a>
                         </li>
+                        {% endif %}
                         <li><a href="/profile/favorites/"
                                tabindex="305">Favorites</a></li>
                         <li><a href="/profile/donations/"
@@ -279,8 +281,16 @@
             </p>
         </div>
     </div>
-    {% cache 21600 stat-num-days-of-oa %}
-        <div class="row lg-v-offset-below-3">
+
+    <div class="row lg-v-offset-below-3">
+        {% if perms.visualizations.has_beta_access %}
+            <div class="col-sm-6">
+                <h3>Supreme Court Visualizations&nbsp;<i class="gray fa fa-line-chart"></i></h3>
+                <p>More stuff to go here, including a picture XXX</p>
+            </div>
+        {% endif %}
+
+        {% cache 21600 stat-num-days-of-oa %}
             <div class="col-sm-6">
                 <h3>The Numbers&nbsp;<i class="gray fa fa-pie-chart"></i></h3>
 
@@ -347,6 +357,13 @@
                     </div>
                 </div>
 
+                {% comment %}
+                This section needs to be added after the beta period ends, when
+                we remove the has_beta_access flag. The alternative is to have
+                move complex caching, and that's no fun. I've left the
+                has_beta_access flag below so we don't miss this while removing
+                that code.
+                {% if perms.visualizations.has_beta_access %}
                 {% if viz_in_last_ten > 0 %}
                     <div class="row">
                         <div class="col-xs-3 text-center">
@@ -354,10 +371,13 @@
                         </div>
                         <div class="col-xs-9"><p>New <a
                                 href="{% url "mapper_homepage" %}">Supreme Court doctrinal
-                            networks</a> published in the last ten days.</p>
+                            visualizations</a> in the last ten days.</p>
                         </div>
                     </div>
                 {% endif %}
+                {% endif %}
+                {% endcomment %}
+
 
                 <div class="row">
                     <div class="col-xs-3 text-center">
@@ -381,7 +401,6 @@
                     </div>
                 {% endif %}
 
-
                 {% if user.is_superuser %}
                     <div class="row">
                         <div class="col-xs-3 text-center">
@@ -394,8 +413,9 @@
                     </div>
                 {% endif %}
             </div>
-        </div>
-    {% endcache %}
+        {% endcache %}
+    </div>
+
 
     {% include "includes/jurisdiction_picker_modal.html" %}
     </div>

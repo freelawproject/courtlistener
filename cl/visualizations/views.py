@@ -8,17 +8,17 @@ from cl.stats import tally_stat
 from cl.visualizations.models import SCOTUSMap, JSONVersion
 from cl.visualizations.forms import VizForm, VizEditForm, JSONEditForm
 from cl.visualizations.utils import reverse_endpoints_if_needed, TooManyNodes
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.core.urlresolvers import reverse
 from django.db.models import F
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
 from django.views.decorators.clickjacking import xframe_options_exempt
-
 from rest_framework import status as statuses
 
 
+@permission_required('visualizations.has_beta_access')
 def render_visualization_page(request, pk, embed):
     viz = get_object_or_404(SCOTUSMap, pk=pk)
 
@@ -50,6 +50,7 @@ def render_visualization_page(request, pk, embed):
     )
 
 
+@permission_required('visualizations.has_beta_access')
 @xframe_options_exempt
 def view_embedded_visualization(request, pk):
     """Return the embedded visualization page.
@@ -59,12 +60,14 @@ def view_embedded_visualization(request, pk):
     return render_visualization_page(request, pk, embed=True)
 
 
+@permission_required('visualizations.has_beta_access')
 def view_visualization(request, pk, slug):
     """Return the visualization page.
     """
     return render_visualization_page(request, pk, embed=False)
 
 
+@permission_required('visualizations.has_beta_access')
 @login_required
 def new_visualization(request):
     if request.method == 'POST':
@@ -128,6 +131,8 @@ def new_visualization(request):
         RequestContext(request),
     )
 
+
+@permission_required('visualizations.has_beta_access')
 @login_required
 def edit_visualization(request, pk):
     # This could apparently also be done with formsets? But they seem awful.
@@ -165,11 +170,13 @@ def edit_visualization(request, pk):
     )
 
 
+@permission_required('visualizations.has_beta_access')
 @login_required
 def delete_visualization(request, pk):
     pass
 
 
+@permission_required('visualizations.has_beta_access')
 def mapper_homepage(request):
     if not is_bot(request):
         tally_stat('search.visualization_scotus_homepage_loaded')
