@@ -51,7 +51,7 @@
     {% else %}
         {# Not deleted; Make decisions on owner/anon and unpub/published #}
         <div class="col-xs-12">
-            <div class="row v-offset-below-4" id="title-block">
+            <div class="row v-offset-below-2" id="title-block">
                 <div class="col-xs-12">
                     {% if viz.published or viz.user == user %}
                         <h2 id="title"
@@ -61,6 +61,13 @@
                             {% endif %}
                         </h2>
 
+                        {% block vis-subtitles %}
+                        <h4 class="gray text-center">Starts at <a
+                                href="{{ viz.cluster_start.get_absolute_url }}">{{ viz.cluster_start.case_name|v_wrapper }}</a>,
+                            and goes to <a
+                                    href="{{ viz.cluster_end.get_absolute_url }}">{{ viz.cluster_end.case_name|v_wrapper }}</a>
+                        </h4>
+                        {% endblock %}
                     {% else %}
                         <div class="row">
                             <div class="col-xs-1 col-sm-2 col-md-3"></div>
@@ -171,12 +178,14 @@
                     <div class="col-md-10">
                         <!-- Nav tabs -->
                         <ul class="nav nav-tabs v-offset-below-3" role="tablist">
-                            <li role="presentation" class="active">
+                            <li role="presentation"
+                                {% if viz.notes %}class="active"{% endif %}>
                                 <a href="#notes" aria-controls="notes"
                                    role="tab"
                                    data-toggle="tab">Comments</a>
                             </li>
-                            <li role="presentation">
+                            <li role="presentation"
+                                {% if not viz.notes %}class="active"{% endif %}>
                                 <a href="#case-table" aria-controls="case-table"
                                    role="tab"
                                    data-toggle="tab">Cases (<span id="case-count"></span>)</a>
@@ -190,13 +199,17 @@
 
                         <!-- Tab panes -->
                         <div class="tab-content">
-                            <div role="tabpanel" class="tab-pane active markdown"
+                            <div role="tabpanel"
+                                 class="tab-pane markdown{% if viz.notes %} active{% endif %}"
                                  id="notes">{{ viz.notes|default:"*(No comments from the creator.)*"|markdown }}
                             </div>
-                            <div role="tabpanel" class="tab-pane" id="case-table">
+                            <div role="tabpanel"
+                                 class="tab-pane{% if not viz.notes %} active{% endif %}"
+                                 id="case-table">
 
                             </div>
-                            <div role="tabpanel" class="tab-pane"
+                            <div role="tabpanel"
+                                 class="tab-pane"
                                  id="case-metadata">
 
                             </div>
