@@ -18,6 +18,7 @@ class AlertAdmin(admin.ModelAdmin):
         'user',
     )
 
+
 class AlertInline(admin.TabularInline):
     model = Alert
     extra = 1

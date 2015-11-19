@@ -2,10 +2,6 @@ from django.contrib import admin
 from cl.donate.models import Donation
 
 
-class DonationInline(admin.StackedInline):
-    model = Donation
-    extra = 1
-
 class DonationAdmin(admin.ModelAdmin):
     readonly_fields = (
         'date_modified',

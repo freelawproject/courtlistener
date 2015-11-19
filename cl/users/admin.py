@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.models import User
 from cl.alerts.admin import AlertInline
-from cl.donate.admin import DonationInline
 from cl.favorites.admin import FavoriteInline
 from cl.users.models import UserProfile, BarMembership
 
@@ -19,11 +18,11 @@ get_stub_account.short_description = "Stub Account?"
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
 
+
 class UserAdmin(admin.ModelAdmin):
     inlines = (
         UserProfileInline,
         AlertInline,
-        DonationInline,
         FavoriteInline,
     )
     list_display = (
