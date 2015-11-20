@@ -14,6 +14,7 @@
         var searchResults = new Bloodhound({
             datumTokenizer: Bloodhound.tokenizers.obj.whitespace('value'),
             queryTokenizer: Bloodhound.tokenizers.whitespace,
+            sufficient: 20,
             identify: function(obj){
                 // Return the item ID so the system can have a unique id for it
                 // in its caches.
@@ -48,7 +49,6 @@
         },
         {
           name: 'case-names',
-          //display: 'caseName',
           display: function(obj){
               var parts = [obj.caseName];
               if (obj.dateFiled){
