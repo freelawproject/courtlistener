@@ -81,15 +81,6 @@ def make_viz_msg(key, request):
             'servers to create. Try building a smaller network by '
             'selecting different cases.',
         )
-    elif key == 'fewer_hops_delivered':
-        messages.add_message(
-            request,
-            messages.SUCCESS,
-            "We were unable to build your network with four "
-            "degrees of separation because it grew too large. "
-            "The network below was built with three degrees of "
-            "separation."
-        )
 
 
 @permission_required('visualizations.has_beta_access')
@@ -111,32 +102,24 @@ def new_visualization(request):
                 notes=cd['notes'],
             )
 
-            build_kwargs = {
-                'parent_authority': end,
-                'visited_nodes': {},
-                'good_nodes': {},
-                'max_hops': 4,
-            }
-            t1 = time.time()
             try:
-                g = viz.build_nx_digraph(**build_kwargs)
+                t1 = time.time()
+                g = viz.build_nx_digraph(
+                    parent_authority=end,
+                    visited_nodes={},
+                    good_nodes={},
+                    max_hops=3,
+                )
+                t2 = time.time()
+                viz.generation_time = t2 - t1
             except TooManyNodes:
-                try:
-                    # Try with fewer hops.
-                    build_kwargs['max_hops'] = 3
-                    g = viz.build_nx_digraph(**build_kwargs)
-                    make_viz_msg('fewer_hops_delivered', request)
-                except TooManyNodes:
-                    # Still too many hops. Abort.
-                    tally_stat('visualization.too_many_nodes_failure')
-                    make_viz_msg('too_many_nodes', request)
-                    return render_to_response(
-                        'new_visualization.html',
-                        {'form': form, 'private': True},
-                        RequestContext(request),
-                    )
-            t2 = time.time()
-            viz.generation_time = t2 - t1
+                tally_stat('visualization.too_many_nodes_failure')
+                make_viz_msg('too_many_nodes', request)
+                return render_to_response(
+                    'new_visualization.html',
+                    {'form': form, 'private': True},
+                    RequestContext(request),
+                )
 
             viz.save()
             viz.add_clusters(g)
