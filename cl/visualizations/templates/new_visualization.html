@@ -10,6 +10,8 @@
         <script src="{{ STATIC_URL }}js/typeahead.bundle.min.js"></script>
     {% endif %}
     <script type="application/javascript">
+        var last_year = new Date();
+        last_year.setFullYear(last_year.getFullYear() - 1);
         var searchResults = new Bloodhound({
             datumTokenizer: Bloodhound.tokenizers.obj.whitespace('value'),
             queryTokenizer: Bloodhound.tokenizers.whitespace,
@@ -19,11 +21,18 @@
                 return obj.id;
             },
             remote: {
-                url: '/api/rest/v3/search/?case_name=(%QUERY) OR (%QUERY*)&filed_after=1925&court=scotus',
+                // This query is anything with the case name typed in...
+                // ...in the supreme court...
+                // ...between 1925 and a year ago that has an SCDB id... OR
+                // ...in the last year, with or without an SCDB id.
+                url: '/api/rest/v3/search/?' +
+                  'case_name=(%QUERY) OR (%QUERY*)&' +
+                  'court=scotus&' +
+                  'q=(dateFiled:[1925-01-01T00:00:00Z TO ' + last_year.toISOString() + '] and scdb_id:["" TO *]) or (dateFiled:[' + last_year.toISOString() + ' TO *])',
                 prepare: function(query, settings){
                     // This function is needed b/c it needs to do both a prefix
                     // search and a non-prefix search.
-                    settings.url = settings.url.replace(/%QUERY/g, query);
+                    settings.url = settings.url.replace(/%QUERY/g, $.trim(query));
                     return settings;
                 },
                 transform: function(response){
@@ -40,7 +49,17 @@
         },
         {
           name: 'case-names',
-          display: 'caseName',
+          //display: 'caseName',
+          display: function(obj){
+              var parts = [obj.caseName];
+              if (obj.dateFiled){
+                  parts.push(new Date(obj.dateFiled).getUTCFullYear());
+              }
+              if (obj.citation){
+                  parts.push(obj.citation.join(", "));
+              }
+              return parts.join(" ⚫ ");
+          },
           limit: 20,
           source: searchResults
         });
