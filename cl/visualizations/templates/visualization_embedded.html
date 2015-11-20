@@ -13,6 +13,7 @@
 {% block header %}{% endblock %}
 {% block footer %}{% endblock %}
 {% block social %}{% endblock %}
+{% block viz-id %}{% endblock %}
 
 {% block vis-subtitles %}{% endblock %}
 {% block vis-lower-content %}{% endblock %}
@@ -31,7 +32,7 @@
         </div>
         <div class="col-xs-6 text-right">
             <p>
-                <a href="{{ request.path }}" class="btn btn-primary btn-sm"
+                <a href="{{ viz.get_absolute_url }}?{{ request.GET.urlencode }}" class="btn btn-primary"
                    target="_blank">View Original</a>
             </p>
         </div>
