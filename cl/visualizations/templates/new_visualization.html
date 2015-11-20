@@ -59,7 +59,7 @@
               }
               return parts.join(" – ");
           },
-          limit: 20,
+          limit: 19,  // 20 seems to cause issues.
           source: searchResults
         });
         $('#starting-cluster-typeahead').bind(
