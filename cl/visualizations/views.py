@@ -1,6 +1,7 @@
 import json
 import time
 
+from django.conf import settings
 from django.contrib import messages
 
 from cl.lib.bot_detector import is_bot
@@ -67,6 +68,30 @@ def view_visualization(request, pk, slug):
     return render_visualization_page(request, pk, embed=False)
 
 
+def make_viz_msg(key, request):
+    if key == 'too_many_nodes':
+        messages.add_message(
+            request,
+            messages.WARNING,
+            '<strong>That network has too many nodes.</strong> We '
+            'were unable to create your visualization because the '
+            'finished product would contain too  many nodes. '
+            'We\'ve found that in practice, such networks are '
+            'difficult to read and take far too long for our '
+            'servers to create. Try building a smaller network by '
+            'selecting different cases.',
+        )
+    elif key == 'fewer_hops_delivered':
+        messages.add_message(
+            request,
+            messages.SUCCESS,
+            "We were unable to build your network with four "
+            "degrees of separation because it grew too large. "
+            "The network below was built with three degrees of "
+            "separation."
+        )
+
+
 @permission_required('visualizations.has_beta_access')
 @login_required
 def new_visualization(request):
@@ -86,32 +111,32 @@ def new_visualization(request):
                 notes=cd['notes'],
             )
 
+            build_kwargs = {
+                'parent_authority': end,
+                'visited_nodes': {},
+                'good_nodes': {},
+                'max_hops': 4,
+            }
+            t1 = time.time()
             try:
-                t1 = time.time()
-                g = viz.build_nx_digraph(
-                    parent_authority=end,
-                    visited_nodes={},
-                    good_nodes={},
-                    max_hops=4,
-                )
-                t2 = time.time()
-                viz.generation_time = t2 - t1
-            except TooManyNodes, e:
-                messages.add_message(
-                    request,
-                    messages.WARNING,
-                    '<strong>Woah there, that network has too many nodes.'
-                    '</strong> We were unable to create your visualization '
-                    'because the finished product would contain more than 70 '
-                    'nodes. We\'ve found that in practice, such networks are '
-                    'difficult to read and take far too long for our servers '
-                    'to build. Try building a smaller network.',
-                )
-                return render_to_response(
-                    'new_visualization.html',
-                    {'form': form, 'private': True},
-                    RequestContext(request),
-                )
+                g = viz.build_nx_digraph(**build_kwargs)
+            except TooManyNodes:
+                try:
+                    # Try with fewer hops.
+                    build_kwargs['max_hops'] = 3
+                    g = viz.build_nx_digraph(**build_kwargs)
+                    make_viz_msg('fewer_hops_delivered', request)
+                except TooManyNodes:
+                    # Still too many hops. Abort.
+                    tally_stat('visualization.too_many_nodes_failure')
+                    make_viz_msg('too_many_nodes', request)
+                    return render_to_response(
+                        'new_visualization.html',
+                        {'form': form, 'private': True},
+                        RequestContext(request),
+                    )
+            t2 = time.time()
+            viz.generation_time = t2 - t1
 
             viz.save()
             viz.add_clusters(g)
@@ -127,7 +152,11 @@ def new_visualization(request):
         form = VizForm()
     return render_to_response(
         'new_visualization.html',
-        {'form': form, 'private': True},
+        {
+            'form': form,
+            'SCDB_LATEST_CASE': settings.SCDB_LATEST_CASE.isoformat(),
+            'private': True
+        },
         RequestContext(request),
     )
 
@@ -179,7 +208,7 @@ def delete_visualization(request, pk):
 @permission_required('visualizations.has_beta_access')
 def mapper_homepage(request):
     if not is_bot(request):
-        tally_stat('search.visualization_scotus_homepage_loaded')
+        tally_stat('visualization.scotus_homepage_loaded')
 
     return render_to_response(
         'visualization_home.html',

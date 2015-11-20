@@ -4,6 +4,7 @@ from django.core.urlresolvers import reverse
 
 
 def inject_settings(request):
+    """Use this function to inject specific settings into every page."""
     return {
         'DEBUG': settings.DEBUG,
         'MIN_DONATION': settings.MIN_DONATION

@@ -10,8 +10,7 @@
         <script src="{{ STATIC_URL }}js/typeahead.bundle.min.js"></script>
     {% endif %}
     <script type="application/javascript">
-        var last_year = new Date();
-        last_year.setFullYear(last_year.getFullYear() - 1);
+        var last_year = "{{ SCDB_LATEST_CASE }}";
         var searchResults = new Bloodhound({
             datumTokenizer: Bloodhound.tokenizers.obj.whitespace('value'),
             queryTokenizer: Bloodhound.tokenizers.whitespace,
@@ -28,7 +27,7 @@
                 url: '/api/rest/v3/search/?' +
                   'case_name=(%QUERY) OR (%QUERY*)&' +
                   'court=scotus&' +
-                  'q=(dateFiled:[1925-01-01T00:00:00Z TO ' + last_year.toISOString() + '] and scdb_id:["" TO *]) or (dateFiled:[' + last_year.toISOString() + ' TO *])',
+                  'q=(dateFiled:[1925-01-01T00:00:00Z TO ' + last_year + 'Z] and scdb_id:["" TO *]) or (dateFiled:[' + last_year + 'Z TO *])',
                 prepare: function(query, settings){
                     // This function is needed b/c it needs to do both a prefix
                     // search and a non-prefix search.

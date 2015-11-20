@@ -1,3 +1,4 @@
+import datetime
 import os
 import re
 import sys
@@ -260,6 +261,14 @@ MARKDOWN_DEUX_STYLES = {
         ],
     },
 }
+
+
+########
+# SCDB #
+########
+# SCOTUS cases after this date aren't expected to have SCDB data.
+SCDB_LATEST_CASE = datetime.datetime(2015, 10, 4)
+
 
 ######################
 # Various and Sundry #
