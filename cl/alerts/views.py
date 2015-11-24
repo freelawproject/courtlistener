@@ -28,14 +28,14 @@ def edit_alert_redirect(request, alert_id):
 
 
 @login_required
-def delete_alert(request, alert_id):
+def delete_alert(request, pk):
     try:
-        alert_id = int(alert_id)
+        pk = int(pk)
     except ValueError:
         return HttpResponseRedirect('/')
 
     # check if the user can edit this, or if they are url hacking
-    alert = get_object_or_404(Alert, pk=alert_id, user=request.user)
+    alert = get_object_or_404(Alert, pk=pk, user=request.user)
 
     # if they've made it this far, they have permission to edit the alert
     alert.delete()
@@ -53,6 +53,6 @@ def delete_alert_confirm(request, alert_id):
         alert_id = int(alert_id)
     except ValueError:
         return HttpResponseRedirect('/')
-    return render_to_response('profile/delete_confirm.html',
+    return render_to_response('delete_confirm.html',
                               {'alert_id': alert_id, 'private': False},
                               RequestContext(request))
