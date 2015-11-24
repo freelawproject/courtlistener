@@ -95,7 +95,7 @@ def delete_favorite(request):
 
     else:
         return HttpResponseNotAllowed(
-            permitted_methods={'POST'},
+            permitted_methods=['POST'],
             content="Not an ajax request."
         )
 
