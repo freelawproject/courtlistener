@@ -2,6 +2,7 @@ import datetime
 import hashlib
 import random
 from cl.users.models import UserProfile
+from cl.users.utils import emails
 from django.contrib.sites.models import Site
 from django.core.mail import send_mail
 from django.core.management import BaseCommand
@@ -111,28 +112,10 @@ class Command(BaseCommand):
 
                 # Send the email.
                 current_site = Site.objects.get_current()
-                email_subject = 'Please confirm your account on %s' % \
-                                current_site.name
-                email_body = (
-                    "Hello, %s,\n\nDuring routine maintenance of our site, we "
-                    "discovered that your email address has not yet been "
-                    "confirmed. To confirm your email address and continue "
-                    "using our site, please click the following link:\n\n"
-                    " - https://www.courtlistener.com/email/confirm/%s\n\n"
-                    "Unfortunately, accounts that are not confirmed will stop "
-                    "receiving alerts, and must eventually be deleted from our "
-                    "system.\n\n"
-                    "Thanks for using our site,\n\n"
-                    "The CourtListener team\n\n\n"
-                    "------------------\n"
-                    "For questions or comments, please see our contact page, "
-                    "https://www.courtlistener.com/contact/." % (
-                        up.user.username,
-                        up.activation_key)
-                )
+                email = emails['email_not_confirmed']
                 send_mail(
-                    email_subject,
-                    email_body,
-                    'CourtListener <noreply@courtlistener.com>',
+                    email['subject'] % current_site.name,
+                    email['body'] % (up.user.username, up.activation_key),
+                    email['from'],
                     [up.user.email]
                 )

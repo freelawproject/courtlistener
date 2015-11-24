@@ -26,7 +26,8 @@ from cl.users.forms import (
     CustomPasswordChangeForm
 )
 from cl.users.models import UserProfile
-from cl.users.utils import convert_to_stub_account
+from cl.users.utils import convert_to_stub_account, emails, message_dict
+from cl.visualizations.models import SCOTUSMap
 
 logger = logging.getLogger(__name__)
 
@@ -77,9 +78,41 @@ def view_donations(request):
 @login_required
 @never_cache
 def view_visualizations(request):
-    return render_to_response('profile/visualizations.html',
-                              {'private': True},
-                              RequestContext(request))
+    visualizations = SCOTUSMap.objects.filter(
+        user=request.user,
+        deleted=False
+    ).order_by(
+        '-date_modified',
+    )
+    return render_to_response(
+        'profile/visualizations.html',
+        {
+            'visualizations': visualizations,
+            'private': True,
+        },
+        RequestContext(request))
+
+
+@permission_required('visualizations.has_beta_access')
+@login_required
+@never_cache
+def view_deleted_visualizations(request):
+    thirty_days_ago = now() - timedelta(days=30)
+    visualizations = SCOTUSMap.objects.filter(
+        user=request.user,
+        deleted=True,
+        date_deleted__gte=thirty_days_ago,
+    ).order_by(
+        '-date_modified',
+    )
+    return render_to_response(
+        'profile/visualizations_deleted.html',
+        {
+            'visualizations': visualizations,
+            'private': True,
+        },
+        RequestContext(request)
+    )
 
 
 @login_required
@@ -88,6 +121,7 @@ def view_api(request):
     return render_to_response('profile/api.html',
                               {'private': True},
                               RequestContext(request))
+
 
 @sensitive_variables('salt', 'activation_key', 'email_body')
 @login_required
@@ -112,40 +146,21 @@ def view_settings(request):
             up.email_confirmed = False
 
             # Send the email.
-            email_subject = 'Email changed successfully on CourtListener'
-            email_body = ("Hello, %s,\n\n"
-                          "You have successfully changed your email address at CourtListener. Please confirm this "
-                          "change by clicking the following link within 5 days:\n\n"
-                          " - https://www.courtlistener.com/email/confirm/%s\n\n"
-                          "Thanks for using our site,\n\n"
-                          "The CourtListener team\n\n"
-                          "------------------\n"
-                          "For questions or comments, please see our contact page, "
-                          "https://www.courtlistener.com/contact/." % (
-                user.username, up.activation_key))
+            email = emails['email_changed_successfully']
             send_mail(
-                email_subject,
-                email_body,
-                'CourtListener <noreply@courtlistener.com>',
-                [new_email]
+                email['subject'],
+                email['body'] % (user.username, up.activation_key),
+                email['from'],
+                [new_email],
             )
 
-            messages.add_message(
-                request,
-                messages.SUCCESS,
-                ('Your settings were saved successfully and you have been '
-                 'logged out. To sign back in and continue using '
-                 'CourtListener, please confirm your new email address by '
-                 'checking your email within five days.')
-            )
+            msg = message_dict['email_changed_successfully']
+            messages.add_message(request, msg['level'], msg['message'])
             logout(request)
         else:
             # if the email wasn't changed, simply inform of success.
-            messages.add_message(
-                request,
-                messages.SUCCESS,
-                'Your settings were saved successfully.'
-            )
+            msg = message_dict['settings_changed_successfully']
+            messages.add_message(request, msg['level'], msg['message'])
 
         # New email address and changes above are saved here.
         profile_form.save()
@@ -166,6 +181,9 @@ def delete_account(request):
             request.user.alerts.all().delete()
             request.user.favorites.all().delete()
             convert_to_stub_account(request.user)
+            email = emails['account_deleted']
+            send_mail(email['subject'], email['body'] % request.user,
+                      email['from'], email['to'])
 
         except Exception, e:
             logger.critical("User was unable to delete account. %s" % e)
@@ -257,39 +275,23 @@ def register(request):
                 up.key_expires = now() + timedelta(days=5)
                 up.save()
 
-                # Send an email with the confirmation link to the new user
-                email_subject = 'Confirm your account on CourtListener.com'
-                email_body = (
-                    "Hello, %s, and thanks for signing up for an account!\n\n"
-                    "To send you emails, we need you to activate your account with CourtListener. To "
-                    "activate your account, click this link within five days:\n\n"
-                    "https://www.courtlistener.com/email/confirm/%s\n\n"
-                    "Thanks for using our site,\n\n"
-                    "The CourtListener Team\n\n"
-                    "-------------------\n"
-                    "For questions or comments, please see our contact page, "
-                    "https://www.courtlistener.com/contact/." % (
-                        user.username, up.activation_key))
+                email = emails['confirm_your_new_account']
                 send_mail(
-                    email_subject,
-                    email_body, 'CourtListener <noreply@courtlistener.com>',
+                    email['subject'],
+                    email['body'] % (user.username, up.activation_key),
+                    email['from'],
                     [user.email]
                 )
-
-                # Send an email letting the admins know there's somebody to say hi to
-                email_subject = 'New user confirmed on CourtListener: %s' % up.user.username
-                email_body = (
-                    "A new user has signed up on CourtListener and they'll be automatically welcomed soon!\n\n"
-                    "  Their name is: %s\n"
-                    "  Their email address is: %s\n\n"
-                    "Sincerely,\n\n"
-                    "The CourtListener Bots" % (
+                email = emails['new_account_created']
+                send_mail(
+                    email['subject'] % up.user.username,
+                    email['body'] % (
                         up.user.get_full_name() or "Not provided",
-                        up.user.email))
-                send_mail(email_subject,
-                          email_body,
-                          'CourtListener <noreply@courtlistener.com>',
-                          [a[1] for a in settings.ADMINS])
+                        up.user.email
+                    ),
+                    email['from'],
+                    email['to'],
+                )
                 tally_stat('user.created')
                 return HttpResponseRedirect(
                     '/register/success/?next=%s' % redirect_to)
@@ -351,9 +353,11 @@ def confirm_email(request, activation_key):
         up.email_confirmed = True
         up.save()
 
-    return render_to_response('register/confirm.html',
-                              {'success': True, 'private': True},
-                              RequestContext(request))
+    return render_to_response(
+        'register/confirm.html',
+        {'success': True, 'private': True},
+        RequestContext(request)
+    )
 
 
 @sensitive_variables('salt', 'activation_key', 'email_body')
@@ -383,30 +387,21 @@ def request_email_confirmation(request):
                 up.key_expires = key_expires
                 up.save()
 
-            email_subject = 'Confirm your account on CourtListener.com'
-            email_body = ("Hello,\n\n"
-                          "Somebody, probably you, has asked that we send an email confirmation link to this "
-                          "address.\n\n"
-                          "If this was you, please confirm your email address by clicking the following link within "
-                          "five days:\n\n"
-                          "https://www.courtlistener.com/email/confirm/%s\n\n"
-                          "If this was not you, please disregard this email.\n\n"
-                          "Thanks for using our site,\n"
-                          "The CourtListener Team\n\n"
-                          "-------\n"
-                          "For questions or comments, please visit our contact page, "
-                          "https://www.courtlistener.com/contact/\n"
-                          "We're always happy to hear from you." % activation_key)
-            send_mail(email_subject,
-                      email_body,
-                      'CourtListener <noreply@courtlistener.com>',
-                      [user.email])
+            email = emails['confirm_existing_account']
+            send_mail(
+                email['subject'],
+                email['body'] % activation_key,
+                email['from'],
+                [user.email],
+            )
             return HttpResponseRedirect('/email-confirmation/success/')
     else:
         form = EmailConfirmationForm()
-    return render_to_response('register/request_email_confirmation.html',
-                              {'private': True, 'form': form},
-                              RequestContext(request))
+    return render_to_response(
+        'register/request_email_confirmation.html',
+        {'private': True, 'form': form},
+        RequestContext(request)
+    )
 
 
 @never_cache
@@ -414,7 +409,8 @@ def email_confirm_success(request):
     return render_to_response(
         'register/request_email_confirmation_success.html',
         {'private': False},
-        RequestContext(request))
+        RequestContext(request)
+    )
 
 
 @sensitive_post_parameters('old_password', 'new_password1', 'new_password2')
@@ -425,12 +421,14 @@ def password_change(request):
         form = CustomPasswordChangeForm(user=request.user, data=request.POST)
         if form.is_valid():
             form.save()
-            messages.add_message(request, messages.SUCCESS,
-                                 'Your password was changed successfully.')
+            msg = message_dict['pwd_changed_successfully']
+            messages.add_message(request, msg['level'], msg['message'])
             update_session_auth_hash(request, form.user)
             return HttpResponseRedirect('/profile/password/change/')
     else:
         form = CustomPasswordChangeForm(user=request.user)
-    return render_to_response('profile/password_form.html',
-                              {'form': form, 'private': False},
-                              RequestContext(request))
+    return render_to_response(
+        'profile/password_form.html',
+        {'form': form, 'private': False},
+        RequestContext(request)
+    )

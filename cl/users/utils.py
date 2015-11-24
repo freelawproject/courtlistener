@@ -1,6 +1,8 @@
 import hashlib
 from cl.users.models import UserProfile
 from django.contrib.auth.models import User
+from django.conf import settings
+from django.contrib import messages
 
 
 def create_stub_account(user_data, profile_data):
@@ -59,5 +61,107 @@ def convert_to_stub_account(user):
     return user
 
 
+emails = {
+    'account_deleted': {
+        'subject': "User deleted their account on CourtListener!",
+        'body': "Sad day indeed. Somebody deleted their account completely, "
+                "blowing it to smithereens. The user that deleted their "
+                "account was: \n\n"
+                " - %s\n\n"
+                "Can't keep 'em all, I suppose.\n\n",
+        'from': 'CourtListener <noreply@courtlistener.com>',
+        'to': [a[1] for a in settings.ADMINS]
+    },
+    'email_changed_successfully': {
+        'subject': 'Email changed successfully on CourtListener',
+        'body': "Hello, %s,\n\n"
+                "You have successfully changed your email address at "
+                "CourtListener. Please confirm this change by clicking the "
+                "following link within 5 days:\n\n"
+                " - https://www.courtlistener.com/email/confirm/%s\n\n"
+                "Thanks for using our site,\n\n"
+                "The CourtListener team\n\n"
+                "------------------\n"
+                "For questions or comments, please see our contact page, "
+                "https://www.courtlistener.com/contact/.",
+        'from': 'CourtListener <noreply@courtlistener.com>',
+    },
+    'confirm_your_new_account': {
+        'subject': 'Confirm your account on CourtListener.com',
+        'body': "Hello, %s, and thanks for signing up for an account!\n\n"
+                "To send you emails, we need you to activate your account with "
+                "CourtListener. To activate your account, click this link "
+                "within five days:\n\n"
+                "https://www.courtlistener.com/email/confirm/%s\n\n"
+                "Thanks for using our site,\n\n"
+                "The CourtListener Team\n\n"
+                "-------------------\n"
+                "For questions or comments, please see our contact page, "
+                "https://www.courtlistener.com/contact/.",
+        'from': 'CourtListener <noreply@courtlistener.com>',
+    },
+    'confirm_existing_account': {
+        'subject': 'Confirm your account on CourtListener.com',
+        'body': "Hello,\n\n"
+                "Somebody, probably you, has asked that we send an email "
+                "confirmation link to this address.\n\n"
+                "If this was you, please confirm your email address by "
+                "clicking the following link within five days:\n\n"
+                "https://www.courtlistener.com/email/confirm/%s\n\n"
+                "If this was not you, you can disregard this email.\n\n"
+                "Thanks for using our site,\n"
+                "The CourtListener Team\n\n"
+                "-------\n"
+                "For questions or comments, please visit our contact page, "
+                "https://www.courtlistener.com/contact/\n"
+                "We're always happy to hear from you.",
+        'from': 'CourtListener <noreply@courtlistener.com>',
+    },
+    'email_not_confirmed': {
+        'subject': 'Please confirm your account on %s',
+        'body': "Hello, %s,\n\n"
+                "During routine maintenance of our site, we discovered that "
+                "your email address has not been confirmed. To confirm your "
+                "email address and continue using our site, please click the "
+                "following link:\n\n"
+                " - https://www.courtlistener.com/email/confirm/%s\n\n"
+                "Unfortunately, accounts that are not confirmed cannot log in, "
+                "will stop receiving alerts, and will eventually be deleted "
+                "from our system.\n\n"
+                "Thanks for using our site,\n\n"
+                "The CourtListener team\n\n\n"
+                "------------------\n"
+                "For questions or comments, please see our contact page, "
+                "https://www.courtlistener.com/contact/.",
+        'from': 'CourtListener <noreply@courtlistener.com>',
+    },
+    'new_account_created': {
+        'subject': 'New user confirmed on CourtListener: %s',
+        'body': "A new user has signed up on CourtListener and they'll be "
+                "automatically welcomed soon!\n\n"
+                "  Their name is: %s\n"
+                "  Their email address is: %s\n\n"
+                "Sincerely,\n\n"
+                "The CourtListener Bots",
+        'from': 'CourtListener <noreply@courtlistener.com>',
+        'to': [a[1] for a in settings.ADMINS],
+    },
+}
 
-
+message_dict = {
+    'email_changed_successfully': {
+        'level': messages.SUCCESS,
+        'message': 'Your settings were saved successfully and you have been '
+                   'logged out. To sign back in and continue using '
+                   'CourtListener, please confirm your new email address by '
+                   'checking your email within five days.'
+    },
+    'settings_changed_successfully': {
+        'level': messages.SUCCESS,
+        'message': 'Your settings were saved successfully.',
+    },
+    'pwd_changed_successfully': {
+        'level': messages.SUCCESS,
+        'message': 'Your password was changed successfully',
+    },
+}
