@@ -17,7 +17,7 @@
 
 {% block content %}
     <div class="col-xs-12">
-        {% if visualizations %}
+        {% if results.paginator.count > 0 %}
             <div class="alert alert-warning" role="alert">
                 <p class="bottom"><i
                         class="fa fa-exclamation-triangle"></i>&nbsp;Items in
@@ -36,7 +36,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                    {% for viz in visualizations %}
+                    {% for viz in results.object_list %}
                         <tr>
                             <td>{{ viz.pk }}</td>
                             <td>
@@ -86,5 +86,6 @@
                 <div class="col-sm-3"></div>
             </div>
         {% endif %}
+        {% include "includes/pagination.html" %}
     </div>
 {% endblock %}

@@ -8,6 +8,7 @@ from django.contrib.auth import update_session_auth_hash, logout
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
@@ -84,10 +85,18 @@ def view_visualizations(request):
     ).order_by(
         '-date_modified',
     )
+    paginator = Paginator(visualizations, 20, orphans=2)
+    page = request.GET.get('page', 1)
+    try:
+        paged_vizes = paginator.page(page)
+    except PageNotAnInteger:
+        paged_vizes = paginator.page(1)
+    except EmptyPage:
+        paged_vizes = paginator.page(paginator.num_pages)
     return render_to_response(
         'profile/visualizations.html',
         {
-            'visualizations': visualizations,
+            'results': paged_vizes,
             'private': True,
         },
         RequestContext(request))
@@ -105,10 +114,19 @@ def view_deleted_visualizations(request):
     ).order_by(
         '-date_modified',
     )
+    paginator = Paginator(visualizations, 20, orphans=2)
+    page = request.GET.get('page', 1)
+    try:
+        paged_vizes = paginator.page(page)
+    except PageNotAnInteger:
+        paged_vizes = paginator.page(1)
+    except EmptyPage:
+        paged_vizes = paginator.page(paginator.num_pages)
+
     return render_to_response(
         'profile/visualizations_deleted.html',
         {
-            'visualizations': visualizations,
+            'results': paged_vizes,
             'private': True,
         },
         RequestContext(request)
