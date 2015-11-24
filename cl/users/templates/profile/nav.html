@@ -4,29 +4,56 @@
 
 {% block nav %}
     <div class="col-xs-12 v-offset-below-2 v-offset-above-3">
-        <ul class="nav nav-tabs nav-justified">
-            <li class="{% block nav-alerts %}inactive{% endblock %}">
+        <ul class="nav nav-tabs nav-justified" role="tablist">
+            <li class="{% block nav-alerts %}inactive{% endblock %}"
+                role="presentation">
                 <a href="/profile/alerts/"><i class="fa fa-bell-o gray"></i>&nbsp;Alerts</a>
             </li>
+
             {% if perms.visualizations.has_beta_access %}
-            <li class="{% block nav-visualizations %}inactive{% endblock %}">
-                <a href="{% url "view_visualizations" %}"><i
-                        class="fa fa-line-chart gray"></i>&nbsp;Visualizations</a>
+            <li class="{% block nav-visualizations %}inactive{% endblock %} dropdown"
+                role="presentation">
+                <a aria-expanded="false" href="#" id="vizDropDown"
+                   class="dropdown-toggle" data-toggle="dropdown"
+                   aria-controls="vizDropDown-contents"><i
+                        class="fa fa-line-chart gray"></i>&nbsp;Visualizations <span
+                        class="caret"></span>
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="vizDropDown"
+                    id="vizDropDown-contents">
+                    <li><a aria-expanded="true" role="tab"
+                           id="dropdown1-tab"
+                           aria-controls="dropdown1"
+                           href="{% url "view_visualizations" %}"><i
+                            class="fa fa-line-chart gray"></i>&nbsp;Active</a>
+                    </li>
+                    <li><a aria-expanded="false" role="tab"
+                           id="dropdown2-tab"
+                           aria-controls="dropdown2"
+                           href="{% url "view_deleted_visualizations" %}"><i class="fa fa-trash-o red"></i>&nbsp;Trash</a>
+                    </li>
+                </ul>
             </li>
             {% endif %}
-            <li class="{% block nav-favorites %}inactive{% endblock %}">
+
+            <li class="{% block nav-favorites %}inactive{% endblock %}"
+                role="presentation">
                 <a href="/profile/favorites/"><i class="fa fa-star-o gray"></i>&nbsp;Favorites</a>
             </li>
-            <li class="{% block nav-donations %}inactive{% endblock %}">
+            <li class="{% block nav-donations %}inactive{% endblock %}"
+                role="presentation">
                 <a href="/profile/donations/"><i class="fa fa-money gray"></i>&nbsp;Donations</a>
             </li>
-            <li class="{% block nav-account %}inactive{% endblock %}">
+            <li class="{% block nav-account %}inactive{% endblock %}"
+                role="presentation">
                 <a href="{% url "view_settings" %}"><i class="fa fa-user gray"></i>&nbsp;Account</a>
             </li>
-            <li class="{% block nav-password %}inactive{% endblock %}">
+            <li class="{% block nav-password %}inactive{% endblock %}"
+                role="presentation">
                 <a href="/profile/password/change"><i class="fa fa-lock gray"></i>&nbsp;Password</a>
             </li>
-            <li class="{% block nav-api%}inactive{% endblock %}">
+            <li class="{% block nav-api%}inactive{% endblock %}"
+                role="presentation">
                 <a href="/profile/api/"><i class="fa fa-code gray"></i>&nbsp;API</a>
             </li>
         </ul>

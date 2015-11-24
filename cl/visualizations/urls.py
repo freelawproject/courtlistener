@@ -1,11 +1,13 @@
 from django.conf.urls import url
 from cl.visualizations.views import (
-    view_visualization,
-    new_visualization,
-    edit_visualization,
     delete_visualization,
+    edit_visualization,
     mapper_homepage,
-    view_embedded_visualization)
+    new_visualization,
+    restore_visualization,
+    view_embedded_visualization,
+    view_visualization,
+)
 
 urlpatterns = [
     url(
@@ -24,9 +26,15 @@ urlpatterns = [
         name='edit_visualization',
     ),
     url(
-        r'^visualizations/scotus-mapper/(?P<pk>\d*)/delete/$',
+        # Check JS files if changing this config.
+        r'^visualizations/scotus-mapper/delete/$',
         delete_visualization,
         name='delete_visualization',
+    ),
+    url(
+        r'^visualizations/scotus-mapper/restore/',
+        restore_visualization,
+        name='restore_visualization',
     ),
     url(
         r'^visualizations/scotus-mapper/(?P<pk>\d*)/embed/$',

@@ -1,21 +1,24 @@
 import json
 import time
 
-from django.conf import settings
-from django.contrib import messages
-
 from cl.lib.bot_detector import is_bot
 from cl.stats import tally_stat
 from cl.visualizations.models import SCOTUSMap, JSONVersion
 from cl.visualizations.forms import VizForm, VizEditForm, JSONEditForm
 from cl.visualizations.utils import reverse_endpoints_if_needed, TooManyNodes
+
+from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.urlresolvers import reverse
 from django.db.models import F
-from django.http import HttpResponseRedirect
+from django.http import (
+    HttpResponseRedirect, HttpResponse, HttpResponseNotAllowed
+)
 from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
 from django.views.decorators.clickjacking import xframe_options_exempt
+from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status as statuses
 
 
@@ -199,10 +202,37 @@ def edit_visualization(request, pk):
     )
 
 
+@ensure_csrf_cookie
 @permission_required('visualizations.has_beta_access')
 @login_required
-def delete_visualization(request, pk):
-    pass
+def delete_visualization(request):
+    if request.is_ajax():
+        v = SCOTUSMap.objects.get(pk=request.POST.get('pk'), user=request.user)
+        v.deleted = True
+        v.save()
+        return HttpResponse("It worked.")
+    else:
+        return HttpResponseNotAllowed(
+            permitted_methods=['POST'],
+            content="Not an ajax request",
+        )
+
+
+@ensure_csrf_cookie
+@permission_required('visualizations.has_beta_access')
+@login_required
+def restore_visualization(request):
+    if request.is_ajax():
+        v = SCOTUSMap.objects.get(pk=request.POST.get('pk'), user=request.user)
+        v.deleted = False
+        v.date_deleted = None
+        v.save()
+        return HttpResponse("It worked")
+    else:
+        return HttpResponseNotAllowed(
+            permitted_methods=['POST'],
+            content="Not an ajax request",
+        )
 
 
 @permission_required('visualizations.has_beta_access')

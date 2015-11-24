@@ -18,6 +18,11 @@
 {% block content %}
     <div class="col-xs-12">
         {% if visualizations %}
+            <div class="alert alert-warning" role="alert">
+                <p class="bottom"><i
+                        class="fa fa-exclamation-triangle"></i>&nbsp;Items in
+                    the trash are deleted after 30 days.</p>
+            </div>
             <div class="table-responsive">
                 <table class="table settings-table">
                     <thead>
@@ -26,10 +31,7 @@
                             <th>Title</th>
                             <th>From</th>
                             <th>To</th>
-                            <th>Created</th>
-                            <th>Modified</th>
-                            <th>View&nbsp;Count</th>
-                            <th>Published</th>
+                            <th>Deleted</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -58,20 +60,14 @@
                                     {{ viz.cluster_end.case_name_full|truncatewords:"20" }}
                                 {% endif %}
                             </td>
-                            <td>{{ viz.date_created|date:"n/j/Y" }}</td>
-                            <td>{{ viz.date_modified|date:"n/j/Y" }}</td>
-                            <td>{{ viz.view_count|intcomma }}</td>
-                            <td>{{ viz.published|yesno|capfirst }}</td>
+                            <td>{{ viz.date_deleted|date:"n/j/Y" }}</td>
                             <td class="right">
-                                <a href="{% url "edit_visualization" pk=viz.pk %}"
-                                   class="btn btn-primary btn-xs">
-                                    <i class="fa fa-pencil"></i>&nbsp;Edit</a>
-                                <a href="{% url "delete_visualization" %}"
-                                   class="btn btn-danger btn-xs trash-button"
+                                <a href="{% url "restore_visualization" %}"
+                                   class="btn btn-success btn-xs restore-button"
                                    data-id="{{ viz.pk }}"
                                    data-toggle="tooltip" data-placement="top"
-                                   title="Move to trash">
-                                    <i class="fa fa-trash-o"></i>&nbsp;Delete</a>
+                                   title="Make Active">
+                                    <i class="fa fa-trash-o"></i>&nbsp;Restore</a>
                             </td>
                         </tr>
                     {% endfor %}
@@ -82,11 +78,9 @@
             <div class="row">
                 <div class="col-sm-3"></div>
                 <div class="col-sm-6">
-                    <h3>You Don't Have Any Visualizations</h3>
+                    <h3>You Don't Have Any Visualizations in the Trash</h3>
 
-                    <p>Visualizations are a way to plot the citations between Supreme Court cases. With visualizations, you can make lots of inferences about cases, like how precedent evolved from one case to another or how a topic may have become more liberal or conservative over time.
-                    </p>
-                    <p><a href="{% url "new_visualization" %}" class="btn btn-primary btn-lg">Make a Visualization</a>
+                    <p>Visualizations in the trash are automatically deleted after 30 days.
                     </p>
                 </div>
                 <div class="col-sm-3"></div>

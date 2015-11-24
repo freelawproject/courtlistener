@@ -261,6 +261,10 @@ div.hopscotch-bubble .hopscotch-bubble-close {
     color: gold;
 }
 
+.red {
+    color: #8a1f11;
+}
+
 .align-top {
     vertical-align: top;
 }
@@ -787,10 +791,6 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 #favorites-star {
     font-size: 1.5em;
     margin-right: 0.5em;
-}
-
-.badge-red {
-    background-color: #8a1f11;
 }
 
 .help-block {

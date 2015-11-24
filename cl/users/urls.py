@@ -64,12 +64,20 @@ urlpatterns = [
         name='password_reset_complete',
     ),
 
-    # Settings pages
+    # Profile pages
     url(r'^profile/settings/$', views.view_settings, name='view_settings'),
     url(r'^profile/favorites/$', views.view_favorites),
     url(r'^profile/alerts/$', views.view_alerts),
-    url(r'^profile/visualizations/$', views.view_visualizations,
-        name='view_visualizations'),
+    url(
+        r'^profile/visualizations/$',
+        views.view_visualizations,
+        name='view_visualizations'
+    ),
+    url(
+        r'^profile/visualizations/deleted/$',
+        views.view_deleted_visualizations,
+        name='view_deleted_visualizations',
+    ),
     url(r'^profile/api/$', views.view_api, name='view_api'),
     url(r'^profile/password/change/$', views.password_change),
     url(r'^profile/delete/$', views.delete_account),

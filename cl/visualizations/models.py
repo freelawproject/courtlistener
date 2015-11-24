@@ -55,6 +55,12 @@ class SCOTUSMap(models.Model):
         blank=True,
         null=True,
     )
+    date_deleted = models.DateTimeField(
+        help_text="The moment when the visualization was last deleted",
+        db_index=True,
+        blank=True,
+        null=True,
+    )
     title = models.CharField(
         help_text="The title of the visualization that you're creating.",
         max_length=200,
@@ -84,6 +90,12 @@ class SCOTUSMap(models.Model):
                   "in seconds.",
         default=0,
     )
+
+    __original_deleted = None
+
+    def __init__(self, *args, **kwargs):
+        super(SCOTUSMap, self).__init__(*args, **kwargs)
+        self.__original_deleted = self.deleted
 
     @property
     def json(self):
@@ -323,12 +335,17 @@ class SCOTUSMap(models.Model):
             # First time published.
             self.date_published = now()
 
+        if self.deleted is True and self.__original_deleted != self.deleted:
+            # Item was just deleted.
+            self.date_deleted = now()
+
         if self.pk is None:
             # First time being saved.
             self.slug = trunc(slugify(self.title), 75)
             # If we could, we'd add clusters and json here, but you can't do
             # that kind of thing until the first object has been saved.
         super(SCOTUSMap, self).save(*args, **kwargs)
+        self.__original_deleted = self.deleted
 
     class Meta:
         permissions = (
