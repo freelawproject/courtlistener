@@ -1,3 +1,6 @@
+from django.contrib import messages
+
+
 def reverse_endpoints_if_needed(start, end):
     """Make sure start date < end date, and flip if needed.
 
@@ -55,3 +58,24 @@ class TooManyNodes(Exception):
     class SetupException(Exception):
         def __init__(self, message):
             Exception.__init__(self, message)
+
+
+message_dict = {
+    'too_many_nodes': {
+        'level': messages.WARNING,
+        'message': '<strong>That network has too many nodes.</strong> We '
+                   'were unable to create your visualization because the '
+                   'finished product would contain too  many nodes. '
+                   'We\'ve found that in practice, such networks are '
+                   'difficult to read and take far too long for our '
+                   'servers to create. Try building a smaller network by '
+                   'selecting different cases.',
+    },
+    'fewer_hops_delivered': {
+        'level': messages.SUCCESS,
+        'message': "We were unable to build your network with three "
+                   "degrees of separation because it grew too large. "
+                   "The network below was built with two degrees of "
+                   "separation.",
+    }
+}

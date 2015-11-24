@@ -5,7 +5,9 @@ from cl.lib.bot_detector import is_bot
 from cl.stats import tally_stat
 from cl.visualizations.models import SCOTUSMap, JSONVersion
 from cl.visualizations.forms import VizForm, VizEditForm, JSONEditForm
-from cl.visualizations.utils import reverse_endpoints_if_needed, TooManyNodes
+from cl.visualizations.utils import (
+    reverse_endpoints_if_needed, TooManyNodes, message_dict
+)
 
 from django.conf import settings
 from django.contrib import messages
@@ -71,30 +73,6 @@ def view_visualization(request, pk, slug):
     return render_visualization_page(request, pk, embed=False)
 
 
-def make_viz_msg(key, request):
-    if key == 'too_many_nodes':
-        messages.add_message(
-            request,
-            messages.WARNING,
-            '<strong>That network has too many nodes.</strong> We '
-            'were unable to create your visualization because the '
-            'finished product would contain too  many nodes. '
-            'We\'ve found that in practice, such networks are '
-            'difficult to read and take far too long for our '
-            'servers to create. Try building a smaller network by '
-            'selecting different cases.',
-        )
-    elif key == 'fewer_hops_delivered':
-        messages.add_message(
-            request,
-            messages.SUCCESS,
-            "We were unable to build your network with three "
-            "degrees of separation because it grew too large. "
-            "The network below was built with two degrees of "
-            "separation."
-        )
-
-
 @permission_required('visualizations.has_beta_access')
 @login_required
 def new_visualization(request):
@@ -128,11 +106,13 @@ def new_visualization(request):
                     # Try with fewer hops.
                     build_kwargs['max_hops'] = 2
                     g = viz.build_nx_digraph(**build_kwargs)
-                    make_viz_msg('fewer_hops_delivered', request)
+                    msg = message_dict['fewer_hops_delivered']
+                    messages.add_message(request, msg['level'], msg['message'])
                 except TooManyNodes:
                     # Still too many hops. Abort.
                     tally_stat('visualization.too_many_nodes_failure')
-                    make_viz_msg('too_many_nodes', request)
+                    msg = message_dict['too_many_nodes']
+                    messages.add_message(request, msg['level'], msg['message'])
                     return render_to_response(
                         'new_visualization.html',
                         {'form': form, 'private': True},
