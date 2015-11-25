@@ -310,6 +310,7 @@ class SCOTUSMap(models.Model):
                 "decision_direction": cluster.scdb_decision_direction,
                 "votes_majority": cluster.scdb_votes_majority,
                 "votes_minority": cluster.scdb_votes_minority,
+                "scdb_id": cluster.scbd_id,
                 "sub_opinions": [{
                     "type": "combined",
                     "opinions_cited": opinions_cited,
