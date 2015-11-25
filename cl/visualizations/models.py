@@ -418,5 +418,11 @@ class JSONVersion(models.Model):
         help_text="The JSON data for a particular version of the visualization.",
     )
 
+    def __unicode__(self):
+        return '<JSONVersion {pk}> for <{map}>'.format(
+            pk=getattr(self, 'pk', None),
+            map=self.map,
+        )
+
     class Meta:
         ordering = ['-date_modified']
