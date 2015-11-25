@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import messages
 
 
@@ -59,6 +60,26 @@ class TooManyNodes(Exception):
         def __init__(self, message):
             Exception.__init__(self, message)
 
+
+emails = {
+    'referer_detected': {
+        'subject': "Somebody seems to have embedded a viz somewhere.",
+        'body': "Hey admins,\n\n"
+                "It looks like somebody embedded a SCOTUSMap on a blog or "
+                "something. Somebody needs to check this out and possibly "
+                "approve it. It appears to be at:\n\n"
+                " - %s\n\n"
+                "With a page title of:\n\n"
+                " - %s\n\n"
+                "And can be reviewed at:\n\n"
+                " - https://www.courtlistener.com%s\n\n"
+                "If nobody approves it, it'll never show up on the site.\n\n"
+                "Godspeed, fair admin.\n"
+                "The CourtListener bots",
+        'from': 'CourtListener <noreply@courtlistener.com>',
+        'to': [a[1] for a in settings.ADMINS],
+    }
+}
 
 message_dict = {
     'too_many_nodes': {

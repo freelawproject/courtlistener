@@ -102,6 +102,11 @@ class SCOTUSMap(models.Model):
         """Returns the most recent version"""
         return self.json_versions.all()[0].json_data
 
+    @property
+    def referers_displayed(self):
+        """Return good referers"""
+        return self.referers.filter(display=True).order_by('date_created')
+
     def make_title(self):
         """Make a title for the visualization
 
@@ -351,6 +356,44 @@ class SCOTUSMap(models.Model):
         permissions = (
             ('has_beta_access', 'Can access features during beta period.'),
         )
+
+
+class Referer(models.Model):
+    """Holds the referer domains where embedded maps are placed"""
+    map = models.ForeignKey(
+        SCOTUSMap,
+        help_text="The visualization that was embedded and which generated a "
+                  "referer",
+        related_name='referers',
+    )
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The time when this item was modified",
+        auto_now=True,
+        db_index=True,
+    )
+    url = models.URLField(
+        help_text="The URL where this item was embedded.",
+        max_length="3000",
+        db_index=True,
+    )
+    page_title = models.CharField(
+        help_text="The title of the page where the item was embedded",
+        max_length=500,
+        blank=True,
+    )
+    display = models.BooleanField(
+        help_text="Should this item be displayed?",
+        default=False,
+    )
+
+    class Meta:
+        # Ensure that we don't have dups in the DB for a given map.
+        unique_together = (("map", "url"),)
 
 
 class JSONVersion(models.Model):

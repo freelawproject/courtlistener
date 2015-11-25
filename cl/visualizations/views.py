@@ -3,8 +3,9 @@ import time
 
 from cl.lib.bot_detector import is_bot
 from cl.stats import tally_stat
-from cl.visualizations.models import SCOTUSMap, JSONVersion
+from cl.visualizations.models import SCOTUSMap, JSONVersion, Referer
 from cl.visualizations.forms import VizForm, VizEditForm, JSONEditForm
+from cl.visualizations.tasks import get_title
 from cl.visualizations.utils import (
     reverse_endpoints_if_needed, TooManyNodes, message_dict
 )
@@ -45,6 +46,16 @@ def render_visualization_page(request, pk, embed):
             status = statuses.HTTP_401_UNAUTHORIZED
 
     if embed:
+        if all([viz.published is True, viz.deleted is False]):
+            # Log the referer if it's set, and the item is live.
+            referer_url = request.META.get('HTTP_REFERER')
+            if referer_url is not None:
+                referer, created = Referer.objects.get_or_create(
+                    url=referer_url, map_id=viz.pk,
+                )
+                if created:
+                    # Spawn a task to try to get the title of the page.
+                    get_title.delay(referer.pk)
         template = 'visualization_embedded.html'
     else:
         template = 'visualization.html'

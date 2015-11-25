@@ -196,6 +196,12 @@
                                    role="tab"
                                    data-toggle="tab">Analysis</a>
                             </li>
+                            {% if viz.referers_displayed.all.count > 0 %}
+                            <li role="presentation">
+                                <a href="#referers" aria-controls="referers"
+                                   role="tab" data-toggle="tab">On the Web</a>
+                            </li>
+                            {% endif %}
                         </ul>
 
                         <!-- Tab panes -->
@@ -216,6 +222,18 @@
                                     <p>Created by: {{ viz.user }}</p>
                                 </div>
                             </div>
+                            {% if viz.referers_displayed.all.count > 0 %}
+                            <div role="tabpanel"
+                                 class="tab-pane"
+                                 id="referers">
+                                <ul>
+                                    {% for referer in viz.referers_displayed.all %}
+                                        <li>{{ referer.date_created|date:"n/j/Y" }}&nbsp;&ndash;&nbsp;<a href="{{ referer.url }}" rel="nofollow">{{ referer.page_title }}</a>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
 
@@ -252,10 +270,16 @@
                             <div class="sidebar-section col-xs-12">
                                 {% if viz.user == user %}
                                     <p><a href="{% url "edit_visualization" pk=viz.pk %}"
-                                          class="btn btn-primary btn-lg btn-block">Edit <span class="visible-lg-inline">Visualization</span></a>
+                                          class="btn btn-primary btn-lg btn-block"><span class="visible-lg-inline">Edit Visualization</span></a>
                                 {% else %}
                                     <h3><span>Created By</span></h3>
                                     <p>{{ viz.user }}</p>
+                                {% endif %}
+                                {% if perms.visualizations.change_scotusmap %}
+                                <p>
+                                    <a href="{% url 'admin:visualizations_scotusmap_change' viz.pk %}"
+                                       class="btn btn-primary btn-lg btn-block"><span class="visible-lg-inline">Admin for Viz</span></a>
+                                </p>
                                 {% endif %}
                             </div>
                         </div>
