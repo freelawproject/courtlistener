@@ -270,7 +270,7 @@
                             <div class="sidebar-section col-xs-12">
                                 {% if viz.user == user %}
                                     <p><a href="{% url "edit_visualization" pk=viz.pk %}"
-                                          class="btn btn-primary btn-lg btn-block"><span class="visible-lg-inline">Edit Visualization</span></a>
+                                          class="btn btn-primary btn-lg btn-block">Edit<span class="visible-lg-inline"> Visualization</span></a>
                                 {% else %}
                                     <h3><span>Created By</span></h3>
                                     <p>{{ viz.user }}</p>
@@ -278,7 +278,7 @@
                                 {% if perms.visualizations.change_scotusmap %}
                                 <p>
                                     <a href="{% url 'admin:visualizations_scotusmap_change' viz.pk %}"
-                                       class="btn btn-primary btn-lg btn-block"><span class="visible-lg-inline">Admin for Viz</span></a>
+                                       class="btn btn-primary btn-lg btn-block">Admin<span class="visible-lg-inline"> for Viz</span></a>
                                 </p>
                                 {% endif %}
                             </div>
