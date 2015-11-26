@@ -32,6 +32,7 @@ class VizEditForm(VizForm):
             'published',
         ]
 
+
 class JSONEditForm(forms.ModelForm):
     class Meta:
         model = JSONVersion

@@ -10,6 +10,7 @@
         <script src="{{ STATIC_URL }}js/typeahead.bundle.min.js"></script>
     {% endif %}
     <script type="application/javascript">
+        // XXX Make sure that the second input can't have the same value as the first.
         var last_year = "{{ SCDB_LATEST_CASE }}";
         var searchResults = new Bloodhound({
             datumTokenizer: Bloodhound.tokenizers.obj.whitespace('value'),
@@ -42,26 +43,28 @@
         });
 
         var typeahead = $('.typeahead');
-        typeahead.typeahead({
-          'hint': false,
-          'highlight': true,
-          'minLength': 3
-        },
-        {
-          name: 'case-names',
-          display: function(obj){
-              var parts = [obj.caseName];
-              if (obj.dateFiled){
-                  parts.push(new Date(obj.dateFiled).getUTCFullYear());
-              }
-              if (obj.citation){
-                  parts.push(obj.citation.join(", "));
-              }
-              return parts.join(" – ");
-          },
-          limit: 19,  // 20 seems to cause issues.
-          source: searchResults
-        });
+        typeahead.typeahead(
+            {
+              'hint': false,
+              'highlight': true,
+              'minLength': 3
+            },
+            {
+              name: 'case-names',
+              display: function(obj){
+                  var parts = [obj.caseName];
+                  if (obj.dateFiled){
+                      parts.push(new Date(obj.dateFiled).getUTCFullYear());
+                  }
+                  if (obj.citation){
+                      parts.push(obj.citation.join(", "));
+                  }
+                  return parts.join(" – ");
+              },
+              limit: 19,  // 20 seems to cause issues.
+              source: searchResults
+            }
+        );
         $('#starting-cluster-typeahead').bind(
                 'typeahead:select',
                 function (ev, suggestion) {
