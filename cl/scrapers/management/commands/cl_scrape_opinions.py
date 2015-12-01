@@ -47,7 +47,6 @@ class Command(BaseCommand):
         parser.add_argument(
             '--rate',
             type=int,
-            required=True,
             default=30,
             help=('The length of time in minutes it takes to crawl '
                   'all requested courts. Particularly useful if it is '
@@ -63,7 +62,7 @@ class Command(BaseCommand):
             help=('The court(s) to scrape and extract. This should be '
                   'in the form of a python module or package import '
                   'from the Juriscraper library, e.g. '
-                  '"juriscraper.opinions.united_states.federal.ca1" '
+                  '"juriscraper.opinions.united_states.federal_appellate.ca1" '
                   'or simply "opinions" to do all opinions.'),
         )
         parser.add_argument(
