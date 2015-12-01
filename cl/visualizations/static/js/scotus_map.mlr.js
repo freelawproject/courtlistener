@@ -100,7 +100,7 @@ $(document).ready(function () {
     var searchResults = new Bloodhound({
         datumTokenizer: Bloodhound.tokenizers.obj.whitespace('value'),
         queryTokenizer: Bloodhound.tokenizers.whitespace,
-        sufficient: 20,
+        sufficient: 21,
         identify: function (obj) {
             // Return the item ID so the system can have a unique id for it
             // in its caches.
@@ -111,27 +111,32 @@ $(document).ready(function () {
             // ...in the supreme court...
             // ...between 1925 and a year ago that has an SCDB id... OR
             // ...in the last year, with or without an SCDB id.
-            url: '/api/rest/v3/search/?' +
-            'case_name=(%QUERY) OR (%QUERY*)&' +
-            'court=scotus&' +
-            'q=((dateFiled:[1945-01-01T00:00:00Z TO ' + last_year + 'Z] AND scdb_id:["" TO *]) OR (dateFiled:[' + last_year + 'Z TO *]))',
+            url: '/api/rest/v3/search/?',
             prepare: function (query, settings) {
-                // This function is needed b/c it needs to do both a prefix
-                // search and a non-prefix search.
-                settings.url = settings.url.replace(/%QUERY/g, $.trim(query));
+                var params = {
+                    //case_name: "(%QUERY) OR (%QUERY*)",
+                    court: 'scotus',
+                    q: '((dateFiled:[1945-01-01T00:00:00Z TO ' + last_year + 'Z] AND scdb_id:["" TO *]) OR (dateFiled:[' + last_year + 'Z TO *]))',
+                    format: 'json'
+                };
+                if (query.length > 0){
+                    // Add a case name parameter, if the user has typed something.
+                    params.case_name = "(%QUERY) OR (%QUERY*)".replace(
+                        /%QUERY/g, $.trim(query));
+                }
 
                 var start_id = $('#id_cluster_start').val();
                 if ($("#ending-cluster-typeahead-search").is(":focus")) {
                     // Pass. No extra params required to do simple search.
                 } else if ($("#ending-cluster-typeahead-authorities").is(":focus")) {
                     // Append the authority IDs onto the end of the query.
-                    settings.url += " AND id:(" + authorityIDs[start_id].join(" OR ") + ")";
+                    params.q += " AND id:(" + authorityIDs[start_id].join(" OR ") + ")";
                 } else if ($("#ending-cluster-typeahead-citing").is(":focus")) {
                     // Append the cited_by ID onto the end of the query.
-                    settings.url += " AND cites:(" + start_id + ")";
+                    params.q += " AND cites:(" + start_id + ")";
                 }
 
-                return settings;
+                return settings.url + $.param(params);
             },
             transform: function (response) {
                 return response.results
@@ -139,13 +144,15 @@ $(document).ready(function () {
         }
     });
 
+
     $('.typeahead').typeahead({
             'hint': false,
             'highlight': true,
-            'minLength': 3
+            'minLength': 0
         },
         {
             display: function (obj) {
+                // Make a nice concatenation of citations, case name and year.
                 var parts = [obj.caseName];
                 if (obj.dateFiled) {
                     parts.push(new Date(obj.dateFiled).getUTCFullYear());
@@ -155,7 +162,7 @@ $(document).ready(function () {
                 }
                 return parts.join(" – ");
             },
-            limit: 19,  // 20 seems to cause issues.
+            limit: 20,  // Must be less than the 'sufficient' param in searchResults.
             source: searchResults
         }
     );
