@@ -90,80 +90,150 @@ $(document).ready(function () {
                 'url': "/api/rest/v3/search/",
                 'data': {q: "id:" + suggestion.id, 'format': 'json'}
             }).done(function (data) {
-                console.log(data);
                 authorityIDs[suggestion.id] = data.results[0].cites || [];
                 callback(suggestion);
             });
         }
     };
 
-    var searchResults = new Bloodhound({
-        datumTokenizer: Bloodhound.tokenizers.obj.whitespace('value'),
+    var identify = function (obj) {
+        // Return the item ID so the system can have a unique id for it
+        // in its caches.
+        return obj.id;
+    };
+    var transform = function (response) {
+        // Pull the results dict out of the main object.
+        return response.results
+    };
+    var remotePrepare = function (query, settings) {
+        // This query is anything with the case name typed in...
+        // ...in the supreme court...
+        // ...between 1945 and a year ago that has an SCDB id... OR
+        // ...in the last year, with or without an SCDB id.
+        var params = {
+            court: 'scotus',
+            q: '((dateFiled:[1945-01-01T00:00:00Z TO ' + last_year + 'Z] AND scdb_id:["" TO *]) OR (dateFiled:[' + last_year + 'Z TO *]))',
+            format: 'json'
+        };
+        if (query.length > 0) {
+            // Add a case name parameter, if the user has typed something.
+            params.case_name = "(%QUERY) OR (%QUERY*)".replace(
+                /%QUERY/g, $.trim(query));
+        }
+
+        var start_id = $('#id_cluster_start').val();
+        if ($("#ending-cluster-typeahead-search").is(":focus")) {
+            // Pass. No extra params required to do simple search.
+        } else if ($("#ending-cluster-typeahead-authorities").is(":focus")) {
+            // Append the authority IDs onto the end of the query.
+            params.q += " AND id:(" + authorityIDs[start_id].join(" OR ") + ")";
+        } else if ($("#ending-cluster-typeahead-citing").is(":focus")) {
+            // Append the cited_by ID onto the end of the query.
+            params.q += " AND cites:(" + start_id + ")";
+        }
+
+        return settings.url + $.param(params);
+    };
+
+    var searchResultsStartingCluster = new Bloodhound({
+        datumTokenizer: Bloodhound.tokenizers.whitespace,
         queryTokenizer: Bloodhound.tokenizers.whitespace,
         sufficient: 21,
-        identify: function (obj) {
-            // Return the item ID so the system can have a unique id for it
-            // in its caches.
-            return obj.id;
-        },
+        identify: identify,
         remote: {
-            // This query is anything with the case name typed in...
-            // ...in the supreme court...
-            // ...between 1925 and a year ago that has an SCDB id... OR
-            // ...in the last year, with or without an SCDB id.
             url: '/api/rest/v3/search/?',
-            prepare: function (query, settings) {
-                var params = {
-                    //case_name: "(%QUERY) OR (%QUERY*)",
-                    court: 'scotus',
-                    q: '((dateFiled:[1945-01-01T00:00:00Z TO ' + last_year + 'Z] AND scdb_id:["" TO *]) OR (dateFiled:[' + last_year + 'Z TO *]))',
-                    format: 'json'
-                };
-                if (query.length > 0){
-                    // Add a case name parameter, if the user has typed something.
-                    params.case_name = "(%QUERY) OR (%QUERY*)".replace(
-                        /%QUERY/g, $.trim(query));
-                }
-
-                var start_id = $('#id_cluster_start').val();
-                if ($("#ending-cluster-typeahead-search").is(":focus")) {
-                    // Pass. No extra params required to do simple search.
-                } else if ($("#ending-cluster-typeahead-authorities").is(":focus")) {
-                    // Append the authority IDs onto the end of the query.
-                    params.q += " AND id:(" + authorityIDs[start_id].join(" OR ") + ")";
-                } else if ($("#ending-cluster-typeahead-citing").is(":focus")) {
-                    // Append the cited_by ID onto the end of the query.
-                    params.q += " AND cites:(" + start_id + ")";
-                }
-
-                return settings.url + $.param(params);
-            },
-            transform: function (response) {
-                return response.results
-            }
+            prepare: remotePrepare,
+            transform: transform
+        }
+    });
+    var searchResultsEndingClusterSearch = new Bloodhound({
+        datumTokenizer: Bloodhound.tokenizers.whitespace,
+        queryTokenizer: Bloodhound.tokenizers.whitespace,
+        sufficient: 21,
+        identify: identify,
+        remote: {
+            url: '/api/rest/v3/search/?',
+            prepare: remotePrepare,
+            transform: transform
+        }
+    });
+    var searchResultsEndingClusterAuthorities = new Bloodhound({
+        datumTokenizer: Bloodhound.tokenizers.whitespace,
+        queryTokenizer: Bloodhound.tokenizers.whitespace,
+        sufficient: 21,
+        identify: identify,
+        remote: {
+            url: '/api/rest/v3/search/?',
+            prepare: remotePrepare,
+            transform: transform
+        }
+    });
+    var searchResultsEndingClusterCiting = new Bloodhound({
+        datumTokenizer: Bloodhound.tokenizers.whitespace,
+        queryTokenizer: Bloodhound.tokenizers.whitespace,
+        sufficient: 21,
+        identify: identify,
+        remote: {
+            url: '/api/rest/v3/search/?',
+            prepare: remotePrepare,
+            transform: transform
         }
     });
 
+    var showFields = function (obj) {
+        // Make a nice concatenation of citations, case name and year.
+        var parts = [obj.caseName];
+        if (obj.dateFiled) {
+            parts.push(new Date(obj.dateFiled).getUTCFullYear());
+        }
+        if (obj.citation) {
+            parts.push(obj.citation.join(", "));
+        }
+        return parts.join(" – ");
+    };
 
-    $('.typeahead').typeahead({
+    $('#starting-cluster-typeahead').typeahead({
             'hint': false,
             'highlight': true,
             'minLength': 0
         },
         {
-            display: function (obj) {
-                // Make a nice concatenation of citations, case name and year.
-                var parts = [obj.caseName];
-                if (obj.dateFiled) {
-                    parts.push(new Date(obj.dateFiled).getUTCFullYear());
-                }
-                if (obj.citation) {
-                    parts.push(obj.citation.join(", "));
-                }
-                return parts.join(" – ");
-            },
-            limit: 20,  // Must be less than the 'sufficient' param in searchResults.
-            source: searchResults
+            display: showFields,
+            limit: 19,  // Must be less than the 'sufficient' param in searchResults.
+            source: searchResultsStartingCluster
+        }
+    );
+    $('#ending-cluster-typeahead-search').typeahead({
+            'hint': false,
+            'highlight': true,
+            'minLength': 0
+        },
+        {
+            display: showFields,
+            limit: 19,  // Must be less than the 'sufficient' param in searchResults.
+            source: searchResultsEndingClusterSearch
+        }
+    );
+    $('#ending-cluster-typeahead-authorities').typeahead({
+            'hint': false,
+            'highlight': true,
+            'minLength': 0
+        },
+        {
+            display: showFields,
+            limit: 19,  // Must be less than the 'sufficient' param in searchResults.
+            source: searchResultsEndingClusterAuthorities
+        }
+    );
+    $('#ending-cluster-typeahead-citing').typeahead({
+            'hint': false,
+            'highlight': true,
+            'minLength': 0
+        },
+        {
+            display: showFields,
+            limit: 19,  // Must be less than the 'sufficient' param in searchResults.
+            source: searchResultsEndingClusterCiting
         }
     );
 
