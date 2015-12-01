@@ -9,73 +9,10 @@
     {% else %}
         <script src="{{ STATIC_URL }}js/typeahead.bundle.min.js"></script>
     {% endif %}
-    <script type="application/javascript">
-        // XXX Make sure that the second input can't have the same value as the first.
-        var last_year = "{{ SCDB_LATEST_CASE }}";
-        var searchResults = new Bloodhound({
-            datumTokenizer: Bloodhound.tokenizers.obj.whitespace('value'),
-            queryTokenizer: Bloodhound.tokenizers.whitespace,
-            sufficient: 20,
-            identify: function(obj){
-                // Return the item ID so the system can have a unique id for it
-                // in its caches.
-                return obj.id;
-            },
-            remote: {
-                // This query is anything with the case name typed in...
-                // ...in the supreme court...
-                // ...between 1925 and a year ago that has an SCDB id... OR
-                // ...in the last year, with or without an SCDB id.
-                url: '/api/rest/v3/search/?' +
-                  'case_name=(%QUERY) OR (%QUERY*)&' +
-                  'court=scotus&' +
-                  'q=(dateFiled:[1925-01-01T00:00:00Z TO ' + last_year + 'Z] and scdb_id:["" TO *]) or (dateFiled:[' + last_year + 'Z TO *])',
-                prepare: function(query, settings){
-                    // This function is needed b/c it needs to do both a prefix
-                    // search and a non-prefix search.
-                    settings.url = settings.url.replace(/%QUERY/g, $.trim(query));
-                    return settings;
-                },
-                transform: function(response){
-                    return response.results
-                }
-            }
-        });
+    <script src="{{ STATIC_URL }}js/scotus_map.mlr.js"></script>
 
-        var typeahead = $('.typeahead');
-        typeahead.typeahead(
-            {
-              'hint': false,
-              'highlight': true,
-              'minLength': 3
-            },
-            {
-              name: 'case-names',
-              display: function(obj){
-                  var parts = [obj.caseName];
-                  if (obj.dateFiled){
-                      parts.push(new Date(obj.dateFiled).getUTCFullYear());
-                  }
-                  if (obj.citation){
-                      parts.push(obj.citation.join(", "));
-                  }
-                  return parts.join(" – ");
-              },
-              limit: 19,  // 20 seems to cause issues.
-              source: searchResults
-            }
-        );
-        $('#starting-cluster-typeahead').bind(
-                'typeahead:select',
-                function (ev, suggestion) {
-            $('#id_cluster_start').val(suggestion.id);
-            $('#first-selection').text(suggestion.caseName);
-        });
-        $('#ending-cluster-typeahead').bind(
-                'typeahead:select',
-                function (ev, suggestion) {
-            $('#id_cluster_end').val(suggestion.id);
-        });
+    <script type="application/javascript">
+        var last_year = "{{ SCDB_LATEST_CASE }}";
     </script>
 {% endblock %}
 
@@ -138,61 +75,160 @@
         <div class="col-xs-12" id="ending-cluster">
             <h3>Second Case</h3>
 
-            <p class="gray">Select another case to connect to <span id="first-selection">your first case</span>.
-            </p>
-            {% if form.cluster_end.errors %}
-                <p class="help-block">
-                    {% for error in form.cluster_end.errors %}
-                        {{ error|escape }}
-                    {% endfor %}
-                </p>
-            {% endif %}
-            <input class="form-control typeahead"
-                   type="text"
-                   id="ending-cluster-typeahead">
+            <ul class="nav nav-tabs nav-justified">
+                <li role="presentation" class="active">
+                    <a href="#search"
+                       aria-controls="search"
+                       role="tab"
+                       data-toggle="tab">Search</a></li>
+                <li role="presentation">
+                    <a href="#authorities"
+                       aria-controls="authorities"
+                       role="tab"
+                       data-toggle="tab"
+                       id="authorities-tab">Cases Cited By <span
+                            class="first-selection">Your First Case</span>
+                        <span class="authority-count"></span>
+                    </a>
+                </li>
+                <li role="presentation">
+                    <a href="#citing"
+                       aria-controls="citing"
+                       role="tab"
+                       data-toggle="tab">Cases Citing <span
+                            class="first-selection">Your First Case</span>
+                    </a>
+                </li>
+            </ul>
+
+            {# These tabs are empty but the active class is used #}
+            <div class="tab-content v-offset-above-2">
+                <div role="tabpanel"
+                     class="tab-pane active"
+                     id="search">
+                    <p class="gray">Search by case name to select another case
+                        to connect to <span class="first-selection">your
+                            first case</span>.
+                    </p>
+                    {% if form.cluster_end.errors %}
+                        <p class="help-block">
+                            {% for error in form.cluster_end.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </p>
+                    {% endif %}
+                    <div class="form-group">
+                        <input class="form-control typeahead ending-typeahead"
+                               type="text"
+                               id="ending-cluster-typeahead-search">
+                    </div>
+                </div>
+                <div role="tabpanel"
+                     class="tab-pane"
+                     id="authorities">
+                    <p class="gray">Search the <span
+                            class="authority-count"></span> Supreme Court
+                        authorities for <span
+                            class="first-selection">your first case</span>.
+                    </p>
+                    {% if form.cluster_end.errors %}
+                        <p class="help-block">
+                            {% for error in form.cluster_end.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </p>
+                    {% endif %}
+                    <div class="form-group">
+                        <input class="form-control typeahead ending-typeahead"
+                               type="text"
+                               id="ending-cluster-typeahead-authorities"
+                               disabled="disabled">
+                    </div>
+                </div>
+                <div role="tabpanel"
+                     class="tab-pane"
+                     id="citing">
+                    <p class="gray">Search the Supreme Court cases that cite <span
+                            class="first-selection">your first case</span>.
+                    </p>
+                    {% if form.cluster_end.errors %}
+                        <p class="help-block">
+                            {% for error in form.cluster_end.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </p>
+                    {% endif %}
+                    <div class="form-group">
+                        <input class="form-control typeahead ending-typeahead"
+                               type="text"
+                               id="ending-cluster-typeahead-citing"
+                               disabled="disabled">
+                    </div>
+                </div>
+            </div>
             {{ form.cluster_end }}
         </div>
 
-        <div class="col-xs-12" id="titles">
-            <h3>Title</h3>
-            <p class="gray">Give your visualization a title. If left blank, this
-                will be automatically generated using the cases you selected.
-            </p>
-            {% if form.title.errors %}
-                <p class="help-block">
-                    {% for error in form.title.errors %}
-                        {{ error|escape }}
-                    {% endfor %}
-                </p>
-            {% endif %}
-            {{ form.title }}
-        </div>
-
-        <div class="col-xs-12" id="notes">
-            <h4>Notes</h4>
-
-            <p class="gray">Provide any additional comments you have about this
-                visualization, explaining the story it tells or why you created
-                it. <a href="{% url "markdown_help" %}">Markdown syntax</a>
-                allowed, but no raw HTML. Examples: **bold**, *italics*.
-            </p>
-            {% if form.notes.errors %}
-                <p class="help-block">
-                    {% for error in form.notes.errors %}
-                        {{ error|escape }}
-                    {% endfor %}
-                </p>
-            {% endif %}
-            {{ form.notes }}
-        </div>
-
-        <div class="col-xs-12 v-offset-above-2">
-            <p>
+        <div class="col-xs-12">
+            <div class="text-center v-offset-above-2" id="center-buttons">
+                <a class="btn btn-default btn-lg" id="more">More Options</a>
                 <button type="submit"
-                        class="btn btn-primary btn-lg pull-right"
+                        class="btn btn-primary btn-lg"
                         name="make-viz"
-                        id="make-viz-button">Make this Visualization</button>
-            </p>
+                        id="make-viz-button">Make this Network
+                </button>
+            </div>
+
+            <div class="hidden row" id="extra-options">
+                <div class="col-xs-12" id="titles">
+                    <h3>Title</h3>
+                    <p class="gray">Give your visualization a title. If left
+                        blank, this
+                        will be automatically generated using the cases you
+                        selected.
+                    </p>
+                    {% if form.title.errors %}
+                        <p class="help-block">
+                            {% for error in form.title.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </p>
+                    {% endif %}
+                    <div class="form-group">
+                        {{ form.title }}
+                    </div>
+                </div>
+
+                <div class="col-xs-12" id="notes">
+                    <h3>Notes</h3>
+
+                    <p class="gray">Provide any additional comments you have
+                        about this
+                        visualization, explaining the story it tells or why you
+                        created
+                        it. <a href="{% url "markdown_help" %}">Markdown
+                            syntax</a>
+                        allowed, but no raw HTML. Examples: **bold**, *italics*.
+                    </p>
+                    {% if form.notes.errors %}
+                        <p class="help-block">
+                            {% for error in form.notes.errors %}
+                                {{ error|escape }}
+                            {% endfor %}
+                        </p>
+                    {% endif %}
+                    <div class="form-group">
+                        {{ form.notes }}
+                    </div>
+                </div>
+                <div class="col-xs-12 pull-right v-offset-above-2">
+                    <button type="submit"
+                            class="btn btn-primary btn-lg pull-right"
+                            name="make-viz"
+                            id="make-viz-button">Make this Network
+                    </button>
+                </div>
+            </div>
         </div>
     </form>
 
