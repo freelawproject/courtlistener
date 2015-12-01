@@ -169,7 +169,7 @@ $(document).ready(function () {
                 $('input[disabled="disabled"]').prop('disabled', false);
             });
             $('#id_cluster_start').val(suggestion.id);
-            $('.first-selection').text(suggestion.caseNameShort);
+            $('.first-selection').text(suggestion.caseNameShort || suggestion.caseName);
         });
     $('.ending-typeahead').bind(
         'typeahead:select',
