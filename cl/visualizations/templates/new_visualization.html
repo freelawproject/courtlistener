@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Create a New Visualization – CourtListener.com{% endblock %}
+{% block title %}Create a New Citation Network – CourtListener.com{% endblock %}
 {% block search-form %}{% endblock %}
 {% block sidebar %}{% endblock %}
 {% block footer-scripts %}
@@ -19,16 +19,12 @@
 {% block content %}
     <div class="col-xs-2"></div>
     <div class="col-xs-8 text-center">
-        <h2>Create a New Visualization</h2>
-        <h3 class="gray v-offset-above-1">Visualizations show citation networks between Supreme Court cases</h3>
-        <p class="v-offset-above-3">To create a new visualization, select two cases and optionally
-            provide a title and any notes.
+        <h2>Create a New Citation Network</h2>
+        <!-- <h3 class="gray v-offset-above-1"Citation networks between Supreme Court cases</h3> -->
+        <p class="v-offset-above-3">Select any two Supreme Court cases and see what citation network connects them.
         </p>
-        <p>Once you've set these up, a visualization will be created and added
-            to your CourtListener profile.
-        </p>
-        <p>You can edit the visualization after you create it, and it won't be
-            published until you're ready to share it.
+        
+        <p>Once created, your network will be saved to your user profile and can be edited and shared.
         </p>
     </div>
     <div class="col-xs-2"></div>
@@ -47,8 +43,8 @@
             {% endif %}
             <h3>First Case</h3>
 
-            <p class="gray">Enter all or part of a case name to serve as the
-                beginning or end of your visualization. Cases will be
+            <p class="gray">Enter all or part of a case name to anchor the
+                beginning or end of your network. Cases will be
                 automatically suggested with the most relevant cases listed
                 first. For example, try typing "Miranda", "Citizens United", or
                 "Obergefell".
@@ -75,6 +71,9 @@
         <div class="col-xs-12" id="ending-cluster">
             <h3>Second Case</h3>
 
+            <p class="gray">There are three ways for you to chose the second case anchoring your network. Use the "SEARCH", "CASES CITED BY" or "CASES CITING" tab.
+            </p>
+            
             <ul class="nav nav-tabs nav-justified">
                 <li role="presentation" class="active">
                     <a href="#search"
@@ -106,9 +105,9 @@
                 <div role="tabpanel"
                      class="tab-pane active"
                      id="search">
-                    <p class="gray">Search by case name to select another case
+                    <p class="gray">Enter all or part of a case name
                         to connect to <span class="first-selection">your
-                            first case</span>.
+                            first case</span>. This search works exactly like the <i>First Case</i> search above.
                     </p>
                     {% if form.cluster_end.errors %}
                         <p class="help-block">
@@ -127,9 +126,9 @@
                      class="tab-pane"
                      id="authorities">
                     <p class="gray">Search the <span
-                            class="authority-count"></span> Supreme Court
-                        authorities for <span
-                            class="first-selection">your first case</span>.
+                            class="authority-count"></span> Supreme Court cases that 
+                         <span
+                            class="first-selection">your first case</span> cites. Make one of these <i>cites</i> cases your second anchor.
                     </p>
                     {% if form.cluster_end.errors %}
                         <p class="help-block">
@@ -148,8 +147,8 @@
                 <div role="tabpanel"
                      class="tab-pane"
                      id="citing">
-                    <p class="gray">Search the Supreme Court cases that cite <span
-                            class="first-selection">your first case</span>.
+                    <p class="gray">Search the Supreme Court cases that came after <span
+                            class="first-selection">your first case</span> and cited back to it. Make one of these <i>cited by</i> cases your second anchor.
                     </p>
                     {% if form.cluster_end.errors %}
                         <p class="help-block">
