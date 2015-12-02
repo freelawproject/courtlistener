@@ -212,6 +212,8 @@ $(document).ready(function () {
             // loads authorities for it, then selects a new first case. In that
             // instance, we'll need the old authorities to be nuked.
             searchResults.clear();
+            searchResults.clearRemoteCache();
+            searchResults.clearPrefetchCache();
         });
     $('.ending-typeahead').bind(
         'typeahead:select',
