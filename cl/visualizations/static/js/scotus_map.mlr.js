@@ -107,7 +107,7 @@ $(document).ready(function () {
                             format: 'json'
                         }
                     }).done(function (data) {
-                        authorityIDs[suggestion.id]['count'] = data.results.length;
+                        authorityIDs[suggestion.id]['count'] = data.count;
                         callback(suggestion);
                     });
                 } else {
@@ -149,9 +149,12 @@ $(document).ready(function () {
         } else if ($("#ending-cluster-typeahead-authorities").is(":focus")) {
             // Append the authority IDs onto the end of the query.
             params.q += " AND id:(" + authorityIDs[start_id].ids.join(" OR ") + ")";
+            // Add a cache busting param to defeat bloodhound's cache.
+            params.bust = 'authorities';
         } else if ($("#ending-cluster-typeahead-citing").is(":focus")) {
             // Append the cited_by ID onto the end of the query.
             params.q += " AND cites:(" + start_id + ")";
+            params.bust = 'citing';
         }
 
         return settings.url + $.param(params);
