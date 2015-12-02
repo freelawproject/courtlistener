@@ -90,13 +90,30 @@ $(document).ready(function () {
                 'method': 'GET',
                 'url': "/api/rest/v3/search/",
                 'data': {
-                    q: dateFiledQ + " AND id:" + suggestion.id,
-                    court: 'scotus',
+                    q: "id:" + suggestion.id,
                     format: 'json'
                 }
             }).done(function (data) {
-                authorityIDs[suggestion.id] = data.results[0].cites || [];
-                callback(suggestion);
+                authorityIDs[suggestion.id]['ids'] = data.results[0].cites || [];
+                if (authorityIDs[suggestion.id]['ids'].length > 0) {
+                    $.ajax({
+                        // We have the authority IDs, but we don't know how many
+                        // are SCOTUS cases in the right date range.
+                        'method': 'GET',
+                        'url': "/api/rest/v3/search/",
+                        'data': {
+                            q: dateFiledQ + " AND id:(" + authorityIDs[suggestion.id].ids.join(" OR ") + ")",
+                            court: 'scotus',
+                            format: 'json'
+                        }
+                    }).done(function (data) {
+                        authorityIDs[suggestion.id]['count'] = data.results.length;
+                        callback(suggestion);
+                    });
+                } else {
+                    authorityIDs[suggestion.id]['count'] = 0;
+                    callback(suggestion);
+                }
             });
         }
     };
@@ -131,7 +148,7 @@ $(document).ready(function () {
             // Pass. No extra params required to do simple search.
         } else if ($("#ending-cluster-typeahead-authorities").is(":focus")) {
             // Append the authority IDs onto the end of the query.
-            params.q += " AND id:(" + authorityIDs[start_id].join(" OR ") + ")";
+            params.q += " AND id:(" + authorityIDs[start_id].ids.join(" OR ") + ")";
         } else if ($("#ending-cluster-typeahead-citing").is(":focus")) {
             // Append the cited_by ID onto the end of the query.
             params.q += " AND cites:(" + start_id + ")";
@@ -144,6 +161,7 @@ $(document).ready(function () {
         datumTokenizer: Bloodhound.tokenizers.obj.whitespace('caseName'),
         queryTokenizer: Bloodhound.tokenizers.whitespace,
         sufficient: 21,
+        matchAnyQueryToken: true,
         identify: identify,
         remote: {
             url: '/api/rest/v3/search/?',
@@ -155,6 +173,7 @@ $(document).ready(function () {
         datumTokenizer: Bloodhound.tokenizers.obj.whitespace('caseName'),
         queryTokenizer: Bloodhound.tokenizers.whitespace,
         sufficient: 21,
+        matchAnyQueryToken: true,
         identify: identify,
         remote: {
             url: '/api/rest/v3/search/?',
@@ -166,6 +185,7 @@ $(document).ready(function () {
         datumTokenizer: Bloodhound.tokenizers.obj.whitespace('caseName'),
         queryTokenizer: Bloodhound.tokenizers.whitespace,
         sufficient: 21,
+        matchAnyQueryToken: true,
         identify: identify,
         remote: {
             url: '/api/rest/v3/search/?',
@@ -177,6 +197,7 @@ $(document).ready(function () {
         datumTokenizer: Bloodhound.tokenizers.obj.whitespace('caseName'),
         queryTokenizer: Bloodhound.tokenizers.whitespace,
         sufficient: 21,
+        matchAnyQueryToken: true,
         identify: identify,
         remote: {
             url: '/api/rest/v3/search/?',
@@ -247,7 +268,7 @@ $(document).ready(function () {
         'typeahead:select',
         function (ev, suggestion) {
             updateAuthorityCache(suggestion, function(suggestion) {
-                $('.authority-count').text("(" + authorityIDs[suggestion.id].length + ")");
+                $('.authority-count').text("(" + authorityIDs[suggestion.id].count + ")");
                 $('input[disabled="disabled"]').prop('disabled', false);
             });
             $('#id_cluster_start').val(suggestion.id);
