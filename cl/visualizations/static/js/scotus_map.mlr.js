@@ -75,6 +75,7 @@ $(document).ready(function () {
     ///////////////////////////
     // New Viz Functionality //
     ///////////////////////////
+    var dateFiledQ = '((dateFiled:[1945-01-01T00:00:00Z TO ' + last_year + 'Z] AND scdb_id:["" TO *]) OR (dateFiled:[' + last_year + 'Z TO *]))';
     var authorityIDs = {};
     var updateAuthorityCache = function (suggestion, callback) {
         // Check if we have the ID in our cache. If so, do nothing. If not,
@@ -88,7 +89,11 @@ $(document).ready(function () {
             $.ajax({
                 'method': 'GET',
                 'url': "/api/rest/v3/search/",
-                'data': {q: "id:" + suggestion.id, 'format': 'json'}
+                'data': {
+                    q: dateFiledQ + " AND id:" + suggestion.id,
+                    court: 'scotus',
+                    format: 'json'
+                }
             }).done(function (data) {
                 authorityIDs[suggestion.id] = data.results[0].cites || [];
                 callback(suggestion);
@@ -112,7 +117,7 @@ $(document).ready(function () {
         // ...in the last year, with or without an SCDB id.
         var params = {
             court: 'scotus',
-            q: '((dateFiled:[1945-01-01T00:00:00Z TO ' + last_year + 'Z] AND scdb_id:["" TO *]) OR (dateFiled:[' + last_year + 'Z TO *]))',
+            q: dateFiledQ,
             format: 'json'
         };
         if (query.length > 0) {
@@ -136,7 +141,7 @@ $(document).ready(function () {
     };
 
     var searchResultsStartingCluster = new Bloodhound({
-        datumTokenizer: Bloodhound.tokenizers.whitespace,
+        datumTokenizer: Bloodhound.tokenizers.obj.whitespace('caseName'),
         queryTokenizer: Bloodhound.tokenizers.whitespace,
         sufficient: 21,
         identify: identify,
@@ -147,7 +152,7 @@ $(document).ready(function () {
         }
     });
     var searchResultsEndingClusterSearch = new Bloodhound({
-        datumTokenizer: Bloodhound.tokenizers.whitespace,
+        datumTokenizer: Bloodhound.tokenizers.obj.whitespace('caseName'),
         queryTokenizer: Bloodhound.tokenizers.whitespace,
         sufficient: 21,
         identify: identify,
@@ -158,7 +163,7 @@ $(document).ready(function () {
         }
     });
     var searchResultsEndingClusterAuthorities = new Bloodhound({
-        datumTokenizer: Bloodhound.tokenizers.whitespace,
+        datumTokenizer: Bloodhound.tokenizers.obj.whitespace('caseName'),
         queryTokenizer: Bloodhound.tokenizers.whitespace,
         sufficient: 21,
         identify: identify,
@@ -169,7 +174,7 @@ $(document).ready(function () {
         }
     });
     var searchResultsEndingClusterCiting = new Bloodhound({
-        datumTokenizer: Bloodhound.tokenizers.whitespace,
+        datumTokenizer: Bloodhound.tokenizers.obj.whitespace('caseName'),
         queryTokenizer: Bloodhound.tokenizers.whitespace,
         sufficient: 21,
         identify: identify,
