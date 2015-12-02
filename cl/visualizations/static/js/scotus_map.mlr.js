@@ -102,7 +102,10 @@ $(document).ready(function () {
                         'method': 'GET',
                         'url': "/api/rest/v3/search/",
                         'data': {
-                            q: dateFiledQ + " AND id:(" + authorityIDs[suggestion.id].ids.join(" OR ") + ")",
+                            q: dateFiledQ +
+                            " AND id:(" +
+                                authorityIDs[suggestion.id].ids.join(" OR ") +
+                            ")",
                             court: 'scotus',
                             format: 'json'
                         }
@@ -160,43 +163,7 @@ $(document).ready(function () {
         return settings.url + $.param(params);
     };
 
-    var searchResultsStartingCluster = new Bloodhound({
-        datumTokenizer: Bloodhound.tokenizers.obj.whitespace('caseName'),
-        queryTokenizer: Bloodhound.tokenizers.whitespace,
-        sufficient: 21,
-        matchAnyQueryToken: true,
-        identify: identify,
-        remote: {
-            url: '/api/rest/v3/search/?',
-            prepare: remotePrepare,
-            transform: transform
-        }
-    });
-    var searchResultsEndingClusterSearch = new Bloodhound({
-        datumTokenizer: Bloodhound.tokenizers.obj.whitespace('caseName'),
-        queryTokenizer: Bloodhound.tokenizers.whitespace,
-        sufficient: 21,
-        matchAnyQueryToken: true,
-        identify: identify,
-        remote: {
-            url: '/api/rest/v3/search/?',
-            prepare: remotePrepare,
-            transform: transform
-        }
-    });
-    var searchResultsEndingClusterAuthorities = new Bloodhound({
-        datumTokenizer: Bloodhound.tokenizers.obj.whitespace('caseName'),
-        queryTokenizer: Bloodhound.tokenizers.whitespace,
-        sufficient: 21,
-        matchAnyQueryToken: true,
-        identify: identify,
-        remote: {
-            url: '/api/rest/v3/search/?',
-            prepare: remotePrepare,
-            transform: transform
-        }
-    });
-    var searchResultsEndingClusterCiting = new Bloodhound({
+    var searchResults = new Bloodhound({
         datumTokenizer: Bloodhound.tokenizers.obj.whitespace('caseName'),
         queryTokenizer: Bloodhound.tokenizers.whitespace,
         sufficient: 21,
@@ -209,60 +176,25 @@ $(document).ready(function () {
         }
     });
 
-    var showFields = function (obj) {
-        // Make a nice concatenation of citations, case name and year.
-        var parts = [obj.caseName];
-        if (obj.dateFiled) {
-            parts.push(new Date(obj.dateFiled).getUTCFullYear());
-        }
-        if (obj.citation) {
-            parts.push(obj.citation.join(", "));
-        }
-        return parts.join(" – ");
-    };
-
-    $('#starting-cluster-typeahead').typeahead({
+    $('.typeahead').typeahead({
             'hint': false,
             'highlight': true,
             'minLength': 0
         },
         {
-            display: showFields,
+            display: function (obj) {
+                // Make a nice concatenation of citations, case name and year.
+                var parts = [obj.caseName];
+                if (obj.dateFiled) {
+                    parts.push(new Date(obj.dateFiled).getUTCFullYear());
+                }
+                if (obj.citation) {
+                    parts.push(obj.citation.join(", "));
+                }
+                return parts.join(" – ");
+            },
             limit: 19,  // Must be less than the 'sufficient' param in searchResults.
-            source: searchResultsStartingCluster
-        }
-    );
-    $('#ending-cluster-typeahead-search').typeahead({
-            'hint': false,
-            'highlight': true,
-            'minLength': 0
-        },
-        {
-            display: showFields,
-            limit: 19,  // Must be less than the 'sufficient' param in searchResults.
-            source: searchResultsEndingClusterSearch
-        }
-    );
-    $('#ending-cluster-typeahead-authorities').typeahead({
-            'hint': false,
-            'highlight': true,
-            'minLength': 0
-        },
-        {
-            display: showFields,
-            limit: 19,  // Must be less than the 'sufficient' param in searchResults.
-            source: searchResultsEndingClusterAuthorities
-        }
-    );
-    $('#ending-cluster-typeahead-citing').typeahead({
-            'hint': false,
-            'highlight': true,
-            'minLength': 0
-        },
-        {
-            display: showFields,
-            limit: 19,  // Must be less than the 'sufficient' param in searchResults.
-            source: searchResultsEndingClusterCiting
+            source: searchResults
         }
     );
 
