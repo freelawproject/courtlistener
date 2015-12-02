@@ -140,7 +140,7 @@ $(document).ready(function () {
             q: dateFiledQ,
             format: 'json'
         };
-        if (query.length > 0) {
+        if ($.trim(query).length > 0) {
             // Add a case name parameter, if the user has typed something.
             params.case_name = "(%QUERY) OR (%QUERY*)".replace(
                 /%QUERY/g, $.trim(query));
