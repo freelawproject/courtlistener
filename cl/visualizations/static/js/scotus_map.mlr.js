@@ -208,6 +208,10 @@ $(document).ready(function () {
             });
             $('#id_cluster_start').val(suggestion.id);
             $('.first-selection').text(suggestion.caseNameShort || suggestion.caseName);
+            // Clear bloodhound, in case somebody selects a first case, then
+            // loads authorities for it, then selects a new first case. In that
+            // instance, we'll need the old authorities to be nuked.
+            searchResults.clear();
         });
     $('.ending-typeahead').bind(
         'typeahead:select',
