@@ -94,7 +94,7 @@ $(document).ready(function () {
                     format: 'json'
                 }
             }).done(function (data) {
-                authorityIDs[suggestion.id]['ids'] = data.results[0].cites || [];
+                authorityIDs[suggestion.id] = {'ids': data.results[0].cites || []};
                 if (authorityIDs[suggestion.id]['ids'].length > 0) {
                     $.ajax({
                         // We have the authority IDs, but we don't know how many
