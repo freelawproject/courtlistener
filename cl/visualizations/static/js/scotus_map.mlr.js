@@ -221,7 +221,7 @@ $(document).ready(function () {
             $('#id_cluster_end').val(suggestion.id);
         });
     $('a[data-toggle="tab"]').on('show.bs.tab', function (e) {
-        $('.ending-typeahead').val("");
+        $('.ending-typeahead').typeahead('val', "");
     });
 
     // Extra options JS
