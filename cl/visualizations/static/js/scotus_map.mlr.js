@@ -72,56 +72,87 @@ $(document).ready(function () {
     });
 
 
-    ///////////////////////////
-    // New Viz Functionality //
-    ///////////////////////////
+    //////////////////////////////
+    // Create Viz Functionality //
+    //////////////////////////////
     var dateFiledQ = '((dateFiled:[1945-01-01T00:00:00Z TO ' + last_year + 'Z] AND scdb_id:["" TO *]) OR (dateFiled:[' + last_year + 'Z TO *]))';
-    var authorityIDs = {};
-    var updateAuthorityCache = function (suggestion, callback) {
-        // Check if we have the ID in our cache. If so, do nothing. If not,
-        // load up the cache.
-        if (suggestion.id in authorityIDs) {
-            // All good; do nothing; pass
-        } else {
-            // Get the IDs, add them as a new key.
-            // Get a list of the IDs cited by the item and cache it. This cache
-            // is needed to do the reverse lookup for authorities.
+    var cache = {};
+    var setAuthorityIDs = function(id, cb){
+        $.ajax({
+            method: 'GET',
+            url: "/api/rest/v3/search/",
+            data: {
+                q: "id:" + id,
+                format: 'json'
+            },
+            success: function(data){
+                cache[id] = {'authority_ids': data.results[0].cites || []};
+            }
+        }).done(function(){
+            cb(id);
+        });
+    };
+    var setAuthorityCount = function(id, cb) {
+        cache[id]['authority_count'] = 0;  // Set the default.
+        if (cache[id]['authority_ids'].length > 0) {
             $.ajax({
+                // We have the authority IDs, but we don't know how many
+                // are SCOTUS cases in the right date range.
                 'method': 'GET',
                 'url': "/api/rest/v3/search/",
                 'data': {
-                    q: "id:" + suggestion.id,
+                    q: dateFiledQ +
+                    " AND id:(" +
+                    cache[id].authority_ids.join(" OR ") +
+                    ")",
+                    court: 'scotus',
                     format: 'json'
+                },
+                success: function(data){
+                    cache[id]['authority_count'] = data.count;
                 }
-            }).done(function (data) {
-                authorityIDs[suggestion.id] = {'ids': data.results[0].cites || []};
-                if (authorityIDs[suggestion.id]['ids'].length > 0) {
-                    $.ajax({
-                        // We have the authority IDs, but we don't know how many
-                        // are SCOTUS cases in the right date range.
-                        'method': 'GET',
-                        'url': "/api/rest/v3/search/",
-                        'data': {
-                            q: dateFiledQ +
-                            " AND id:(" +
-                                authorityIDs[suggestion.id].ids.join(" OR ") +
-                            ")",
-                            court: 'scotus',
-                            format: 'json'
-                        }
-                    }).done(function (data) {
-                        authorityIDs[suggestion.id]['count'] = data.count;
+            }).done(function(){
+                cb();
+            });
+        } else {
+            cb();
+        }
+    };
+    var setCitingCount = function(id, cb){
+        cache[id]['citing_count'] = 0;  // Set the default
+        $.ajax({
+            method: 'GET',
+            url: "/api/rest/v3/search/",
+            data: {
+                q: dateFiledQ + " AND cites:(" + id + ")",
+                court: 'scotus',
+                format: 'json'
+            },
+            success: function (data) {
+                cache[id]['citing_count'] = data.count;
+            }
+        }).done(function(){
+            cb();
+        });
+    };
+    var updateCache = function (suggestion, callback) {
+        // Check if we have the ID in our cache. If so, do nothing. If not,
+        // load up the cache.
+        if (suggestion.id in cache) {
+            // All good; do nothing; pass
+        } else {
+            // Get the authority IDs as the
+            setAuthorityIDs(suggestion.id, function(){
+                setAuthorityCount(suggestion.id, function(){
+                    setCitingCount(suggestion.id, function(){
                         callback(suggestion);
                     });
-                } else {
-                    authorityIDs[suggestion.id]['count'] = 0;
-                    callback(suggestion);
-                }
+                });
             });
         }
     };
 
-    var remotePrepare = function (query) {
+    var getParamsForQuery = function (query) {
         // This query is anything with the case name typed in...
         // ...in the supreme court...
         // ...between 1945 and a year ago that has an SCDB id... OR
@@ -142,30 +173,16 @@ $(document).ready(function () {
             // Pass. No extra params required to do simple search.
         } else if ($("#ending-cluster-typeahead-authorities").is(":focus")) {
             // Append the authority IDs onto the end of the query.
-            params.q += " AND id:(" + authorityIDs[start_id].ids.join(" OR ") + ")";
+            params.q += " AND id:(" + cache[start_id].authority_ids.join(" OR ") + ")";
             // Add a cache busting param to defeat bloodhound's cache.
-            params.bust = 'authorities';
         } else if ($("#ending-cluster-typeahead-citing").is(":focus")) {
             // Append the cited_by ID onto the end of the query.
             params.q += " AND cites:(" + start_id + ")";
-            params.bust = 'citing';
         }
 
         return params;
     };
 
-
-    var customSearch = debounce(function(q, sync, async){
-        var params = remotePrepare(q);
-        return $.ajax({
-            method: 'GET',
-            url: "/api/rest/v3/search/",
-            data: params,
-            success: function (data) {
-                return async(data.results);
-            }
-        });
-    }, 300);
 
     $('.typeahead').typeahead({
             'hint': false,
@@ -184,8 +201,18 @@ $(document).ready(function () {
                 }
                 return parts.join(" – ");
             },
-            limit: 19,  // Must be less than the 'sufficient' param in searchResults.
-            source: customSearch
+            limit: 20,
+            source: debounce(function (q, sync, async) {
+                var params = getParamsForQuery(q);
+                return $.ajax({
+                    method: 'GET',
+                    url: "/api/rest/v3/search/",
+                    data: params,
+                    success: function (data) {
+                        return async(data.results);
+                    }
+                });
+            }, 300)
         }
     );
 
@@ -193,12 +220,16 @@ $(document).ready(function () {
     $('#starting-cluster-typeahead').bind(
         'typeahead:select',
         function (ev, suggestion) {
-            updateAuthorityCache(suggestion, function(suggestion) {
-                $('.authority-count').text("(" + authorityIDs[suggestion.id].count + ")");
+            updateCache(suggestion, function(suggestion) {
+                $('.authority-count')
+                    .text("(" + cache[suggestion.id].authority_count + ")");
+                $('.citing-count')
+                    .text("(" + cache[suggestion.id].citing_count + ")");
                 $('input[disabled="disabled"]').prop('disabled', false);
             });
             $('#id_cluster_start').val(suggestion.id);
-            $('.first-selection').text(suggestion.caseNameShort || suggestion.caseName);
+            $('.first-selection')
+                .text(suggestion.caseNameShort || suggestion.caseName);
         });
     $('.ending-typeahead').bind(
         'typeahead:select',

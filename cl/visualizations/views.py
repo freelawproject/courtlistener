@@ -20,6 +20,7 @@ from django.http import (
 )
 from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
+from django.views.decorators.cache import never_cache
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status as statuses
@@ -86,6 +87,7 @@ def view_visualization(request, pk, slug):
 
 @permission_required('visualizations.has_beta_access')
 @login_required
+@never_cache
 def new_visualization(request):
     if request.method == 'POST':
         form = VizForm(request.POST)
