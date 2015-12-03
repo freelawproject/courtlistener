@@ -121,16 +121,7 @@ $(document).ready(function () {
         }
     };
 
-    var identify = function (obj) {
-        // Return the item ID so the system can have a unique id for it
-        // in its caches.
-        return obj.id;
-    };
-    var transform = function (response) {
-        // Pull the results dict out of the main object.
-        return response.results
-    };
-    var remotePrepare = function (query, settings) {
+    var remotePrepare = function (query) {
         // This query is anything with the case name typed in...
         // ...in the supreme court...
         // ...between 1945 and a year ago that has an SCDB id... OR
@@ -160,21 +151,21 @@ $(document).ready(function () {
             params.bust = 'citing';
         }
 
-        return settings.url + $.param(params);
+        return params;
     };
 
-    var searchResults = new Bloodhound({
-        datumTokenizer: Bloodhound.tokenizers.obj.whitespace('caseName'),
-        queryTokenizer: Bloodhound.tokenizers.whitespace,
-        sufficient: 21,
-        matchAnyQueryToken: true,
-        identify: identify,
-        remote: {
-            url: '/api/rest/v3/search/?',
-            prepare: remotePrepare,
-            transform: transform
-        }
-    });
+
+    var customSearch = debounce(function(q, sync, async){
+        var params = remotePrepare(q);
+        return $.ajax({
+            method: 'GET',
+            url: "/api/rest/v3/search/",
+            data: params,
+            success: function (data) {
+                return async(data.results);
+            }
+        });
+    }, 300);
 
     $('.typeahead').typeahead({
             'hint': false,
@@ -194,7 +185,7 @@ $(document).ready(function () {
                 return parts.join(" – ");
             },
             limit: 19,  // Must be less than the 'sufficient' param in searchResults.
-            source: searchResults
+            source: customSearch
         }
     );
 
