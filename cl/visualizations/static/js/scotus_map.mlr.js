@@ -183,38 +183,48 @@ $(document).ready(function () {
         return params;
     };
 
-
-    $('.typeahead').typeahead({
-            'hint': false,
-            'highlight': true,
-            'minLength': 0
-        },
-        {
-            display: function (obj) {
-                // Make a nice concatenation of citations, case name and year.
-                var parts = [obj.caseName];
-                if (obj.dateFiled) {
-                    parts.push(new Date(obj.dateFiled).getUTCFullYear());
-                }
-                if (obj.citation) {
-                    parts.push(obj.citation.join(", "));
-                }
-                return parts.join(" – ");
-            },
-            limit: 20,
-            source: debounce(function (q, sync, async) {
-                var params = getParamsForQuery(q);
-                return $.ajax({
-                    method: 'GET',
-                    url: "/api/rest/v3/search/",
-                    data: params,
-                    success: function (data) {
-                        return async(data.results);
-                    }
-                });
-            }, 300)
+    var display = function(obj){
+        // Make a concatenation of citations, case name and year.
+        var parts = [obj.caseName];
+        if (obj.dateFiled) {
+            parts.push(new Date(obj.dateFiled).getUTCFullYear());
         }
-    );
+        if (obj.citation) {
+            parts.push(obj.citation[0]);
+        }
+        return parts.join(" – ");
+    };
+    var source = function (q, sync, async) {
+        var params = getParamsForQuery(q);
+        return $.ajax({
+            method: 'GET',
+            url: "/api/rest/v3/search/",
+            data: params,
+            success: function (data) {
+                return async(data.results);
+            }
+        });
+    };
+    var optionsNoMin = {
+        'hint': false,
+        'highlight': true,
+        'minLength': 0
+    };
+    var optionsMinSet = {
+        'hint': false,
+        'highlight': true,
+        'minLength': 3
+    };
+    var resultOptions = {
+        display: display,
+        limit: 19,
+        source: debounce(source, 300)
+    };
+
+    $("#starting-cluster-typeahead, #ending-cluster-typeahead-search")
+        .typeahead(optionsMinSet, resultOptions);
+    $('#ending-cluster-typeahead-citing, #ending-cluster-typeahead-authorities')
+        .typeahead(optionsNoMin, resultOptions);
 
 
     $('#starting-cluster-typeahead').bind(

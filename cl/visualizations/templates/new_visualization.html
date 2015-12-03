@@ -5,9 +5,9 @@
 {% block sidebar %}{% endblock %}
 {% block footer-scripts %}
     {% if DEBUG %}
-        <script src="{{ STATIC_URL }}js/typeahead.bundle.js"></script>
+        <script src="{{ STATIC_URL }}js/typeahead.jquery.js"></script>
     {% else %}
-        <script src="{{ STATIC_URL }}js/typeahead.bundle.min.js"></script>
+        <script src="{{ STATIC_URL }}js/typeahead.jquery.min.js"></script>
     {% endif %}
     <script src="{{ STATIC_URL }}js/scotus_map.mlr.js"></script>
 
