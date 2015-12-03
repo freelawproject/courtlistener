@@ -199,6 +199,7 @@ $(document).ready(function () {
             });
             $('#id_cluster_start').val(suggestion.id);
             $('.first-selection').text(suggestion.caseNameShort || suggestion.caseName);
+        });
     $('.ending-typeahead').bind(
         'typeahead:select',
         function (ev, suggestion) {
