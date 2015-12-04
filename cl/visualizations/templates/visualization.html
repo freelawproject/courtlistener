@@ -218,9 +218,31 @@
                             <div role="tabpanel"
                                  class="tab-pane"
                                  id="case-metadata">
-                                <div id="creator">
-                                    <p>Created by: {{ viz.user }}</p>
+                                <div id="case-metadata-title">
+                                    <h2>Metadata for {{ viz.title|v_wrapper }}</h2>
                                 </div>
+                                <div id="degree-of-dissent">
+                                    <h3>Degree of Dissent<a
+                                            href="{% url "faq" %}#dod">&nbsp;<i
+                                            class="fa fa-question-circle gray"></i></a>
+                                    </h3>
+                                    <p><span id="dod-info"></span></p>
+                                    <div id="dod-chart"></div>
+                                </div>
+
+                                <div id="creator">
+                                    <h3>Creator</h3>
+                                    <p>{{ viz.user.get_full_name|default:viz.user }}</p>
+                                </div>
+
+                                {% if viz.published %}
+                                <div>
+                                    <h3>Published</h3>
+                                    <p>{{ viz.date_published }}</p>
+                                </div>
+                                {% endif %}
+
+
                             </div>
                             {% if viz.referers_displayed.all.count > 0 %}
                             <div role="tabpanel"
@@ -239,41 +261,18 @@
 
                     <div class="col-md-2">
                         <div class="row">
-                            <div class="sidebar-section col-md-12 hidden-sm hidden-xs">
-                                <h4 class="caps gray">{{ viz.view_count|intcomma }}
-                                    view{{ viz.view_count|pluralize }}</h4>
-                            </div>
-                            <div class="sidebar-section col-md-12 hidden-sm hidden-xs">
-                                <h4 class="caps gray"><span id="dod"></span> Degree of Dissent&nbsp;<a href="{% url "faq" %}#dod"><i
-                                        class="fa fa-question-circle gray"></i></a></h4>
-                            </div>
-
-                            {% if viz.published %}
-                                <div class="sidebar-section col-xs-6 col-md-12">
-                                    <h3><span>Published</span></h3>
-                                    <p>{{ viz.date_published }}</p>
-                                </div>
-                            {% endif %}
-                        </div>
-                        <div class="row">
-                            <div class="sidebar-section col-sm-12">
-                                <h3><span>Embed</span></h3>
-                                <div class="form-group">
-                                    <input type="text"
-                                           value="&lt;iframe height=&quot;500&quot; width=&quot;560&quot; src=&quot;{% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "view_embedded_visualization" viz.pk %}&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;"
-                                           onclick="this.select()"
-                                           class="form-control"
-                                           id="embed-input">
-                                </div>
-                            </div>
-
                             <div class="sidebar-section col-xs-12">
+                                <p><a href="{% url "new_visualization" %}"
+                                      class="btn btn-success btn-lg btn-block">New <span class="visible-lg-inline">Visualization</span></a>
+                                </p>
+                                <p><a href=""
+                                      class="btn btn-primary btn-lg btn-block">Share
+                                    <span class="visible-lg-inline">Visualization</span></a>
+                                </p>
                                 {% if viz.user == user %}
                                     <p><a href="{% url "edit_visualization" pk=viz.pk %}"
                                           class="btn btn-primary btn-lg btn-block">Edit<span class="visible-lg-inline"> Visualization</span></a>
-                                {% else %}
-                                    <h3><span>Created By</span></h3>
-                                    <p>{{ viz.user }}</p>
+                                    </p>
                                 {% endif %}
                                 {% if perms.visualizations.change_scotusmap %}
                                 <p>
@@ -281,6 +280,24 @@
                                        class="btn btn-primary btn-lg btn-block">Admin<span class="visible-lg-inline"> for Viz</span></a>
                                 </p>
                                 {% endif %}
+                            </div>
+
+                            <div class="sidebar-section col-sm-12">
+                                <h3><span>Embed</span></h3>
+                                <div class="form-group">
+                                    <input type="text"
+                                           value="&lt;iframe height=&quot;500&quot; width=&quot;560&quot; src=&quot;{% if request.is_secure %}https{% else %}http{% endif %}://
+                                                   {{ request.get_host }}{% url "view_embedded_visualization" viz.pk %}&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;"
+                                           onclick="this.select()"
+                                           class="form-control"
+                                           id="embed-input">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="sidebar-section col-md-12 hidden-sm hidden-xs">
+                                <h4 class="caps gray">{{ viz.view_count|intcomma }}
+                                    view{{ viz.view_count|pluralize }}</h4>
                             </div>
                         </div>
                     </div>
