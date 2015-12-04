@@ -1,10 +1,13 @@
 from django.conf.urls import url
 from cl.visualizations.views import (
     delete_visualization,
+    restore_visualization,
+    share_visualization,
+    privatize_visualization,
     edit_visualization,
     mapper_homepage,
+    gallery,
     new_visualization,
-    restore_visualization,
     view_embedded_visualization,
     view_visualization,
 )
@@ -37,6 +40,16 @@ urlpatterns = [
         name='restore_visualization',
     ),
     url(
+        r'^visualizations/scotus-mapper/share/',
+        share_visualization,
+        name='share_visualization',
+    ),
+    url(
+        r'^visualizations/scotus-mapper/privatize/',
+        privatize_visualization,
+        name='privatize_visualization',
+    ),
+    url(
         r'^visualizations/scotus-mapper/(?P<pk>\d*)/embed/$',
         view_embedded_visualization,
         name='view_embedded_visualization',
@@ -45,5 +58,10 @@ urlpatterns = [
         r'^visualizations/scotus-mapper/(?P<pk>\d*)/(?P<slug>[^/]*)/$',
         view_visualization,
         name='view_visualization',
+    ),
+    url(
+        r'^visualizations/gallery/$',
+        gallery,
+        name='viz_gallery',
     ),
 ]

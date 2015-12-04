@@ -21,12 +21,15 @@
     {% if DEBUG %}
         <script src="{{ STATIC_URL }}js/d3.js"></script>
         <script src="{{ STATIC_URL }}js/plottable.js"></script>
+        <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.js"></script>
     {% else %}
         <script src="{{ STATIC_URL }}js/d3.min.js"></script>
         <script src="{{ STATIC_URL }}js/plottable.min.js"></script>
+        <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
     {% endif %}
 
     {# <script src="{{ STATIC_URL }}js/scotus_map.js"></script> #}
+    <script src="{{ STATIC_URL }}js/scotus_map.mlr.js"></script>
     <script src="https://rawgit.com/jraller/citegraph/master/app/scripts/scotus_map.js"></script>
 
     <script type="text/javascript">
@@ -58,7 +61,7 @@
                         <h2 id="title"
                             class="text-center"><span class="alt">{% block viz-id %}{{ viz.id }}.&nbsp;{% endblock %}</span>{{ viz.title|v_wrapper }}
                             {% if not viz.published and viz.user == user %}
-                                <span class="alt">(Private)</span>
+                                <span class="alt private-label">(Private)</span>
                             {% endif %}
                         </h2>
 
@@ -236,21 +239,30 @@
                         <div class="row">
                             <div class="sidebar-section col-xs-12">
                                 <p><a href="{% url "new_visualization" %}"
-                                      class="btn btn-success btn-lg btn-block">New <span class="visible-lg-inline">Network</span></a>
+                                      class="btn btn-success btn-lg btn-block">
+                                    <i class="fa fa-plus"></i>&nbsp;New <span class="visible-lg-inline">Network</span></a>
                                 </p>
-                                <p><a href=""
-                                      class="btn btn-primary btn-lg btn-block">Share
+                                {% if not viz.published %}
+                                <p><a href="{% url "share_visualization" %}"
+                                      class="btn btn-primary btn-lg btn-block share-button"
+                                      data-id="{{ viz.pk }}"
+                                      data-function="share">
+                                    <i class="fa fa-share-alt"></i>&nbsp;<span id="share">Share</span>
                                     <span class="visible-lg-inline">Network</span></a>
                                 </p>
+                                {% endif %}
                                 {% if viz.user == user %}
                                     <p><a href="{% url "edit_visualization" pk=viz.pk %}"
-                                          class="btn btn-primary btn-lg btn-block">Edit<span class="visible-lg-inline"> Network</span></a>
+                                          class="btn btn-primary btn-lg btn-block">
+                                        <i class="fa fa-pencil"></i>&nbsp;Edit
+                                        <span class="visible-lg-inline">Network</span></a>
                                     </p>
                                 {% endif %}
                                 {% if perms.visualizations.change_scotusmap %}
                                 <p>
                                     <a href="{% url 'admin:visualizations_scotusmap_change' viz.pk %}"
-                                       class="btn btn-primary btn-lg btn-block">Admin<span class="visible-lg-inline"> for Viz</span></a>
+                                       class="btn btn-primary btn-lg btn-block">
+                                        <i class="fa fa-lock"></i>&nbsp;Admin<span class="visible-lg-inline"> for Viz</span></a>
                                 </p>
                                 {% endif %}
                             </div>

@@ -217,6 +217,37 @@ def restore_visualization(request):
             content="Not an ajax request",
         )
 
+@ensure_csrf_cookie
+@permission_required('visualizations.has_beta_access')
+@login_required
+def share_visualization(request):
+    if request.is_ajax():
+        v = SCOTUSMap.objects.get(pk=request.POST.get('pk'), user=request.user)
+        v.published = True
+        v.save()
+        return HttpResponse("It worked")
+    else:
+        return HttpResponseNotAllowed(
+            permitted_methods=['POST'],
+            content="Not an ajax request",
+        )
+
+
+@ensure_csrf_cookie
+@permission_required('visualizations.has_beta_access')
+@login_required
+def privatize_visualization(request):
+    if request.is_ajax():
+        v = SCOTUSMap.objects.get(pk=request.POST.get('pk'), user=request.user)
+        v.published = False
+        v.save()
+        return HttpResponse("It worked")
+    else:
+        return HttpResponseNotAllowed(
+                permitted_methods=['POST'],
+                content="Not an ajax request",
+        )
+
 
 @permission_required('visualizations.has_beta_access')
 def mapper_homepage(request):
@@ -228,3 +259,8 @@ def mapper_homepage(request):
         {'private': True},
         RequestContext(request),
     )
+
+
+@permission_required('visualization.has_beta_access')
+def gallery(request):
+    pass
