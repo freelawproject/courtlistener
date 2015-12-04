@@ -85,7 +85,7 @@ message_dict = {
     'too_many_nodes': {
         'level': messages.WARNING,
         'message': '<strong>That network has too many nodes.</strong> We '
-                   'were unable to create your visualization because the '
+                   'were unable to create your network because the '
                    'finished product would contain too  many nodes. '
                    'We\'ve found that in practice, such networks are '
                    'difficult to read and take far too long for our '

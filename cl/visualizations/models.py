@@ -108,7 +108,7 @@ class SCOTUSMap(models.Model):
         return self.referers.filter(display=True).order_by('date_created')
 
     def make_title(self):
-        """Make a title for the visualization
+        """Make a title for the network
 
         Title tries to use the shortest possible case name from the starting
         and ending clusters plus the number of degrees.

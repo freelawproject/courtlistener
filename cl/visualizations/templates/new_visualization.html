@@ -180,7 +180,7 @@
             <div class="hidden row" id="extra-options">
                 <div class="col-xs-12" id="titles">
                     <h3>Title</h3>
-                    <p class="gray">Give your visualization a title. If left
+                    <p class="gray">Give your network a title. If left
                         blank, this
                         will be automatically generated using the cases you
                         selected.
@@ -201,12 +201,11 @@
                     <h3>Notes</h3>
 
                     <p class="gray">Provide any additional comments you have
-                        about this
-                        visualization, explaining the story it tells or why you
-                        created
-                        it. <a href="{% url "markdown_help" %}">Markdown
-                            syntax</a>
-                        allowed, but no raw HTML. Examples: **bold**, *italics*.
+                        about this network, explaining the story it tells
+                        or why you created it. <a
+                                href="{% url "markdown_help" %}"
+                                target="_blank">Markdown syntax</a> allowed,
+                        but no raw HTML. Examples: **bold**, *italics*.
                     </p>
                     {% if form.notes.errors %}
                         <p class="help-block">

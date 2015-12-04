@@ -70,7 +70,7 @@ def render_visualization_page(request, pk, embed):
 @permission_required('visualizations.has_beta_access')
 @xframe_options_exempt
 def view_embedded_visualization(request, pk):
-    """Return the embedded visualization page.
+    """Return the embedded network page.
 
     Exempts the default xframe options, and allows standard caching.
     """
@@ -79,7 +79,7 @@ def view_embedded_visualization(request, pk):
 
 @permission_required('visualizations.has_beta_access')
 def view_visualization(request, pk, slug):
-    """Return the visualization page.
+    """Return the network page.
     """
     return render_visualization_page(request, pk, embed=False)
 

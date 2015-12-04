@@ -42,7 +42,7 @@
         <div class="col-xs-1 col-sm-2 col-md-3"></div>
         <div class="col-xs-10 col-sm-8 col-md-6 well">
             <h2 class="text-center">Deleted by Owner</h2>
-            <p>This visualization was deleted by the owner. If this was done in
+            <p>This network was deleted by the owner. If this was done in
                 error, and you are the owner, you can restore it from your <a
                         href="{% url "view_deleted_visualizations" %}">profile
                     page</a>.
@@ -73,23 +73,23 @@
                         <div class="row">
                             <div class="col-xs-1 col-sm-2 col-md-3"></div>
                             <div class="col-xs-10 col-sm-8 col-md-6 well">
-                                <h2 class="text-center">This Visualization is Private</h2>
+                                <h2 class="text-center">This Network is Private</h2>
                                 {% if user.is_authenticated %}
                                     <p>You don't appear to be the owner of this
-                                        visualization and it has not been
+                                        network and it has not been
                                         shared by its owner. If you know the
-                                        creator of this visualization, ask them
+                                        creator of this network, ask them
                                         to share it.
                                     </p>
                                 {% else %}
                                     <p>You are not signed in and this a
-                                        private visualization. If you're the
-                                        creator of this visualization and wish
+                                        private network. If you're the
+                                        creator of this network and wish
                                         to edit it, please <a
                                                 href="{% url "sign-in" %}?next={{ request.path }}">sign
                                             in</a> and you will be able to
                                         access it. If you are not the creator of
-                                        this visualization, and you know the
+                                        this network, and you know the
                                         creator, ask them to share it.
                                     </p>
                                 {% endif %}
@@ -263,15 +263,15 @@
                         <div class="row">
                             <div class="sidebar-section col-xs-12">
                                 <p><a href="{% url "new_visualization" %}"
-                                      class="btn btn-success btn-lg btn-block">New <span class="visible-lg-inline">Visualization</span></a>
+                                      class="btn btn-success btn-lg btn-block">New <span class="visible-lg-inline">Network</span></a>
                                 </p>
                                 <p><a href=""
                                       class="btn btn-primary btn-lg btn-block">Share
-                                    <span class="visible-lg-inline">Visualization</span></a>
+                                    <span class="visible-lg-inline">Network</span></a>
                                 </p>
                                 {% if viz.user == user %}
                                     <p><a href="{% url "edit_visualization" pk=viz.pk %}"
-                                          class="btn btn-primary btn-lg btn-block">Edit<span class="visible-lg-inline"> Visualization</span></a>
+                                          class="btn btn-primary btn-lg btn-block">Edit<span class="visible-lg-inline"> Network</span></a>
                                     </p>
                                 {% endif %}
                                 {% if perms.visualizations.change_scotusmap %}
