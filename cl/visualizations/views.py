@@ -1,10 +1,9 @@
-import json
 import time
 
 from cl.lib.bot_detector import is_bot
 from cl.stats import tally_stat
 from cl.visualizations.models import SCOTUSMap, JSONVersion, Referer
-from cl.visualizations.forms import VizForm, VizEditForm, JSONEditForm
+from cl.visualizations.forms import VizForm, VizEditForm
 from cl.visualizations.tasks import get_title
 from cl.visualizations.utils import (
     reverse_endpoints_if_needed, TooManyNodes, message_dict
@@ -164,20 +163,13 @@ def edit_visualization(request, pk):
     viz = get_object_or_404(SCOTUSMap, pk=pk, user=request.user)
     if request.method == 'POST':
         form_viz = VizEditForm(request.POST, instance=viz)
-        form_json = JSONEditForm(request.POST)
-        if form_viz.is_valid() and form_json.is_valid():
+        if form_viz.is_valid():
             cd_viz = form_viz.cleaned_data
-            cd_json = form_json.cleaned_data
 
             viz.title = cd_viz['title']
             viz.notes = cd_viz['notes']
             viz.published = cd_viz['published']
             viz.save()
-
-            if json.loads(viz.json) != json.loads(cd_json['json_data']):
-                # Save a new version of the JSON
-                jv = JSONVersion(map=viz, json_data=cd_json['json_data'])
-                jv.save()
 
             return HttpResponseRedirect(reverse(
                 'view_visualization',
@@ -185,11 +177,9 @@ def edit_visualization(request, pk):
             ))
     else:
         form_viz = VizEditForm(instance=viz)
-        form_json = JSONEditForm(instance=viz.json_versions.all()[0])
     return render_to_response(
         'edit_visualization.html',
         {'form_viz': form_viz,
-         'form_json': form_json,
          'private': True},
         RequestContext(request),
     )
