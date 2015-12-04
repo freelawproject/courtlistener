@@ -50,7 +50,7 @@
         </div>
         <div class="col-xs-1 col-sm-2 col-md-3"></div>
     {% else %}
-        {# Not deleted; Make decisions on owner/anon and unpub/published #}
+        {# Not deleted; Make decisions on owner/anon and shared/private #}
         <div class="col-xs-12">
             <div class="row v-offset-below-2" id="title-block">
                 <div class="col-xs-12">
@@ -58,7 +58,7 @@
                         <h2 id="title"
                             class="text-center"><span class="alt">{% block viz-id %}{{ viz.id }}.&nbsp;{% endblock %}</span>{{ viz.title|v_wrapper }}
                             {% if not viz.published and viz.user == user %}
-                                <span class="alt">(Unpublished)</span>
+                                <span class="alt">(Private)</span>
                             {% endif %}
                         </h2>
 
@@ -73,24 +73,24 @@
                         <div class="row">
                             <div class="col-xs-1 col-sm-2 col-md-3"></div>
                             <div class="col-xs-10 col-sm-8 col-md-6 well">
-                                <h2 class="text-center">This Visualization is Unpublished</h2>
+                                <h2 class="text-center">This Visualization is Private</h2>
                                 {% if user.is_authenticated %}
                                     <p>You don't appear to be the owner of this
                                         visualization and it has not been
-                                        published by its owner. If you know the
+                                        shared by its owner. If you know the
                                         creator of this visualization, ask them
-                                        to publish it to make it live.
+                                        to share it.
                                     </p>
                                 {% else %}
-                                    <p>You are not signed in and this an
-                                        unpublished visualization. If you're the
+                                    <p>You are not signed in and this a
+                                        private visualization. If you're the
                                         creator of this visualization and wish
                                         to edit it, please <a
                                                 href="{% url "sign-in" %}?next={{ request.path }}">sign
                                             in</a> and you will be able to
                                         access it. If you are not the creator of
                                         this visualization, and you know the
-                                        creator, ask them to publish it.
+                                        creator, ask them to share it.
                                     </p>
                                 {% endif %}
                             </div>
@@ -237,7 +237,7 @@
 
                                 {% if viz.published %}
                                 <div>
-                                    <h3>Published</h3>
+                                    <h3>Shared</h3>
                                     <p>{{ viz.date_published }}</p>
                                 </div>
                                 {% endif %}

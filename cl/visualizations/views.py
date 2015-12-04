@@ -42,7 +42,7 @@ def render_visualization_page(request, pk, embed):
         status = statuses.HTTP_410_GONE
     else:
         if viz.published is False and viz.user != request.user:
-            # Not deleted, unpublished and not the owner
+            # Not deleted, private and not the owner
             status = statuses.HTTP_401_UNAUTHORIZED
 
     if embed:

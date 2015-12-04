@@ -50,7 +50,7 @@ class SCOTUSMap(models.Model):
         db_index=True,
     )
     date_published = models.DateTimeField(
-        help_text="The moment when the visualization was first published",
+        help_text="The moment when the visualization was first shared",
         db_index=True,
         blank=True,
         null=True,
@@ -78,7 +78,7 @@ class SCOTUSMap(models.Model):
         default=0,
     )
     published = models.BooleanField(
-        help_text="Whether the visualization can be seen publicly.",
+        help_text="Whether the visualization has been shared.",
         default=False,
     )
     deleted = models.BooleanField(
@@ -338,7 +338,7 @@ class SCOTUSMap(models.Model):
             self.title = trunc(self.make_title(), 200, ellipsis='…')
 
         if self.published is True and self.date_published is None:
-            # First time published.
+            # First time shared.
             self.date_published = now()
 
         if self.deleted is True and self.__original_deleted != self.deleted:
