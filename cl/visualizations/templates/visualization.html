@@ -242,7 +242,7 @@
                                       class="btn btn-success btn-lg btn-block">
                                     <i class="fa fa-plus"></i>&nbsp;New <span class="visible-lg-inline">Network</span></a>
                                 </p>
-                                {% if not viz.published %}
+                                {% if not viz.published and viz.user == user%}
                                 <p><a href="{% url "share_visualization" %}"
                                       class="btn btn-primary btn-lg btn-block share-button"
                                       data-id="{{ viz.pk }}"
