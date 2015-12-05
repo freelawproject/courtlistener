@@ -817,6 +817,9 @@ body.embed div#title-block {
     overflow-y: auto;
     max-height: 450px;
 }
+.label-area .text-line {
+    filter: url(#whitefade);
+}
 
 /* Typeahead */
 .twitter-typeahead .tt-query,
