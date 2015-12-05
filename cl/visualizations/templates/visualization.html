@@ -60,9 +60,11 @@
                     {% if viz.published or viz.user == user %}
                         <h2 id="title"
                             class="text-center"><span class="alt">{% block viz-id %}{{ viz.id }}.&nbsp;{% endblock %}</span>{{ viz.title|v_wrapper }}
-                            {% if not viz.published and viz.user == user %}
-                                <span class="alt private-label">(Private)</span>
-                            {% endif %}
+                            <span class="alt private-label">
+                                {% if not viz.published and viz.user == user%}
+                                    (Private)
+                                {% endif %}
+                            </span>
                         </h2>
 
                         {% block vis-subtitles %}

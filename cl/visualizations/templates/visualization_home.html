@@ -88,10 +88,22 @@
                 </p>
             </div>
             <div class="col-xs-6">
-                <h3 class="text-center">Galleries</h3>
-                <h4>On the Open Web</h4>
-                <h4>Latest</h4>
-                <h4>Featured Users</h4>
+                <div class="row">
+                    <div class="col-sm-12">
+                        <h3 class="text-center">Gallery</h3>
+                        <p><img src="{{ STATIC_PREFIX }}png/prototype-vis-1.png"
+                             class="img-responsive">
+                        </p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-12">
+                        <p class="right">
+                            <a href="{% url "viz_gallery" %}"
+                               class="btn btn-primary btn-lg">Check out the Gallery</a>
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

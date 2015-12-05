@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load markdown_deux_tags %}
+{% block title %}SCOTUS Network Gallery - CourtListener.com{% endblock %}
+{% block search-form %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+    {% if DEBUG %}
+        <script src="{{ STATIC_URL }}js/d3.js"></script>
+        <script src="{{ STATIC_URL }}js/plottable.js"></script>
+    {% else %}
+        <script src="{{ STATIC_URL }}js/d3.min.js"></script>
+        <script src="{{ STATIC_URL }}js/plottable.min.js"></script>
+    {% endif %}
+
+    {# <script src="{{ STATIC_URL }}js/scotus_map.js"></script> #}
+    <script src="https://rawgit.com/jraller/citegraph/master/app/scripts/scotus_map.js"></script>
+
+    <script type="text/javascript">
+        var opinions = {
+            {% for viz in results.paginator.object_list %}
+                {{ viz.id }}: {{ viz.json|safe }}{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        };
+    </script>
+{% endblock %}
+
+{% block content %}
+    <div class="col-lg-7 col-sm-9" id="gallery">
+        <h2>Gallery of Supreme Court Network Visualizations</h2>
+        {% if results.paginator.count > 0 %}
+            <span class="small gray top">Ordered by date shared</span>
+            <div class="v-offset-above-2">
+            {% for viz in results.paginator.object_list %}
+                <article class="v-offset-below-3">
+                    <div class="media">
+                        <div class="media-left">
+                            <a href="{{ viz.get_absolute_url }}">
+                                <div id="chart-{{ viz.id }}"></div>
+                            </a>
+                        </div>
+                        <div class="media-body">
+                            <h3 class="media-heading bottom">
+                                <a href="{{ viz.get_absolute_url }}" class="serif">{{ viz.title }}</a> <span class="gray small">({{ viz.clusters.all.count }} Cases)</span>
+                            </h3>
+                            <p>Shared by {{ viz.user.get_full_name|default:viz.user }} on {{ viz.date_published|date:"n/j/Y" }}.
+                            </p>
+                            {% if viz.notes %}
+                                <p><strong>Notes:</strong> {{ viz.notes|markdown|truncatewords_html:75|striptags }}</p>
+                            {% endif %}
+                            <h4 class="gray caps">{{ viz.view_count|intcomma }} view{{ viz.view_count|pluralize }}</h4>
+                        </div>
+                    </div>
+                </article>
+            {% endfor %}
+            </div>
+        {% else %}
+            {# no items found, show an error #}
+            <div class="row">
+                <div class="col-sm-3"></div>
+                <div class="col-sm-6">
+                    <h3>No Networks Found</h3>
+                    <p>This can happen if you've applied to many filters. Try removing some of your restrictions.
+                    </p>
+                </div>
+                <div class="col-sm-3"></div>
+            </div>
+        {% endif %}
+        {% include "includes/pagination.html" %}
+        {% include "includes/random_tip.html" %}
+    </div>
+{% endblock %}

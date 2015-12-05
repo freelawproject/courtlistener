@@ -12,6 +12,7 @@ from cl.visualizations.utils import (
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
 from django.db.models import F
 from django.http import (
@@ -78,6 +79,7 @@ def view_embedded_visualization(request, pk):
 
 
 @permission_required('visualizations.has_beta_access')
+@never_cache
 def view_visualization(request, pk, slug):
     """Return the network page.
     """
@@ -263,4 +265,28 @@ def mapper_homepage(request):
 
 @permission_required('visualization.has_beta_access')
 def gallery(request):
-    pass
+    visualizations = SCOTUSMap.objects.filter(
+            published=True,
+            deleted=False
+    ).order_by(
+        '-date_published',
+        '-date_modified',
+        '-date_created',
+    )
+    paginator = Paginator(visualizations, 20)
+    page = request.GET.get('page', 1)
+    try:
+        paged_vizes = paginator.page(page)
+    except PageNotAnInteger:
+        paged_vizes = paginator.page(1)
+    except EmptyPage:
+        paged_vizes = paginator.page(paginator.num_pages)
+    return render_to_response(
+        'gallery.html',
+        {
+            'results': paged_vizes,
+            'private': False,
+        },
+        RequestContext(request)
+    )
+
