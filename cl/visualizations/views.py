@@ -263,7 +263,7 @@ def mapper_homepage(request):
     )
 
 
-@permission_required('visualization.has_beta_access')
+@permission_required('visualizations.has_beta_access')
 def gallery(request):
     visualizations = SCOTUSMap.objects.filter(
         published=True,
