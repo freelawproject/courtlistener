@@ -20,7 +20,7 @@
     <script type="text/javascript">
         var opinions = {
             {% for viz in results.object_list %}
-                {{ viz.id }}: {{ viz.json|safe }}{% if not forloop.last %},{% endif %}
+                "{{ viz.id }}": {{ viz.json|safe }}{% if not forloop.last %},{% endif %}
             {% endfor %}
         };
     </script>
