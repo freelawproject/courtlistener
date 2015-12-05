@@ -273,7 +273,7 @@ def gallery(request):
         '-date_modified',
         '-date_created',
     )
-    paginator = Paginator(visualizations, 20)
+    paginator = Paginator(visualizations, 5)
     page = request.GET.get('page', 1)
     try:
         paged_vizes = paginator.page(page)
