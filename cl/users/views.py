@@ -99,7 +99,8 @@ def view_visualizations(request):
             'results': paged_vizes,
             'private': True,
         },
-        RequestContext(request))
+        RequestContext(request)
+    )
 
 
 @permission_required('visualizations.has_beta_access')
