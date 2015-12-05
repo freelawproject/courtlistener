@@ -266,8 +266,8 @@ def mapper_homepage(request):
 @permission_required('visualization.has_beta_access')
 def gallery(request):
     visualizations = SCOTUSMap.objects.filter(
-            published=True,
-            deleted=False
+        published=True,
+        deleted=False,
     ).order_by(
         '-date_published',
         '-date_modified',

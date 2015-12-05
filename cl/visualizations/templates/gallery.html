@@ -19,7 +19,7 @@
 
     <script type="text/javascript">
         var opinions = {
-            {% for viz in results.paginator.object_list %}
+            {% for viz in results.object_list %}
                 {{ viz.id }}: {{ viz.json|safe }}{% if not forloop.last %},{% endif %}
             {% endfor %}
         };
@@ -32,7 +32,7 @@
         {% if results.paginator.count > 0 %}
             <span class="small gray top">Ordered by date shared</span>
             <div class="v-offset-above-2">
-            {% for viz in results.paginator.object_list %}
+            {% for viz in results.object_list %}
                 <article class="v-offset-below-3">
                     <div class="media">
                         <div class="media-left">
