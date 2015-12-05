@@ -1,5 +1,5 @@
 /*eslint-env browser */
-/*global $, Modernizr, hopscotch */
+/*global $, hopscotch */
 
 $(document).ready(function() {
     // 'use strict'; // uncomment later on after full cleanup
@@ -392,15 +392,6 @@ $(document).ready(function() {
     });
 });
 
-
-Modernizr.load({
-    // Sets up HTML5 input placeholders in browsers that don't support them.
-    test: Modernizr.placeholder,
-    nope: '/static/js/placeholder-1.8.6.min.js',
-    complete: function () {
-        $('input, textarea').placeholder();
-    }
-});
 
 // Debounce - rate limit a function
 // https://davidwalsh.name/javascript-debounce-function

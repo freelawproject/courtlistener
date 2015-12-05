@@ -91,13 +91,6 @@
         cc_info.hide();
         payment_price.text("Checks are free for us to process!")
     });
-
-    Modernizr.load({
-        // Sets up HTML5 input placeholders in browsers that don't support them.
-        test: Modernizr.placeholder,
-        nope: '/static/js/placeholder-1.8.6.min.js',
-        complete: function () { $('input, textarea').placeholder(); }
-    });
     </script>
 {% endblock %}
 
