@@ -5,6 +5,10 @@
 {% block search-form %}{% endblock %}
 {% block sidebar %}{% endblock %}
 
+{% block head %}
+    <link rel="stylesheet" href="{{ STATIC_URL }}css/plottable.css"/>
+{% endblock %}
+
 {% block footer-scripts %}
     {% if DEBUG %}
         <script src="{{ STATIC_URL }}js/d3.js"></script>
