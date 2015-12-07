@@ -134,6 +134,7 @@ def new_visualization(request):
                     )
 
             if len(g.edges()) == 0:
+                tally_stat('visualization.too_few_nodes_failure')
                 msg = message_dict['too_few_nodes']
                 messages.add_message(request, msg['level'], msg['message'])
                 return render_to_response(
@@ -266,9 +267,19 @@ def mapper_homepage(request):
     if not is_bot(request):
         tally_stat('visualization.scotus_homepage_loaded')
 
+    visualizations = SCOTUSMap.objects.filter(
+        published=True,
+        deleted=False,
+    ).order_by(
+        '-date_published',
+    )[:3]
+
     return render_to_response(
         'visualization_home.html',
-        {'private': True},
+        {
+            'visualizations': visualizations,
+            'private': False,
+        },
         RequestContext(request),
     )
 
