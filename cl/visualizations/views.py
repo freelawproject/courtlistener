@@ -14,7 +14,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
-from django.db.models import F
+from django.db.models import F, Count
 from django.http import (
     HttpResponseRedirect, HttpResponse, HttpResponseNotAllowed
 )
@@ -268,6 +268,8 @@ def gallery(request):
     visualizations = SCOTUSMap.objects.filter(
         published=True,
         deleted=False,
+    ).annotate(
+        Count('clusters'),
     ).order_by(
         '-date_published',
         '-date_modified',

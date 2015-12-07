@@ -32,7 +32,7 @@
 
 {% block content %}
     <div class="col-xs-12" id="gallery">
-        <h2>Gallery of Supreme Court Network Visualizations</h2>
+        <h2>Gallery of Recent Supreme Court Network Visualizations</h2>
         {% if results.paginator.count > 0 %}
             <span class="small gray top">Ordered by date shared</span>
             <div class="v-offset-above-2">
@@ -46,14 +46,14 @@
                         </div>
                         <div class="media-body">
                             <h3 class="media-heading bottom">
-                                <a href="{{ viz.get_absolute_url }}" class="serif">{{ viz.title }}</a> <span class="gray small">({{ viz.clusters.all.count }} Cases)</span>
+                                <a href="{{ viz.get_absolute_url }}" class="serif">{{ viz.title }}</a>
                             </h3>
                             <p>Shared by {{ viz.user.get_full_name|default:viz.user }} on {{ viz.date_published|date:"n/j/Y" }}.
                             </p>
                             {% if viz.notes %}
                                 <p><strong>Notes:</strong> {{ viz.notes|markdown|truncatewords_html:75|striptags }}</p>
                             {% endif %}
-                            <h4 class="gray caps">{{ viz.view_count|intcomma }} view{{ viz.view_count|pluralize }}</h4>
+                            <h4 class="gray caps">{{ viz.view_count|intcomma }} view{{ viz.view_count|pluralize }}, {{ viz.clusters__count }} cases</h4>
                         </div>
                     </div>
                 </article>
