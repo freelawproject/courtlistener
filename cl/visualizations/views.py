@@ -272,6 +272,8 @@ def mapper_homepage(request):
         deleted=False,
     ).order_by(
         '-date_published',
+        '-date_modified',
+        '-date_created',
     )[:3]
 
     return render_to_response(
