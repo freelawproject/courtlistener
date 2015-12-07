@@ -42,7 +42,6 @@
             <div class="col-xs-6">
                 <h3 class="text-center">How it All Works</h3>
                 <p>
-
                     Haven't got to this yet. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
                     Mauris eget pulvinar risus. Fusce laoreet vestibulum massa
                     vel condimentum. Proin at posuere lacus, ac interdum arcu.
@@ -83,9 +82,6 @@
                     velit accumsan eget. Fusce molestie ipsum vel feugiat
                     molestie.
                 </p>
-                <p>
-                    Remember to put links here to FLP UB.
-                </p>
             </div>
             <div class="col-xs-6">
                 <div class="row">
@@ -101,6 +97,32 @@
                         <p class="right">
                             <a href="{% url "viz_gallery" %}"
                                class="btn btn-primary btn-lg">Check out the Gallery</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-xs-6">
+                <h3 class="text-center">Collaboration</h3>
+                <div class="row">
+                    <div class="col-xs-6">
+                        <a href="http://law.ubalt.edu" target="_blank">
+                            <img src="{{ STATIC_URL }}png/ubalt-logo.png"
+                             class="img-responsive"
+                             height="98" width="292">
+                        </a>
+                    </div>
+                    <div class="col-xs-6">
+                        <p class="v-offset-above-1">This project was proudly developed hand in hand by <a
+                                href="http://law.ubalt.edu/faculty/profiles/starger.cfm">Colin
+                            Starger</a> at the <a href="http://law.ubalt.edu/">University
+                            of Baltimore School of Law</a> and <a
+                                href="http://freelawproject.org">Free Law
+                            Project</a>.
+                            We look forward to seeing how it is used and to <a
+                                    href="{% url "contact" %}">hearing your
+                                feedback</a>.
                         </p>
                     </div>
                 </div>
