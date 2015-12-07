@@ -70,7 +70,8 @@ class SCOTUSMap(models.Model):
         max_length=75,
     )
     notes = models.TextField(
-        help_text="Any notes that help explain the diagram, in Markdown format",
+        help_text="A description to help explain the diagram, in Markdown "
+                  "format",
         blank=True,
     )
     view_count = models.IntegerField(

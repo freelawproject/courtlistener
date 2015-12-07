@@ -51,7 +51,7 @@
                             <p>Shared by {{ viz.user.get_full_name|default:viz.user }} on {{ viz.date_published|date:"n/j/Y" }}.
                             </p>
                             {% if viz.notes %}
-                                <p><strong>Notes:</strong> {{ viz.notes|markdown|truncatewords_html:75|striptags }}</p>
+                                <p><strong>Description:</strong> {{ viz.notes|markdown|truncatewords_html:75|striptags }}</p>
                             {% endif %}
                             <h4 class="gray caps">{{ viz.view_count|intcomma }} view{{ viz.view_count|pluralize }}, {{ viz.clusters__count }} cases</h4>
                         </div>

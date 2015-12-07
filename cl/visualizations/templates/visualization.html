@@ -176,7 +176,7 @@
                                 {% if viz.notes %}class="active"{% endif %}>
                                 <a href="#notes" aria-controls="notes"
                                    role="tab"
-                                   data-toggle="tab">Comments</a>
+                                   data-toggle="tab">Description</a>
                             </li>
                             <li role="presentation"
                                 {% if not viz.notes %}class="active"{% endif %}>
@@ -201,7 +201,7 @@
                         <div class="tab-content">
                             <div role="tabpanel"
                                  class="tab-pane markdown{% if viz.notes %} active{% endif %}"
-                                 id="notes">{{ viz.notes|default:"*(No comments from the creator.)*"|markdown }}
+                                 id="notes">{{ viz.notes|default:"*(No description from the creator.)*"|markdown }}
                             </div>
                             <div role="tabpanel"
                                  class="tab-pane{% if not viz.notes %} active{% endif %}"
