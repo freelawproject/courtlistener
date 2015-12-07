@@ -24,8 +24,7 @@
                         <tr>
                             <th>ID</th>
                             <th>Title</th>
-                            <th>From</th>
-                            <th>To</th>
+                            <th>Count</th>
                             <th>Created</th>
                             <th>Modified</th>
                             <th>View&nbsp;Count</th>
@@ -40,24 +39,7 @@
                             <td>
                                 <a href="{{ viz.get_absolute_url }}">{{ viz.title }}</a>
                             </td>
-                            <td>
-                                {% if viz.cluster_start.case_name_short %}
-                                    {{ viz.cluster_start.case_name_short }}
-                                {% elif vis.cluster_start.case_name %}
-                                    {{ viz.cluster_start.case_name }}
-                                {% else %}
-                                    {{ viz.cluster_start.case_name_full }}
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if viz.cluster_end.case_name_short %}
-                                    {{ viz.cluster_end.case_name_short }}
-                                {% elif vis.cluster_end.case_name %}
-                                    {{ viz.cluster_end.case_name }}
-                                {% else %}
-                                    {{ viz.cluster_end.case_name_full|truncatewords:"20" }}
-                                {% endif %}
-                            </td>
+                            <td>{{ viz.clusters__count }} Cases</td>
                             <td>{{ viz.date_created|date:"n/j/Y" }}</td>
                             <td>{{ viz.date_modified|date:"n/j/Y" }}</td>
                             <td>{{ viz.view_count|intcomma }}</td>

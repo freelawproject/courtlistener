@@ -68,10 +68,10 @@
                         </h2>
 
                         {% block vis-subtitles %}
-                        <h4 class="gray text-center">Starts at <a
+                        <h4 class="gray text-center">Contains {{ viz.clusters.all.count }} cases starting at <a
                                 href="{{ viz.cluster_start.get_absolute_url }}">{{ viz.cluster_start.case_name|v_wrapper }}</a>,
-                            and goes to <a
-                                    href="{{ viz.cluster_end.get_absolute_url }}">{{ viz.cluster_end.case_name|v_wrapper }}</a>
+                            and going to <a
+                                    href="{{ viz.cluster_end.get_absolute_url }}">{{ viz.cluster_end.case_name|v_wrapper }}</a>.
                         </h4>
                         {% endblock %}
                     {% else %}
