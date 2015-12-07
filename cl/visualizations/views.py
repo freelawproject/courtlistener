@@ -6,7 +6,7 @@ from cl.visualizations.models import SCOTUSMap, JSONVersion, Referer
 from cl.visualizations.forms import VizForm, VizEditForm
 from cl.visualizations.tasks import get_title
 from cl.visualizations.utils import (
-    reverse_endpoints_if_needed, TooManyNodes, message_dict
+    reverse_endpoints_if_needed, TooManyNodes, message_dict,
 )
 
 from django.conf import settings
@@ -132,6 +132,16 @@ def new_visualization(request):
                         {'form': form, 'private': True},
                         RequestContext(request),
                     )
+
+            if len(g.edges()) == 0:
+                msg = message_dict['too_few_nodes']
+                messages.add_message(request, msg['level'], msg['message'])
+                return render_to_response(
+                    'new_visualization.html',
+                    {'form': form, 'private': True},
+                    RequestContext(request),
+                )
+
             t2 = time.time()
             viz.generation_time = t2 - t1
 
