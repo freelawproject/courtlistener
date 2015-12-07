@@ -50,7 +50,7 @@
                             </h3>
                             <p>Shared by {{ viz.user.get_full_name|default:viz.user }} on {{ viz.date_published|date:"n/j/Y" }}.
                             </p>
-                            <p><strong>Degree of Dissent: <span id="dod-info-{{ viz.pk }}"></span></strong></p>
+                            <p><strong>Degree of Dissent:</strong> <span id="dod-info-{{ viz.pk }}"></span></p>
                             {% if viz.notes %}
                                 <p><strong>Description:</strong> {{ viz.notes|markdown|truncatewords_html:200|striptags }}</p>
                             {% endif %}
