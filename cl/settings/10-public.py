@@ -257,7 +257,7 @@ MARKDOWN_DEUX_STYLES = {
         "safe_mode": "escape",
         "link_patterns": [
             (re.compile(r'network\s+#?(\d+)\b', re.I),
-             r'/visualization/scotus-mapper/\1/md/')
+             r'/visualizations/scotus-mapper/\1/md/')
         ],
     },
 }
