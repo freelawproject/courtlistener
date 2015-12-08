@@ -194,6 +194,7 @@
                 {{ cluster.docket.docket_number|default:"Unknown" }}
             </span>
         </p>
+        {% if cluster.docket.court_id == 'scotus' %}
         <p class="bottom">
             <span class="meta-data-header">Supreme Court Database ID:</span>
             <span class="meta-data-value">
@@ -206,6 +207,7 @@
                 {% endif %}
             </span>
         </p>
+        {% endif %}
         <p class="bottom">
             <span class="meta-data-header">Judges:</span>
             <span class="meta-data-value">
