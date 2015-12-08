@@ -137,6 +137,30 @@
                         {% if user.is_authenticated %}
                             <ul class="nav navbar-nav">
                                 <li><a href="/about/" tabindex="300">About</a></li>
+                                {% if perms.visualizations.has_beta_access %}
+                                <li class="dropdown">
+                                    <a href="#"
+                                       class="dropdown-toggle"
+                                       tabindex="301"
+                                       data-toggle="dropdown">Visualizations&nbsp;<span
+                                            class="caret"></span>
+                                    </a>
+                                    <ul class="dropdown-menu" role="menu">
+                                        <li>
+                                            <a href="{% url "viz_gallery" %}"
+                                               tabindex="301">Gallery</a>
+                                        </li>
+                                        <li>
+                                            <a href="{% url "mapper_homepage" %}"
+                                               tabindex="301">SCOTUS Networks</a>
+                                        </li>
+                                        <li>
+                                            <a href="{% url "new_visualization" %}"
+                                               tabindex="301">New Network</a>
+                                        </li>
+                                    </ul>
+                                </li>
+                                {% endif %}
                                 <li><a href="{% url "faq" %}" tabindex="301">FAQ</a></li>
                                 <li><a href="/coverage/" tabindex="302">Coverage</a></li>
                                 <li class="dropdown">
@@ -219,6 +243,9 @@
                     <div class="col-sm-6 no-gutter">
                         <div class="footer-item">
                             <a href="/about/">About</a>
+                        </div>
+                        <div class="footer-item">
+                            <a href="{% url "mapper_homepage" %}">Visual&shy;izations</a>
                         </div>
                         <div class="footer-item">
                             <a href="{% url "faq" %}">FAQ</a>
