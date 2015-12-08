@@ -174,7 +174,7 @@ a.button:active{
 
 .footer-item {
     margin-bottom: 0.4em;
-    font-size: 110%;
+    font-size: 120%;
     line-height: 1.2em;
 }
 
@@ -829,10 +829,11 @@ body.embed div#title-block {
     position: absolute;
 }
 #viz-homepage #background-chart svg {
+    filter: url(#blur);
     filter: blur(1px);
 }
 #viz-homepage .white-out {
-    background-color: rgba(255, 255, 255, 0.75);
+    background-color: rgba(255, 255, 255, 0.80);
     z-index: 1;
     position: relative;
 }

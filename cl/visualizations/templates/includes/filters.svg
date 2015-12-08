@@ -12,5 +12,9 @@
                             stdDeviation="2"></feGaussianBlur>
             <feBlend in="SourceGraphic" in2="blur" mode="normal"></feBlend>
         </filter>
+
+        <filter id="blur" x="0" y="0">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1"/>
+        </filter>
     </defs>
 </svg>
