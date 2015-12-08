@@ -274,7 +274,7 @@ def mapper_homepage(request):
         '-date_published',
         '-date_modified',
         '-date_created',
-    )[:4]
+    )[:2]
 
     return render_to_response(
         'visualization_home.html',
