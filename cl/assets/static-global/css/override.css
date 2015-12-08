@@ -812,6 +812,14 @@ body.embed div#title-block {
 .plottable .light-label .text-line {
     fill: #000;
 }
+
+.plottable-colors-0 {
+    background-color: mediumpurple;
+}
+
+.plottable-colors-1 {
+    background-color: orangered;
+}
 #table {
     overflow-y: auto;
     max-height: 450px;
