@@ -822,6 +822,9 @@ body.embed div#title-block {
 .gallery-chart {
     width: 400px;
 }
+#viz-page .tooltip-inner {
+    text-align: left;
+}
 
 /* Typeahead */
 .twitter-typeahead .tt-query,
