@@ -37,14 +37,14 @@
             </div>
         </div>
         <div class="row v-offset-above-3">
-            {% for viz in visualizations|slice:":2" %}
+            {% for viz in visualizations|slice:":3" %}
                 <div class="
                     {% if forloop.first %}
-                        col-xs-12 col-md-6
+                        col-xs-12 col-md-4
                     {% else %}
-                        hidden-xs hidden-sm col-md-6
+                        hidden-xs hidden-sm col-md-4
                     {% endif %}">
-                    <div id="chart-{{ viz.id }}"></div>
+                    <div id="chart-{{ viz.id }}" data-height="200"></div>
                 </div>
             {% endfor %}
         </div>
@@ -105,7 +105,7 @@
                 <div class="row">
                     <div class="col-sm-12">
                         <h3 class="text-center">Gallery</h3>
-                        {% for viz in visualizations|slice:"3" %}
+                        {% for viz in visualizations|slice:"4" %}
                             <div id="chart-{{ viz.id }}"></div>
                         {% endfor %}
                     </div>
