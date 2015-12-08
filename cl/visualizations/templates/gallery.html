@@ -10,17 +10,6 @@
 {% endblock %}
 
 {% block footer-scripts %}
-    {% if DEBUG %}
-        <script src="{{ STATIC_URL }}js/d3.js"></script>
-        <script src="{{ STATIC_URL }}js/plottable.js"></script>
-    {% else %}
-        <script src="{{ STATIC_URL }}js/d3.min.js"></script>
-        <script src="{{ STATIC_URL }}js/plottable.min.js"></script>
-    {% endif %}
-
-    {# <script src="{{ STATIC_URL }}js/scotus_map.js"></script> #}
-    <script src="https://rawgit.com/jraller/citegraph/master/app/scripts/scotus_map.js"></script>
-
     <script type="text/javascript">
         var opinions = {
             {% for viz in results.object_list %}
@@ -28,6 +17,7 @@
             {% endfor %}
         };
     </script>
+    {% include "includes/footer-scripts.html" %}
 {% endblock %}
 
 {% block content %}
