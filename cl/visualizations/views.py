@@ -270,6 +270,11 @@ def mapper_homepage(request):
     visualizations = SCOTUSMap.objects.filter(
         published=True,
         deleted=False,
+    ).annotate(
+        Count('clusters'),
+    ).filter(
+        # Ensures that we only show good stuff on homepage
+        clusters__count__gt=10,
     ).order_by(
         '-date_published',
         '-date_modified',
