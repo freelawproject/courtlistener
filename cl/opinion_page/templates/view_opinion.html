@@ -27,7 +27,7 @@
 
 
         {# show the admin tools if applicable #}
-        {% if perms.search.change_docket or perms.search.change_opinion_cluster or perms.search.change_citation %}
+        {% if perms.search.change_docket or perms.search.change_opinioncluster or perms.search.change_citation %}
             <div class="sidebar-section">
                 <h3><span>Admin</span></h3>
                 <p>
@@ -35,7 +35,7 @@
                         <a href="{% url 'admin:search_docket_change' cluster.docket.pk %}"
                            class="btn btn-primary btn-xs">Docket</a>
                     {% endif %}
-                    {% if perms.search.change_opinion_cluster %}
+                    {% if perms.search.change_opinioncluster %}
                         <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}"
                            class="btn btn-primary btn-xs">Cluster</a>
                     {% endif %}
