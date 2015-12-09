@@ -277,7 +277,7 @@
                         </button>
                     </form>
                     <p class="gray">Some jurisdictions do not yet support alerts. Check
-                        <a href="/coverage/#scraped-jurisdictions">our list</a> to be
+                        <a href="{% url "coverage" %}#scraped-jurisdictions">our list</a> to be
                         sure your query is supported.</p>
                 {% else %}
                     <p>To create an alert, place a query.</p>
@@ -368,7 +368,7 @@
                         instead
                     </li>
                 </ul>
-                <p>Our <a href="/coverage/">coverage page</a> details which cases we
+                <p>Our <a href="{% url "coverage" %}">coverage page</a> details which cases we
                 have. If you expected more results than this, <a href="{% url "contact" %}">let us know</a>.
                 We value your feedback.</p>
             {% else %}

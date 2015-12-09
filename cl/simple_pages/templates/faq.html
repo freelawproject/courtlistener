@@ -90,7 +90,7 @@
     <h3 id="general">General</h3>
     <h4 id="who-and-what">What Is This Site? Who Runs It?</h4>
     <p>CourtListener is a legal research website currently containing <a
-            href="/coverage/">{{ total_opinion_count|intcomma }}</a> legal opinions from federal and state courts.
+            href="{% url "coverage" %}">{{ total_opinion_count|intcomma }}</a> legal opinions from federal and state courts.
         CourtListener is operated by the non-profit <a
                 href="http://freelawproject.org">Free Law Project</a>. Free Law Project seeks to provide free access to
         primary legal materials, develop legal research tools, and support academic research on legal corpora.
@@ -128,7 +128,7 @@
             CiteGeist</a>, produce search results that are particularly impressive.</p>
 
     <p>Unlike many sites that may be several days or weeks behind, we strive to collect new opinions from
-        the courts in near real time. For <a href="/coverage/#scraped-jurisdictions">the courts we cover</a>, new
+        the courts in near real time. For <a href="{% url "coverage" %}#scraped-jurisdictions">the courts we cover</a>, new
         opinions should typically appear within 30 minutes of being posted on the court's website.</p>
 
     <p>But the most important distinguishing factor about this site is that it is <a
@@ -156,7 +156,7 @@
     <p>Get started by running a search and the "Create an Alert" option will be
         in the sidebar next to your results.
     </p>
-    <p>Note that alerts are only currently supported in <a href="/coverage/#scraped-jurisdictions">
+    <p>Note that alerts are only currently supported in <a href="{% url "coverage" %}#scraped-jurisdictions">
         {{ scraped_court_count }} jurisdictions</a>.</p>
 
     <h4 id="real-time-alerts">What Are Real Time Alerts?</h4>
@@ -180,7 +180,7 @@
     <h4 id="oral-args">How Do You Get the Oral Arguments That You Have?</h4>
     <p>We get oral arguments by looking at court websites on approximately an
         hourly basis. We currently only check the sites listed on our <a
-            href="/coverage/#scraped-jurisdictions">coverage page</a>. Once we
+            href="{% url "coverage" %}#scraped-jurisdictions">coverage page</a>. Once we
         have downloaded an oral argument, we convert it to an MP3, downsample
         the audio for faster downloading, and add album art for your MP3
         player. When the file is ready, it is added to the site and it becomes
@@ -220,7 +220,7 @@
     <h3 id="coverage-and-content">Coverage and Content</h3>
     <h4 id="what-coverage-exists">What Is Your Coverage of Legal Materials and
         How Comprehensive Is It?</h4>
-    <p>See our <a href="/coverage/">coverage</a> page for all the details. We are
+    <p>See our <a href="{% url "coverage" %}">coverage</a> page for all the details. We are
         constantly working to fill gaps in our coverage, but until we have the entirety of United States case law,
         you should consult additional sources for any important legal research task.</p>
     <p>When we think we are closer to having everything, we intend to conduct an "audit" of our documents to
@@ -333,7 +333,7 @@
     </p>
 
     <h4 id="can-i-contribute">Can I Contribute to the Project Somehow?</h4>
-    <p>Yes! Absolutely. Read our <a href="/contribute/">page about getting
+    <p>Yes! Absolutely. Read our <a href="{% url "contribute" %}">page about getting
         involved</a> or simply <a
             href="mailto:volunteer@freelawproject.org">send us an email</a>
         with how you think you might be able to help.

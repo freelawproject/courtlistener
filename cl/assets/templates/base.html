@@ -136,7 +136,7 @@
                     {% block main-nav %}
                         {% if user.is_authenticated %}
                             <ul class="nav navbar-nav">
-                                <li><a href="/about/" tabindex="300">About</a></li>
+                                <li><a href="{% url "about" %}" tabindex="300">About</a></li>
                                 {% if perms.visualizations.has_beta_access %}
                                 <li class="dropdown">
                                     <a href="#"
@@ -162,7 +162,7 @@
                                 </li>
                                 {% endif %}
                                 <li><a href="{% url "faq" %}" tabindex="301">FAQ</a></li>
-                                <li><a href="/coverage/" tabindex="302">Coverage</a></li>
+                                <li><a href="{% url "coverage" %}" tabindex="302">Coverage</a></li>
                                 <li class="dropdown">
                                     <a href="#"
                                        class="dropdown-toggle"
@@ -190,10 +190,10 @@
                             </ul>
                         {% else %}
                             <ul class="nav navbar-nav">
-                                <li><a href="/about/">About</a></li>
+                                <li><a href="{% url "about" %}">About</a></li>
                                 <li><a href="{% url "faq" %}">FAQ</a></li>
                                 <li><a href="" class="tour-link">Tour</a></li>
-                                <li><a href="/coverage/">Coverage</a></li>
+                                <li><a href="{% url "coverage" %}">Coverage</a></li>
                                 {% if request.path != "/sign-out/" %}
                                     <li>
                                         <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}">
@@ -242,7 +242,7 @@
                 <div class="col-xs-6">
                     <div class="col-sm-6 no-gutter">
                         <div class="footer-item">
-                            <a href="/about/">About</a>
+                            <a href="{% url "about" %}">About</a>
                         </div>
                         <div class="footer-item">
                             <a href="{% url "mapper_homepage" %}">Visual&shy;izations</a>
@@ -260,13 +260,13 @@
 
                     <div class="col-sm-6 no-gutter">
                         <div class="footer-item">
-                            <a href="/coverage/">Coverage</a>
+                            <a href="{% url "coverage" %}">Coverage</a>
                         </div>
                         <div class="footer-item">
                             <a href="{% url "api_index" %}">APIs and Bulk Data</a>
                         </div>
                         <div class="footer-item">
-                            <a href="/feeds/">Feeds &amp; Podcasts</a>&nbsp;<i class="gray fa fa-rss inline"></i>
+                            <a href="{% url "feeds_info" %}">Feeds &amp; Podcasts</a>&nbsp;<i class="gray fa fa-rss inline"></i>
                         </div>
                         <div class="footer-item">
                             <a href="{% url "court_index" %}">Jurisdictions</a>
@@ -283,13 +283,13 @@
                             <a href="{% url "contact" %}">Contact</a>
                         </div>
                         <div class="footer-item">
-                            <a href="/contribute/">Contribute</a>
+                            <a href="{% url "contribute" %}">Contribute</a>
                         </div>
                     </div>
 
                     <div class="col-sm-6 no-gutter">
                         <div class="footer-item">
-                            <a href="/terms/">Terms &amp; Privacy</a>
+                            <a href="{% url "terms" %}">Terms &amp; Privacy</a>
                         </div>
                         <div class="footer-item">
                             <a href="/removal/">Removal</a>

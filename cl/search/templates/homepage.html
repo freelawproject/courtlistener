@@ -54,7 +54,7 @@
     {% if user.is_authenticated %}
         <div class="navbar-right">
             <ul class="nav navbar-nav">
-                <li><a href="/about/" tabindex="300">About</a></li>
+                <li><a href="{% url "about" %}" tabindex="300">About</a></li>
                 {% if perms.visualizations.has_beta_access %}
                 <li class="dropdown">
                     <a href="#"
@@ -80,7 +80,7 @@
                 </li>
                 {% endif %}
                 <li><a href="{% url "faq" %}" tabindex="301">FAQ</a></li>
-                <li><a href="/coverage/" tabindex="302">Coverage</a></li>
+                <li><a href="{% url "coverage" %}" tabindex="302">Coverage</a></li>
                 <li class="dropdown">
                     <a href="#"
                        class="dropdown-toggle"
@@ -108,10 +108,10 @@
         </div>
     {% else %}
         <ul class="nav navbar-nav">
-            <li><a href="/about/">About</a></li>
+            <li><a href="{% url "about" %}">About</a></li>
             <li><a href="{% url "faq" %}">FAQ</a></li>
             <li><a href="" class="tour-link">Tour</a></li>
-            <li><a href="/coverage/">Coverage</a></li>
+            <li><a href="{% url "coverage" %}">Coverage</a></li>
         {% if request.path != "/sign-out/" %}
             <li>
                 <a href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}{% if results %}page={{ results.number }}{% endif %}">

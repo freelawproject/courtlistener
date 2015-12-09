@@ -97,7 +97,7 @@
         <p>
             Authentication is necessary so we can monitor usage of the system
             and so we can assist with any errors that may occur. Per our <a
-                href="/terms/#privacy">privacy policy</a>, we do not track your
+                href="{% url "terms" %}#privacy">privacy policy</a>, we do not track your
             queries in the API, though we may collect statistical information
             for system monitoring.
         </p>
@@ -802,7 +802,7 @@
             we expect to expand this API to provide faceting along additional
             fields, but at present it simply provides jurisdiction counts by
             year for any requested jurisdiction. This API does not require
-            authentication and is what powers our live <a href="/coverage/">coverage page</a>.
+            authentication and is what powers our live <a href="{% url "coverage" %}">coverage page</a>.
         </p>
         <p>
             To receive jurisdiction counts by year, simply provide the

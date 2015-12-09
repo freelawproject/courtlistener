@@ -34,14 +34,15 @@ urlpatterns = [
             'email_template_name': 'register/password_reset_email.html',
             'extra_context': {'private': False},
             'password_reset_form': CustomPasswordResetForm
-        }
+        },
+        name='password_reset',
     ),
     url(
         r'^reset-password/instructions-sent/$',
         auth_views.password_reset_done,
         {
             'template_name': 'register/password_reset_done.html',
-            'extra_context': {'private': False}
+            'extra_context': {'private': True}
         },
         name='password_reset_done',
     ),
@@ -51,7 +52,7 @@ urlpatterns = [
         {
             'template_name': 'register/password_reset_confirm.html',
             'set_password_form': CustomSetPasswordForm,
-            'extra_context': {'private': False}
+            'extra_context': {'private': True}
         }
     ),
     url(
@@ -59,7 +60,7 @@ urlpatterns = [
         auth_views.password_reset_complete,
         {
             'template_name': 'register/password_reset_complete.html',
-            'extra_context': {'private': False}
+            'extra_context': {'private': True}
         },
         name='password_reset_complete',
     ),

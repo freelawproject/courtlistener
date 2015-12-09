@@ -38,7 +38,7 @@ def index_sitemap_maker(request):
 
     # Random additional sitemaps.
     sites.extend([
-        'https://www.courtlistener.com/sitemap-donate.xml',
+        'https://www.courtlistener.com/sitemap-simple-pages.xml',
         'https://www.courtlistener.com/sitemap-visualizations.xml',
     ])
 
