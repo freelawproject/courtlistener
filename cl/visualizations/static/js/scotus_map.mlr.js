@@ -83,7 +83,6 @@ $(document).ready(function () {
             buttonIcon = button.find('i'),
             privateLabel = $('span.private-label'),
             shareLabel = $('#share'),
-            defaultMessage = "This network has been shared!",
             url = function () {
                 if (action === 'share') {
                     return "/visualizations/scotus-mapper/share/"
@@ -93,9 +92,9 @@ $(document).ready(function () {
             }(),
             message = function() {
                 if (action === 'share'){
-                    return "This network has been shared!";
+                    return "This page can be seen by anybody with the link!";
                 } else if (action === 'privatize'){
-                    return "This network has been unshared.";
+                    return "This page can only be seen by you.";
                 }
             }();
 
@@ -127,8 +126,6 @@ $(document).ready(function () {
                         .removeClass('fa-spinner fa-pulse')
                         .addClass('fa-lock');
                     shareLabel.text("Unshare");
-                    message = "This network has been unshared.";
-                    url = '/visualizations/scotus-mapper/privatize/';
                 } else if (action === "privatize"){
                     action = "share";
                     button.data('function', 'share');
@@ -137,8 +134,6 @@ $(document).ready(function () {
                         .removeClass('fa-spinner fa-pulse')
                         .addClass('fa-share-alt');
                     shareLabel.text("Share");
-                    message = defaultMessage;
-                    url = defaultUrl;
                 }
             },
             error: function(){
