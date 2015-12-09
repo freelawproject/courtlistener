@@ -76,14 +76,14 @@
                        data-toggle="dropdown"
                        tabindex="303">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
                     <ul class="dropdown-menu" role="menu">
-                        <li><a href="/profile/alerts/"
+                        <li><a href="{% url "profile_alerts" %}"
                                tabindex="304">Alerts</a></li>
                         {% if perms.visualizations.has_beta_access %}
                         <li><a href="{% url "view_visualizations" %}"
                                tabindex="306">Visualizations</a>
                         </li>
                         {% endif %}
-                        <li><a href="/profile/favorites/"
+                        <li><a href="{% url "profile_favorites" %}"
                                tabindex="305">Favorites</a></li>
                         <li><a href="/profile/donations/"
                                tabindex="306">Donations</a></li>

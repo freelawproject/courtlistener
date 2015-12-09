@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timedelta
 
 from django.contrib.auth.models import User
+from django.core.urlresolvers import reverse
 from django.db.models import Sum
 from django.utils.timezone import utc, make_aware
 from django.contrib import messages
@@ -151,7 +152,7 @@ def show_results(request):
                                  'Your alert was %s successfully.' % action)
 
             # and redirect to the alerts page
-            return HttpResponseRedirect('/profile/alerts/')
+            return HttpResponseRedirect(reverse("profile_alerts"))
         else:
             # Invalid form. Do the search again and show them the alert form
             # with the errors

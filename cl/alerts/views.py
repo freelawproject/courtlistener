@@ -2,6 +2,7 @@ from cl.alerts.models import Alert
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.urlresolvers import reverse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import HttpResponseRedirect
 from django.shortcuts import render_to_response
@@ -44,7 +45,7 @@ def delete_alert(request, pk):
         messages.SUCCESS,
         'Your alert was deleted successfully.'
     )
-    return HttpResponseRedirect('/profile/alerts/')
+    return HttpResponseRedirect(reverse("profile_alerts"))
 
 
 @login_required

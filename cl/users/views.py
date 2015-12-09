@@ -202,7 +202,9 @@ def delete_account(request):
         try:
             request.user.alerts.all().delete()
             request.user.favorites.all().delete()
+            request.user.scotus_maps.all().update(deleted=True)
             convert_to_stub_account(request.user)
+            logout(request)
             email = emails['account_deleted']
             send_mail(email['subject'], email['body'] % request.user,
                       email['from'], email['to'])
@@ -212,8 +214,12 @@ def delete_account(request):
 
         return HttpResponseRedirect('/profile/delete/done/')
 
+    non_deleted_map_count = request.user.scotus_maps.filter(deleted=False).count()
     return render_to_response('profile/delete.html',
-                              {'private': True},
+                              {
+                                  'non_deleted_map_count': non_deleted_map_count,
+                                  'private': True
+                              },
                               RequestContext(request))
 
 

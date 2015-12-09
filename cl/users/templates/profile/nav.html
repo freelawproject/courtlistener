@@ -7,7 +7,7 @@
         <ul class="nav nav-tabs nav-justified" role="tablist">
             <li class="{% block nav-alerts %}inactive{% endblock %}"
                 role="presentation">
-                <a href="/profile/alerts/"><i class="fa fa-bell-o gray"></i>&nbsp;Alerts</a>
+                <a href="{% url "profile_alerts" %}"><i class="fa fa-bell-o gray"></i>&nbsp;Alerts</a>
             </li>
 
             {% if perms.visualizations.has_beta_access %}
@@ -38,7 +38,7 @@
 
             <li class="{% block nav-favorites %}inactive{% endblock %}"
                 role="presentation">
-                <a href="/profile/favorites/"><i class="fa fa-star-o gray"></i>&nbsp;Favorites</a>
+                <a href="{% url "profile_favorites" %}"><i class="fa fa-star-o gray"></i>&nbsp;Favorites</a>
             </li>
             <li class="{% block nav-donations %}inactive{% endblock %}"
                 role="presentation">
