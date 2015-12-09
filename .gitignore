@@ -22,3 +22,6 @@ Solr/data_audio/
 
 # IntelliJ IDEA files
 .idea
+
+# Dev personal stuff - never check in these things with keys or codes!
+cl/settings/05-private.py
