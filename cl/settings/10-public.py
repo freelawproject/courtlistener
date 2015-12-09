@@ -281,12 +281,10 @@ if DEVELOPMENT:
     #INSTALLED_APPS.append('debug_toolbar')
     INTERNAL_IPS = ('127.0.0.1',)
 
-    #if 'test' in sys.argv:
-        # Does DB in memory during tests
-        # DATABASES['default'] = {
-        #    'ENGINE': 'django.db.backends.sqlite3',
-        #    'NAME': 'sqlite_db',
-        #}
+    if 'test' in sys.argv:
+        db = DATABASES['default']
+        db['ENCODING'] = 'UTF8'
+        db['TEST_ENCODING'] = 'UTF8'
 
 
 else:
