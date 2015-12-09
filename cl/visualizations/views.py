@@ -230,6 +230,7 @@ def restore_visualization(request):
             content="Not an ajax request",
         )
 
+
 @ensure_csrf_cookie
 @permission_required('visualizations.has_beta_access')
 @login_required
