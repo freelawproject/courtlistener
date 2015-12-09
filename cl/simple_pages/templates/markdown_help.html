@@ -361,21 +361,22 @@ orange|celery</pre>
         </div>
 
 
-        <h3 id="viz-linking" class="v-offset-above-3">Linking to Other
-            Networks</h3>
+        <h3 id="linking" class="v-offset-above-3">Linking to Other
+            Items</h3>
 
-        <p>One final thing you can do is link to other networks on
+        <p>One final thing you can do is link to other networks or opinions on
             CourtListener. This can be done as follows:
         </p>
-        <pre>As demonstrated in network #2, the doctrine has a long history.</pre>
-        <p>Which creates a link to graph #2.</p>
+        <pre>As demonstrated in network #2, the doctrine has a long history starting at opinion #108713.</pre>
+        <p>Which creates a link to network #2.</p>
         <div class="panel panel-default">
             <div class="panel-body">
-                <p>As demonstrated in <a href="{% url "view_visualization" pk=2 slug=md %}">graph #2</a>, the doctrine has a long history.
+                <p>As demonstrated in <a href="{% url "view_visualization" pk=2 slug="md" %}">network #2</a>, the doctrine has a long history starting at <a href="{% url "view_case" 108713 "md" %}">opinion #108713</a>.
                 </p>
             </div>
         </div>
-        <p>Whenever the word <em>graph</em> is followed by a pound sign and a number, it will automatically be made into a link.</p>
+        <p>Whenever the word <em>network</em> or the word <em>opinion</em> is followed by a pound sign and a number, it will automatically be made into a link. Upper case or lower case letters will work.
+        </p>
     </div>
 
 
@@ -445,6 +446,6 @@ Violets are blue.</pre>
         <h4 class="v-offset-above-1"><a href="#images">Images</a></h4>
         <h4 class="v-offset-above-1"><a href="#footnotes">Footnotes</a></h4>
         <h4 class="v-offset-above-1"><a href="#tables">Tables</a></h4>
-        <h4 class="v-offset-above-1"><a href="#viz-linking">Linking to Other Networks</a></h4>
+        <h4 class="v-offset-above-1"><a href="#linking">Linking to Other Networks</a></h4>
     </div>
 {% endblock %}
