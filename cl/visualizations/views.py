@@ -1,25 +1,26 @@
-import json
 import time
 
 from cl.lib.bot_detector import is_bot
 from cl.stats import tally_stat
 from cl.visualizations.models import SCOTUSMap, JSONVersion, Referer
-from cl.visualizations.forms import VizForm, VizEditForm, JSONEditForm
+from cl.visualizations.forms import VizForm, VizEditForm
 from cl.visualizations.tasks import get_title
 from cl.visualizations.utils import (
-    reverse_endpoints_if_needed, TooManyNodes, message_dict
+    reverse_endpoints_if_needed, TooManyNodes, message_dict,
 )
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
-from django.db.models import F
+from django.db.models import F, Count
 from django.http import (
     HttpResponseRedirect, HttpResponse, HttpResponseNotAllowed
 )
 from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
+from django.views.decorators.cache import never_cache
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status as statuses
@@ -42,7 +43,7 @@ def render_visualization_page(request, pk, embed):
         status = statuses.HTTP_410_GONE
     else:
         if viz.published is False and viz.user != request.user:
-            # Not deleted, unpublished and not the owner
+            # Not deleted, private and not the owner
             status = statuses.HTTP_401_UNAUTHORIZED
 
     if embed:
@@ -70,7 +71,7 @@ def render_visualization_page(request, pk, embed):
 @permission_required('visualizations.has_beta_access')
 @xframe_options_exempt
 def view_embedded_visualization(request, pk):
-    """Return the embedded visualization page.
+    """Return the embedded network page.
 
     Exempts the default xframe options, and allows standard caching.
     """
@@ -78,14 +79,16 @@ def view_embedded_visualization(request, pk):
 
 
 @permission_required('visualizations.has_beta_access')
+@never_cache
 def view_visualization(request, pk, slug):
-    """Return the visualization page.
+    """Return the network page.
     """
     return render_visualization_page(request, pk, embed=False)
 
 
 @permission_required('visualizations.has_beta_access')
 @login_required
+@never_cache
 def new_visualization(request):
     if request.method == 'POST':
         form = VizForm(request.POST)
@@ -129,6 +132,17 @@ def new_visualization(request):
                         {'form': form, 'private': True},
                         RequestContext(request),
                     )
+
+            if len(g.edges()) == 0:
+                tally_stat('visualization.too_few_nodes_failure')
+                msg = message_dict['too_few_nodes']
+                messages.add_message(request, msg['level'], msg['message'])
+                return render_to_response(
+                    'new_visualization.html',
+                    {'form': form, 'private': True},
+                    RequestContext(request),
+                )
+
             t2 = time.time()
             viz.generation_time = t2 - t1
 
@@ -162,20 +176,13 @@ def edit_visualization(request, pk):
     viz = get_object_or_404(SCOTUSMap, pk=pk, user=request.user)
     if request.method == 'POST':
         form_viz = VizEditForm(request.POST, instance=viz)
-        form_json = JSONEditForm(request.POST)
-        if form_viz.is_valid() and form_json.is_valid():
+        if form_viz.is_valid():
             cd_viz = form_viz.cleaned_data
-            cd_json = form_json.cleaned_data
 
             viz.title = cd_viz['title']
             viz.notes = cd_viz['notes']
             viz.published = cd_viz['published']
             viz.save()
-
-            if json.loads(viz.json) != json.loads(cd_json['json_data']):
-                # Save a new version of the JSON
-                jv = JSONVersion(map=viz, json_data=cd_json['json_data'])
-                jv.save()
 
             return HttpResponseRedirect(reverse(
                 'view_visualization',
@@ -183,11 +190,9 @@ def edit_visualization(request, pk):
             ))
     else:
         form_viz = VizEditForm(instance=viz)
-        form_json = JSONEditForm(instance=viz.json_versions.all()[0])
     return render_to_response(
         'edit_visualization.html',
         {'form_viz': form_viz,
-         'form_json': form_json,
          'private': True},
         RequestContext(request),
     )
@@ -225,14 +230,93 @@ def restore_visualization(request):
             content="Not an ajax request",
         )
 
+@ensure_csrf_cookie
+@permission_required('visualizations.has_beta_access')
+@login_required
+def share_visualization(request):
+    if request.is_ajax():
+        v = SCOTUSMap.objects.get(pk=request.POST.get('pk'), user=request.user)
+        v.published = True
+        v.save()
+        return HttpResponse("It worked")
+    else:
+        return HttpResponseNotAllowed(
+            permitted_methods=['POST'],
+            content="Not an ajax request",
+        )
+
+
+@ensure_csrf_cookie
+@permission_required('visualizations.has_beta_access')
+@login_required
+def privatize_visualization(request):
+    if request.is_ajax():
+        v = SCOTUSMap.objects.get(pk=request.POST.get('pk'), user=request.user)
+        v.published = False
+        v.save()
+        return HttpResponse("It worked")
+    else:
+        return HttpResponseNotAllowed(
+                permitted_methods=['POST'],
+                content="Not an ajax request",
+        )
+
 
 @permission_required('visualizations.has_beta_access')
 def mapper_homepage(request):
     if not is_bot(request):
         tally_stat('visualization.scotus_homepage_loaded')
 
+    visualizations = SCOTUSMap.objects.filter(
+        published=True,
+        deleted=False,
+    ).annotate(
+        Count('clusters'),
+    ).filter(
+        # Ensures that we only show good stuff on homepage
+        clusters__count__gt=10,
+    ).order_by(
+        '-date_published',
+        '-date_modified',
+        '-date_created',
+    )[:2]
+
     return render_to_response(
         'visualization_home.html',
-        {'private': True},
+        {
+            'visualizations': visualizations,
+            'private': False,
+        },
         RequestContext(request),
     )
+
+
+@permission_required('visualizations.has_beta_access')
+def gallery(request):
+    visualizations = SCOTUSMap.objects.filter(
+        published=True,
+        deleted=False,
+    ).annotate(
+        Count('clusters'),
+    ).order_by(
+        '-date_published',
+        '-date_modified',
+        '-date_created',
+    )
+    paginator = Paginator(visualizations, 5)
+    page = request.GET.get('page', 1)
+    try:
+        paged_vizes = paginator.page(page)
+    except PageNotAnInteger:
+        paged_vizes = paginator.page(1)
+    except EmptyPage:
+        paged_vizes = paginator.page(paginator.num_pages)
+    return render_to_response(
+        'gallery.html',
+        {
+            'results': paged_vizes,
+            'private': False,
+        },
+        RequestContext(request)
+    )
+

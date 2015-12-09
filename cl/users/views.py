@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.urlresolvers import reverse
+from django.db.models import Count
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
@@ -81,7 +82,9 @@ def view_donations(request):
 def view_visualizations(request):
     visualizations = SCOTUSMap.objects.filter(
         user=request.user,
-        deleted=False
+        deleted=False,
+    ).annotate(
+        Count('clusters'),
     ).order_by(
         '-date_modified',
     )
@@ -99,7 +102,8 @@ def view_visualizations(request):
             'results': paged_vizes,
             'private': True,
         },
-        RequestContext(request))
+        RequestContext(request)
+    )
 
 
 @permission_required('visualizations.has_beta_access')

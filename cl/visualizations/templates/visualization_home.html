@@ -2,98 +2,127 @@
 {% load humanize %}
 {% load cache %}
 
-{% block title %}Non-Profit Free Legal Search Engine and Alert System -
+{% block title %}Supreme Court Network Visualizations -
     CourtListener.com{% endblock %}
 
 {% block search-form %}{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
+{% block head %}
+    <link rel="stylesheet" href="{{ STATIC_URL }}css/plottable.css"/>
+{% endblock %}
+
+{% block footer-scripts %}
+    <script type="text/javascript">
+        var opinions = {
+            {% for viz in visualizations %}
+                "{{ viz.id }}": {{ viz.json|safe }}{% if not forloop.last %},
+                {% endif %}
+            {% endfor %}
+        };
+    </script>
+    {% include "includes/footer-scripts.html" %}
+{% endblock %}
+
 {% block content %}
-    <div id="visualization_scotus_homepage" class="col-xs-12">
-        <div class="row v-offset-above-3">
+    {% cache 21600 scotus-mapper-product-page %}
+    <div id="viz-homepage" class="col-xs-12">
+        <div class="row v-offset-below-3">
             <div class="col-xs-12">
-                <p class="text-center x-large bottom">Supreme Court Doctrinal Network
-                    Visualizations</p>
-                <p class="text-center large gray">A collaboration between Free Law Project and the University of Baltimore School of Law
-                </p>
-            </div>
-        </div>
-        <div class="row v-offset-above-3">
-            <div class="col-xs-4"><img src="{{ STATIC_PREFIX }}png/prototype-vis-1.png" class="img-responsive"></div>
-            <div class="col-xs-4"><img
-                    src="{{ STATIC_PREFIX }}png/prototype-vis-1.png"
-                    class="img-responsive">
-            </div>
-            <div class="col-xs-4"><img
-                    src="{{ STATIC_PREFIX }}png/prototype-vis-1.png"
-                    class="img-responsive">
-            </div>
-        </div>
-        <div class="row v-offset-above-4">
-            <div class="col-xs-12">
-                <p class="lead">With this free tool you can create, save and curate your own visualizations of Supreme Court citation networks, and embed them in your website or blog. Learn more by looking below at our curated gallery, watching our videos or by making one yourself.
-                </p>
-                <div class="text-center v-offset-above-3"><a href="{% url "new_visualization" %}" class="btn btn-sm btn-xl btn-primary">Make a Visualization</a>
+                <div class="row v-offset-above-3">
+                    {% for viz in visualizations|slice:":1" %}
+                        <div class="col-xs-12 v-offset-above-3" id="background-chart">
+                            <div id="chart-{{ viz.id }}" data-height="200"></div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="white-out">
+                    <div class="row">
+                        <div class="col-xs-12">
+                            <p class="text-center x-large bottom" id="title">Supreme Court Citation Networks
+                            </p>
+                            <p class="text-center large gray">A collaboration between Free Law Project and the University of Baltimore School of Law
+                            </p>
+                        </div>
+                    </div>
+                    <div class="row v-offset-above-3">
+                        <div class="col-xs-12">
+                            <p class="lead"><strong>With this free tool</strong> you can analyze and study lines of Supreme Court cases by creating citation networks. You can quickly access the full text of all the opinions in your citation network as well as examine all the associated case data from Supreme Court Database (Spaeth). Citation networks are visualized graphically and underlying data is also presented in sortable tables. You can save your networks, edit and comment upon them, and share them too. You can even embed interactive network visualizations in your website or blog.  Learn more by looking below at our gallery of shared networks or by making one yourself.
+                            </p>
+                            <div class="text-center v-offset-above-3"
+                                 id="new-button"><a
+                                    href="{% url "new_visualization" %}"
+                                    class="btn btn-sm btn-xl btn-primary">Make a Network</a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+
+
         <div class="row v-offset-above-3">
-            <div class="col-xs-6">
+            <div class="col-md-6">
                 <h3 class="text-center">How it All Works</h3>
                 <p>
-
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-                    Mauris eget pulvinar risus. Fusce laoreet vestibulum massa
-                    vel condimentum. Proin at posuere lacus, ac interdum arcu.
-                    Quisque sed tincidunt neque. Vivamus non lorem et risus
-                    pulvinar varius. Nunc ultricies risus at magna iaculis,
-                    vitae varius nibh vestibulum. Integer nunc nibh, laoreet ut
-                    urna vitae, pulvinar facilisis turpis. Quisque mollis velit
-                    nec mauris rutrum, eu maximus enim ornare. Mauris mauris
-                    tellus, iaculis ut est eget, sagittis tincidunt ipsum.
-                    Aenean ullamcorper efficitur enim, blandit rhoncus nisi.
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+                    When the Supreme Court decides cases, it usually hands down an opinion justifying its holding by reference to precedent. Court opinions invoke precedent by citing to prior cases that confronted similar or related questions of law. Over time, as the Court elaborates on legal doctrine, earlier cases become connected to later cases by chains of citation. Lawyers often refer to such chains of related cases as lines of cases. This tool allows users to analyze and study lines of cases by creating citation networks.
                 </p>
 
                 <p>
-                    Nullam pretium porta ligula, non eleifend nisl facilisis at.
-                    Phasellus arcu nulla, mattis in tempor nec, commodo id nisi.
-                    Fusce consequat orci et tristique consectetur. Sed mi lorem,
-                    fermentum in sagittis aliquet, aliquet a purus. Suspendisse
-                    augue nulla, molestie in erat non, viverra tristique justo.
-                    Aliquam non tempus sem. Suspendisse malesuada volutpat
-                    justo, vel bibendum nulla fringilla eget. Nulla porta eros
-                    at nulla fermentum, in dictum enim porttitor. Nam enim
-                    libero, lacinia vitae consequat eget, tristique vitae elit.
-                    Quisque suscipit dui nibh, ac venenatis ex bibendum nec.
-                    Nulla facilisi. Nullam porta turpis at est euismod consequat
-                    in a purus. Etiam euismod magna et fringilla viverra.
+                    Citation networks connect any two Supreme Court cases at three “degrees of separation.” To understand what this means, imagine a line of cases running from <i>Case A</i> to <i>Case Z</i>. If <i>Case Z</i> directly cites <i>Case A</i>, then that constitutes the 1-degree connection in the A-Z network. Now, if <i>Case Z</i> also cites to another case – <i>Case Y</i> – and <i>Case Y</i> in turn cites back to <i>Case A</i>, then <i>Case Y</i> forms a 2-degree connection in the A-Z network (Z->Y->A). Finally, if <i>Case Y</i> cites to yet another case – <i>Case B</i> – and <i>Case B</i> again cites to <i>Case A</i>, then <i>Case B</i> constitutes a 3-degree connection in the A-Z network (Z->Y->B->A). This tool automatically finds and displays <u>all</u> 1st, 2nd, and 3rd degree connections between any two user-specified Supreme Court cases.
                 </p>
                 <p>
-                    Duis bibendum finibus ultricies. Vivamus eu lorem neque.
-                    Quisque nisl metus, egestas at faucibus ac, accumsan
-                    vulputate ligula. Praesent quis pellentesque ex, ac maximus
-                    lorem. Pellentesque malesuada, neque non elementum bibendum,
-                    orci sem dapibus elit, vitae elementum neque ipsum et
-                    sapien. Vivamus convallis diam mauris, at dapibus metus
-                    imperdiet vel. Fusce in efficitur ipsum. Nam euismod dolor
-                    quis augue mattis eleifend. Cras laoreet sodales dolor nec
-                    convallis. Quisque mattis lacinia enim, vitae ultricies
-                    velit accumsan eget. Fusce molestie ipsum vel feugiat
-                    molestie.
+                    In addition to showing the citation relationship between cases, this tool also leverages data about the cases available in the <a href="http://scdb.wustl.edu/index.php">Supreme Court Database (Spaeth)</a>. Specifically, the tool visualizes Spaeth data concerning the <a href="http://scdb.wustl.edu/documentation.php?var=decisionDirection">decision direction</a> of cases (liberal v. conservative) and <a href="http://scdb.wustl.edu/documentation.php?var=majVotes">vote count</a> (9-0, 8-1, etc). Links to the complete text of all opinions and links to the complete Spaeth data for a given case are also provided.
                 </p>
-                <p>
-                    Remember to put links here to FLP UB.
-                </p>
+
             </div>
-            <div class="col-xs-6">
-                <h3 class="text-center">Galleries</h3>
-                <h4>On the Open Web</h4>
-                <h4>Latest</h4>
-                <h4>Featured Users</h4>
+            <div class="col-md-6">
+                <div class="row">
+                    <div class="col-sm-12">
+                        <h3 class="text-center">Gallery</h3>
+                        {% for viz in visualizations|slice:"1:" %}
+                            <div id="chart-{{ viz.id }}"></div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-12 v-offset-above-2">
+                        <p class="right">
+                            <a href="{% url "viz_gallery" %}"
+                               class="btn btn-primary btn-lg">Check out the Gallery</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-6">
+                <h3 class="text-center">Collaboration</h3>
+                <div class="row">
+                    <div class="col-xs-6">
+                        <a href="http://law.ubalt.edu/faculty/scotus-mapping/index.cfm" target="_blank">
+                            <img src="{{ STATIC_URL }}png/ubalt-logo.png"
+                             class="img-responsive"
+                             height="98" width="292">
+                        </a>
+                    </div>
+                    <div class="col-xs-6">
+                        <p class="v-offset-above-1">This project was proudly developed hand in hand by <a
+                                href="http://law.ubalt.edu/faculty/profiles/starger.cfm">Colin
+                            Starger</a> at the <a href="http://law.ubalt.edu/">University
+                            of Baltimore School of Law</a> and <a
+                                href="http://freelawproject.org">Free Law
+                            Project</a>.
+                            We look forward to seeing how it is used and to <a
+                                    href="{% url "contact" %}">hearing your
+                                feedback</a>.
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+    {% endcache %}
 
 {% endblock %}

@@ -297,6 +297,7 @@ def serve_static_file(request, file_path=''):
      - If blocked, we set the x-robots-tag HTTP header
      - Serve up the file using Apache2's xsendfile
     """
+    # XXX This is not updated.
     response = HttpResponse()
     file_loc = os.path.join(settings.MEDIA_ROOT, file_path.encode('utf-8'))
     if file_path.startswith('mp3'):

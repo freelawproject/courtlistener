@@ -31,14 +31,3 @@ class VizEditForm(VizForm):
             'notes',
             'published',
         ]
-
-
-class JSONEditForm(forms.ModelForm):
-    class Meta:
-        model = JSONVersion
-        fields = [
-            'json_data',
-        ]
-        widgets = {
-            'json_data': forms.Textarea(attrs={'class': 'form-control'})
-        }

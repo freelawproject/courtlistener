@@ -1,9 +1,9 @@
 $(document).ready(function () {
-    ///////////////////////////////////
-    // Trash & Restore Functionality //
-    ///////////////////////////////////
-    $(".trash-button, .restore-button").click(function (event) {
-        event.preventDefault();
+    ////////////////////
+    // Trash, Restore //
+    ////////////////////
+    $(".trash-button, .restore-button").click(function (e) {
+        e.preventDefault();
         var button = $(this),
             id = button.data('id'),
             buttonIcon = button.find('i'),
@@ -11,8 +11,9 @@ $(document).ready(function () {
             pageType,
             message;
 
-        buttonIcon.removeClass("fa-trash-o");
-        buttonIcon.addClass("fa-spinner fa-pulse");
+        buttonIcon
+            .removeClass("fa-trash-o")
+            .addClass("fa-spinner fa-pulse");
         if (window.location.href.indexOf("deleted") >= 0){
             // We're on the deleted page, trying to restore.
             pageType = "trash";
@@ -67,122 +68,101 @@ $(document).ready(function () {
         });
     });
     $(function () {
-        // Initialize tooltips on this page.
+        // Initialize tooltips on profile pages.
         $('[data-toggle="tooltip"]').tooltip()
     });
 
-
-    ///////////////////////////
-    // New Viz Functionality //
-    ///////////////////////////
-    var authorityIDs = {};
-    var updateAuthorityCache = function (suggestion, callback) {
-        // Check if we have the ID in our cache. If so, do nothing. If not,
-        // load up the cache.
-        if (suggestion.id in authorityIDs) {
-            // All good; do nothing; pass
-        } else {
-            // Get the IDs, add them as a new key.
-            // Get a list of the IDs cited by the item and cache it. This cache
-            // is needed to do the reverse lookup for authorities.
-            $.ajax({
-                'method': 'GET',
-                'url': "/api/rest/v3/search/",
-                'data': {q: "id:" + suggestion.id, 'format': 'json'}
-            }).done(function (data) {
-                console.log(data);
-                authorityIDs[suggestion.id] = data.results[0].cites || [];
-                callback(suggestion);
-            });
-        }
-    };
-
-    var searchResults = new Bloodhound({
-        datumTokenizer: Bloodhound.tokenizers.obj.whitespace('value'),
-        queryTokenizer: Bloodhound.tokenizers.whitespace,
-        sufficient: 20,
-        identify: function (obj) {
-            // Return the item ID so the system can have a unique id for it
-            // in its caches.
-            return obj.id;
-        },
-        remote: {
-            // This query is anything with the case name typed in...
-            // ...in the supreme court...
-            // ...between 1925 and a year ago that has an SCDB id... OR
-            // ...in the last year, with or without an SCDB id.
-            url: '/api/rest/v3/search/?' +
-            'case_name=(%QUERY) OR (%QUERY*)&' +
-            'court=scotus&' +
-            'q=((dateFiled:[1945-01-01T00:00:00Z TO ' + last_year + 'Z] AND scdb_id:["" TO *]) OR (dateFiled:[' + last_year + 'Z TO *]))',
-            prepare: function (query, settings) {
-                // This function is needed b/c it needs to do both a prefix
-                // search and a non-prefix search.
-                settings.url = settings.url.replace(/%QUERY/g, $.trim(query));
-
-                var start_id = $('#id_cluster_start').val();
-                if ($("#ending-cluster-typeahead-search").is(":focus")) {
-                    // Pass. No extra params required to do simple search.
-                } else if ($("#ending-cluster-typeahead-authorities").is(":focus")) {
-                    // Append the authority IDs onto the end of the query.
-                    settings.url += " AND id:(" + authorityIDs[start_id].join(" OR ") + ")";
-                } else if ($("#ending-cluster-typeahead-citing").is(":focus")) {
-                    // Append the cited_by ID onto the end of the query.
-                    settings.url += " AND cites:(" + start_id + ")";
+    /////////////////////
+    // Share/privatize //
+    /////////////////////
+    $('.share-button').click(function(e){
+        e.preventDefault();
+        var button = $(this),
+            id = button.data('id'),
+            action = button.data('function'),
+            buttonIcon = button.find('i'),
+            privateLabel = $('span.private-label'),
+            shareLabel = $('#share'),
+            defaultMessage = "This network has been shared!",
+            url = function () {
+                if (action === 'share') {
+                    return "/visualizations/scotus-mapper/share/"
+                } else if (action === 'privatize') {
+                    return '/visualizations/scotus-mapper/privatize/';
                 }
+            }(),
+            message = function() {
+                if (action === 'share'){
+                    return "This network has been shared!";
+                } else if (action === 'privatize'){
+                    return "This network has been unshared.";
+                }
+            }();
 
-                return settings;
+        buttonIcon
+            .removeClass('fa-share-alt')
+            .addClass('fa-spinner fa-pulse');
+        $.ajax({
+            method: "POST",
+            url: url,
+            data: {pk: id},
+            success: function(){
+                $('.bootstrap-growl').alert("close");
+                $.bootstrapGrowl(
+                    message,
+                    {
+                        type: "success",
+                        align: "center",
+                        width: "auto",
+                        delay: 2000,
+                        allow_dismiss: false,
+                        offset: {from: 'top', amount: 80}
+                    }
+                );
+                if (action === "share"){
+                    action = "privatize";
+                    button.data('function', 'privatize');
+                    privateLabel.addClass('hidden');
+                    buttonIcon
+                        .removeClass('fa-spinner fa-pulse')
+                        .addClass('fa-lock');
+                    shareLabel.text("Unshare");
+                    message = "This network has been unshared.";
+                    url = '/visualizations/scotus-mapper/privatize/';
+                } else if (action === "privatize"){
+                    action = "share";
+                    button.data('function', 'share');
+                    privateLabel.removeClass('hidden');
+                    buttonIcon
+                        .removeClass('fa-spinner fa-pulse')
+                        .addClass('fa-share-alt');
+                    shareLabel.text("Share");
+                    message = defaultMessage;
+                    url = defaultUrl;
+                }
             },
-            transform: function (response) {
-                return response.results
+            error: function(){
+                if (action === 'share'){
+                    buttonIcon
+                        .removeClass("fa-spinner fa-pulse")
+                        .addClass('fa-share-alt');
+                } else if (action === 'privatize') {
+                    buttonIcon
+                        .removeClass("fa-spinner fa-pulse")
+                        .addClass('fa-lock');
+                }
+                $.bootstrapGrowl(
+                    "An error occurred. Please try again.",
+                    {
+                        type: "danger",
+                        align: "center",
+                        width: "auto",
+                        delay: 2000,
+                        allow_dismiss: false,
+                        offset: {from: 'top', amount: 80}
+                    }
+                );
             }
-        }
-    });
-
-    $('.typeahead').typeahead({
-            'hint': false,
-            'highlight': true,
-            'minLength': 3
-        },
-        {
-            display: function (obj) {
-                var parts = [obj.caseName];
-                if (obj.dateFiled) {
-                    parts.push(new Date(obj.dateFiled).getUTCFullYear());
-                }
-                if (obj.citation) {
-                    parts.push(obj.citation.join(", "));
-                }
-                return parts.join(" – ");
-            },
-            limit: 19,  // 20 seems to cause issues.
-            source: searchResults
-        }
-    );
-
-
-    $('#starting-cluster-typeahead').bind(
-        'typeahead:select',
-        function (ev, suggestion) {
-            updateAuthorityCache(suggestion, function(suggestion) {
-                $('.authority-count').text("(" + authorityIDs[suggestion.id].length + ")");
-                $('input[disabled="disabled"]').prop('disabled', false);
-            });
-            $('#id_cluster_start').val(suggestion.id);
-            $('.first-selection').text(suggestion.caseNameShort || suggestion.caseName);
         });
-    $('.ending-typeahead').bind(
-        'typeahead:select',
-        function (ev, suggestion) {
-            $('#id_cluster_end').val(suggestion.id);
-        });
-    $('a[data-toggle="tab"]').on('show.bs.tab', function (e) {
-        $('.ending-typeahead').val("");
-    });
-
-    // Extra options JS
-    $('#more').click(function(e){
-        $('#center-buttons').addClass('hidden');
-        $('#extra-options').removeClass('hidden');
-    });
+    })
 });

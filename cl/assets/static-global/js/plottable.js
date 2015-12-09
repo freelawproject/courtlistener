@@ -1,5 +1,5 @@
 /*!
-Plottable 1.16.1 (https://github.com/palantir/plottable)
+Plottable 1.16.2 (https://github.com/palantir/plottable)
 Copyright 2014-2015 Palantir Technologies
 Licensed under MIT (https://github.com/palantir/plottable/blob/master/LICENSE)
 */
@@ -885,7 +885,7 @@ var Plottable;
 })(Plottable || (Plottable = {}));
 var Plottable;
 (function (Plottable) {
-    Plottable.version = "1.16.1";
+    Plottable.version = "1.16.2";
 })(Plottable || (Plottable = {}));
 var Plottable;
 (function (Plottable) {
@@ -4870,7 +4870,7 @@ var Plottable;
             Category.prototype._setup = function () {
                 _super.prototype._setup.call(this);
                 this._measurer = new SVGTypewriter.Measurers.CacheCharacterMeasurer(this._tickLabelContainer);
-                this._wrapper = new SVGTypewriter.Wrappers.SingleLineWrapper();
+                this._wrapper = new SVGTypewriter.Wrappers.Wrapper();
                 this._writer = new SVGTypewriter.Writers.Writer(this._measurer, this._wrapper);
             };
             Category.prototype._rescale = function () {
@@ -6106,6 +6106,9 @@ var Plottable;
                 if (rowPadding == null) {
                     return this._rowPadding;
                 }
+                if (!Plottable.Utils.Math.isValidNumber(rowPadding) || rowPadding < 0) {
+                    throw Error("rowPadding must be a non-negative finite value");
+                }
                 this._rowPadding = rowPadding;
                 this.redraw();
                 return this;
@@ -6113,6 +6116,9 @@ var Plottable;
             Table.prototype.columnPadding = function (columnPadding) {
                 if (columnPadding == null) {
                     return this._columnPadding;
+                }
+                if (!Plottable.Utils.Math.isValidNumber(columnPadding) || columnPadding < 0) {
+                    throw Error("columnPadding must be a non-negative finite value");
                 }
                 this._columnPadding = columnPadding;
                 this.redraw();
@@ -6122,6 +6128,9 @@ var Plottable;
                 if (weight == null) {
                     return this._rowWeights[index];
                 }
+                if (!Plottable.Utils.Math.isValidNumber(weight) || weight < 0) {
+                    throw Error("rowWeight must be a non-negative finite value");
+                }
                 this._rowWeights[index] = weight;
                 this.redraw();
                 return this;
@@ -6129,6 +6138,9 @@ var Plottable;
             Table.prototype.columnWeight = function (index, weight) {
                 if (weight == null) {
                     return this._columnWeights[index];
+                }
+                if (!Plottable.Utils.Math.isValidNumber(weight) || weight < 0) {
+                    throw Error("columnWeight must be a non-negative finite value");
                 }
                 this._columnWeights[index] = weight;
                 this.redraw();
@@ -6968,6 +6980,9 @@ var Plottable;
                     closestPointEntity = entity;
                 }
             });
+            if (closestPointEntity === undefined) {
+                return undefined;
+            }
             return this._lightweightPlotEntityToPlotEntity(closestPointEntity);
         };
         /**
@@ -7988,6 +8003,8 @@ var Plottable;
              */
             function Scatter() {
                 _super.call(this);
+                this._labelsEnabled = false;
+                this._label = null;
                 this.addClass("scatter-plot");
                 var animator = new Plottable.Animators.Easing();
                 animator.startDelay(5);
@@ -8018,6 +8035,21 @@ var Plottable;
                 this._propertyBindings.set(Scatter._SYMBOL_KEY, { accessor: symbol });
                 this.render();
                 return this;
+            };
+            Scatter.prototype._generateAttrToProjector = function () {
+                var attrToProjector = _super.prototype._generateAttrToProjector.call(this);
+                // Copy each of the different projectors.
+                var xAttr = Plottable.Plot._scaledAccessor(this.x());
+                var yAttr = Plottable.Plot._scaledAccessor(this.y());
+                var sizeAttr = Plottable.Plot._scaledAccessor(this.size());
+                var xScale = this.x().scale;
+                var yScale = this.y().scale;
+                var sizeScale = this.size().scale;
+                attrToProjector["x"] = function (d, i, dataset) { return xAttr(d, i, dataset); };
+                attrToProjector["y"] = function (d, i, dataset) { return yAttr(d, i, dataset); };
+                attrToProjector["size"] = function (d, i, dataset) { return sizeAttr(d, i, dataset); };
+                // Clean up the attributes projected onto the SVG elements
+                return attrToProjector;
             };
             Scatter.prototype._generateDrawSteps = function () {
                 var drawSteps = [];
@@ -8095,6 +8127,12 @@ var Plottable;
                     return dataXRange.min <= x && x <= dataXRange.max && dataYRange.min <= y && y <= dataYRange.max;
                 });
             };
+            Scatter.prototype._entityBBox = function (datum, index, dataset, attrToProjector) {
+                return {
+                    x: attrToProjector["x"](datum, index, dataset),
+                    y: attrToProjector["y"](datum, index, dataset)
+                };
+            };
             /**
              * Gets the Entities at a particular Point.
              *
@@ -8114,6 +8152,94 @@ var Plottable;
                     var size = sizeProjector(datum, index, dataset);
                     return x - size / 2 <= p.x && p.x <= x + size / 2 && y - size / 2 <= p.y && p.y <= y + size / 2;
                 });
+            };
+            Scatter.prototype.label = function (label) {
+                if (label == null) {
+                    return this._label;
+                }
+                this._label = label;
+                this.render();
+                return this;
+            };
+            Scatter.prototype.labelsEnabled = function (enabled) {
+                if (enabled == null) {
+                    return this._labelsEnabled;
+                }
+                else {
+                    this._labelsEnabled = enabled;
+                    this.render();
+                    return this;
+                }
+            };
+            Scatter.prototype._additionalPaint = function (time) {
+                var _this = this;
+                this._renderArea.selectAll(".label-area").remove();
+                if (this._labelsEnabled && this.label() != null) {
+                    Plottable.Utils.Window.setTimeout(function () { return _this._drawLabels(); }, time);
+                }
+            };
+            Scatter.prototype._drawLabels = function () {
+                var _this = this;
+                var dataToDraw = this._getDataToDraw();
+                this.datasets().forEach(function (dataset, i) { return _this._drawLabel(dataToDraw, dataset, i); });
+            };
+            Scatter.prototype._drawLabel = function (dataToDraw, dataset, datasetIndex) {
+                var _this = this;
+                var attrToProjector = this._generateAttrToProjector();
+                var labelArea = this._renderArea.append("g").classed("label-area", true);
+                var measurer = new SVGTypewriter.Measurers.Measurer(labelArea);
+                var writer = new SVGTypewriter.Writers.Writer(measurer);
+                var xRange = this.x().scale.range();
+                var yRange = this.y().scale.range();
+                var xMin = Math.min.apply(null, xRange);
+                var xMax = Math.max.apply(null, xRange);
+                var yMin = Math.min.apply(null, yRange);
+                var yMax = Math.max.apply(null, yRange);
+                var data = dataToDraw.get(dataset);
+                data.forEach(function (datum, datumIndex) {
+                    var label = "" + _this.label()(datum, datumIndex, dataset);
+                    var measurement = measurer.measure(label);
+                    var x = attrToProjector["x"](datum, datumIndex, dataset);
+                    var y = attrToProjector["y"](datum, datumIndex, dataset);
+                    var size = attrToProjector["size"](datum, datumIndex, dataset);
+                    // let horizontalOffset = (measurement.width) / 2;
+                    var verticalOffset = (measurement.height) / 2;
+                    x += size / 2;
+                    y -= verticalOffset + (size / 2);
+                    var xLabelRange = { min: x, max: x + measurement.width };
+                    var yLabelRange = { min: y, max: y + measurement.height };
+                    if (xLabelRange.min < xMin || xLabelRange.max > xMax || yLabelRange.min < yMin || yLabelRange.max > yMax) {
+                        return;
+                    }
+                    if (_this._overlayLabel(xLabelRange, yLabelRange, datumIndex, datasetIndex, dataToDraw)) {
+                        return;
+                    }
+                    var color = attrToProjector["fill"](datum, datumIndex, dataset);
+                    var dark = Plottable.Utils.Color.contrast("white", color) * 1.6 < Plottable.Utils.Color.contrast("black", color);
+                    var g = labelArea.append("g").attr("transform", "translate(" + x + "," + y + ")");
+                    var className = dark ? "dark-label" : "light-label";
+                    g.classed(className, true);
+                    writer.write(label, measurement.width, measurement.height, {
+                        selection: g,
+                        xAlign: "center",
+                        yAlign: "center",
+                        textRotation: 0
+                    });
+                });
+            };
+            Scatter.prototype._overlayLabel = function (labelXRange, labelYRange, datumIndex, datasetIndex, dataToDraw) {
+                var attrToProjector = this._generateAttrToProjector();
+                var datasets = this.datasets();
+                for (var i = datasetIndex; i < datasets.length; i++) {
+                    var dataset = datasets[i];
+                    var data = dataToDraw.get(dataset);
+                    for (var j = (i === datasetIndex ? datumIndex + 1 : 0); j < data.length; j++) {
+                        if (Plottable.Utils.DOM.intersectsBBox(labelXRange, labelYRange, this._entityBBox(data[j], j, dataset, attrToProjector))) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
             };
             Scatter._SIZE_KEY = "size";
             Scatter._SYMBOL_KEY = "symbol";

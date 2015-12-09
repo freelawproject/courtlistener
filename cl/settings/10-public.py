@@ -256,8 +256,8 @@ MARKDOWN_DEUX_STYLES = {
         },
         "safe_mode": "escape",
         "link_patterns": [
-            (re.compile(r'graph\s+#?(\d+)\b', re.I),
-             r'/visualization/scotus-mapper/\1/md/')
+            (re.compile(r'network\s+#?(\d+)\b', re.I),
+             r'/visualizations/scotus-mapper/\1/md/')
         ],
     },
 }

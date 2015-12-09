@@ -84,13 +84,20 @@ emails = {
 message_dict = {
     'too_many_nodes': {
         'level': messages.WARNING,
-        'message': '<strong>That network has too many nodes.</strong> We '
-                   'were unable to create your visualization because the '
-                   'finished product would contain too  many nodes. '
+        'message': '<strong>That network has too many cases.</strong> We '
+                   'were unable to create your network because the '
+                   'finished product would contain too  many cases. '
                    'We\'ve found that in practice, such networks are '
                    'difficult to read and take far too long for our '
                    'servers to create. Try building a smaller network by '
                    'selecting different cases.',
+    },
+    'too_few_nodes': {
+        'level': messages.WARNING,
+        'message': '<strong>That network has no citations between the '
+                   'cases.</strong> With no connections between the cases, we '
+                   'can\'t build a network. Try selecting different cases that '
+                   'you\'re sure cite each other.',
     },
     'fewer_hops_delivered': {
         'level': messages.SUCCESS,

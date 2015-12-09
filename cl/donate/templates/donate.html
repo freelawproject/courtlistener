@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Donate to Free Law Project - CourtListener.com{% endblock %}
+{% block title %}Donate to Free Law Project – CourtListener.com{% endblock %}
 {% block description %}
     CourtListener is an initiative of Free Law Project, a Federal
     501(c)(3) non-profit. Your donations make our work possible and support
@@ -90,13 +90,6 @@
         check_info.show("fast");
         cc_info.hide();
         payment_price.text("Checks are free for us to process!")
-    });
-
-    Modernizr.load({
-        // Sets up HTML5 input placeholders in browsers that don't support them.
-        test: Modernizr.placeholder,
-        nope: '/static/js/placeholder-1.8.6.min.js',
-        complete: function () { $('input, textarea').placeholder(); }
     });
     </script>
 {% endblock %}
