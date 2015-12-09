@@ -281,13 +281,13 @@ if DEVELOPMENT:
     #INSTALLED_APPS.append('debug_toolbar')
     INTERNAL_IPS = ('127.0.0.1',)
 
-    if 'test' in sys.argv:
+    #if 'test' in sys.argv:
         # Does DB in memory during tests
-        DATABASES['default'] = {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': 'sqlite_db',
-        }
-        del DATABASES['old']
+        # DATABASES['default'] = {
+        #    'ENGINE': 'django.db.backends.sqlite3',
+        #    'NAME': 'sqlite_db',
+        #}
+
 
 else:
     SESSION_COOKIE_SECURE = True
@@ -360,5 +360,3 @@ if DEVELOPMENT:
         'level': 'DEBUG',
         'propagate': False,
     }
-
-
