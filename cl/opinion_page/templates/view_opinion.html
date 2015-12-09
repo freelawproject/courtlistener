@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% load text_filters %}
 
-{% block title %}{{ title }} - CourtListener.com{% endblock %}
-{% block og_title %}{{ title }} - CourtListener.com{% endblock %}
+{% block title %}{{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}{{ title }} – CourtListener.com{% endblock %}
 {% block description %}Opinion for {{ title }}{% endblock %}
 {% block og_description %}Opinion for {{ title }}{% endblock %}
 {% block search-form %}{% endblock %}
@@ -27,7 +27,7 @@
 
 
         {# show the admin tools if applicable #}
-        {% if perms.search.change_docket or perms.search.change_opinion_cluster or perms.search.change_citation %}
+        {% if perms.search.change_docket or perms.search.change_opinioncluster or perms.search.change_citation %}
             <div class="sidebar-section">
                 <h3><span>Admin</span></h3>
                 <p>
@@ -35,7 +35,7 @@
                         <a href="{% url 'admin:search_docket_change' cluster.docket.pk %}"
                            class="btn btn-primary btn-xs">Docket</a>
                     {% endif %}
-                    {% if perms.search.change_opinion_cluster %}
+                    {% if perms.search.change_opinioncluster %}
                         <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}"
                            class="btn btn-primary btn-xs">Cluster</a>
                     {% endif %}
@@ -89,7 +89,7 @@
         {# Show cases this case cites #}
         {% if top_authorities %}
             <div id="authorities" class="sidebar-section">
-                <h3><span>Authorities ({{ cluster.authority_data.count }})</span></h3>
+                <h3><span>Authorities ({{ cluster.authority_count }})</span></h3>
                 <p class="bottom">This opinion cites:</p>
                 <ul>
                     {% for authority in top_authorities %}
@@ -194,6 +194,7 @@
                 {{ cluster.docket.docket_number|default:"Unknown" }}
             </span>
         </p>
+        {% if cluster.docket.court_id == 'scotus' %}
         <p class="bottom">
             <span class="meta-data-header">Supreme Court Database ID:</span>
             <span class="meta-data-value">
@@ -206,6 +207,7 @@
                 {% endif %}
             </span>
         </p>
+        {% endif %}
         <p class="bottom">
             <span class="meta-data-header">Judges:</span>
             <span class="meta-data-value">

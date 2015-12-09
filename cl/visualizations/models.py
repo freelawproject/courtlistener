@@ -50,7 +50,7 @@ class SCOTUSMap(models.Model):
         db_index=True,
     )
     date_published = models.DateTimeField(
-        help_text="The moment when the visualization was first published",
+        help_text="The moment when the visualization was first shared",
         db_index=True,
         blank=True,
         null=True,
@@ -70,7 +70,8 @@ class SCOTUSMap(models.Model):
         max_length=75,
     )
     notes = models.TextField(
-        help_text="Any notes that help explain the diagram, in Markdown format",
+        help_text="A description to help explain the diagram, in Markdown "
+                  "format",
         blank=True,
     )
     view_count = models.IntegerField(
@@ -78,7 +79,7 @@ class SCOTUSMap(models.Model):
         default=0,
     )
     published = models.BooleanField(
-        help_text="Whether the visualization can be seen publicly.",
+        help_text="Whether the visualization has been shared.",
         default=False,
     )
     deleted = models.BooleanField(
@@ -106,25 +107,6 @@ class SCOTUSMap(models.Model):
     def referers_displayed(self):
         """Return good referers"""
         return self.referers.filter(display=True).order_by('date_created')
-
-    def make_title(self):
-        """Make a title for the visualization
-
-        Title tries to use the shortest possible case name from the starting
-        and ending clusters plus the number of degrees.
-        """
-        def get_best_case_name(obj):
-            case_name_preference = [
-                obj.case_name_short,
-                obj.case_name,
-                obj.case_name_full
-            ]
-            return next((_ for _ in case_name_preference if _), "Unknown")
-
-        return "{start} to {end}".format(
-            start=get_best_case_name(self.cluster_start),
-            end=get_best_case_name(self.cluster_end),
-        )
 
     def build_nx_digraph(self, parent_authority, visited_nodes, good_nodes,
                          max_hops, hops_taken=0, max_nodes=70):
@@ -331,6 +313,28 @@ class SCOTUSMap(models.Model):
         return reverse('view_visualization', kwargs={'pk': self.pk,
                                                      'slug': self.slug})
 
+    def make_title(self):
+        """Make a title for the network
+
+        Title tries to use the shortest possible case name from the starting
+        and ending clusters plus the number of degrees.
+        """
+
+        def get_best_case_name(obj):
+            case_name_preference = [
+                obj.case_name_short,
+                obj.case_name,
+                obj.case_name_full
+            ]
+            return next((_ for _ in case_name_preference if _), "Unknown")
+
+        return "{start} ({start_year}) to {end} ({end_year})".format(
+                start=get_best_case_name(self.cluster_start),
+                start_year=self.cluster_start.date_filed.year,
+                end=get_best_case_name(self.cluster_end),
+                end_year=self.cluster_end.date_filed.year,
+        )
+
     def save(self, *args, **kwargs):
         # Note that the title needs to be made first, so that the slug can be
         # generated from it.
@@ -338,7 +342,7 @@ class SCOTUSMap(models.Model):
             self.title = trunc(self.make_title(), 200, ellipsis='…')
 
         if self.published is True and self.date_published is None:
-            # First time published.
+            # First time shared.
             self.date_published = now()
 
         if self.deleted is True and self.__original_deleted != self.deleted:

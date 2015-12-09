@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0">
+    <defs>
+        <filter id="whitefade">
+            <feFlood flood-color="white" result="base"></feFlood>
+            <feMorphology result="bigger" in="SourceGraphic" operator="dilate"
+                          radius="5"></feMorphology>
+            <feColorMatrix result="mask" in="bigger" type="matrix"
+                           values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.85 0"></feColorMatrix>
+            <feComposite result="drop" in="base" in2="mask"
+                         operator="in"></feComposite>
+            <feGaussianBlur result="blur" in="drop"
+                            stdDeviation="2"></feGaussianBlur>
+            <feBlend in="SourceGraphic" in2="blur" mode="normal"></feBlend>
+        </filter>
+
+        <filter id="blur" x="0" y="0">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1"/>
+        </filter>
+    </defs>
+</svg>

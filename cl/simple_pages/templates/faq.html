@@ -2,7 +2,7 @@
 {% load honeypot %}
 {% load humanize %}
 
-{% block title %}Frequently Asked Questions - CourtListener.com{% endblock %}
+{% block title %}Frequently Asked Questions – CourtListener.com{% endblock %}
 {% block search-form %}{% endblock %}
 {% block sidebar %}{% endblock %}
 
@@ -29,9 +29,12 @@
             <a href="#real-time-alerts">What are Real Time Alerts?</a><br>
             <a href="#explain-citations">How do you identify citations?</a><br>
             <a href="#oral-args">How do you get the oral arguments you have?</a><br>
-            <a href="#dod">What do you mean by "Degree of Dissent"</a>
         </p>
 
+        <h3 class="bottom">Supreme Court Networks</h3>
+        <p>
+            <a href="#dod">What do you mean by "Degree of Dissent"?</a>
+        </p>
 
         <h3 class="bottom">Coverage and Content</h3>
         <p>
@@ -178,37 +181,19 @@
         player. When the file is ready, it is added to the site and it becomes
         available in search results, podcasts and bulk data.</p>
 
-    <h4 id="dod">What do you mean by "Degree of Dissent"</h4>
-    <p>We use <em>Degree of Dissent</em> in our <a
+ <h3 id="supreme-court-networks">Supreme Court Networks</h3>
+    <h4 id="dod">What do you mean by "Degree of Dissent"?</h4>
+    <p>We use <em>Degree of Dissent</em> (DoD) in our <a
             href="{% url "mapper_homepage" %}">visualizations of Supreme Court
         networks</a> to indicate the average level of disagreement in the cases
         shown. For example, in a network that shows two cases, each with
         unanimous 9-0 votes, there would be no dissent, and so the score would
         be 0. By contrast, if a network had only two cases, each with 5-4
-        decisions, the degree of dissent would be 0.89, indicating a highly
-        dissenting network. A score of 1 represents total disagreement and can
-        only happen when the votes are perfectly split due to a recusal creating
-        an evenly split 4-4 vote&mdash;this has never happened in practice.
+        decisions, the DoD would be 1.0, indicating a highly
+        dissenting network. Mathematically, the DoD for a given case is calculated by multiplying the number of dissents by 0.25. This means that a 9-0 case will have the same DoD as a 8-0 case (0.0) and a 6-3 will have the same DoD as 5-3 case.
     </p>
-    <p>Mathematically, this is calculated by taking the average of the degree of
-        dissent for each case shown in the visualization. Degree of dissent for
-        each case is calculated with:
+    <p>In some cases you may see that the DoD is not using all of the cases in a network, stating something like: "Degree of Dissent: 0.73 for 16 cases of 17." This occurs because some cases do not have vote information in the Supreme Court Database (Spaeth).
     </p>
-    <blockquote>
-        <code>1 - (difference between votes / total number of votes)</code>
-    </blockquote>
-    <p>So, as a final example, let's consider a visualization showing three
-        cases, 8-1, 6-3, and 6-2 (a recusal). The degree of dissent is the
-        average of:
-    </p>
-    <blockquote>
-        <code>
-            1 - (7/9) = 0.22 and<br>
-            1 - (3/9) = 0.66 and<br>
-            1 - (4/8) = 0.50
-        </code>
-    </blockquote>
-    <p>Which comes to 0.46&mdash;a moderate degree of dissent.</p>
 
 
     <h3 id="coverage-and-content">Coverage and Content</h3>
