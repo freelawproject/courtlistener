@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
-from django.db.models import Sum
+from django.db.models import Sum, Count
 from django.utils.timezone import utc, make_aware
 from django.contrib import messages
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
@@ -218,6 +218,19 @@ def show_results(request):
                     date_published__gte=ten_days_ago,
                     published=True,
                 ).count()
+            visualizations = SCOTUSMap.objects.filter(
+                published=True,
+                deleted=False,
+            ).annotate(
+                Count('clusters'),
+            ).filter(
+                # Ensures that we only show good stuff on homepage
+                clusters__count__gt=10,
+            ).order_by(
+                '-date_published',
+                '-date_modified',
+                '-date_created',
+            )[:1]
             render_dict.update({
                 'alerts_in_last_ten': alerts_in_last_ten,
                 'queries_in_last_ten': queries_in_last_ten,
@@ -228,6 +241,7 @@ def show_results(request):
                 'users_in_last_ten': users_in_last_ten,
                 'days_of_oa': days_of_oa,
                 'viz_in_last_ten': viz_in_last_ten,
+                'visualizations': visualizations,
                 'private': False,  # VERY IMPORTANT!
             })
             return render_to_response(
