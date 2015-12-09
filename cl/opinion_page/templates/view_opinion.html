@@ -89,7 +89,7 @@
         {# Show cases this case cites #}
         {% if top_authorities %}
             <div id="authorities" class="sidebar-section">
-                <h3><span>Authorities ({{ cluster.authority_data.count }})</span></h3>
+                <h3><span>Authorities ({{ cluster.authority_count }})</span></h3>
                 <p class="bottom">This opinion cites:</p>
                 <ul>
                     {% for authority in top_authorities %}

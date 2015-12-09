@@ -312,6 +312,7 @@ $(document).ready(function() {
                 target: '#cited-by',
                 placement: 'bottom',
                 arrowOffset: 'center',
+                showPrevButton: false,
                 title: 'The Power of Citation',
                 content: 'Roe v. Wade has been cited hundreds of times since ' +
                     'it was issued in 1973. Looking at these citations can ' +
@@ -322,13 +323,61 @@ $(document).ready(function() {
                 placement: 'top',
                 arrowOffset: 'center',
                 title: 'Authorities',
-                showPrevButton: false,
-                content: '<p>The Authorities section lists all of the ' +
+                content: 'The Authorities section lists all of the ' +
                     'opinions that Roe v. Wade references. These can be ' +
-                    'thought of as the principles it rests on.</p>' +
-                    '<p>That\'s everything for now! Let us know if ' +
-                    'you have any questions.</p>',
+                    'thought of as the principles upon which it rests.',
+                multipage: true,
                 onNext: function(){
+                    window.location = '/visualizations/scotus-mapper/'
+                }
+            },
+            {//8
+                target: '#new-button a',
+                zindex: 2,
+                placement: 'bottom',
+                arrowOffset: 'center',
+                xOffset: 'center',
+                showPrevButton: false,
+                title: 'Supreme Court Network Visualizations',
+                content: '<p>Networks like these show how a line of precedent ' +
+                'evolves. You can make your own network to study an area that ' +
+                'interests you or look at ones other people have shared.</p>' +
+                '<p>For now let\'s skip creating our own and check out what ' +
+                'the final product looks like.</p>',
+                multipage: true,
+                onNext: function () {
+                    window.location = '/visualizations/scotus-mapper/232/roberts-to-crawford/'
+                }
+            },
+            {//9
+                target: "#chart",
+                placement: "top",
+                arrowOffset: 'center',
+                showPrevButton: false,
+                xOffset: 'center',
+                yOffset: 150,
+                title: 'Network Visualizations',
+                content: 'Network visualizations have a lot of information. ' +
+                'To understand them, consider that the most recent case is on ' +
+                'the right and all previous cases are to the left. The ' +
+                'further to the left you go, the more heavily cited the cases ' +
+                'become.'
+            },
+            {//10
+                target: "form",
+                placement: "top",
+                arrowOffset: "center",
+                xOffset: 'center',
+                title: "Different Views",
+                content: '<p>Networks can be adjusted to show several ' +
+                'different perspecives or Degrees of Separation (DoS). Read ' +
+                'the tips in the question marks for more details. There is ' +
+                'also more information in the tabs below or you can create ' +
+                'your own network to share with others via the button on ' +
+                'the right.</p>' +
+                '<p>That\'s everything for now. Let us know if ' +
+                'you have any questions!</p>',
+                onNext: function () {
                     hopscotch.endTour();
                 }
             }
@@ -345,14 +394,11 @@ $(document).ready(function() {
             hopscotch.startTour(tour, 0);
         }
     });
-    // Start it automatically for certain steps.
-    if (hopscotch.getState() === 'feature-tour:0') {
-        hopscotch.startTour(tour);
-    }
-    if (hopscotch.getState() === 'feature-tour:3') {
-        hopscotch.startTour(tour);
-    }
-    if (hopscotch.getState() === 'feature-tour:6') {
+    // Start it automatically for certain steps, if they were directed from
+    // another page.
+    var autoStartIDs = ['feature-tour:0', 'feature-tour:3', 'feature-tour:6',
+                        'feature-tour:8', 'feature-tour:9'];
+    if ($.inArray(hopscotch.getState(), autoStartIDs)){
         hopscotch.startTour(tour);
     }
 

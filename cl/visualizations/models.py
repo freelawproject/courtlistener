@@ -108,27 +108,6 @@ class SCOTUSMap(models.Model):
         """Return good referers"""
         return self.referers.filter(display=True).order_by('date_created')
 
-    def make_title(self):
-        """Make a title for the network
-
-        Title tries to use the shortest possible case name from the starting
-        and ending clusters plus the number of degrees.
-        """
-        def get_best_case_name(obj):
-            case_name_preference = [
-                obj.case_name_short,
-                obj.case_name,
-                obj.case_name_full
-            ]
-            return next((_ for _ in case_name_preference if _), "Unknown")
-
-        return "{start} ({start_year}) to {end} ({end_year})".format(
-            start=get_best_case_name(self.cluster_start),
-            start_year=self.cluster_start.date_filed.year,
-            end=get_best_case_name(self.cluster_end),
-            end_year=self.cluster_end.date_filed.year,
-        )
-
     def build_nx_digraph(self, parent_authority, visited_nodes, good_nodes,
                          max_hops, hops_taken=0, max_nodes=70):
         """Recursively build a networkx graph
@@ -333,6 +312,28 @@ class SCOTUSMap(models.Model):
     def get_absolute_url(self):
         return reverse('view_visualization', kwargs={'pk': self.pk,
                                                      'slug': self.slug})
+
+    def make_title(self):
+        """Make a title for the network
+
+        Title tries to use the shortest possible case name from the starting
+        and ending clusters plus the number of degrees.
+        """
+
+        def get_best_case_name(obj):
+            case_name_preference = [
+                obj.case_name_short,
+                obj.case_name,
+                obj.case_name_full
+            ]
+            return next((_ for _ in case_name_preference if _), "Unknown")
+
+        return "{start} ({start_year}) to {end} ({end_year})".format(
+                start=get_best_case_name(self.cluster_start),
+                start_year=self.cluster_start.date_filed.year,
+                end=get_best_case_name(self.cluster_end),
+                end_year=self.cluster_end.date_filed.year,
+        )
 
     def save(self, *args, **kwargs):
         # Note that the title needs to be made first, so that the slug can be

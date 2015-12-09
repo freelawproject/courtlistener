@@ -40,7 +40,7 @@
                 <div class="white-out">
                     <div class="row">
                         <div class="col-xs-12">
-                            <p class="text-center x-large bottom">Supreme Court Citation Networks
+                            <p class="text-center x-large bottom" id="title">Supreme Court Citation Networks
                             </p>
                             <p class="text-center large gray">A collaboration between Free Law Project and the University of Baltimore School of Law
                             </p>
@@ -50,7 +50,10 @@
                         <div class="col-xs-12">
                             <p class="lead"><strong>With this free tool</strong> you can analyze and study lines of Supreme Court cases by creating citation networks. You can quickly access the full text of all the opinions in your citation network as well as examine all the associated case data from Supreme Court Database (Spaeth). Citation networks are visualized graphically and underlying data is also presented in sortable tables. You can save your networks, edit and comment upon them, and share them too. You can even embed interactive network visualizations in your website or blog.  Learn more by looking below at our gallery of shared networks or by making one yourself.
                             </p>
-                            <div class="text-center v-offset-above-3"><a href="{% url "new_visualization" %}" class="btn btn-sm btn-xl btn-primary">Make a Network</a>
+                            <div class="text-center v-offset-above-3"
+                                 id="new-button"><a
+                                    href="{% url "new_visualization" %}"
+                                    class="btn btn-sm btn-xl btn-primary">Make a Network</a>
                             </div>
                         </div>
                     </div>
