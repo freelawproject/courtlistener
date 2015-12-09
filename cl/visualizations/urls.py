@@ -1,4 +1,6 @@
 from django.conf.urls import url
+from django.contrib.sitemaps.views import sitemap
+
 from cl.visualizations.views import (
     delete_visualization,
     restore_visualization,
@@ -11,6 +13,7 @@ from cl.visualizations.views import (
     view_embedded_visualization,
     view_visualization,
 )
+from cl.visualizations.sitemap import VizSitemap
 
 urlpatterns = [
     url(
@@ -63,5 +66,11 @@ urlpatterns = [
         r'^visualizations/gallery/$',
         gallery,
         name='viz_gallery',
+    ),
+    url(
+        r'^sitemap-visualizations\.xml$',
+        sitemap,
+        {'sitemaps': {'visualizations': VizSitemap}},
+        name='django.contrib.sitemaps.views.sitemap'
     ),
 ]

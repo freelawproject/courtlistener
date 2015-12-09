@@ -7,6 +7,7 @@ from cl.lib import sunburnt
 
 items_per_sitemap = 250
 
+
 @never_cache
 def index_sitemap_maker(request):
     """Generate a sitemap index page
@@ -38,6 +39,7 @@ def index_sitemap_maker(request):
     # Random additional sitemaps.
     sites.extend([
         'https://www.courtlistener.com/sitemap-donate.xml',
+        'https://www.courtlistener.com/sitemap-visualizations.xml',
     ])
 
     xml = loader.render_to_string('sitemap_index.xml', {'sitemaps': sites})
