@@ -75,7 +75,7 @@ class BasicAPIPageTest(TestCase):
         self.assertEqual(r.status_code, 200)
 
     def test_coverage_api(self):
-        r = self.client.get(reverse('coverage_api',
+        r = self.client.get(reverse('coverage_data',
                                     kwargs={'version': 2, 'court': 'ca9'}))
         self.assertEqual(r.status_code, 200)
 

@@ -26,12 +26,15 @@ urlpatterns = [
     url(r'^api/jurisdictions/$',
         views.court_index,
         name='court_index'),
-    url(r'^api/rest-info/(?P<version>v[12])?/?$',
+    url(r'^api/rest-info/(?P<version>v[123])?/?$',
         views.rest_docs,
         name='rest_docs'),
     url(r'^api/bulk-info/$',
         views.bulk_data_index,
         name='bulk_data_index'),
+    url(r'^api/rest/v(?P<version>[123])/coverage/(?P<court>.+)/$',
+        views.coverage_data,
+        name='coverage_data'),
 
     # Pagerank file
     url(r'^api/bulk/external_pagerank/$',

@@ -66,7 +66,7 @@ def rest_docs(request, version):
     courts = make_court_variable()
     court_count = len(courts)
     if version is None:
-        version = 'latest'
+        version = 'vlatest'
     return render_to_response(
         'rest-docs-%s.html' % version,
         {'court_count': court_count,
