@@ -21,31 +21,28 @@
                     href="http://django-tastypie.readthedocs.org/en/latest/">tastypie
                 toolkit</a>.
         </p>
-        <p>This API currently has the following endpoints that can be consumed via GET requests:</p>
+        <p>This API currently has several endpoints. You can get a list of the available endpoints by sending a request to the root of the API
+        </p>
+        <blockquote>
+            <code>curl --header "Accept: application/json"</strong>
+                https://www.courtlistener.com/api/rest/v3/</code>
+        </blockquote>
+
+        <p>That will give you a result listing endpoints like:</p>
         <ol>
+            <li><a href="/api/rest/v3/dockets/">/api/rest/v3/dockets/</a></li>
+            <li><a href="/api/rest/v3/audio/">/api/rest/v3/audio/</a></li>
+            <li><a href="/api/rest/v3/clusters/">/api/rest/v3/clusters/</a></li>
+            <li><a href="/api/rest/v3/opinions/">/api/rest/v3/opinions/</a></li>
+            <li><a href="/api/rest/v3/cites/">/api/rest/v3/cites/</a></li>
+            <li><a href="/api/rest/v3/cited-by/">/api/rest/v3/cited-by/</a></li>
+            <li><a href="/api/rest/v3/citation/">/api/rest/v3/citation/</a></li>
             <li>
-
+                <a href="/api/rest/v3/courts/">/api/rest/v3/courts/</a>
             </li>
+            <li><a href="/api/rest/v3/search/">/api/rest/v3/search/</a></li>
             <li>
-
-            </li>
-            <li>
-
-            </li>
-            <li>
-
-            </li>
-            <li>
-
-            </li>
-            <li>
-
-            </li>
-            <li>
-
-            </li>
-            <li>
-
+                <a href="/api/rest/v3/coverage/all/">/api/rest/v3/coverage/all/</a>
             </li>
         </ol>
 

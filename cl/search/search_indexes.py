@@ -1,9 +1,11 @@
+from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.utils import deepgetattr
 
 from datetime import datetime
 from datetime import time
 from django.core.urlresolvers import NoReverseMatch
 from django.template import loader
+
 
 
 class InvalidDocumentError(Exception):
@@ -46,10 +48,7 @@ class SearchDocument(object):
         self.court_citation_string = item.cluster.docket.court.citation_string
 
         # Cluster
-        if item.cluster.case_name:
-            self.caseName = item.cluster.case_name
-        elif item.cluster.case_name_full:
-            self.caseName = item.cluster.case_name_full
+        self.caseName = best_case_name(item.cluster)
         self.caseNameShort = item.cluster.case_name_short
         self.sibling_ids = [sibling.pk for sibling in item.siblings.all()]
         self.panel_ids = [judge.pk for judge in item.cluster.panel.all()]
@@ -129,10 +128,7 @@ class SearchAudioFile(object):
         self.court_citation_string = item.docket.court.citation_string
 
         # Audio file
-        if item.case_name:
-            self.caseName = item.case_name
-        else:
-            self.caseName = item.case_name_full
+        self.caseName = best_case_name(item)
         self.panel_ids = [judge.pk for judge in item.panel.all()]
         self.judge = item.judges
         self.file_size_mp3 = deepgetattr(item, 'local_path_mp3.size', None)

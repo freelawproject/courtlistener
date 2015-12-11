@@ -3,11 +3,12 @@
 {% load humanize %}
 {% load admin_urls %}
 
-{% block title %}Docket for {{ docket.case_name }} – CourtListener.com{% endblock %}
-{% block og_title %}Docket for {{ docket.case_name }} -
+{% block title %}Docket for {{ docket|best_case_name }} –
     CourtListener.com{% endblock %}
-{% block description %}Docket for {{ docket.case_name }}{% endblock %}
-{% block og_description %}Docket for {{ docket.case_name }}{% endblock %}
+{% block og_title %}Docket for {{ docket|best_case_name }} -
+    CourtListener.com{% endblock %}
+{% block description %}Docket for {{ docket|best_case_name }}{% endblock %}
+{% block og_description %}Docket for {{ docket|best_case_name }}{% endblock %}
 
 {% block sidebar %}{% endblock sidebar %}
 
@@ -21,7 +22,7 @@
                 </a>
             </p>
         {% endif %}
-        <h2>{{ docket.case_name|safe|v_wrapper }}</h2>
+        <h2>{{ docket|best_case_name|safe|v_wrapper }}</h2>
 
         {% if docket.clusters.count %}
         <div>
@@ -53,7 +54,7 @@
                 {% for af in docket.audio_files.all %}
                     <li>
                         <a href="{{ af.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                            {{ af.case_name|safe|v_wrapper }}
+                            {{ af|best_case_name|safe|v_wrapper }}
                         </a>
                         {% if perms.audio.change_audio %}
                             <a href="{% url 'admin:audio_audio_change' af.pk %}"

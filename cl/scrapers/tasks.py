@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from cl.audio.models import Audio
 from cl.citations.tasks import update_document_by_id
+from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.string_utils import anonymize, trunc
 from cl.lib.mojibake import fix_mojibake
 from cl.scrapers.models import ErrorLog
@@ -21,6 +22,7 @@ import glob
 import subprocess
 import time
 import traceback
+
 
 DEVNULL = open('/dev/null', 'w')
 
@@ -303,7 +305,7 @@ def set_mp3_meta_data(audio_obj, mp3_path):
     # Load the file, then create a fresh tag.
     audio_file = eyed3.load(mp3_path)
     audio_file.initTag()
-    audio_file.tag.title = audio_obj.case_name
+    audio_file.tag.title = best_case_name(audio_obj)
     audio_file.tag.album = u'{court}, {year}'.format(
         court=court.full_name,
         year=audio_obj.docket.date_argued.year
@@ -400,7 +402,7 @@ def process_audio_file(pk):
     with open(path_to_tmp_location, 'r') as mp3:
         try:
             cf = ContentFile(mp3.read())
-            file_name = trunc(af.case_name.lower(), 72) + '_cl.mp3'
+            file_name = trunc(best_case_name(af).lower(), 72) + '_cl.mp3'
             af.file_with_date = af.docket.date_argued
             af.local_path_mp3.save(file_name, cf, save=False)
         except:

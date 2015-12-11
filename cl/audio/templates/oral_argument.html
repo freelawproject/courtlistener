@@ -2,7 +2,7 @@
 {% load text_filters %}
 {% load admin_urls %}
 
-{% block title %}{{ title }} – Oral Argument – CourtListener.com{% endblock %}
+{% block title %}Oral Argument for {{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}Oral Argument for {{ title }} – CourtListener.com{% endblock %}
 {% block description %}Oral Argument for {{ title }}{% endblock %}
 {% block og_description %}Oral Argument for {{ title }}{% endblock %}
@@ -30,7 +30,7 @@
             $("#jquery_jplayer_1").jPlayer({
                 ready: function (event) {
                     $(this).jPlayer("setMedia", {
-                        title: "{{ af.case_name }}",
+                        title: "{{ af|best_case_name }}",
                         mp3: "/{{ af.local_path_mp3 }}"
                     });
                 },
@@ -119,7 +119,7 @@
            data-target="#modal-save-favorite, #modal-logged-out"
            title="{% if favorite_form.instance.audio_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
 
-        <h2 class="inline">{{ af.case_name|safe|v_wrapper }}</h2>
+        <h2 class="inline">{{ af|best_case_name|safe|v_wrapper }}</h2>
         {% include "includes/favorites_modal.html" %}
 
         <h3>{{ af.docket.court }}</h3>

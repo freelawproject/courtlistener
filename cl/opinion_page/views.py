@@ -8,6 +8,7 @@ from django.template import RequestContext
 from django.views.decorators.cache import never_cache
 
 from cl.citations.find_citations import get_citations
+from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import search_utils
 from cl.lib.encode_decode import ascii_to_num
 from cl.lib.import_lib import map_citations_to_models
@@ -39,7 +40,7 @@ def view_opinion(request, pk, _):
     # Look up the court, cluster, title and favorite information
     cluster = get_object_or_404(OpinionCluster, pk=pk)
     title = '%s, %s' % (
-        trunc(cluster.case_name, 100),
+        trunc(best_case_name(cluster), 100),
         cluster.citation_string,
     )
     get_string = search_utils.make_get_string(request)
@@ -55,7 +56,7 @@ def view_opinion(request, pk, _):
         favorite_form = FavoriteForm(
             initial={
                 'cluster_id': cluster.pk,
-                'name': trunc(cluster.case_name, 100, ellipsis='...'),
+                'name': trunc(best_case_name(cluster), 100, ellipsis='...'),
             }
         )
 
@@ -81,7 +82,7 @@ def view_authorities(request, pk, slug):
         'view_opinion_authorities.html',
         {
             'title': '%s, %s' % (
-                trunc(cluster.case_name, 100),
+                trunc(best_case_name(cluster), 100),
                 cluster.citation_string
             ),
             'cluster': cluster,
@@ -98,7 +99,7 @@ def cluster_visualizations(request, pk, slug):
         'view_opinion_visualizations.html',
         {
             'title': '%s, %s' % (
-                trunc(cluster.case_name, 100),
+                trunc(best_case_name(cluster), 100),
                 cluster.citation_string
             ),
             'cluster': cluster,

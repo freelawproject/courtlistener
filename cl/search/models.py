@@ -1,6 +1,7 @@
 # coding=utf-8
 import re
 from cl import settings
+from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.model_helpers import make_upload_path
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
@@ -148,7 +149,7 @@ class Docket(models.Model):
             return str(self.pk)
 
     def save(self, *args, **kwargs):
-        self.slug = slugify(trunc(self.case_name, 75))
+        self.slug = slugify(trunc(best_case_name(self), 75))
         super(Docket, self).save(*args, **kwargs)
 
     def get_absolute_url(self):
@@ -463,7 +464,7 @@ class OpinionCluster(models.Model):
     @property
     def caption(self):
         """Make a proper caption"""
-        caption = self.case_name
+        caption = best_case_name(self)
         if self.neutral_cite:
             caption += ", %s" % self.neutral_cite
             return caption  # neutral cites lack the parentheses, so we're done here.
@@ -588,7 +589,7 @@ class OpinionCluster(models.Model):
         return reverse('view_case', args=[self.pk, self.slug])
 
     def save(self, index=True, force_commit=False, *args, **kwargs):
-        self.slug = slugify(trunc(self.case_name, 75))
+        self.slug = slugify(trunc(best_case_name(self), 75))
         super(OpinionCluster, self).save(*args, **kwargs)
         if index:
             from cl.search.tasks import add_or_update_cluster

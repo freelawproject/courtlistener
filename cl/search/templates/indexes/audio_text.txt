@@ -1,8 +1,10 @@
 {# Audio file #}
 {% if item.case_name_full %}
     {{ item.case_name_full }}
-{% else %}
+{% elif item.case_name %}
     {{ item.case_name }}
+{% else %}
+    {{ item.case_name_short }}
 {% endif %}
 
 {# Docket #}
