@@ -26,7 +26,7 @@ urlpatterns = [
     url(r'^api/jurisdictions/$',
         views.court_index,
         name='court_index'),
-    url(r'^api/rest-info/(?P<version>v[12])?/?$',
+    url(r'^api/rest-info/v?(?P<version>[12])?/?$',
         views.rest_docs,
         name='rest_docs'),
     url(r'^api/bulk-info/$',
