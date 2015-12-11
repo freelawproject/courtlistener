@@ -115,6 +115,8 @@ def view_deleted_visualizations(request):
         user=request.user,
         deleted=True,
         date_deleted__gte=thirty_days_ago,
+    ).annotate(
+        Count('clusters'),
     ).order_by(
         '-date_modified',
     )
