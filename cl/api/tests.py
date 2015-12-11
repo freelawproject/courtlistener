@@ -7,16 +7,17 @@ from django.test.utils import override_settings
 from django.utils.timezone import now
 from django.utils.html import escape
 
+from cl.audio.models import Audio
 from cl.api.management.commands.cl_make_bulk_data import Command
 from cl.api.views import coverage_data
-from cl.search.models import Docket, Court, OpinionCluster
+from cl.search.models import Docket, Court, Opinion, OpinionCluster
 from cl.scrapers.management.commands.cl_scrape_oral_arguments import \
     Command as OralArgumentCommand
 from cl.scrapers.test_assets import test_oral_arg_scraper
 
 
 class BulkDataTest(TestCase):
-    fixtures = ['test_court.json']
+    fixtures = ['court_data.json']
     tmp_data_dir = '/tmp/bulk-dir/'
 
     def setUp(self):
@@ -33,6 +34,10 @@ class BulkDataTest(TestCase):
             date_filed=last_month
         )
         self.doc_cluster.save(index=False)
+        opinion = Opinion.objects.create(
+            cluster=self.doc_cluster,
+            type='Lead Opinion'
+        )
 
         # Scrape the audio "site" and add its contents
         site = test_oral_arg_scraper.Site().parse()
@@ -45,11 +50,21 @@ class BulkDataTest(TestCase):
             shutil.rmtree(self.tmp_data_dir)
         except OSError:
             pass
-            
+
     @override_settings(BULK_DATA_DIR=tmp_data_dir)
     def test_make_all_bulk_files(self):
         """Can we successfully generate all bulk files?"""
         Command().execute()
+
+    def test_database_has_objects_for_bulk_export(self):
+        self.assertTrue(Opinion.objects.count() > 0, 'Opinions exist')
+        self.assertTrue(Audio.objects.count() > 0, 'Audio exist')
+        self.assertTrue(Docket.objects.count() > 0, 'Docket exist')
+        self.assertTrue(Court.objects.count() > 0, 'Court exist')
+        self.assertEqual(
+            Court.objects.get(pk='test').full_name,
+            'Testing Supreme Court'
+        )
 
 class BasicAPIPageTest(TestCase):
     """Test the basic views"""

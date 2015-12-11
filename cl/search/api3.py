@@ -16,7 +16,7 @@ from tastypie import fields
 from tastypie import authentication
 from tastypie.authentication import (
     BasicAuthentication as BasicAuthenticationWithUser
-)
+) # wrapped an old Class name being used for now
 from tastypie.constants import ALL
 from tastypie.exceptions import BadRequest
 
@@ -55,14 +55,16 @@ class JurisdictionResource(ModelResourceWithFieldsFilter):
 class DocketResource(ModelResourceWithFieldsFilter):
     court = fields.ForeignKey(
         JurisdictionResource,
-        'court'
+        'court',
+        null=True
     )
     document_uris = fields.ToManyField(
-        'search.api2.DocumentResource',
-        'documents'
+        'cl.search.api3.DocumentResource',
+        'documents',
+        null=True
     )
     audio_uris = fields.ToManyField(
-        'search.api2.AudioResource',
+        'cl.search.api3.AudioResource',
         'audio_files'
     )
 
@@ -155,7 +157,8 @@ class DocumentResource(ModelResourceWithFieldsFilter):
     citation = fields.ForeignKey(
         CitationResource,
         'citation',
-        full=True
+        full=True,
+        null=True
     )
     docket = fields.ForeignKey(
         DocketResource,
@@ -164,6 +167,7 @@ class DocumentResource(ModelResourceWithFieldsFilter):
     court = fields.ForeignKey(
         JurisdictionResource,
         'docket__court',
+        null=True
     )
     html = fields.CharField(
         attribute='html',

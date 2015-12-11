@@ -18,7 +18,7 @@ class Command(BaseCommand):
 
         # Make the main bulk files
         arg_tuples = (
-            ('document', Opinion, 'docket.court_id', api3.DocumentResource),
+            ('document', OpinionCluster, 'docket.court_id', api3.DocumentResource),
             ('audio', Audio, 'docket.court_id', api3.AudioResource),
             ('docket', Docket, 'court_id', api3.DocketResource),
             ('jurisdiction', Court, 'pk', api3.JurisdictionResource),
