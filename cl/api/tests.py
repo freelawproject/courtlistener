@@ -1,11 +1,13 @@
 from datetime import timedelta
 import shutil
 from django.core.urlresolvers import reverse
+from django.http import HttpRequest, JsonResponse
 from django.test import Client, TestCase
 from django.test.utils import override_settings
 from django.utils.timezone import now
 
 from cl.api.management.commands.cl_make_bulk_data import Command
+from cl.api.views import coverage_data
 from cl.search.models import Docket, Court, OpinionCluster
 from cl.scrapers.management.commands.cl_scrape_oral_arguments import \
     Command as OralArgumentCommand
@@ -75,3 +77,32 @@ class BasicAPIPageTest(TestCase):
         r = self.client.get(reverse('coverage_api',
                                     kwargs={'version': 2, 'court': 'ca9'}))
         self.assertEqual(r.status_code, 200)
+
+    def test_coverage_api_via_url(self):
+        # Should hit something like:
+        #  https://www.courtlistener.com/api/rest/v2/coverage/ca2/
+        r = self.client.get('/api/rest/v2/coverage/ca2/')
+        self.assertEqual(r.status_code, 200)
+
+    def test_api_info_page_displays_latest_rest_docs_by_default(self):
+        response = self.client.get('/api/rest-info/')
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'rest-docs-vlatest.html')
+
+    def test_api_info_page_can_display_different_versions_of_rest_docs(self):
+        for version in ['v1', 'v2']:
+            response = self.client.get('/api/rest-info/%s/' % (version,))
+            self.assertEqual(response.status_code, 200)
+            self.assertTemplateUsed(response, 'rest-docs-%s.html' % (version,))
+            self.assertContains(response, 'REST API - %s' % (version.upper(),))
+
+
+class ApiViewTest(TestCase):
+    """Tests views in API module via direct calls and not HTTP"""
+
+    def test_coverage_data_view_provides_court_data(self):
+        response = coverage_data(HttpRequest(), 'v2', 'ca9')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response, JsonResponse)
+        self.assertContains(response, 'annual_counts')
+        self.assertContains(response, 'total')
