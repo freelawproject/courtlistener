@@ -351,7 +351,7 @@ class SCOTUSMap(models.Model):
 
         if self.pk is None:
             # First time being saved.
-            self.slug = trunc(slugify(self.title), 75)
+            self.slug = slugify(trunc(self.title, 75))
             # If we could, we'd add clusters and json here, but you can't do
             # that kind of thing until the first object has been saved.
         super(SCOTUSMap, self).save(*args, **kwargs)

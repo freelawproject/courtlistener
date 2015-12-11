@@ -321,7 +321,7 @@ def scrape_and_parse():
                 # The slug needs to be done here, b/c it is only done automatically
                 # the first time the citation is saved, and this will be
                 # at least the second.
-                cite.slug = trunc(slugify(cite.caseNameShort), 50)
+                cite.slug = slugify(trunc(cite.caseNameShort, 75))
                 cite.save()
 
             if DEBUG >= 4:

@@ -148,7 +148,7 @@ class Docket(models.Model):
             return str(self.pk)
 
     def save(self, *args, **kwargs):
-        self.slug = trunc(slugify(self.case_name), 75)
+        self.slug = slugify(trunc(self.case_name, 75))
         super(Docket, self).save(*args, **kwargs)
 
     def get_absolute_url(self):
@@ -588,7 +588,7 @@ class OpinionCluster(models.Model):
         return reverse('view_case', args=[self.pk, self.slug])
 
     def save(self, index=True, force_commit=False, *args, **kwargs):
-        self.slug = trunc(slugify(self.case_name), 75)
+        self.slug = slugify(trunc(self.case_name, 75))
         super(OpinionCluster, self).save(*args, **kwargs)
         if index:
             from cl.search.tasks import add_or_update_cluster
