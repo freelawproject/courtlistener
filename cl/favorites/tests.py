@@ -3,7 +3,7 @@ from django.test import Client, TestCase
 
 class FavoriteTest(TestCase):
     fixtures = ['authtest_data.json', 'test_objects_search.json',
-                'judge_judy.json']
+                'judge_judy.json', 'test_objects_audio.json']
 
     def setUp(self):
         # Set up some handy variables
