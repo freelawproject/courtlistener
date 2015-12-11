@@ -1,4 +1,10 @@
-[
+[ {
+    "model": "judges.race",
+    "pk": 1,
+    "fields": {
+      "race": "w"
+    }
+  },
   {
     "fields": {
       "gender": "f",
