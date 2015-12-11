@@ -68,7 +68,7 @@ def rest_docs(request, version):
     if version is None:
         version = 'latest'
     return render_to_response(
-        'rest-docs-v%s.html' % version,
+        'rest-docs-%s.html' % version,
         {'court_count': court_count,
          'courts': courts,
          'private': False},

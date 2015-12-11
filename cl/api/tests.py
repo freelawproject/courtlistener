@@ -5,6 +5,7 @@ from django.http import HttpRequest, JsonResponse
 from django.test import Client, TestCase
 from django.test.utils import override_settings
 from django.utils.timezone import now
+from django.utils.html import escape
 
 from cl.api.management.commands.cl_make_bulk_data import Command
 from cl.api.views import coverage_data
@@ -94,7 +95,8 @@ class BasicAPIPageTest(TestCase):
             response = self.client.get('/api/rest-info/%s/' % (version,))
             self.assertEqual(response.status_code, 200)
             self.assertTemplateUsed(response, 'rest-docs-%s.html' % (version,))
-            self.assertContains(response, 'REST API - %s' % (version.upper(),))
+            header = 'REST API &ndash; %s' % (version.upper(),)
+            self.assertContains(response, header)
 
 
 class ApiViewTest(TestCase):
