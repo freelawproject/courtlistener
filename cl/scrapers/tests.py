@@ -11,7 +11,7 @@ from cl.scrapers.management.commands import (
     cl_report_scrape_status, cl_scrape_opinions, cl_scrape_oral_arguments
 )
 from cl.scrapers.tasks import (
-    extract_from_txt, extract_doc_content, extract_by_ocr
+    extract_from_txt, extract_doc_content, extract_by_ocr, process_audio_file
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.search.models import Court, Opinion
@@ -298,3 +298,20 @@ class DupcheckerWithFixturesTest(TestCase):
                     dup_checker.emulate_break,
                     "We should have hit a break but didn't."
                 )
+
+class AudioFileTaskTest(TestCase):
+
+    fixtures = ['judge_judy.json', 'test_objects_search.json',
+                'test_objects_audio.json']
+
+    def test_process_audio_file(self):
+        audio = Audio.objects.get(pk=1)
+        audio.duration = None
+        audio.save()
+
+        audio = Audio.objects.get(pk=1)
+        self.assertNotEqual(audio.duration, 15)
+
+        process_audio_file(pk=1)
+        audio = Audio.objects.get(pk=1)
+        self.assertEqual(audio.duration, 15)

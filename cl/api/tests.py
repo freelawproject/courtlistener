@@ -41,8 +41,11 @@ class BulkDataTest(TestCase):
     def tearDown(self):
         OpinionCluster.objects.all().delete()
         Docket.objects.all().delete()
-        shutil.rmtree(self.tmp_data_dir)
-
+        try:
+            shutil.rmtree(self.tmp_data_dir)
+        except OSError:
+            pass
+            
     @override_settings(BULK_DATA_DIR=tmp_data_dir)
     def test_make_all_bulk_files(self):
         """Can we successfully generate all bulk files?"""

@@ -2,7 +2,7 @@ import logging
 
 from cl.audio.models import Audio
 from cl.lib.api import (
-    ModelResourceWithFieldsFilter, BasicAuthenticationWithUser,
+    ModelResourceWithFieldsFilter,
     PerUserCacheThrottle, SolrList, good_time_filters, numerical_filters,
     good_date_filters
 )
@@ -14,6 +14,9 @@ from cl.search.models import (
 )
 from tastypie import fields
 from tastypie import authentication
+from tastypie.authentication import (
+    BasicAuthentication as BasicAuthenticationWithUser
+)
 from tastypie.constants import ALL
 from tastypie.exceptions import BadRequest
 
