@@ -10,7 +10,8 @@ from django.utils.html import escape
 from cl.audio.models import Audio
 from cl.api.management.commands.cl_make_bulk_data import Command
 from cl.api.views import coverage_data
-from cl.search.models import Docket, Court, Opinion, OpinionCluster
+from cl.search.models import \
+    Docket, Court, Opinion, OpinionCluster, OpinionsCited
 from cl.scrapers.management.commands.cl_scrape_oral_arguments import \
     Command as OralArgumentCommand
 from cl.scrapers.test_assets import test_oral_arg_scraper
@@ -37,6 +38,14 @@ class BulkDataTest(TestCase):
         opinion = Opinion.objects.create(
             cluster=self.doc_cluster,
             type='Lead Opinion'
+        )
+        opinion2 = Opinion.objects.create(
+            cluster=self.doc_cluster,
+            type='Concurrence'
+        )
+        OpinionsCited.objects.create(
+            citing_opinion=opinion2,
+            cited_opinion=opinion
         )
 
         # Scrape the audio "site" and add its contents
@@ -65,6 +74,14 @@ class BulkDataTest(TestCase):
             Court.objects.get(pk='test').full_name,
             'Testing Supreme Court'
         )
+
+    def test_that_make_citation_data_works(self):
+        """Can we select data from the citation table and export it?"""
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute('select * from Document_opinions_cited')
+            results = cursor.fetchall()
+            self.assertTrue(len(results) > 0)
 
 class BasicAPIPageTest(TestCase):
     """Test the basic views"""
