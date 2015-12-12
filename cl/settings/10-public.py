@@ -111,6 +111,17 @@ SOLR_OPINION_URL = 'http://127.0.0.1:8983/solr/collection1'
 SOLR_AUDIO_URL = 'http://127.0.0.1:8983/solr/audio'
 
 
+#########
+# Redis #
+#########
+# Redis is configured with 16 databaes out of the box. This serves to keep them
+# neatly mapped.
+REDIS_DATABASES = {
+    'CELERY': 0,
+    'CACHE': 1,
+}
+
+
 ##########
 # CELERY #
 ##########
@@ -121,8 +132,8 @@ if DEVELOPMENT:
     CELERYD_CONCURRENCY = 2
 else:
     # Celery settings for production sites
-    BROKER_URL = 'redis://'
-    CELERY_RESULT_BACKEND = 'redis://'
+    BROKER_URL = 'redis://localhost:6379/%s' % REDIS_DATABASES['CELERY']
+    CELERY_RESULT_BACKEND = 'redis://localhost:6379/%s' % REDIS_DATABASES['CELERY']
     CELERYD_CONCURRENCY = 20
     BROKER_POOL_LIMIT = 30
     BROKER_TRANSPORT_OPTIONS = {
@@ -138,6 +149,23 @@ else:
 CELERY_DISABLE_RATE_LIMITS = True
 CELERY_SEND_TASK_ERROR_EMAILS = True
 
+
+####################
+# Cache & Sessions #
+####################
+CACHES = {
+    'default': {
+        'BACKEND': 'redis_cache.RedisCache',
+        'LOCATION': 'localhost:6379',
+        'OPTIONS': {
+            'DB': REDIS_DATABASES['CACHE'],
+            'PICKLE_VERSION': 1,
+        },
+    },
+}
+# This sets Redis as the session backend. This is often advised against, but we
+# have pretty good persistency in Redis, so it's fairly well backed up.
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 
 #########
 # Email #
