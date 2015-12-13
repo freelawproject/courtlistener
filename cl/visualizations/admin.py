@@ -45,7 +45,6 @@ class SCOTUSMapAdmin(admin.ModelAdmin):
     readonly_fields = (
         'date_created',
         'date_modified',
-        'date_published',
         'generation_time',
     )
     list_display = (
