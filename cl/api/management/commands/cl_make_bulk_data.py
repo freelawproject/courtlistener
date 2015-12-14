@@ -18,7 +18,7 @@ class Command(BaseCommand):
 
         # Make the main bulk files
         arg_tuples = (
-            ('document', Opinion, 'docket.court_id', api3.DocumentResource),
+            ('document', OpinionCluster, 'docket.court_id', api3.DocumentResource),
             ('audio', Audio, 'docket.court_id', api3.AudioResource),
             ('docket', Docket, 'court_id', api3.DocketResource),
             ('jurisdiction', Court, 'pk', api3.JurisdictionResource),
@@ -54,6 +54,6 @@ class Command(BaseCommand):
         # the document_id and citation_id columns from the
         # Document_opinions_cited table to disk as a compressed CSV.
         os.system(
-            '''psql -c "COPY \\"Document_opinions_cited\\" (from_document, to_document) to stdout DELIMITER ',' CSV HEADER" -d courtlistener --username django | gzip > /tmp/bulk/citation/all.csv.gz'''
+            '''psql -c "COPY \\"search_opinionscited\\" (from_document, to_document) to stdout DELIMITER ',' CSV HEADER" -d courtlistener --username django | gzip > /tmp/bulk/citation/all.csv.gz'''
         )
         print '   - Table created successfully.'
