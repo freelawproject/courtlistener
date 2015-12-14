@@ -275,8 +275,7 @@
                                 <h3><span>Embed</span></h3>
                                 <div class="form-group">
                                     <input type="text"
-                                           value="&lt;iframe height=&quot;500&quot; width=&quot;560&quot; src=&quot;{% if request.is_secure %}https{% else %}http{% endif %}://
-                                                   {{ request.get_host }}{% url "view_embedded_visualization" viz.pk %}&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;"
+                                           value="&lt;iframe height=&quot;475&quot; width=&quot;560&quot; src=&quot;{% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "view_embedded_visualization" viz.pk %}&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;"
                                            onclick="this.select()"
                                            class="form-control"
                                            id="embed-input">
