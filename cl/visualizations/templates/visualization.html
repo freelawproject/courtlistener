@@ -94,13 +94,13 @@
             {% if viz.published or viz.user == user %}
                 <div class="row">
                     <div class="col-xs-12">
-                        <div id="chart"></div>
+                        <div id="chart" data-height="{% block height %}600{% endblock %}"></div>
                         {% block vis-caption %}{% endblock %}
                         {% block vis-forms %}
                             <form action=""
                                   method="POST"
                                   role="form"
-                                  class="v-offset-above-4 v-offset-below-3">
+                                  class="v-offset-above-2 v-offset-below-3">
                                 <div class="row">
                                     <div class="form-group col-md-4">
                                         <label for="chartType">Chart Type&nbsp;<i
