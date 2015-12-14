@@ -78,9 +78,16 @@ class BulkDataTest(TestCase):
 
 class BasicAPIPageTest(TestCase):
     """Test the basic views"""
+    fixtures = ['judge_judy.json', 'test_objects_search.json']
 
     def setUp(self):
         self.client = Client()
+
+        # Need pagerank file for test_pagerank_file()
+        from cl.search.management.commands.cl_calculate_pagerank_networkx \
+            import Command
+        command = Command()
+        command.do_pagerank(chown=False)
 
     def test_api_index(self):
         r = self.client.get(reverse('api_index'))
