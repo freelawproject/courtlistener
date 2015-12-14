@@ -222,61 +222,68 @@
         </p>
         <br>
 
-        <ul class="nav nav-tabs v-offset-below-3" role="tablist">
-            {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
-                <li role="presentation" {% if forloop.first %}class="active"{% endif %}>
-                    <a href="#{{ sub_opinion.type }}{{ forloop.counter }}"
-                       aria-controls="{{ sub_opinion.type }}{{ forloop.counter }}"
-                       role="tab"
-                       data-toggle="tab">{{ sub_opinion.get_type_display }}</a>
-                </li>
-            {% endfor %}
-        </ul>
+        {# Only display tabs and make panels if more than one sub-opinion. #}
+        {% with opinion_count=cluster.sub_opinions.all.count %}
+            {% if opinion_count > 1 %}
+                <ul class="nav nav-tabs v-offset-below-3" role="tablist">
+                    {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                        <li role="presentation" {% if forloop.first %}class="active"{% endif %}>
+                            <a href="#{{ sub_opinion.type }}{{ forloop.counter }}"
+                               aria-controls="{{ sub_opinion.type }}{{ forloop.counter }}"
+                               role="tab"
+                               data-toggle="tab">{{ sub_opinion.get_type_display }}</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
 
-        <div class="tab-content">
-            {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
-                <div role="tabpanel"
-                     class="tab-pane {% if forloop.first %}active{% endif %}"
-                     id="{{ sub_opinion.type }}{{ forloop.counter }}">
+            <div class="tab-content">
+                {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                    <div {% if opinion_count > 1 %}
+                            role="tabpanel"
+                            class="tab-pane {% if forloop.first %}active{% endif %}"
+                        {% endif %}
+                            id="{{ sub_opinion.type }}{{ forloop.counter }}">
 
-                    {% if sub_opinion.extracted_by_ocr %}
-                        <div class="col-sm-12 alert-warning alert">
-                            <p class="bottom">The text of this document was
-                                obtained by analyzing a scanned document
-                                provided by the court. As a result it may have
-                                typos, and you may prefer <a
-                                        href="{{ sub_opinion.download_url }}"
-                                        class="visitable">reading the
-                                    original</a>.
-                            </p>
-                        </div>
-                        <div class="clearfix"></div>
-                    {% endif %}
-                    {% if 'Z' in cluster.source %}
-                    <div id="columbia-text">
-                    {% elif 'L' in cluster.source %}
-                    <div id='lawbox-text'>
-                    {% elif 'R' in cluster.source %}
-                    <div id='resource-org-text'>
-                    {% else %}
-                    <div id='default-text'>
-                    {% endif %}
-                        <div id="opinion-content"> {# used by Zotero, Juris-M #}
-                            {% if sub_opinion.html_with_citations %}
-                                {{ sub_opinion.html_with_citations|safe }}
-                            {% elif sub_opinion.html_columbia %}
-                                {{ sub_opinion.html_columbia|safe }}
-                            {% elif sub_opinion.html_lawbox %}
-                                {{ sub_opinion.html_lawbox|safe }}
-                            {% elif sub_opinion.html %}
-                                {{sub_opinion.html|safe}}
-                            {% else %}
-                                <pre>{{sub_opinion.plain_text}}</pre>
-                            {% endif %}
+                        {% if sub_opinion.extracted_by_ocr %}
+                            <div class="col-sm-12 alert-warning alert">
+                                <p class="bottom">The text of this document was
+                                    obtained by analyzing a scanned document
+                                    provided by the court. As a result it may have
+                                    typos, and you may prefer <a
+                                            href="{{ sub_opinion.download_url }}"
+                                            class="visitable">reading the
+                                        original</a>.
+                                </p>
+                            </div>
+                            <div class="clearfix"></div>
+                        {% endif %}
+                        {% if 'Z' in cluster.source %}
+                        <div id="columbia-text">
+                        {% elif 'L' in cluster.source %}
+                        <div id='lawbox-text'>
+                        {% elif 'R' in cluster.source %}
+                        <div id='resource-org-text'>
+                        {% else %}
+                        <div id='default-text'>
+                        {% endif %}
+                            <div id="opinion-content"> {# used by Zotero, Juris-M #}
+                                {% if sub_opinion.html_with_citations %}
+                                    {{ sub_opinion.html_with_citations|safe }}
+                                {% elif sub_opinion.html_columbia %}
+                                    {{ sub_opinion.html_columbia|safe }}
+                                {% elif sub_opinion.html_lawbox %}
+                                    {{ sub_opinion.html_lawbox|safe }}
+                                {% elif sub_opinion.html %}
+                                    {{sub_opinion.html|safe}}
+                                {% else %}
+                                    <pre>{{sub_opinion.plain_text}}</pre>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
-                </div>
-            {% endfor %}
-        </div>
+                {% endfor %}
+            </div>
+        {% endwith %}
     </article>
 {% endblock %}
