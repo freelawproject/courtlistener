@@ -31,7 +31,7 @@
         <div class="row v-offset-below-3">
             <div class="col-xs-12">
                 <div class="row v-offset-above-3">
-                    {% for viz in visualizations|slice:":1" %}
+                    {% for viz in visualizations|slice:"0" %}
                         <div class="col-xs-12 v-offset-above-3" id="background-chart">
                             <div id="chart-{{ viz.id }}" data-height="200"></div>
                         </div>
@@ -81,7 +81,7 @@
                 <div class="row">
                     <div class="col-sm-12">
                         <h3 class="text-center">Gallery</h3>
-                        {% for viz in visualizations|slice:"1:" %}
+                        {% for viz in visualizations|slice:"1" %}
                             <div id="chart-{{ viz.id }}"></div>
                         {% endfor %}
                     </div>
