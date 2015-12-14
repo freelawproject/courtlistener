@@ -40,7 +40,7 @@ def convert_to_stub_account(user):
     :param user: The user to operate on.
     :return: The new user object.
     """
-    user.first_name = None
+    user.first_name = "Deleted"
     user.last_name = None
     user.username = hashlib.md5(user.email).hexdigest()[:30]
     user.set_unusable_password()

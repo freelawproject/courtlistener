@@ -34,6 +34,7 @@ def verify_honeypot_value(request, field_name):
                                     {'fieldname': field})
             return HttpResponseBadRequest(resp)
 
+
 def check_honeypot(func=None, field_name=None):
     """
         Check request.POST for valid honeypot field.

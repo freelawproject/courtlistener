@@ -1,6 +1,7 @@
 import re
 from django.core import urlresolvers
 from cl.citations import find_citations, match_citations
+from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.search.models import Opinion, OpinionsCited
 from celery import task
 
@@ -46,7 +47,7 @@ def update_document(opinion, index=True):
 
     if DEBUG >= 1:
         print "%s at %s" % (
-            opinion.cluster.case_name,
+            best_case_name(opinion.cluster),
             urlresolvers.reverse(
                 'admin:search_opinioncluster_change',
                 args=(opinion.cluster.pk,),

@@ -24,8 +24,10 @@
 {# Cluster #}
 {% if item.cluster.case_name_full %}
     {{ item.cluster.case_name_full }}
-{% else %}
+{% elif item.cluster.case_name %}
     {{ item.cluster.case_name }}
+{% else %}
+    {{ item.cluster.case_name_short }}
 {% endif %}
 {% for judge in item.cluster.panel.all %}
     {{ judge.name_full }}

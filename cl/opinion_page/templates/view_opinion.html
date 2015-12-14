@@ -8,7 +8,7 @@
 {% block search-form %}{% endblock %}
 
 {% block head %}
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{cluster.case_name|truncatewords:10}}" href="/feed/search/?q=cites:({{ cluster.sub_opinions.all|OR_join }})">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{cluster|best_case_name|truncatewords:10}}" href="/feed/search/?q=cites:({{ cluster.sub_opinions.all|OR_join }})">
 {% endblock %}
 
 {% block footer-scripts %}

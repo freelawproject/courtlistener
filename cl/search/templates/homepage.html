@@ -10,6 +10,10 @@
 
 {% block main-nav %}{% endblock %}
 
+{% block head %}
+    <link rel="stylesheet" href="{{ STATIC_URL }}css/plottable.css"/>
+{% endblock %}
+
 {% block footer-scripts %}
     <script type="text/javascript">
         $(document).ready(function () {
@@ -17,19 +21,26 @@
         });
         // Initialize popovers (required because they're "opt-in for performance reasons")
         $("[data-toggle='popover']").popover();
+        var opinions = {
+            {% for viz in visualizations %}
+                "{{ viz.id }}": {{ viz.json|safe }}{% if not forloop.last %},
+                {% endif %}
+            {% endfor %}
+        };
     </script>
     <script type="application/ld+json">
-    {
-      "@context": "http://schema.org",
-      "@type": "WebSite",
-      "url": "https://www.courtlistener.com/",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://www.courtlistener.com/?q={search_term}",
-        "query-input": "required name=search_term"
-      }
-    }
-</script>
+        {
+          "@context": "http://schema.org",
+          "@type": "WebSite",
+          "url": "https://www.courtlistener.com/",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://www.courtlistener.com/?q={search_term}",
+            "query-input": "required name=search_term"
+          }
+        }
+    </script>
+    {% include "includes/footer-scripts.html" %}
 {% endblock %}
 
 {% block logo %}
@@ -43,7 +54,7 @@
     {% if user.is_authenticated %}
         <div class="navbar-right">
             <ul class="nav navbar-nav">
-                <li><a href="/about/" tabindex="300">About</a></li>
+                <li><a href="{% url "about" %}" tabindex="300">About</a></li>
                 {% if perms.visualizations.has_beta_access %}
                 <li class="dropdown">
                     <a href="#"
@@ -69,21 +80,21 @@
                 </li>
                 {% endif %}
                 <li><a href="{% url "faq" %}" tabindex="301">FAQ</a></li>
-                <li><a href="/coverage/" tabindex="302">Coverage</a></li>
+                <li><a href="{% url "coverage" %}" tabindex="302">Coverage</a></li>
                 <li class="dropdown">
                     <a href="#"
                        class="dropdown-toggle"
                        data-toggle="dropdown"
                        tabindex="303">Profile&nbsp;<i class="gray fa fa-user"></i> <span class="caret"></span></a>
                     <ul class="dropdown-menu" role="menu">
-                        <li><a href="/profile/alerts/"
+                        <li><a href="{% url "profile_alerts" %}"
                                tabindex="304">Alerts</a></li>
                         {% if perms.visualizations.has_beta_access %}
                         <li><a href="{% url "view_visualizations" %}"
                                tabindex="306">Visualizations</a>
                         </li>
                         {% endif %}
-                        <li><a href="/profile/favorites/"
+                        <li><a href="{% url "profile_favorites" %}"
                                tabindex="305">Favorites</a></li>
                         <li><a href="/profile/donations/"
                                tabindex="306">Donations</a></li>
@@ -97,10 +108,10 @@
         </div>
     {% else %}
         <ul class="nav navbar-nav">
-            <li><a href="/about/">About</a></li>
+            <li><a href="{% url "about" %}">About</a></li>
             <li><a href="{% url "faq" %}">FAQ</a></li>
             <li><a href="" class="tour-link">Tour</a></li>
-            <li><a href="/coverage/">Coverage</a></li>
+            <li><a href="{% url "coverage" %}">Coverage</a></li>
         {% if request.path != "/sign-out/" %}
             <li>
                 <a href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}{% if results %}page={{ results.number }}{% endif %}">
@@ -285,9 +296,9 @@
             <p>We download opinions from many jurisdictions on an ongoing basis. Here are the most recent ones.
             </p>
             {% include "includes/search_result.html" with results=results type_override="o" simple=True %}
-            <p>
+            <p class="right">
                 <a href="/?order_by=dateFiled+desc"
-                   class="btn btn-default v-offset-above-2">See Recent Opinions</a>
+                   class="btn btn-primary btn-lg v-offset-above-2">See Recent Opinions</a>
             </p>
         </div>
 
@@ -299,9 +310,9 @@
                 ongoing basis. Here are the most recent ones.
             </p>
             {% include "includes/search_result.html" with results=results_oa type_override="oa" simple=True %}
-            <p>
+            <p class="right">
                 <a href="/?order_by=dateArgued+desc&type=oa"
-                   class="btn btn-default v-offset-above-2">See Recent Oral Arguments</a>
+                   class="btn btn-primary btn-lg v-offset-above-2">See Recent Oral Arguments</a>
             </p>
         </div>
     </div>
@@ -309,8 +320,30 @@
     <div class="row lg-v-offset-below-3">
         {% if perms.visualizations.has_beta_access %}
             <div class="col-sm-6">
-                <h3>Supreme Court Networks&nbsp;<i class="gray fa fa-line-chart"></i></h3>
-                <p>More stuff to go here, including a picture XXX</p>
+                <div class="row">
+                    <div class="col-xs-12">
+                        <h3>Supreme Court Network Visualizations&nbsp;<i class="gray fa fa-line-chart"></i>
+                        </h3>
+                        <p>Supreme Court Network Visualizations allow you to see
+                            and analyze lines of precedent in Supreme Court
+                            cases.
+                        </p>
+                            {% for viz in visualizations %}
+                                <div id="chart-{{ viz.id }}"></div>
+                            {% endfor %}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-xs-12 v-offset-above-2">
+                        <a href="{% url "viz_gallery" %}"
+                           class="btn btn-lg btn-default">See Gallery</a>
+
+                        <p class="float-right">
+                            <a href="{% url "mapper_homepage" %}"
+                               class="btn btn-lg btn-primary">Learn More About SCOTUS Networks</a>
+                        </p>
+                    </div>
+                </div>
             </div>
         {% endif %}
 

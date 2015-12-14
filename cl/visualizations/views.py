@@ -230,6 +230,7 @@ def restore_visualization(request):
             content="Not an ajax request",
         )
 
+
 @ensure_csrf_cookie
 @permission_required('visualizations.has_beta_access')
 @login_required
@@ -292,6 +293,7 @@ def mapper_homepage(request):
 
 
 @permission_required('visualizations.has_beta_access')
+@never_cache
 def gallery(request):
     visualizations = SCOTUSMap.objects.filter(
         published=True,

@@ -1,4 +1,5 @@
 from cl.audio.models import Audio
+from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
 from cl.lib import search_utils
@@ -16,7 +17,7 @@ def view_audio_file(request, pk, _):
     We also test if the item is a favorite and send data as such.
     """
     af = get_object_or_404(Audio, pk=pk)
-    title = "Oral Argument for " + trunc(af.case_name, 100)
+    title = trunc(af.case_name, 100)
     get_string = search_utils.make_get_string(request)
 
     try:
@@ -27,7 +28,7 @@ def view_audio_file(request, pk, _):
         favorite_form = FavoriteForm(
             initial={
                 'audio_id': af.pk,
-                'name': trunc(af.docket.case_name, 100, ellipsis='...'),
+                'name': trunc(best_case_name(af.docket), 100, ellipsis='...'),
             }
         )
 

@@ -13,12 +13,27 @@
         <p>We hope that you will have no need to delete your account, but we
             understand that sometimes people want a clean slate.</p>
 
-        <p class="v-offset-below-3">After you press the button below, your data
+        <p>After you press the button below, your data
             will be deleted and resurrecting your account will not be
             possible.
         </p>
+        <p>The following will be deleted:</p>
+        <ul>
+            {% if request.user.alerts.count > 0 %}
+                <li>All of <a href="{% url "profile_alerts" %}">your alerts</a> ({{ request.user.alerts.count }}).</li>
+            {% endif %}
+            {% if request.user.favorites.count > 0 %}
+                <li>All of <a href="{% url "profile_favorites" %}">your favorites</a> ({{ request.user.favorites.count }}).</li>
+            {% endif %}
+            {% if non_deleted_map_count > 0 %}
+                <li>All of your <a href="{% url "view_visualizations" %}">network visualizations</a> ({{ non_deleted_map_count }}).</li>
+            {% endif %}
+        </ul>
 
-        <a href="{% url "view_settings" %}" class="btn btn-primary">Cancel and Go
+        <p class="v-offset-below-3">If you have any last minute questions or comments, we hope you'll <a href="{% url "contact" %}" target="_blank">share them with us</a> before you delete your account.
+        </p>
+
+        <a href="{% url "view_settings" %}" class="btn btn-success">Cancel and Go
             Back</a>&nbsp;&nbsp;
         <form action="" method="post" class="float-right">{% csrf_token %}
             <button type="submit" class="btn btn-danger">Delete My Account Now</button>

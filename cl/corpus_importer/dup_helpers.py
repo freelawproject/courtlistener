@@ -39,7 +39,7 @@ def merge_cases_simple(new, target_id):
 
     # Recreate the slug from the new case name (this changes the URL, but the
     # old will continue working)
-    target.slug = trunc(slugify(new.case_name), 50)
+    target.slug = slugify(trunc(new.case_name, 75))
 
     # Take the case name from the new item; they tend to be pretty good
     target.case_name = new.case_name

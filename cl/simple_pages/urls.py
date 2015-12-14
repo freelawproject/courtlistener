@@ -6,17 +6,18 @@ from cl.simple_pages.views import (
     coverage_graph, faq, about, browser_warning, serve_static_file, old_terms,
     latest_terms, contribute, markdown_help
 )
+from cl.simple_pages.sitemap import sitemap_maker
 
 mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html', 'mp3')
 
 
 urlpatterns = [
     # Footer stuff
-    url(r'^about/$', about),
+    url(r'^about/$', about, name='about'),
     url(r'^faq/$', faq, name="faq"),
-    url(r'^coverage/$', coverage_graph),
-    url(r'^feeds/$', feeds),
-    url(r'^contribute/$', contribute),
+    url(r'^coverage/$', coverage_graph, name='coverage'),
+    url(r'^feeds/$', feeds, name='feeds_info'),
+    url(r'^contribute/$', contribute, name='contribute'),
     url(r'^contact/$', contact, name="contact"),
     url(r'^contact/thanks/$', contact_thanks),
     url(r'^help/markdown/$', markdown_help, name="markdown_help"),
@@ -33,7 +34,7 @@ urlpatterns = [
     ),
 
     url(r'^terms/v/(\d{1,2})/$', old_terms),
-    url(r'^terms/$', latest_terms),
+    url(r'^terms/$', latest_terms, name='terms'),
 
     # Randoms
     url(r'^tools/$', tools_page),
@@ -41,6 +42,9 @@ urlpatterns = [
 
     # Robots
     url(r'^robots.txt$', robots),
+
+    # Sitemap:
+    url(r'^sitemap-simple-pages\.xml$', sitemap_maker),
 
     # SEO-related stuff
     url(r'^BingSiteAuth.xml$', validate_for_bing),

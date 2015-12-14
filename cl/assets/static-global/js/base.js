@@ -398,7 +398,7 @@ $(document).ready(function() {
     // another page.
     var autoStartIDs = ['feature-tour:0', 'feature-tour:3', 'feature-tour:6',
                         'feature-tour:8', 'feature-tour:9'];
-    if ($.inArray(hopscotch.getState(), autoStartIDs)){
+    if ($.inArray(hopscotch.getState(), autoStartIDs) !== -1){
         hopscotch.startTour(tour);
     }
 

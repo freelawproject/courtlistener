@@ -55,10 +55,12 @@ def compress_whitespace(text, autoescape=None):
     """Compress whitespace in a string as a browser does with HTML
 
     For example, this:
-    text   foo
 
-    bar    baz
-    bcomes: 'text foo bar baz'
+        text   foo
+
+        bar    baz
+
+    Becomes: 'text foo bar baz'
     """
     if autoescape:
         esc = conditional_escape
@@ -117,3 +119,23 @@ def OR_join(queryset):
     This is a one-liner, but you can't do this kind of thing in a template.
     """
     return ' OR '.join([str(item.pk) for item in queryset])
+
+
+@register.filter(is_safe=True)
+def best_case_name(obj):
+    """Take an object and return the highest quality case name possible.
+
+    In general, this means returning the fields in an order like:
+
+        - case_name
+        - case_name_full
+        - case_name_short
+
+    Assumes that the object passed in has all of those attributes.
+    """
+    if obj.case_name:
+        return obj.case_name
+    elif obj.case_name_full:
+        return obj.case_name_full
+    else:
+        return obj.case_name_short

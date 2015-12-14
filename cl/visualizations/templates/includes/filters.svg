@@ -14,7 +14,7 @@
         </filter>
 
         <filter id="blur" x="0" y="0">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="1"/>
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1"></feGaussianBlur>
         </filter>
     </defs>
 </svg>
