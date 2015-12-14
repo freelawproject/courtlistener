@@ -33,7 +33,7 @@ urlpatterns = [
         name='advanced_search'
     ),
 
-    url(r'^terms/v/(\d{1,2})/$', old_terms),
+    url(r'^terms/v/(\d{1,2})/$', old_terms, name='old_terms'),
     url(r'^terms/$', latest_terms, name='terms'),
 
     # Randoms
