@@ -5,10 +5,10 @@ from django.utils.text import get_valid_filename
 def make_upload_path(instance, filename):
     """Return a string like pdf/2010/08/13/foo_v._var.pdf"""
     try:
-        # Cannot do proper type checking here because of circular import
-        # problems when importing Audio, Document, etc.
-        d = instance.file_with_date
+        # Make sure it's an Opinion with a valid OpinionCluster with date_filed
+        d = instance.cluster.date_filed
     except AttributeError:
+        # TODO: update exception to match new data model
         raise NotImplementedError("This function cannot be used without a "
                                   "file_with_date attribute.")
 
@@ -66,4 +66,3 @@ def disable_auto_now_fields(*models):
                 field.auto_now = False
             if hasattr(field, 'auto_now_add'):
                 field.auto_now_add = False
-
