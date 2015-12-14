@@ -10,9 +10,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
 
     {% block meta %}
-    <meta name="description" content="{% block description %}Create alerts, search for and browse the latest court
-        opinions. Updated automatically with the latest court documents. An initiative
-        of Free Law Project.{% endblock %}"/>
+    <meta name="description" content="{% block description %}Create alerts, search for and browse the latest court opinions. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}"/>
     <link rel="author" href="/humans.txt" type="text/plain"/>
 
     {# Open Search Plugin #}
@@ -37,10 +35,13 @@
     <meta property="og:title" content="{% block og_title %}CourtListener{% endblock %}"/>
     <meta property="og:description"
           content="{% block og_description %}Create alerts, search for and browse the latest court opinions.{% endblock %}">
-    <meta property="og:url" content="https://www.courtlistener.com{{ request.path }}"/>
+    <meta property="og:url" content="{% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{{ request.path }}"/>
     <meta property="og:site_name" content="CourtListener"/>
     <meta property="og:image"
-          content="https://www.courtlistener.com/static/png/og-image-300x300.png"/>
+          content="{% block og_image %}{% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{{ STATIC_URL }}png/og-image-300x300.png{% endblock %}"/>
+    <meta property="og:image:type" content="image/png"/>
+    <meta property="og:image:width" content="{% block og_image_width %}300{% endblock %}"/>
+    <meta property="og:image:height" content="{% block og_image_height %}300{% endblock %}"/>
     {% endblock %}
 
     {% block icons %}
