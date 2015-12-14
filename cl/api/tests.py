@@ -75,13 +75,6 @@ class BulkDataTest(TestCase):
             'Testing Supreme Court'
         )
 
-    def test_that_make_citation_data_works(self):
-        """Can we select data from the citation table and export it?"""
-        from django.db import connection
-        with connection.cursor() as cursor:
-            cursor.execute('select * from Document_opinions_cited')
-            results = cursor.fetchall()
-            self.assertTrue(len(results) > 0)
 
 class BasicAPIPageTest(TestCase):
     """Test the basic views"""
