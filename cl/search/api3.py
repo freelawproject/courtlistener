@@ -20,6 +20,7 @@ from tastypie.authentication import (
 from tastypie.constants import ALL
 from tastypie.exceptions import BadRequest
 
+# XXX: What *is* this file? Why does it have a 3 in its name?
 
 logger = logging.getLogger(__name__)
 

@@ -2,19 +2,14 @@ import json
 import os
 
 from cl import settings
-from cl.api import serializers, filters
-from cl.audio.models import Audio
-from cl.lib import api, magic, search_utils, sunburnt
-from cl.search import forms
-from cl.search.models import (
-    Court, OpinionCluster, Docket, OpinionsCited, Opinion
-)
+from cl.lib import magic, search_utils, sunburnt
+from cl.search.models import Court
 from cl.stats import tally_stat
 
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
-from rest_framework import status, pagination, viewsets, permissions, response
+from rest_framework import status
 
 
 def annotate_courts_with_counts(courts, court_count_tuples):
@@ -178,63 +173,3 @@ def deprecated_api(request, v):
         safe=False,
         status=status.HTTP_410_GONE
     )
-
-
-class DocketViewSet(viewsets.ModelViewSet):
-    queryset = Docket.objects.all()
-    serializer_class = serializers.DocketSerializer
-    filter_class = filters.DocketFilter
-
-
-class CourtViewSet(viewsets.ModelViewSet):
-    queryset = Court.objects.exclude(jurisdiction='T')
-    serializer_class = serializers.CourtSerializer
-    filter_class = filters.CourtFilter
-
-
-class AudioViewSet(viewsets.ModelViewSet):
-    queryset = Audio.objects.all()
-    serializer_class = serializers.AudioSerializer
-    filter_class = filters.AudioFilter
-
-
-class OpinionClusterViewSet(viewsets.ModelViewSet):
-    queryset = OpinionCluster.objects.all()
-    serializer_class = serializers.OpinionClusterSerializer
-    filter_class = filters.OpinionClusterFilter
-
-
-class OpinionViewSet(viewsets.ModelViewSet):
-    queryset = Opinion.objects.all()
-    serializer_class = serializers.OpinionSerializer
-    filter_class = filters.OpinionFilter
-
-
-class SearchViewSet(viewsets.ViewSet):
-    # Default permissions use Django permissions, so here we AllowAny, but folks
-    # will need to log in to get past the thresholds.
-    permission_classes = (permissions.AllowAny, )
-
-    def list(self, request, *args, **kwargs):
-        search_form = forms.SearchForm(request.GET)
-        if search_form.is_valid():
-            cd = search_form.cleaned_data
-            if cd['q'] == '':
-                cd['q'] = '*:*'  # Get everything
-
-            paginator = pagination.PageNumberPagination()
-            sl = api.get_object_list(request, cd=cd, paginator=paginator)
-
-            result_page = paginator.paginate_queryset(sl, request)
-            serializer = serializers.SearchResultSerializer(
-                result_page,
-                many=True,
-                context={'schema': sl.conn.schema}
-            )
-            return paginator.get_paginated_response(serializer.data)
-
-        # Invalid search.
-        return response.Response(
-            serializers.errors,
-            status=status.HTTP_400_BAD_REQUEST
-        )

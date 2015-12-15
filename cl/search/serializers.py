@@ -1,6 +1,5 @@
 from collections import OrderedDict
 
-from cl.audio import models as audio_models
 from cl.lib.sunburnt import schema
 from cl.lib.sunburnt.schema import SolrSchema
 from cl.search import models as search_models
@@ -19,6 +18,11 @@ class DocketSerializer(serializers.HyperlinkedModelSerializer):
         view_name='opinioncluster-detail',
         read_only=True,
     )
+    audio_files = serializers.HyperlinkedRelatedField(
+        many=True,
+        view_name='audio-detail',
+        read_only=True,
+    )
     absolute_url = serializers.CharField(source='get_absolute_url',
                                          read_only=True)
 
@@ -32,17 +36,14 @@ class CourtSerializer(serializers.HyperlinkedModelSerializer):
         exclude = ('notes',)
 
 
-class AudioSerializer(serializers.HyperlinkedModelSerializer):
-    absolute_url = serializers.CharField(source='get_absolute_url',
-                                         read_only=True)
-
-    class Meta:
-        model = audio_models.Audio
-
-
 class OpinionClusterSerializer(serializers.HyperlinkedModelSerializer):
     absolute_url = serializers.CharField(source='get_absolute_url',
                                          read_only=True)
+    panel = serializers.HyperlinkedRelatedField(
+            many=True,
+            view_name='judge-detail',
+            read_only=True,
+    )
 
     class Meta:
         model = search_models.OpinionCluster

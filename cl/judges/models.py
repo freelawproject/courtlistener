@@ -123,10 +123,10 @@ class Judge(models.Model):
         return reverse('view_judge', args=[self.pk, self.slug])
 
     def save(self, *args, **kwargs):
-        self.slug = trunc(
-            slugify('%s %s %s %s' % (self.name_first, self.name_middle,
-                                     self.name_last, self.name_suffix)),
-            158,
+        self.slug = slugify(
+            trunc('%s %s %s %s' % (self.name_first, self.name_middle,
+                                   self.name_last, self.name_suffix),
+                  158),
         )
         self.full_clean()
         super(Judge, self).save(*args, **kwargs)

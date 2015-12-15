@@ -7,6 +7,8 @@ from cl.audio.models import Audio
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.lib.utils import mkdir_p
 
+# XXX See: http://www.django-rest-framework.org/api-guide/serializers/#serializing-objects
+# XXX And: http://www.django-rest-framework.org/api-guide/serializers/#dealing-with-multiple-objects
 
 class Command(BaseCommand):
     help = 'Create the bulk files for all jurisdictions and for "all".'

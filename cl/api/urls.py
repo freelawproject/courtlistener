@@ -1,15 +1,19 @@
 from cl.api import views
+from cl.audio import api_views as audio_views
+from cl.judges import api_views as judge_views
+from cl.search import api_views as search_views
 
 from django.conf.urls import url, include
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
-router.register(r'dockets', views.DocketViewSet)
-router.register(r'courts', views.CourtViewSet)
-router.register(r'audio', views.AudioViewSet)
-router.register(r'clusters', views.OpinionClusterViewSet)
-router.register(r'opinions', views.OpinionViewSet)
-router.register(r'search', views.SearchViewSet, base_name='search')
+router.register(r'dockets', search_views.DocketViewSet)
+router.register(r'courts', search_views.CourtViewSet)
+router.register(r'audio', audio_views.AudioViewSet)
+router.register(r'clusters', search_views.OpinionClusterViewSet)
+router.register(r'opinions', search_views.OpinionViewSet)
+router.register(r'judges', judge_views.JudgesViewSet)
+router.register(r'search', search_views.SearchViewSet, base_name='search')
 
 
 urlpatterns = [
