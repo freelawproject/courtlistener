@@ -60,6 +60,6 @@ class SearchViewSet(viewsets.ViewSet):
 
         # Invalid search.
         return response.Response(
-            serializers.errors,
+            search_form.errors,
             status=status.HTTP_400_BAD_REQUEST
         )
