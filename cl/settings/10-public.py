@@ -157,7 +157,6 @@ CACHES = {
         'LOCATION': 'localhost:6379',
         'OPTIONS': {
             'DB': REDIS_DATABASES['CACHE'],
-            'PICKLE_VERSION': 1,
         },
     },
 }

@@ -4,12 +4,18 @@
 {% load humanize %}
 
 {% block title %}Network Graph of {{ viz.title }} – CourtListener.com{% endblock %}
+{% block og_title %}Network Graph of {{ viz.title }} – CourtListener.com{% endblock %}
 {% block description %}
     Network graph of {{ viz.title }} at CourtListener.com
 {% endblock %}
 {% block og_description %}
     Network graph of {{ viz.title }} at CourtListener.com
 {% endblock %}
+{% block og_image %}{% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{{ STATIC_URL }}png/og-viz-image-1000x450.png{% endblock %}
+{% block og_image_width %}1000{% endblock %}
+{% block og_image_height %}450{% endblock %}
+
+
 {% block search-form %}{% endblock %}
 {% block sidebar %}{% endblock %}
 {% block head %}
@@ -94,13 +100,13 @@
             {% if viz.published or viz.user == user %}
                 <div class="row">
                     <div class="col-xs-12">
-                        <div id="chart"></div>
+                        <div id="chart" data-height="{% block height %}600{% endblock %}"></div>
                         {% block vis-caption %}{% endblock %}
                         {% block vis-forms %}
                             <form action=""
                                   method="POST"
                                   role="form"
-                                  class="v-offset-above-4 v-offset-below-3">
+                                  class="v-offset-above-2 v-offset-below-3">
                                 <div class="row">
                                     <div class="form-group col-md-4">
                                         <label for="chartType">Chart Type&nbsp;<i
@@ -275,8 +281,7 @@
                                 <h3><span>Embed</span></h3>
                                 <div class="form-group">
                                     <input type="text"
-                                           value="&lt;iframe height=&quot;500&quot; width=&quot;560&quot; src=&quot;{% if request.is_secure %}https{% else %}http{% endif %}://
-                                                   {{ request.get_host }}{% url "view_embedded_visualization" viz.pk %}&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;"
+                                           value="&lt;iframe height=&quot;475&quot; width=&quot;560&quot; src=&quot;{% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "view_embedded_visualization" viz.pk %}&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;"
                                            onclick="this.select()"
                                            class="form-control"
                                            id="embed-input">

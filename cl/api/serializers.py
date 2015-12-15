@@ -56,14 +56,16 @@ class OpinionSerializer(serializers.HyperlinkedModelSerializer):
         model = search_models.Opinion
 
 
-class OpinionsCitedSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = search_models.OpinionsCited
-
-
 class SearchResultSerializer(serializers.Serializer):
     """The serializer for search results.
     """
+
+    def update(self, instance, validated_data):
+        raise NotImplementedError
+
+    def create(self, validated_data):
+        raise NotImplementedError
+
     solr_field_mappings = {
         schema.SolrBooleanField: serializers.BooleanField,
         schema.SolrUnicodeField: serializers.CharField,

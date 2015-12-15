@@ -9,7 +9,6 @@ router.register(r'courts', views.CourtViewSet)
 router.register(r'audio', views.AudioViewSet)
 router.register(r'clusters', views.OpinionClusterViewSet)
 router.register(r'opinions', views.OpinionViewSet)
-router.register(r'cited-by', views.OpinionsCitedViewSet)
 router.register(r'search', views.SearchViewSet, base_name='search')
 
 

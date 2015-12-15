@@ -749,3 +749,4 @@ class OpinionsCited(models.Model):
 
     class Meta:
         verbose_name_plural = 'Opinions cited'
+        unique_together = ("citing_opinion", "cited_opinion")
