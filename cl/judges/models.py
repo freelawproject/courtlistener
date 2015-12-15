@@ -321,6 +321,9 @@ class Position(models.Model):
         blank=True,
     )
 
+    def __unicode__(self):
+        return '%s: %s at %s' % (self.pk, self.judge.name_full, self.court_id)
+
     def save(self, *args, **kwargs):
         self.full_clean()
         super(Position, self).save(*args, **kwargs)
@@ -375,9 +378,9 @@ class Politician(models.Model):
     )
 
     def __unicode__(self):
-        return u'%s: %s %s %s %s %s' % (self.pk, self.office, self.name_first,
-                                        self.name_middle, self.name_last,
-                                        self.name_suffix)
+        return u'%s: %s %s %s %s %s' % (self.pk, self.get_office_display(),
+                                        self.name_first, self.name_middle,
+                                        self.name_last, self.name_suffix)
 
 
 class RetentionEvent(models.Model):
@@ -680,6 +683,7 @@ class Title(models.Model):
     date_granularity_start = models.CharField(
         choices=DATE_GRANULARITIES,
         max_length=15,
+        blank=True,
     )
     date_end = models.DateField(
         help_text="The year that a judge ceased holding the title.",
@@ -689,6 +693,7 @@ class Title(models.Model):
     date_granularity_end = models.CharField(
         choices=DATE_GRANULARITIES,
         max_length=15,
+        blank=True,
     )
 
     def clean_fields(self, *args, **kwargs):
@@ -802,6 +807,7 @@ class Source(models.Model):
         blank=True,
     )
     date_accessed = models.DateField(
+        help_text="The date the data was gathered.",
         blank=True,
         null=True,
     )

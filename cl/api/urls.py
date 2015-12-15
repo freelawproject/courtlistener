@@ -13,6 +13,17 @@ router.register(r'audio', audio_views.AudioViewSet)
 router.register(r'clusters', search_views.OpinionClusterViewSet)
 router.register(r'opinions', search_views.OpinionViewSet)
 router.register(r'judges', judge_views.JudgesViewSet)
+router.register(r'positions', judge_views.PositionViewSet)
+router.register(r'politicians', judge_views.PoliticianViewSet)
+router.register(r'retention-events', judge_views.RetentionEventViewSet)
+router.register(r'educations', judge_views.EducationViewSet)
+router.register(r'schools', judge_views.SchoolViewSet)
+router.register(r'careers', judge_views.CareerViewSet)
+router.register(r'titles', judge_views.TitleViewSet)
+router.register(r'political-affiliations',
+                judge_views.PoliticalAffiliationViewSet)
+router.register(r'sources', judge_views.SourceViewSet)
+router.register(r'aba-ratings', judge_views.ABARatingViewSet)
 router.register(r'search', search_views.SearchViewSet, base_name='search')
 
 
