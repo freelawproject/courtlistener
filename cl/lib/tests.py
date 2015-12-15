@@ -90,5 +90,6 @@ class TestModelHelpers(TestCase):
 
     def test_make_upload_path_works_with_opinions(self):
         expected = 'mp3/2015/12/14/hotline_bling.mp3'
+        self.opinion.file_with_date = datetime.date(2015, 12, 14)
         path = make_upload_path(self.opinion, 'hotline_bling.mp3')
         self.assertEqual(expected, path)
