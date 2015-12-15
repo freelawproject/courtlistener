@@ -1,6 +1,13 @@
+# coding=utf8
+"""
+Unit tests for lib
+"""
+import datetime
 from django.test import TestCase
 from cl.lib.string_utils import trunc
 from cl.lib.search_utils import make_fq
+from cl.lib.model_helpers import make_upload_path
+from cl.search.models import Opinion, OpinionCluster, Docket, Court
 
 
 class TestStringUtils(TestCase):
@@ -63,3 +70,26 @@ class TestMakeFQ(TestCase):
                 make_fq(cd={key: test[0]}, field=field, key=key),
                 '%s:(%s)' % (field, test[1])
             )
+
+class TestModelHelpers(TestCase):
+    """Test the model_utils helper functions"""
+    fixtures = ['test_court.json']
+
+    def setUp(self):
+        self.court = Court.objects.get(pk='test')
+        self.docket = Docket(case_name=u'Docket', court=self.court)
+        self.opinioncluster = OpinionCluster(
+            case_name=u'Hotline Bling',
+            docket=self.docket,
+            date_filed=datetime.date(2015, 12, 14),
+        )
+        self.opinion = Opinion(
+            cluster=self.opinioncluster,
+            type='Lead Opinion',
+        )
+
+    def test_make_upload_path_works_with_opinions(self):
+        expected = 'mp3/2015/12/14/hotline_bling.mp3'
+        self.opinion.file_with_date = datetime.date(2015, 12, 14)
+        path = make_upload_path(self.opinion, 'hotline_bling.mp3')
+        self.assertEqual(expected, path)

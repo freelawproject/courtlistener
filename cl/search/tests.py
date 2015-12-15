@@ -16,7 +16,7 @@ from lxml import html
 
 from cl.lib.solr_core_admin import get_data_dir
 from cl.lib.test_helpers import SolrTestCase
-from cl.search.models import Court, Docket
+from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.search.management.commands.cl_calculate_pagerank_networkx import \
     Command
 
@@ -137,18 +137,20 @@ class ModelTest(TestCase):
             court=court,
         )
         docket.save()
-        d = Document(
+        oc = OpinionCluster(
             case_name=u"Blah",
             docket=docket,
             date_filed=datetime.date(1899, 1, 1),
-
         )
+        oc.save()
+        o = Opinion(cluster=oc, type='Lead Opinion')
 
         try:
             cf = ContentFile(StringIO.StringIO('blah').read())
-            d.local_path.save('file_name.pdf', cf, save=False)
-            d.save(index=True)
-        except ValueError:
+            o.file_with_date = datetime.date(1899, 1, 1)
+            o.local_path.save('file_name.pdf', cf, save=False)
+            o.save(index=True)
+        except ValueError as e:
             raise ValueError("Unable to save a case older than 1900. Did you "
                              "try to use `strftime`...again?")
 
