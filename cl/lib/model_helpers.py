@@ -66,4 +66,3 @@ def disable_auto_now_fields(*models):
                 field.auto_now = False
             if hasattr(field, 'auto_now_add'):
                 field.auto_now_add = False
-
