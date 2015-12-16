@@ -131,6 +131,6 @@ class DupChecker(dict):
             else:
                 # Not the fifth duplicate. Continue onwards, but don't
                 # emulate a break statement.
-                return False
+                return True
         else:
             return True
