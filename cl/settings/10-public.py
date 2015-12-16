@@ -314,6 +314,7 @@ if DEVELOPMENT:
         db = DATABASES['default']
         db['ENCODING'] = 'UTF8'
         db['TEST_ENCODING'] = 'UTF8'
+        db['CONN_MAX_AGE'] = 0
 
 
 else:
