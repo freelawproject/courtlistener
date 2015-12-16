@@ -2,7 +2,8 @@
 from datetime import timedelta
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
-from django.test import TestCase, LiveServerTestCase
+from django.core.urlresolvers import reverse
+from django.test import LiveServerTestCase
 from django.utils.timezone import now
 from django.utils.http import urlsafe_base64_encode
 from selenium import webdriver
@@ -10,7 +11,7 @@ from selenium import webdriver
 from cl.users.models import UserProfile
 
 
-class UserTest(TestCase):
+class UserTest(LiveServerTestCase):
     fixtures = ['authtest_data.json']
 
     def test_creating_a_new_user(self):
@@ -24,16 +25,30 @@ class UserTest(TestCase):
             'last_name': '☠☠☠☠☠☠☠☠☠☠☠',
             'skip_me_if_alive': '',
         }
-        response = self.client.post('/register/', params, follow=True)
-        self.assertRedirects(response, 'http://testserver/register/success/?next=/')
+        response = self.client.post(
+            '{host}{path}'.format(
+                host=self.live_server_url,
+                path=reverse('register'),
+            ),
+            params,
+            follow=True,
+        )
+        self.assertRedirects(
+            response,
+            '{host}{path}?next=/'.format(
+                host='http://testserver',
+                path=reverse('register_success')
+            ),
+            host=self.live_server_url,
+        )
 
     def test_signing_in(self):
-        """Can we create a user on the backend then sign them into the front end?"""
+        """Can we create a user on the backend then sign them in"""
         params = {
             'username': 'pandora',
             'password': 'password',
         }
-        r = self.client.post('/sign-in/', params, follow=True)
+        r = self.client.post(reverse('sign-in'), params, follow=True)
         self.assertRedirects(r, 'http://testserver/')
 
     def test_confirming_an_email_address(self):
@@ -45,7 +60,10 @@ class UserTest(TestCase):
         u.key_expires = now() + timedelta(days=2)
         u.save()
 
-        r = self.client.get('/email/confirm/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/')
+        r = self.client.get(reverse(
+            'email_confirm',
+            args=['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
+        ))
         self.assertEqual(200, r.status_code,
                          msg="Did not get 200 code when activating account. "
                              "Instead got %s" % r.status_code)
@@ -56,7 +74,10 @@ class UserTest(TestCase):
         # Test the trickier case when an email is associated with many accounts
         UserProfile.objects.filter(pk__in=(3, 4,))\
             .update(key_expires=now() + timedelta(days=2))
-        r = self.client.get('/email/confirm/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab/')
+        r = self.client.get(reverse(
+            'email_confirm',
+            args=['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab'],
+        ))
         self.assertIn('has been confirmed', r.content,
                       msg="Test string not found in response.content")
         self.assertEqual(200, r.status_code,
@@ -89,7 +110,10 @@ class LiveUserTest(LiveServerTestCase):
         This test checks that the email goes out and that the status code
         returned is valid.
         """
-        self.selenium.get('%s%s' % (self.live_server_url, '/reset-password/'))
+        self.selenium.get('{host}{path}'.format(
+            host=self.live_server_url,
+            path=reverse('password_reset'),
+        ))
         email_input = self.selenium.find_element_by_name("email")
         email_input.send_keys('pandora@courtlistener.com')
         email_input.submit()
@@ -99,8 +123,10 @@ class LiveUserTest(LiveServerTestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(
             self.selenium.current_url,
-            '%s%s' % (self.live_server_url,
-                      '/reset-password/instructions-sent/')
+            '{host}{path}'.format(
+                host=self.live_server_url,
+                path=reverse('password_reset_done'),
+            )
         )
 
     def test_set_password_using_the_HTML(self):
@@ -108,10 +134,12 @@ class LiveUserTest(LiveServerTestCase):
         # Generate a token and use it to visit a generated reset URL
         up = UserProfile.objects.get(pk=1)
         token = default_token_generator.make_token(up.user)
-        url = '%s/confirm-password/%s/%s/' % (
-            self.live_server_url,
-            urlsafe_base64_encode(str(up.user.pk)),
-            token,
+        url = '{host}{path}'.format(
+            host=self.live_server_url,
+            path=reverse('confirm_password', kwargs={
+                'uidb64': urlsafe_base64_encode(str(up.user.pk)),
+                'token': token,
+            }),
         )
         self.selenium.get(url)
         #self.selenium.save_screenshot('/home/mlissner/phantom.png')
@@ -130,5 +158,8 @@ class LiveUserTest(LiveServerTestCase):
 
         self.assertEqual(
             self.selenium.current_url,
-            '%s%s' % (self.live_server_url, '/reset-password/complete/')
+            '{host}{path}'.format(
+                host=self.live_server_url,
+                path=reverse('password_reset_complete'),
+            )
         )
