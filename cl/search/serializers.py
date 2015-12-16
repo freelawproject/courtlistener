@@ -40,6 +40,21 @@ class CourtSerializer(serializers.HyperlinkedModelSerializer):
 class OpinionSerializer(serializers.HyperlinkedModelSerializer):
     absolute_url = serializers.CharField(source='get_absolute_url',
                                          read_only=True)
+    cluster = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name='opinioncluster-detail',
+        read_only=True,
+    )
+    author = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name='judge-detail',
+        read_only=True,
+    )
+    joined_by = serializers.HyperlinkedRelatedField(
+            many=True,
+            view_name='judge-detail',
+            read_only=True,
+    )
 
     class Meta:
         model = Opinion
@@ -66,8 +81,7 @@ class OpinionClusterSerializer(serializers.HyperlinkedModelSerializer):
     docket = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='docket-detail',
-        queryset=Docket.objects.all(),
-        style={'base_template': 'input.html'},
+        read_only=True,
     )
 
     sub_opinions = OpinionSerializer(many=True, read_only=True)
