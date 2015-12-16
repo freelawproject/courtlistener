@@ -235,7 +235,6 @@ class DupcheckerWithFixturesTest(TestCase):
                 'test_objects_search.json']
 
     def setUp(self):
-        super(DupcheckerWithFixturesTest, self).setUp()
         self.court = Court.objects.get(pk='test')
 
         # Set the dup_threshold to zero for these tests
@@ -257,7 +256,7 @@ class DupcheckerWithFixturesTest(TestCase):
                 lookup_by='sha1'
             )
             if dup_checker.full_crawl:
-                self.assertTrue(
+                self.assertFalse(
                     onwards,
                     'DupChecker returned %s during a full crawl.' % onwards
                 )
@@ -285,7 +284,7 @@ class DupcheckerWithFixturesTest(TestCase):
                 lookup_by='sha1'
             )
             if dup_checker.full_crawl:
-                self.assertTrue(
+                self.assertFalse(
                     onwards,
                     'DupChecker says to %s during a full crawl.' % onwards)
             else:
