@@ -1,6 +1,8 @@
 from cl.lib.test_helpers import SitemapTest
 from django.test import TestCase
 from django.test.client import Client
+from cl.lib import sunburnt
+from django.conf import settings
 
 
 class ViewDocumentTest(TestCase):
@@ -45,10 +47,38 @@ class RedirectionTest(TestCase):
 class OpinionSitemapTest(SitemapTest):
     def __init__(self, *args, **kwargs):
         super(OpinionSitemapTest, self).__init__(*args, ** kwargs)
-        # Count here will be fickle, as it's a combination of the authority,
-        # binary and regular opinion pages.
-        self.expected_item_count = 18
         self.sitemap_url = '/sitemap-opinions.xml'
 
     def test_does_the_sitemap_have_content(self):
+        # OpinionsSitemap uses the solr index to generate the page, so
+        # the only accurate count to exect comes from the index itself
+        # which will also be based on the fixtures.
+        conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
+        params = {
+            'q': '*:*',
+            'rows': 1000,
+            'start': 0,
+            'fl': ','.join([
+                'absolute_url',
+                'dateFiled',
+                'local_path',
+                'citeCount',
+                'timestamp',
+            ]),
+            'sort': 'dateFiled asc',
+            'caller': 'opinion_sitemap_maker',
+        }
+        search_results_object = conn.raw_query(**params).execute()
+        count = 0
+        # the underlying SitemapTest relies on counting url elements in
+        # the xml response...this logic mimics the creation of the xml,
+        # so we at least know what we *should* get getting for a count
+        # if the SiteMapTest's HTTP client-based test gets an HTTP 200
+        for result in search_results_object:
+            if result.get('local_path') and result.get('local_path') != '':
+                count += 3
+            else:
+                count += 2
+
+        self.expected_item_count = count
         super(OpinionSitemapTest, self).does_the_sitemap_have_content()
