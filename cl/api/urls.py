@@ -7,11 +7,16 @@ from django.conf.urls import url, include
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
+# Search & Audio
 router.register(r'dockets', search_views.DocketViewSet)
 router.register(r'courts', search_views.CourtViewSet)
 router.register(r'audio', audio_views.AudioViewSet)
 router.register(r'clusters', search_views.OpinionClusterViewSet)
 router.register(r'opinions', search_views.OpinionViewSet)
+router.register(r'opinions-cited', search_views.OpinionsCitedViewSet)
+router.register(r'search', search_views.SearchViewSet, base_name='search')
+
+# Judges
 router.register(r'judges', judge_views.JudgesViewSet)
 router.register(r'positions', judge_views.PositionViewSet)
 router.register(r'politicians', judge_views.PoliticianViewSet)
@@ -24,7 +29,6 @@ router.register(r'political-affiliations',
                 judge_views.PoliticalAffiliationViewSet)
 router.register(r'sources', judge_views.SourceViewSet)
 router.register(r'aba-ratings', judge_views.ABARatingViewSet)
-router.register(r'search', search_views.SearchViewSet, base_name='search')
 
 
 urlpatterns = [

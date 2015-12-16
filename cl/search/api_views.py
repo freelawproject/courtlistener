@@ -1,13 +1,14 @@
 from cl.lib import api
-from cl.search.models import Docket, Court, OpinionCluster, Opinion
+from cl.search.models import Docket, Court, OpinionCluster, Opinion, \
+    OpinionsCited
 from cl.search.forms import SearchForm
 from cl.search.filters import (
-    DocketFilter, CourtFilter, OpinionClusterFilter, OpinionFilter
-)
+    DocketFilter, CourtFilter, OpinionClusterFilter, OpinionFilter,
+    OpinionsCitedFilter)
 from cl.search.serializers import (
     DocketSerializer, CourtSerializer, OpinionClusterSerializer,
     OpinionSerializer, SearchResultSerializer,
-)
+    OpinionsCitedSerializer)
 from rest_framework import status, pagination, viewsets, permissions, response
 
 
@@ -33,6 +34,12 @@ class OpinionViewSet(viewsets.ModelViewSet):
     queryset = Opinion.objects.all()
     serializer_class = OpinionSerializer
     filter_class = OpinionFilter
+
+
+class OpinionsCitedViewSet(viewsets.ModelViewSet):
+    queryset = OpinionsCited.objects.all()
+    serializer_class = OpinionsCitedSerializer
+    filter_class = OpinionsCitedFilter
 
 
 class SearchViewSet(viewsets.ViewSet):

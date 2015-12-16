@@ -2,7 +2,8 @@ from collections import OrderedDict
 
 from cl.lib.sunburnt import schema
 from cl.lib.sunburnt.schema import SolrSchema
-from cl.search import models as search_models
+from cl.search.models import Docket, OpinionCluster, Opinion, Court, \
+    OpinionsCited
 
 from rest_framework import serializers
 
@@ -27,26 +28,13 @@ class DocketSerializer(serializers.HyperlinkedModelSerializer):
                                          read_only=True)
 
     class Meta:
-        model = search_models.Docket
+        model = Docket
 
 
 class CourtSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
-        model = search_models.Court
+        model = Court
         exclude = ('notes',)
-
-
-class OpinionClusterSerializer(serializers.HyperlinkedModelSerializer):
-    absolute_url = serializers.CharField(source='get_absolute_url',
-                                         read_only=True)
-    panel = serializers.HyperlinkedRelatedField(
-            many=True,
-            view_name='judge-detail',
-            read_only=True,
-    )
-
-    class Meta:
-        model = search_models.OpinionCluster
 
 
 class OpinionSerializer(serializers.HyperlinkedModelSerializer):
@@ -54,7 +42,38 @@ class OpinionSerializer(serializers.HyperlinkedModelSerializer):
                                          read_only=True)
 
     class Meta:
-        model = search_models.Opinion
+        model = Opinion
+
+
+class OpinionsCitedSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = OpinionsCited
+
+
+class OpinionClusterSerializer(serializers.HyperlinkedModelSerializer):
+    absolute_url = serializers.CharField(source='get_absolute_url',
+                                         read_only=True)
+    panel = serializers.HyperlinkedRelatedField(
+        many=True,
+        view_name='judge-detail',
+        read_only=True,
+    )
+    non_participating_judges = serializers.HyperlinkedRelatedField(
+        many=True,
+        view_name='judge-detail',
+        read_only=True,
+    )
+    docket = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name='docket-detail',
+        queryset=Docket.objects.all(),
+        style={'base_template': 'input.html'},
+    )
+
+    sub_opinions = OpinionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = OpinionCluster
 
 
 class SearchResultSerializer(serializers.Serializer):
