@@ -35,6 +35,7 @@ urlpatterns = [
     # Sitemap
     url(
         r'^sitemap-opinions\.xml',
-        opinion_sitemap_maker
+        opinion_sitemap_maker,
+        name='opinion_sitemap',
     ),
 ]
