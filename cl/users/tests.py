@@ -4,6 +4,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.test import TestCase, LiveServerTestCase
 from django.utils.timezone import now
+from django.utils.http import urlsafe_base64_encode
 from selenium import webdriver
 
 from cl.users.models import UserProfile
@@ -109,7 +110,7 @@ class LiveUserTest(LiveServerTestCase):
         token = default_token_generator.make_token(up.user)
         url = '%s/confirm-password/%s/%s/' % (
             self.live_server_url,
-            up.user.pk,
+            urlsafe_base64_encode(str(up.user.pk)),
             token,
         )
         self.selenium.get(url)
