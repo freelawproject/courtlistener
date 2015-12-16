@@ -32,7 +32,8 @@ class IngestionTest(IndexedSolrTestCase):
         parsed_site = site.parse()
         cl_scrape_opinions.Command().scrape_court(parsed_site, full_crawl=True)
 
-        self.assertTrue(False, msg="Need to check the DB for content here.")
+        opinions = Opinion.objects.all()
+        self.assertTrue(opinions.count() == 6, 'Should have 6 test opinions.')
 
     def test_ingest_oral_arguments(self):
         """Can we successfully ingest oral arguments at a high level?"""
