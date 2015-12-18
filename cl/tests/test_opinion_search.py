@@ -4,16 +4,49 @@ Functional testing of courtlistener
 """
 from cl.tests.base import BaseSeleniumTest
 
-class SearchFunctionalTest(BaseSeleniumTest):
+class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
     fixtures = ['test_court.json', 'authtest_data.json',
         'judge_judy.json', 'test_objects_search.json']
 
-    def test_search_and_facet(self):
-        # Dora fires up her browse and hits up CL
-        self.browser.get(self.server_url)
+    def _navigate_to_wildcard_results(self):
+        pass
 
-        self.fail('finish test')
+    def test_toggle_to_oral_args_search_results(self):
+        # Dora navigates to the global SERP from the homepage
+        self._navigate_to_wildcard_results()
+
+        # Dora sees she has Opinion results, but wants Oral Arguments
+
+        # She clicks on Oral Arguments
+
+        # And notices her result set is now different
+
+    def test_search_and_facet_docket_numbers(self):
+        self.fail('finish the test!')
+
+    def test_search_result_detail_page(self):
+        self.fail('finish the test')
+
+    def test_search_and_add_precedential_results(self):
+        # Dora navigates to CL and just hits Search to just start with
+        # a global result set
+        self._navigate_to_wildcard_results()
+
+        # She notices only Precedential results are being displayed
+
+        # Even though she notices all jurisdictions were included in her search
+
+        # But she also notices the option to select and include
+        # Non-Precedential results. She checks the box.
+
+        # Nothing happens yet.
+
+        # She goes ahead and clicks the Search button again to resubmit
+
+        # And now she notices her result set increases thanks to adding in
+        # those other opinion types!
+        self.fail('Finish the test!')
 
     def test_basic_homepage_search_and_signin_and_signout(self):
         # Dora navigates to the CL website.

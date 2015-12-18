@@ -154,5 +154,23 @@
             "email_confirmed": false,
             "zip_code": null
         }
+    },
+    {
+        "fields": {
+          "username": "admin",
+          "first_name": "Admin",
+          "last_name": "With password 'password'",
+          "is_active": true,
+          "is_superuser": true,
+          "is_staff": true,
+          "last_login": null,
+          "groups": [],
+          "user_permissions": [],
+          "password": "pbkdf2_sha256$20000$DwYV02x33AMD$lniavPf2laatGuJgs7CBZxZfaN4InUysvcEsGmu4Rvg=",
+          "email": "",
+          "date_joined": "2015-12-18T20:05:45.160Z"
+        },
+        "model": "auth.user",
+        "pk": 5
     }
 ]
