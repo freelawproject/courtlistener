@@ -4,16 +4,22 @@ Functional testing of courtlistener
 """
 from cl.tests.base import BaseSeleniumTest
 
-class BasicUserTest(BaseSeleniumTest):
+class SearchFunctionalTest(BaseSeleniumTest):
 
     fixtures = ['test_court.json', 'authtest_data.json',
         'judge_judy.json', 'test_objects_search.json']
 
-    def test_basic_homepage_search_and_signin(self):
-        # Alice Anonymous navigates to the CL website.
+    def test_search_and_facet(self):
+        # Dora fires up her browse and hits up CL
         self.browser.get(self.server_url)
 
-        # At a glance, Alice can see the Latest Opinions, Latest Oral Arguments,
+        self.fail('finish test')
+
+    def test_basic_homepage_search_and_signin_and_signout(self):
+        # Dora navigates to the CL website.
+        self.browser.get(self.server_url)
+
+        # At a glance, Dora can see the Latest Opinions, Latest Oral Arguments,
         # the searchbox (obviously important), and a place to sign in
         page_text = self.browser.find_element_by_tag_name('body').text
         self.assertIn('Latest Opinions', page_text)
@@ -25,7 +31,7 @@ class BasicUserTest(BaseSeleniumTest):
 
         self.assertIn('Sign in / Register', page_text)
 
-        # Alice remembers this Lissner guy and wonders if he's been involved
+        # Dora remembers this Lissner guy and wonders if he's been involved
         # in any litigation. She types his name into the search box and hits
         # Enter
         search_box.send_keys('lissner\n')

@@ -5,6 +5,8 @@ from django.test import LiveServerTestCase
 from selenium import webdriver
 import sys
 
+DESKTOP_WINDOW = (1024, 768)
+MOBILE_WINDOW = (500, 600)
 
 class BaseSeleniumTest(LiveServerTestCase):
     """Base class for Selenium Tests. Sets up a few attributes:
@@ -36,7 +38,7 @@ class BaseSeleniumTest(LiveServerTestCase):
             service_log_path='/var/log/courtlistener/django.log',
         )
         self.browser.implicitly_wait(1)
-        self.browser.set_window_size(1024, 768)
+        self.browser.set_window_size(DESKTOP_WINDOW[0], DESKTOP_WINDOW[1])
 
     def tearDown(self):
         if self.screenshot:
