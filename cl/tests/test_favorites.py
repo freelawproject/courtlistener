@@ -7,7 +7,7 @@ from cl.tests.base import BaseSeleniumTest
 class UserFavoritesTest(BaseSeleniumTest):
 
     fixtures = ['test_court.json', 'authtest_data.json',
-        'judge_judy.json', 'test_objects_search.json']
+        'judge_judy.json', 'test_objects_search.json', 'favorites.json']
 
     def test_anonymous_user_is_prompted_when_favoriting_an_opinion(self):
         # Dora needs to do some research, so she fires up CL and performs
