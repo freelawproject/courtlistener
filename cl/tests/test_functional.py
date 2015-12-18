@@ -2,44 +2,12 @@
 """
 Functional testing of courtlistener
 """
-from django.test import LiveServerTestCase
-from selenium import webdriver
-import sys
+from cl.tests.base import BaseSeleniumTest
 
-class BasicUserTest(LiveServerTestCase):
+class BasicUserTest(BaseSeleniumTest):
 
     fixtures = ['test_court.json', 'authtest_data.json',
         'judge_judy.json', 'test_objects_search.json']
-
-    @classmethod
-    def setUpClass(cls):
-        cls.screenshot = True
-        for arg in sys.argv:
-            if 'liveserver' in arg:
-                cls.server_url = 'http://' + arg.split('=')[1]
-                return
-        super(BasicUserTest, cls).setUpClass()
-        cls.server_url = cls.live_server_url
-
-    @classmethod
-    def tearDownClass(cls):
-        if cls.server_url == cls.live_server_url:
-            super(BasicUserTest, cls).tearDownClass()
-
-    def setUp(self):
-        self.browser = webdriver.PhantomJS(
-            executable_path='/usr/local/phantomjs/phantomjs',
-            service_log_path='/var/log/courtlistener/django.log',
-        )
-        self.browser.implicitly_wait(1)
-        self.browser.set_window_size(1024, 768)
-
-    def tearDown(self):
-        if self.screenshot:
-            print '\nSaving screenshot...'
-            self.browser.save_screenshot(type(self).__name__ + '.png')
-        self.browser.quit()
-
 
     def test_basic_homepage_search_and_signin(self):
         # Alice Anonymous navigates to the CL website.
