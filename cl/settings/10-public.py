@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'markdown_deux',
     'rest_framework',
     'rest_framework.authtoken',
+    'crispy_forms',  # For DRF HTML site.
 
     # CourtListener Apps
     'cl.alerts',

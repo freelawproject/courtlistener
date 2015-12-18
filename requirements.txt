@@ -42,6 +42,7 @@ python-mimeparse==0.1.4
 pytz==2015.7
 redis==2.10.5
 requests==2.7.0
+selenium==2.48.0
 simplejson
 six==1.9.0
 sqlparse==0.1.15

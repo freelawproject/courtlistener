@@ -237,7 +237,7 @@ def delete_profile_done(request):
 @never_cache
 def register(request):
     """allow only an anonymous user to register"""
-    redirect_to = request.REQUEST.get('next', '')
+    redirect_to = request.GET.get('next', '')
     if 'sign-in' in redirect_to:
         # thus, we don't redirect people back to the sign-in form
         redirect_to = ''
@@ -340,7 +340,7 @@ def register(request):
 def register_success(request):
     """Tell the user they have been registered and allow them to continue where
     they left off."""
-    redirect_to = request.REQUEST.get('next', '')
+    redirect_to = request.GET.get('next', '')
     return render_to_response('register/registration_complete.html',
                               {'redirect_to': redirect_to, 'private': True},
                               RequestContext(request))

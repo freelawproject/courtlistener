@@ -53,7 +53,8 @@ urlpatterns = [
             'template_name': 'register/password_reset_confirm.html',
             'set_password_form': CustomSetPasswordForm,
             'extra_context': {'private': True}
-        }
+        },
+        name='confirm_password',
     ),
     url(
         r'^reset-password/complete/$',
@@ -88,12 +89,17 @@ urlpatterns = [
         views.register,
         name="register"
     ),
-    url(r'^register/success/$', views.register_success),
+    url(
+        r'^register/success/$',
+        views.register_success,
+        name='register_success',
+    ),
 
     # Registration pages
     url(
         r'^email/confirm/([0-9a-f]{40})/$',
-        views.confirm_email
+        views.confirm_email,
+        name='email_confirm',
     ),
     url(
         r'^email-confirmation/request/$',

@@ -1,6 +1,6 @@
 from cl.search.models import (
-    Court, OpinionCluster, Docket, Opinion
-)
+    Court, OpinionCluster, Docket, Opinion,
+    OpinionsCited)
 import rest_framework_filters as filters
 
 
@@ -61,4 +61,12 @@ class OpinionFilter(filters.FilterSet):
         model = Opinion
         fields = (
             'id', 'type', 'sha1', 'extracted_by_ocr'
+        )
+
+
+class OpinionsCitedFilter(filters.FilterSet):
+    class Meta:
+        model = OpinionsCited
+        fields = (
+            'citing_opinion', 'cited_opinion',
         )

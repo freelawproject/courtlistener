@@ -4,6 +4,7 @@ from cl.search.models import (
 
 from django.contrib import admin
 
+
 class OpinionAdmin(admin.ModelAdmin):
     fields = (
         'cluster',
@@ -107,6 +108,7 @@ class CourtAdmin(admin.ModelAdmin):
         'short_name',
         'id',
     )
+
 
 class DocketAdmin(admin.ModelAdmin):
     readonly_fields = (

@@ -4,28 +4,15 @@ from django.template import loader
 from django.utils.encoding import smart_str
 
 from cl.lib import sunburnt
-from cl.sitemap import items_per_sitemap
+from cl.sitemap import items_per_sitemap, opinion_solr_params
 
 
 def opinion_sitemap_maker(request):
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
     page = request.GET.get("p", '1')
-    start = (int(page) - 1) * items_per_sitemap
-    params = {
-        'q': '*:*',
-        'rows': items_per_sitemap,
-        'start': start,
-        'fl': ','.join([
-            'absolute_url',
-            'dateFiled',
-            'local_path',
-            'citeCount',
-            'timestamp',
-        ]),
-        'sort': 'dateFiled asc',
-        'caller': 'opinion_sitemap_maker',
-    }
-    search_results_object = conn.raw_query(**params).execute()
+    opinion_solr_params['start'] = (int(page) - 1) * items_per_sitemap
+
+    search_results_object = conn.raw_query(**opinion_solr_params).execute()
 
     # Translate Solr object into something Django's template can use
     urls = []
