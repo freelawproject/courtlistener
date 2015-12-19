@@ -3,14 +3,16 @@
 Functional testing of courtlistener
 """
 from cl.tests.base import BaseSeleniumTest
+from django.conf import settings
 
 class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
-    fixtures = ['test_court.json', 'authtest_data.json',
-        'judge_judy.json', 'test_objects_search.json']
+    fixtures = ['test_court.json', 'judge_judy.json',
+                'test_objects_search.json', 'test_objects_audio.json',
+                'authtest_data.json']
 
     def _navigate_to_wildcard_results(self):
-        pass
+        self.fail('Finish the test.')
 
     def test_toggle_to_oral_args_search_results(self):
         # Dora navigates to the global SERP from the homepage
@@ -49,6 +51,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.fail('Finish the test!')
 
     def test_basic_homepage_search_and_signin_and_signout(self):
+
         # Dora navigates to the CL website.
         self.browser.get(self.server_url)
 
@@ -72,6 +75,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # The browser brings her to a search engine result page with some
         # results. She notices her query is still in the searchbox and
         # has the ability to refine via facets
+        result_count = self.browser.find_element_by_id('result-count')
+        self.assertIn('Results', result_count.text)
         search_box = self.browser.find_element_by_id('id_q')
         self.assertEqual('lissner', search_box.get_attribute('value'))
 
