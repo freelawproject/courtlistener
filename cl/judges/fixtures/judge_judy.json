@@ -6,6 +6,207 @@
     }
   },
   {
+    "model": "judges.race",
+    "pk": 2,
+    "fields": {
+      "race": "b"
+    }
+  },
+  {
+    "fields": {
+      "date_retention": "2015-12-14",
+      "unopposed": true,
+      "date_modified": "2015-12-15T06:16:21.989Z",
+      "votes_yes": 44,
+      "retention_type": "reapp_gov",
+      "votes_no": 2,
+      "won": true,
+      "date_created": "2015-12-15T06:16:21.989Z",
+      "position": 1
+    },
+    "model": "judges.retentionevent",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "date_referred_to_judicial_committee": null,
+      "votes_no": null,
+      "date_granularity_start": "%Y-%m-%d",
+      "date_hearing": null,
+      "court": "ca1",
+      "voice_vote": null,
+      "votes_yes": null,
+      "date_start": "2015-12-14",
+      "date_retirement": null,
+      "date_elected": null,
+      "predecessor": 1,
+      "termination_reason": "",
+      "appointer": 1,
+      "judicial_committee_action": "no_rep",
+      "date_granularity_termination": "",
+      "judge": 1,
+      "date_confirmation": null,
+      "date_judicial_committee_action": null,
+      "date_modified": "2015-12-15T06:16:21.987Z",
+      "date_termination": null,
+      "how_selected": "e_part",
+      "date_created": "2015-12-15T02:01:52.727Z",
+      "date_nominated": null,
+      "nomination_process": "fed_senate",
+      "date_recess_appointment": null
+    },
+    "model": "judges.position",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "name_first": "Bill",
+      "name_last": "Clinton",
+      "office": "p",
+      "date_modified": "2015-12-15T07:05:44.352Z",
+      "name_suffix": "",
+      "name_middle": "",
+      "date_created": "2015-12-15T05:56:00.709Z"
+    },
+    "model": "judges.politician",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "name": "American University",
+      "date_modified": "2010-06-08T00:00:00Z",
+      "unit_id": 131159,
+      "ope_id": 143400,
+      "is_alias_of": null,
+      "date_created": "2010-06-08T00:00:00Z",
+      "ein": 530196549
+    },
+    "model": "judges.school",
+    "pk": 6041
+  },
+  {
+    "fields": {
+      "name": "New York Law School",
+      "date_modified": "2010-06-08T00:00:00Z",
+      "unit_id": 193821,
+      "ope_id": 278300,
+      "is_alias_of": null,
+      "date_created": "2010-06-08T00:00:00Z",
+      "ein": 135645885
+    },
+    "model": "judges.school",
+    "pk": 3938
+  },
+  {
+    "fields": {
+      "school": 6041,
+      "degree": "BA",
+      "date_modified": "2015-12-15T06:25:15.460Z",
+      "degree_year": null,
+      "judge": 1,
+      "date_created": "2015-12-15T06:25:15.460Z"
+    },
+    "model": "judges.education",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "school": 3938,
+      "degree": "JD",
+      "date_modified": "2015-12-15T06:25:15.460Z",
+      "degree_year": 1965,
+      "judge": 1,
+      "date_created": "2015-12-15T06:25:15.460Z"
+    },
+    "model": "judges.education",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "date_modified": "2015-12-15T06:35:48.930Z",
+      "date_end": null,
+      "date_start": "2015-12-14",
+      "job_type": "prac",
+      "organization_name": "Pants, Inc.",
+      "date_granularity_end": "",
+      "judge": 1,
+      "date_created": "2015-12-15T06:35:48.930Z",
+      "date_granularity_start": "%Y-%m-%d",
+      "job_title": "Corporate Lawyer"
+    },
+    "model": "judges.career",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "date_modified": "2015-12-15T06:42:15.263Z",
+      "date_end": null,
+      "date_start": "2015-12-14",
+      "date_granularity_end": "",
+      "judge": 1,
+      "date_created": "2015-12-15T06:42:15.263Z",
+      "title_name": "c-jud",
+      "date_granularity_start": "%Y-%m-%d"
+    },
+    "model": "judges.title",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "political_party": "d",
+      "politician": null,
+      "date_modified": "2015-12-15T07:02:57.585Z",
+      "date_end": null,
+      "date_start": "2015-12-14",
+      "source": "b",
+      "date_granularity_end": "",
+      "judge": 1,
+      "date_created": "2015-12-15T07:02:57.585Z",
+      "date_granularity_start": "%Y-%m-%d"
+    },
+    "model": "judges.politicalaffiliation",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "political_party": "d",
+      "politician": 1,
+      "date_modified": "2015-12-15T07:05:44.354Z",
+      "date_end": null,
+      "date_start": "2015-12-14",
+      "source": "b",
+      "date_granularity_end": "",
+      "judge": null,
+      "date_created": "2015-12-15T07:05:44.354Z",
+      "date_granularity_start": "%Y-%m-%d"
+    },
+    "model": "judges.politicalaffiliation",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "judge": 1,
+      "url": "",
+      "notes": "This is a test.",
+      "date_accessed": "2015-12-15",
+      "date_modified": "2015-12-15T22:30:00.297Z"
+    },
+    "model": "judges.source",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "rating": "nq",
+      "date_modified": "2015-12-15T07:32:16.217Z",
+      "date_granularity_rated": "%Y-%m-%d",
+      "judge": 1,
+      "date_created": "2015-12-15T07:32:16.217Z",
+      "date_rated": "2015-12-14"
+    },
+    "model": "judges.abarating",
+    "pk": 1
+  },
+  {
     "fields": {
       "gender": "f",
       "name_first": "Judith",

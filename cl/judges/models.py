@@ -717,7 +717,8 @@ class Race(models.Model):
     )
 
     def __unicode__(self):
-        return self.get_race_display()
+        # This is used in the API via the StringRelatedField. Do not cthange.
+        return self.race
 
 
 class PoliticalAffiliation(models.Model):

@@ -1,11 +1,9 @@
-from datetime import timedelta
+from datetime import timedelta, date
 import shutil
 from django.core.urlresolvers import reverse
 from django.http import HttpRequest, JsonResponse
-from django.test import Client, TestCase
-from django.test.utils import override_settings
+from django.test import Client, TestCase, override_settings
 from django.utils.timezone import now
-from django.utils.html import escape
 
 from cl.audio.models import Audio
 from cl.api.management.commands.cl_make_bulk_data import Command
@@ -143,3 +141,172 @@ class ApiViewTest(TestCase):
         self.assertIsInstance(response, JsonResponse)
         self.assertContains(response, 'annual_counts')
         self.assertContains(response, 'total')
+
+
+class DRFApiFilterTests(TestCase):
+    """Do the filters work properly?"""
+    fixtures = ['judge_judy.json']
+
+    def assertCount(self, path, q, expected_count):
+        r = self.client.get(path, q)
+        self.assertEqual(len(r.data['results']), expected_count)
+
+    def test_judge_filtering_by_first_name(self):
+        """Can we filter by first name?"""
+        path = reverse('judge-list', kwargs={'version': 'v3'})
+
+        # Filtering with good values brings back 1 result.
+        q = {'name_first__istartswith': 'judith'}
+        self.assertCount(path, q, 1)
+
+        # Filtering with bad values brings back no results.
+        q = {'name_first__istartswith': 'XXX'}
+        self.assertCount(path, q, 0)
+
+    def test_judge_filtering_by_date(self):
+        """Do the various date filters work properly?"""
+        path = reverse('judge-list', kwargs={'version': 'v3'})
+
+        # Exact match for her birthday
+        correct_date = date(1942, 10, 21)
+        q = {'date_dob': correct_date.isoformat()}
+        self.assertCount(path, q, 1)
+
+        # People born after the day before her birthday
+        before = correct_date - timedelta(days=1)
+        q = {'date_dob__gt': before.isoformat()}
+        self.assertCount(path, q, 1)
+
+        # Flip the logic. This should return no results.
+        q = {'date_dob__lt': before.isoformat()}
+        self.assertCount(path, q, 0)
+
+    def test_nested_judge_filtering(self):
+        """Can we filter across various relations?
+
+        Each of these assertions adds another parameter making our final test
+        a pretty complex combination.
+        """
+        path = reverse('judge-list', kwargs={'version': 'v3'})
+        q = dict()
+
+        # No results for a bad query
+        q['educations__degree'] = 'XXX'
+        self.assertCount(path, q, 0)
+
+        # One result for a good query
+        q['educations__degree'] = 'JD'
+        self.assertCount(path, q, 1)
+
+        # Again, no results
+        q['educations__degree_year'] = 1400
+        self.assertCount(path, q, 0)
+
+        # But with the correct year...one result
+        q['educations__degree_year'] = 1965
+        self.assertCount(path, q, 1)
+
+        # Judy went to "New York Law School"
+        q['educations__school__name__istartswith'] = "New York Law"
+        self.assertCount(path, q, 1)
+
+        # Moving on to careers. Bad value, then good.
+        q['careers__job_title__icontains'] = 'XXX'
+        self.assertCount(path, q, 0)
+        q['careers__job_title__icontains'] = 'lawyer'
+        self.assertCount(path, q, 1)
+
+        # Moving on to titles...bad value, then good.
+        q['titles__title_name'] = 'XXX'
+        self.assertCount(path, q, 0)
+        q['titles__title_name'] = 'c-jud'
+        self.assertCount(path, q, 1)
+
+        # Political affiliation filtering...bad, then good.
+        q['political_affiliations__political_party'] = 'XXX'
+        self.assertCount(path, q, 0)
+        q['political_affiliations__political_party'] = 'd'
+        self.assertCount(path, q, 1)
+
+        # Sources
+        about_now = '2015-12-17T00:00:00Z'
+        q['sources__date_modified__gt'] = about_now
+        self.assertCount(path, q, 0)
+        q.pop('sources__date_modified__gt')  # Next key doesn't overwrite.
+        q['sources__date_modified__lt'] = about_now
+        self.assertCount(path, q, 1)
+
+        # ABA Ratings
+        q['aba_ratings__rating'] = 'q'
+        self.assertCount(path, q, 0)
+        q['aba_ratings__rating'] = 'nq'
+        self.assertCount(path, q, 1)
+
+
+    def test_education_filtering(self):
+        """Can we filter education objects?"""
+        path = reverse('education-list', kwargs={'version': 'v3'})
+        q = dict()
+
+        # Filter by degree
+        q['degree'] = 'XXX'
+        self.assertCount(path, q, 0)
+        q['degree'] = 'JD'
+        self.assertCount(path, q, 1)
+
+        # Filter by degree's related field, School
+        q['school__name__istartswith'] = 'XXX'
+        self.assertCount(path, q, 0)
+        q['school__name__istartswith'] = 'New York'
+        self.assertCount(path, q, 1)
+
+    def test_title_filtering(self):
+        """Can Judge Titles be filtered?"""
+        path = reverse('title-list', kwargs={'version': 'v3'})
+        q = dict()
+
+        # Filter by title_name
+        q['title_name'] = 'XXX'
+        self.assertCount(path, q, 0)
+        q['title_name'] = 'c-jud'
+        self.assertCount(path, q, 1)
+
+    def test_reverse_filtering(self):
+        """Can we filter Source objects by judge name?"""
+        # I want any source notes about judge judy.
+        path = reverse('source-list', kwargs={'version': 'v3'})
+        q = {'judge': 1}
+        self.assertCount(path, q, 1)
+
+    def test_position_filters(self):
+        """Can we filter on positions"""
+        path = reverse('position-list', kwargs={'version': 'v3'})
+        q = dict()
+
+        # I want positions to do with judge #1 (Judy)
+        q['judge'] = 1
+        self.assertCount(path, q, 1)
+
+        # Retention events
+        q['rentention_events__retention_type'] = 'reapp_gov'
+        self.assertCount(path, q, 1)
+
+        # Appointer was Bill, a Democrat
+        q['appointer__name_first__istartswith'] = 'bill'
+        q['appointer__political_affiliations__political_party'] = 'd'
+        self.assertCount(path, q, 1)
+        # She was not appointed by a Republican
+        q['appointer__political_affiliations__political_party'] = 'r'
+        self.assertCount(path, q, 0)
+
+    def test_racial_filters(self):
+        """Can we filter by race?"""
+        path = reverse('judge-list', kwargs={'version': 'v3'})
+        q = {'race': 'w'}
+        self.assertCount(path, q, 1)
+
+        # Do an OR. This returns judges that are either black or white (not
+        # that it matters, MJ)
+        q['race'] = ['w', 'b']
+        self.assertCount(path, q, 1)
+
