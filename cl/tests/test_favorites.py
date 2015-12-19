@@ -27,11 +27,8 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # On the detail page she now sees it might be useful later, so she
         # clicks on the little star next to the result result title
-        self.assertIn(
-            'Back to Search Results',
-            self.browser.find_element_by_tag_name('body').text
-        )
-
+        self.assert_text_in_body('Back to Search Results')
+        title = self.browser.find_element_by_css_selector('article h2').text
         star = self.browser.find_element_by_id('favorites-star')
         self.assertEqual(
             star.get_attribute('title').strip(),
@@ -40,16 +37,29 @@ class UserFavoritesTest(BaseSeleniumTest):
         star.click()
 
         # Oops! She's not signed in and she sees a prompt telling her as such
+        link = self.browser.find_element_by_css_selector('#modal-logged-out a')
+        self.assertIn('Sign in or register to save a favorite', link.text)
+        link.click()
 
         # Clicking it brings her to the sign in page
+        self.assert_text_in_body('Sign in')
+        self.assert_text_in_body('Username')
+        self.assert_text_in_body('Password')
 
         # She logs in
+        self.browser.find_element_by_id('username').send_keys('pandora')
+        self.browser.find_element_by_id('password').send_keys('password\n')
 
         # And is brought back to that item!
+        self.assert_text_in_body(title.strip())
 
         # Clicking the star now brings up the "Save Favorite" dialog. Nice!
+        star = self.browser.find_element_by_id('favorites-star')
+        star.click()
 
-        self.fail('finish test')
+        self.browser.find_element_by_id('modal-save-favorite')
+        modal_title = self.browser.find_element_by_id('save-favorite-title')
+        self.assertIn('Save Favorite', modal_title.text)
 
     def test_logged_in_user_can_save_favorite(self):
         # Dora goes to CL, logs in, and does a search on her topic of interest

@@ -45,3 +45,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             print '\nSaving screenshot...'
             self.browser.save_screenshot(type(self).__name__ + '.png')
         self.browser.quit()
+
+
+    def assert_text_in_body(self, text):
+        self.assertIn(text, self.browser.find_element_by_tag_name('body').text)
