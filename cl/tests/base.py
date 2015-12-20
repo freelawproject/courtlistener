@@ -46,7 +46,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
     def tearDownClass(cls):
         if cls.server_url == cls.live_server_url:
             super(BaseSeleniumTest, cls).tearDownClass()
-        cls._teardown_test_solr()
+        #cls._teardown_test_solr()
 
     def setUp(self):
         self.browser = webdriver.PhantomJS(
@@ -71,12 +71,21 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         """ Try to initialize a pair of Solr cores for testing purposes """
 
         print '>> initializing test solr cores...'
-        create_solr_core(TEST_OPINION_CORE)
+        # data_dir, if left blank, ends up bing put in /tmp/solr/...
+        create_solr_core(
+            TEST_OPINION_CORE,
+            data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr',
+                'data_opinion_test'),
+            schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
+                                'schema.xml'),
+            instance_dir='/usr/local/solr/example/solr/opinion_test')
         create_solr_core(
             TEST_AUDIO_CORE,
+            data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr',
+                'data_audio_test'),
             schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
                                 'audio_schema.xml'),
-            instance_dir='/usr/local/solr/example/solr/audio',
+            instance_dir='/usr/local/solr/example/solr/audio_test',
         )
         swap_solr_core('collection1', TEST_OPINION_CORE)
         swap_solr_core('audio', TEST_AUDIO_CORE)
@@ -121,3 +130,26 @@ class SolrBackendTest(BaseSeleniumTest):
             params={'q':'lissner'})
         self.assertEqual(r.status_code, 200)
         self.assertIn('Lissner v. Saad', r.text)
+
+class SearchViewTest(BaseSeleniumTest):
+
+    fixtures = ['test_court.json', 'judge_judy.json',
+                'test_objects_search.json', 'test_objects_audio.json',
+                'authtest_data.json']
+
+    def test_do_search_function(self):
+        from cl.search.forms import SearchForm
+        from cl.search.views import do_search
+        from django.http import HttpRequest
+        request = HttpRequest()
+        request.method = 'GET'
+        request.GET['q'] = 'lissner'
+        request.GET['stat_Precedential'] = 'on'
+        response = do_search(request)
+
+        self.assertIsInstance(response['search_form'], SearchForm)
+        self.assertIsNotNone(response['results'])
+        paginator = response['results'].paginator
+        print 'Pagination: %s' % (paginator.object_list,)
+        print 'Case: %s' % (paginator.object_list.solr_highlights.caseName)
+        self.assertTrue(response['results'].paginator.count > 0)

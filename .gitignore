@@ -19,6 +19,8 @@ cl/assets/static/
 # Solr
 Solr/data/
 Solr/data_audio/
+Solr/data_opinion_test/
+Solr/data_audio_test/
 
 # IntelliJ IDEA files
 .idea
