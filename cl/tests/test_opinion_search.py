@@ -12,9 +12,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     Test some of the primary search functionality of CL: searching opinions.
     These tests should exercise all aspects of using the search box and SERP.
     """
-    fixtures = ['test_court.json', 'judge_judy.json',
-                'test_objects_search.json', 'test_objects_audio.json',
-                'authtest_data.json']
+    fixtures = ['test_court.json', 'authtest_data.json',
+        'judge_judy.json', 'test_objects_search.json']
 
     @skip('finish the test')
     def _navigate_to_wildcard_results(self):

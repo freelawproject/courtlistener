@@ -17,5 +17,24 @@
             "notes": "",
             "date_modified": "2013-08-14T16:46:30Z"
         }
+    },
+    {
+        "pk": "ca1",
+        "model": "search.court",
+        "fields": {
+            "jurisdiction": "F",
+            "end_date": null,
+            "citation_string": "1st Cir.",
+            "short_name": "First Circuit",
+            "in_use": true,
+            "url": "http://www.ca1.uscourts.gov/",
+            "notes": "",
+            "date_modified": "2013-08-14T16:46:30Z",
+            "full_name": "Court of Appeals for the First Circuit",
+            "position": 101.0,
+            "has_opinion_scraper": true,
+            "has_oral_argument_scraper": true,
+            "start_date": "1891-03-03"
+        }
     }
 ]
