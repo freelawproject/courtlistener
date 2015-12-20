@@ -84,7 +84,11 @@ class OpinionClusterSerializer(serializers.HyperlinkedModelSerializer):
         read_only=True,
     )
 
-    sub_opinions = OpinionSerializer(many=True, read_only=True)
+    sub_opinions = serializers.HyperlinkedRelatedField(
+        many=True,
+        view_name='opinion-detail',
+        read_only=True,
+    )
 
     class Meta:
         model = OpinionCluster

@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'crispy_forms',  # For DRF HTML site.
+    'django_filters',
 
     # CourtListener Apps
     'cl.alerts',
@@ -85,6 +86,9 @@ INSTALLED_APPS = [
     'cl.users',
     'cl.visualizations',
 ]
+
+if DEVELOPMENT:
+    INSTALLED_APPS.append('django_extensions')
 
 
 # This is where the @login_required decorator redirects. By default it's
@@ -251,13 +255,16 @@ REST_FRAMEWORK = {
 
     # Filtering
     'DEFAULT_FILTER_BACKENDS': (
-        'rest_framework_filters.backends.DjangoFilterBackend',
+        'rest_framework.filters.DjangoFilterBackend',
     ),
 
     # Assorted & Sundry
     'PAGE_SIZE': 20,
     'URL_FIELD_NAME': 'resource_uri',
 }
+
+if DEVELOPMENT:
+    REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']['anon'] = '10000/day'
 
 # CORS
 CORS_ORIGIN_ALLOW_ALL = True
