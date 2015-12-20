@@ -2,15 +2,16 @@
 Base class(es) for functional testing CourtListener using Selenium and PhantomJS
 """
 from django.conf import settings
-from django.core.management import call_command
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test.utils import override_settings
 from selenium import webdriver
-from cl.lib import sunburnt
 from cl.lib.solr_core_admin import (
     create_solr_core, swap_solr_core, delete_solr_core
 )
-import os, sys, requests
+from cl.search.tasks import add_or_update_opinions
+from cl.search.models import Opinion
+from cl.audio.models import Audio
+import os, sys
 
 DESKTOP_WINDOW = (1024, 768)
 MOBILE_WINDOW = (500, 600)
@@ -40,13 +41,11 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
                 return
         super(BaseSeleniumTest, cls).setUpClass()
         cls.server_url = cls.live_server_url
-        cls._initialize_test_solr()
 
     @classmethod
     def tearDownClass(cls):
         if cls.server_url == cls.live_server_url:
             super(BaseSeleniumTest, cls).tearDownClass()
-        #cls._teardown_test_solr()
 
     def setUp(self):
         self.browser = webdriver.PhantomJS(
@@ -55,13 +54,16 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         )
         self.browser.implicitly_wait(1)
         self.browser.set_window_size(DESKTOP_WINDOW[0], DESKTOP_WINDOW[1])
+        self._initialize_test_solr()
         self._update_index()
 
     def tearDown(self):
         if self.screenshot:
-            print '\nSaving screenshot...'
+            filename = type(self).__name__ + '.png'
+            print '\nSaving screenshot: %s' % (filename,)
             self.browser.save_screenshot(type(self).__name__ + '.png')
         self.browser.quit()
+        self._teardown_test_solr()
 
     def assert_text_in_body(self, text):
         self.assertIn(text, self.browser.find_element_by_tag_name('body').text)
@@ -70,7 +72,6 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
     def _initialize_test_solr():
         """ Try to initialize a pair of Solr cores for testing purposes """
 
-        print '>> initializing test solr cores...'
         # data_dir, if left blank, ends up bing put in /tmp/solr/...
         create_solr_core(
             TEST_OPINION_CORE,
@@ -87,69 +88,19 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
                                 'audio_schema.xml'),
             instance_dir='/usr/local/solr/example/solr/audio_test',
         )
-        swap_solr_core('collection1', TEST_OPINION_CORE)
-        swap_solr_core('audio', TEST_AUDIO_CORE)
 
     @staticmethod
     def _update_index():
-        print '>> Trying to run cl_update_index...'
-        for obj_type, core_name in {
-            'audio': TEST_AUDIO_CORE,
-            'opinions': TEST_OPINION_CORE,
-        }.items():
-            args = [
-                '--type', obj_type,
-                '--solr-url', 'http://127.0.0.1:8983/solr/%s' % core_name,
-                '--update',
-                '--everything',
-                '--do-commit',
-                '--noinput',
-            ]
-            call_command('cl_update_index', *args)
+        # For now, until some model/api issues are worked out for Audio
+        # objects, we'll avoid using the cl_update_index command and do
+        # this the hard way using tasks
+        keys = [opinion.pk for opinion in Opinion.objects.all()]
+        add_or_update_opinions(keys)
+
 
 
     @staticmethod
     def _teardown_test_solr():
         """ Try to clean up and remove the test Solr cores """
-        print '>> destroying test solr cores...'
-        swap_solr_core(TEST_OPINION_CORE, 'collection1')
-        swap_solr_core(TEST_AUDIO_CORE, 'audio')
         delete_solr_core(TEST_OPINION_CORE)
         delete_solr_core(TEST_AUDIO_CORE)
-
-
-class SolrBackendTest(BaseSeleniumTest):
-
-    fixtures = ['test_court.json', 'judge_judy.json',
-                'test_objects_search.json', 'test_objects_audio.json',
-                'authtest_data.json']
-
-    def test_solr_initialized_with_opinions(self):
-        """Our base test class should spin up a Solr core with Opinions"""
-        r = requests.get('http://localhost:8983/solr/opinion_test/query',
-            params={'q':'lissner'})
-        self.assertEqual(r.status_code, 200)
-        self.assertIn('Lissner v. Saad', r.text)
-
-class SearchViewTest(BaseSeleniumTest):
-
-    fixtures = ['test_court.json', 'judge_judy.json',
-                'test_objects_search.json', 'test_objects_audio.json',
-                'authtest_data.json']
-
-    def test_do_search_function(self):
-        from cl.search.forms import SearchForm
-        from cl.search.views import do_search
-        from django.http import HttpRequest
-        request = HttpRequest()
-        request.method = 'GET'
-        request.GET['q'] = 'lissner'
-        request.GET['stat_Precedential'] = 'on'
-        response = do_search(request)
-
-        self.assertIsInstance(response['search_form'], SearchForm)
-        self.assertIsNotNone(response['results'])
-        paginator = response['results'].paginator
-        print 'Pagination: %s' % (paginator.object_list,)
-        print 'Case: %s' % (paginator.object_list.solr_highlights.caseName)
-        self.assertTrue(response['results'].paginator.count > 0)

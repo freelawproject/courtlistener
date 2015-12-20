@@ -4,16 +4,23 @@ Functional testing of courtlistener
 """
 from cl.tests.base import BaseSeleniumTest
 from django.conf import settings
+from unittest import skip
+
 
 class OpinionSearchFunctionalTest(BaseSeleniumTest):
-
+    """
+    Test some of the primary search functionality of CL: searching opinions.
+    These tests should exercise all aspects of using the search box and SERP.
+    """
     fixtures = ['test_court.json', 'judge_judy.json',
                 'test_objects_search.json', 'test_objects_audio.json',
                 'authtest_data.json']
 
+    @skip('finish the test')
     def _navigate_to_wildcard_results(self):
         self.fail('Finish the test.')
 
+    @skip('finish the test')
     def test_toggle_to_oral_args_search_results(self):
         # Dora navigates to the global SERP from the homepage
         self._navigate_to_wildcard_results()
@@ -24,12 +31,15 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # And notices her result set is now different
 
+    @skip('finish the test')
     def test_search_and_facet_docket_numbers(self):
         self.fail('finish the test!')
 
+    @skip('finish the test')
     def test_search_result_detail_page(self):
         self.fail('finish the test')
 
+    @skip('finish the test')
     def test_search_and_add_precedential_results(self):
         # Dora navigates to CL and just hits Search to just start with
         # a global result set

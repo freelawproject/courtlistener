@@ -1,8 +1,9 @@
 # coding=utf-8
 """
-Tests for visual aspects of CourtListener
+Tests for visual aspects of CourtListener's responsive design
 """
 from cl.tests.base import BaseSeleniumTest, DESKTOP_WINDOW, MOBILE_WINDOW
+from unittest import skip
 
 
 class DesktopLayoutTest(BaseSeleniumTest):
@@ -12,6 +13,7 @@ class DesktopLayoutTest(BaseSeleniumTest):
         super(DesktopLayoutTest, self).setUp()
         self.browser.set_window_size(DESKTOP_WINDOW[0], DESKTOP_WINDOW[1])
 
+    @skip('finish the test')
     def test_desktop_home_page_aesthetics(self):
         self.browser.get(self.server_url)
 
@@ -29,6 +31,7 @@ class MobileLayoutTest(BaseSeleniumTest):
         super(MobileLayoutTest, self).setUp()
         self.browser.set_window_size(MOBILE_WINDOW[0], MOBILE_WINDOW[1])
 
+    @skip('finish the test')
     def test_mobile_home_page_aesthetics(self):
         self.browser.get(self.server_url)
 

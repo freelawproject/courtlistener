@@ -1,15 +1,24 @@
 # coding=utf-8
 """
-Functional testing of courtlistener
+Functional testing of CourtListener's Favorites functionality
 """
 from cl.tests.base import BaseSeleniumTest
+from cl.favorites.models import Favorite
+from unittest import skip
 
 class UserFavoritesTest(BaseSeleniumTest):
-
+    """
+    Functionally test all aspects of favoriting Opinions and Oral Arguments
+    including CRUD related operationgs of a user's favorites.
+    """
+    
     fixtures = ['test_court.json', 'authtest_data.json',
         'judge_judy.json', 'test_objects_search.json', 'favorites.json']
 
     def test_anonymous_user_is_prompted_when_favoriting_an_opinion(self):
+        ## Clean up favorites to start
+        Favorite.objects.all().delete()
+
         # Dora needs to do some research, so she fires up CL and performs
         # an initial query on her subject: Lissner
         self.browser.get(self.server_url)
@@ -61,6 +70,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         modal_title = self.browser.find_element_by_id('save-favorite-title')
         self.assertIn('Save Favorite', modal_title.text)
 
+    @skip('finish the test')
     def test_logged_in_user_can_save_favorite(self):
         # Dora goes to CL, logs in, and does a search on her topic of interest
 
@@ -85,6 +95,7 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         self.fail('finish test')
 
+    @skip('finish the test')
     def test_user_can_change_favorites(self):
         # Dora already has some favorites and she logs in and pulls them up
 
