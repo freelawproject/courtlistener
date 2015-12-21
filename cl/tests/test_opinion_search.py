@@ -25,9 +25,11 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     @skip('finish the test')
     def test_toggle_to_oral_args_search_results(self):
         # Dora navigates to the global SERP from the homepage
+        self.browser.get(self.server_url)
         self._navigate_to_wildcard_results()
 
         # Dora sees she has Opinion results, but wants Oral Arguments
+
 
         # She clicks on Oral Arguments
 
@@ -46,8 +48,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # a global result set
         self.browser.get(self.server_url)
         self._navigate_to_wildcard_results()
-        result_text = self.browser.find_element_by_id('result-count')\
-            .text.strip()
+        first_count = self.extract_result_count_from_serp()
 
         # She notices only Precedential results are being displayed
         prec = self.browser.find_element_by_id('id_stat_Precedential')
@@ -72,7 +73,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # Nothing happens yet.
         ## TODO: this is hacky for now...just make sure result count is same
-        self.assert_text_in_body(result_text)
+        self.assertEqual(first_count, self.extract_result_count_from_serp())
 
         # She goes ahead and clicks the Search button again to resubmit
         self.browser.find_element_by_id('search-button').click()
@@ -86,15 +87,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # And now she notices her result set increases thanks to adding in
         # those other opinion types!
-        new_result_text = self.browser.find_element_by_id('result-count').text
-        new_result_text = new_result_text.strip()
-        try:
-            first_count = long(result_text.split(' ')[0].replace(',', ''))
-            second_count = long(new_result_text.split(' ')[0].replace(',', ''))
-        except IndexError, ValueError:
-            self.fail('Cannot extract result counts from SERP')
+        second_count = self.extract_result_count_from_serp()
         self.assertTrue(second_count > first_count)
-
 
     def test_basic_homepage_search_and_signin_and_signout(self):
 
