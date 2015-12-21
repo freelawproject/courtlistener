@@ -143,7 +143,7 @@ class ApiViewTest(TestCase):
         self.assertContains(response, 'total')
 
 
-class DRFApiFilterTests(TestCase):
+class DRFJudgeApiFilterTests(TestCase):
     """Do the filters work properly?"""
     fixtures = ['judge_judy.json']
 
@@ -308,3 +308,25 @@ class DRFApiFilterTests(TestCase):
         # that it matters, MJ)
         q['race'] = ['w', 'b']
         self.assertCount(path, q, 1)
+
+
+class DRFFieldSelectionTest(TestCase):
+    fixtures = ['judge_judy.json', 'test_objects_search.json']
+
+    def test_only_some_fields_returned(self):
+        """Can we return only some of the fields?"""
+
+        # First check the Judge endpoint, one of our more compliated ones.
+        path = reverse('judge-list', kwargs={'version': 'v3'})
+        fields_to_return = ['educations', 'date_modified', 'slug']
+        q = {'fields': ','.join(fields_to_return)}
+        r = self.client.get(path, q)
+        self.assertEqual(len(r.data['results'][0].keys()),
+                         len(fields_to_return))
+
+        # One more check for good measure.
+        path = reverse('opinioncluster-list', kwargs={'version': 'v3'})
+        fields_to_return = ['per_curiam', 'slug']
+        r = self.client.get(path, q)
+        self.assertEqual(len(r.data['results'][0].keys()),
+                         len(fields_to_return))

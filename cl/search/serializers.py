@@ -1,5 +1,6 @@
 from collections import OrderedDict
 
+from cl.api.utils import DynamicFieldsModelSerializer
 from cl.lib.sunburnt import schema
 from cl.lib.sunburnt.schema import SolrSchema
 from cl.search.models import Docket, OpinionCluster, Opinion, Court, \
@@ -8,7 +9,8 @@ from cl.search.models import Docket, OpinionCluster, Opinion, Court, \
 from rest_framework import serializers
 
 
-class DocketSerializer(serializers.HyperlinkedModelSerializer):
+class DocketSerializer(DynamicFieldsModelSerializer,
+                       serializers.HyperlinkedModelSerializer):
     court = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='court-detail',
@@ -31,13 +33,15 @@ class DocketSerializer(serializers.HyperlinkedModelSerializer):
         model = Docket
 
 
-class CourtSerializer(serializers.HyperlinkedModelSerializer):
+class CourtSerializer(DynamicFieldsModelSerializer,
+                      serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Court
         exclude = ('notes',)
 
 
-class OpinionSerializer(serializers.HyperlinkedModelSerializer):
+class OpinionSerializer(DynamicFieldsModelSerializer,
+                        serializers.HyperlinkedModelSerializer):
     absolute_url = serializers.CharField(source='get_absolute_url',
                                          read_only=True)
     cluster = serializers.HyperlinkedRelatedField(
@@ -60,12 +64,14 @@ class OpinionSerializer(serializers.HyperlinkedModelSerializer):
         model = Opinion
 
 
-class OpinionsCitedSerializer(serializers.HyperlinkedModelSerializer):
+class OpinionsCitedSerializer(DynamicFieldsModelSerializer,
+                              serializers.HyperlinkedModelSerializer):
     class Meta:
         model = OpinionsCited
 
 
-class OpinionClusterSerializer(serializers.HyperlinkedModelSerializer):
+class OpinionClusterSerializer(DynamicFieldsModelSerializer,
+                               serializers.HyperlinkedModelSerializer):
     absolute_url = serializers.CharField(source='get_absolute_url',
                                          read_only=True)
     panel = serializers.HyperlinkedRelatedField(
@@ -96,6 +102,8 @@ class OpinionClusterSerializer(serializers.HyperlinkedModelSerializer):
 
 class SearchResultSerializer(serializers.Serializer):
     """The serializer for search results.
+
+    Does not presently support the fields argument.
     """
 
     def update(self, instance, validated_data):
