@@ -49,9 +49,31 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.assert_text_in_body('Date Argued')
         self.assert_text_not_in_body('Date Filed')
 
-    @skip('finish the test')
     def test_search_and_facet_docket_numbers(self):
-        self.fail('finish the test!')
+        # Dora goes to CL and performs an initial wildcard Search
+        self.browser.get(self.server_url)
+        self._perform_wildcard_search()
+        initial_count = self.extract_result_count_from_serp()
+
+        # Seeing a result that has a docket number displayed, she wants
+        # to find all similar opinions with the same or similar docket
+        # number
+        search_results = self.browser.find_element_by_id('search-results')
+        self.assertIn('Docket Number:', search_results.text)
+
+        # She types part of the docket number into the docket number
+        # filter on the left and hits enter
+        text_box = self.browser.find_element_by_id('id_docket_number')
+        text_box.send_keys('1337\n')
+
+        # The SERP refreshes and she sees resuls that
+        # only contain fragments of the docker number she entered
+        new_count = self.extract_result_count_from_serp()
+        self.assertTrue(new_count < initial_count)
+
+        search_results = self.browser.find_element_by_id('search-results')
+        for result in search_results.find_elements_by_tag_name('article'):
+            self.assertIn('1337', result.text)
 
     @skip('finish the test')
     def test_search_result_detail_page(self):
