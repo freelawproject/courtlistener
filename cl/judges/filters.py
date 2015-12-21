@@ -72,6 +72,11 @@ class CareerFilter(filters.FilterSet):
 
 
 class SchoolFilter(filters.FilterSet):
+    educations = filters.RelatedFilter(
+        'cl.judges.filters.EducationFilter',
+        name='educations',
+    )
+
     class Meta:
         model = School
         fields = {
@@ -87,6 +92,7 @@ class SchoolFilter(filters.FilterSet):
 
 class EducationFilter(filters.FilterSet):
     school = filters.RelatedFilter(SchoolFilter, name='school')
+    judge = filters.RelatedFilter('cl.judges.filters.JudgeFilter', name='judge')
 
     class Meta:
         model = Education
@@ -116,8 +122,6 @@ class PoliticianFilter(filters.FilterSet):
 
 
 class RetentionEventFilter(filters.FilterSet):
-    # date_retention = filters.AllLookupsFilter(name='date_retention')
-
     class Meta:
         model = RetentionEvent
         fields = {

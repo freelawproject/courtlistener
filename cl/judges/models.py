@@ -451,6 +451,7 @@ class Education(models.Model):
     )
     school = models.ForeignKey(
         'judges.School',
+        related_name='educations',
     )
     degree = models.CharField(
         max_length=100,

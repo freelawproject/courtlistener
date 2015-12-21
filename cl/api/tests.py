@@ -309,6 +309,23 @@ class DRFJudgeApiFilterTests(TestCase):
         q['race'] = ['w', 'b']
         self.assertCount(path, q, 1)
 
+    def test_circular_relationships(self):
+        """Do filters configured using strings instead of classes work?"""
+        path = reverse('education-list', kwargs={'version': 'v3'})
+        q = dict()
+
+        # Traverse judges, careers
+        q['judge__careers__job_title__icontains'] = 'xxx'
+        self.assertCount(path, q, 0)
+        q['judge__careers__job_title__icontains'] = 'lawyer'
+        self.assertCount(path, q, 1)
+
+        # Just traverse to the judge table
+        q['judge__name_first'] = "Judy"  # Nope.
+        self.assertCount(path, q, 0)
+        q['judge__name_first'] = "Judith"  # Yep.
+        self.assertCount(path, q, 1)
+
 
 class DRFFieldSelectionTest(TestCase):
     fixtures = ['judge_judy.json', 'test_objects_search.json']
