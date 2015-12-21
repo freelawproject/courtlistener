@@ -14,26 +14,40 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
     fixtures = ['test_court.json', 'authtest_data.json',
         'judge_judy.json', 'test_objects_search.json',
-        'functest_opinions.json']
+        'functest_opinions.json', 'test_objects_audio.json']
 
-    def _navigate_to_wildcard_results(self):
+    def _perform_wildcard_search(self):
         searchbox = self.browser.find_element_by_id('id_q')
         searchbox.send_keys('\n')
         result_count = self.browser.find_element_by_id('result-count')
         self.assertIn('Results', result_count.text)
 
-    @skip('finish the test')
     def test_toggle_to_oral_args_search_results(self):
         # Dora navigates to the global SERP from the homepage
         self.browser.get(self.server_url)
-        self._navigate_to_wildcard_results()
+        self._perform_wildcard_search()
+        self.extract_result_count_from_serp()
 
         # Dora sees she has Opinion results, but wants Oral Arguments
-
+        self.assertTrue(self.extract_result_count_from_serp() > 0)
+        label = self.browser.\
+            find_element_by_css_selector('label[for="id_type_0"]')
+        self.assertEqual('Opinions', label.text.strip())
+        self.assertIn('selected', label.get_attribute('class'))
+        self.assert_text_in_body('Date Filed')
+        self.assert_text_not_in_body('Date Argued')
 
         # She clicks on Oral Arguments
+        self.browser \
+            .find_element_by_css_selector('label[for="id_type_1"]') \
+            .click()
 
         # And notices her result set is now different
+        oa_label = self.browser. \
+            find_element_by_css_selector('label[for="id_type_1"]')
+        self.assertIn('selected', oa_label.get_attribute('class'))
+        self.assert_text_in_body('Date Argued')
+        self.assert_text_not_in_body('Date Filed')
 
     @skip('finish the test')
     def test_search_and_facet_docket_numbers(self):
@@ -47,7 +61,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # Dora navigates to CL and just hits Search to just start with
         # a global result set
         self.browser.get(self.server_url)
-        self._navigate_to_wildcard_results()
+        self._perform_wildcard_search()
         first_count = self.extract_result_count_from_serp()
 
         # She notices only Precedential results are being displayed
