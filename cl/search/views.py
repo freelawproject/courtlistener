@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
 from django.db.models import Sum, Count
@@ -20,7 +21,6 @@ from cl.lib import search_utils
 from cl.lib import sunburnt
 from cl.lib.bot_detector import is_bot
 from cl.search.forms import SearchForm, _clean_form
-from cl import settings
 from cl.search.models import Court, Opinion
 from cl.stats import tally_stat, Stat
 from cl.visualizations.models import SCOTUSMap

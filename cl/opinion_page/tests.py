@@ -5,6 +5,8 @@ from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.test import TestCase
 from django.test.client import Client
+from cl.lib import sunburnt
+from django.conf import settings
 
 
 class ViewDocumentTest(TestCase):

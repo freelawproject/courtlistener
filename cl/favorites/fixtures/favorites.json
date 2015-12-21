@@ -1,0 +1,15 @@
+[
+  {
+    "fields": {
+      "name": "Formerly known as \"case name cluster 3\"",
+      "date_modified": "2015-12-18T20:57:19.753Z",
+      "notes": "Totes my Notes 2",
+      "cluster_id": 3,
+      "user": 1,
+      "date_created": "2015-12-18T20:47:03.103Z",
+      "audio_id": null
+    },
+    "model": "favorites.favorite",
+    "pk": 1
+  }
+]
