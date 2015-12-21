@@ -11,7 +11,9 @@ from cl.lib.sunburnt import SolrError
 def create_solr_core(core_name, data_dir='/tmp/solr/data',
         schema=os.path.join(settings.INSTALL_ROOT, 'Solr',
                             'conf', 'schema.xml'),
-        instance_dir='/usr/local/solr/example/solr/collection1'):
+        instance_dir='/usr/local/solr/example/solr/collection1',
+        config=os.path.join(settings.INSTALL_ROOT, 'Solr',
+                            'conf', 'solrconfig.xml')):
     """ Create a new core for use in testing."""
     if data_dir == '/tmp/solr/data':
         # If the user doesn't specify a data directory, we give them one with
@@ -25,8 +27,7 @@ def create_solr_core(core_name, data_dir='/tmp/solr/data',
         'name': core_name,
         'dataDir': data_dir,
         'instanceDir': instance_dir,
-        'config': os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-                               'solrconfig.xml'),
+        'config': config,
         'schema': schema,
         'persist': 'true',
     }
