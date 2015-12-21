@@ -13,51 +13,118 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     These tests should exercise all aspects of using the search box and SERP.
     """
     fixtures = ['test_court.json', 'authtest_data.json',
-        'judge_judy.json', 'test_objects_search.json']
+        'judge_judy.json', 'test_objects_search.json',
+        'functest_opinions.json', 'test_objects_audio.json']
 
-    @skip('finish the test')
-    def _navigate_to_wildcard_results(self):
-        self.fail('Finish the test.')
+    def _perform_wildcard_search(self):
+        searchbox = self.browser.find_element_by_id('id_q')
+        searchbox.send_keys('\n')
+        result_count = self.browser.find_element_by_id('result-count')
+        self.assertIn('Results', result_count.text)
 
-    @skip('finish the test')
     def test_toggle_to_oral_args_search_results(self):
         # Dora navigates to the global SERP from the homepage
-        self._navigate_to_wildcard_results()
+        self.browser.get(self.server_url)
+        self._perform_wildcard_search()
+        self.extract_result_count_from_serp()
 
         # Dora sees she has Opinion results, but wants Oral Arguments
+        self.assertTrue(self.extract_result_count_from_serp() > 0)
+        label = self.browser.\
+            find_element_by_css_selector('label[for="id_type_0"]')
+        self.assertEqual('Opinions', label.text.strip())
+        self.assertIn('selected', label.get_attribute('class'))
+        self.assert_text_in_body('Date Filed')
+        self.assert_text_not_in_body('Date Argued')
 
         # She clicks on Oral Arguments
+        self.browser \
+            .find_element_by_css_selector('label[for="id_type_1"]') \
+            .click()
 
         # And notices her result set is now different
+        oa_label = self.browser. \
+            find_element_by_css_selector('label[for="id_type_1"]')
+        self.assertIn('selected', oa_label.get_attribute('class'))
+        self.assert_text_in_body('Date Argued')
+        self.assert_text_not_in_body('Date Filed')
 
-    @skip('finish the test')
     def test_search_and_facet_docket_numbers(self):
-        self.fail('finish the test!')
+        # Dora goes to CL and performs an initial wildcard Search
+        self.browser.get(self.server_url)
+        self._perform_wildcard_search()
+        initial_count = self.extract_result_count_from_serp()
+
+        # Seeing a result that has a docket number displayed, she wants
+        # to find all similar opinions with the same or similar docket
+        # number
+        search_results = self.browser.find_element_by_id('search-results')
+        self.assertIn('Docket Number:', search_results.text)
+
+        # She types part of the docket number into the docket number
+        # filter on the left and hits enter
+        text_box = self.browser.find_element_by_id('id_docket_number')
+        text_box.send_keys('1337\n')
+
+        # The SERP refreshes and she sees resuls that
+        # only contain fragments of the docker number she entered
+        new_count = self.extract_result_count_from_serp()
+        self.assertTrue(new_count < initial_count)
+
+        search_results = self.browser.find_element_by_id('search-results')
+        for result in search_results.find_elements_by_tag_name('article'):
+            self.assertIn('1337', result.text)
 
     @skip('finish the test')
     def test_search_result_detail_page(self):
         self.fail('finish the test')
 
-    @skip('finish the test')
     def test_search_and_add_precedential_results(self):
         # Dora navigates to CL and just hits Search to just start with
         # a global result set
-        self._navigate_to_wildcard_results()
+        self.browser.get(self.server_url)
+        self._perform_wildcard_search()
+        first_count = self.extract_result_count_from_serp()
 
         # She notices only Precedential results are being displayed
+        prec = self.browser.find_element_by_id('id_stat_Precedential')
+        non_prec = self.browser.find_element_by_id('id_stat_Non-Precedential')
+        self.assertEqual(prec.get_attribute('checked'), u'true')
+        self.assertIsNone(non_prec.get_attribute('checked'))
+        prec_count = self.browser.find_element_by_css_selector(
+            'label[for="id_stat_Precedential"]'
+        )
+        non_prec_count = self.browser.find_element_by_css_selector(
+            'label[for="id_stat_Non-Precedential"]'
+        )
+        self.assertNotIn('(0)', prec_count.text)
+        self.assertNotIn('(0)', non_prec_count.text)
 
         # Even though she notices all jurisdictions were included in her search
+        self.assert_text_in_body('All Jurisdictions Selected')
 
         # But she also notices the option to select and include
-        # Non-Precedential results. She checks the box.
+        # non_precedential results. She checks the box.
+        non_prec.click()
 
         # Nothing happens yet.
+        ## TODO: this is hacky for now...just make sure result count is same
+        self.assertEqual(first_count, self.extract_result_count_from_serp())
 
         # She goes ahead and clicks the Search button again to resubmit
+        self.browser.find_element_by_id('search-button').click()
+
+        # She didn't change the query, so the search box should still look
+        # the same (which is blank)
+        self.assertEqual(
+            self.browser.find_element_by_id('id_q').get_attribute('value'),
+            u''
+        )
 
         # And now she notices her result set increases thanks to adding in
         # those other opinion types!
-        self.fail('Finish the test!')
+        second_count = self.extract_result_count_from_serp()
+        self.assertTrue(second_count > first_count)
 
     def test_basic_homepage_search_and_signin_and_signout(self):
 
