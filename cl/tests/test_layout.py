@@ -17,7 +17,7 @@ class DesktopLayoutTest(BaseSeleniumTest):
     def test_desktop_home_page_aesthetics(self):
         self.browser.get(self.server_url)
 
-        #search box should be centered
+        # search box should be centered
         self.fail('finish test')
 
 
@@ -35,5 +35,5 @@ class MobileLayoutTest(BaseSeleniumTest):
     def test_mobile_home_page_aesthetics(self):
         self.browser.get(self.server_url)
 
-        #search box should be centered
+        # search box should be centered
         self.fail('finish test')

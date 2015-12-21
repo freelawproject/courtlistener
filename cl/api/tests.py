@@ -242,7 +242,6 @@ class DRFApiFilterTests(TestCase):
         q['aba_ratings__rating'] = 'nq'
         self.assertCount(path, q, 1)
 
-
     def test_education_filtering(self):
         """Can we filter education objects?"""
         path = reverse('education-list', kwargs={'version': 'v3'})
@@ -309,4 +308,3 @@ class DRFApiFilterTests(TestCase):
         # that it matters, MJ)
         q['race'] = ['w', 'b']
         self.assertCount(path, q, 1)
-

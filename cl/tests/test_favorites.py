@@ -6,17 +6,18 @@ from cl.tests.base import BaseSeleniumTest
 from cl.favorites.models import Favorite
 from unittest import skip
 
+
 class UserFavoritesTest(BaseSeleniumTest):
     """
     Functionally test all aspects of favoriting Opinions and Oral Arguments
     including CRUD related operationgs of a user's favorites.
     """
-    
-    fixtures = ['test_court.json', 'authtest_data.json',
-        'judge_judy.json', 'test_objects_search.json', 'favorites.json']
+
+    fixtures = ['test_court.json', 'authtest_data.json', 'judge_judy.json',
+                'test_objects_search.json', 'favorites.json']
 
     def test_anonymous_user_is_prompted_when_favoriting_an_opinion(self):
-        ## Clean up favorites to start
+        # Clean up favorites to start
         Favorite.objects.all().delete()
 
         # Dora needs to do some research, so she fires up CL and performs
