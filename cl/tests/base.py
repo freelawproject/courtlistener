@@ -8,7 +8,7 @@ from selenium import webdriver
 from cl.lib.solr_core_admin import (
     create_solr_core, swap_solr_core, delete_solr_core
 )
-from cl.search.tasks import add_or_update_opinions
+from cl.search.tasks import add_or_update_opinions, add_or_update_audio_files
 from cl.search.models import Opinion
 from cl.audio.models import Audio
 import os, sys
@@ -68,6 +68,20 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
     def assert_text_in_body(self, text):
         self.assertIn(text, self.browser.find_element_by_tag_name('body').text)
 
+    def assert_text_not_in_body(self, text):
+        self.assertNotIn(
+            text,
+            self.browser.find_element_by_tag_name('body').text
+        )
+
+    def extract_result_count_from_serp(self):
+        results = self.browser.find_element_by_id('result-count').text.strip()
+        try:
+            count = long(results.split(' ')[0].replace(',', ''))
+        except IndexError, ValueError:
+            self.fail('Cannot extract result count from SERP.')
+        return count
+
     @staticmethod
     def _initialize_test_solr():
         """ Try to initialize a pair of Solr cores for testing purposes """
@@ -77,15 +91,15 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             TEST_OPINION_CORE,
             data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr',
                 'data_opinion_test'),
-            schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-                                'schema.xml'),
+            schema='schema.xml',
+            config='solrconfig.xml',
             instance_dir='/usr/local/solr/example/solr/opinion_test')
         create_solr_core(
             TEST_AUDIO_CORE,
             data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr',
                 'data_audio_test'),
-            schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
-                                'audio_schema.xml'),
+            schema='schema.xml',
+            config='solrconfig.xml',
             instance_dir='/usr/local/solr/example/solr/audio_test',
         )
 
@@ -94,13 +108,13 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         # For now, until some model/api issues are worked out for Audio
         # objects, we'll avoid using the cl_update_index command and do
         # this the hard way using tasks
-        keys = [opinion.pk for opinion in Opinion.objects.all()]
-        add_or_update_opinions(keys)
-
-
+        opinion_keys = [opinion.pk for opinion in Opinion.objects.all()]
+        add_or_update_opinions(opinion_keys)
+        audio_keys = [audio.pk for audio in Audio.objects.all()]
+        add_or_update_audio_files(audio_keys)
 
     @staticmethod
     def _teardown_test_solr():
         """ Try to clean up and remove the test Solr cores """
-        delete_solr_core(TEST_OPINION_CORE)
-        delete_solr_core(TEST_AUDIO_CORE)
+        delete_solr_core(TEST_OPINION_CORE, delete_data_dir=True)
+        delete_solr_core(TEST_AUDIO_CORE, delete_data_dir=True)
