@@ -76,7 +76,7 @@
       "citation_id": null,
       "source": "C",
       "state_cite_one": "33 state 1",
-      "panel": [],
+      "panel": [1],
       "per_curiam": false,
       "federal_cite_one": "",
       "judges": "",
@@ -91,6 +91,8 @@
       "precedential_status": "Published",
       "citation_count": 4,
       "scdb_id": "",
+      "scdb_votes_minority": null,
+      "scdb_votes_majority": null,
       "specialty_cite_one": "",
       "nature_of_suit": "",
       "non_participating_judges": [],
@@ -133,6 +135,8 @@
       "precedential_status": "Published",
       "citation_count": 6,
       "scdb_id": "",
+      "scdb_votes_minority": 3,
+      "scdb_votes_majority": 6,
       "specialty_cite_one": "",
       "nature_of_suit": "",
       "non_participating_judges": [],
@@ -175,6 +179,8 @@
       "precedential_status": "Published",
       "citation_count": 8,
       "scdb_id": "",
+      "scdb_votes_minority": null,
+      "scdb_votes_majority": null,
       "specialty_cite_one": "",
       "nature_of_suit": "",
       "non_participating_judges": [],
@@ -202,7 +208,7 @@
       "joined_by": [],
       "date_created": "2015-08-15T14:10:56.801Z",
       "html_lawbox": null,
-      "type": "010combined"
+      "type": "020lead"
     },
     "model": "search.opinion",
     "pk": 1
@@ -220,7 +226,7 @@
       "html_with_citations": "",
       "local_path": "test/search/opinion_pdf_image_based.pdf",
       "html_columbia": null,
-      "joined_by": [],
+      "joined_by": [1],
       "date_created": "2015-08-15T14:10:56.801Z",
       "html_lawbox": null,
       "type": "010combined"

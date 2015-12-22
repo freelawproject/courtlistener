@@ -11,6 +11,7 @@ class SourceFilter(filters.FilterSet):
     class Meta:
         model = Source
         fields = {
+            'id': ['exact'],
             'date_modified': DATETIME_LOOKUPS,
             'judge': ['exact'],
         }
@@ -20,6 +21,7 @@ class ABARatingFilter(filters.FilterSet):
     class Meta:
         model = ABARating
         fields = {
+            'id': ['exact'],
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
             'date_rated': DATE_LOOKUPS,
@@ -32,6 +34,7 @@ class PoliticalAffiliationFilter(filters.FilterSet):
     class Meta:
         model = PoliticalAffiliation
         fields = {
+            'id': ['exact'],
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
             'date_start': DATE_LOOKUPS,
@@ -47,6 +50,7 @@ class TitleFilter(filters.FilterSet):
     class Meta:
         model = Title
         fields = {
+            'id': ['exact'],
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
             'date_start': DATE_LOOKUPS,
@@ -60,6 +64,7 @@ class CareerFilter(filters.FilterSet):
     class Meta:
         model = Career
         fields = {
+            'id': ['exact'],
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
             'date_start': DATE_LOOKUPS,
@@ -80,6 +85,7 @@ class SchoolFilter(filters.FilterSet):
     class Meta:
         model = School
         fields = {
+            'id': ['exact'],
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
             'name': BASIC_TEXT_LOOKUPS,
@@ -97,6 +103,7 @@ class EducationFilter(filters.FilterSet):
     class Meta:
         model = Education
         fields = {
+            'id': ['exact'],
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
             'degree_year': ['exact'],
@@ -112,6 +119,7 @@ class PoliticianFilter(filters.FilterSet):
     class Meta:
         model = Politician
         fields = {
+            'id': ['exact'],
             'date_modified': DATETIME_LOOKUPS,
             'date_created': DATETIME_LOOKUPS,
             'name_first': BASIC_TEXT_LOOKUPS,
@@ -125,6 +133,7 @@ class RetentionEventFilter(filters.FilterSet):
     class Meta:
         model = RetentionEvent
         fields = {
+            'id': ['exact'],
             'position': ['exact'],
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
@@ -146,6 +155,7 @@ class PositionFilter(filters.FilterSet):
     class Meta:
         model = Position
         fields = {
+            'id': ['exact'],
             'judge': ['exact'],
             'predecessor': ['exact'],
             'date_created': DATETIME_LOOKUPS,
@@ -180,6 +190,23 @@ class JudgeFilter(filters.FilterSet):
     sources = filters.RelatedFilter(SourceFilter, name='sources')
     aba_ratings = filters.RelatedFilter(ABARatingFilter, name='aba_ratings')
     positions = filters.RelatedFilter(PositionFilter, name='positions')
+    opinion_clusters_participating_judges = filters.RelatedFilter(
+        'cl.search.filters.OpinionClusterFilter',
+        'opinion_clusters_participating_judges',
+    )
+    opinion_clusters_non_participating_judges = filters.RelatedFilter(
+        'cl.search.filters.OpinionClusterFilter',
+        'opinion_clusters_non_participating_judges',
+    )
+    opinions_written = filters.RelatedFilter(
+        'cl.search.filters.OpinionFilter',
+        name='opinions_written',
+    )
+    opinions_joined = filters.RelatedFilter(
+        'cl.search.filters.OpinionFilter',
+        name='opinions_joined',
+    )
+
     race = filters.MultipleChoiceFilter(
         choices=Race.RACES,
         action=lambda queryset, value:
@@ -189,6 +216,7 @@ class JudgeFilter(filters.FilterSet):
     class Meta:
         model = Judge
         fields = {
+            'id': ['exact'],
             'date_created': DATETIME_LOOKUPS,
             'date_modified': DATETIME_LOOKUPS,
             'date_dob': DATE_LOOKUPS,
