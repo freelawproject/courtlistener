@@ -74,6 +74,14 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             self.browser.find_element_by_tag_name('body').text
         )
 
+    def attempt_sign_in(self, username, password):
+        signin = self.browser.find_element_by_link_text('Sign in / Register')
+        signin.click()
+        self.assertIn('Sign In', self.browser.title)
+        self.browser.find_element_by_id('username').send_keys(username)
+        self.browser.find_element_by_id('password').send_keys(password + '\n')
+        self.assertTrue(self.extract_result_count_from_serp() > 0)
+
     def extract_result_count_from_serp(self):
         results = self.browser.find_element_by_id('result-count').text.strip()
         try:
@@ -108,9 +116,9 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         # For now, until some model/api issues are worked out for Audio
         # objects, we'll avoid using the cl_update_index command and do
         # this the hard way using tasks
-        opinion_keys = [opinion.pk for opinion in Opinion.objects.all()]
+        opinion_keys = Opinion.objects.values_list('pk', flat=True)
         add_or_update_opinions(opinion_keys)
-        audio_keys = [audio.pk for audio in Audio.objects.all()]
+        audio_keys = Audio.objects.values_list('pk', flat=True)
         add_or_update_audio_files(audio_keys)
 
     @staticmethod
