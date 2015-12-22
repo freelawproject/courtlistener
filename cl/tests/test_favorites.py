@@ -185,19 +185,64 @@ class UserFavoritesTest(BaseSeleniumTest):
         self.assert_text_in_body(short_title)
         self.assert_text_in_body('Back to Home Page')
 
-    @skip('finish the test')
     def test_user_can_change_favorites(self):
         # Dora already has some favorites and she logs in and pulls them up
+        self.browser.get(self.server_url)
+        self.attempt_sign_in('pandora', 'password')
+
+        profile_dropdown = self.browser.\
+            find_element_by_css_selector('a.dropdown-toggle')
+        self.assertEqual(profile_dropdown.text.strip(), u'Profile')
+
+        dropdown_menu = self.browser.\
+            find_element_by_css_selector('ul.dropdown-menu')
+        self.assertIsNone(dropdown_menu.get_attribute('display'))
+
+        profile_dropdown.click()
+
+        favorites = self.browser.find_element_by_link_text('Favorites')
+        favorites.click()
 
         # She sees an edit link next to one of them and clicks it
+        self.assertIn('Favorites', self.browser.title)
+        self.assert_text_in_body('Totes my Notes 2') # in fixture favorites.json
+        edit_link = self.browser.find_element_by_link_text('Edit / Delete')
+        edit_link.click()
 
         # Greeted with an "Edit This Favorite" dialog, she fixes a typo in
         # the name and notes fields
+        modal = self.browser.find_element_by_id('modal-save-favorite')
+        self.assertIn('Edit This Favorite', modal.text)
+        name = modal.find_element_by_id('save-favorite-name-field')
+        notes = modal.find_element_by_id('save-favorite-notes-field')
+        # -- via favorites.json[pk=1]
+        self.assertEqual(
+            name.get_attribute('value'),
+            'Formerly known as \"case name cluster 3\"'
+        )
+        self.assertEqual(
+            notes.get_attribute('value'),
+            'Totes my Notes 2'
+        )
+
+        name.clear()
+        name.send_keys('Renamed Favorite')
+        notes.clear()
+        notes.send_keys('Modified Notes')
 
         # She clicks Save
+        button = modal.find_element_by_id('saveFavorite')
+        self.assertIn('Save', button.text)
+        button.click()
 
         # And notices the change on the page immediately
+        self.assertIn('Favorites', self.browser.title)
+        self.assert_text_in_body('Renamed Favorite')
+        self.assert_text_in_body('Modified Notes')
+        self.assert_text_not_in_body('case name cluster 3')
+        self.assert_text_not_in_body('Totes my Notes 2')
 
         # Skeptical, she hits refresh to be sure
-
-        self.fail('finish test')
+        self.browser.refresh()
+        self.assert_text_in_body('Renamed Favorite')
+        self.assert_text_in_body('Modified Notes')
