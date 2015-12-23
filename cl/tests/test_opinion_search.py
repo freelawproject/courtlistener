@@ -75,9 +75,64 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         for result in search_results.find_elements_by_tag_name('article'):
             self.assertIn('1337', result.text)
 
-    @skip('finish the test')
-    def test_search_result_detail_page(self):
-        self.fail('finish the test')
+    def test_opinion_search_result_detail_page(self):
+        # Dora navitages to CL and does a simple wild card search
+        self.browser.get(self.server_url)
+        self._perform_wildcard_search()
+
+        # Seeing an Opinion immediately on the first page of results, she
+        # wants more details so she clicks the title and drills into the result
+        articles = self.browser.find_elements_by_tag_name('article')
+        articles[0].find_elements_by_tag_name('a')[0].click()
+
+        # She is brought to the detail page for the results
+        self.assertNotIn('Search Results', self.browser.title)
+        self.assert_text_in_body('Back to Search Results')
+
+        # and she can see lots of detail! This includes things like:
+        # The name of the jurisdiction/court,
+        # the status of the Opinion, any citations, the docket number,
+        # the Judges, and a unique fingerpring ID
+        meta_data = self.browser.\
+            find_elements_by_css_selector('.meta-data-header')
+        headers = [u'Filed:', u'Precedential Status:', u'Citations:',
+                   u'Docket Number:', u'Judges:', u'Nature of suit:']
+        for header in headers:
+            self.assertIn(header, [meta.text for meta in meta_data])
+
+        # The complete body of the opinion is also displayed for her to
+        # read on the page
+        self.assertNotEqual(
+            self.browser.find_element_by_id('opinion-content').text.strip(),
+            ''
+        )
+
+        # She wants to dig a big deeper into the influence of this Opinion,
+        # so she's able to see links to the first five citations on the left
+        # and a link to the full list
+
+        # She clicks the "Full List of Citations" link and is brought to
+        # a page with all the citations shown as links
+
+        # She notices their paginated if there are too many and is given the
+        # option to page through them. She clicks Next to review the next page
+
+        # She's just been glossing through things and now she wants to
+        # go back to the result. Seeing a convenient link Back to Document,
+        # she clicks it and is taken back to the result page
+
+        # She now wants to see details on the list of Opinions cited within
+        # this particular opinion. She notices an abbreviated list on the left,
+        # and can click into a Full Table of Authorities. (She does so.)
+
+        # Like before, she's just curious of the list and clicks Back to
+        # Document.
+
+        # Finally, she wants to grab the original opinion from the Court in
+        # question. She notices she has TWO options! She can grab From the Court
+        # or can grab the CourtListener (Our) backup.
+        self.fail('Finish the test.')
+
 
     def test_search_and_add_precedential_results(self):
         # Dora navigates to CL and just hits Search to just start with
