@@ -78,7 +78,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     def test_opinion_search_result_detail_page(self):
         # Dora navitages to CL and does a simple wild card search
         self.browser.get(self.server_url)
-        self._perform_wildcard_search()
+        self.browser.find_element_by_id('id_q').send_keys('voutila\n')
 
         # Seeing an Opinion immediately on the first page of results, she
         # wants more details so she clicks the title and drills into the result
@@ -88,6 +88,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # She is brought to the detail page for the results
         self.assertNotIn('Search Results', self.browser.title)
         self.assert_text_in_body('Back to Search Results')
+        article_text = self.browser.find_element_by_tag_name('article').text
 
         # and she can see lots of detail! This includes things like:
         # The name of the jurisdiction/court,
@@ -110,29 +111,59 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # She wants to dig a big deeper into the influence of this Opinion,
         # so she's able to see links to the first five citations on the left
         # and a link to the full list
+        cited_by = self.browser.find_element_by_id('cited-by')
+        self.assertIn('Cited By', cited_by.find_element_by_tag_name('h3').text)
+        citations = cited_by.find_elements_by_tag_name('li')
+        self.assertTrue(len(citations) > 0 and len(citations) < 6)
 
         # She clicks the "Full List of Citations" link and is brought to
         # a page with all the citations shown as links
+        full_list = cited_by.\
+            find_element_by_link_text('Full List of Cited Opinions')
+        full_list.click()
 
         # She notices their paginated if there are too many and is given the
-        # option to page through them. She clicks Next to review the next page
+        # option to page through them.
+        self.assertIn('Opinions Citing', self.browser.title)
+        self.assert_text_not_in_body('Prev.')
+        citations = self.browser.\
+            find_elements_by_css_selector('li.citing-opinion')
+        self.assertTrue(len(citations) > 0)
 
         # She's just been glossing through things and now she wants to
         # go back to the result. Seeing a convenient link Back to Document,
         # she clicks it and is taken back to the result page
-
+        self.browser.find_element_by_link_text('Back to Document').click()
+        self.assertNotIn('Opinions Citing', self.browser.title)
+        self.assertEqual(
+            self.browser.find_element_by_tag_name('article').text,
+            article_text
+        )
         # She now wants to see details on the list of Opinions cited within
         # this particular opinion. She notices an abbreviated list on the left,
         # and can click into a Full Table of Authorities. (She does so.)
+        authorities = self.browser.find_element_by_id('authorities')
+        self.assertIn(
+            'Authorities',
+            authorities.find_element_by_tag_name('h3').text
+        )
+        authority_links = authorities.find_elements_by_tag_name('li')
+        self.assertTrue(len(authority_links) > 0 and len(authority_links < 6))
+        authorities\
+            .find_element_by_link_text('Full Table of Authorities')\
+            .click()
+        self.assertIn('Table of Authorities', self.browser.title)
 
         # Like before, she's just curious of the list and clicks Back to
         # Document.
+        self.browser.find_element_by_link_text('Back to Document').click()
 
-        # Finally, she wants to grab the original opinion from the Court in
-        # question. She notices she has TWO options! She can grab From the Court
-        # or can grab the CourtListener (Our) backup.
-        self.fail('Finish the test.')
-
+        # And she's back at the Opinion in question and pretty happy about that
+        self.assertNotIn('Table of Authorities', self.browser.title)
+        self.assertEqual(
+            self.browser.find_element_by_tag_name('article').text,
+            article_text
+        )
 
     def test_search_and_add_precedential_results(self):
         # Dora navigates to CL and just hits Search to just start with
