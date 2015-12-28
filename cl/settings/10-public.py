@@ -32,6 +32,7 @@ TEMPLATES = [{
             'cl.lib.context_processors.inject_settings',
             'cl.lib.context_processors.inject_random_tip',
         ),
+        'debug': DEBUG,
     },
 }]
 
