@@ -3,7 +3,6 @@
 Functional testing of courtlistener
 """
 from cl.tests.base import BaseSeleniumTest
-from unittest import skip
 
 
 class OpinionSearchFunctionalTest(BaseSeleniumTest):

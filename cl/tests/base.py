@@ -34,7 +34,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.screenshot = True
+        cls.screenshot = False
         for arg in sys.argv:
             if 'liveserver' in arg:
                 cls.server_url = 'http://' + arg.split('=')[1]
