@@ -101,6 +101,7 @@ class Docket(models.Model):
         'Court',
         help_text="The court where the docket was filed",
         db_index=True,
+        related_name='dockets',
     )
     case_name_short = models.TextField(
         help_text="The abridged name of the case, often a single word, e.g. "

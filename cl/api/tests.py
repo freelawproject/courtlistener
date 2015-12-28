@@ -143,13 +143,14 @@ class ApiViewTest(TestCase):
         self.assertContains(response, 'total')
 
 
-class DRFApiFilterTests(TestCase):
+def assertCount(cls, path, q, expected_count):
+    r = cls.client.get(path, q)
+    cls.assertEqual(len(r.data['results']), expected_count)
+
+
+class DRFJudgeApiFilterTests(TestCase):
     """Do the filters work properly?"""
     fixtures = ['judge_judy.json']
-
-    def assertCount(self, path, q, expected_count):
-        r = self.client.get(path, q)
-        self.assertEqual(len(r.data['results']), expected_count)
 
     def test_judge_filtering_by_first_name(self):
         """Can we filter by first name?"""
@@ -157,11 +158,11 @@ class DRFApiFilterTests(TestCase):
 
         # Filtering with good values brings back 1 result.
         q = {'name_first__istartswith': 'judith'}
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
         # Filtering with bad values brings back no results.
         q = {'name_first__istartswith': 'XXX'}
-        self.assertCount(path, q, 0)
+        assertCount(self, path, q, 0)
 
     def test_judge_filtering_by_date(self):
         """Do the various date filters work properly?"""
@@ -170,16 +171,16 @@ class DRFApiFilterTests(TestCase):
         # Exact match for her birthday
         correct_date = date(1942, 10, 21)
         q = {'date_dob': correct_date.isoformat()}
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
         # People born after the day before her birthday
         before = correct_date - timedelta(days=1)
         q = {'date_dob__gt': before.isoformat()}
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
         # Flip the logic. This should return no results.
         q = {'date_dob__lt': before.isoformat()}
-        self.assertCount(path, q, 0)
+        assertCount(self, path, q, 0)
 
     def test_nested_judge_filtering(self):
         """Can we filter across various relations?
@@ -192,56 +193,55 @@ class DRFApiFilterTests(TestCase):
 
         # No results for a bad query
         q['educations__degree'] = 'XXX'
-        self.assertCount(path, q, 0)
+        assertCount(self, path, q, 0)
 
         # One result for a good query
         q['educations__degree'] = 'JD'
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
         # Again, no results
         q['educations__degree_year'] = 1400
-        self.assertCount(path, q, 0)
+        assertCount(self, path, q, 0)
 
         # But with the correct year...one result
         q['educations__degree_year'] = 1965
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
         # Judy went to "New York Law School"
         q['educations__school__name__istartswith'] = "New York Law"
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
         # Moving on to careers. Bad value, then good.
         q['careers__job_title__icontains'] = 'XXX'
-        self.assertCount(path, q, 0)
+        assertCount(self, path, q, 0)
         q['careers__job_title__icontains'] = 'lawyer'
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
         # Moving on to titles...bad value, then good.
         q['titles__title_name'] = 'XXX'
-        self.assertCount(path, q, 0)
+        assertCount(self, path, q, 0)
         q['titles__title_name'] = 'c-jud'
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
         # Political affiliation filtering...bad, then good.
         q['political_affiliations__political_party'] = 'XXX'
-        self.assertCount(path, q, 0)
+        assertCount(self, path, q, 0)
         q['political_affiliations__political_party'] = 'd'
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
         # Sources
         about_now = '2015-12-17T00:00:00Z'
         q['sources__date_modified__gt'] = about_now
-        self.assertCount(path, q, 0)
+        assertCount(self, path, q, 0)
         q.pop('sources__date_modified__gt')  # Next key doesn't overwrite.
         q['sources__date_modified__lt'] = about_now
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
         # ABA Ratings
         q['aba_ratings__rating'] = 'q'
-        self.assertCount(path, q, 0)
+        assertCount(self, path, q, 0)
         q['aba_ratings__rating'] = 'nq'
-        self.assertCount(path, q, 1)
-
+        assertCount(self, path, q, 1)
 
     def test_education_filtering(self):
         """Can we filter education objects?"""
@@ -250,15 +250,15 @@ class DRFApiFilterTests(TestCase):
 
         # Filter by degree
         q['degree'] = 'XXX'
-        self.assertCount(path, q, 0)
+        assertCount(self, path, q, 0)
         q['degree'] = 'JD'
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
         # Filter by degree's related field, School
         q['school__name__istartswith'] = 'XXX'
-        self.assertCount(path, q, 0)
+        assertCount(self, path, q, 0)
         q['school__name__istartswith'] = 'New York'
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
     def test_title_filtering(self):
         """Can Judge Titles be filtered?"""
@@ -267,16 +267,16 @@ class DRFApiFilterTests(TestCase):
 
         # Filter by title_name
         q['title_name'] = 'XXX'
-        self.assertCount(path, q, 0)
+        assertCount(self, path, q, 0)
         q['title_name'] = 'c-jud'
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
     def test_reverse_filtering(self):
         """Can we filter Source objects by judge name?"""
         # I want any source notes about judge judy.
         path = reverse('source-list', kwargs={'version': 'v3'})
         q = {'judge': 1}
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
     def test_position_filters(self):
         """Can we filter on positions"""
@@ -285,28 +285,211 @@ class DRFApiFilterTests(TestCase):
 
         # I want positions to do with judge #1 (Judy)
         q['judge'] = 1
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
         # Retention events
         q['rentention_events__retention_type'] = 'reapp_gov'
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
         # Appointer was Bill, a Democrat
         q['appointer__name_first__istartswith'] = 'bill'
         q['appointer__political_affiliations__political_party'] = 'd'
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
         # She was not appointed by a Republican
         q['appointer__political_affiliations__political_party'] = 'r'
-        self.assertCount(path, q, 0)
+        assertCount(self, path, q, 0)
 
     def test_racial_filters(self):
         """Can we filter by race?"""
         path = reverse('judge-list', kwargs={'version': 'v3'})
         q = {'race': 'w'}
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
         # Do an OR. This returns judges that are either black or white (not
         # that it matters, MJ)
         q['race'] = ['w', 'b']
-        self.assertCount(path, q, 1)
+        assertCount(self, path, q, 1)
 
+    def test_circular_relationships(self):
+        """Do filters configured using strings instead of classes work?"""
+        path = reverse('education-list', kwargs={'version': 'v3'})
+        q = dict()
+
+        # Traverse judges, careers
+        q['judge__careers__job_title__icontains'] = 'xxx'
+        assertCount(self, path, q, 0)
+        q['judge__careers__job_title__icontains'] = 'lawyer'
+        assertCount(self, path, q, 1)
+
+        # Just traverse to the judge table
+        q['judge__name_first'] = "Judy"  # Nope.
+        assertCount(self, path, q, 0)
+        q['judge__name_first'] = "Judith"  # Yep.
+        assertCount(self, path, q, 1)
+
+    def test_exclusion_filters(self):
+        """Can we exclude using !'s?"""
+        path = reverse('position-list', kwargs={'version': 'v3'})
+        q = dict()
+
+        # I want positions to do with any judge other than judge #1
+        # Note the exclamation mark. In a URL this would look like
+        # "?judge!=1". Fun stuff.
+        q['judge!'] = 1
+        assertCount(self, path, q, 0)   # Alas, there are none.
+
+
+class DRFSearchAndAudioAppsApiFilterTest(TestCase):
+    fixtures = ['judge_judy.json', 'test_objects_search.json',
+                'test_objects_audio.json', 'court_data.json',]
+
+    def test_cluster_filters(self):
+        """Do a variety of cluster filters work?"""
+        path = reverse('opinioncluster-list', kwargs={'version': 'v3'})
+        q = dict()
+
+        # Related filters
+        q['panel__id'] = 1
+        assertCount(self, path, q, 1)
+        q['non_participating_judges!'] = 1  # Exclusion filter.
+        assertCount(self, path, q, 1)
+        q['sub_opinions__author'] = 1
+        assertCount(self, path, q, 4)
+
+        # Boolean filter
+        q['per_curiam'] = False
+        assertCount(self, path, q, 4)
+
+        # Integer lookups
+        q = dict()
+        q['scdb_votes_majority__gt'] = 10
+        assertCount(self, path, q, 0)
+        q['scdb_votes_majority__gt'] = 1
+        assertCount(self, path, q, 1)
+
+    def test_opinion_filter(self):
+        """Do a variety of opinion filters work?"""
+        path = reverse('opinion-list', kwargs={'version': 'v3'})
+        q = dict()
+
+        # Simple filters
+        q['sha1'] = 'asdfasdfasdfasdfasdfasddf-nope'
+        assertCount(self, path, q, 0)
+        q['sha1'] = 'asdfasdfasdfasdfasdfasddf'
+        assertCount(self, path, q, 6)
+
+        # Related filters
+        q['cluster__panel'] = 2
+        assertCount(self, path, q, 0)
+        q['cluster__panel'] = 1
+        assertCount(self, path, q, 4)
+
+        q = dict()
+        q['author__name_first__istartswith'] = "Nope"
+        assertCount(self, path, q, 0)
+        q['author__name_first__istartswith'] = "jud"
+        assertCount(self, path, q, 6)
+
+        q['joined_by__name_first__istartswith'] = "Nope"
+        assertCount(self, path, q, 0)
+        q['joined_by__name_first__istartswith'] = "jud"
+        assertCount(self, path, q, 1)
+
+        q = dict()
+        types = ['010combined']
+        q['type'] = types
+        assertCount(self, path, q, 5)
+        types.append('020lead')
+        assertCount(self, path, q, 6)
+
+    def test_docket_filters(self):
+        """Do a variety of docket filters work?"""
+        path = reverse('docket-list', kwargs={'version': 'v3'})
+        q = dict()
+
+        # Simple filter
+        q['docket_number'] = '14-1165-nope'
+        assertCount(self, path, q, 0)
+        q['docket_number'] = 'docket number'
+        assertCount(self, path, q, 3)
+
+        # Related filters
+        q['court'] = 'test-nope'
+        assertCount(self, path, q, 0)
+        q['court'] = 'test'
+        assertCount(self, path, q, 3)
+
+        q['clusters__panel__name_first__istartswith'] = 'jud-nope'
+        assertCount(self, path, q, 0)
+        q['clusters__panel__name_first__istartswith'] = 'jud'
+        assertCount(self, path, q, 1)
+
+        q['audio_files__sha1'] = 'de8cff186eb263dc06bdc5340860eb6809f898d3-nope'
+        assertCount(self, path, q, 0)
+        q['audio_files__sha1'] = 'de8cff186eb263dc06bdc5340860eb6809f898d3'
+        assertCount(self, path, q, 1)
+
+    def test_audio_filters(self):
+        path = reverse('audio-list', kwargs={'version': 'v3'})
+        q = dict()
+
+        # Simple filter
+        q['sha1'] = 'de8cff186eb263dc06bdc5340860eb6809f898d3-nope'
+        assertCount(self, path, q, 0)
+        q['sha1'] = 'de8cff186eb263dc06bdc5340860eb6809f898d3'
+        assertCount(self, path, q, 1)
+
+        # Related filter
+        q['docket__court'] = 'test-nope'
+        assertCount(self, path, q, 0)
+        q['docket__court'] = 'test'
+        assertCount(self, path, q, 1)
+
+        # Multiple choice filter
+        q = dict()
+        sources = ['C']
+        q['source'] = sources
+        assertCount(self, path, q, 2)
+        sources.append('CR')
+        assertCount(self, path, q, 3)
+
+
+def test_opinion_cited_filters(self):
+        """Do the filters on the opinions_cited work?"""
+        path = reverse('opinionscited-list', kwargs={'version': 'v3'})
+        q = dict()
+
+        # Simple related filter
+        q['citing_opinion__sha1'] = 'asdf-nope'
+        assertCount(self, path, q, 0)
+        q['citing_opinion__sha1'] = 'asdfasdfasdfasdfasdfasddf'
+        assertCount(self, path, q, 4)
+
+        # Fancy filter: Citing Opinions written by judges with first name
+        # istartingwith "jud"
+        q['citing_opinion__author__name_first__istartswith'] = 'jud-nope'
+        assertCount(self, path, q, 0)
+        q['citing_opinion__author__name_first__istartswith'] = 'jud'
+        assertCount(self, path, q, 4)
+
+
+class DRFFieldSelectionTest(TestCase):
+    fixtures = ['judge_judy.json', 'test_objects_search.json']
+
+    def test_only_some_fields_returned(self):
+        """Can we return only some of the fields?"""
+
+        # First check the Judge endpoint, one of our more complicated ones.
+        path = reverse('judge-list', kwargs={'version': 'v3'})
+        fields_to_return = ['educations', 'date_modified', 'slug']
+        q = {'fields': ','.join(fields_to_return)}
+        r = self.client.get(path, q)
+        self.assertEqual(len(r.data['results'][0].keys()),
+                         len(fields_to_return))
+
+        # One more check for good measure.
+        path = reverse('opinioncluster-list', kwargs={'version': 'v3'})
+        fields_to_return = ['per_curiam', 'slug']
+        r = self.client.get(path, q)
+        self.assertEqual(len(r.data['results'][0].keys()),
+                         len(fields_to_return))

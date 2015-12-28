@@ -56,7 +56,7 @@
       "processing_complete": true,
       "download_url": "http://media.ca7.uscourts.gov/sound/external/gw.14-2631.14-2631_07_08_2015.mp3",
       "case_name": "Hong Liu Yang v. Loretta E. Lynch",
-      "source": "C",
+      "source": "CR",
       "local_path_mp3": "test/audio/2.mp3",
       "duration": 653,
       "date_created": "2015-08-08T01:24:26.633Z",

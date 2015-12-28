@@ -3,7 +3,6 @@
 Functional testing of courtlistener
 """
 from cl.tests.base import BaseSeleniumTest
-from django.conf import settings
 from unittest import skip
 
 

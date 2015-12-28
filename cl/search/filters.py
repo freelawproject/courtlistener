@@ -1,72 +1,149 @@
+from cl.api.utils import INTEGER_LOOKUPS, DATETIME_LOOKUPS, DATE_LOOKUPS
 from cl.search.models import (
-    Court, OpinionCluster, Docket, Opinion,
-    OpinionsCited)
+    Court, OpinionCluster, Docket, Opinion, OpinionsCited, SOURCES
+)
 import rest_framework_filters as filters
 
 
 class CourtFilter(filters.FilterSet):
-    date_modified = filters.AllLookupsFilter(name='date_modified')
-    position = filters.AllLookupsFilter(name='position')
-    start_date = filters.AllLookupsFilter(name='start_date')
-    end_date = filters.AllLookupsFilter(name='end_date')
+    dockets = filters.RelatedFilter(
+        'cl.search.filters.DocketFilter',
+        name='dockets',
+    )
 
     class Meta:
         model = Court
-        fields = (
-            'id', 'date_modified', 'in_use', 'has_opinion_scraper',
-            'has_oral_argument_scraper', 'position', 'start_date', 'end_date',
-            'jurisdiction',
-        )
+        fields = {
+            'id': ['exact'],
+            'date_modified': DATETIME_LOOKUPS,
+            'in_use': ['exact'],
+            'has_opinion_scraper': ['exact'],
+            'has_oral_argument_scraper': ['exact'],
+            'position': INTEGER_LOOKUPS,
+            'start_date': DATE_LOOKUPS,
+            'end_date': DATE_LOOKUPS,
+            'jurisdiction': ['exact'],
+        }
 
 
 class DocketFilter(filters.FilterSet):
-    date_modified = filters.AllLookupsFilter(name='date_modified')
-    date_created = filters.AllLookupsFilter(name='date_created')
-    date_argued = filters.AllLookupsFilter(name='date_argued')
-    date_reargued = filters.AllLookupsFilter(name='date_reargued')
-    date_reargument_denied = filters.AllLookupsFilter(
-        name='date_reargument_denied')
     court = filters.RelatedFilter(CourtFilter, name='court')
-    date_blocked = filters.AllLookupsFilter(name='date_blocked')
+    clusters = filters.RelatedFilter(
+        "cl.search.filters.OpinionClusterFilter",
+        name='clusters',
+    )
+    audio_files = filters.RelatedFilter(
+        'cl.audio.filters.AudioFilter',
+        name='audio_files',
+    )
 
     class Meta:
         model = Docket
-        fields = (
-            'id', 'blocked',
-        )
-
-
-class OpinionClusterFilter(filters.FilterSet):
-    date_modified = filters.AllLookupsFilter(name='date_modified')
-    date_created = filters.AllLookupsFilter(name='date_created')
-    date_blocked = filters.AllLookupsFilter(name='date_blocked')
-    date_filed = filters.AllLookupsFilter(name='date_filed')
-    docket = filters.RelatedFilter(DocketFilter, name='docket')
-
-    class Meta:
-        model = OpinionCluster
-        fields = (
-            'id', 'per_curiam', 'citation_id', 'citation_count', 'scdb_id',
-            'scdb_decision_direction', 'scdb_votes_majority',
-            'scdb_votes_minority', 'source', 'precedential_status', 'blocked',
-        )
+        fields = {
+            'id': ['exact'],
+            'date_modified': DATETIME_LOOKUPS,
+            'date_created': DATETIME_LOOKUPS,
+            'date_argued': DATE_LOOKUPS,
+            'date_reargued': DATE_LOOKUPS,
+            'date_reargument_denied': DATE_LOOKUPS,
+            'docket_number': ['exact'],
+            'date_blocked': DATE_LOOKUPS,
+            'blocked': ['exact'],
+        }
 
 
 class OpinionFilter(filters.FilterSet):
-    date_modified = filters.AllLookupsFilter(name='date_modified')
-    date_created = filters.AllLookupsFilter(name='date_created')
-    cluster = filters.RelatedFilter(OpinionClusterFilter, name='cluster')
+    # Cannot to reference to opinions_cited here, due to it being a self join,
+    # which is not supported (possibly for good reasons?)
+    cluster = filters.RelatedFilter(
+        'cl.search.filters.OpinionClusterFilter',
+        name='cluster',
+    )
+    author = filters.RelatedFilter(
+        'cl.judges.filters.JudgeFilter',
+        name='author',
+    )
+    joined_by = filters.RelatedFilter(
+        'cl.judges.filters.JudgeFilter',
+        name='joined_by',
+    )
+    type = filters.MultipleChoiceFilter(
+        choices=Opinion.OPINION_TYPES,
+    )
 
     class Meta:
         model = Opinion
-        fields = (
-            'id', 'type', 'sha1', 'extracted_by_ocr'
-        )
+        fields = {
+            'id': ['exact'],
+            'date_modified': DATETIME_LOOKUPS,
+            'date_created': DATETIME_LOOKUPS,
+            'sha1': ['exact'],
+            'extracted_by_ocr': ['exact'],
+        }
+
+
+class OpinionClusterFilter(filters.FilterSet):
+    docket = filters.RelatedFilter(DocketFilter, name='docket')
+    non_participating_judges = filters.RelatedFilter(
+        'cl.judges.filters.JudgeFilter',
+        name='non_participating_judges',
+    )
+    panel = filters.RelatedFilter(
+        'cl.judges.filters.JudgeFilter',
+        name='panel',
+    )
+    sub_opinions = filters.RelatedFilter(
+        OpinionFilter,
+        name='sub_opinions',
+    )
+    source = filters.MultipleChoiceFilter(
+        choices=SOURCES,
+    )
+
+    class Meta:
+        model = OpinionCluster
+        fields = {
+            'id': ['exact'],
+            'date_created': DATETIME_LOOKUPS,
+            'date_modified': DATETIME_LOOKUPS,
+            'date_filed': DATE_LOOKUPS,
+            'per_curiam': ['exact'],
+            'citation_id': ['exact'],
+            'federal_cite_one': ['exact'],
+            'federal_cite_two': ['exact'],
+            'federal_cite_three': ['exact'],
+            'state_cite_one': ['exact'],
+            'state_cite_two': ['exact'],
+            'state_cite_three': ['exact'],
+            'state_cite_regional': ['exact'],
+            'specialty_cite_one': ['exact'],
+            'scotus_early_cite': ['exact'],
+            'lexis_cite': ['exact'],
+            'westlaw_cite': ['exact'],
+            'neutral_cite': ['exact'],
+            'scdb_id': ['exact'],
+            'scdb_decision_direction': ['exact'],
+            'scdb_votes_majority': INTEGER_LOOKUPS,
+            'scdb_votes_minority': INTEGER_LOOKUPS,
+            'citation_count': INTEGER_LOOKUPS,
+            'precedential_status': ['exact'],
+            'date_blocked': DATE_LOOKUPS,
+            'blocked': ['exact'],
+        }
 
 
 class OpinionsCitedFilter(filters.FilterSet):
+    citing_opinion = filters.RelatedFilter(
+            OpinionFilter,
+            name='citing_opinion',
+    )
+    cited_opinion = filters.RelatedFilter(
+            OpinionFilter,
+            name='cited_opinion',
+    )
+
     class Meta:
         model = OpinionsCited
-        fields = (
-            'citing_opinion', 'cited_opinion',
-        )
+        fields = {
+            'id': ['exact'],
+        }

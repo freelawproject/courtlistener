@@ -1,7 +1,5 @@
-from cl.lib import sunburnt
 from cl.lib.test_helpers import SitemapTest
 from cl.sitemap import opinion_solr_params
-from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.test import TestCase
 from django.test.client import Client
