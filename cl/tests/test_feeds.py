@@ -1,10 +1,10 @@
 # coding=utf-8
 """
-Functional testing of courtlistener feeds
+Functional testing of courtlistener RSS feeds
 """
 from cl.search.models import Court
 from cl.tests.base import BaseSeleniumTest
-
+import feedparser
 
 
 class FeedsFunctionalTest(BaseSeleniumTest):
@@ -40,12 +40,19 @@ class FeedsFunctionalTest(BaseSeleniumTest):
                 '%s/feed/court/%s/' % (self.server_url, court.pk,)
             )
             link.click()
-            self.assert_text_in_body('<?xml version="1.0" encoding="utf-8"?>')
+            self.assertIn(
+                'feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"',
+                self.browser.page_source
+            )
             self.browser.back()
 
-    def test_feeds_contain_links_to_pdf_opinions(self):
+    def test_opinion_rss_feeds_usable_in_rss_reader(self):
         """
-        Do the Opinion feeds for those with PDFs provide valid links to
-        the original and the backup PDF copies?
+        Can the RSS feeds be properly used in an RSS Reader?
         """
-        self.fail('Finish Test')
+
+        f = feedparser.parse('%s/feed/court/test/' % (self.server_url,))
+        self.assertEqual(
+            u'CourtListener.com: All opinions for the Testing Supreme Court',
+            f.feed.title
+        )
