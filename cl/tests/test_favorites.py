@@ -5,7 +5,6 @@ Functional testing of CourtListener's Favorites functionality
 from cl.tests.base import BaseSeleniumTest, DESKTOP_WINDOW
 from cl.favorites.models import Favorite
 from selenium import webdriver
-from unittest import skip
 
 
 class UserFavoritesTest(BaseSeleniumTest):

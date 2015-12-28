@@ -121,26 +121,21 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             find_element_by_link_text('Full List of Cited Opinions')
         full_list.click()
 
-        # TODO: Reconcile difference in Citations page being SERP vs.
-        # the Authorities page being distinct and non-SERP
+        # She notices this submits a new query targeting anything citing the
+        # original opinion she was viewing. She notices she's back on the SERP
+        self.assertIn('Search Results for', self.browser.title)
+        query = self.browser.find_element_by_id('id_q').get_attribute('value')
+        self.assertIn('cites:', query)
 
-        # She notices they're paginated if there are too many and is given the
-        # option to page through them.
-        self.assertIn('Opinions Citing', self.browser.title)
-        self.assert_text_not_in_body('Prev.')
-        citations = self.browser.\
-            find_elements_by_css_selector('li.citing-opinion')
-        self.assertTrue(len(citations) > 0)
-
-        # She's just been glossing through things and now she wants to
-        # go back to the result. Seeing a convenient link Back to Document,
-        # she clicks it and is taken back to the result page
-        self.browser.find_element_by_link_text('Back to Document').click()
-        self.assertNotIn('Opinions Citing', self.browser.title)
+        # She wants to go back to the Opinion page, so she clicks back in her
+        # browser, expecting to return to the Opinion details
+        self.browser.back()
+        self.assertNotIn('Search Results', self.browser.title)
         self.assertEqual(
             self.browser.find_element_by_tag_name('article').text,
             article_text
         )
+
         # She now wants to see details on the list of Opinions cited within
         # this particular opinion. She notices an abbreviated list on the left,
         # and can click into a Full Table of Authorities. (She does so.)
@@ -150,7 +145,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             authorities.find_element_by_tag_name('h3').text
         )
         authority_links = authorities.find_elements_by_tag_name('li')
-        self.assertTrue(len(authority_links) > 0 and len(authority_links < 6))
+        self.assertTrue(len(authority_links) > 0 and len(authority_links) < 6)
         authorities\
             .find_element_by_link_text('Full Table of Authorities')\
             .click()
@@ -158,7 +153,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # Like before, she's just curious of the list and clicks Back to
         # Document.
-        self.browser.find_element_by_link_text('Back to Document').click()
+        self.browser.find_element_by_link_text('Back to Opinion').click()
 
         # And she's back at the Opinion in question and pretty happy about that
         self.assertNotIn('Table of Authorities', self.browser.title)

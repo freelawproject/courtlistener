@@ -14,7 +14,7 @@ from cl.audio.models import Audio
 import os, sys
 
 DESKTOP_WINDOW = (1024, 768)
-MOBILE_WINDOW = (500, 600)
+MOBILE_WINDOW = (640, 960)
 
 TEST_OPINION_CORE = 'opinion_test'
 TEST_AUDIO_CORE = 'audio_test'
@@ -52,7 +52,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             executable_path='/usr/local/phantomjs/phantomjs',
             service_log_path='/var/log/courtlistener/django.log',
         )
-        self.browser.implicitly_wait(1)
+        self.browser.implicitly_wait(3)
         self.browser.set_window_size(DESKTOP_WINDOW[0], DESKTOP_WINDOW[1])
         self._initialize_test_solr()
         self._update_index()
