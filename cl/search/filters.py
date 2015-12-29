@@ -1,7 +1,7 @@
 from cl.api.utils import INTEGER_LOOKUPS, DATETIME_LOOKUPS, DATE_LOOKUPS
 from cl.search.models import (
-    Court, OpinionCluster, Docket, Opinion, OpinionsCited, SOURCES
-)
+    Court, OpinionCluster, Docket, Opinion, OpinionsCited, SOURCES,
+    JURISDICTIONS)
 import rest_framework_filters as filters
 
 
@@ -9,6 +9,9 @@ class CourtFilter(filters.FilterSet):
     dockets = filters.RelatedFilter(
         'cl.search.filters.DocketFilter',
         name='dockets',
+    )
+    jurisdiction = filters.MultipleChoiceFilter(
+        choices=JURISDICTIONS,
     )
 
     class Meta:
@@ -22,7 +25,6 @@ class CourtFilter(filters.FilterSet):
             'position': INTEGER_LOOKUPS,
             'start_date': DATE_LOOKUPS,
             'end_date': DATE_LOOKUPS,
-            'jurisdiction': ['exact'],
         }
 
 
