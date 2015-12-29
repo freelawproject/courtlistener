@@ -424,32 +424,16 @@
         </blockquote>
 
 
-
         <h3>Field Selection</h3>
-        <p>
-            To save bandwidth and speed up your queries, fields can be limited by using the <code>fields</code> GET
-            parameter with a comma-separated list of fields you wish to receive.
+        <p>To save bandwidth, fields can be limited by using the <code>fields</code> GET parameter with a comma-separated list of fields you wish to receive.
         </p>
-        <p>For example, if you wish to only receive the <code>resource_uri</code> and <code>absolute_url</code>
-            fields from the <code>document</code> endpoint you could do so with:
+        <p>For example, if you wish to only receive the <code>educations</code> and <code>date_modified</code> fields from the <code>Judge</code> endpoint you could do so with:
         </p>
         <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v2/document/?<strong>fields=absolute_url,resource_uri</strong></code>
+            <code>curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "judge-list" version="v3" %}?fields=educations,date_modified
+            </code>
         </blockquote>
-        <p>
-            Using the double underscore syntax, this can also be used for nested resources. For example, the
-            <code>document</code> endpoint nests the <code>citation</code> endpoint in its results and the
-            <code>citation</code> endpoint has a field called <code>federal_cite_one</code>. If you wished to use the
-            <code>document</code> endpoint to only get back the nested <code>federal_cite_one</code> field, you could do
-            so with:
-        </p>
-        <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v2/document/?<strong>fields=citation__federal_cite_one</strong></code>
-        </blockquote>
-        <p>
-            Using the <code>fields</code> parameter in these ways could save
-            both of us time and bandwidth if you are making many requests.
-            Please consider using this parameter for your requests.
+        <p>Unfortunately, this cannot be used for nested resources, though <a href="https://github.com/freelawproject/courtlistener/issues/407" target="_blank">we welcome contributions in this area</a>.
         </p>
 
 
