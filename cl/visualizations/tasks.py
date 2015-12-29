@@ -43,14 +43,14 @@ def get_title(self, referer_id):
 
     html_tree = html.fromstring(r.text)
     try:
-        title = html_tree.xpath('//title')[0].text.strip()
+        title = getattr(html_tree.xpath('//title')[0], 'text', '').strip()
     except IndexError as exc:
         raise self.retry(exc=exc, countdown=countdown)
 
     if title:
         referer.page_title = trunc(
-                title,
-                referer._meta.get_field('page_title').max_length,
+            title,
+            referer._meta.get_field('page_title').max_length,
         )
         referer.save()
 
