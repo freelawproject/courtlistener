@@ -3,7 +3,7 @@ import socket
 from cl.audio.models import Audio
 from cl.lib.sunburnt import SolrError
 from cl.lib import sunburnt
-from cl.search.models import Opinion
+from cl.search.models import Opinion, OpinionCluster
 from cl.search.search_indexes import InvalidDocumentError, SearchAudioFile
 from cl.search.search_indexes import SearchDocument
 
@@ -79,5 +79,12 @@ def delete_items(items, solr_url):
 
 @task
 def add_or_update_cluster(pk, force_commit=True):
-    # TODO: Implement this.
-    pass
+    si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='w')
+    try:
+        si.add([SearchDocument(item) for item in
+                OpinionCluster.objects.get(pk=pk).sub_opinions.all()])
+        if force_commit:
+            si.commit()
+    except SolrError, exc:
+        add_or_update_cluster.retry(exc=exc, countdown=30)
+
