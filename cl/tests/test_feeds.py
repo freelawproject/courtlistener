@@ -76,7 +76,6 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         For Opinions with stored PDFs, does the feed provide valid links
         to the CourtListener copy of the original PDF?
         """
-        import requests
         f = feedparser.parse('%s/feed/court/test/' % (self.server_url,))
         for entry in f.entries:
             if entry.enclosures is not None:

@@ -17,7 +17,7 @@ from cl.lib import magic
 from cl.lib import search_utils
 from cl.lib.bot_detector import is_bot
 from cl.lib.sunburnt import sunburnt
-from cl.search.models import Court, OpinionCluster
+from cl.search.models import Court, OpinionCluster, Opinion
 from cl.search.forms import SearchForm
 from cl.simple_pages.forms import ContactForm
 from cl.stats import tally_stat
@@ -304,7 +304,7 @@ def serve_static_file(request, file_path=''):
         item = get_object_or_404(Audio, local_path_mp3=file_path)
         mimetype = 'audio/mpeg'
     else:
-        item = get_object_or_404(Document, local_path=file_path)
+        item = get_object_or_404(Opinion, local_path=file_path)
         try:
             mimetype = magic.from_file(file_loc, mime=True)
         except IOError:
