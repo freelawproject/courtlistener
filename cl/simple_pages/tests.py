@@ -91,7 +91,7 @@ class StaticFilesTest(TestCase):
         request = HttpRequest()
         response = serve_static_file(request, file_path=self.good_txt_path)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response['Content-Type'], 'text')
+        self.assertEqual(response['Content-Type'], 'text/plain')
         self.assertIn('attachment;', response['Content-Disposition'])
         self.assertIn(
             'FOR THE DISTRICT OF COLUMBIA CIRCUIT',

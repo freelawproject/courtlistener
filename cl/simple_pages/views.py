@@ -305,6 +305,7 @@ def serve_static_file(request, file_path=''):
         mimetype = 'audio/mpeg'
     else:
         item = get_object_or_404(Opinion, local_path=file_path)
+        item.blocked = item.cluster.blocked
         try:
             mimetype = magic.from_file(file_loc, mime=True)
         except IOError:
