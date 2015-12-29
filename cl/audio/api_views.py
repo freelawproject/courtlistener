@@ -8,3 +8,6 @@ class AudioViewSet(viewsets.ModelViewSet):
     queryset = Audio.objects.all()
     serializer_class = AudioSerializer
     filter_class = AudioFilter
+    ordering_fields = (
+        'date_created', 'date_modified', 'date_blocked',
+    )

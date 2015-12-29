@@ -16,24 +16,38 @@ class DocketViewSet(viewsets.ModelViewSet):
     queryset = Docket.objects.all()
     serializer_class = DocketSerializer
     filter_class = DocketFilter
+    ordering_fields = (
+        'date_created', 'date_modified', 'date_argued', 'date_reargued',
+        'date_reargument_denied', 'date_blocked',
+    )
 
 
 class CourtViewSet(viewsets.ModelViewSet):
     queryset = Court.objects.exclude(jurisdiction='T')
     serializer_class = CourtSerializer
     filter_class = CourtFilter
+    ordering_fields = (
+        'date_modified', 'position', 'start_date', 'end_date',
+    )
 
 
 class OpinionClusterViewSet(viewsets.ModelViewSet):
     queryset = OpinionCluster.objects.all()
     serializer_class = OpinionClusterSerializer
     filter_class = OpinionClusterFilter
+    ordering_fields = (
+        'date_created', 'date_modified', 'date_filed', 'citation_count',
+        'date_blocked',
+    )
 
 
 class OpinionViewSet(viewsets.ModelViewSet):
     queryset = Opinion.objects.all()
     serializer_class = OpinionSerializer
     filter_class = OpinionFilter
+    ordering_fields = (
+        'date_created', 'date_modified',
+    )
 
 
 class OpinionsCitedViewSet(viewsets.ModelViewSet):
