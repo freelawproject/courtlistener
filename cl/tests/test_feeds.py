@@ -56,3 +56,17 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             u'CourtListener.com: All opinions for the Testing Supreme Court',
             f.feed.title
         )
+        # Per https://pythonhosted.org/feedparser/bozo.html
+        self.assertEqual(f.bozo, 0, 'Feed should be wellformed')
+
+    def test_opinion_rss_feeds_contain_valid_attachment_links(self):
+        """
+        For Opinions with stored PDFs, does the feed provide valid links
+        to the CourtListener copy of the original PDF?
+        """
+        f = feedparser.parse('%s/feed/court/test/' % (self.server_url,))
+        for entry in f.entries:
+            if entry.enclosures is not None:
+                self.assertEqual(len(entry.enclosures), 1)
+                r = self.client.get(entry.enclosures[0])
+                self.assertEqual(r.status, 200)
