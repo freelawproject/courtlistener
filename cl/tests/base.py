@@ -14,7 +14,7 @@ from cl.audio.models import Audio
 import os, sys
 
 DESKTOP_WINDOW = (1024, 768)
-MOBILE_WINDOW = (500, 600)
+MOBILE_WINDOW = (640, 960)
 
 TEST_OPINION_CORE = 'opinion_test'
 TEST_AUDIO_CORE = 'audio_test'
@@ -52,7 +52,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             executable_path='/usr/local/phantomjs/phantomjs',
             service_log_path='/var/log/courtlistener/django.log',
         )
-        self.browser.implicitly_wait(1)
+        self.browser.implicitly_wait(3)
         self.browser.set_window_size(DESKTOP_WINDOW[0], DESKTOP_WINDOW[1])
         self._initialize_test_solr()
         self._update_index()
@@ -73,6 +73,14 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             text,
             self.browser.find_element_by_tag_name('body').text
         )
+
+    def attempt_sign_in(self, username, password):
+        signin = self.browser.find_element_by_link_text('Sign in / Register')
+        signin.click()
+        self.assertIn('Sign In', self.browser.title)
+        self.browser.find_element_by_id('username').send_keys(username)
+        self.browser.find_element_by_id('password').send_keys(password + '\n')
+        self.assertTrue(self.extract_result_count_from_serp() > 0)
 
     def extract_result_count_from_serp(self):
         results = self.browser.find_element_by_id('result-count').text.strip()
@@ -108,9 +116,9 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         # For now, until some model/api issues are worked out for Audio
         # objects, we'll avoid using the cl_update_index command and do
         # this the hard way using tasks
-        opinion_keys = [opinion.pk for opinion in Opinion.objects.all()]
+        opinion_keys = Opinion.objects.values_list('pk', flat=True)
         add_or_update_opinions(opinion_keys)
-        audio_keys = [audio.pk for audio in Audio.objects.all()]
+        audio_keys = Audio.objects.values_list('pk', flat=True)
         add_or_update_audio_files(audio_keys)
 
     @staticmethod
