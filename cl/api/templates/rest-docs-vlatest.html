@@ -296,7 +296,7 @@
 
 
         <h3>Filtering</h3>
-        <p>Each endpoint can be filtered in a variety of ways using a technique similar to <a href="https://docs.djangoproject.com/en/dev/ref/models/querysets/#field-lookups">Django's field lookups</a>. The best way to see how an endpoint can be filtered is by doing an OPTIONS request on the endpoint, and inspecting the <code>filters</code> key in the response.
+        <p>Each endpoint can be filtered in a variety of ways using a technique similar to <a href="https://docs.djangoproject.com/en/dev/ref/models/querysets/#field-lookups">Django's field lookups</a> (see exceptions in <a href="#fn1" id="fn-ref-1">footnote 1</a>). The best way to see how an endpoint can be filtered is by doing an OPTIONS request on the endpoint, and inspecting the <code>filters</code> key in the response.
         </p>
         <p>In the <code>filters</code> key, you'll find a dictionary listing all of the fields that can be used for filtering along with their their types, lookup fields, and any values (aka choices) that can be used for specific lookups. For example, every <code>OpinionCluster</code> has a field called <code>lexis_cite</code> that can be used for lookups. An <code>OPTIONS</code> request describes it like so:
         </p>
@@ -397,14 +397,31 @@
 
 
         <h3>Ordering</h3>
-        <p>
-            With the exception of the coverage endpoint, ordering can be done on fields defined in the <em>ordering</em>
-            section of an endpoint's schema. Ordering is done using the <code>order_by</code> GET parameter, with
-            descending ordering available by prepending the minus sign (e.g. <code>order_by=-date_modified</code>).
-            However, because the <em>search</em> endpoint uses Solr for its backend, ordering is instead done using
-            the <code>asc</code> and <code>desc</code>, as described in detail below. This allows the URLs used for
-            the search endpoint to match those used in front-end queries.
+        <p>To see which fields can be used for ordering, look at the <code>ordering</code> key in an <code>OPTIONS</code> request (see exceptions in <a href="#fn2" id="fn-ref-2">footnote 2</a>). For example, the <code>Position</code> endpoint contains this:
         </p>
+        <pre class="pre-scrollable">
+"ordering": [
+    "date_created",
+    "date_modified",
+    "date_nominated",
+    "date_elected",
+    "date_recess_appointment",
+    "date_referred_to_judicial_committee",
+    "date_judicial_committee_action",
+    "date_hearing",
+    "date_confirmation",
+    "date_start",
+    "date_retirement",
+    "date_termination"
+]</pre>
+        <p>Thus, you can order using any of these fields in conjunction with the <code>order_by</code> parameter.</p>
+        <p>Decending order can be done using a minus sign. Multiple fields can be requested using a comma-separated list. This, for example, returns judicial <code>Position</code>s ordered by the most recently modified, then by the most recently elected:
+        </p>
+        <blockquote>
+            <code>curl {% if request.is_secure %}https{% else %}
+                http{% endif %}://{{ request.get_host }}{% url "position-list" version="v3" %}?order_by=-date_modified,-date_elected
+            </code>
+        </blockquote>
 
 
 
@@ -929,6 +946,14 @@
         <blockquote>
             <code>curl https://www.courtlistener.com url "coverage_api" version='2' court='ca9' </code>
         </blockquote>
+
+        <h2>Footnotes</h2>
+        <p id="fn1"><sup>1</sup> The <code>search</code> endpoint is handled by our search engine, not our database. Filters are thus applied using the same <code>GET</code> parameters as are created when using the front end of the website. Our recommendation is to hone your query there, then move the parameters to the API.<a
+                href="#fn-ref-1">&#8617;</a>
+        </p>
+        <p id="fn2"><sup>2</sup> Ordering of the <code>search</code> endpoing is done using the same parameters as created when using the front end of the website.<a
+                href="#fn-ref-2">&#8617;</a>
+        </p>
     </div>
 
 
