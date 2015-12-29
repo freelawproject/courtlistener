@@ -98,7 +98,10 @@ class JurisdictionFeed(Feed):
         return [item['status'], ]
 
     def item_enclosure_url(self, item):
-        return item['local_path']
+        path = item['local_path']
+        if not path.startswith('/'):
+            return '/%s' % (path,)
+        return path
 
     description_template = 'feeds/solr_desc_template.html'
 
