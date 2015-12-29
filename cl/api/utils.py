@@ -84,5 +84,7 @@ class SimpleMetadataWithFilters(SimpleMetadata):
             filters[filter_name] = attrs
 
         metadata['filters'] = filters
+
+        metadata['ordering'] = view.ordering_fields
         return metadata
 
