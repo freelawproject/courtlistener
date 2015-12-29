@@ -8,6 +8,7 @@ from cl.audio.models import Audio
 import datetime
 import os
 
+
 class ContactTest(TestCase):
     fixtures = ['authtest_data.json']
 

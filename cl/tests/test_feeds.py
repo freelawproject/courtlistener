@@ -9,6 +9,7 @@ from cl.tests.base import BaseSeleniumTest
 import feedparser
 import os
 
+
 @override_settings(
     MEDIA_ROOT = os.path.join(settings.INSTALL_ROOT, 'cl/assets/media/test/')
 )
