@@ -261,6 +261,7 @@ REST_FRAMEWORK = {
     # Assorted & Sundry
     'PAGE_SIZE': 20,
     'URL_FIELD_NAME': 'resource_uri',
+    'DEFAULT_METADATA_CLASS': 'cl.api.utils.SimpleMetadataWithFilters'
 }
 
 if DEVELOPMENT:
