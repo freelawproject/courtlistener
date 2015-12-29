@@ -46,7 +46,19 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             )
             self.browser.back()
 
-    def test_opinion_rss_feeds_usable_in_rss_reader(self):
+    def test_all_jurisdiction_opinion_rss_feeds_usable_in_rss_reader(self):
+        """
+        Can the RSS feed for ALL jurisdictions render properly in an RSS reader?
+        """
+        f = feedparser.parse('%s/feed/court/all/' % (self.server_url,))
+        self.assertEqual(
+            u'CourtListener.com: All Opinions (High Volume)',
+            f.feed.title
+        )
+        # Per https://pythonhosted.org/feedparser/bozo.html
+        self.assertEqual(f.bozo, 0, 'Feed should be wellformed')
+
+    def test_court_opinion_rss_feeds_usable_in_rss_reader(self):
         """
         Can the RSS feeds be properly used in an RSS Reader?
         """
@@ -64,9 +76,13 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         For Opinions with stored PDFs, does the feed provide valid links
         to the CourtListener copy of the original PDF?
         """
+        import requests
         f = feedparser.parse('%s/feed/court/test/' % (self.server_url,))
         for entry in f.entries:
             if entry.enclosures is not None:
                 self.assertEqual(len(entry.enclosures), 1)
-                r = self.client.get(entry.enclosures[0])
-                self.assertEqual(r.status, 200)
+                print 'Enclosure for entry (%s):\n%s' \
+                    % (entry.id, entry.enclosures[0].href)
+                # Django returnes a 301 Moved Permanently so we must follow
+                r = self.client.get(entry.enclosures[0].href, follow=True)
+                self.assertEqual(r.status_code, 200)

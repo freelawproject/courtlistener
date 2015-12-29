@@ -308,7 +308,7 @@
       "download_url": null,
       "cluster": 1,
       "html_with_citations": "",
-      "local_path": "test/search/opinion_text.txt",
+      "local_path": "/test/search/opinion_text.txt",
       "html_columbia": null,
       "joined_by": [],
       "date_created": "2015-08-15T14:10:56.801Z",

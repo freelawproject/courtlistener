@@ -97,6 +97,9 @@ class JurisdictionFeed(Feed):
     def item_categories(self, item):
         return [item['status'], ]
 
+    def item_enclosure_url(self, item):
+        return item['local_path']
+
     description_template = 'feeds/solr_desc_template.html'
 
 
