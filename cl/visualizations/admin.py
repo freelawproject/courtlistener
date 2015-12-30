@@ -25,6 +25,9 @@ class RefererAdmin(admin.ModelAdmin):
     raw_id_fields = (
         'map',
     )
+    list_filter = (
+        'display',
+    )
 
 
 class RefererInline(admin.StackedInline):
