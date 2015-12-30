@@ -98,35 +98,37 @@ class JurisdictionFeed(Feed):
         return [item['status'], ]
 
     def item_enclosure_url(self, item):
-        path = item['local_path']
-        if not path.startswith('/'):
-            return '/%s' % (path,)
-        return path
+        try:
+            path = item['local_path']
+            if not path.startswith('/'):
+                return '/%s' % (path,)
+            return path
+        except:
+            return None
 
     def item_enclosure_length(self, item):
-        file_loc = os.path.join(
-            settings.MEDIA_ROOT,
-            item['local_path'].encode('utf-8')
-        )
         try:
+            file_loc = os.path.join(
+                settings.MEDIA_ROOT,
+                item['local_path'].encode('utf-8')
+            )
             return os.path.getsize(file_loc)
         except:
             return None
 
     def item_enclosure_mime_type(self, item):
-        file_loc = os.path.join(
-            settings.MEDIA_ROOT,
-            item['local_path'].encode('utf-8')
-        )
         try:
-            mime = magic.from_file(file_loc)
-            if mime.startswith('empty'):
-                mime = 'application/octet-stream'
-            elif mime.startswith('ASCII text'):
-                mime = 'text/plain'
+            file_loc = os.path.join(
+                settings.MEDIA_ROOT,
+                item['local_path'].encode('utf-8')
+            )
+            mime = magic.from_file(file_loc, mime=True)
+            if mime.startswith('inode'):
+                return None
+            return mime
         except:
-            return 'application/octet-stream'
-        return mime
+            return None
+
     description_template = 'feeds/solr_desc_template.html'
 
 

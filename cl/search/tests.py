@@ -11,6 +11,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.core.urlresolvers import reverse
+from django.http import HttpRequest
 from django.test import TestCase, override_settings
 from lxml import html
 
@@ -598,26 +599,44 @@ class JurisdictionFeedTest(TestCase):
 
     def setUp(self):
         self.good_item = {
+            'title': 'Opinion Title',
+            'court': 'SCOTUS',
+            'absolute_url': 'http://absolute_url',
+            'caseName': 'Case Name',
+            'status': 'Precedential',
+            'dateFiled': datetime.date(2015, 12, 25),
             'local_path': 'txt/2015/12/28/opinion_text.txt'
         }
-        self.zero_item = {
+        self.zero_item = self.good_item.copy()
+        self.zero_item.update({
             'local_path': 'txt/2015/12/28/opinion_text_bad.junk'
-        }
-        self.bad_item = {
+        })
+        self.bad_item = self.good_item.copy()
+        self.bad_item.update({
             'local_path': 'asdfasdfasdfasdfasdfasdfasdfasdfasdjkfasdf'
-        }
-        self.pdf_item = {
+        })
+        self.pdf_item = self.good_item.copy()
+        self.pdf_item.update({
             'local_path': 'pdf/2013/06/12/' \
                 + 'in_re_motion_for_consent_to_disclosure_of_court_records.pdf'
-        }
+        })
+        self.null_item = self.good_item.copy()
+        self.null_item.update({
+            'local_path': None
+        })
         self.feed = JurisdictionFeed()
+        super(JurisdictionFeedTest, self).setUp()
 
     def test_proper_calculation_of_length(self):
         """
         Does the item_enclosure_length method count the file size properly?
         """
         self.assertEqual(self.feed.item_enclosure_length(self.good_item), 31293)
-        self.assertEqual(self.feed.item_enclosure_length(self.zero_item), 0)
+        self.assertEqual(
+            self.feed.item_enclosure_length(self.zero_item),
+            0,
+            'item %s should be zero bytes' % (self.zero_item['local_path'])
+        )
 
     def test_enclosure_length_returns_none_on_bad_input(self):
         """Given a bad path to a nonexistant file, do we safely return None?"""
@@ -635,14 +654,34 @@ class JurisdictionFeedTest(TestCase):
         Does the mime type detection safely return a good default value when
         given a file it can't detect the mime type for?
         """
-        self.assertEqual(
-            self.feed.item_enclosure_mime_type(self.zero_item),
-            'application/octet-stream'
-        )
-        self.assertEqual(
-            self.feed.item_enclosure_mime_type(self.bad_item),
-            'application/octet-stream'
-        )
+        self.assertIsNone(self.feed.item_enclosure_mime_type(self.zero_item))
+        self.assertIsNone(self.feed.item_enclosure_mime_type(self.bad_item))
+
+    def test_feed_renders_with_item_without_file_path(self):
+        """
+        For Opinions without local_path attributes (that is they don't have a
+        corresponding original PDF/txt/doc file) can we render the feed without
+        the enclosures
+        """
+        fake_results = [self.null_item]
+
+        class FakeFeed(JurisdictionFeed):
+            link = 'http://localhost'
+            def items(self, obj):
+                return fake_results
+        court = Court.objects.get(pk='test')
+        request = HttpRequest()
+        request.path = '/feed'
+        try:
+            feed = FakeFeed().get_feed(court, request)
+            xml = feed.writeString('utf-8')
+            self.assertIn(
+                'feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"',
+                xml
+            )
+            self.assertNotIn('enclosure', xml)
+        except Exception as e:
+            self.fail('Could not call get_feed(): %s' % (e,))
 
 
 class PagerankTest(TestCase):
