@@ -16,6 +16,7 @@ from lxml import html
 
 from cl.lib.solr_core_admin import get_data_dir
 from cl.lib.test_helpers import SolrTestCase
+from cl.search.feeds import JurisdictionFeed
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.search.management.commands.cl_calculate_pagerank_networkx import \
     Command
@@ -586,6 +587,62 @@ class FeedTest(SolrTestCase):
                 msg="Did not find %s node(s) with XPath query: %s. "
                     "Instead found: %s" % (count, test, node_count)
             )
+
+
+@override_settings(
+    MEDIA_ROOT = os.path.join(settings.INSTALL_ROOT, 'cl/assets/media/test/')
+)
+class JurisdictionFeedTest(TestCase):
+
+    fixtures = ['court_data.json']
+
+    def setUp(self):
+        self.good_item = {
+            'local_path': 'txt/2015/12/28/opinion_text.txt'
+        }
+        self.zero_item = {
+            'local_path': 'txt/2015/12/28/opinion_text_bad.junk'
+        }
+        self.bad_item = {
+            'local_path': 'asdfasdfasdfasdfasdfasdfasdfasdfasdjkfasdf'
+        }
+        self.pdf_item = {
+            'local_path': 'pdf/2013/06/12/' \
+                + 'in_re_motion_for_consent_to_disclosure_of_court_records.pdf'
+        }
+        self.feed = JurisdictionFeed()
+
+    def test_proper_calculation_of_length(self):
+        """
+        Does the item_enclosure_length method count the file size properly?
+        """
+        self.assertEqual(self.feed.item_enclosure_length(self.good_item), 31293)
+        self.assertEqual(self.feed.item_enclosure_length(self.zero_item), 0)
+
+    def test_enclosure_length_returns_none_on_bad_input(self):
+        """Given a bad path to a nonexistant file, do we safely return None?"""
+        self.assertIsNone(self.feed.item_enclosure_length(self.bad_item))
+
+    def test_item_enclosure_mime_type(self):
+        """Does the mime type detection work correctly?"""
+        self.assertEqual(
+            self.feed.item_enclosure_mime_type(self.good_item),
+            'text/plain'
+        )
+
+    def test_item_enclosure_mime_type_handles_bogus_files(self):
+        """
+        Does the mime type detection safely return a good default value when
+        given a file it can't detect the mime type for?
+        """
+        self.assertEqual(
+            self.feed.item_enclosure_mime_type(self.zero_item),
+            'application/octet-stream'
+        )
+        self.assertEqual(
+            self.feed.item_enclosure_mime_type(self.bad_item),
+            'application/octet-stream'
+        )
 
 
 class PagerankTest(TestCase):

@@ -1,12 +1,12 @@
 import datetime
-from cl.lib import search_utils, sunburnt
+from cl.lib import search_utils, sunburnt, magic
 from cl.search.forms import SearchForm
 from cl.search.models import Court
 from django.conf import settings
 from django.contrib.syndication.views import Feed
 from django.shortcuts import get_object_or_404
 from django.utils.feedgenerator import Atom1Feed
-
+import os
 
 class SearchFeed(Feed):
     """This feed returns the results of a search feed. It lacks a second
@@ -103,6 +103,30 @@ class JurisdictionFeed(Feed):
             return '/%s' % (path,)
         return path
 
+    def item_enclosure_length(self, item):
+        file_loc = os.path.join(
+            settings.MEDIA_ROOT,
+            item['local_path'].encode('utf-8')
+        )
+        try:
+            return os.path.getsize(file_loc)
+        except:
+            return None
+
+    def item_enclosure_mime_type(self, item):
+        file_loc = os.path.join(
+            settings.MEDIA_ROOT,
+            item['local_path'].encode('utf-8')
+        )
+        try:
+            mime = magic.from_file(file_loc)
+            if mime.startswith('empty'):
+                mime = 'application/octet-stream'
+            elif mime.startswith('ASCII text'):
+                mime = 'text/plain'
+        except:
+            return 'application/octet-stream'
+        return mime
     description_template = 'feeds/solr_desc_template.html'
 
 

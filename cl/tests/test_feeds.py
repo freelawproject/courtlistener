@@ -83,6 +83,8 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         for entry in f.entries:
             if entry.enclosures is not None:
                 self.assertEqual(len(entry.enclosures), 1)
+                self.assertTrue(len(entry.enclosures[0].type) > 0)
+                self.assertTrue(entry.enclosures[0].length > 1)
                 r = self.client.get(entry.enclosures[0].href, follow=True)
                 self.assertEqual(
                     r.status_code,
