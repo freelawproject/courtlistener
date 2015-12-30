@@ -1,3 +1,4 @@
+from cl.api.utils import LoggingMixin
 from cl.lib import api
 from cl.search.models import Docket, Court, OpinionCluster, Opinion, \
     OpinionsCited
@@ -12,7 +13,7 @@ from cl.search.serializers import (
 from rest_framework import status, pagination, viewsets, permissions, response
 
 
-class DocketViewSet(viewsets.ModelViewSet):
+class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Docket.objects.all()
     serializer_class = DocketSerializer
     filter_class = DocketFilter
@@ -22,7 +23,7 @@ class DocketViewSet(viewsets.ModelViewSet):
     )
 
 
-class CourtViewSet(viewsets.ModelViewSet):
+class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Court.objects.exclude(jurisdiction='T')
     serializer_class = CourtSerializer
     filter_class = CourtFilter
@@ -31,7 +32,7 @@ class CourtViewSet(viewsets.ModelViewSet):
     )
 
 
-class OpinionClusterViewSet(viewsets.ModelViewSet):
+class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = OpinionCluster.objects.all()
     serializer_class = OpinionClusterSerializer
     filter_class = OpinionClusterFilter
@@ -41,7 +42,7 @@ class OpinionClusterViewSet(viewsets.ModelViewSet):
     )
 
 
-class OpinionViewSet(viewsets.ModelViewSet):
+class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Opinion.objects.all()
     serializer_class = OpinionSerializer
     filter_class = OpinionFilter
@@ -50,13 +51,13 @@ class OpinionViewSet(viewsets.ModelViewSet):
     )
 
 
-class OpinionsCitedViewSet(viewsets.ModelViewSet):
+class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = OpinionsCited.objects.all()
     serializer_class = OpinionsCitedSerializer
     filter_class = OpinionsCitedFilter
 
 
-class SearchViewSet(viewsets.ViewSet):
+class SearchViewSet(LoggingMixin, viewsets.ViewSet):
     # Default permissions use Django permissions, so here we AllowAny, but folks
     # will need to log in to get past the thresholds.
     permission_classes = (permissions.AllowAny,)

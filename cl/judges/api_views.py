@@ -1,3 +1,4 @@
+from cl.api.utils import LoggingMixin
 from cl.judges.filters import (
     JudgeFilter, PositionFilter, PoliticianFilter, RetentionEventFilter,
     EducationFilter, SchoolFilter, CareerFilter, TitleFilter,
@@ -14,7 +15,7 @@ from cl.judges.models import Judge, Position, Politician, RetentionEvent, \
 from rest_framework import viewsets
 
 
-class JudgesViewSet(viewsets.ModelViewSet):
+class JudgesViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Judge.objects.all()
     serializer_class = JudgeSerializer
     filter_class = JudgeFilter
@@ -23,7 +24,7 @@ class JudgesViewSet(viewsets.ModelViewSet):
     )
 
 
-class PositionViewSet(viewsets.ModelViewSet):
+class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Position.objects.all()
     serializer_class = PositionSerializer
     filter_class = PositionFilter
@@ -35,7 +36,7 @@ class PositionViewSet(viewsets.ModelViewSet):
     )
 
 
-class PoliticianViewSet(viewsets.ModelViewSet):
+class PoliticianViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Politician.objects.all()
     serializer_class = PoliticianSerializer
     filter_class = PoliticianFilter
@@ -44,7 +45,7 @@ class PoliticianViewSet(viewsets.ModelViewSet):
     )
 
 
-class RetentionEventViewSet(viewsets.ModelViewSet):
+class RetentionEventViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = RetentionEvent.objects.all()
     serializer_class = RetentionEventSerializer
     filter_class = RetentionEventFilter
@@ -53,7 +54,7 @@ class RetentionEventViewSet(viewsets.ModelViewSet):
     )
 
 
-class EducationViewSet(viewsets.ModelViewSet):
+class EducationViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Education.objects.all()
     serializer_class = EducationSerializer
     filter_class = EducationFilter
@@ -62,7 +63,7 @@ class EducationViewSet(viewsets.ModelViewSet):
     )
 
 
-class SchoolViewSet(viewsets.ModelViewSet):
+class SchoolViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = School.objects.all()
     serializer_class = SchoolSerializer
     filter_class = SchoolFilter
@@ -71,7 +72,7 @@ class SchoolViewSet(viewsets.ModelViewSet):
     )
 
 
-class CareerViewSet(viewsets.ModelViewSet):
+class CareerViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Career.objects.all()
     serializer_class = CareerSerializer
     filter_class = CareerFilter
@@ -80,7 +81,7 @@ class CareerViewSet(viewsets.ModelViewSet):
     )
 
 
-class TitleViewSet(viewsets.ModelViewSet):
+class TitleViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Title.objects.all()
     serializer_class = TitleSerializer
     filter_class = TitleFilter
@@ -89,7 +90,7 @@ class TitleViewSet(viewsets.ModelViewSet):
     )
 
 
-class PoliticalAffiliationViewSet(viewsets.ModelViewSet):
+class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = PoliticalAffiliation.objects.all()
     serializer_class = PoliticalAffiliationSerializer
     filter_class = PoliticalAffiliationFilter
@@ -98,7 +99,7 @@ class PoliticalAffiliationViewSet(viewsets.ModelViewSet):
     )
 
 
-class SourceViewSet(viewsets.ModelViewSet):
+class SourceViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Source.objects.all()
     serializer_class = SourceSerializer
     filter_class = SourceFilter
@@ -107,7 +108,7 @@ class SourceViewSet(viewsets.ModelViewSet):
     )
 
 
-class ABARatingViewSet(viewsets.ModelViewSet):
+class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = ABARating.objects.all()
     serializer_class = ABARatingSerializer
     filter_class = ABARatingFilter

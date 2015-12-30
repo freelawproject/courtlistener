@@ -1,6 +1,6 @@
 import logging
-from datetime import datetime, timedelta
-
+import redis
+from datetime import date, datetime, timedelta
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
@@ -181,8 +181,7 @@ def show_results(request):
             render_dict.update({'results_oa': oa_dict['results']})
             # But give it a fresh form for the advanced search section
             render_dict.update({'search_form': SearchForm(request.GET)})
-            ten_days_ago = make_aware(datetime.today() - timedelta(days=10),
-                                      utc)
+            ten_days_ago = make_aware(datetime.today() - timedelta(days=10), utc)
             alerts_in_last_ten = Stat.objects.filter(
                     name__contains='alerts.sent',
                     date_logged__gte=ten_days_ago
@@ -195,10 +194,18 @@ def show_results(request):
                     name__contains='bulk_data',
                     date_logged__gte=ten_days_ago
                 ).aggregate(Sum('count'))['count__sum']
-            api_in_last_ten = Stat.objects.filter(
-                    name__contains='api',
-                    date_logged__gte=ten_days_ago
-                ).aggregate(Sum('count'))['count__sum']
+            r = redis.StrictRedis(
+                host=settings.REDIS_HOST,
+                port=settings.REDIS_PORT,
+                db=settings.REDIS_DATABASES['STATS'],
+            )
+            last_ten_days = ['api:v3.d:%s.count' %
+                             (date.today() - timedelta(days=x)).isoformat()
+                             for x in range(0, 10)]
+            api_in_last_ten = sum(
+                [int(result) for result in
+                 r.mget(*last_ten_days) if result is not None]
+            )
             users_in_last_ten = User.objects.filter(
                     date_joined__gte=ten_days_ago
                 ).count()
