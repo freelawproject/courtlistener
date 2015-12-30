@@ -123,7 +123,10 @@ SOLR_AUDIO_URL = 'http://127.0.0.1:8983/solr/audio'
 REDIS_DATABASES = {
     'CELERY': 0,
     'CACHE': 1,
+    'STATS': 2,
 }
+REDIS_HOST = 'localhost'
+REDIS_PORT = 6379
 
 
 ##########
@@ -136,8 +139,10 @@ if DEVELOPMENT:
     CELERYD_CONCURRENCY = 2
 else:
     # Celery settings for production sites
-    BROKER_URL = 'redis://localhost:6379/%s' % REDIS_DATABASES['CELERY']
-    CELERY_RESULT_BACKEND = 'redis://localhost:6379/%s' % REDIS_DATABASES['CELERY']
+    BROKER_URL = 'redis://%s:%s/%s' % (REDIS_HOST, REDIS_PORT,
+                                       REDIS_DATABASES['CELERY'])
+    CELERY_RESULT_BACKEND = 'redis://%s:%s/%s' % (REDIS_HOST, REDIS_PORT,
+                                                  REDIS_DATABASES['CELERY'])
     CELERYD_CONCURRENCY = 20
     BROKER_POOL_LIMIT = 30
     BROKER_TRANSPORT_OPTIONS = {

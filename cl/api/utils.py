@@ -1,4 +1,8 @@
+import redis
+
 from collections import OrderedDict
+from datetime import date
+from django.conf import settings
 from django.utils.encoding import force_text
 from rest_framework import serializers
 from rest_framework.metadata import SimpleMetadata
@@ -88,3 +92,41 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         metadata['ordering'] = view.ordering_fields
         return metadata
 
+
+class LoggingMixin(object):
+    """Log requests to Redis
+
+    This draws inspiration from the code that can be found at: https://github.com/aschn/drf-tracking/blob/master/rest_framework_tracking/mixins.py
+
+    The big distinctions, however, are that this code uses Redis for greater
+    speed, and that it logs significantly less information.
+
+    We want to know:
+     - How many queries in last X days, total?
+     - How many queries ever, total?
+     - How many queries total made by user X?
+     - How many queries per day made by user X?
+    """
+
+    def initial(self, request, *args, **kwargs):
+        super(LoggingMixin, self).initial(request, *args, **kwargs)
+
+        d = date.today().isoformat()
+        user = request.user
+        endpoint = request.resolver_match.url_name
+
+        r = redis.StrictRedis(
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            db=settings.REDIS_DATABASES['STATS'],
+        )
+        pipe = r.pipeline()
+
+        pipe.incr('api:v3.count')           # Global total
+        pipe.incr('api:v3.d:%s.count' % d)  # Global daily tallies
+        pipe.incr('api:v3.user:%s.count' % user.pk)            # User grand total
+        pipe.incr('api:v3.user:%s.d:%s.count' % (user.pk, d))  # User daily tallies
+        pipe.incr('api:v3.endpoint:%s.count' % endpoint)            # endpoint total
+        pipe.incr('api:v3.endpoint:%s.d:%s.count' % (endpoint, d))  # Daily endpoint total
+
+        pipe.execute()
