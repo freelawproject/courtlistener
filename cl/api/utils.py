@@ -122,11 +122,18 @@ class LoggingMixin(object):
         )
         pipe = r.pipeline()
 
-        pipe.incr('api:v3.count')           # Global total
-        pipe.incr('api:v3.d:%s.count' % d)  # Global daily tallies
-        pipe.incr('api:v3.user:%s.count' % user.pk)            # User grand total
-        pipe.incr('api:v3.user:%s.d:%s.count' % (user.pk, d))  # User daily tallies
-        pipe.incr('api:v3.endpoint:%s.count' % endpoint)            # endpoint total
-        pipe.incr('api:v3.endpoint:%s.d:%s.count' % (endpoint, d))  # Daily endpoint total
+        # Global and daily tallies for all URLs.
+        pipe.incr('api:v3.count')
+        pipe.incr('api:v3.d:%s.count' % d)
+
+        # Use a sorted set to store the user stats, with the score representing
+        # the number of queries the user made total or on a given day.
+        pipe.zincrby('api:v3.user.counts', user.pk)
+        pipe.zincrby('api:v3.user.d:%s.counts' % d, user.pk)
+
+        # Use a sorted set to store all the endpoints with score representing
+        # the number of queries the endpoint received total or on a given day.
+        pipe.zincrby('api:v3.endpoint.counts', endpoint)
+        pipe.zincrby('api:v3.endpoint.d:%s.counts' % d, endpoint)
 
         pipe.execute()
