@@ -60,6 +60,10 @@ class SCOTUSMapAdmin(admin.ModelAdmin):
         'published',
         'deleted',
     )
+    search_fields = (
+        'id',
+        'title',
+    )
 
 
 admin.site.register(SCOTUSMap, SCOTUSMapAdmin)
