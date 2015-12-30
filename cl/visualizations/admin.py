@@ -28,6 +28,12 @@ class RefererAdmin(admin.ModelAdmin):
     list_filter = (
         'display',
     )
+    list_display = (
+        '__unicode__',
+        'display',
+        'date_created',
+        'date_modified',
+    )
 
 
 class RefererInline(admin.StackedInline):
