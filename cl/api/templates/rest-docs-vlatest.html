@@ -17,11 +17,9 @@
     <div class="col-sm-7">
         <h1 id="about">REST API &ndash; V3</h1>
 
-        <p>For developers that wish to have a granular API for our data, we
-            provide a RESTful API based on the <a
-                    href="http://www.django-rest-framework.org/" target="_blank">Django REST Framework</a>.
+        <p>For developers that wish to have a granular API for our data, we provide a RESTful API based on the <a href="http://www.django-rest-framework.org/" target="_blank">Django REST Framework</a>.
         </p>
-        <p>This API provides responses in XML, JSON or HTML, with JSON. If you visit the API using your browser you'll receive nicely formatted HTML making your work as a developer as simple as possible. Hit this button, and you'll open a new tab listing all of the endpoints this API supports:
+        <p>This API provides responses in JSON, XML, or HTML, with JSON as the default. If you visit the API using your browser you'll receive nicely formatted HTML making your work as a developer as simple as possible. Hit this button, and you'll open a new tab listing all of the endpoints this API supports:
         </p>
         <p><a href="{% url "api-root" version="v3" %}"
               target="_blank"
@@ -37,7 +35,6 @@
         <p>Note that when you pressed the button, you got an HTML result, but when you ran <code>curl</code> you got a JSON object. This is deliberate and is
             <a href="#formats">discussed in more depth below</a>.
         </p>
-
         <p>The endpoints listed in this response can be used in combination to make sophisticated queries against our database or our search engine. To learn more about an endpoint, you can send an <code>OPTIONS</code> request to it, like so:
         </p>
 
@@ -45,15 +42,15 @@
             <code>curl -X OPTIONS {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "api-root" version="v3" %}</code>
         </blockquote>
 
-        <p>This replaces the "schema" queries that were available in previous versions of the API
+        <p>This replaces the "schema" queries that were available in previous versions of the API. If you're browsing the HTML version of the API, you can also just press the big button that says "OPTIONS".
         </p>
 
-        <p>The following representation of our database, though a bit messy, should be instructive
-            when thinking about how these endpoints work together:
+        <p>The following representation of our database shows how these endpoints work together:
         </p>
         <p>
             <a href="{{ STATIC_PREFIX }}png/schema-design-v3.png"
-               target="_blank">
+               target="_blank"
+               title="Click to see details.">
                 <img src="{{ STATIC_PREFIX }}png/schema-design-v3-small.png"
                      width="640"
                      height="423"
@@ -61,39 +58,34 @@
             </a>
         </p>
 
-        <p>The basic ideas are:</p>
+        <p>In addition to the relations above, the basic ideas are:</p>
         <ul>
-            <li>Dockets are the top-level objects and they contain OpinionClusters and Audio files. In the future, we envision having a Case object that contains the multiple dockets for a case that are generated as it travels between lower and upper courts. Until then, Dockets are the highest level object, just serving to group other objects together.
+            <li><code>Dockets</code> are the top-level objects and they contain <code>OpinionClusters</code> and <code>Audio</code> files. In the future, we envision having a <code>Case</code> object that contains the multiple <code>Dockets</code> for a case that are generated as it travels between lower and upper courts. Until then, <code>Dockets</code> are the highest level object, just serving to group other objects together.
             </li>
-            <li>OpinionClusters are collections of Opinion objects. Opinions can be dissents, concurrences or other types of opinion, and so this is how they are grouped together for a specific case. If we don't know if an opinion is a Dissent, Concurrence or something else, we just call it a Combined Opinion. You can see all the different types of Opinions by sending an <code>OPTIONS</code> request to the Opinions endpoint.
+            <li><code>OpinionClusters</code> are collections of <code>Opinion</code> objects. <code>Opinion</code>s can be Dissents, Concurrences or other types of opinion, and so this is how they are grouped together for a specific case. If we don't know if an <code>Opinion</code> is a Dissent, Concurrence or something else, we just call it a Combined Opinion. You can see all the different types of Opinions by sending an <code>OPTIONS</code> request to the <code>Opinion</code> endpoint.
             </li>
-            <li>As a general rule, metadata lives at the highest level where it makes sense. For example, it's possible to put docket numbers in the OpinionCluster objects, but it makes more sense at a higher level&mdash;at the Docket level. A sometimes-confusing counter example are case names, which have metadata at the Docket leval <em>and</em> at the OpinionCluster level. This is because case names can change at different times, and because a single Docket could have multiple OpinionClusters, each with a different case name. <a href="#case-names">See more information about case names.</a>
-
+            <li>As a general rule, metadata lives at the highest level where it makes sense. For example, it's possible to put docket numbers in the </code>OpinionCluster</code> objects, but it makes more sense at a higher level&mdash;at the <code>Docket</code> level. A sometimes-confusing counter example are case names, which have metadata at the <code>Docket</code> level <em>and</em> at the <code>OpinionCluster</code> level. This is because case names can change at different times, and because a single <code>Docket</code> could have multiple <code>OpinionClusters</code>, each with a different case name. <a href="#case-names">See more information about case names.</a>
             </li>
-            <li>Each Docket is associated with a single jurisdiction. Generally, this is the court where the dispute was litigated. If the case moves between jurisdictions, each jurisdiction has its own docket.
+            <li>Each <code>Docket</code> is associated with a single jurisdiction. Generally, this is the court where the dispute was litigated. If the case moves between jurisdictions, each jurisdiction has its own <code>Docket</code>.
             </li>
-            <li>As of version three of this API, Opinions objects cite each other, allowing a dissent to cite a concurrence or any other combination of Opinion types.
+            <li>As of version three of this API, <code>Opinions</code> objects cite each other, allowing a dissent to cite a concurrence or any other combination of <code>Opinion</code> types.
             </li>
-            <li>Judges have Careers, Titles, Positions, and a number of other fields as described in the image above.
+            <li><code>Judge</code>s have <code>Career</code>s, <code>Title</code>s,
+                <code>Position</code>s, and a number of other fields as described in the image above.
             </li>
         </ul>
 
-        <h2>Overview of Endpoints</h2>
-        <p>
-            This section explains general principles of the API and rules that apply to all of our RESTful endpoints.
+
+
+        <h2 id="overview">Overview of Endpoints</h2>
+        <p>This section explains general principles of the API and rules that apply to all of our RESTful endpoints. In general, these principals are driven by the features supported by the <a href="http://www.django-rest-framework.org/" target="_blank"> Django REST Framework</a>. For more information about many of these sections, we encourage you to check out the documentation there.
         </p>
 
 
-        <h3>Authentication</h3>
-        <p>
-            Authentication is necessary so we can monitor usage of the system
-            and so we can assist with any errors that may occur. Per our <a
-                href="{% url "terms" %}#privacy">privacy policy</a>, we do not track your
-            queries in the API, though we may collect statistical information
-            for system monitoring.
+        <h3 id="authentication">Authentication</h3>
+        <p>Authentication is necessary so we can monitor usage of the system and so we can assist with any errors that may occur. Per our <a href="{% url "terms" %}#privacy">privacy policy</a>, we do not track your queries in the API, though we do collect statistical information for system monitoring.
         </p>
-        <p>There are currently three types of authentication available on the
-            API:
+        <p>There are currently three types of authentication available on the API:
         </p>
         <ol>
             <li>
@@ -104,97 +96,63 @@
                 <a href="http://www.django-rest-framework.org/api-guide/authentication/#tokenauthentication">Django REST Framework Token Authentication</a>
             </li>
         </ol>
-        <p>One form of authentication that is currently not supported is <a href="http://tools.ietf.org/html/rfc6749">OAuth2</a>.
-            If this is a valuable form of authentication for your service,
-            please get in touch using <a href="{% url "contact" %}">our contact
-                form</a>, or chime in to <a
-                    href="https://github.com/freelawproject/courtlistener/issues/371">the
-                issue where we're tracking this feature</a>. If there is enough
-            demand, or if somebody steps forward to develop this feature, it
-            will be added.
+        <p>One form of authentication that is currently not supported is <a href="http://tools.ietf.org/html/rfc6749">OAuth2</a>. If this is a valuable form of authentication for your service, please get in touch using <a href="{% url "contact" %}">our contact form</a>, or chime in to <a href="https://github.com/freelawproject/courtlistener/issues/371">the issue where we're tracking this feature</a>. If there is enough demand, or if somebody steps forward to develop this feature, it will be added.
         </p>
-        <p>All communication with the CourtListener servers is over HTTPS, and
-            so the choice of which form of authentication to use is generally a
-            question of what's most convenient for the context of your work. Our
-            recommendations are:
+        <p>All communication with the CourtListener servers is over HTTPS, and so the choice of which form of authentication to use is generally a question of what's most convenient for the context of your work. Our recommendations are:
         </p>
         <ul>
-            <li>Use Basic Authentication for testing;</li>
-            <li>Use Django Session Authentication if you already have a user's
-                cookie or are developing a system where you can ask the user to
-                log in; and
+            <li>Use Basic Authentication for testing.</li>
+            <li>Use Django Session Authentication if you already have a user's cookie or are developing a system where you can ask the user to log into CourtListener.
             </li>
             <li>Use Token Authentication for all normal programmatic API access.</li>
         </ul>
+        <p>Up until now, in this documentation we've used the API without authenticating at all. We made this possible for tutorials like this, but there are very harsh throttles for users that are not authenticated. It is not recommended to use the APIs without authenticating. (<a href="#limitations-throttles">See more about Throttles</a>.)
+        </p>
 
-        <h4>HTTP Basic Authentication</h4>
-        <p>
-            To do HTTP Basic Authentication using cURL, you might do something
-            like this:
+
+        <h4 id="basic-auth">HTTP Basic Authentication</h4>
+        <p>To do HTTP Basic Authentication using curl, you might do something like this:
         </p>
         <blockquote>
-            <code>curl --user "harvey:your-password"
-                "https://www.courtlistener.com/api/rest/v3/opinion/"</code>
+            <code>curl --user "harvey:your-password" {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "opinioncluster-list" version="v3" %}</code>
         </blockquote>
         <p>
             You can also do it in your browser with a url like:
         </p>
         <blockquote>
-            <code>https://harvey:your-password@www.courtlistener.com/api/rest/v3/opinion/</code>
+            <code>{% if request.is_secure %}https{% else %}http{% endif %}://harvey:your-password@{{ request.get_host }}{% url "opinioncluster-list" version="v3" %}</code>
         </blockquote>
-        <p>
-            But that's not normally necessary because most browsers will provide
-            you with a popup if you need to authenticate using HTTP Basic
-            Authentication.
+        <p>But if you're using your browser, <a href="{% url 'sign-in' %}">you might as well just log in</a>.
         </p>
 
-        <h4>Django Session Authentication</h4>
+
+        <h4 id="session-auth">Django Session Authentication</h4>
         <p>To use Django Session Authentication, simply log into the website.</p>
 
+
         <h4 id="token-auth">Token Authentication</h4>
-        <p>To use your token, use the <code>Authentication</code> HTTP Header.
-            The key should be prefixed by the string literal <code>Token</code>, with whitespace separating the two strings. For example:
-        </p>
-        <p>The following media types and parameters can be used:
-        </p>
-        <ul>
-            <li><strong>HTML</strong>: The media type for HTML is <code>text/html</code>.</li>
-            <li><strong>JSON</strong>: The media type for JSON is <code>application/json</code>. Providing the <code>indent</code> media type parameter allows clients to set the indenting for the response, for example: <code>Accept: application/json; indent=2</code>.
-            </li>
-            <li><strong>XML</strong>: The media type for XML is <code>application/xml</code>.
-            </li>
-        </ul>
-        <p>JSONP, a clever browser hack, is no longer provided due to the wide support of <a href="http://www.w3.org/TR/cors/">CORS</a>. YAML is no longer supported due to the ubiquitous availability of JSON parsers.
-        </p>
-        <p>Take note that by default, browsers send an <code>Accept</code> header similar to:
+        <p>To use your token, use the <code>Authentication</code> HTTP Header. The key should be prefixed by the string literal <code>Token</code>, with whitespace separating the two strings. For example:
         </p>
         <blockquote>
-            <code>Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}</code>
+            <code>Authorization: Token
+                {% if user.is_authenticated %}{{ user.auth_token }}{% else %}
+                    &lt;your-token-here&gt;{% endif %}</code>
         </blockquote>
         <p>Using curl, this looks like:</p>
         <blockquote>
-            <code>curl -X GET http://127.0.0.1:8000/rest/api/v3/opinion/ --header
-                'Authorization: Token
-                {% if user.is_authenticated %}{{ user.auth_token }}{% else %}
-                    &lt;your-token-here&gt;{% endif %}
+            <code>curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "opinioncluster-list" version="v3" %} --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'
             </code>
         </blockquote>
         <p>Note that quotes are used to enclose the whitespace in the header.</p>
         {% if user.is_authenticated %}
-            <p>Your permanent token for use with this API is:</p>
+            <p>Your permanent token for use with this API is being used in the examples above, is at the top of this page, and is:</p>
             <blockquote>
                 <code>{{ user.auth_token }}</code>
             </blockquote>
         {% else %}
-            <p><a
-                    href="{% url "sign-in" %}?next={{ request.path }}#token-auth"
-                    class="btn btn-primary">Sign
-                In To See Your Token</a>
+            <p><a href="{% url "sign-in" %}?next={{ request.path }}#token-auth">Sign in to see your permanent token in these examples and at the top of this page.</a>
             </p>
         {% endif %}
-
-        <h4>Django Session Authentication</h4>
-        <p>To use Django Session Authentication, simply log into the website.</p>
 
 
         <h3 id="formats">Serialization Formats</h3>
@@ -216,86 +174,23 @@
         <blockquote>
             <code>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8</code>
         </blockquote>
-        <p>This states that <code>text/html</code> is the preferred serialization format, and the API respects that, returning HTML when requested by a browser and returning JSON when no Accept header is provided (such as when using cURL).
+        <p>This states that <code>text/html</code> is the preferred serialization format, and the API respects that, returning HTML when requested by a browser and returning JSON when no <code>Accept</code> header is provided (such as when using cURL).
         </p>
         <p>If you wish to set the <code>Accept</code> header using cURL, you can do so using the <code>--header</code> flag:
         </p>
         <blockquote>
-            <code>curl <strong>--header "Accept: application/xml"</strong>
+            <code>curl --header "Accept: application/xml"
                 {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "opinioncluster-list" version="v3" %}</code>
         </blockquote>
         <p>All data is serialized using the utf-8 charset.</p>
 
 
-        <h3>Parsing Uploaded Content</h3>
+        <h3 id="parsing">Parsing Uploaded Content</h3>
         <p>If you are a user that has write access to these APIs (most users do not), you will need to use the <code>Content-Type</code> HTTP header to explicitly set the format of the content you are uploading. The header can be set to any of the values that are available for serialization or to <code>application/x-www-form-urlencoded</code> or <code>multipart/form-data</code>, if you are sending form data.
         </p>
 
 
-        <h3>Views, Pagination and Subset Selection</h3>
-        <p>
-            Each endpoint provides a list view, a detail view and a set view. The <em>list</em> view is what you see
-            when you visit an endpoint, when it shows a list of results.  The <em>detail</em> view shows all meta
-            data for a single result and can be viewed by following the <code>resource_uri</code> field for a result on
-            the list view. Occasionally, content is excluded from the list view for performance reasons, but it may be
-            available on the detail view. With the exception of the coverage API, links to the next and previous pages
-            are available in the <code>meta</code> section of the results.
-        </p>
-        <p>There are currently three types of authentication available on the
-            API:
-        </p>
-        <ol>
-            <li>
-                <a href="http://en.wikipedia.org/wiki/Basic_access_authentication">HTTP Basic Authentication</a>
-            </li>
-            <li>Django Session Authentication (using cookies)</li>
-            <li>
-                <a href="http://www.django-rest-framework.org/api-guide/authentication/#tokenauthentication">Django REST Framework Token Authentication</a>
-            </li>
-        </ol>
-        <p>One form of authentication that is currently not supported is <a href="http://tools.ietf.org/html/rfc6749">OAuth2</a>.
-            If this is a valuable form of authentication for your service,
-            please get in touch using <a href="{% url "contact" %}">our contact
-                form</a>, or chime in to <a
-                    href="https://github.com/freelawproject/courtlistener/issues/371">the
-                issue where we're tracking this feature</a>. If there is enough
-            demand, or if somebody steps forward to develop this feature, it
-            will be added.
-        </p>
-        <p>All communication with the CourtListener servers is over HTTPS, and
-            so the choice of which form of authentication to use is generally a
-            question of what's most convenient for the context of your work. Our
-            recommendations are:
-        </p>
-        <ul>
-            <li>Use Basic Authentication for testing;</li>
-            <li>Use Django Session Authentication if you already have a user's
-                cookie or are developing a system where you can ask the user to
-                log in; and
-            </li>
-            <li>Use Token Authentication for all normal programmatic API access.</li>
-        </ul>
-
-        <h4>HTTP Basic Authentication</h4>
-        <p>
-            A subset of results may be selected by using the <em>set</em> view, and separating the IDs you wish to
-            receive with semi-colons. For example this returns three jurisdictions using the <code>jurisdiction</code>
-            endpoint:
-        </p>
-        <blockquote>
-            <code>curl "https://www.courtlistener.com/api/rest/v2/jurisdiction/set/scotus;ca9;cal"</code>
-        </blockquote>
-        <p>
-            Note that we use quotation marks in this query in order to escape shell interpretation of the semicolons.
-        </p>
-
-
-        <h3>Parsing Uploaded Content</h3>
-        <p>If you are a user that has write access to these APIs (most users do not), you will need to use the <code>Content-Type</code> HTTP header to explicitly set the format of the content you are uploading. The header can be set to any of the values that are available for serialization or to <code>application/x-www-form-urlencoded</code> or <code>multipart/form-data</code>, if you are sending form data.
-        </p>
-
-
-        <h3>Filtering</h3>
+        <h3 id="filtering">Filtering</h3>
         <p>Each endpoint can be filtered in a variety of ways using a technique similar to <a href="https://docs.djangoproject.com/en/dev/ref/models/querysets/#field-lookups">Django's field lookups</a> (see exceptions in <a href="#fn1" id="fn-ref-1">footnote 1</a>). The best way to see how an endpoint can be filtered is by doing an OPTIONS request on the endpoint, and inspecting the <code>filters</code> key in the response.
         </p>
         <p>In the <code>filters</code> key, you'll find a dictionary listing all of the fields that can be used for filtering along with their their types, lookup fields, and any values (aka choices) that can be used for specific lookups. For example, every <code>OpinionCluster</code> has a field called <code>lexis_cite</code> that can be used for lookups. An <code>OPTIONS</code> request describes it like so:
@@ -438,58 +333,13 @@
 
 
 
-        <h3>Limitations &amp; Throttles</h3>
-        <p>At present, this API is throttled to 1,000 queries per hour per
-            user. Anonymous users (those that are not logged in), are allowed
-            100 queries per day for testing purposes. This number is counted by
-            using the <code>X-Forwarded-For</code> and <code>Remote-Addr</code>
-            HTTP headers, which can create problems for users that are behind
-            a gateway that uses <a
-                    href="http://en.wikipedia.org/wiki/Network_address_translation">Network
-                Address Translation</a>. For more information about how this
-            works, <a
-                    href="http://www.django-rest-framework.org/api-guide/throttling/#how-clients-are-identified">read
-                the documentation on the Django REST Framework website</a>, but
-            in general, the simplest solution is to log in. Note that using
-            the browsable HTML API counts towards these thresholds.
+        <h3 id="limitations-throttles">Limitations &amp; Throttles</h3>
+        <p>At present, this API is throttled to 1,000 queries per hour. Anonymous users (those that are not logged in), are allowed 100 queries per day for testing purposes.
         </p>
-        <p>If you are hitting these limits or anticipate doing so, <a
-                href="{% url "contact" %}">please get in touch</a> so we can
-            investigate easing your thresholds.
+        <p>These numbers are counted by using the <code>X-Forwarded-For</code> and <code>Remote-Addr</code> HTTP headers, which can create problems for users that are behind a gateway that uses <a href="http://en.wikipedia.org/wiki/Network_address_translation">Network Address Translation (NAT)</a>. For more information about how this works, <a href="http://www.django-rest-framework.org/api-guide/throttling/#how-clients-are-identified">read the documentation on the Django REST Framework website</a>, but in general, the simplest solution is usually to log in. Note that using the browsable HTML API counts towards these thresholds since it's technically just another mediatype of the API.
         </p>
-        <p>If you are hitting these limits or anticipate doing so, <a
-                href="{% url "contact" %}">please get in touch</a> so we can
-            investigate easing your thresholds.
+        <p>If you are hitting these limits or anticipate doing so, <a href="{% url "contact" %}">please get in touch</a> so we can investigate easing your thresholds.
         </p>
-        <p>
-            On the list view, 20 results are shown at a time by default. This can be limited to show fewer results, but
-            cannot be set to show more. The <code>jurisdiction</code> endpoint allows up to 1,000 results at a time by
-            setting the <code>limit</code> GET parameter like so:
-        </p>
-        <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v2/jurisdiction/?<strong>limit=50</strong></code>
-        </blockquote>
-        <p>Using curl, this looks like:</p>
-        <blockquote>
-            <code>curl -X GET http://127.0.0.1:8000/rest/api/v3/opinion/ --header
-                'Authorization: Token
-                {% if user.is_authenticated %}{{ user.auth_token }}{% else %}
-                    &lt;your-token-here&gt;{% endif %}
-            </code>
-        </blockquote>
-        <p>Note that quotes are used to enclose the whitespace in the header.</p>
-        {% if user.is_authenticated %}
-            <p>Your permanent token for use with this API is:</p>
-            <blockquote>
-                <code>{{ user.auth_token }}</code>
-            </blockquote>
-        {% else %}
-            <p><a
-                    href="{% url "sign-in" %}?next={{ request.path }}#token-auth"
-                    class="btn btn-primary">Sign
-                In To See Your Token</a>
-            </p>
-        {% endif %}
 
 
         <h3>Field Details</h3>
