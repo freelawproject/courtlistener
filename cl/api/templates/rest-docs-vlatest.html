@@ -275,7 +275,7 @@
 
 
         <h3 id="ordering">Ordering</h3>
-        <p>To see which fields can be used for ordering, look at the <code>ordering</code> key in an <code>OPTIONS</code> request (see exceptions in <a href="#fn2" id="fn-ref-2">footnote 2</a>). For example, the <code>Position</code> endpoint contains this:
+        <p>To see which fields can be used for ordering, look at the <code>ordering</code> key in an <code>OPTIONS</code> request (see exceptions in <a href="#fn1" id="fn-ref-2">footnote 1</a>). For example, the <code>Position</code> endpoint contains this:
         </p>
         <pre class="pre-scrollable">
 "ordering": [
@@ -409,7 +409,22 @@
             </li>
             <li><code>citation_id</code> can safely be ignored by new users of this API. It exists to provide backwards compatibility to an endpoint that has been merged into the <code>OpinionCluster</code> endpoint.
             </li>
-            <li>There are numerous citation fields such as <code>federal_cite_one</code>, <code>federal_cite_two</code>, etc. These exist to hold all of the possible parallel citations that an <code>OpinionCluster</code> may have. They are always filled sequentially for a given citation type (federal, state, specialty, etc.). You can learn more about citation types in our <a href="https://github.com/freelawproject/reporters-db" target="_blank">Reporter Database</a> project.
+            <li>
+                <p>There are numerous citation fields such as <code>federal_cite_one</code>, <code>state_cite_two</code>, etc. These exist to hold all of the possible <a href="http://legalresearchprinciples.pbworks.com/w/page/16129937/Parallel%20Citations">parallel citations</a> that an <code>OpinionCluster</code> may have. They are always filled sequentially for a given citation type (federal, state, specialty, etc.). After several years reorganizing our schema, we currently categorize citations into the following types:
+                </p>
+                <ul>
+                    <li>Neutral (e.g. 2013 FL 1)</li>
+                    <li>Federal (e.g. 5 F. 55)</li>
+                    <li>State (e.g. Alabama Reports</li>
+                    <li>Regional (e.g. Atlantic Reporter)</li>
+                    <li>Specialty (e.g. Lawyers' Edition)</li>
+                    <li>Old Supreme Court (e.g. 5 Black. 55)</li>
+                    <li>Lexis or West (e.g. 5 LEXIS 55, or 5 WL 55)</li>
+                </ul>
+                <p class="v-offset-above-1">Some opinions have multiple citations of a given type, and to support those instances we provide several fields of that type. For example, we have fields for <code>federal_cite_one</code>, <code>federal_cite_two</code>, and <code>federal_cite_three</code>, which together can hold three parallel federal citations for a single opinion.
+                </p>
+                <p>You can learn more about citation types in our <a href="https://github.com/freelawproject/reporters-db" target="_blank">Reporter Database</a> project.
+                </p>
             </li>
             <li>The <code>source</code> field is a very important one, as it designates where the content of the <code>OpinionCluster</code> came from. This is vitally important when you are looking at the sub_opinions of the <code>OpinionCluster</code> (the dissents, concurrences, etc.) because the <code>source</code> field indicates whether we will have the plain text or HTML of the item.
             </li>
@@ -434,7 +449,8 @@
                     </li>
                     <li><code>html_columbia</code> will be populated if we got the content from the Columbia collaboration.
                     </li>
-                    <li>html_with_citations</li> is a special field that is populated by parsing one of the above fields for citations, generating an HTML file with linkified citations. All items should eventually have this field (though processing can take some time).
+                    <li><code>html_with_citations</code> is a special field that is populated by parsing one of the above fields for citations, generating an HTML file with linkified citations. All items should eventually have this field (though processing can take some time). In general, this is the field that is used to generate pages on CourtListener.
+                    </li>
                 </ul>
             </li>
         </ul>
@@ -442,250 +458,81 @@
 
 
         <h3 id="audio-endpoint">{% url "audio-list" version="v3" %}</h3>
-        <p>
-            The <code>audio</code> endpoint is modeled after the <code>Opinion</code> endpoint and has very similar behavior, except
-            instead of serving documents, it currently serves oral arguments and may later serve other similar audio files. As with the
-            document endpoint, it can be filtered and ordered by various fields as described in its <a
-                href="/api/rest/v2/audio/schema/?format=json">schema document</a>.
-        </p>
-        <p>
-            Aside from these few notes, the <code>audio</code> endpoint should be very familiar and should have no surprises.
+        <p>The <code>audio</code> endpoint is modeled after the <code>OpinionCluster</code> endpoint and has very similar behavior, except instead of serving collections of opinions, it currently serves oral arguments and may later serve other similar audio files. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
         </p>
 
 
+        <h3 id='cites-endpoint'>{% url "opinionscited-list" version="v3" %}</h3>
+        <p>This endpoint provides an interface into the citation graph that CourtListener provides between <code>Opinion</code>s. Using the filters listed in response to an <code>OPTIONS</code> request, you can see the <code>Opinion</code>s that an <code>Opinion</code> cites (it's "Authorities") or you can see the <code>Opinion</code>s that cite an <code>Opinion</code>.
+        </p>These can be thought of as compliments, though the results can be dramatically different. For example, a very important <code>Opinion</code>, <em><a href="{% url "view_case" "111170" "strickland-v-washington" %}">Strickland v. Washington</a></em>, has been cited thousands of times by subsequent cases, but a quick look in the database reveals that no <code>Opinion</code> has more than about 500 authorities (things it cites to), and most have about 60.
+        </p>
+        <p>The citation graph is also provided as <a href="{% url "bulk_data_index" %}#citation-data">a single CSV file</a> listing every citation between <code>Opinion</code>s. Please don't attempt to crawl this endpoint &mdash; It has more than 10 million records.
+        </p>
 
-        <h3 id='cites-endpoint'>/api/rest/v2/cites/ <span class="alt bold">and</span> /api/rest/v2/cited-by/</h3>
+
+        <h3 id="jurisdiction-endpoint">{% url "court-list" version="v3" %}</h3>
         <p>
-            These endpoints provide interfaces into the citation graph that CourtListener provides between documents.
-            <code>/cites/</code> provides a paginated display of the documents that a document <em>cites</em>, and
-            <code>cited-by</code> provides a paginated display of the documents that cite a document. These can be
-            thought of as compliments, though the results can be dramatically different. For example, a very important
-            document, <em><a href="/opinion/111170/strickland-v-washington/">Strickland v.
-            Washington</a></em>, has been cited thousands of times (<code>cited-by</code>), however no document cites
-            thousands of other documents (looking in the database, it appears the limit is around 400 authorities).
+            This endpoint provides basic information about the <strong>{{ court_count }}</strong> jurisdictions in the American court system that we support. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
         </p>
-        <p>
-            These endpoints only provide limited functionality. They cannot be filtered or ordered and they do not
-            provide a detail or set view. To use these endpoints, provide the ID of the document you wish to
-            analyze, like so:
-        </p>
-        <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/cited-by/?id=111170</pre>
-        <p>Or the reverse:</p>
-        <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/cites/?id=111170</pre>
-        <p>
-            The <code>id</code> parameter is required.
+        <p>Please cache the results of this endpoint to your system. It does not change often.
         </p>
 
 
 
-        <h3 id="citation-endpoint">/api/rest/v2/citation/</h3>
-        <p>
-            This endpoint is integrated into the <code>document</code> endpoint and is also available individually.
-            This endpoint provides each of the many citations that an opinion can have. Since opinions are often included
-            in several written reporters, there are fields in this model for numerous
-            <a href="http://legalresearchprinciples.pbworks.com/w/page/16129937/Parallel%20Citations">parallel
-            citations</a>. After several years reorganizing our schema, we currently categorize citations into the
-            following types:
+        <h3 id="search-endpoint">{% url "search-list" version="v3" %}</h3>
+        <p>This endpoint allows you to query our search engine in a similar manner as is possible in our front end. Because this endpoint does not use the Django models directly, this endpoint is quite different than any other. Unfortunately, unlike other endpoints, it does not support <code>OPTIONS</code> requests and thus is not self-documenting. Several Additional differences should also be noted:
         </p>
         <ul>
-            <li>Neutral (e.g. 2013 FL 1)</li>
-            <li>Federal (e.g. 5 F. 55)</li>
-            <li>State (e.g. Alabama Reports </li>
-            <li>Regional (e.g. Atlantic Reporter)</li>
-            <li>Specialty (e.g. Lawyers' Edition)</li>
-            <li>Old Supreme Court (e.g. 5 Black. 55)</li>
-            <li>Lexis or West (e.g. 5 LEXIS 55, or 5 WL 55)</li>
+            <li><strong>Ordering</strong>: Instead of using a minus sign to flip
+                ordering, it uses <code>asc</code> and <code>desc</code>.
+            </li>
+            <li><strong>Filtering</strong>: Instead of using the Django lookup fields, it uses Solr syntax.To filter on this endpoint, we recommend identifying an effective query on the front end that generates the results you desire and then using that query (and variations thereof) to query the API. On the backend, the same code serves both the API and the front end.
+            </li>
+            <li>
+                <p><strong>Fields</strong>: The fields on this endpoint often differ slightly from those in the other endpoints. Both their names and their values may be different. For example, instead of having a field called <code>nature_of_suit</code>, this endpoint has a field called <code>suitNature</code>. Instead of having a number of citation fields (<code>federal_cite_one</code>, <code>state_cite_two</code>, etc.), this endpoint just has all the citations in a single field called <code>citations</code>, which provides the same values as a list.
+                </p>
+                <p>These changes are all necessary to make this endpoint a powerful and user friendly search engine. For example, users can query natures of suit using a query like <code>suitNature:foo</code> instead of having to write underscores. Users can search all citations at once, not having to think about whether it's a federal citation or a state one or something else.
+                </p>
+            </li>
+            <li>This endpoint can return different kinds of objects, depending on the <code>type</code> parameter. If it's set to <code>o</code>, you'll get opinions. If it's set to <code>oa</code>, you'll get back oral arguments. We'll add more <code>type</code>s in the future too.
+            </li>
+            <li>Like the front end, when the <code>type</code> is set to return opinions, only precedential results are returned by default. To get other precedential statuses, you need to explicitly request them.
+            </li>
         </ul>
-        <p>
-            Some opinions have multiple citations of a given type, and to support those instances we provide several
-            fields of that type. For example, we have fields for <code>federal_cite_one</code>,
-            <code>federal_cite_two</code>, and <code>federal_cite_three</code>, which together can hold three parallel
-            federal citations for a single opinion.
+        <p>Some fields warrant more details:
         </p>
-        <p>
-            All of the filtering, ordering and field lookups described above can be used on this endpoint, as described
-            in its <a href="/api/rest/v2/citation/schema/?format=json">schema</a>. This endpoint also provides a field called
-            <code>opinion_uris</code>, which references the parent opinion for a citation.
-        </p>
-        <p>
-            At present, for performance reasons it is not possible to filter based on a citation. For this purpose, we
-            recommend the <a href="#search-endpoint">search endpoint</a>. For instance, when you know a citation and
-            want to see what information we have about it, try something like:
-            <a href="https://www.courtlistener.com/api/rest/v2/search/?citation=101 U.S. 99">https://www.courtlistener.com/api/rest/v2/search/?citation=101 U.S. 99</a>.
-        </p>
+        <ul>
+            <li><strong><code>snippet</code></strong>: This field contains the same values as are found on the front end, utilizing the HTML5 <code>&lt;mark&gt;</code> element to identify up to five matches in a document. If you wish to use the snippet but do not want highlighting, simply use CSS to give the <code>mark</code> element no styling, like a <code>span</code> element. This field only responds to arguments provided to the <code>q</code> parameter. If that parameter is not used, the <code>snippet</code> field will show the first 500 characters of the <code>text</code> field.
+            </li>
+            <li><strong><code>stat_*</code></strong>: For this Boolean field, we provide opinionated default values. Because most searchers are not interested in non-precedential (unpublished) results, we leave them out by default. If you wish to receive these items, you must explicitly ask for them as you do on the front end.
+            </li>
+        </ul>
 
+        <h3 id="judge-endpoint">Judge Endpoints</h3>
+        {% if perms.judges.has_beta_api_access %}
+            <p>Thank you for being an early tester of our judicial database.</p>
+            <p>We will add notes here as we answer <a href="{% url "contact" %}">your questions</a> about these APIs. In the meantime, as with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options for any judicial endpoint by making an <code>OPTIONS</code> request.
+            </p>
+        {% else %}
+            <p>Unfortunately, these endpoints are not yet fully released.</p>
+            {% if request.user.is_anonymous %}
+                <p><a href="{% url "sign-in" %}?next={{ request.path }}">
+                    Sign in if you have been given early access to this feature. </a>
+                </p>
+                <p>If you wish to have early access to this feature, please <a href="{% url "contact" %}">contact us</a> to apply.
+                </p>
+            {% else %}
+                <p>You do not have permission to use these endpoints. Please <a href="{% url "contact" %}">contact us</a> to apply for early access.
+                </p>
+            {% endif %}
+        {% endif %}
 
-
-        <h3 id="jurisdiction-endpoint">/api/rest/v2/jurisdiction/</h3>
-        <p>
-            This is the simplest of our REST endpoints and currently provides basic information about the
-            <strong>{{ court_count }}</strong> jurisdictions in the American court system that we support.
-        </p>
-        <p>
-            This endpoint can be filtered or ordered in numerous ways as described in its
-            <a href="/api/rest/v2/jurisdiction/schema/">schema</a>. Brief descriptions of the fields can be found there
-            as well.
-        </p>
-        <p>
-            Over time this endpoint will contain more and more information
-            about jurisdictions such as the address of the courthouses and
-            other such information. We welcome data contributions in this area
-            as much of this information will need to be gathered manually.
-        </p>
-
-
-
-        <h3 id="search-endpoint">/api/rest/v2/search/</h3>
-        <p>
-            This endpoint allows you to query our search engine in a similar manner as is possible in our front end.
-            Because this endpoint does not use the Django models directly, this endpoint is quite different than any
-            other. Several differences should be noted.
-        </p>
-        <p>
-            First, the fields and results from this endpoint are slightly
-            different than those in the other endpoints. For example, instead
-            of using a minus sign to flip ordering, it uses <code>asc</code>
-            and <code>desc</code>. And instead of the <code>court</code> field
-            returning a reference to the <code>jurisdiction</code> endpoint,
-            it provides the name of the jurisdiction where the document was
-            issued. (See <a href="/api/rest/v2/search/schema/?format=json">the
-            schema</a> and the notes below for all of the ordering options
-            and field information).
-        </p>
-        <p>
-            A peculiarity of this endpoint is that, like the front end, it serves both <code>audio</code> and
-            <code>document</code> results, depending on the value of the <code>type</code> argument. These results have
-            many overlapping fields, so, for example, if you get back the field <code>download_url</code> and the
-            <code>type</code> is set to the letter <code>o</code> (meaning opinions)&hellip;
-        </p>
-        <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/search/?<strong>type=o</strong></pre>
-        <p>
-            &hellip;<code>download_url</code> will represent the location the
-            opinion was downloaded from. Conversely, if <code>type</code> is
-            set to the letters <code>oa</code> (meaning oral arguments), the
-            <code>download_url</code> will represent the location the <em>audio
-            file</em> was downloaded from, instead. This can be confusing,
-            however, remember that the <code>type</code> field defaults to
-            <code>o</code>, and that the fields that overlap should make sense
-            for all result types.
-        </p>
-        <p>
-            Because this endpoint hits against a Solr search index instead of a
-            database, the filtering works differently. To filter on this
-            endpoint, we recommend identifying an effective query on the front
-            end that generates the results you desire and then using that query
-            (and variations thereof) to query the API. On the backend, the same
-            code serves both the API and the front end.
-        </p>
-        <p>
-            When examining the <em>filtering</em> section of <a
-                href="/api/rest/v2/search/schema/?format=json">the schema</a>,
-            note that fields have been labeled as follows:
-        </p>
-        <dl>
-            <dt>search</dt>
-            <dd>
-                These fields are filterable according to the syntax defined in the
-                <a href="{% url 'advanced_search' %}">advanced query techniques</a> available on the front end.
-            </dd>
-            <dt>int</dt>
-            <dd>
-                These fields require ints as their arguments, and generally provide greater-than or less-than
-                queries
-            </dd>
-            <dt>date</dt>
-            <dd>
-                These fields allow you to search for dates greater than or less than a given value. Input dates ascribe
-                to ISO-8601 format, however, partial dates are allowed, and will be interpreted appropriately. For
-                example, placing "2012" in the <code>filed_after</code> parameter will assume you mean documents after
-                "2012-01-01".
-            </dd>
-            <dt>Boolean</dt>
-            <dd>
-                Only the stat_* field is currently available as boolean. This field is represented by checkboxes in
-                the front end, and can be enabled by setting its value to "on". For example to include only
-                Precedential documents, you might place a query like:
-                <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/search/?<strong>stat_Precedential=on</strong></pre>
-            </dd>
-            <dt>CSV</dt>
-            <dd>
-                The <code>court</code> field is currently available as a list of comma separated values (CSV). Thus, to
-                request multiple courts, you can simply separate their IDs with a comma. For example to get all
-                documents from the Supreme Court (<code>scotus</code>) and the Ninth Circuit of Appeals
-                (<code>ca9</code>), you would make a query like:
-                <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/search/?<strong>court=scotus,ca9</strong></pre>
-                IDs for all jurisdictions are in the sidebar.
-            </dd>
-        </dl>
-        <p>
-            Finally, note that like the front end, when the <code>type</code> is set to <code>o</code> (the default), only
-            precedential results are returned by default. See below for an example that also returns non-precedential results.
-        </p>
-        <p>
-            Four fields in the search results require special explanation:
-        </p>
-        <dl>
-            <dt><code>resource_uri</code></dt>
-            <dd>
-                Because this endpoint is designed to help find documents, once you've found the ones you want, we provide
-                a <code>resource_uri</code> that directs you back to the <code>document</code> endpoint, which has all of
-                the best meta data. This is in contrast to any of the other endpoints, but follows the pattern of searching
-                for results and selecting them to examine the details.
-            </dd>
-            <dt><code>snippet</code></dt>
-            <dd>
-                This field contains the same values as are found on the front end, utilizing the HTML5
-                <code>&lt;mark&gt;</code> element to identify up to five matches in an document. If you wish to use the
-                snippet but do not want highlighting, simply use CSS to give the <code>mark</code> element no styling,
-                like a <code>span</code> element. This field only responds to arguments provided to the <code>q</code>
-                parameter. If that parameter is not used, the <code>snippet</code> field will show the first 500
-                characters of the <code>text</code> field.
-            </dd>
-            <dt><code>stat_*</code></dt>
-            <dd>
-                For this Boolean field, we provide opinionated default values. Because most searchers are not interested
-                in non-precedential (unpublished) results, we leave them out by default. If you wish to receive these
-                items, you must explicitly ask for them as you do on the front end. For example, this query returns both
-                precedential (published) and non-precedential (unpublished) results:
-                <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/search/?stat_Precedential=on&stat_Non-Precedential=on</pre>
-            </dd>
-            <dt><code>court</code></dt>
-            <dd>
-                This field provides the name of the jurisdiction where the document was issued. In other endpoints, this
-                field directs you to the <code>jurisdiction</code> endpoint.
-            </dd>
-        </dl>
-
-
-
-        <h3 id="coverage-endpoint">/api/rest/v2/coverage/</h3>
-        <p>
-            Unlike the other endpoints in this API, the coverage endpoint is
-            not based on the <a
-                href="http://django-tastypie.readthedocs.org/en/latest/">tastypie
-            API framework</a>. As a result it is much simpler, only providing
-            data in a very specific manner, serialized as JSON. In the future
-            we expect to expand this API to provide faceting along additional
-            fields, but at present it simply provides jurisdiction counts by
-            year for any requested jurisdiction. This API does not require
-            authentication and is what powers our live <a href="{% url "coverage" %}">coverage page</a>.
-        </p>
-        <p>
-            To receive jurisdiction counts by year, simply provide the
-            jurisdiction ID you wish to query or the special keyword,
-            <code>all</code>, which returns counts for all jurisdictions. For
-            example, this provides annual counts for the Ninth Circuit of
-            Appeals (<code>ca9</code>):
-        </p>
-        <pre class="scrollable">curl https://www.courtlistener.com url "coverage_api" version='2' court='ca9'</pre>
 
         <h2>Footnotes</h2>
-        <p id="fn1"><sup>1</sup> The <code>search</code> endpoint is handled by our search engine, not our database. Filters are thus applied using the same <code>GET</code> parameters as are created when using the front end of the website. Our recommendation is to hone your query there, then move the parameters to the API.<a
-                href="#fn-ref-1">&#8617;</a>
+        <p id="fn1"><sup>1</sup> The <code>search</code> endpoint is handled by our search engine, not our database. Filters and ordering are thus applied using the same <code>GET</code> parameters as are created when using the front end of the website. Our recommendation is to hone your query there, then move the parameters to the API. See more details in <a href="#search-endpoint">the search section of this document</a>.
         </p>
-        <p id="fn2"><sup>2</sup> Ordering of the <code>search</code> endpoing is done using the same parameters as created when using the front end of the website.<a
-                href="#fn-ref-2">&#8617;</a>
-        </p>
+        <p><a href="#fn-ref-1">Back to reference 1 &#8617;</a></p>
+        <p><a href="#fn-ref-2">Back to reference 2 &#8617;</a></p>
     </div>
 
 
@@ -697,19 +544,15 @@
                 <p>Your permanent token for use with this API is:</p>
                 <h4><code>{{ user.auth_token }}</code></h4>
             {% else %}
-                <p><a
-                        href="{% url "sign-in" %}?next={{ request.path }}"
-                        class="btn btn-primary btn-lg">Sign
-                    In To See Your Token</a>
+                <p><a href="{% url "sign-in" %}?next={{ request.path }}"
+                        class="btn btn-primary btn-lg">Sign In To See Your Token</a>
                 </p>
             {% endif %}
         </div>
 
         <div class="sidebar-section">
             <h3><span>Available Jurisdictions</span></h3>
-            <p>
-                We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs.
-                Details about the jurisdictions that are available can be found <a href="{% url "court_index" %}">here</a>.
+            <p>We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs. Details about the jurisdictions that are available can <a href="{% url "court_index" %}">be found here</a>.
             </p>
             <p>Below is a cheat sheet listing the abbreviations for all available jurisdictions.</p>
             <div id="scrollable-jurisdictions">
@@ -743,9 +586,7 @@
 
         <div class="sidebar-section">
             <h3><span>Powered By</span></h3>
-            <p>
-                If you are interested, we have a variety of <a href="http://freelawproject.org/about/assets/">"Powered
-                By" logos</a> available for your website or application. We appreciate a reference, but it's not required.
+            <p> If you are interested, we have a variety of <a href="http://freelawproject.org/about/assets/">"Powered By" logos</a> available for your website or application. We appreciate a reference, and it supports our work, but it's not currently required.
             </p>
             <a href="http://freelawproject.org/about/assets/#powered-by">
                 <img src="{{ STATIC_PREFIX }}png/logo-long-w350.png" width="350" height="81">
@@ -754,28 +595,21 @@
 
         <div class="sidebar-section">
             <h3><span>CiteGeist Scores</span></h3>
-
-            <p>If you are interested in the CiteGeist score for each opinion, it is now available via our
-                <a href="{% url "bulk_data_index" %}#citegeist">bulk data API</a>.
+            <p>If you are interested in the CiteGeist score for each opinion, it is now available via our <a href="{% url "bulk_data_index" %}#citegeist">bulk data API</a>.
+            </p>
+            <p>This data is not available via the REST API because a single new citation between cases causes a ripple effect through every value in the database.
             </p>
         </div>
 
         <div class="sidebar-section">
             <h3><span>Maintenance Schedule</span></h3>
-            <p>
-                We regularly perform bulk tasks on our servers and maintain
-                <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a
-                public calendar</a> for tracking them. If you intend to do bulk crawling of our API, please be mindful
-                of this schedule.
+            <p>We regularly perform bulk tasks on our servers and maintain <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a public calendar</a> for tracking them. If you need to do bulk crawling of our API, please be mindful of this schedule.
             </p>
         </div>
 
         <div class="sidebar-section">
             <h3><span>Browser Tools</span></h3>
-            <p>
-                Several tools are available to help view JSON in your browser. If you are using Firefox, check out
-                <a href="https://addons.mozilla.org/en-US/firefox/addon/jsonovich/">JSONovitch</a>. If you are using
-                Chrome, check out <a href="https://chrome.google.com/webstore/detail/jsonview/chklaanhfefbnpoihckbnefhakgolnmc?hl=en">JSONView</a>.
+            <p>Several tools are available to help view JSON in your browser. If you are using Firefox, check out <a href="https://addons.mozilla.org/en-US/firefox/addon/jsonovich/">JSONovitch</a>. If you are using Chrome, check out <a href="https://chrome.google.com/webstore/detail/jsonview/chklaanhfefbnpoihckbnefhakgolnmc?hl=en">JSONView</a>.
             </p>
         </div>
 
