@@ -1,16 +1,17 @@
+from rest_framework import status, pagination, viewsets, permissions, response
+
 from cl.api.utils import LoggingMixin
-from cl.lib import api
-from cl.search.models import Docket, Court, OpinionCluster, Opinion, \
-    OpinionsCited
-from cl.search.forms import SearchForm
-from cl.search.filters import (
+from cl.search import api_utils
+from cl.search.api_filters import (
     DocketFilter, CourtFilter, OpinionClusterFilter, OpinionFilter,
     OpinionsCitedFilter)
-from cl.search.serializers import (
+from cl.search.api_serializers import (
     DocketSerializer, CourtSerializer, OpinionClusterSerializer,
     OpinionSerializer, SearchResultSerializer,
     OpinionsCitedSerializer)
-from rest_framework import status, pagination, viewsets, permissions, response
+from cl.search.forms import SearchForm
+from cl.search.models import Docket, Court, OpinionCluster, Opinion, \
+    OpinionsCited
 
 
 class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -70,7 +71,7 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                 cd['q'] = '*:*'  # Get everything
 
             paginator = pagination.PageNumberPagination()
-            sl = api.get_object_list(request, cd=cd, paginator=paginator)
+            sl = api_utils.get_object_list(request, cd=cd, paginator=paginator)
 
             result_page = paginator.paginate_queryset(sl, request)
             serializer = SearchResultSerializer(

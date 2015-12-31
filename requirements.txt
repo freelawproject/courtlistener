@@ -19,7 +19,6 @@ django-filter==0.11.0
 django-localflavor==1.1
 django-markdown-deux
 django-redis-cache==1.6.5
-django-tastypie==0.12.2
 djangorestframework==3.3.2
 djangorestframework-filters==0.6.0
 djangorestframework-xml==1.2.0

@@ -1,10 +1,11 @@
 import rest_framework_filters as filters
+
 from cl.api.utils import DATETIME_LOOKUPS, \
     DATE_LOOKUPS, BASIC_TEXT_LOOKUPS, ALL_TEXT_LOOKUPS, INTEGER_LOOKUPS
 from cl.judges.models import Judge, Position, Politician, RetentionEvent, \
     Education, School, Career, Title, PoliticalAffiliation, Source, ABARating, \
     Race
-from cl.search.filters import CourtFilter
+from cl.search.api_filters import CourtFilter
 
 
 class SourceFilter(filters.FilterSet):

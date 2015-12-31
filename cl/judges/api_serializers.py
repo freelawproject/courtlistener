@@ -1,7 +1,8 @@
+from rest_framework import serializers
+
 from cl.api.utils import DynamicFieldsModelSerializer
 from cl.judges.models import Judge, Position, Politician, RetentionEvent, \
     Education, School, Career, Title, PoliticalAffiliation, Source, ABARating
-from rest_framework import serializers
 
 
 class SchoolSerializer(DynamicFieldsModelSerializer,

@@ -1,10 +1,12 @@
+from rest_framework import viewsets
+
 from cl.api.utils import LoggingMixin, BetaUsersReadOnly
-from cl.judges.filters import (
+from cl.judges.api_filters import (
     JudgeFilter, PositionFilter, PoliticianFilter, RetentionEventFilter,
     EducationFilter, SchoolFilter, CareerFilter, TitleFilter,
     PoliticalAffiliationFilter, ABARatingFilter, SourceFilter,
 )
-from cl.judges.serializers import (
+from cl.judges.api_serializers import (
     JudgeSerializer, PositionSerializer, PoliticianSerializer,
     RetentionEventSerializer, EducationSerializer, SchoolSerializer,
     CareerSerializer, TitleSerializer, PoliticalAffiliationSerializer,
@@ -12,7 +14,6 @@ from cl.judges.serializers import (
 )
 from cl.judges.models import Judge, Position, Politician, RetentionEvent, \
     Education, School, Career, Title, PoliticalAffiliation, Source, ABARating
-from rest_framework import viewsets
 
 
 class JudgesViewSet(LoggingMixin, viewsets.ModelViewSet):
