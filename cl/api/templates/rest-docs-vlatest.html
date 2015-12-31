@@ -28,9 +28,7 @@
         </p>
         <p>We could have also pulled up that same information using curl, using a command like:</p>
 
-        <blockquote>
-            <code>curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "api-root" version="v3" %}</code>
-        </blockquote>
+        <pre class="scrollable">curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "api-root" version="v3" %}</pre>
 
         <p>Note that when you pressed the button, you got an HTML result, but when you ran <code>curl</code> you got a JSON object. This is deliberate and is
             <a href="#formats">discussed in more depth below</a>.
@@ -38,9 +36,7 @@
         <p>The endpoints listed in this response can be used in combination to make sophisticated queries against our database or our search engine. To learn more about an endpoint, you can send an <code>OPTIONS</code> request to it, like so:
         </p>
 
-        <blockquote>
-            <code>curl -X OPTIONS {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "api-root" version="v3" %}</code>
-        </blockquote>
+        <pre class="scrollable">curl -X OPTIONS {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "api-root" version="v3" %}</pre>
 
         <p>This replaces the "schema" queries that were available in previous versions of the API. If you're browsing the HTML version of the API, you can also just press the big button that says "OPTIONS".
         </p>
@@ -64,7 +60,7 @@
             </li>
             <li><code>OpinionClusters</code> are collections of <code>Opinion</code> objects. <code>Opinion</code>s can be Dissents, Concurrences or other types of opinion, and so this is how they are grouped together for a specific case. If we don't know if an <code>Opinion</code> is a Dissent, Concurrence or something else, we just call it a Combined Opinion. You can see all the different types of Opinions by sending an <code>OPTIONS</code> request to the <code>Opinion</code> endpoint.
             </li>
-            <li>As a general rule, metadata lives at the highest level where it makes sense. For example, it's possible to put docket numbers in the </code>OpinionCluster</code> objects, but it makes more sense at a higher level&mdash;at the <code>Docket</code> level. A sometimes-confusing counter example are case names, which have metadata at the <code>Docket</code> level <em>and</em> at the <code>OpinionCluster</code> level. This is because case names can change at different times, and because a single <code>Docket</code> could have multiple <code>OpinionClusters</code>, each with a different case name. <a href="#case-names">See more information about case names.</a>
+            <li>As a general rule, metadata lives at the highest level where it makes sense. For example, it's possible to put docket numbers in the <code>OpinionCluster</code> objects, but it makes more sense at a higher level&mdash;at the <code>Docket</code> level. A sometimes-confusing counter example are case names, which have metadata at the <code>Docket</code> level <em>and</em> at the <code>OpinionCluster</code> level. This is because case names can change at different times, and because a single <code>Docket</code> could have multiple <code>OpinionClusters</code>, each with a different case name. <a href="#case-names">See more information about case names.</a>
             </li>
             <li>Each <code>Docket</code> is associated with a single jurisdiction. Generally, this is the court where the dispute was litigated. If the case moves between jurisdictions, each jurisdiction has its own <code>Docket</code>.
             </li>
@@ -82,10 +78,18 @@
         </p>
 
 
+        <h3 id="permissions">Permissions</h3>
+        {# has_beta_api_access -- remove this when removing the permission block. #}
+        <p>Endpoints relating to judges are currently only available to select beta testers. If you wish to have access to these endpoints, <a href="{% url "contact" %}">please get in touch.</a>
+        </p>
+        <p>All other endpoints are available according to the <a href="#limitations-throttles">throttling</a> and <a href="#authentication">authentication</a> limitations listed below.
+        </p>
+
+
         <h3 id="authentication">Authentication</h3>
         <p>Authentication is necessary so we can monitor usage of the system and so we can assist with any errors that may occur. Per our <a href="{% url "terms" %}#privacy">privacy policy</a>, we do not track your queries in the API, though we do collect statistical information for system monitoring.
         </p>
-        <p>There are currently three types of authentication available on the API:
+        <p>There are currently four types of authentication available on the API:
         </p>
         <ol>
             <li>
@@ -113,15 +117,11 @@
         <h4 id="basic-auth">HTTP Basic Authentication</h4>
         <p>To do HTTP Basic Authentication using curl, you might do something like this:
         </p>
-        <blockquote>
-            <code>curl --user "harvey:your-password" {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "opinioncluster-list" version="v3" %}</code>
-        </blockquote>
+        <pre class="scrollable">curl --user "harvey:your-password" {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "opinioncluster-list" version="v3" %}</pre>
         <p>
             You can also do it in your browser with a url like:
         </p>
-        <blockquote>
-            <code>{% if request.is_secure %}https{% else %}http{% endif %}://harvey:your-password@{{ request.get_host }}{% url "opinioncluster-list" version="v3" %}</code>
-        </blockquote>
+        <pre class="scrollable">{% if request.is_secure %}https{% else %}http{% endif %}://harvey:your-password@{{ request.get_host }}{% url "opinioncluster-list" version="v3" %}</pre>
         <p>But if you're using your browser, <a href="{% url 'sign-in' %}">you might as well just log in</a>.
         </p>
 
@@ -133,22 +133,13 @@
         <h4 id="token-auth">Token Authentication</h4>
         <p>To use your token, use the <code>Authentication</code> HTTP Header. The key should be prefixed by the string literal <code>Token</code>, with whitespace separating the two strings. For example:
         </p>
-        <blockquote>
-            <code>Authorization: Token
-                {% if user.is_authenticated %}{{ user.auth_token }}{% else %}
-                    &lt;your-token-here&gt;{% endif %}</code>
-        </blockquote>
+        <pre class="scrollable">Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}</pre>
         <p>Using curl, this looks like:</p>
-        <blockquote>
-            <code>curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "opinioncluster-list" version="v3" %} --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'
-            </code>
-        </blockquote>
+        <pre class="scrollable">curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "opinioncluster-list" version="v3" %} --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
         <p>Note that quotes are used to enclose the whitespace in the header.</p>
         {% if user.is_authenticated %}
             <p>Your permanent token for use with this API is being used in the examples above, is at the top of this page, and is:</p>
-            <blockquote>
-                <code>{{ user.auth_token }}</code>
-            </blockquote>
+            <pre class="scrollable">{{ user.auth_token }}</pre>
         {% else %}
             <p><a href="{% url "sign-in" %}?next={{ request.path }}#token-auth">Sign in to see your permanent token in these examples and at the top of this page.</a>
             </p>
@@ -171,17 +162,12 @@
         </p>
         <p>Note that by default, browsers send an <code>Accept</code> header similar to:
         </p>
-        <blockquote>
-            <code>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8</code>
-        </blockquote>
+        <pre class="scrollable">text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8</pre>
         <p>This states that <code>text/html</code> is the preferred serialization format, and the API respects that, returning HTML when requested by a browser and returning JSON when no <code>Accept</code> header is provided (such as when using cURL).
         </p>
         <p>If you wish to set the <code>Accept</code> header using cURL, you can do so using the <code>--header</code> flag:
         </p>
-        <blockquote>
-            <code>curl --header "Accept: application/xml"
-                {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "opinioncluster-list" version="v3" %}</code>
-        </blockquote>
+        <pre class="scrollable">curl --header "Accept: application/xml"{% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "opinioncluster-list" version="v3" %}</pre>
         <p>All data is serialized using the utf-8 charset.</p>
 
 
@@ -224,9 +210,7 @@
         <p>
         <p>These field lookups can be used by appending them to a field with a double underscore as a separator. For example, this would return all clusters with a <code>scdb_votes_majority</code> value greater than 2:
         </p>
-        <blockquote>
-            <code>curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "opinioncluster-list" version="v3" %}?scdb_votes_majority__gt=2</code>
-        </blockquote>
+        <pre class="scrollable">curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "opinioncluster-list" version="v3" %}?scdb_votes_majority__gt=2</pre>
         <p>These filters can be combined using multiple <code>GET</code> parameters.</p>
         <p>There are a few special types of filters. The first are <code>RelatedFilter</code>s, which allow you to use any of the filters from one object on a different, related object. For example, when you are using the <code>Docket</code> endpoint, you'll see that it has a filter described as:
         </p>
@@ -246,9 +230,7 @@
 }
 </pre>
         <p>Thus, you can lookup dockets from a specific jurisdiction using:</p>
-        <blockquote>
-            <code>curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "docket-list" version="v3" %}?court__id=scotus</code>
-        </blockquote>
+        <pre class="scrollable">curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "docket-list" version="v3" %}?court__id=scotus</pre>
         <p>This opens up many possibilities. For example, another filter on the <code>Court</code> endpoint is for <code>jurisdiction</code>s:
         </p>
         <pre>
@@ -284,14 +266,13 @@
         </p>
         <p>A final trick that can be used with the filters is the exclusion parameter. Any filter can be converted into an exclusion filter by prepending it with an exclamation mark. For example, this returns <code>Docket</code>s from non-Federal Appellate jurisdictions:
         </p>
-        <pre class=pre-scrollable>curl {% if request.is_secure %}https{% else %}
-            http{% endif %}://{{ request.get_host }}{% url "docket-list" version="v3" %}?court__jurisdiction!=F</pre>
+        <pre class=pre-scrollable>curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "docket-list" version="v3" %}?court__jurisdiction!=F</pre>
         <p>You can see more examples of almost any type of filter in <a href="https://github.com/freelawproject/courtlistener/blob/opinion-split/cl/api/tests.py" target="_blank">our automated tests</a>.
         </p>
 
 
 
-        <h3>Ordering</h3>
+        <h3 id="ordering">Ordering</h3>
         <p>To see which fields can be used for ordering, look at the <code>ordering</code> key in an <code>OPTIONS</code> request (see exceptions in <a href="#fn2" id="fn-ref-2">footnote 2</a>). For example, the <code>Position</code> endpoint contains this:
         </p>
         <pre class="pre-scrollable">
@@ -312,11 +293,8 @@
         <p>Thus, you can order using any of these fields in conjunction with the <code>order_by</code> parameter.</p>
         <p>Decending order can be done using a minus sign. Multiple fields can be requested using a comma-separated list. This, for example, returns judicial <code>Position</code>s ordered by the most recently modified, then by the most recently elected:
         </p>
-        <blockquote>
-            <code>curl {% if request.is_secure %}https{% else %}
-                http{% endif %}://{{ request.get_host }}{% url "position-list" version="v3" %}?order_by=-date_modified,-date_elected
-            </code>
-        </blockquote>
+        <pre class="scrollable">curl {% if request.is_secure %}https{% else %}
+                http{% endif %}://{{ request.get_host }}{% url "position-list" version="v3" %}?order_by=-date_modified,-date_elected</pre>
 
 
         <h3>Field Selection</h3>
@@ -324,10 +302,7 @@
         </p>
         <p>For example, if you wish to only receive the <code>educations</code> and <code>date_modified</code> fields from the <code>Judge</code> endpoint you could do so with:
         </p>
-        <blockquote>
-            <code>curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "judge-list" version="v3" %}?fields=educations,date_modified
-            </code>
-        </blockquote>
+        <pre class="scrollable">curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "judge-list" version="v3" %}?fields=educations,date_modified</pre>
         <p>Unfortunately, this cannot be used for nested resources, though <a href="https://github.com/freelawproject/courtlistener/issues/407" target="_blank">we welcome contributions in this area</a>.
         </p>
 
@@ -403,9 +378,7 @@
             In some cases you might only have a URL, and you might want to look up the item in the API. <code>
             absolute_url</code>s generally look like this:
         </p>
-        <blockquote>
-            <code>/$document-type/$numeric-id/$name-of-the-case/</code>
-        </blockquote>
+        <pre class="scrollable">/$document-type/$numeric-id/$name-of-the-case/</pre>
         <p>
             There are three sections:
         </p>
@@ -439,25 +412,19 @@
             document. This means that when you are working with the <code>citation</code> endpoint, you cannot use the
             document IDs, and vice versa. For example, this:
         </p>
-        <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v2/<strong>document</strong>/111170/</code>
-        </blockquote>
+        <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/<strong>document</strong>/111170/</pre>
         <p>
             Returns <em><a href="/opinion/111170/strickland-v-washington/">Strickland v. Washington</a></em>. But this
             does not:
         </p>
-        <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v2/<strong>citation</strong>/111170/</code>
-        </blockquote>
+        <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/<strong>citation</strong>/111170/</pre>
         <p>
             Even though though they have the same ID. Each document and audio
             file also has a globally unique <code><a
                 href="https://en.wikipedia.org/wiki/SHA-1">SHA1</a></code> sum
             that can be queried using the search endpoint:
         </p>
-        <blockquote>
-            <code>https://www.courtlistener.com/api/rest/v2/search/?q=a2daab35251795fc2621c6ac46b6031c95a4e0ba</code>
-        </blockquote>
+        <pre class="scrollable">https://www.courtlistener.com/api/rest/v2/search/?q=a2daab35251795fc2621c6ac46b6031c95a4e0ba</pre>
         <p>
             To get audio results, also set the type parameter to
             <code>oa</code>, for oral arguments.
@@ -514,9 +481,7 @@
             use. Observe the following query, which gets all items that were modified after June 9th, 2013
             (<code>__gt</code>), ordered by <code>date_modified</code> (ascending).
         </p>
-        <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v2/document/?<strong>date_modified__gt=2013-06-09+00:00Z&order_by=date_modified</strong></code>
-        </blockquote>
+        <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/document/?<strong>date_modified__gt=2013-06-09+00:00Z&order_by=date_modified</strong></pre>
         <p>
             And remember, to flip the ordering, you can use a minus sign in your ordering argument
             (<code>order_by=<strong>-</strong>date_modified</code>).
@@ -557,13 +522,9 @@
             provide a detail or set view. To use these endpoints, provide the ID of the document you wish to
             analyze, like so:
         </p>
-        <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v2/cited-by/?id=111170</code>
-        </blockquote>
+        <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/cited-by/?id=111170</pre>
         <p>Or the reverse:</p>
-        <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v2/cites/?id=111170</code>
-        </blockquote>
+        <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/cites/?id=111170</pre>
         <p>
             The <code>id</code> parameter is required.
         </p>
@@ -650,9 +611,7 @@
             many overlapping fields, so, for example, if you get back the field <code>download_url</code> and the
             <code>type</code> is set to the letter <code>o</code> (meaning opinions)&hellip;
         </p>
-        <blockquote>
-            <code>curl https://www.courtlistener.com/api/rest/v2/search/?<strong>type=o</strong></code>
-        </blockquote>
+        <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/search/?<strong>type=o</strong></pre>
         <p>
             &hellip;<code>download_url</code> will represent the location the
             opinion was downloaded from. Conversely, if <code>type</code> is
@@ -699,9 +658,7 @@
                 Only the stat_* field is currently available as boolean. This field is represented by checkboxes in
                 the front end, and can be enabled by setting its value to "on". For example to include only
                 Precedential documents, you might place a query like:
-                <blockquote>
-                    <code>curl https://www.courtlistener.com/api/rest/v2/search/?<strong>stat_Precedential=on</strong></code>
-                </blockquote>
+                <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/search/?<strong>stat_Precedential=on</strong></pre>
             </dd>
             <dt>CSV</dt>
             <dd>
@@ -709,9 +666,7 @@
                 request multiple courts, you can simply separate their IDs with a comma. For example to get all
                 documents from the Supreme Court (<code>scotus</code>) and the Ninth Circuit of Appeals
                 (<code>ca9</code>), you would make a query like:
-                <blockquote>
-                    <code>curl https://www.courtlistener.com/api/rest/v2/search/?<strong>court=scotus,ca9</strong></code>
-                </blockquote>
+                <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/search/?<strong>court=scotus,ca9</strong></pre>
                 IDs for all jurisdictions are in the sidebar.
             </dd>
         </dl>
@@ -745,9 +700,7 @@
                 in non-precedential (unpublished) results, we leave them out by default. If you wish to receive these
                 items, you must explicitly ask for them as you do on the front end. For example, this query returns both
                 precedential (published) and non-precedential (unpublished) results:
-                <blockquote>
-                    <code>curl https://www.courtlistener.com/api/rest/v2/search/?stat_Precedential=on&stat_Non-Precedential=on</code>
-                </blockquote>
+                <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/search/?stat_Precedential=on&stat_Non-Precedential=on</pre>
             </dd>
             <dt><code>court</code></dt>
             <dd>
@@ -777,9 +730,7 @@
             example, this provides annual counts for the Ninth Circuit of
             Appeals (<code>ca9</code>):
         </p>
-        <blockquote>
-            <code>curl https://www.courtlistener.com url "coverage_api" version='2' court='ca9' </code>
-        </blockquote>
+        <pre class="scrollable">curl https://www.courtlistener.com url "coverage_api" version='2' court='ca9'</pre>
 
         <h2>Footnotes</h2>
         <p id="fn1"><sup>1</sup> The <code>search</code> endpoint is handled by our search engine, not our database. Filters are thus applied using the same <code>GET</code> parameters as are created when using the front end of the website. Our recommendation is to hone your query there, then move the parameters to the API.<a

@@ -6,6 +6,7 @@ from django.conf import settings
 from django.utils.encoding import force_text
 from rest_framework import serializers
 from rest_framework.metadata import SimpleMetadata
+from rest_framework.permissions import DjangoModelPermissions
 from rest_framework_filters import RelatedFilter
 from rest_framework.throttling import UserRateThrottle
 
@@ -172,3 +173,20 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         if len(self.history) >= self.num_requests:
             return self.throttle_failure()
         return self.throttle_success()
+
+
+class BetaUsersReadOnly(DjangoModelPermissions):
+    """Provides access beta access to users with the right permissions.
+
+    Such users must have the has_beta_api_access flag set on their account.
+    """
+
+    perms_map = {
+        'GET': ['%(app_label)s.has_beta_api_access'],
+        'OPTIONS': ['%(app_label)s.has_beta_api_access'],
+        'HEAD': ['%(app_label)s.has_beta_api_access'],
+        'POST': ['%(app_label)s.add_%(model_name)s'],
+        'PUT': ['%(app_label)s.change_%(model_name)s'],
+        'PATCH': ['%(app_label)s.change_%(model_name)s'],
+        'DELETE': ['%(app_label)s.delete_%(model_name)s'],
+    }
