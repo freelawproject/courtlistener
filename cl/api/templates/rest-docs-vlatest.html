@@ -95,7 +95,9 @@
             <li>
                 <a href="http://en.wikipedia.org/wiki/Basic_access_authentication">HTTP Basic Authentication</a>
             </li>
-            <li>Django Session Authentication (using cookies)</li>
+            <li>
+                <a href="https://docs.djangoproject.com/en/dev/topics/auth/" target="_blank"> Django Session Authentication</a> (using cookies)
+            </li>
             <li>
                 <a href="http://www.django-rest-framework.org/api-guide/authentication/#tokenauthentication">Django REST Framework Token Authentication</a>
             </li>
@@ -293,8 +295,7 @@
         <p>Thus, you can order using any of these fields in conjunction with the <code>order_by</code> parameter.</p>
         <p>Decending order can be done using a minus sign. Multiple fields can be requested using a comma-separated list. This, for example, returns judicial <code>Position</code>s ordered by the most recently modified, then by the most recently elected:
         </p>
-        <pre class="scrollable">curl {% if request.is_secure %}https{% else %}
-                http{% endif %}://{{ request.get_host }}{% url "position-list" version="v3" %}?order_by=-date_modified,-date_elected</pre>
+        <pre class="scrollable">curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "position-list" version="v3" %}?order_by=-date_modified,-date_elected</pre>
 
 
         <h3>Field Selection</h3>
@@ -317,24 +318,21 @@
         </p>
 
 
-        <h3>Field Details</h3>
-        <h4>Date Formats</h4>
-        <p>
-            As <a href="http://xkcd.com/1179/">required by influential comic
-            strips</a>, all date formats are set to <a
-                href="http://en.wikipedia.org/wiki/ISO_8601">ISO-8601
-            format</a>.
+        <h3 id="field-details">Field Details</h3>
+        <h4 id="date-formats">Date Formats</h4>
+        <p>As <a href="http://xkcd.com/1179/">required by an influential comic strip</a>, all date formats are set to <a href="http://en.wikipedia.org/wiki/ISO_8601">ISO-8601 format</a>.
         </p>
+
 
         <h4 id="case-names">Case Names</h4>
         <p>Unfortunately, case Names are a complicated topic, and there are a few common misconceptions about them:
         </p>
         <ol>
-            <li>Case names are not unique. There's nothing stopping a court from using <em>Johnson v. State</em> every time a person named Johnson sues the State. Indeed, this is common.
+            <li><strong>Case names are not unique.</strong> There's nothing stopping a court from using <em>Johnson v. State</em> every time a person named Johnson sues the State. Indeed, this is common.
             </li>
-            <li>Case names are not stable. Many cases begin their lives by suing the governor or the Attorney General. But these people change as a result of elections or appointments and so the names of these cases must change too.
+            <li><strong>Case names are not stable.</strong> Many cases begin their lives by suing the governor or the Attorney General. But these people change as a result of elections or appointments and so the names of these cases must change too.
             </li>
-            <li>Case names don't always contain v. Instead, many cases start with <em>In Re</em> or other abbreviations.
+            <li><strong>Case names don't always contain v.</strong> Instead, many cases start with <em>In Re</em> or other abbreviations.
             </li>
         </ol>
         <p>We've done our best to normalize case names wherever we can, following Blue Book conventions. Some things we regularly do include:
@@ -347,19 +345,19 @@
             <li>We do our best to make the case names Title Case rather than UPPERCASE, as many courts insist on publishing them.</li>
         </ol>
         <p>The result of all this work is that we have pretty good case names.</p>
-        <p>In the API, you'll see case names in a variety of places due to the fact that they can change over time. For example, there are <code>case_name</code> fields on the Docket object and also on the OpinionCluster objects. In almost all instances, these values are the same but some cases have different values for the Docket than for an OpinionCluster, so we keep this data in duplicate.
+        <p>In the API, you'll see case names in a variety of places due to the fact that they can change over time. For example, there are <code>case_name</code> fields on the <code>Docket</code> object and also on the <code>OpinionCluster</code> objects. In almost all instances, these values are the same but some cases have different values for the <code>Docket</code> than for an <code>OpinionCluster</code>, so we keep this data in duplicate.
         </p>
         <p>Case names can also vary considerably in length, and we've identified three different types of case names:
         </p>
         <ol>
-            <li><code>case_name</code>: This is a typical case name that can be used in almost all referencces. An example might be <em>Roe v. Wade</em>.
+            <li><code>case_name</code>: This is a typical case name that can be used in almost all references. An example might be <em>Roe v. Wade</em>.
             </li>
             <li><code>case_name_short</code>: This is a shortened one or two word case name that can be used in legal writing after the standard case name has been provided by the author. An example of this might be simply <em>Roe</em> used, "As was stated in <em>Roe</em>&hellip;"
             </li>
             <li><code>case_name_full</code>: This is the full list of plaintiffs and defendants in a case, sometimes going on for hundreds of words, and often including titles or other information. For example: <em>Roe Et Al v. Wade, District Attorney of Dallas County</em>.
             </li>
         </ol>
-        <p>All cases have at least one of these values, many have two values and some have all three. A <code>case_name_short</code> was generated algorithmically for every case possible, but about 40% of cases were too complicated for our program to process and so they were left blank. Human editors have ensured that every Supreme Court case from 1945 to present has this value.
+        <p>All cases have at least one of these values, many have two values and some have all three. A <code>case_name_short</code> was generated algorithmically for every case possible, but about 40% of cases were too complicated for our program to process and so they were left blank. Human editors have ensured that every Supreme Court case from 1945 to present has a <code>case_name_short</code> value.
         </p>
         <p><code>case_name</code> is available for the majority of cases, except those that were imported from Resource.org, which only provided <code>case_name_full</code> values. When that happened, there was no way for us to condense a <code>case_name_full</code>, so until a human editor is available to review them, they will lack this value. All cases have either a <code>case_name</code> or a <code>case_name_full</code> value.
         </p>
@@ -367,16 +365,10 @@
         </p>
 
 
-        <h4>The <code>absolute_url</code> Field</h4>
-        <p>
-            The <code>absolute_url</code> field shows the URL where a resource
-            can be seen live on the site. It is absolute in the sense that it
-            should never change and will always be backwards compatible if
-            changes are ever needed (as in the upgrade to v2 of this API).
+        <h4 id="absolute-url">The <code>absolute_url</code> Field</h4>
+        <p>The <code>absolute_url</code> field shows the URL where a resource can be seen live on the site. It is absolute in the sense that it should never change and will always be backwards compatible if changes are ever needed.
         </p>
-        <p>
-            In some cases you might only have a URL, and you might want to look up the item in the API. <code>
-            absolute_url</code>s generally look like this:
+        <p>In some cases you might start with a URL from CourtListener, and you might want to look up the item in the API. Generally, CourtListener URLs are designed to contain an ID that can be used in the API to look it up, following a pattern like:
         </p>
         <pre class="scrollable">/$document-type/$numeric-id/$name-of-the-case/</pre>
         <p>
@@ -384,119 +376,74 @@
         </p>
         <ol>
             <li>
-                <strong>$document-type</strong>: This is the type of document that has been returned, for example,
-                "opinion" indicates that you have gotten an opinion as your result.
+                <strong>$document-type</strong>: This is the type of document that has been returned, for example, "opinion" indicates that you have gotten an opinion as your result.
             </li>
             <li>
-                <strong>$numeric-id</strong>: This is a numeric representation of the ID for the document. This value
-                increments as we add content to the system. Note that due to deletions and modifications the numeric
-                IDs are not guaranteed to be purely sequential &ndash; IDs will be missing.
+                <strong>$numeric-id</strong>: This is a numeric representation of the ID for the document. This value increments as we add content to the system. Note that due to deletions and modifications the numeric IDs are not guaranteed to be purely sequential&mdash;IDs will be missing.
             </li>
             <li>
-                <strong>$name-of-the-case</strong>: This is the "<a
-                    href="https://en.wikipedia.org/wiki/Slug_%28publishing%29">slug</a>"
-                of the document, and generally mirrors its case name. This
-                value can change if we clean up a case name, but provided it is
-                not omitted completely, this part of the URL can be any value
-                without ever affecting the page that is loaded. Put another
-                way, we load pages based on the <code>$numeric-id</code> and
-                <code>$document-type</code>, not by the name of the case.
+                <strong>$name-of-the-case</strong>: This is the "<a href="https://en.wikipedia.org/wiki/Slug_%28publishing%29">slug</a>" of the document, and generally mirrors its case name. This value can change if we clean up a case name, but provided it is not omitted completely, this part of the URL can be any value without ever affecting the page that is loaded. Put another way, we load pages based on the <code>$numeric-id</code> and <code>$document-type</code>, not by the name of the case.
             </li>
         </ol>
 
 
 
-        <h4>IDs and SHA1 Sums</h4>
-        <p>
-            Because of the way the data is organized in our backend, there is a unique ID for each citation and each
-            document. This means that when you are working with the <code>citation</code> endpoint, you cannot use the
-            document IDs, and vice versa. For example, this:
+        <h3 id="upgrades">Upgrades and Fixes</h3>
+        <p>Like the rest of the CourtListener platform, this API and its documentation are <a href="https://github.com/freelawproject/courtlistener">open source</a>. If it lacks functionality that you desire or if you find these notes lacking, pull requests providing improvements are very welcome. Just get in touch on <a href="http://lists.freelawproject.org/cgi-bin/mailman/listinfo/dev">our developer forum</a> or via our <a href="{% url "contact" %}">contact form</a> to discuss your ideas. Or, if it's something quick, just go ahead and send us a pull request.
         </p>
-        <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/<strong>document</strong>/111170/</pre>
-        <p>
-            Returns <em><a href="/opinion/111170/strickland-v-washington/">Strickland v. Washington</a></em>. But this
-            does not:
-        </p>
-        <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/<strong>citation</strong>/111170/</pre>
-        <p>
-            Even though though they have the same ID. Each document and audio
-            file also has a globally unique <code><a
-                href="https://en.wikipedia.org/wiki/SHA-1">SHA1</a></code> sum
-            that can be queried using the search endpoint:
-        </p>
-        <pre class="scrollable">https://www.courtlistener.com/api/rest/v2/search/?q=a2daab35251795fc2621c6ac46b6031c95a4e0ba</pre>
-        <p>
-            To get audio results, also set the type parameter to
-            <code>oa</code>, for oral arguments.
+        <p>Getting this kind support is one of the most rewarding things possible and is a major goal of <a href="http://freelawproject.org">Free Law Project</a>. Many of the features you use on CourtListener were built this way. We're building something together.
         </p>
 
 
-
-        <h3>Upgrades and Fixes</h3>
-        <p>
-            Like the rest of the CourtListener platform, this API and its documentation are
-            <a href="https://github.com/freelawproject/courtlistener/tree/master/alert/search/api2.py">open
-                source</a>. If it lacks functionality that you desire or if you find
-            <a href="https://github.com/freelawproject/courtlistener/tree/master/alert/assets/templates/api">these
-            notes</a> lacking, pull requests providing improvements are very welcome. Just get in touch in
-            <a href="http://lists.freelawproject.org/cgi-bin/mailman/listinfo/dev">our developer forum</a> to discuss
-            your ideas or, if it's a quick thing, just go ahead and send us a pull request.
+        <h2 id="endpoints">Endpoints</h2>
+        <h3 id="docket-endpoint">{% url "docket-list" version="v3" %}</h3>
+        <p>As described above, <code>Docket</code> objects link <code>OpinionCluster</code> and <code>Audio</code> objects together, following the conventional definition of a docket. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
         </p>
 
-
-
-        <h2 id="document-endpoint">/api/rest/v2/document/</h2>
-        <p>
-            This can be considered the main endpoint for many users. It provides access to the documents in our database
-            and can be filtered or ordered in various ways as mentioned above. As with all endpoints, field descriptions
-            can be found in the schema document. Visiting this endpoint provides the metadata for 20 documents at a
-            time. The full text of the documents may be found by visiting their detail page, which can be found by
-            following the <code>resource_uri</code> attribute for a result. Full text is not provided by default to
-            save on bandwidth and processing.
+        <h3 id="cluster-endpoint">{% url "opinioncluster-list" version="v3" %}</h3>
+        <p>This is a major endpoint serving up the millions of <code>OpinionClusters</code> that are available on CourtListener. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
         </p>
-        <p>
-            The results at this endpoint can be filtered by a number of fields. Among others, this includes filtering
-            by:
-        </p>
-        <!-- A more clever person would generate this *from* the schema itself -->
+        <p>Follows are a few notes on the fields that are available:</p>
         <ul>
-            <li><code>blocked</code>: Whether the document should be blocked from search engines.</li>
-            <li><code>citation_count</code>: The number of times the document has been cited by other documents.</li>
-            <li><code>court</code>: The ID of the court where the document was written.</li>
-            <li><code>date_filed</code>: The date the document was filed by the court.</li>
-            <li><code>date_modified</code>: The date and time the document was last modified.</li>
-            <li><code>extracted_by_ocr</code>: Whether the text of the document was extracted from an image using OCR.</li>
-            <li><code>precedential_status</code>: Whether the document has precedential value.</li>
-            <li><code>time_retrieved</code>: The date and time the document was added to our system.</li>
+            <li>There are presently two fields, <code>judges</code> and <code>panel</code> that contain similar information. The <code>judges</code> field is simply a string field containing the names of judges that heard a case. The <code>panel</code> field is a foreign key to the <code>Judges</code> endpoint, providing more detail about a specific judge or judges. These two fields exist because we have not historically had access to good judicial data, forcing us to simply save the name of the judge as a string.
+            </li>
+            <li><code>citation_id</code> can safely be ignored by new users of this API. It exists to provide backwards compatibility to an endpoint that has been merged into the <code>OpinionCluster</code> endpoint.
+            </li>
+            <li>There are numerous citation fields such as <code>federal_cite_one</code>, <code>federal_cite_two</code>, etc. These exist to hold all of the possible parallel citations that an <code>OpinionCluster</code> may have. They are always filled sequentially for a given citation type (federal, state, specialty, etc.). You can learn more about citation types in our <a href="https://github.com/freelawproject/reporters-db" target="_blank">Reporter Database</a> project.
+            </li>
+            <li>The <code>source</code> field is a very important one, as it designates where the content of the <code>OpinionCluster</code> came from. This is vitally important when you are looking at the sub_opinions of the <code>OpinionCluster</code> (the dissents, concurrences, etc.) because the <code>source</code> field indicates whether we will have the plain text or HTML of the item.
+            </li>
         </ul>
-        <p>
-            For the full list of filtering fields, see the <em>filtering</em>
-            section of the <a
-                href="/api/rest/v2/document/schema/?format=json">schema
-            document</a>.
+
+        <h3 id="opinion-endpoint">{% url "opinion-list" version="v3" %}</h3>
+        <p>The <code>Opinion</code> endpoint contains specific information about Opinions. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
         </p>
-        <p>
-            As mentioned above, in the schema document you will find that each filtering field provides a list of
-            field lookups that are available to it. The following query provides an example of these lookups in
-            use. Observe the following query, which gets all items that were modified after June 9th, 2013
-            (<code>__gt</code>), ordered by <code>date_modified</code> (ascending).
-        </p>
-        <pre class="scrollable">curl https://www.courtlistener.com/api/rest/v2/document/?<strong>date_modified__gt=2013-06-09+00:00Z&order_by=date_modified</strong></pre>
-        <p>
-            And remember, to flip the ordering, you can use a minus sign in your ordering argument
-            (<code>order_by=<strong>-</strong>date_modified</code>).
-        </p>
-        <p>
-            The results of this endpoint can also be ordered by <code>time_retrieved</code>, <code>date_modified</code>,
-            <code>date_filed</code>, or <code>date_blocked</code>. Again, this is described in more detail in the
-            schema.
-        </p>
+        <p>Follows are a few notes on the fields that are available:</p>
+        <ul>
+            <li>The <code>type</code> field indicates whether the item is a concurrence, lead opinion, dissent, etc. The values provided for this field are proceeded by numbers so that if they are sorted alphabetically, they will also be sorted from highest priority to lowest.
+            </li>
+            <li>The <code>sha1</code> field provides a unique cryptographic hash of every item in our collection.
+            </li>
+            <li>Some of the <code>plain_text</code>, <code>html</code>, <code>html_lawbox</code>, <code>html_columbia</code> and <code>html_with_citations</code> fields will be populated depending on the <code>OpinionCluster</code>'s <code>source</code> field:
+                <ul>
+                    <li><code>plain_text</code> will be populated if we got the opinion from a court's website as a PDF or Microsoft Word document.
+                    </li>
+                    <li><code>html</code> will be populated if we got the opinion from a court's website as a Word Perfect or HTML document, or if we got the opinion from Resource.org, which provides HTML documents.
+                    </li>
+                    <li><code>html_lawbox</code> will be populated if we got the content from the Lawbox donation.
+                    </li>
+                    <li><code>html_columbia</code> will be populated if we got the content from the Columbia collaboration.
+                    </li>
+                    <li>html_with_citations</li> is a special field that is populated by parsing one of the above fields for citations, generating an HTML file with linkified citations. All items should eventually have this field (though processing can take some time).
+                </ul>
+            </li>
+        </ul>
 
 
 
-        <h2 id="audio-endpoint">/api/rest/v2/audio/</h2>
+        <h3 id="audio-endpoint">{% url "audio-list" version="v3" %}</h3>
         <p>
-            The <code>audio</code> endpoint is modeled after the <code>document</code> endpoint and has very similar behavior, except
+            The <code>audio</code> endpoint is modeled after the <code>Opinion</code> endpoint and has very similar behavior, except
             instead of serving documents, it currently serves oral arguments and may later serve other similar audio files. As with the
             document endpoint, it can be filtered and ordered by various fields as described in its <a
                 href="/api/rest/v2/audio/schema/?format=json">schema document</a>.
@@ -507,7 +454,7 @@
 
 
 
-        <h2 id='cites-endpoint'>/api/rest/v2/cites/ <span class="alt bold">and</span> /api/rest/v2/cited-by/</h2>
+        <h3 id='cites-endpoint'>/api/rest/v2/cites/ <span class="alt bold">and</span> /api/rest/v2/cited-by/</h3>
         <p>
             These endpoints provide interfaces into the citation graph that CourtListener provides between documents.
             <code>/cites/</code> provides a paginated display of the documents that a document <em>cites</em>, and
@@ -531,7 +478,7 @@
 
 
 
-        <h2 id="citation-endpoint">/api/rest/v2/citation/</h2>
+        <h3 id="citation-endpoint">/api/rest/v2/citation/</h3>
         <p>
             This endpoint is integrated into the <code>document</code> endpoint and is also available individually.
             This endpoint provides each of the many citations that an opinion can have. Since opinions are often included
@@ -569,7 +516,7 @@
 
 
 
-        <h2 id="jurisdiction-endpoint">/api/rest/v2/jurisdiction/</h2>
+        <h3 id="jurisdiction-endpoint">/api/rest/v2/jurisdiction/</h3>
         <p>
             This is the simplest of our REST endpoints and currently provides basic information about the
             <strong>{{ court_count }}</strong> jurisdictions in the American court system that we support.
@@ -588,7 +535,7 @@
 
 
 
-        <h2 id="search-endpoint">/api/rest/v2/search/</h2>
+        <h3 id="search-endpoint">/api/rest/v2/search/</h3>
         <p>
             This endpoint allows you to query our search engine in a similar manner as is possible in our front end.
             Because this endpoint does not use the Django models directly, this endpoint is quite different than any
@@ -711,7 +658,7 @@
 
 
 
-        <h2 id="coverage-endpoint">/api/rest/v2/coverage/</h2>
+        <h3 id="coverage-endpoint">/api/rest/v2/coverage/</h3>
         <p>
             Unlike the other endpoints in this API, the coverage endpoint is
             not based on the <a
