@@ -5,7 +5,7 @@ from cl.api.utils import DATETIME_LOOKUPS, \
 from cl.judges.models import Judge, Position, Politician, RetentionEvent, \
     Education, School, Career, Title, PoliticalAffiliation, Source, ABARating, \
     Race
-from cl.search.api_filters import CourtFilter
+from cl.search.filters import CourtFilter
 
 
 class SourceFilter(filters.FilterSet):

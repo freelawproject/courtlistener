@@ -2,13 +2,13 @@ from rest_framework import status, pagination, viewsets, permissions, response
 
 from cl.api.utils import LoggingMixin
 from cl.search import api_utils
-from cl.search.api_filters import (
-    DocketFilter, CourtFilter, OpinionClusterFilter, OpinionFilter,
-    OpinionsCitedFilter)
 from cl.search.api_serializers import (
     DocketSerializer, CourtSerializer, OpinionClusterSerializer,
     OpinionSerializer, SearchResultSerializer,
     OpinionsCitedSerializer)
+from cl.search.filters import (
+    DocketFilter, CourtFilter, OpinionClusterFilter, OpinionFilter,
+    OpinionsCitedFilter)
 from cl.search.forms import SearchForm
 from cl.search.models import Docket, Court, OpinionCluster, Opinion, \
     OpinionsCited
