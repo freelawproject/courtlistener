@@ -25,6 +25,15 @@ class RefererAdmin(admin.ModelAdmin):
     raw_id_fields = (
         'map',
     )
+    list_filter = (
+        'display',
+    )
+    list_display = (
+        '__unicode__',
+        'display',
+        'date_created',
+        'date_modified',
+    )
 
 
 class RefererInline(admin.StackedInline):
@@ -59,6 +68,10 @@ class SCOTUSMapAdmin(admin.ModelAdmin):
     list_filter = (
         'published',
         'deleted',
+    )
+    search_fields = (
+        'id',
+        'title',
     )
 
 

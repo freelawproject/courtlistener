@@ -1,12 +1,12 @@
 from collections import OrderedDict
 
+from rest_framework import serializers
+
 from cl.api.utils import DynamicFieldsModelSerializer
 from cl.lib.sunburnt import schema
 from cl.lib.sunburnt.schema import SolrSchema
 from cl.search.models import Docket, OpinionCluster, Opinion, Court, \
     OpinionsCited
-
-from rest_framework import serializers
 
 
 class DocketSerializer(DynamicFieldsModelSerializer,

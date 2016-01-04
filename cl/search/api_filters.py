@@ -1,8 +1,9 @@
+import rest_framework_filters as filters
+
 from cl.api.utils import INTEGER_LOOKUPS, DATETIME_LOOKUPS, DATE_LOOKUPS
 from cl.search.models import (
     Court, OpinionCluster, Docket, Opinion, OpinionsCited, SOURCES,
     JURISDICTIONS)
-import rest_framework_filters as filters
 
 
 class CourtFilter(filters.FilterSet):

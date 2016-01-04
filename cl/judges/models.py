@@ -145,6 +145,11 @@ class Judge(models.Model):
             self.name_suffix,
         ])
 
+    class Meta:
+        permissions = (
+            ('has_beta_api_access', 'Can access features during beta period.'),
+        )
+
 
 class Position(models.Model):
     """A role held by a judge, and the details about it."""
