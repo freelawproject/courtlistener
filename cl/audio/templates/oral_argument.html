@@ -65,6 +65,9 @@
                         <a href="{% url 'admin:audio_audio_change' af.pk%}"
                            class="btn btn-primary btn-xs">Audio File</a>
                     {% endif %}
+                    {% if request.user.is_superuser and private %}
+                      <div class="btn btn-primary btn-xs">Blocked from Search</div>
+                    {% endif %}
                 </p>
             </div>
         {% endif %}
