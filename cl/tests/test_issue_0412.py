@@ -4,6 +4,7 @@ Test Issue 412: Add admin-visible notice to various pages showing if they are
 blocked from search engines
 """
 from cl.tests.base import BaseSeleniumTest
+from cl.search.models import OpinionCluster, Docket, Court
 
 
 class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
@@ -12,9 +13,23 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
     indications of whether Opinions are blocked from Search Engines
     """
 
+    fixtures = ['test_court.json', 'authtest_data.json', 'judge_judy.json',
+        'opinions-issue-412.json']
+
     def test_admin_viewing_blocked_opinion(self):
         """ For a blocked Opinion, an Admin should see indication. """
-        self.fail('Finish test_admin_viewing_blocked_opinion')
+        # Admin logs into CL using her admin account
+        self.browser.get(self.server_url)
+        self.attempt_sign_in('admin', 'password')
+
+        # She navigates to a particular Opinion page she knows has been blocked
+        # from indexing by Search Engines
+        oc = OpinionCluster.objects.get(pk=11)
+        self.browser.get(oc.get_absolute_url())
+        self.assert_text_in_body(oc.case_name)
+
+        # She notices a widget letting her know it's blocked by search engines
+        self.browser.find_element_by_css_selector('.blocked-search-engines')
 
     def test_non_admin_viewing_blocked_opinion(self):
         """ For a blocked Opinion, a Non-admin should see NO indication. """
