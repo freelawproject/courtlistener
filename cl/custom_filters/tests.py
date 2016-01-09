@@ -1,4 +1,7 @@
-from django.test import TestCase
+from django.template import Context
+from django.test import TestCase, RequestFactory
+
+from cl.custom_filters.templatetags.extras import get_full_host
 from cl.custom_filters.templatetags.text_filters import naturalduration
 
 
@@ -65,3 +68,21 @@ class TestNaturalDuration(TestCase):
                     "  Got:      %s\n"
                     "  Expected: %s" % (test, actual_result, expected_result)
             )
+
+
+class TestExtras(TestCase):
+
+    factory = RequestFactory()
+
+    def test_get_full_host(self):
+        """Does get_full_host return the right values"""
+        c = Context({'request': self.factory.request()})
+        self.assertEqual(
+            get_full_host(c),
+            'http://testserver',
+        )
+
+        self.assertEqual(
+            get_full_host(c, username='billy', password='crystal'),
+            'http://billy:crystal@testserver',
+        )
