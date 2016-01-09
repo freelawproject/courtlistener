@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load extras %}
 
 {% block title %}REST API, v3 &ndash; CourtListener.com{% endblock %}
 {% block description %}
@@ -28,7 +29,7 @@
         </p>
         <p>We could have also pulled up that same information using curl, using a command like:</p>
 
-        <pre class="scrollable">curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "api-root" version="v3" %}</pre>
+        <pre class="scrollable">curl {% get_full_host %}{% url "api-root" version="v3" %}</pre>
 
         <p>Note that when you pressed the button, you got an HTML result, but when you ran <code>curl</code> you got a JSON object. This is deliberate and is
             <a href="#formats">discussed in more depth below</a>.
@@ -36,7 +37,7 @@
         <p>The endpoints listed in this response can be used in combination to make sophisticated queries against our database or our search engine. To learn more about an endpoint, you can send an <code>OPTIONS</code> request to it, like so:
         </p>
 
-        <pre class="scrollable">curl -X OPTIONS {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "api-root" version="v3" %}</pre>
+        <pre class="scrollable">curl -X OPTIONS {% get_full_host %}{% url "api-root" version="v3" %}</pre>
 
         <p>This replaces the "schema" queries that were available in previous versions of the API. If you're browsing the HTML version of the API, you can also just press the big button that says "OPTIONS".
         </p>
@@ -119,11 +120,12 @@
         <h4 id="basic-auth">HTTP Basic Authentication</h4>
         <p>To do HTTP Basic Authentication using curl, you might do something like this:
         </p>
-        <pre class="scrollable">curl --user "harvey:your-password" {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "opinioncluster-list" version="v3" %}</pre>
+        <pre class="scrollable">curl --user "harvey:your-password"
+            {% get_full_host %}{% url "opinioncluster-list" version="v3" %}</pre>
         <p>
             You can also do it in your browser with a url like:
         </p>
-        <pre class="scrollable">{% if request.is_secure %}https{% else %}http{% endif %}://harvey:your-password@{{ request.get_host }}{% url "opinioncluster-list" version="v3" %}</pre>
+        <pre class="scrollable">{% get_full_host username='harvey' password='your-password' %}{% url "opinioncluster-list" version="v3" %}</pre>
         <p>But if you're using your browser, <a href="{% url 'sign-in' %}">you might as well just log in</a>.
         </p>
 
@@ -137,7 +139,7 @@
         </p>
         <pre class="scrollable">Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}</pre>
         <p>Using curl, this looks like:</p>
-        <pre class="scrollable">curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "opinioncluster-list" version="v3" %} --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
+        <pre class="scrollable">curl {% get_full_host %}{% url "opinioncluster-list" version="v3" %} --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
         <p>Note that quotes are used to enclose the whitespace in the header.</p>
         {% if user.is_authenticated %}
             <p>Your permanent token for use with this API is being used in the examples above, is at the top of this page, and is:</p>
@@ -169,7 +171,7 @@
         </p>
         <p>If you wish to set the <code>Accept</code> header using cURL, you can do so using the <code>--header</code> flag:
         </p>
-        <pre class="scrollable">curl --header "Accept: application/xml"{% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "opinioncluster-list" version="v3" %}</pre>
+        <pre class="scrollable">curl --header "Accept: application/xml"{% get_full_host %}{% url "opinioncluster-list" version="v3" %}</pre>
         <p>All data is serialized using the utf-8 charset.</p>
 
 
@@ -212,7 +214,7 @@
         <p>
         <p>These field lookups can be used by appending them to a field with a double underscore as a separator. For example, this would return all clusters with a <code>scdb_votes_majority</code> value greater than 2:
         </p>
-        <pre class="scrollable">curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "opinioncluster-list" version="v3" %}?scdb_votes_majority__gt=2</pre>
+        <pre class="scrollable">curl {% get_full_host %}{% url "opinioncluster-list" version="v3" %}?scdb_votes_majority__gt=2</pre>
         <p>These filters can be combined using multiple <code>GET</code> parameters.</p>
         <p>There are a few special types of filters. The first are <code>RelatedFilter</code>s, which allow you to use any of the filters from one object on a different, related object. For example, when you are using the <code>Docket</code> endpoint, you'll see that it has a filter described as:
         </p>
@@ -232,7 +234,7 @@
 }
 </pre>
         <p>Thus, you can lookup dockets from a specific jurisdiction using:</p>
-        <pre class="scrollable">curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "docket-list" version="v3" %}?court__id=scotus</pre>
+        <pre class="scrollable">curl {% get_full_host %}{% url "docket-list" version="v3" %}?court__id=scotus</pre>
         <p>This opens up many possibilities. For example, another filter on the <code>Court</code> endpoint is for <code>jurisdiction</code>s:
         </p>
         <pre>
@@ -258,17 +260,17 @@
         </p>
         <p>Thus, if you want to filter for <code>Docket</code>s that occur in Federal Appellate (<code>F</code>) or Federal District (<code>FD</code>) courts, you can do:
         </p>
-        <pre class="pre-scrollable">curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "docket-list" version="v3" %}?court__jurisdiction=F&court__jurisdiction=FD</pre>
+        <pre class="pre-scrollable">curl {% get_full_host %}{% url "docket-list" version="v3" %}?court__jurisdiction=F&court__jurisdiction=FD</pre>
         <p>Naturally, related filter queries and lookup types can be combined to arrive at queries like:
         </p>
-        <pre class="pre-scrollable">curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "docket-list" version="v3" %}?court__date_modified__gt=2013-01-01T00:00:00Z</pre>
+        <pre class="pre-scrollable">curl {% get_full_host %}{% url "docket-list" version="v3" %}?court__date_modified__gt=2013-01-01T00:00:00Z</pre>
         <p>Which would return all dockets that occurred in a court that was modified in our system after January 01, 2013.
         </p>
         <p>Note that date-times are described in the <code>OPTIONS</code> response as <code>IsoDateTimeFilter</code>s, and that dates are simply <code>DateFilter</code>s. The former need dates as above, with the complete date and time provided as described by <a href="http://en.wikipedia.org/wiki/ISO_8601" target="_blank">ISO-8601</a>. The latter only need the date to be provided.
         </p>
         <p>A final trick that can be used with the filters is the exclusion parameter. Any filter can be converted into an exclusion filter by prepending it with an exclamation mark. For example, this returns <code>Docket</code>s from non-Federal Appellate jurisdictions:
         </p>
-        <pre class=pre-scrollable>curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "docket-list" version="v3" %}?court__jurisdiction!=F</pre>
+        <pre class=pre-scrollable>curl {% get_full_host %}{% url "docket-list" version="v3" %}?court__jurisdiction!=F</pre>
         <p>You can see more examples of almost any type of filter in <a href="https://github.com/freelawproject/courtlistener/blob/opinion-split/cl/api/tests.py" target="_blank">our automated tests</a>.
         </p>
 
@@ -295,7 +297,7 @@
         <p>Thus, you can order using any of these fields in conjunction with the <code>order_by</code> parameter.</p>
         <p>Decending order can be done using a minus sign. Multiple fields can be requested using a comma-separated list. This, for example, returns judicial <code>Position</code>s ordered by the most recently modified, then by the most recently elected:
         </p>
-        <pre class="scrollable">curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "position-list" version="v3" %}?order_by=-date_modified,-date_elected</pre>
+        <pre class="scrollable">curl {% get_full_host %}{% url "position-list" version="v3" %}?order_by=-date_modified,-date_elected</pre>
 
 
         <h3>Field Selection</h3>
@@ -303,7 +305,7 @@
         </p>
         <p>For example, if you wish to only receive the <code>educations</code> and <code>date_modified</code> fields from the <code>Judge</code> endpoint you could do so with:
         </p>
-        <pre class="scrollable">curl {% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "judge-list" version="v3" %}?fields=educations,date_modified</pre>
+        <pre class="scrollable">curl {% get_full_host %}{% url "judge-list" version="v3" %}?fields=educations,date_modified</pre>
         <p>Unfortunately, this cannot be used for nested resources, though <a href="https://github.com/freelawproject/courtlistener/issues/407" target="_blank">we welcome contributions in this area</a>.
         </p>
 
