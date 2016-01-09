@@ -32,6 +32,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # She notices a widget letting her know it's blocked by search engines
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertIn('Blocked from Search', sidebar.text)
+        self.assertNotIn('Available via Search', sidebar.text)
 
     def test_non_admin_viewing_blocked_opinion(self):
         """ For a blocked Opinion, a Non-admin should see NO indication. """
@@ -49,6 +50,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # She does NOT see a widget telling her the page is blocked
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertNotIn('Blocked from Search', sidebar.text)
+        self.assertIn('Available via Search', sidebar.text)
 
     def test_admin_viewing_not_blocked_opinion(self):
         """ For a non-blocked Opinion, there should be no indication """
@@ -66,7 +68,8 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # She does NOT see a widget telling her the page is blocked
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertNotIn('Blocked from Search', sidebar.text)
-
+        self.assertIn('Available via Search', sidebar.text)
+        
 class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
     """
     Tests for validating UX elements of showing or not showing visual
@@ -148,7 +151,7 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
         self.browser \
             .find_element_by_css_selector('label[for="id_type_1"]') \
             .click()
-            
+
         # The SERP updates and she selects the one she knows is blocked
         blocked_argument = self.browser.find_element_by_link_text(
             'Not Blocked Oral Argument (Test 2015)'
