@@ -25,7 +25,6 @@
             </h4>
         </div>
 
-
         {# show the admin tools if applicable #}
         {% if perms.search.change_docket or perms.search.change_opinioncluster or perms.search.change_citation %}
             <div class="sidebar-section">
@@ -44,6 +43,9 @@
                             <a href="{% url 'admin:search_opinion_change' sub_opinion.pk %}"
                                class="btn btn-primary btn-xs">{{ sub_opinion.type }} opinion</a>
                         {% endfor %}
+                    {% endif %}
+                    {% if request.user.is_superuser and private %}
+                      <div class="btn btn-primary btn-xs">Blocked from Search</div>
                     {% endif %}
                 </p>
             </div>
