@@ -141,7 +141,7 @@ $(document).ready(function () {
     };
     var resultOptions = {
         display: display,
-        limit: 20,
+        limit: 19,
         source: debounce(source, 300)
     };
 
