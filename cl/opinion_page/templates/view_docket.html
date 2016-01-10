@@ -11,13 +11,17 @@
 {% block og_description %}Docket for {{ docket|best_case_name }}{% endblock %}
 
 {% block sidebar %}
-{% if request.user.is_superuser and private %}
     <div class="col-sm-3" id="sidebar">
+      {% if request.user.is_superuser %}
         <div class="sidebar-section">
-          <div class="btn btn-primary btn-xs">Blocked from Search</div>
+          {% if private %}
+          <div class="btn btn-danger btn-xs">Blocked from Search</div>
+          {% else %}
+          <div class="btn btn-primary btn-xs">Available via Search</div>
+          {% endif %}
         </div>
+      {% endif %}
     </div>
-{% endif %}
 {% endblock sidebar %}
 
 {% block content %}

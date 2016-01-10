@@ -8,6 +8,9 @@ from cl.tests.base import BaseSeleniumTest
 from cl.search.models import Opinion, Docket
 
 
+NOT_BLOCKED_MSG = 'Available via Search'
+BLOCKED_MSG = 'Blocked from Search'
+
 class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
     """
     Tests for validating UX elements of showing or not showing visual
@@ -31,8 +34,8 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
         # She notices a widget letting her know it's blocked by search engines
         sidebar = self.browser.find_element_by_id('sidebar')
-        self.assertIn('Blocked from Search', sidebar.text)
-        self.assertNotIn('Available via Search', sidebar.text)
+        self.assertIn(BLOCKED_MSG, sidebar.text)
+        self.assertNotIn(NOT_BLOCKED_MSG, sidebar.text)
 
     def test_non_admin_viewing_blocked_opinion(self):
         """ For a blocked Opinion, a Non-admin should see NO indication. """
@@ -49,8 +52,8 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
         # She does NOT see a widget telling her the page is blocked
         sidebar = self.browser.find_element_by_id('sidebar')
-        self.assertNotIn('Blocked from Search', sidebar.text)
-        self.assertIn('Available via Search', sidebar.text)
+        self.assertNotIn(BLOCKED_MSG, sidebar.text)
+        self.assertNotIn(NOT_BLOCKED_MSG, sidebar.text)
 
     def test_admin_viewing_not_blocked_opinion(self):
         """ For a non-blocked Opinion, there should be no indication """
@@ -67,9 +70,9 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
         # She does NOT see a widget telling her the page is blocked
         sidebar = self.browser.find_element_by_id('sidebar')
-        self.assertNotIn('Blocked from Search', sidebar.text)
-        self.assertIn('Available via Search', sidebar.text)
-        
+        self.assertNotIn(BLOCKED_MSG, sidebar.text)
+        self.assertIn(NOT_BLOCKED_MSG, sidebar.text)
+
 class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
     """
     Tests for validating UX elements of showing or not showing visual
@@ -80,15 +83,54 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
     def test_admin_viewing_blocked_docket(self):
         """ For a blocked Dockets, an Admin should see indication. """
-        self.fail('Finish test_admin_viewing_blocked_docket')
+        # Admin navigates to CL and logs in
+        self.browser.get(self.server_url)
+        self.attempt_sign_in('admin', 'password')
+
+        # Pulls up a page for a Docket that is blocked to search engines
+        docket = Docket.objects.get(pk=11)
+        self.browser.get(
+            '%s%s' % (self.server_url, docket.get_absolute_url(),)
+        )
+
+        # And sees a badge that lets her know it's blocked
+        sidebar = self.browser.find_element_by_id('sidebar')
+        self.assertIn(BLOCKED_MSG, sidebar.text)
+        self.assertNotIn(NOT_BLOCKED_MSG, sidebar.text)
 
     def test_non_admin_viewing_blocked_docket(self):
         """ For a blocked Dockets, a Non-admin should see NO indication. """
-        self.fail('Finish test_non_admin_viewing_blocked_docket')
+        # Pandora navigates to CL and logs in
+        self.browser.get(self.server_url)
+        self.attempt_sign_in('pandora', 'password')
+
+        # Pulls up a page for a Docket that is blocked to search engines
+        docket = Docket.objects.get(pk=11)
+        self.browser.get(
+            '%s%s' % (self.server_url, docket.get_absolute_url(),)
+        )
+
+        # And sees a badge that lets her know it's blocked
+        sidebar = self.browser.find_element_by_id('sidebar')
+        self.assertNotIn(BLOCKED_MSG, sidebar.text)
+        self.assertNotIn(NOT_BLOCKED_MSG, sidebar.text)
 
     def test_admin_viewing_not_blocked_docket(self):
         """ For a non-blocked Dockets, there should be no indication """
-        self.fail('test_admin_viewing_not_blocked_docket')
+        # Admin navigates to CL and logs in
+        self.browser.get(self.server_url)
+        self.attempt_sign_in('admin', 'password')
+
+        # Pulls up a page for a Docket that is blocked to search engines
+        docket = Docket.objects.get(pk=10)
+        self.browser.get(
+            '%s%s' % (self.server_url, docket.get_absolute_url(),)
+        )
+
+        # And sees a badge that lets her know it's blocked
+        sidebar = self.browser.find_element_by_id('sidebar')
+        self.assertNotIn(BLOCKED_MSG, sidebar.text)
+        self.assertIn(NOT_BLOCKED_MSG, sidebar.text)
 
 
 class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
@@ -118,7 +160,7 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
         # She notices a widget letting her know it's blocked by search engines
         sidebar = self.browser.find_element_by_id('sidebar')
-        self.assertIn('Blocked from Search', sidebar.text)
+        self.assertIn(BLOCKED_MSG, sidebar.text)
 
     def test_non_admin_viewing_blocked_audio_page(self):
         """ For a blocked Audio pages, a Non-admin should see NO indication. """
@@ -139,7 +181,7 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
         # She notices a widget letting her know it's blocked by search engines
         sidebar = self.browser.find_element_by_id('sidebar')
-        self.assertNotIn('Blocked from Search', sidebar.text)
+        self.assertNotIn(BLOCKED_MSG, sidebar.text)
 
     def test_admin_viewing_not_blocked_audio_page(self):
         """ For a non-blocked Audio pages, there should be no indication """
@@ -160,4 +202,4 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
         # She notices a widget letting her know it's blocked by search engines
         sidebar = self.browser.find_element_by_id('sidebar')
-        self.assertNotIn('Blocked from Search', sidebar.text)
+        self.assertNotIn(BLOCKED_MSG, sidebar.text)
