@@ -8,8 +8,7 @@ from cl.tests.base import BaseSeleniumTest
 from cl.search.models import Opinion, Docket
 
 
-NOT_BLOCKED_MSG = 'Available via Search'
-BLOCKED_MSG = 'Blocked from Search'
+BLOCKED_MSG = 'Blocked from Search Engines'
 
 class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
     """
@@ -35,7 +34,6 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # She notices a widget letting her know it's blocked by search engines
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertIn(BLOCKED_MSG, sidebar.text)
-        self.assertNotIn(NOT_BLOCKED_MSG, sidebar.text)
 
     def test_non_admin_viewing_blocked_opinion(self):
         """ For a blocked Opinion, a Non-admin should see NO indication. """
@@ -53,7 +51,6 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # She does NOT see a widget telling her the page is blocked
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertNotIn(BLOCKED_MSG, sidebar.text)
-        self.assertNotIn(NOT_BLOCKED_MSG, sidebar.text)
 
     def test_admin_viewing_not_blocked_opinion(self):
         """ For a non-blocked Opinion, there should be no indication """
@@ -71,7 +68,6 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # She does NOT see a widget telling her the page is blocked
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertNotIn(BLOCKED_MSG, sidebar.text)
-        self.assertIn(NOT_BLOCKED_MSG, sidebar.text)
 
 class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
     """
@@ -96,10 +92,9 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # And sees a badge that lets her know it's blocked
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertIn(BLOCKED_MSG, sidebar.text)
-        self.assertNotIn(NOT_BLOCKED_MSG, sidebar.text)
 
     def test_non_admin_viewing_blocked_docket(self):
-        """ For a blocked Dockets, a Non-admin should see NO indication. """
+        """ For a blocked Docket, a Non-admin should see NO indication. """
         # Pandora navigates to CL and logs in
         self.browser.get(self.server_url)
         self.attempt_sign_in('pandora', 'password')
@@ -113,10 +108,9 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # And sees a badge that lets her know it's blocked
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertNotIn(BLOCKED_MSG, sidebar.text)
-        self.assertNotIn(NOT_BLOCKED_MSG, sidebar.text)
 
     def test_admin_viewing_not_blocked_docket(self):
-        """ For a non-blocked Dockets, there should be no indication """
+        """ For a non-blocked Docket, there should be no indication. """
         # Admin navigates to CL and logs in
         self.browser.get(self.server_url)
         self.attempt_sign_in('admin', 'password')
@@ -130,7 +124,6 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # And sees a badge that lets her know it's blocked
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertNotIn(BLOCKED_MSG, sidebar.text)
-        self.assertIn(NOT_BLOCKED_MSG, sidebar.text)
 
 
 class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
