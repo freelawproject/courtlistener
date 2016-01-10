@@ -1,18 +1,19 @@
-from cl.api.utils import LoggingMixin
-from cl.judges.filters import (
-    JudgeFilter, PositionFilter, PoliticianFilter, RetentionEventFilter,
-    EducationFilter, SchoolFilter, CareerFilter, TitleFilter,
-    PoliticalAffiliationFilter, ABARatingFilter, SourceFilter,
-)
-from cl.judges.serializers import (
+from rest_framework import viewsets
+
+from cl.api.utils import LoggingMixin, BetaUsersReadOnly
+from cl.judges.api_serializers import (
     JudgeSerializer, PositionSerializer, PoliticianSerializer,
     RetentionEventSerializer, EducationSerializer, SchoolSerializer,
     CareerSerializer, TitleSerializer, PoliticalAffiliationSerializer,
     ABARatingSerializer, SourceSerializer,
 )
+from cl.judges.filters import (
+    JudgeFilter, PositionFilter, PoliticianFilter, RetentionEventFilter,
+    EducationFilter, SchoolFilter, CareerFilter, TitleFilter,
+    PoliticalAffiliationFilter, ABARatingFilter, SourceFilter,
+)
 from cl.judges.models import Judge, Position, Politician, RetentionEvent, \
     Education, School, Career, Title, PoliticalAffiliation, Source, ABARating
-from rest_framework import viewsets
 
 
 class JudgesViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -22,6 +23,7 @@ class JudgesViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = (
         'date_created', 'date_modified', 'date_dob', 'date_dod',
     )
+    permission_classes = (BetaUsersReadOnly,)
 
 
 class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -34,42 +36,39 @@ class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
         'date_judicial_committee_action', 'date_hearing', 'date_confirmation',
         'date_start', 'date_retirement', 'date_termination',
     )
+    permission_classes = (BetaUsersReadOnly,)
 
 
 class PoliticianViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Politician.objects.all()
     serializer_class = PoliticianSerializer
     filter_class = PoliticianFilter
-    ordering_fields = (
-        'date_created', 'date_modified',
-    )
+    ordering_fields = ('date_created', 'date_modified')
+    permission_classes = (BetaUsersReadOnly,)
 
 
 class RetentionEventViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = RetentionEvent.objects.all()
     serializer_class = RetentionEventSerializer
     filter_class = RetentionEventFilter
-    ordering_fields = (
-        'date_created', 'date_modified', 'date_retention',
-    )
+    ordering_fields = ('date_created', 'date_modified', 'date_retention')
+    permission_classes = (BetaUsersReadOnly,)
 
 
 class EducationViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Education.objects.all()
     serializer_class = EducationSerializer
     filter_class = EducationFilter
-    ordering_fields = (
-        'date_created', 'date_modified',
-    )
+    ordering_fields = ('date_created', 'date_modified')
+    permission_classes = (BetaUsersReadOnly,)
 
 
 class SchoolViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = School.objects.all()
     serializer_class = SchoolSerializer
     filter_class = SchoolFilter
-    ordering_fields = (
-        'date_created', 'date_modified',
-    )
+    ordering_fields = ('date_created', 'date_modified')
+    permission_classes = (BetaUsersReadOnly,)
 
 
 class CareerViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -79,6 +78,7 @@ class CareerViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = (
         'date_created', 'date_modified', 'date_start', 'date_end',
     )
+    permission_classes = (BetaUsersReadOnly,)
 
 
 class TitleViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -88,6 +88,7 @@ class TitleViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = (
         'date_created', 'date_modified', 'date_start', 'date_end',
     )
+    permission_classes = (BetaUsersReadOnly,)
 
 
 class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -97,6 +98,7 @@ class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = (
         'date_created', 'date_modified', 'date_start', 'date_end',
     )
+    permission_classes = (BetaUsersReadOnly,)
 
 
 class SourceViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -106,6 +108,7 @@ class SourceViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = (
         'date_modified', 'date_accessed',
     )
+    permission_classes = (BetaUsersReadOnly,)
 
 
 class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -115,3 +118,4 @@ class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = (
         'date_created', 'date_modified', 'date_rated',
     )
+    permission_classes = (BetaUsersReadOnly,)

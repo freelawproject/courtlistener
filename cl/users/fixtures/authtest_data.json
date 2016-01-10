@@ -172,5 +172,26 @@
         },
         "model": "auth.user",
         "pk": 5
+    },
+    {
+        "pk": 5,
+        "model": "users.userprofile",
+        "fields": {
+            "barmembership": [],
+            "city": "Metrocity",
+            "activation_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+            "stub_account": false,
+            "avatar": "",
+            "key_expires": "2013-07-20T18:31:04.327Z",
+            "address1": null,
+            "address2": null,
+            "employer": "Free Law Project",
+            "plaintext_preferred": false,
+            "wants_newsletter": false,
+            "state": "CA",
+            "user": 5,
+            "email_confirmed": true,
+            "zip_code": null
+        }
     }
 ]

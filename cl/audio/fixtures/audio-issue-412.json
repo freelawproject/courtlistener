@@ -1,0 +1,48 @@
+[
+  {
+    "fields": {
+      "date_blocked": null,
+      "judges": "",
+      "sha1": "de8cff186eb263dc06bdc5340860eb6809f898d3",
+      "local_path_original_file": "mp3/2015/08/15/sec_v._frank_j._custable_jr._cl.mp3",
+      "date_modified": "2015-07-28T00:36:13.094Z",
+      "case_name_full": "Not Blocked Oral Argument",
+      "processing_complete": true,
+      "download_url": "http://media.ca7.uscourts.gov/sound/external/gw.15-1442.15-1442_07_08_2015.mp3",
+      "case_name": "Not Blocked Oral Argument",
+      "source": "C",
+      "local_path_mp3": "test/audio/2.mp3",
+      "duration": 15,
+      "date_created": "2015-08-08T01:24:26.633Z",
+      "case_name_short": "Not Blocked Oral Argument",
+      "panel": [],
+      "docket": 10,
+      "blocked": false
+    },
+    "model": "audio.audio",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "date_blocked": "2015-08-08",
+      "judges": "",
+      "sha1": "daadaf6cc018114259f7eba27c4c2e6bba9bd0d7",
+      "local_path_original_file": "mp3/2015/07/08/jose_a._dominguez_v._loretta_e._lynch.mp3",
+      "date_modified": "2015-07-28T00:36:26.116Z",
+      "case_name_full": "Blocked Oral Argument",
+      "processing_complete": true,
+      "download_url": "http://media.ca7.uscourts.gov/sound/external/gw.14-3661.14-3661_07_08_2015.mp3",
+      "case_name": "Blocked Oral Argument",
+      "source": "C",
+      "local_path_mp3": "test/audio/2.mp3",
+      "duration": 837,
+      "date_created": "2015-08-08T01:24:26.633Z",
+      "case_name_short": "Blocked Oral Argument",
+      "panel": [],
+      "docket": 11,
+      "blocked": true
+    },
+    "model": "audio.audio",
+    "pk": 2
+  }
+]

@@ -10,7 +10,17 @@
 {% block description %}Docket for {{ docket|best_case_name }}{% endblock %}
 {% block og_description %}Docket for {{ docket|best_case_name }}{% endblock %}
 
-{% block sidebar %}{% endblock sidebar %}
+{% block sidebar %}
+    <div class="col-sm-3" id="sidebar">
+      {% if request.user.is_superuser %}
+        <div class="sidebar-section">
+          {% if private %}
+          <div class="btn btn-danger btn-xs">Blocked from Search Engines</div>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+{% endblock sidebar %}
 
 {% block content %}
     <div class="col-xs-12">

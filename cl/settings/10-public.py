@@ -232,11 +232,15 @@ REST_FRAMEWORK = {
     # Throttles
     'DEFAULT_THROTTLE_CLASSES': (
         'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle'
+        'cl.api.utils.ExceptionalUserRateThrottle',
     ),
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',
         'user': '1000/hour',
+    },
+    'OVERRIDE_THROTTLE_RATES': {
+        'scout': '10000/hour',
+        'scout_test': '10000/hour',
     },
 
     # Auth

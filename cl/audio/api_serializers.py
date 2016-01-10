@@ -1,5 +1,6 @@
-from cl.audio import models as audio_models
 from rest_framework import serializers
+
+from cl.audio import models as audio_models
 
 
 class AudioSerializer(serializers.HyperlinkedModelSerializer):

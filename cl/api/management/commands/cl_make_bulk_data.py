@@ -4,8 +4,8 @@ from django.core.management import BaseCommand
 
 from cl.api.tasks import make_bulk_data_and_swap_it_in, swap_archives
 from cl.audio.models import Audio
-from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.lib.utils import mkdir_p
+from cl.search.models import Court, Docket, OpinionCluster
 
 # XXX See: http://www.django-rest-framework.org/api-guide/serializers/#serializing-objects
 # XXX And: http://www.django-rest-framework.org/api-guide/serializers/#dealing-with-multiple-objects
@@ -15,8 +15,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         courts = Court.objects.all()
-
-        from cl.search import api3
 
         # Make the main bulk files
         arg_tuples = (

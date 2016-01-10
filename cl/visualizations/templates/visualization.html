@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load markdown_deux_tags %}
 {% load text_filters %}
+{% load extras %}
 {% load humanize %}
 
 {% block title %}Network Graph of {{ viz.title }} – CourtListener.com{% endblock %}
@@ -11,7 +12,7 @@
 {% block og_description %}
     Network graph of {{ viz.title }} at CourtListener.com
 {% endblock %}
-{% block og_image %}{% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{{ STATIC_URL }}png/og-viz-image-1000x450.png{% endblock %}
+{% block og_image %}{% get_full_host %}{{ STATIC_URL }}png/og-viz-image-1000x450.png{% endblock %}
 {% block og_image_width %}1000{% endblock %}
 {% block og_image_height %}450{% endblock %}
 
@@ -26,7 +27,7 @@
     <script type="text/javascript">
         {# Gets the most recent version, by default ordering #}
         var opinions = {{ viz.json|safe }},
-            embedUrl = '{% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "view_embedded_visualization" viz.pk %}';
+            embedUrl = '{% get_full_host %}{% url "view_embedded_visualization" viz.pk %}';
 
     </script>
     {% include "includes/footer-scripts.html" %}
@@ -281,7 +282,7 @@
                                 <h3><span>Embed</span></h3>
                                 <div class="form-group">
                                     <input type="text"
-                                           value="&lt;iframe height=&quot;475&quot; width=&quot;560&quot; src=&quot;{% if request.is_secure %}https{% else %}http{% endif %}://{{ request.get_host }}{% url "view_embedded_visualization" viz.pk %}&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;"
+                                           value="&lt;iframe height=&quot;475&quot; width=&quot;560&quot; src=&quot;{% get_full_host %}{% url "view_embedded_visualization" viz.pk %}&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;"
                                            onclick="this.select()"
                                            class="form-control"
                                            id="embed-input">

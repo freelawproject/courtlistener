@@ -6,7 +6,9 @@ from django.conf import settings
 from django.utils.encoding import force_text
 from rest_framework import serializers
 from rest_framework.metadata import SimpleMetadata
+from rest_framework.permissions import DjangoModelPermissions
 from rest_framework_filters import RelatedFilter
+from rest_framework.throttling import UserRateThrottle
 
 DATETIME_LOOKUPS = ['exact', 'gte', 'gt', 'lte', 'lt', 'range', 'year',
                     'month', 'day', 'hour', 'minute', 'second']
@@ -122,11 +124,69 @@ class LoggingMixin(object):
         )
         pipe = r.pipeline()
 
-        pipe.incr('api:v3.count')           # Global total
-        pipe.incr('api:v3.d:%s.count' % d)  # Global daily tallies
-        pipe.incr('api:v3.user:%s.count' % user.pk)            # User grand total
-        pipe.incr('api:v3.user:%s.d:%s.count' % (user.pk, d))  # User daily tallies
-        pipe.incr('api:v3.endpoint:%s.count' % endpoint)            # endpoint total
-        pipe.incr('api:v3.endpoint:%s.d:%s.count' % (endpoint, d))  # Daily endpoint total
+        # Global and daily tallies for all URLs.
+        pipe.incr('api:v3.count')
+        pipe.incr('api:v3.d:%s.count' % d)
+
+        # Use a sorted set to store the user stats, with the score representing
+        # the number of queries the user made total or on a given day.
+        pipe.zincrby('api:v3.user.counts', user.pk)
+        pipe.zincrby('api:v3.user.d:%s.counts' % d, user.pk)
+
+        # Use a sorted set to store all the endpoints with score representing
+        # the number of queries the endpoint received total or on a given day.
+        pipe.zincrby('api:v3.endpoint.counts', endpoint)
+        pipe.zincrby('api:v3.endpoint.d:%s.counts' % d, endpoint)
 
         pipe.execute()
+
+
+class ExceptionalUserRateThrottle(UserRateThrottle):
+    def allow_request(self, request, view):
+        """
+        Give special access to a few special accounts.
+
+        Mirrors code in super class with minor tweaks.
+        """
+        if self.rate is None:
+            return True
+
+        self.key = self.get_cache_key(request, view)
+        if self.key is None:
+            return True
+
+        self.history = self.cache.get(self.key, [])
+        self.now = self.timer()
+
+        # Adjust if user has special privileges.
+        override_rate = settings.REST_FRAMEWORK['OVERRIDE_THROTTLE_RATES'].get(
+            request.user.username,
+            None,
+        )
+        if override_rate is not None:
+            self.num_requests, self.duration = self.parse_rate(override_rate)
+
+        # Drop any requests from the history which have now passed the
+        # throttle duration
+        while self.history and self.history[-1] <= self.now - self.duration:
+            self.history.pop()
+        if len(self.history) >= self.num_requests:
+            return self.throttle_failure()
+        return self.throttle_success()
+
+
+class BetaUsersReadOnly(DjangoModelPermissions):
+    """Provides access beta access to users with the right permissions.
+
+    Such users must have the has_beta_api_access flag set on their account.
+    """
+
+    perms_map = {
+        'GET': ['%(app_label)s.has_beta_api_access'],
+        'OPTIONS': ['%(app_label)s.has_beta_api_access'],
+        'HEAD': ['%(app_label)s.has_beta_api_access'],
+        'POST': ['%(app_label)s.add_%(model_name)s'],
+        'PUT': ['%(app_label)s.change_%(model_name)s'],
+        'PATCH': ['%(app_label)s.change_%(model_name)s'],
+        'DELETE': ['%(app_label)s.delete_%(model_name)s'],
+    }

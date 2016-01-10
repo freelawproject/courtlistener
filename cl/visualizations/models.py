@@ -396,6 +396,12 @@ class Referer(models.Model):
         default=False,
     )
 
+    def __unicode__(self):
+        return '{pk}: Refers to {map}'.format(
+            pk=getattr(self, 'pk', None),
+            map=self.map,
+        )
+
     class Meta:
         # Ensure that we don't have dups in the DB for a given map.
         unique_together = (("map", "url"),)
