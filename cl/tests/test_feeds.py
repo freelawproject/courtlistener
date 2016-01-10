@@ -1,23 +1,43 @@
 # coding=utf-8
+# pylint: disable=C0103
 """
 Functional testing of courtlistener RSS feeds
 """
+import os
+import feedparser
 from django.conf import settings
 from django.test.utils import override_settings
+from cl.lib.storage import IncrementingFileSystemStorage
 from cl.search.models import Court
 from cl.tests.base import BaseSeleniumTest
-import feedparser
-import os
 
 
 @override_settings(
-    MEDIA_ROOT = os.path.join(settings.INSTALL_ROOT, 'cl/assets/media/test/')
+    MEDIA_ROOT=os.path.join(settings.INSTALL_ROOT, 'cl/assets/media/test/')
 )
 class FeedsFunctionalTest(BaseSeleniumTest):
     """Tests the Feeds page and functionality"""
 
     fixtures = ['test_court.json', 'judge_judy.json', 'functest_opinions.json',
-        'functest_audio.json']
+                'functest_audio.json']
+
+    @classmethod
+    def setUpClass(cls):
+        """
+        Need to work around issue reported and fixed in Django project:
+        https://code.djangoproject.com/ticket/26038
+
+        Overwriting the current 1.8/1.9 logic on FileSystemStorage:
+            def path(self, name):
+                    return safe_join(self.location, name)
+
+        """
+        def patched_path(self, name):
+            """ Patching Path method to use MEDIA_ROOT properly """
+            return '%s%s' % (settings.MEDIA_ROOT, name,)
+
+        IncrementingFileSystemStorage.path = patched_path
+        super(FeedsFunctionalTest, cls).setUpClass()
 
     def test_can_get_to_feeds_from_homepage(self):
         """Can we get to the feeds/podcasts page from the homepage?"""
