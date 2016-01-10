@@ -6,6 +6,7 @@ Functional testing of courtlistener RSS feeds
 import os
 import feedparser
 from django.conf import settings
+from django.core.urlresolvers import reverse
 from django.test.utils import override_settings
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.search.models import Court
@@ -54,7 +55,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         Does the feeds page show all the proper links for each jurisdiction?
         """
         courts = Court.objects.all()
-        self.browser.get('%s/feeds' % (self.server_url,))
+        self.browser.get('%s%s' % (self.server_url, reverse('feeds_info')))
         self.assert_text_in_body('Jurisdiction Feeds for Opinions')
 
         for court in courts:
@@ -74,7 +75,9 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         """
         Can the RSS feed for ALL jurisdictions render properly in an RSS reader?
         """
-        f = feedparser.parse('%s/feed/court/all/' % (self.server_url,))
+        f = feedparser.parse(
+            '%s%s' % (self.server_url, reverse('all_jurisdictions_feed'))
+        )
         self.assertEqual(
             u'CourtListener.com: All Opinions (High Volume)',
             f.feed.title
@@ -86,7 +89,12 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         """
         Can the RSS feeds be properly used in an RSS Reader?
         """
-        f = feedparser.parse('%s/feed/court/test/' % (self.server_url,))
+        url = '%s%s' % \
+            (
+                self.server_url,
+                reverse('jurisdiction_feed', kwargs={'court':'test'})
+            )
+        f = feedparser.parse(url)
         self.assertEqual(
             u'CourtListener.com: All opinions for the Testing Supreme Court',
             f.feed.title
@@ -99,7 +107,9 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         For Opinions with stored PDFs, does the feed provide valid links
         to the CourtListener copy of the original PDF?
         """
-        f = feedparser.parse('%s/feed/court/all/' % (self.server_url,))
+        f = feedparser.parse(
+            '%s%s' % (self.server_url, reverse('all_jurisdictions_feed'))
+        )
         for entry in f.entries:
             if entry.enclosures is not None:
                 self.assertEqual(len(entry.enclosures), 1)
@@ -118,7 +128,9 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         """
         For Oral Arguments, does the feed provide valid links to MP3 content?
         """
-        f = feedparser.parse('%s/podcast/court/all/' % (self.server_url,))
+        f = feedparser.parse(
+            '%s%s' % (self.server_url, reverse('all_jurisdictions_podcast'))
+        )
         for entry in f.entries:
             if entry.enclosures is not None:
                 self.assertEqual(len(entry.enclosures), 1)
