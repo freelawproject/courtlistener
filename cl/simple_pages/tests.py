@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.http import HttpRequest
 from django.test import TestCase
+from django.test.utils import override_settings
 from cl.simple_pages.views import serve_static_file
 from cl.search.models import Opinion, OpinionCluster, Docket, Court
 from cl.audio.models import Audio
