@@ -1,5 +1,6 @@
 import datetime
-from cl.lib import search_utils, sunburnt, magic
+from cl.lib import search_utils, sunburnt
+from cl.lib.mime_types import lookup_mime_type
 from cl.search.forms import SearchForm
 from cl.search.models import Court
 from django.conf import settings
@@ -122,10 +123,7 @@ class JurisdictionFeed(Feed):
                 settings.MEDIA_ROOT,
                 item['local_path'].encode('utf-8')
             )
-            mime = magic.from_file(file_loc, mime=True)
-            if mime.startswith('inode'):
-                return None
-            return mime
+            return lookup_mime_type(file_loc)
         except:
             return None
 
