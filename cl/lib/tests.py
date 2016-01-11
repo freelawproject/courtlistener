@@ -6,6 +6,7 @@ import datetime
 from django.test import TestCase
 from cl.lib.string_utils import trunc
 from cl.lib.search_utils import make_fq
+from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import make_upload_path
 from cl.search.models import Opinion, OpinionCluster, Docket, Court
 
@@ -93,3 +94,28 @@ class TestModelHelpers(TestCase):
         self.opinion.file_with_date = datetime.date(2015, 12, 14)
         path = make_upload_path(self.opinion, 'hotline_bling.mp3')
         self.assertEqual(expected, path)
+
+
+class TestMimeLookup(TestCase):
+    """ Test the Mime type lookup function(s)"""
+
+    def test_unsupported_extension_returns_octetstream(self):
+        """ For a bad extension, do we return the proper default? """
+        tests = [
+            '/var/junk/filename.something.xyz',
+            '../var/junk/~filename_something',
+            '../../junk.junk.xxx'
+        ]
+        for test in tests:
+            self.assertEqual('application/octet-stream', lookup_mime_type(test))
+
+    def test_known_good_mimetypes(self):
+        """ For known good mimetypes, make sure we return the right value """
+        tests = {
+            'mp3/2015/1/1/something_v._something_else.mp3':'audio/mpeg',
+            'doc/2015/1/1/voutila_v._bonvini.doc':'application/msword',
+            'pdf/2015/1/1/voutila_v._bonvini.pdf':'application/pdf',
+            'txt/2015/1/1/voutila_v._bonvini.txt':'text/plain',
+        }
+        for test_path in tests.keys():
+            self.assertEqual(tests.get(test_path), lookup_mime_type(test_path))

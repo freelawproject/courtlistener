@@ -24,6 +24,7 @@ djangorestframework-filters==0.6.0
 djangorestframework-xml==1.2.0
 docutils==0.12
 eyeD3==0.7.8
+feedparser==5.2.1
 geonamescache==0.20
 hiredis==0.2.0
 httplib2==0.9.1

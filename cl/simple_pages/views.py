@@ -17,7 +17,7 @@ from cl.lib import magic
 from cl.lib import search_utils
 from cl.lib.bot_detector import is_bot
 from cl.lib.sunburnt import sunburnt
-from cl.search.models import Court, OpinionCluster
+from cl.search.models import Court, OpinionCluster, Opinion
 from cl.search.forms import SearchForm
 from cl.simple_pages.forms import ContactForm
 from cl.stats import tally_stat
@@ -297,14 +297,14 @@ def serve_static_file(request, file_path=''):
      - If blocked, we set the x-robots-tag HTTP header
      - Serve up the file using Apache2's xsendfile
     """
-    # XXX This is not updated.
     response = HttpResponse()
     file_loc = os.path.join(settings.MEDIA_ROOT, file_path.encode('utf-8'))
     if file_path.startswith('mp3'):
         item = get_object_or_404(Audio, local_path_mp3=file_path)
         mimetype = 'audio/mpeg'
     else:
-        item = get_object_or_404(Document, local_path=file_path)
+        item = get_object_or_404(Opinion, local_path=file_path)
+        item.blocked = item.cluster.blocked
         try:
             mimetype = magic.from_file(file_loc, mime=True)
         except IOError:
