@@ -4,11 +4,7 @@
 {% block search-form %}{% endblock %}
 {% block sidebar %}{% endblock %}
 {% block footer-scripts %}
-    {% if DEBUG %}
-        <script src="{{ STATIC_URL }}js/typeahead.jquery.js"></script>
-    {% else %}
-        <script src="{{ STATIC_URL }}js/typeahead.jquery.min.js"></script>
-    {% endif %}
+    <script src="{{ STATIC_URL }}js/typeahead.jquery.js"></script>
     <script src="{{ STATIC_URL }}js/scotus_map_new.js"></script>
 
     <script type="application/javascript">
