@@ -1,12 +1,13 @@
 from django.conf.urls import url
 from django.views.generic import RedirectView
+
+from cl.simple_pages.sitemap import sitemap_maker
 from cl.simple_pages.views import (
     tools_page, validate_for_google, validate_for_google2, validate_for_wot,
     validate_for_bing, robots, advanced_search, contact_thanks, contact, feeds,
     coverage_graph, faq, about, browser_warning, serve_static_file, old_terms,
     latest_terms, contribute, markdown_help
 )
-from cl.simple_pages.sitemap import sitemap_maker
 
 mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html', 'mp3')
 
@@ -24,7 +25,7 @@ urlpatterns = [
 
     # Serve a static file
     url(r'^(?P<file_path>(?:' + "|".join(mime_types) + ')/.*)$',
-     serve_static_file),
+        serve_static_file),
 
     # Advanced search page
     url(

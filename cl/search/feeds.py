@@ -1,13 +1,16 @@
 import datetime
-from cl.lib import search_utils, sunburnt
-from cl.lib.mime_types import lookup_mime_type
-from cl.search.forms import SearchForm
-from cl.search.models import Court
+import os
+
 from django.conf import settings
 from django.contrib.syndication.views import Feed
 from django.shortcuts import get_object_or_404
 from django.utils.feedgenerator import Atom1Feed
-import os
+
+from cl.lib import search_utils, sunburnt
+from cl.lib.mime_types import lookup_mime_type
+from cl.search.forms import SearchForm
+from cl.search.models import Court
+
 
 class SearchFeed(Feed):
     """This feed returns the results of a search feed. It lacks a second

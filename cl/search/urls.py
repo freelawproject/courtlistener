@@ -1,14 +1,20 @@
+from django.conf.urls import url
+
 from cl.search.feeds import (
     JurisdictionFeed, AllJurisdictionsFeed, SearchFeed
 )
-from django.conf.urls import url
 
 urlpatterns = [
     # Search pages
     url(r'^$', 'cl.search.views.show_results'),
 
     # Feeds & Podcasts
-    url(r'^feed/(search)/$', SearchFeed(), name='search_feed'),
+    url(
+        r'^feed/(search)/$',
+        SearchFeed(),
+        name='search_feed'
+    ),
+
     # lacks URL capturing b/c it will use GET queries.
     url(
         r'^feed/court/all/$',

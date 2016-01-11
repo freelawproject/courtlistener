@@ -883,18 +883,6 @@ body.embed div#title-block {
     width: 100%;
 }
 
-/* Charts */
-#charts {
-    display: inline-block;
-    margin: 0px 5px 5px 5px;
-}
-#graph {
-    height: 100%;
-    width: 100%;
-}
-#graph table {
-    width: 20%;
-}
 
 /* Hide hopscotch number in tour */
 div.hopscotch-bubble .hopscotch-bubble-number {
