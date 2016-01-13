@@ -1,19 +1,23 @@
-import os
+import StringIO
 import json
+import os
+import time
+
 import lxml
 import requests
-import StringIO
-import time
+
 from cl import settings
 from cl.lib.sunburnt import SolrError
 
 
-def create_solr_core(core_name, data_dir='/tmp/solr/data',
-        schema=os.path.join(settings.INSTALL_ROOT, 'Solr',
-                            'conf', 'schema.xml'),
+def create_solr_core(
+        core_name,
+        data_dir='/tmp/solr/data',
+        schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
+                            'schema.xml'),
         instance_dir='/usr/local/solr/example/solr/collection1',
-        config=os.path.join(settings.INSTALL_ROOT, 'Solr',
-                            'conf', 'solrconfig.xml')):
+        config=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
+                            'solrconfig.xml')):
     """ Create a new core for use in testing."""
     if data_dir == '/tmp/solr/data':
         # If the user doesn't specify a data directory, we give them one with
@@ -35,6 +39,24 @@ def create_solr_core(core_name, data_dir='/tmp/solr/data',
     if r.status_code != 200:
         print "Problem creating core. Got status_code of %s. Check the Solr " \
               "logs for details." % r.status_code
+
+
+def create_default_cores():
+    """Helper utility to create the default cores."""
+    create_solr_core(
+        core_name='collection1',
+        data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data'),
+        schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
+                            'schema.xml'),
+        instance_dir='/usr/local/solr/example/solr/collection1',
+    )
+    create_solr_core(
+        core_name='audio',
+        data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr', 'data_audio'),
+        schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
+                            'audio_schema.xml'),
+        instance_dir='/usr/local/solr/example/solr/audio',
+    )
 
 
 def delete_solr_core(core_name, delete_index=True, delete_data_dir=False):
