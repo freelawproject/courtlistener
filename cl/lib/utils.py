@@ -5,6 +5,7 @@ import os
 class _UNSPECIFIED(object):
     pass
 
+
 def deepgetattr(obj, name, default=_UNSPECIFIED):
     """Try to retrieve the given attribute of an object, digging on '.'.
 
@@ -33,8 +34,14 @@ def deepgetattr(obj, name, default=_UNSPECIFIED):
         else:
             return default
 
+
 def mkdir_p(path):
-    """Makes a directory path, but doesn't crash if the path already exists."""
+    """Makes a directory path, but doesn't crash if the path already exists.
+
+    Doesn't clobber.
+
+    :param path: A path you wish to create on the file system.
+    """
     try:
         os.makedirs(path)
     except OSError as exc:
