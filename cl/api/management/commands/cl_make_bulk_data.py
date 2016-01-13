@@ -1,10 +1,11 @@
 import os
+import shutil
 from os.path import join
 
 from django.conf import settings
 from django.core.management import BaseCommand
 
-from cl.api.tasks import make_bulk_data_and_swap_it_in, swap_archives
+from cl.api.tasks import make_bulk_data_and_swap_it_in
 from cl.audio.api_serializers import AudioSerializer
 from cl.audio.models import Audio
 from cl.lib.utils import mkdir_p
@@ -116,14 +117,21 @@ class Command(BaseCommand):
         # Make the citation bulk data
         obj_type_str = 'citations'
         print ' - Creating bulk data CSV for citations...'
-        self.make_citation_data(obj_type_str)
+        tmp_destination = join(settings.BULK_DATA_DIR, 'tmp', obj_type_str)
+        final_destination = join(settings.BULK_DATA_DIR, obj_type_str)
+        self.make_citation_data(tmp_destination, obj_type_str)
         print "   - Swapping in the new citation archives..."
-        swap_archives(obj_type_str)
+
+        mkdir_p(join(settings.BULK_DATA_DIR, obj_type_str))
+        shutil.move(
+            join(tmp_destination, 'all.csv.gz'),
+            join(final_destination, 'all.csv.gz'),
+        )
 
         print 'Done.\n'
 
     @staticmethod
-    def make_citation_data(obj_type_str):
+    def make_citation_data(tmp_destination, obj_type_str):
         """Because citations are paginated and because as of this moment there
         are 11M citations in the database, we cannot provide users with a bulk
         data file containing the complete objects for every citation.
@@ -131,7 +139,6 @@ class Command(BaseCommand):
         Instead of doing that, we dump our citation table with a shell command,
         which provides people with compact and reasonable data they can import.
         """
-        tmp_destination = join(settings.BULK_DATA_DIR, 'tmp', obj_type_str)
         mkdir_p(tmp_destination)
 
         print '   - Copying the citations table to disk...'
@@ -143,7 +150,7 @@ class Command(BaseCommand):
                 password=settings.DATABASES['default']['PASSWORD'],
                 database=settings.DATABASES['default']['NAME'],
                 username=settings.DATABASES['default']['USER'],
-                destination=join(tmp_destination, 'all.tar.gz'),
+                destination=join(tmp_destination, 'all.csv.gz'),
             )
         )
         print '   - Table created successfully.'

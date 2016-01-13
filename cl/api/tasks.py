@@ -45,7 +45,7 @@ def swap_archives(obj_type_str):
 
     # Move the info files too.
     try:
-        shutil.move(
+        shutil.copy2(
             join(settings.BULK_DATA_DIR, 'tmp', obj_type_str, 'info.json'),
             join(settings.BULK_DATA_DIR, obj_type_str, 'info.json')
         )
