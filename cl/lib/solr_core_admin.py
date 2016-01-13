@@ -160,7 +160,7 @@ def get_data_dir(core):
     """
     status_doc = get_solr_core_status()
     return str(status_doc.xpath(
-        '//*[@name= "dataDir"][../*[@name="name" = "%s"]]/text()' % core)[0])
+            '//*[@name="%s"]//*[@name="dataDir"]/text()' % core)[0])
 
 
 def reload_pagerank_external_file_cache():
