@@ -1,14 +1,16 @@
 import os
 
+from django.conf import settings
 from django.core.management import BaseCommand
 
 from cl.api.tasks import make_bulk_data_and_swap_it_in, swap_archives
+from cl.audio.api_serializers import AudioSerializer
 from cl.audio.models import Audio
 from cl.lib.utils import mkdir_p
-from cl.search.models import Court, Docket, OpinionCluster
+from cl.search.api_serializers import OpinionClusterSerializer, \
+    OpinionSerializer, DocketSerializer, CourtSerializer
+from cl.search.models import Court, Docket, OpinionCluster, Opinion
 
-# XXX See: http://www.django-rest-framework.org/api-guide/serializers/#serializing-objects
-# XXX And: http://www.django-rest-framework.org/api-guide/serializers/#dealing-with-multiple-objects
 
 class Command(BaseCommand):
     help = 'Create the bulk files for all jurisdictions and for "all".'
@@ -17,17 +19,98 @@ class Command(BaseCommand):
         courts = Court.objects.all()
 
         # Make the main bulk files
-        arg_tuples = (
-            ('document', OpinionCluster, 'docket.court_id', api3.DocumentResource),
-            ('audio', Audio, 'docket.court_id', api3.AudioResource),
-            ('docket', Docket, 'court_id', api3.DocketResource),
-            ('jurisdiction', Court, 'pk', api3.JurisdictionResource),
-        )
+        kwargs_list = [
+            {
+                'obj_type_str': 'clusters',
+                'obj_type': OpinionCluster,
+                'court_attr': 'docket.court_id',
+                'serializer': OpinionClusterSerializer,
+            },
+            {
+                'obj_type_str': 'opinions',
+                'obj_type': Opinion,
+                'court_attr': 'cluster.docket.court_id',
+                'serializer': OpinionSerializer,
+            },
+            {
+                'obj_type_str': 'dockets',
+                'obj_type': Docket,
+                'court_attr': 'court_id',
+                'serializer': DocketSerializer,
+            },
+            {
+                'obj_type_str': 'courts',
+                'obj_type': Court,
+                'court_attr': None,
+                'serializer': CourtSerializer,
+            },
+            {
+                'obj_type_str': 'audio',
+                'obj_type': Audio,
+                'court_attr': 'docket.court_id',
+                'serializer': AudioSerializer,
+            },
+            # has_beta_api_access
+            # {
+            #     'obj_type_str': 'judges',
+            #     'obj_type': Judge,
+            #     'court_attr': None,
+            #     'serializer': JudgeSerializer,
+            # },
+            # {
+            #     'obj_type_str': 'positions',
+            #     'obj_type': Position,
+            #     'court_attr': None,
+            #     'serializer': PositionSerializer,
+            # },
+            # {
+            #     'obj_type_str': 'politicians',
+            #     'obj_type': Politician,
+            #     'court_attr': None,
+            #     'serializer': PoliticianSerializer,
+            # },
+            # {
+            #     'obj_type_str': 'retention-events',
+            #     'obj_type': RetentionEvent,
+            #     'court_attr': None,
+            #     'serializer': RetentionEventSerializer,
+            # },
+            # {
+            #     'obj_type_str': 'educations',
+            #     'obj_type': Education,
+            #     'court_attr': None,
+            #     'serializer': EducationSerializer,
+            # },
+            # {
+            #     'obj_type_str': 'schools',
+            #     'obj_type': School,
+            #     'court_attr': None,
+            #     'serializer': SchoolSerializer,
+            # },
+            # {
+            #     'obj_type_str': 'careers',
+            #     'obj_type': Career,
+            #     'court_attr': None,
+            #     'serializer': CareerSerializer,
+            # },
+            # {
+            #     'obj_type_str': 'titles',
+            #     'obj_type': Title,
+            #     'court_attr': None,
+            #     'serializer': TitleSerializer,
+            # },
+            # {
+            #     'obj_type_str': 'politicial-affiliations',
+            #     'obj_type': PoliticalAffiliation,
+            #     'court_attr': None,
+            #     'serializer': PoliticalAffiliationSerializer,
+            # },
+        ]
 
         print 'Starting bulk file creation with %s celery tasks...' % \
-              len(arg_tuples)
-        for arg_tuple in arg_tuples:
-            make_bulk_data_and_swap_it_in.delay(arg_tuple, courts)
+              len(kwargs_list)
+        for kwargs in kwargs_list:
+            make_bulk_data_and_swap_it_in.delay(courts, kwargs)
 
         # Make the citation bulk data
         print ' - Creating bulk data CSV for citations...'
@@ -48,12 +131,14 @@ class Command(BaseCommand):
         """
         mkdir_p('/tmp/bulk/citation')
 
-        print '   - Copying the Document_opinions_cited table to disk...'
+        print '   - Copying the citations table to disk...'
 
         # This command calls the psql COPY command and requests that it dump
-        # the document_id and citation_id columns from the
-        # Document_opinions_cited table to disk as a compressed CSV.
+        # the citation table to disk as a compressed CSV.
         os.system(
-            '''psql -c "COPY \\"search_opinionscited\\" (from_document, to_document) to stdout DELIMITER ',' CSV HEADER" -d courtlistener --username django | gzip > /tmp/bulk/citation/all.csv.gz'''
+            '''psql -c "COPY \\"search_opinionscited\\" (citing_opinion_id, cited_opinion_id) to stdout DELIMITER ',' CSV HEADER" -d {database} --username {username} | gzip > /tmp/bulk/citation/all.csv.gz'''.format(
+                database=settings.DATABASES['default']['NAME'],
+                username=settings.DATABASES['default']['USER'],
+            )
         )
         print '   - Table created successfully.'
