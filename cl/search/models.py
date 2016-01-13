@@ -289,7 +289,7 @@ class Document(models.Model):
     )
 
     type = models.CharField(
-        help_text="The type of file. Should be an enumeration. (Whether it is a Document or Attachment)",
+        help_text="The type of file. Should be an enumeration. (Whether it is a Document or Attachment).",
         max_length=100,
         null=False,
         blank=False,
