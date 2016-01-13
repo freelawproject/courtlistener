@@ -1,4 +1,5 @@
 import os
+from os.path import join
 
 from django.conf import settings
 from django.core.management import BaseCommand
@@ -10,6 +11,8 @@ from cl.lib.utils import mkdir_p
 from cl.search.api_serializers import OpinionClusterSerializer, \
     OpinionSerializer, DocketSerializer, CourtSerializer
 from cl.search.models import Court, Docket, OpinionCluster, Opinion
+
+
 
 
 class Command(BaseCommand):
@@ -113,15 +116,16 @@ class Command(BaseCommand):
             make_bulk_data_and_swap_it_in.delay(courts, kwargs)
 
         # Make the citation bulk data
+        obj_type_str = 'citations'
         print ' - Creating bulk data CSV for citations...'
-        self.make_citation_data()
+        self.make_citation_data(obj_type_str)
         print "   - Swapping in the new citation archives..."
-        swap_archives('citation')
+        swap_archives(obj_type_str)
 
         print 'Done.\n'
 
     @staticmethod
-    def make_citation_data():
+    def make_citation_data(obj_type_str):
         """Because citations are paginated and because as of this moment there
         are 11M citations in the database, we cannot provide users with a bulk
         data file containing the complete objects for every citation.
@@ -129,17 +133,19 @@ class Command(BaseCommand):
         Instead of doing that, we dump our citation table with a shell command,
         which provides people with compact and reasonable data they can import.
         """
-        mkdir_p('/tmp/bulk/citation')
+        tmp_destination = join(settings.BULK_DATA_DIR, 'tmp', obj_type_str)
+        mkdir_p(tmp_destination)
 
         print '   - Copying the citations table to disk...'
 
         # This command calls the psql COPY command and requests that it dump
         # the citation table to disk as a compressed CSV.
         os.system(
-            '''PGPASSWORD="{password}" psql -c "COPY \\"search_opinionscited\\" (citing_opinion_id, cited_opinion_id) to stdout DELIMITER ',' CSV HEADER" -d {database} --username {username} | gzip > /tmp/bulk/citation/all.csv.gz'''.format(
+            '''PGPASSWORD="{password}" psql -c "COPY \\"search_opinionscited\\" (citing_opinion_id, cited_opinion_id) to stdout DELIMITER ',' CSV HEADER" -d {database} --username {username} | gzip > {destination}'''.format(
                 password=settings.DATABASES['default']['PASSWORD'],
                 database=settings.DATABASES['default']['NAME'],
                 username=settings.DATABASES['default']['USER'],
+                destination=join(tmp_destination, 'all.tar.gz'),
             )
         )
         print '   - Table created successfully.'

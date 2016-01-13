@@ -43,6 +43,19 @@ def swap_archives(obj_type_str):
             join(settings.BULK_DATA_DIR, obj_type_str, os.path.basename(f))
         )
 
+    # Move the info files too.
+    try:
+        shutil.move(
+            join(settings.BULK_DATA_DIR, 'tmp', obj_type_str, 'info.json'),
+            join(settings.BULK_DATA_DIR, obj_type_str, 'info.json')
+        )
+    except IOError as e:
+        if e.errno == 2:
+            # No such file/directory
+            pass
+        else:
+            raise
+
 
 def targz_json_files(courts, obj_type_str, court_attr):
     """Create gz-compressed archives using the JSON on disk."""
