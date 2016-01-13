@@ -136,7 +136,8 @@ class Command(BaseCommand):
         # This command calls the psql COPY command and requests that it dump
         # the citation table to disk as a compressed CSV.
         os.system(
-            '''psql -c "COPY \\"search_opinionscited\\" (citing_opinion_id, cited_opinion_id) to stdout DELIMITER ',' CSV HEADER" -d {database} --username {username} | gzip > /tmp/bulk/citation/all.csv.gz'''.format(
+            '''PGPASSWORD="{password}" psql -c "COPY \\"search_opinionscited\\" (citing_opinion_id, cited_opinion_id) to stdout DELIMITER ',' CSV HEADER" -d {database} --username {username} | gzip > /tmp/bulk/citation/all.csv.gz'''.format(
+                password=settings.DATABASES['default']['PASSWORD'],
                 database=settings.DATABASES['default']['NAME'],
                 username=settings.DATABASES['default']['USER'],
             )
