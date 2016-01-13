@@ -1,14 +1,20 @@
-import redis
-
+import json
+import os
 from collections import OrderedDict
 from datetime import date
+
+import redis
+from dateutil import parser
 from django.conf import settings
 from django.utils.encoding import force_text
+from django.utils.timezone import now
 from rest_framework import serializers
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
-from rest_framework_filters import RelatedFilter
 from rest_framework.throttling import UserRateThrottle
+from rest_framework_filters import RelatedFilter
+
+from cl.lib.utils import mkdir_p
 
 DATETIME_LOOKUPS = ['exact', 'gte', 'gt', 'lte', 'lt', 'range', 'year',
                     'month', 'day', 'hour', 'minute', 'second']
@@ -31,7 +37,7 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
         if not self.context or not self.context.get('request'):
             # This happens during initialization.
             return
-        fields = self.context['request'].query_params.get('fields')
+        fields = getattr(self.context['request'], 'query_params', {}).get('fields')
         if fields is not None:
             fields = fields.split(',')
             # Drop any fields that are not specified in the `fields` argument.
@@ -68,8 +74,8 @@ class SimpleMetadataWithFilters(SimpleMetadata):
             else:
                 # Exact match or RelatedFilter
                 if isinstance(filter_type, RelatedFilter):
-                    model_name = filter_type.filterset.Meta.\
-                        model._meta.verbose_name_plural.title()
+                    model_name = (filter_type.filterset.Meta.model.
+                                  _meta.verbose_name_plural.title())
                     attrs['lookup_types'] = "See available filters for '%s'" % \
                                             model_name
                 else:
@@ -190,3 +196,83 @@ class BetaUsersReadOnly(DjangoModelPermissions):
         'PATCH': ['%(app_label)s.change_%(model_name)s'],
         'DELETE': ['%(app_label)s.delete_%(model_name)s'],
     }
+
+
+class BulkJsonHistory(object):
+    """Helpers for keeping track of data modified info on disk.
+
+    Format of JSON data is:
+
+    {
+      "last_good_date": ISO-Date,
+      "last_attempt: ISO-Date,
+      "duration": seconds,
+    }
+
+    """
+
+    def __init__(self, obj_type_str):
+        self.obj_type_str = obj_type_str
+        self.path = os.path.join(settings.BULK_DATA_DIR, 'tmp', obj_type_str,
+                                 'info.json')
+        self.json = self.load_json_file()
+        super(BulkJsonHistory, self).__init__()
+
+    def load_json_file(self):
+        """Get the history file from disk and return it as data."""
+        try:
+            with open(self.path, 'r') as f:
+                try:
+                    return json.load(f)
+                except ValueError:
+                    # When the file doesn't exist.
+                    return {}
+        except IOError as e:
+            # Happens when the directory isn't even there.
+            return {}
+
+    def save_to_disk(self):
+        mkdir_p(self.path.rsplit('/', 1)[0])
+        with open(self.path, 'w') as f:
+            json.dump(self.json, f, indent=2)
+
+    def delete_from_disk(self):
+        try:
+            os.remove(self.path)
+        except OSError as e:
+            if e.errno != 2:
+                # Problem other than No such file or directory.
+                raise
+
+    def get_last_good_date(self):
+        """Get the last good date from the file, or return None."""
+        d = self.json.get('last_good_date', None)
+        if d is None:
+            return d
+        else:
+            return parser.parse(d)
+
+    def get_last_attempt(self):
+        """Get the last attempt from the file, or return None."""
+        d = self.json.get('last_attempt', None)
+        if d is None:
+            return d
+        else:
+            return parser.parse(d)
+
+    def add_current_attempt_and_save(self):
+        """Add an attempt as the current attempt."""
+        self.json['last_attempt'] = now().isoformat()
+        self.save_to_disk()
+
+    def mark_success_and_save(self):
+        """Note a successful run."""
+        n = now()
+        self.json['last_good_date'] = n.isoformat()
+        try:
+            duration = n - parser.parse(self.json['last_attempt'])
+            self.json['duration'] = int(duration.total_seconds())
+        except KeyError:
+            # last_attempt wasn't set ahead of time.
+            self.json['duration'] = "Unknown"
+        self.save_to_disk()

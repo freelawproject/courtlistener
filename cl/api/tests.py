@@ -1,18 +1,20 @@
-from datetime import timedelta, date
 import shutil
+from datetime import timedelta, date
+
 from django.core.urlresolvers import reverse
 from django.http import HttpRequest, JsonResponse
 from django.test import Client, TestCase, override_settings
 from django.utils.timezone import now
 
-from cl.audio.models import Audio
 from cl.api.management.commands.cl_make_bulk_data import Command
+from cl.api.utils import BulkJsonHistory
 from cl.api.views import coverage_data
-from cl.search.models import \
-    Docket, Court, Opinion, OpinionCluster, OpinionsCited
+from cl.audio.models import Audio
 from cl.scrapers.management.commands.cl_scrape_oral_arguments import \
     Command as OralArgumentCommand
 from cl.scrapers.test_assets import test_oral_arg_scraper
+from cl.search.models import \
+    Docket, Court, Opinion, OpinionCluster, OpinionsCited
 
 
 class BulkDataTest(TestCase):
@@ -493,3 +495,43 @@ class DRFFieldSelectionTest(TestCase):
         r = self.client.get(path, q)
         self.assertEqual(len(r.data['results'][0].keys()),
                          len(fields_to_return))
+
+
+class BulkJsonHistoryTest(TestCase):
+
+    def setUp(self):
+        self.history = BulkJsonHistory('test')
+
+    def tearDown(self):
+        self.history.delete_from_disk()
+
+    def test_load_the_file(self):
+        data = self.history.load_json_file()
+        self.assertEqual(
+            {},
+            data,
+        )
+
+    def test_load_date_when_none(self):
+        d = self.history.get_last_good_date()
+        self.assertIsNone(d)
+
+    def test_set_date_then_load_it(self):
+        self.history.add_current_attempt_and_save()
+        self.history.mark_success_and_save()
+        d = self.history.get_last_good_date()
+        self.assertAlmostEqual(
+            # The date serialized is within ten seconds of now.
+            d,
+            now(),
+            delta=timedelta(seconds=10)
+        )
+
+    def test_add_current_attempt(self):
+        self.history.add_current_attempt_and_save()
+        d = self.history.get_last_attempt()
+        self.assertAlmostEqual(
+            d,
+            now(),
+            delta=timedelta(seconds=10)
+        )
