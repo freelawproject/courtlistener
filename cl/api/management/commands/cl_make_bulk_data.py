@@ -13,8 +13,6 @@ from cl.search.api_serializers import OpinionClusterSerializer, \
 from cl.search.models import Court, Docket, OpinionCluster, Opinion
 
 
-
-
 class Command(BaseCommand):
     help = 'Create the bulk files for all jurisdictions and for "all".'
 
