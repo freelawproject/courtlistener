@@ -12,4 +12,14 @@
 <script src="{{ STATIC_URL }}js/scotus_map.mlr.js"></script>
 <script src="https://rawgit.com/jraller/citegraph/master/app/scripts/scotus_map.js"></script>
 
+<style type="text/css">
+    /*
+        Has to be here b/c if it's in the CSS file, Firefox looks for this
+        relative to the CSS file, not relative to the HTML document.
+    */
+    .label-area .text-line {
+        filter: url(#whitefade);
+    }
+</style>
+
 {% include "includes/filters.svg" %}
