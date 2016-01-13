@@ -146,13 +146,15 @@ class ApiViewTest(TestCase):
 
 
 def assertCount(cls, path, q, expected_count):
+    cls.client.login(username='pandora', password='password')
     r = cls.client.get(path, q)
-    cls.assertEqual(len(r.data['results']), expected_count)
+    cls.assertEqual(len(r.data['results']), expected_count,
+                    msg="r.data was: %s" % r.data)
 
 
 class DRFJudgeApiFilterTests(TestCase):
     """Do the filters work properly?"""
-    fixtures = ['judge_judy.json']
+    fixtures = ['judge_judy.json', 'user_with_judge_access.json']
 
     def test_judge_filtering_by_first_name(self):
         """Can we filter by first name?"""
@@ -343,7 +345,8 @@ class DRFJudgeApiFilterTests(TestCase):
 
 class DRFSearchAndAudioAppsApiFilterTest(TestCase):
     fixtures = ['judge_judy.json', 'test_objects_search.json',
-                'test_objects_audio.json', 'court_data.json',]
+                'test_objects_audio.json', 'court_data.json',
+                'user_with_judge_access.json']
 
     def test_cluster_filters(self):
         """Do a variety of cluster filters work?"""
@@ -455,8 +458,7 @@ class DRFSearchAndAudioAppsApiFilterTest(TestCase):
         sources.append('CR')
         assertCount(self, path, q, 3)
 
-
-def test_opinion_cited_filters(self):
+    def test_opinion_cited_filters(self):
         """Do the filters on the opinions_cited work?"""
         path = reverse('opinionscited-list', kwargs={'version': 'v3'})
         q = dict()
@@ -476,7 +478,8 @@ def test_opinion_cited_filters(self):
 
 
 class DRFFieldSelectionTest(TestCase):
-    fixtures = ['judge_judy.json', 'test_objects_search.json']
+    fixtures = ['judge_judy.json', 'test_objects_search.json',
+                'user_with_judge_access.json']
 
     def test_only_some_fields_returned(self):
         """Can we return only some of the fields?"""
@@ -485,6 +488,7 @@ class DRFFieldSelectionTest(TestCase):
         path = reverse('judge-list', kwargs={'version': 'v3'})
         fields_to_return = ['educations', 'date_modified', 'slug']
         q = {'fields': ','.join(fields_to_return)}
+        self.client.login(username='pandora', password='password')
         r = self.client.get(path, q)
         self.assertEqual(len(r.data['results'][0].keys()),
                          len(fields_to_return))
