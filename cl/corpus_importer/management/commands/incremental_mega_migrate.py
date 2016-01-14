@@ -214,7 +214,7 @@ class Command(BaseCommand):
                 )
                 if old_audio is not None:
                     new_docket.date_argued = old_audio.date_argued
-                new_docket.save(using='default')
+                #new_docket.save(using='default')
 
             # Do Documents/Clusters
             if old_document is not None:
