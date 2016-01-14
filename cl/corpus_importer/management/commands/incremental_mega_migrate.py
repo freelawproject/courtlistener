@@ -175,13 +175,22 @@ class Command(BaseCommand):
                 old_document = old_docket.documents.all()[0]
             except IndexError:
                 old_document = None
+            if old_document is None and old_audio is None:
+                continue
+
             if old_document is not None:
                 old_citation = old_document.citation
                 old_docket.case_name, old_docket.case_name_full, old_docket.case_name_short = self._get_case_names(
                     old_citation.case_name)
+            else:
+                # Fall back on the docket if needed. Assumes they docket and
+                # document case_names are always the same.
+                old_docket.case_name, old_docket.case_name_full, old_docket.case_name_short = self._get_case_names(
+                        old_docket.case_name)
             if old_audio is not None:
                 old_audio.case_name, old_audio.case_name_full, old_audio.case_name_short = self._get_case_names(
                     old_audio.case_name)
+
 
             # Courts are in place thanks to initial data. Get the court.
             court = CourtNew.objects.get(pk=old_docket.court_id)
