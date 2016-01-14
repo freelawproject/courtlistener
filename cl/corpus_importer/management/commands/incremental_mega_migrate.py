@@ -203,21 +203,21 @@ class Command(BaseCommand):
 
     def merge_dockets(self, old, old_citation, existing):
         """Merge the elements of the old Docket into the existing one."""
-        self.stdout.write("Comparing %s to %s\n" % (old, existing))
+        self.stdout.write("Comparing %s to %s\n" % (old.pk, existing.pk))
         if old.case_name_short and old.case_name_short != existing.case_name_short:
-            self.stdout.write("  case_name_short:\n    %s\n    %s\n" % (
+            self.stdout.write("  case_name_short:\n    %s\n    %s\n".decode('utf-8') % (
                 old.case_name_short, existing.case_name_short,
             ))
         if old.case_name and old.case_name != existing.case_name:
-            self.stdout.write("  case_name:\n    %s\n    %s\n" % (
+            self.stdout.write("  case_name:\n    %s\n    %s\n".decode('utf-8') % (
                 old.case_name, existing.case_name,
             ))
         if old.case_name_full and old.case_name_full != existing.case_name_full:
-            self.stdout.write("  case_name_full:\n    %s\n    %s\n" % (
+            self.stdout.write("  case_name_full:\n    %s\n    %s\n".decode('utf-8') % (
                 old.case_name_full, existing.case_name_full,
             ))
         if old_citation.docket_number and old_citation.docket_number != existing.docket_number:
-            self.stdout.write("  docket_number:\n    %s\n    %s\n" % (
+            self.stdout.write("  docket_number:\n    %s\n    %s\n".decode('utf-8') % (
                 old_citation.docket_number, existing.docket_number
             ))
         if old.blocked and not existing.blocked:
