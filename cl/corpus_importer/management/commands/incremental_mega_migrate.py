@@ -28,7 +28,7 @@ from cl.donate.models import (
 from cl.favorites.models import (
     Favorite as FavoriteNew,
 )
-from cl.lib.argparse_types import valid_date
+from cl.lib.argparse_types import valid_date_time
 from cl.lib.model_helpers import disable_auto_now_fields
 from cl.search.models import (
     Docket as DocketNew,
@@ -84,11 +84,12 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             '--start',
-            type=valid_date,
+            type=valid_date_time,
             default=None,
             help="If provided, items modified on or after this date will be "
                  "migrated as best possible (some types will not be migrated "
-                 "or will be migrated ignoring this parameter). (YYYY-MM-DD)"
+                 "or will be migrated ignoring this parameter). (ISO-8601 "
+                 "format)"
         )
 
     def handle(self, *args, **options):
