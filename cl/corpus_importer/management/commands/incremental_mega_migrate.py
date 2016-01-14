@@ -92,8 +92,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        self.start = options['start']
         if options['search']:
-            self.migrate_opinions_oral_args_and_dockets(options['start'])
+            self.migrate_opinions_oral_args_and_dockets()
         if options['citations']:
             self.migrate_intra_object_citations()
         if options['user_stuff']:
@@ -152,7 +153,7 @@ class Command(BaseCommand):
         ), ending='')
         self.stdout.flush()
 
-    def migrate_opinions_oral_args_and_dockets(self, start_date):
+    def migrate_opinions_oral_args_and_dockets(self):
         """Migrate the core objects across, diffing as you go.
 
         :param start_date: Items changed after this date will be processed.
@@ -161,9 +162,9 @@ class Command(BaseCommand):
         self.stdout.write("Migrating dockets, audio files, and opinions...")
         # Find dockets modified after date or with sub-items modified after
         # date.
-        q = Q(date_modified__gte=start_date)
-        q |= Q(documents__date_modified__gte=start_date)
-        q |= Q(audio_files__date_modified__gte=start_date)
+        q = Q(date_modified__gte=self.start)
+        q |= Q(documents__date_modified__gte=self.start)
+        q |= Q(audio_files__date_modified__gte=self.start)
         old_dockets = DocketOld.objects.using('old').filter(q)
 
         for old_docket in old_dockets:
@@ -267,32 +268,36 @@ class Command(BaseCommand):
         """Merge the items."""
         self.stdout.write("Comparing pk: %s with citation %s to new cluster "
                           "and opinion." % (old_document.pk, old_citation.pk))
-        self._print_attr('date_filed', old_document, existing_oc)
-        self._print_attr('case_name_short', old_docket, existing_oc)
-        self._print_attr('case_name', old_docket, existing_oc)
-        self._print_attr('case_name_full', old_docket, existing_oc)
-        self._print_attr('federal_cite_one', old_citation, existing_oc)
-        self._print_attr('federal_cite_two', old_citation, existing_oc)
-        self._print_attr('federal_cite_three', old_citation, existing_oc)
-        self._print_attr('state_cite_one', old_citation, existing_oc)
-        self._print_attr('state_cite_two', old_citation, existing_oc)
-        self._print_attr('state_cite_three', old_citation, existing_oc)
-        self._print_attr('state_cite_regional', old_citation, existing_oc)
-        self._print_attr('specialty_cite_one', old_citation, existing_oc)
-        self._print_attr('scotus_early_cite', old_citation, existing_oc)
-        self._print_attr('lexis_cite', old_citation, existing_oc)
-        self._print_attr('westlaw_cite', old_citation, existing_oc)
-        self._print_attr('neutral_cite', old_citation, existing_oc)
-        self._print_attr('scdb_id', old_document.supreme_court_db_id, existing_oc)
-        self._print_attr('nature_of_suit', old_document, existing_oc)
-        self._print_attr('blocked', old_document, existing_oc)
+        if existing_oc.date_modified >= self.start and \
+                        old_document.date_modified >= self.start:
+            self._print_attr('date_filed', old_document, existing_oc)
+            self._print_attr('case_name_short', old_docket, existing_oc)
+            self._print_attr('case_name', old_docket, existing_oc)
+            self._print_attr('case_name_full', old_docket, existing_oc)
+            self._print_attr('federal_cite_one', old_citation, existing_oc)
+            self._print_attr('federal_cite_two', old_citation, existing_oc)
+            self._print_attr('federal_cite_three', old_citation, existing_oc)
+            self._print_attr('state_cite_one', old_citation, existing_oc)
+            self._print_attr('state_cite_two', old_citation, existing_oc)
+            self._print_attr('state_cite_three', old_citation, existing_oc)
+            self._print_attr('state_cite_regional', old_citation, existing_oc)
+            self._print_attr('specialty_cite_one', old_citation, existing_oc)
+            self._print_attr('scotus_early_cite', old_citation, existing_oc)
+            self._print_attr('lexis_cite', old_citation, existing_oc)
+            self._print_attr('westlaw_cite', old_citation, existing_oc)
+            self._print_attr('neutral_cite', old_citation, existing_oc)
+            self._print_attr('scdb_id', old_document.supreme_court_db_id, existing_oc)
+            self._print_attr('nature_of_suit', old_document, existing_oc)
+            self._print_attr('blocked', old_document, existing_oc)
 
-        self._print_attr('sha1', old_document, existing_o)
-        self._print_attr('download_url', old_document, existing_o)
-        self._print_attr('plain_text', old_document, existing_o, yesno=True)
-        self._print_attr('html', old_document, existing_o, yesno=True)
-        self._print_attr('html_lawbox', old_document, existing_o, yesno=True)
-        self._print_attr('extracted_by_ocr', old_document, existing_o)
+        if existing_o.date_modified >= self.start and \
+                old_document.date_modified >= self.start:
+            self._print_attr('sha1', old_document, existing_o)
+            self._print_attr('download_url', old_document, existing_o)
+            self._print_attr('plain_text', old_document, existing_o, yesno=True)
+            self._print_attr('html', old_document, existing_o, yesno=True)
+            self._print_attr('html_lawbox', old_document, existing_o, yesno=True)
+            self._print_attr('extracted_by_ocr', old_document, existing_o)
 
 
     def merge_dockets(self, old, old_citation, existing):
