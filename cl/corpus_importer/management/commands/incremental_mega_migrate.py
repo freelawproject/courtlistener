@@ -186,7 +186,7 @@ class Command(BaseCommand):
             # Courts are in place thanks to initial data. Get the court.
             court = CourtNew.objects.get(pk=old_docket.court_id)
 
-            # All dockets are safe to migrate. Just do it.
+            # Do Dockets
             try:
                 existing_docket = (DocketNew.objects
                                    .using('default')
@@ -194,16 +194,101 @@ class Command(BaseCommand):
             except DocketNew.DoesNotExist:
                 existing_docket = None
             if existing_docket is not None:
-                # Attempt merge.
-                self.merge_dockets(old_docket, old_citation, existing_docket)
-
+                # Simply skip. All differences have been resolved by hand.
+                new_docket = existing_docket
             else:
                 # New docket, just create it.
-                self.stdout.write("No intersection. Creating new document.")
+                new_docket = DocketNew(
+                    pk=old_docket.pk,
+                    date_modified=old_docket.date_modified,
+                    date_created=old_docket.date_modified,
+                    court=court,
+                    case_name=old_docket.case_name,
+                    case_name_full=old_docket.case_name_full,
+                    case_name_short=old_docket.case_name_short,
+                    slug=self._none_to_blank(old_docket.slug),
+                    docket_number=self._none_to_blank(
+                        old_citation.docket_number),
+                    date_blocked=old_docket.date_blocked,
+                    blocked=old_docket.blocked,
+                )
+                if old_audio is not None:
+                    new_docket.date_argued = old_audio.date_argued
+                new_docket.save(using='default')
+
+            # Do Documents/Clusters
+            if old_document is not None:
+                try:
+                    existing_oc = (OpinionClusterNew.objects
+                                   .using('default')
+                                   .get(pk=old_document.pk))
+                except OpinionClusterNew.DoesNotExist:
+                    existing_oc = None
+                try:
+                    existing_o = (OpinionNew.objects
+                                  .using('default')
+                                  .get(pk=old_document.pk))
+                except OpinionNew.DoesNotExist:
+                    existing_o = None
+                if existing_oc is not None or existing_o is not None:
+                    self.merge_citation_document_cluster(
+                            old_document, old_citation, old_docket, existing_oc, existing_o)
+                else:
+                    # New item. Just add it.
+                    pass
+
+    def _print_attr(self, attr_name, old, new, yesno=False):
+        old_val = getattr(old, attr_name, old)
+        new_val = getattr(new, attr_name, new)
+
+        if old_val and old_val != new_val:
+            if yesno:
+                self.stdout.write("  {attr_name} has changed.".format(
+                    attr_name=attr_name
+                ).decode('utf-8'))
+            else:
+                self.stdout.write("  {attr_name}:\n    '{old}'\n    '{new}'\n".format(
+                    attr_name=attr_name,
+                    old=old_val,
+                    new=new_val,
+                ).decode('utf-8'))
+
+    def merge_citation_document_cluster(self, old_document, old_citation,
+                                        old_docket, existing_oc, existing_o):
+        """Merge the items."""
+        self.stdout.write("Comparing pk: %s with citation %s to new cluster "
+                          "and opinion." % (old_document.pk, old_citation.pk))
+        self._print_attr('date_filed', old_document, existing_oc)
+        self._print_attr('case_name_short', old_docket, existing_oc)
+        self._print_attr('case_name', old_docket, existing_oc)
+        self._print_attr('case_name_full', old_docket, existing_oc)
+        self._print_attr('federal_cite_one', old_citation, existing_oc)
+        self._print_attr('federal_cite_two', old_citation, existing_oc)
+        self._print_attr('federal_cite_three', old_citation, existing_oc)
+        self._print_attr('state_cite_one', old_citation, existing_oc)
+        self._print_attr('state_cite_two', old_citation, existing_oc)
+        self._print_attr('state_cite_three', old_citation, existing_oc)
+        self._print_attr('state_cite_regional', old_citation, existing_oc)
+        self._print_attr('specialty_cite_one', old_citation, existing_oc)
+        self._print_attr('scotus_early_cite', old_citation, existing_oc)
+        self._print_attr('lexis_cite', old_citation, existing_oc)
+        self._print_attr('westlaw_cite', old_citation, existing_oc)
+        self._print_attr('neutral_cite', old_citation, existing_oc)
+        self._print_attr('scdb_id', old_document.supreme_court_db_id, existing_oc)
+        self._print_attr('nature_of_suit', old_document, existing_oc)
+        self._print_attr('blocked', old_document, existing_oc)
+
+        self._print_attr('sha1', old_document, existing_o)
+        self._print_attr('download_url', old_document, existing_o)
+        self._print_attr('plaintext', old_document, existing_o, yesno=True)
+        self._print_attr('html', old_document, existing_o, yesno=True)
+        self._print_attr('html_lawbox', old_document, existing_o, yesno=True)
+        self._print_attr('extracted_by_ocr', old_document, existing_o)
+
 
     def merge_dockets(self, old, old_citation, existing):
         """Merge the elements of the old Docket into the existing one."""
-        self.stdout.write("Comparing %s to %s\n" % (old.pk, existing.pk))
+        self.stdout.write("Comparing dockets with id: %s\n" % existing.pk)
         if old.case_name_short and old.case_name_short != existing.case_name_short:
             self.stdout.write("  case_name_short:\n    %s\n    %s\n".decode('utf-8') % (
                 old.case_name_short, existing.case_name_short,
