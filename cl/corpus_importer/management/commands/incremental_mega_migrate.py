@@ -280,7 +280,7 @@ class Command(BaseCommand):
 
         self._print_attr('sha1', old_document, existing_o)
         self._print_attr('download_url', old_document, existing_o)
-        self._print_attr('plaintext', old_document, existing_o, yesno=True)
+        self._print_attr('plain_text', old_document, existing_o, yesno=True)
         self._print_attr('html', old_document, existing_o, yesno=True)
         self._print_attr('html_lawbox', old_document, existing_o, yesno=True)
         self._print_attr('extracted_by_ocr', old_document, existing_o)
