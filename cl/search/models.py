@@ -280,7 +280,7 @@ class DocketEntry(models.Model):
     )
 
     def __unicode__(self):
-        return "%s" % (self.text[:50])
+        return "DocketEntry ---> %s" % (self.text[:50])
 
 
 class Document(models.Model):
