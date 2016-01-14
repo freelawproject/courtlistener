@@ -1,16 +1,17 @@
 # coding=utf-8
 import re
+
+from django.core.exceptions import ValidationError
+from django.core.urlresolvers import reverse
+from django.db import models
+from django.utils.encoding import smart_unicode
+from django.utils.text import slugify
+
 from cl import settings
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.model_helpers import make_upload_path
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
-from django.core.exceptions import ValidationError
-from django.core.urlresolvers import reverse
-from django.db import models
-from django.utils.text import slugify
-from django.utils.encoding import smart_unicode
-
 
 # changes here need to be mirrored in the coverage page view and Solr configs
 # Note that spaces cannot be used in the keys, or else the SearchForm won't work
@@ -715,7 +716,10 @@ class Opinion(models.Model):
 
     def __unicode__(self):
         try:
-            return self.cluster.case_name
+            return "{pk} - {cn}".format(
+                pk=getattr(self, 'pk', None),
+                cn=self.cluster.case_name,
+            )
         except AttributeError:
             return u'Orphan opinion with ID: %s' % self.pk
 
