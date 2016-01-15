@@ -10,6 +10,8 @@ import subprocess
 import sys
 import traceback
 
+from django.conf import settings
+
 from cl.corpus_importer.court_regexes import (
     fd_pairs, state_pairs, disambiguate_by_judge, fb_pairs
 )
@@ -20,7 +22,7 @@ from cl.corpus_importer import dup_finder, dup_helpers
 from cl.lib.argparse_types import readable_dir
 from cl.lib.string_utils import anonymize
 from cl.lib.import_lib import map_citations_to_models
-from cl.search.models import Document, Court, Docket
+from cl.search.models import Court, Docket
 from datetime import timedelta
 from django.utils.timezone import now
 from django import db
@@ -61,7 +63,7 @@ except (IOError, EOFError):
 try:
     # Load up SCOTUS dates
     scotus_dates = {}
-    with open(os.path.join(INSTALL_ROOT, 'alert', 'corpus_importer',
+    with open(os.path.join(settings.INSTALL_ROOT, 'alert', 'corpus_importer',
                            'scotus_dates.csv'), 'r') as scotus_date_file:
         for line in scotus_date_file:
             citation, date_filed = [line.strip() for line in line.split('|')]
