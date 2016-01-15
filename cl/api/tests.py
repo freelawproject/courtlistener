@@ -55,6 +55,7 @@ class BulkDataTest(TestCase):
     def tearDown(self):
         OpinionCluster.objects.all().delete()
         Docket.objects.all().delete()
+        Audio.objects.all().delete()
         try:
             shutil.rmtree(self.tmp_data_dir)
         except OSError:
