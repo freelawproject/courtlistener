@@ -32,10 +32,12 @@ def calculate_counts():
     """
     thirty_days_ago = now() - timedelta(days=30)
     thirty_five_days_ago = now() - timedelta(days=35)
-    cts_more_than_30_days = Court.objects \
-        .filter(docket__clusters__date_filed__gt=thirty_days_ago) \
-        .annotate(count=Count('docket__clusters__sub_opinions__pk')) \
+    cts_more_than_30_days = (
+        Court.objects
+        .filter(dockets__clusters__date_filed__gt=thirty_days_ago)
+        .annotate(count=Count('dockets__clusters__sub_opinions__pk'))
         .values('pk', 'count')
+    )
 
     # Needed because annotation calls above don't return courts with no new
     # opinions
