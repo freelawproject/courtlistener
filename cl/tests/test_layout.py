@@ -11,8 +11,8 @@ class LayoutTest(BaseSeleniumTest):
     """Test non-device-specific layout features."""
 
     fixtures = ['test_court.json', 'authtest_data.json',
-        'judge_judy.json', 'test_objects_search.json',
-        'functest_opinions.json', 'test_objects_audio.json']
+                'judge_judy.json', 'test_objects_search.json',
+                'functest_opinions.json', 'test_objects_audio.json']
 
     def test_general_homepage_layout(self):
         """
@@ -22,9 +22,8 @@ class LayoutTest(BaseSeleniumTest):
         """
         self.browser.get(self.server_url)
 
-        #homepage = self.browser.find_element_by_id('homepage')
-        rows = self.browser.\
-            find_elements_by_css_selector('#homepage > .row')
+        # homepage = self.browser.find_element_by_id('homepage')
+        rows = self.browser.find_elements_by_css_selector('#homepage > .row')
 
         # Order of collapsing should follow:
         # - Search box
@@ -103,9 +102,9 @@ class DesktopLayoutTest(BaseSeleniumTest):
         juri_select = self.browser.find_element_by_css_selector(
             'div[data-content="Select Jurisdictions"]'
         )
-        search_width = searchbox.size['width'] \
-            + search_button.size['width'] \
-            + juri_select.size['width']
+        search_width = (searchbox.size['width'] +
+                        search_button.size['width'] +
+                        juri_select.size['width'])
         self.assertAlmostEqual(
             searchbox.location['x'] + search_width / 2,
             DESKTOP_WINDOW[0] / 2,
@@ -125,8 +124,8 @@ class MobileLayoutTest(BaseSeleniumTest):
     """
 
     fixtures = ['test_court.json', 'authtest_data.json',
-        'judge_judy.json', 'test_objects_search.json',
-        'functest_opinions.json', 'test_objects_audio.json']
+                'judge_judy.json', 'test_objects_search.json',
+                'functest_opinions.json', 'test_objects_audio.json']
 
     def setUp(self):
         super(MobileLayoutTest, self).setUp()
@@ -142,8 +141,8 @@ class MobileLayoutTest(BaseSeleniumTest):
 
         # on mobile, the navbar should start collapsed into a hamburger-esque
         # icon in the upper right
-        navbar_header = self.\
-            browser.find_element_by_css_selector('.navbar-header')
+        navbar_header = (self.browser
+                         .find_element_by_css_selector('.navbar-header'))
         navbtn = navbar_header.find_element_by_tag_name('button')
         self.assertIn('collapsed', navbtn.get_attribute('class'))
         self.assertAlmostEqual(
@@ -177,9 +176,9 @@ class MobileLayoutTest(BaseSeleniumTest):
         juri_select = self.browser.find_element_by_css_selector(
             'div[data-content="Select Jurisdictions"]'
         )
-        search_width = searchbox.size['width'] \
-            + search_button.size['width'] \
-            + juri_select.size['width']
+        search_width = (searchbox.size['width'] +
+                        search_button.size['width'] +
+                        juri_select.size['width'])
 
         self.assertAlmostEqual(
             searchbox.location['x'] + search_width / 2,

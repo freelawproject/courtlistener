@@ -1,5 +1,4 @@
 # coding=utf-8
-# pylint: disable=C0103
 """
 Functional testing of courtlistener RSS feeds
 """
@@ -92,7 +91,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         url = '%s%s' % \
             (
                 self.server_url,
-                reverse('jurisdiction_feed', kwargs={'court':'test'})
+                reverse('jurisdiction_feed', kwargs={'court': 'test'})
             )
         f = feedparser.parse(url)
         self.assertEqual(
@@ -119,8 +118,8 @@ class FeedsFunctionalTest(BaseSeleniumTest):
                 self.assertEqual(
                     r.status_code,
                     200,
-                    'GET %s should result in HTTP 200' % \
-                        (entry.enclosures[0].href)
+                    'GET %s should result in HTTP 200' %
+                    entry.enclosures[0].href
                 )
                 self.assertIn('attachment;', r['Content-Disposition'])
 
@@ -138,8 +137,8 @@ class FeedsFunctionalTest(BaseSeleniumTest):
                 self.assertEqual(
                     r.status_code,
                     200,
-                    'GET %s should result in HTTP 200' % \
-                        (entry.enclosures[0].href)
+                    'GET %s should result in HTTP 200' %
+                    entry.enclosures[0].href
                 )
                 self.assertEqual(r['Content-Type'], 'audio/mpeg')
 
@@ -176,11 +175,11 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         self.assertEqual(len(link_titles), len(f.entries))
 
         for entry in f.entries:
-            foundSimilarTitle = False
+            found_similar_title = False
             for title in link_titles:
                 if entry.title in title:
-                    foundSimilarTitle = True
+                    found_similar_title = True
             self.assertTrue(
-                foundSimilarTitle,
-                'Should have seen a search result similar to %s' % (entry.title)
+                found_similar_title,
+                'Should have seen a search result similar to %s' % entry.title
             )

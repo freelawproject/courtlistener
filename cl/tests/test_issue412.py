@@ -3,12 +3,12 @@
 Test Issue 412: Add admin-visible notice to various pages showing if they are
 blocked from search engines
 """
-from selenium.common.exceptions import NoSuchElementException
 from cl.tests.base import BaseSeleniumTest
-from cl.search.models import Opinion, Docket
+from cl.search.models import Docket
 
 
 BLOCKED_MSG = 'Blocked from Search Engines'
+
 
 class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
     """
@@ -68,6 +68,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # She does NOT see a widget telling her the page is blocked
         sidebar = self.browser.find_element_by_id('sidebar')
         self.assertNotIn(BLOCKED_MSG, sidebar.text)
+
 
 class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
     """

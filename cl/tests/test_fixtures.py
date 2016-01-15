@@ -4,6 +4,7 @@ Unit tests for validating Fixture loading works with model logic
 from django.test import TestCase
 from cl.judges.models import Judge
 
+
 class FixtureTest(TestCase):
     """Used to validate certain aspects of various fixture files...
     ...mostly that they will properly load and support other tests."""

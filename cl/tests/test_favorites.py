@@ -10,7 +10,7 @@ from selenium import webdriver
 class UserFavoritesTest(BaseSeleniumTest):
     """
     Functionally test all aspects of favoriting Opinions and Oral Arguments
-    including CRUD related operationgs of a user's favorites.
+    including CRUD related operations of a user's favorites.
     """
 
     fixtures = ['test_court.json', 'authtest_data.json', 'judge_judy.json',
@@ -205,7 +205,7 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # She sees an edit link next to one of them and clicks it
         self.assertIn('Favorites', self.browser.title)
-        self.assert_text_in_body('Totes my Notes 2') # in fixture favorites.json
+        self.assert_text_in_body('Totes my Notes 2')  # in favorites.json
         edit_link = self.browser.find_element_by_link_text('Edit / Delete')
         edit_link.click()
 
