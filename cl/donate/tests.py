@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.core import mail
 from django.test import Client, TestCase
-from django.utils.timezone import now
+from django.utils.timezone import make_aware
 from cl.donate.management.commands.cl_send_donation_reminders import Command
 from cl.donate.models import Donation
 
@@ -26,8 +26,10 @@ class EmailCommandTest(TestCase):
     def test_sending_an_email(self):
         """Do we send emails correctly?"""
         # Set this value since the JSON will get stale and can't have dynamic
-        # dates.
-        about_a_year_ago = now() - timedelta(days=355)
+        # dates. Note that we need to use make_aware because it selects the
+        # current time zone, which is also what __day does in the code we're
+        # testing. If they select their time zones differently, this fails!
+        about_a_year_ago = make_aware(datetime.now() - timedelta(days=355))
         Donation.objects.filter(pk=1).update(date_created=about_a_year_ago)
 
         comm = Command()
