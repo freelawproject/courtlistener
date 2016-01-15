@@ -98,7 +98,7 @@ if DEVELOPMENT:
 LOGIN_URL = "/sign-in/"
 LOGIN_REDIRECT_URL = "/"
 
-# These remap some of the the messages constants to correspond with blueprint
+# These remap some of the the messages constants to correspond with bootstrap
 MESSAGE_TAGS = {
     message_constants.DEBUG: 'alert-warning',
     message_constants.INFO: 'alert-info',
@@ -111,15 +111,18 @@ MESSAGE_TAGS = {
 # Solr #
 ########
 SOLR_OPINION_URL = 'http://127.0.0.1:8983/solr/collection1'
-#SOLR_OPINION_URL = 'http://127.0.0.1:8983/solr/swap_core'
 SOLR_AUDIO_URL = 'http://127.0.0.1:8983/solr/audio'
+SOLR_OPINION_TEST_CORE_NAME = 'opinion_test'
+SOLR_AUDIO_TEST_CORE_NAME = 'audio_test'
+SOLR_OPINION_TEST_URL = 'http://127.0.0.1:8983/solr/opinion_test'
+SOLR_AUDIO_TEST_URL = 'http://127.0.0.1:8983/solr/audio_test'
 
 
 #########
 # Redis #
 #########
-# Redis is configured with 16 databaes out of the box. This serves to keep them
-# neatly mapped.
+# Redis is configured with 16 databases out of the box. This keeps them neatly
+# mapped.
 REDIS_DATABASES = {
     'CELERY': 0,
     'CACHE': 1,
