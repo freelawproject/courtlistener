@@ -51,8 +51,9 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             executable_path='/usr/local/phantomjs/phantomjs',
             service_log_path='/var/log/courtlistener/django.log',
         )
+        #self.browser = webdriver.Firefox()
         self.browser.implicitly_wait(3)
-        self.browser.set_window_size(DESKTOP_WINDOW[0], DESKTOP_WINDOW[1])
+        self.browser.set_window_size(*DESKTOP_WINDOW)
         self._initialize_test_solr()
         self._update_index()
 

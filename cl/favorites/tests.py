@@ -1,3 +1,4 @@
+import time
 from django.test import Client, TestCase
 from cl.tests.base import BaseSeleniumTest, DESKTOP_WINDOW
 from cl.favorites.models import Favorite
@@ -162,6 +163,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         self.browser.find_element_by_id('saveFavorite').click()
 
         # She now sees the star is full on yellow implying it's a fave!
+        time.sleep(1)  # Selnium is sometimes faster than JS.
         star = self.browser.find_element_by_id('favorites-star')
         self.assertIn('gold', star.get_attribute('class'))
         self.assertNotIn('gray', star.get_attribute('class'))
@@ -173,7 +175,7 @@ class UserFavoritesTest(BaseSeleniumTest):
                 executable_path='/usr/local/phantomjs/phantomjs',
                 service_log_path='/var/log/courtlistener/django.log',
         )
-        self.browser.set_window_size(DESKTOP_WINDOW[0], DESKTOP_WINDOW[1])
+        self.browser.set_window_size(*DESKTOP_WINDOW)
 
         # When she returns, she signs back into CL and wants to pull up
         # that favorite again, so she goes to Favorites under the Profile menu
