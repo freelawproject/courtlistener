@@ -94,20 +94,12 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         """ Try to initialize a pair of Solr cores for testing purposes """
 
         # data_dir, if left blank, ends up bing put in /tmp/solr/...
-        create_solr_core(
-            settings.SOLR_OPINION_TEST_CORE_NAME,
-            data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr',
-                                  'data_opinion_test'),
-            schema='schema.xml',
-            config='solrconfig.xml',
-            instance_dir='/usr/local/solr/example/solr/opinion_test')
+        create_solr_core(settings.SOLR_OPINION_TEST_CORE_NAME)
         create_solr_core(
             settings.SOLR_AUDIO_TEST_CORE_NAME,
-            data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr',
-                                  'data_audio_test'),
-            schema='schema.xml',
-            config='solrconfig.xml',
-            instance_dir='/usr/local/solr/example/solr/audio_test',
+            schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
+                                'audio_schema.xml'),
+            instance_dir='/usr/local/solr/example/solr/audio',
         )
 
     @staticmethod
