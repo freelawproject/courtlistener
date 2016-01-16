@@ -71,9 +71,9 @@ class UserFavoritesTest(BaseSeleniumTest):
         # She looks over the results and sees one in particular possibly of
         # interest so she clicks on the title
         articles = self.browser.find_elements_by_tag_name('article')
-        self.assertTrue(len(articles) > 1, 'Should have more than 1 result')
+        self.assertTrue(len(articles) == 1, 'Should have 1 result')
 
-        title_anchor = articles[1].find_elements_by_tag_name('a')[0]
+        title_anchor = articles[0].find_elements_by_tag_name('a')[0]
         self.assertNotEqual(title_anchor.text.strip(), '')
         title_anchor.click()
 
@@ -127,7 +127,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         # Drilling into the result she's interested brings her to the details
         # TODO: Candidate for refactor
         articles = self.browser.find_elements_by_tag_name('article')
-        title_anchor = articles[1].find_elements_by_tag_name('a')[0]
+        title_anchor = articles[0].find_elements_by_tag_name('a')[0]
         search_title = title_anchor.text.strip()
         self.assertNotEqual(search_title, '')
         title_anchor.click()
@@ -280,6 +280,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         button.click()
 
         # And notices the change on the page immediately
+        time.sleep(0.5)  # Selenium is too fast.
         self.assertIn('Favorites', self.browser.title)
         self.assert_text_in_body('Renamed Favorite')
         self.assert_text_in_body('Modified Notes')
