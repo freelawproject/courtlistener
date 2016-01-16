@@ -1,22 +1,18 @@
 # coding=utf-8
 import StringIO
 import datetime
-import json
 import os
-import shutil
-import time
 
-from datadiff import diff
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.core.urlresolvers import reverse
 from django.http import HttpRequest
 from django.test import TestCase, override_settings
-from lxml import html
+from lxml import etree, html
 
 from cl.lib.solr_core_admin import get_data_dir
-from cl.lib.test_helpers import SolrTestCase
+from cl.lib.test_helpers import SolrTestCase, IndexedSolrTestCase
 from cl.search.feeds import JurisdictionFeed
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.search.management.commands.cl_calculate_pagerank_networkx import \
@@ -158,64 +154,64 @@ class ModelTest(TestCase):
                              "try to use `strftime`...again?")
 
 
-class SearchTest(SolrTestCase):
+class SearchTest(IndexedSolrTestCase):
     def test_a_simple_text_query(self):
         """Does typing into the main query box work?"""
         r = self.client.get('/', {'q': 'supreme'})
-        self.assertIn('Tarrant', r.content)
+        self.assertIn('Honda', r.content)
+        self.assertIn('1 Result', r.content)
 
     def test_a_case_name_query(self):
         """Does querying by case name work?"""
-        r = self.client.get('/', {'q': '*:*', 'caseName': 'tarrant'})
-        self.assertIn('Tarrant', r.content)
+        r = self.client.get('/', {'q': '*:*', 'case_name': 'honda'})
+        self.assertIn('Honda', r.content)
 
     def test_a_query_with_white_space_only(self):
         """Does everything work when whitespace is in various fields?"""
         r = self.client.get('/', {'q': ' ',
                                   'judge': ' ',
                                   'case_name': ' '})
-        self.assertIn('Tarrant', r.content)
+        self.assertIn('Honda', r.content)
         self.assertNotIn('deadly', r.content)
 
     def test_a_query_with_a_date(self):
         """Does querying by date work?"""
         response = self.client.get('/', {'q': '*:*',
-                                         'filed_after': '2013-06',
-                                         'filed_before': '2013-07'})
-        self.assertIn('Tarrant', response.content)
+                                         'filed_after': '1795-06',
+                                         'filed_before': '1796-01'})
+        self.assertIn('Honda', response.content)
 
     def test_faceted_queries(self):
         """Does querying in a given court return the document? Does querying
         the wrong facets exclude it?
         """
         r = self.client.get('/', {'q': '*:*', 'court_test': 'on'})
-        self.assertIn('Tarrant', r.content)
+        self.assertIn('Honda', r.content)
         r = self.client.get('/', {'q': '*:*', 'stat_Errata': 'on'})
-        self.assertNotIn('Tarrant', r.content)
+        self.assertNotIn('Honda', r.content)
+        self.assertIn("Debbas", r.content)
 
     def test_a_docket_number_query(self):
         """Can we query by docket number?"""
-        r = self.client.get('/', {'q': '*:*', 'docket_number': '11-889'})
+        r = self.client.get('/', {'q': '*:*', 'docket_number': '2'})
         self.assertIn(
-            'Tarrant',
+            'Honda',
             r.content,
             "Result not found by docket number!"
         )
 
     def test_a_west_citation_query(self):
         """Can we query by citation number?"""
-        get_dicts = [{'q': '*:*', 'citation': '44'},
-                     {'q': 'citation:44'},
-                     # Tests query field lower-casing, and a deprecated field.
-                     {'q': 'westcite:44'}]
+        get_dicts = [{'q': '*:*', 'citation': '33'},
+                     {'q': 'citation:33'}]
         for get_dict in get_dicts:
             r = self.client.get('/', get_dict)
-            self.assertIn('Tarrant', r.content)
+            self.assertIn('Honda', r.content)
 
     def test_a_neutral_citation_query(self):
         """Can we query by neutral citation numbers?"""
-        r = self.client.get('/', {'q': '*:*', 'neutral_cite': '44'})
-        self.assertIn('Tarrant', r.content)
+        r = self.client.get('/', {'q': '*:*', 'neutral_cite': '22'})
+        self.assertIn('Honda', r.content)
 
     def test_a_query_with_a_old_date(self):
         """Do we have any recurrent issues with old dates and strftime (issue
@@ -226,78 +222,83 @@ class SearchTest(SolrTestCase):
     def test_a_judge_query(self):
         """Can we query by judge name?"""
         r = self.client.get('/', {'q': '*:*', 'judge': 'david'})
-        self.assertIn('Tarrant', r.content)
+        self.assertIn('Honda', r.content)
         r = self.client.get('/', {'q': 'judge:david'})
-        self.assertIn('Tarrant', r.content)
+        self.assertIn('Honda', r.content)
 
     def test_a_nature_of_suit_query(self):
         """Can we query by nature of suit?"""
-        r = self.client.get('/', {'q': 'suitNature:copyright'})
-        self.assertIn('Tarrant', r.content)
+        r = self.client.get('/', {'q': 'suitNature:"copyright"'})
+        self.assertIn('Honda', r.content)
 
     def test_citation_filtering(self):
         """Can we find Documents by citation filtering?"""
-        msg = "%s case back when filtering by citation count."
-        r = self.client.get('/', {'q': '*:*', 'cited_lt': 5, 'cited_gt': 3})
+        r = self.client.get('/', {'q': '*:*', 'cited_lt': 7, 'cited_gt': 5})
         self.assertIn(
-            'Tarrant',
+            'Honda',
             r.content,
-            msg=msg % 'Did not get'
+            msg=u'Did not get case back when filtering by citation count.'
         )
-        r = self.client.get('/', {'q': '*:*', 'cited_lt': 10, 'cited_gt': 8})
-        self.assertNotIn(
-            'Tarrant',
+        r = self.client.get('/', {'q': '*:*', 'cited_lt': 100, 'cited_gt': 80})
+        self.assertIn(
+            "had no results",
             r.content,
-            msg=msg % 'Got'
+            msg=u'Got case back when filtering by crazy citation count.'
         )
 
     def test_citation_ordering(self):
         """Can the results be re-ordered by citation count?"""
         r = self.client.get('/', {'q': '*:*', 'order_by': 'citeCount desc'})
+        most_cited_name = 'case name cluster 3'
+        less_cited_name = 'Howard v. Honda'
         self.assertTrue(
-            r.content.index('Disclosure') < r.content.index('Tarrant'),
-            msg="'Disclosure' should come BEFORE 'Tarrant' when ordered by "
-                "descending citeCount.")
+            r.content.index(most_cited_name) < r.content.index(less_cited_name),
+            msg="'%s' should come BEFORE '%s' when ordered by descending "
+                "citeCount." % (most_cited_name, less_cited_name))
 
         r = self.client.get('/', {'q': '*:*', 'order_by': 'citeCount asc'})
         self.assertTrue(
-            r.content.index('Disclosure') > r.content.index('Tarrant'),
-            msg="'Disclosure' should come AFTER 'Tarrant' when "
-                "ordered by ascending citeCount.")
+            r.content.index(most_cited_name) > r.content.index(less_cited_name),
+            msg="'%s' should come AFTER '%s' when ordered by ascending "
+                "citeCount." % (most_cited_name, less_cited_name))
 
     def test_oa_results_basic(self):
         r = self.client.get('/', {'type': 'oa'})
-        self.assertIn('Jeremy', r.content)
+        self.assertIn('Jose', r.content)
 
     def test_oa_results_date_argued_ordering(self):
         r = self.client.get('/', {'type': 'oa', 'order_by': 'dateArgued desc'})
         self.assertTrue(
-            r.content.index('Ander') > r.content.index('Jeremy'),
-            msg="'Ander should come AFTER 'Jeremy' when order_by desc."
+            r.content.index('SEC') < r.content.index('Jose'),
+            msg="'SEC' should come BEFORE 'Jose' when order_by desc."
         )
 
         r = self.client.get('/', {'type': 'oa', 'order_by': 'dateArgued asc'})
         self.assertTrue(
-            r.content.index('Ander') < r.content.index('Jeremy'),
-            msg="'Ander should come BEFORE 'Jeremy' when order_by asc."
+            r.content.index('Jose') < r.content.index('SEC'),
+            msg="'Jose' should come AFTER 'SEC' when order_by asc."
         )
 
     def test_oa_case_name_filtering(self):
-        r = self.client.get('/', {'type': 'oa', 'case_name': 'ander'})
+        r = self.client.get('/', {'type': 'oa', 'case_name': 'jose'})
+        actual = len(html.fromstring(r.content).xpath('//article'))
+        expected = 1
         self.assertEqual(
-            len(html.fromstring(r.content).xpath('//article')),
-            1,
+            actual,
+            expected,
             msg="Did not get expected number of results when filtering by " \
-                "case name."
+                "case name. Expected %s, but got %s." % (expected, actual)
         )
 
     def test_oa_jurisdiction_filtering(self):
         r = self.client.get('/', {'type': 'oa', 'court': 'test'})
+        actual = len(html.fromstring(r.content).xpath('//article'))
+        expected = 2
         self.assertEqual(
-            len(html.fromstring(r.content).xpath('//article')),
-            2,
+            actual,
+            expected,
             msg="Did not get expected number of results when filtering by "
-                "jurisdiction."
+                "jurisdiction. Expected %s, but got %s." % (actual, expected)
         )
 
     def test_oa_date_argued_filtering(self):
@@ -323,276 +324,34 @@ class SearchTest(SolrTestCase):
                       msg="Invalid search did not result in \"deadly\" error.")
 
 
-@override_settings(MEDIA_ROOT='/tmp/%s' % time.time())
-class ApiTest(SolrTestCase):
-
-    def tearDown(self):
-        """For these tests we change MEDIA_ROOT so we have a safe place to put
-        files as we save them. We need to delete this location once the tests
-        finish.
-        """
-        super(ApiTest, self).tearDown()
-        try:
-            shutil.rmtree(settings.MEDIA_ROOT)
-        except OSError:
-            print "WARNING: Unable to delete %s. This probably means your " \
-                  "/tmp directory is getting junked up." % settings.MEDIA_ROOT
-
-    def strip_varying_data(self, endpoint, actual, correct):
-        """A number of metadata fields vary each time the tests are run and
-        thus must be stripped so as to not cause issues.
-        """
-        if endpoint in ('audio', 'cited-by', 'cites', 'docket', 'document',
-                        'opinion'):
-            for j in (actual, correct,):
-                for o in j['objects']:
-                    if 'date_created' in o:
-                        # Not all objects have this field
-                        o['date_created'] = None
-                    o['date_modified'] = None
-        elif endpoint == 'search':
-            # Drop the timestamps and scores b/c they can differ
-            for j in (actual, correct):
-                for o in j['objects']:
-                    o['timestamp'] = None
-                    o['score'] = None
-        elif endpoint == 'jurisdiction':
-            # Drop any non-testing jurisdiction, cause they change over time
-            objects = []
-            for court in actual['objects']:
-                if court['id'] == 'test':
-                    court['date_modified'] = None
-                    objects.append(court)
-                    actual['objects'] = objects
-                    break
-            actual['meta']['total_count'] = 1
-        return actual, correct
-
-    def test_deprecated_api_versions(self):
-        print("Testing deprecated API paths...")
-        deprecated_versions = ('1', '2')
-        # Make sure all the subpaths are deprecated too.
-        paths = ['', 'asdf/', 'schema/']
-        for v in deprecated_versions:
-            for path in paths:
-                path = reverse('deprecated_api', kwargs={'v': v}) + path
-                print("  %s..." % path),
-                r = self.client.get(path)
-                actual = json.loads(r.content)
-                with open(os.path.join(
-                    settings.INSTALL_ROOT,
-                    'cl',
-                    'search',
-                    'test_assets',
-                    'api_deprecated.json'
-                ), 'r') as f:
-                    correct = json.load(f)
-                    self.assertEqual(
-                        actual,
-                        correct,
-                        "Deprecated API did not return the expected result. "
-                        "Instead, returned:\n %s" % actual
-                    )
-                print('✓')
-
-    def test_api_meta_data(self):
-        """Does the content of the search API have the right meta data?"""
-        print "Trying various API endpoints..."
-        self.client.login(username='pandora', password='password')
-        api_endpoints = [
-            ({'resource_name': 'docket', 'api_name': 'v3'}, ''),
-            ({'resource_name': 'audio', 'api_name': 'v3'}, ''),
-            ({'resource_name': 'cluster', 'api_name': 'v3'}, ''),
-            ({'resource_name': 'document', 'api_name': 'v3'}, ''),
-            ({'resource_name': 'cited-by', 'api_name': 'v3'}, '&id=1'),
-            ({'resource_name': 'cites', 'api_name': 'v3'}, '&id=1'),
-            ({'resource_name': 'jurisdiction', 'api_name': 'v3'}, ''),
-            ({'resource_name': 'search', 'api_name': 'v3'}, ''),
-        ]
-        for reverse_params, get_params in api_endpoints:
-            path = reverse(
-                'api_dispatch_list',
-                kwargs=reverse_params
-            ) + '?format=json%s' % get_params
-            print("  Testing %s..." % path),
-            r = self.client.get(path)
-            actual = json.loads(r.content)
-
-            with open(os.path.join(
-                    settings.INSTALL_ROOT, 'cl', 'search', 'test_assets',
-                    'api_{}_{}_test_results.json'.format(
-                        reverse_params['api_name'],
-                        reverse_params['resource_name']
-                    )), 'r') as f:
-                correct = json.load(f)
-
-                actual, correct = self.strip_varying_data(
-                    reverse_params['resource_name'],
-                    actual,
-                    correct
-                )
-
-                msg = "Response from API did not match expected " \
-                      "results (api version: {}, endpoint: {}):\n" \
-                      "{}\n\n" \
-                      "{}".format(
-                          reverse_params['api_name'],
-                          reverse_params['resource_name'],
-                          diff(actual,
-                               correct,
-                               fromfile='actual',
-                               tofile='correct'),
-                          json.dumps(actual, indent=2, sort_keys=True),
-                      )
-                self.assertEqual(
-                    actual,
-                    correct,
-                    msg=msg,
-                )
-                print "✓"
-
-    def test_api_pagination(self):
-        print("Testing if the cited-by and cites endpoints paginate properly")
-        self.client.login(username='pandora', password='password')
-        simple_path = reverse('api_dispatch_list',
-                              kwargs={'resource_name': 'cites',
-                                      'api_name': 'v3'}) + '?id=1'
-        print "  Testing no pagination, no limits: {}...".format(simple_path),
-        r = self.client.get(simple_path)
-        json_no_offset_no_limit = json.loads(r.content)
-        self.assertEqual(
-            len(json_no_offset_no_limit['objects']),
-            2,
-            msg="Did not get the expected result count on the cites endpoint."
-        )
-        print '✓'
-
-        offset_1 = reverse(
-            'api_dispatch_list',
-            kwargs={'resource_name': 'cites', 'api_name': 'v3'}
-        ) + '?id=1&offset=1'
-        print("  Testing offset value of 1: {}".format(offset_1)),
-        r = self.client.get(offset_1)
-        json_offset_1 = json.loads(r.content)
-
-        # Do we get back one fewer results with the offset?
-        self.assertEqual(
-            len(json_offset_1['objects']),
-            len(json_no_offset_no_limit['objects']) - 1
-        )
-        print '✓'
-
-        print("  Does the first item of the offset query match the second in "
-              "the query without an offset..."),
-        self.assertEqual(
-            json_offset_1['objects'][0]['absolute_url'],
-            json_no_offset_no_limit['objects'][1]['absolute_url'],
-        )
-        print '✓'
-
-        print("  Does the first item in a query limited to one result match the"
-              "first item in an unlimited query..."),
-        r = self.client.get('/api/rest/v3/cites/?id=1&limit=1')
-        json_limit_1 = json.loads(r.content)
-        r = self.client.get('/api/rest/v3/cites/?id=1&limit=1&offset=1')
-        json_limit_1_offset_1 = json.loads(r.content)
-        self.assertEqual(
-            json_limit_1['objects'][0]['absolute_url'],
-            json_no_offset_no_limit['objects'][0]['absolute_url']
-        )
-        print '✓'
-
-        print("  Does the first item in a query limited to one result and "
-              "offset by one match the second item in an unlimited query..."),
-        self.assertEqual(
-            json_limit_1_offset_1['objects'][0]['absolute_url'],
-            json_no_offset_no_limit['objects'][1]['absolute_url']
-        )
-        print '✓'
-
-        print("  Are the results of a limit 1 and an offset 1 different..."),
-        self.assertNotEqual(
-            json_limit_1['objects'][0]['absolute_url'],
-            json_limit_1_offset_1['objects'][0]['absolute_url']
-        )
-        print '✓'
-
-    def test_api_result_count(self):
-        print("Testing result counts from metadata and objects...")
-        self.client.login(username='pandora', password='password')
-        api_versions = ['v3']
-        for v in api_versions:
-            path = reverse(
-                'api_dispatch_list',
-                kwargs={'resource_name': 'search', 'api_name': v}
-            ) + '?q=*:*&format=json'
-            r = self.client.get(path)
-            json = json.loads(r.content)
-            print("  Does the metadata count match the result count..."),
-            self.assertEqual(
-                self.expected_num_results_opinion,
-                json['meta']['total_count'],
-                msg="Metadata count does not match (api version: '%s'):\n"
-                    "  Got:\t%s\n"
-                    "  Expected:\t%s\n" %
-                    (v, json['meta']['total_count'],
-                     self.expected_num_results_opinion,)
-            )
-            print '✓'
-
-            print("  Does the number of results returned match the expected "
-                  "number...")
-            num_actual_results = len(json['objects'])
-            self.assertEqual(
-                self.expected_num_results_opinion,
-                num_actual_results,
-                msg="Actual number of results varies from expected number "
-                    "(api version: '%s'):\n"
-                    "  Got:\t%s\n"
-                    "  Expected:\t%s\n" %
-                    (v, num_actual_results,
-                     self.expected_num_results_opinion)
-            )
-            print '✓'
-
-    def test_api_able_to_login(self):
-        print("Testing can we log in properly..."),
-        username, password = 'pandora', 'password'
-        logged_in_successfully = self.client.login(
-            username=username, password=password)
-        self.assertTrue(
-            logged_in_successfully,
-            msg="Unable to log into the test client with:\n"
-                "  Username:\t%s\n"
-                "  Password:\t%s\n" % (username, password)
-        )
-        print '✓'
-
-
-class FeedTest(SolrTestCase):
+class FeedTest(IndexedSolrTestCase):
     def test_jurisdiction_feed(self):
         """Can we simply load the jurisdiction feed?"""
-        response = self.client.get('/feed/court/test/')
+        response = self.client.get(reverse('jurisdiction_feed',
+                                           kwargs={'court': 'test'}))
         self.assertEqual(200, response.status_code,
                          msg="Did not get 200 OK status code for jurisdiction "
                              "feed")
-        html_tree = html.fromstring(response.content)
+        xml_tree = etree.fromstring(response.content)
         node_tests = (
-            ('//feed/entry', 3),
-            ('//feed/entry/title', 3),
+            ('//a:feed/a:entry', 5),
+            ('//a:feed/a:entry/a:title', 5),
         )
-        for test, count in node_tests:
-            node_count = len(html_tree.xpath(test))
+        for test, expected_count in node_tests:
+            actual_count = len(xml_tree.xpath(
+                test,
+                namespaces={'a': 'http://www.w3.org/2005/Atom'})
+            )
             self.assertEqual(
-                node_count,
-                count,
+                actual_count,
+                expected_count,
                 msg="Did not find %s node(s) with XPath query: %s. "
-                    "Instead found: %s" % (count, test, node_count)
+                    "Instead found: %s" % (expected_count, test, actual_count)
             )
 
 
 @override_settings(
-    MEDIA_ROOT = os.path.join(settings.INSTALL_ROOT, 'cl/assets/media/test/')
+    MEDIA_ROOT=os.path.join(settings.INSTALL_ROOT, 'cl/assets/media/test/')
 )
 class JurisdictionFeedTest(TestCase):
 
@@ -655,8 +414,14 @@ class JurisdictionFeedTest(TestCase):
         Does the mime type detection safely return a good default value when
         given a file it can't detect the mime type for?
         """
-        self.assertIsNone(self.feed.item_enclosure_mime_type(self.zero_item))
-        self.assertIsNone(self.feed.item_enclosure_mime_type(self.bad_item))
+        self.assertEqual(
+            self.feed.item_enclosure_mime_type(self.zero_item),
+            'application/octet-stream',
+        )
+        self.assertEqual(
+            self.feed.item_enclosure_mime_type(self.bad_item),
+            'application/octet-stream',
+        )
 
     def test_feed_renders_with_item_without_file_path(self):
         """
@@ -951,7 +716,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # results. She notices her query is still in the searchbox and
         # has the ability to refine via facets
         result_count = self.browser.find_element_by_id('result-count')
-        self.assertIn('Results', result_count.text)
+        self.assertIn('1 Result', result_count.text)
         search_box = self.browser.find_element_by_id('id_q')
         self.assertEqual('lissner', search_box.get_attribute('value'))
 
