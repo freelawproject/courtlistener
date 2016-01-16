@@ -1,3 +1,4 @@
+from django.core.urlresolvers import reverse
 from reporters_db import REPORTERS
 from cl.citations.find_citations import get_citations, is_date_in_reporter
 from cl.citations import find_citations
@@ -242,8 +243,8 @@ class CitationFeedTest(TestCase):
     def _tree_has_content(self, content, expected_count):
         xml_tree = etree.fromstring(content)
         count = len(xml_tree.xpath(
-            '//s:entry',
-            namespaces={'s': 'http://www.w3.org/2005/Atom'})
+            '//a:entry',
+            namespaces={'a': 'http://www.w3.org/2005/Atom'})
         )
         self.assertEqual(
             count,
@@ -252,7 +253,10 @@ class CitationFeedTest(TestCase):
 
     def test_basic_cited_by_feed(self):
         """Can we load the cited-by feed and does it have content?"""
-        r = self.client.get('/feed/search/?q=cites:2')
+        r = self.client.get(
+            reverse('search_feed', args=['search']),
+            {'q': 'cites:1'}
+        )
         self.assertEqual(r.status_code, 200)
 
         expected_count = 1
