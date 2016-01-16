@@ -141,7 +141,11 @@ class Docket(models.Model):
         help_text="The docket numbers of a case, can be consolidated and "
                   "quite long",
         max_length=5000,  # was 50, 100, 300, 1000
-        blank=False
+        # Docket number is a mandatory field for every Docket object.
+        # Setting blank to False makes the field mandatory.
+        blank=False,
+        null=False,
+        db_index=True
     )
     date_blocked = models.DateField(
         help_text="The date that this opinion was blocked from indexing by "
@@ -160,8 +164,7 @@ class Docket(models.Model):
     date_filed = models.DateField(
         help_text="the date the case was filed.",
         blank=True,
-        null=True,
-        db_index=True,
+        null=True
     )
 
     date_terminated = models.DateField(
@@ -176,23 +179,27 @@ class Docket(models.Model):
         null=True,
     )
 
-    pacer_case_id = models.CharField(
+    pacer_case_id = models.PositiveIntegerField(
         help_text="The cased ID which PACER provides.",
-        max_length=50,
+        # Even though pacer_case_id is a mandatory attribute of RECAP dockets, we cannot have the same here.
+        # as existing Dockets in CourtListener don't have pacer_case_number attribute and
+        # all Dockets of CourtListener may not be available in RECAP.
+        # Therefore pacer_case_id cannot be made a mandatory argument in here.
         null=True,
+        blank=True,
         db_index=True
     )
 
     case_cause = models.CharField(
         help_text=" The type of cause for the case (Not sure)",
-        max_length=500,
+        max_length=200,
         null=True,
         blank=True
     )
 
     nature_of_suit = models.CharField(
         help_text=" The type of case.  (Not sure)",
-        max_length=500,
+        max_length=100,
         null=True,
         blank=True
     )
@@ -206,28 +213,30 @@ class Docket(models.Model):
 
     jurisdiction_type = models.CharField(
         help_text="Stands for jurisdiction in RECAP XML docket.",
-        max_length=500,
+        # Some examples are : "Diversity", "U.S. Government Defendant",
+        max_length=100,
         null=True,
         blank=True
     )
 
     xml_filepath_local = models.FilePathField(
         help_text="RECAP’s Docket XML page file path in the local storage area.",
-        max_length=1000,
+        max_length=500,
         null=True,
         blank=True
     )
 
     xml_filepath_ia = models.FilePathField(
         help_text="The Docket XML page file path in The Internet Archive",
-        max_length=1000,
+        max_length=500,
         null=True,
         blank=True
     )
 
     source = models.SmallIntegerField(
-        help_text="contains the source of the  Docket.",
+        help_text="contains the source of the Docket.",
         null=False,
+        blank=False,
         choices=SOURCE_CHOICES,
         default=DEFAULT
     )
@@ -252,13 +261,14 @@ class DocketEntry(models.Model):
         Docket,
         null=False,
         blank=False,
-        help_text="Foreign key as a relation to the corresponding Docket object. Specifies which docket the docket entry belongs to."
+        help_text="Foreign key as a relation to the corresponding Docket object. "
+                  "Specifies which docket the docket entry belongs to."
     )
 
     filed_date = models.DateField(
         help_text="The Created date of the Docket Entry.",
-        blank=True,
-        null=True
+        blank=False,
+        null=False
     )
 
     entered_date = models.DateField(
@@ -267,15 +277,21 @@ class DocketEntry(models.Model):
         null=True
     )
 
-    entry_number = models.IntegerField(
+    entry_number = models.PositiveIntegerField(
         help_text="# on the PACER docket page.",
-        null=True,
-        blank=True
+        null=False,
+        blank=False
+        # Here we have made the entry_number a mandatory field because all docket entries in RECAP
+        # will and must have aa Entry number.
+        # Recap uses this number to identify documents and attachments. Therefore To maintain the identity of docket
+        # entries and documents, it is important to have an entry number to every docket entry.
     )
 
     text = models.TextField(
         blank=False,
-        help_text="The text content of the docket entry that appears in the PACER docket page. This field is the long_desc in RECAP.",
+        null=False,
+        help_text="The text content of the docket entry that appears in the PACER docket page. "
+                  "This field is the long_desc in RECAP.",
         db_index=True
     )
 
@@ -288,22 +304,26 @@ class Document(models.Model):
         The model for Docket Documents and Attachments.
     """
 
+    PACER_DOCUMENT = 1
+    ATTACHMENT = 2
+
     DOCUMENT_TYPES = (
-        ('document', "PACER Document"),
-        ('attachment', "Attachment")
+        (PACER_DOCUMENT, "PACER Document"),
+        (ATTACHMENT, "Attachment")
     )
 
-    type = models.CharField(
+    document_type = models.IntegerField(
         help_text="The type of file. Should be an enumeration.(Whether it is a Document or Attachment).",
-        max_length=100,
         null=False,
         blank=False,
+        db_index=True,
         choices=DOCUMENT_TYPES
     )
 
     docket_entry = models.ForeignKey(
         DocketEntry,
         null=False,
+        blank=False,
         help_text="Foreign Key to the DocketEntry object to which it belongs. "
                   "Multiple documents can belong to a DocketEntry. (Attachments and Documents together)"
     )
@@ -311,6 +331,7 @@ class Document(models.Model):
     document_number = models.PositiveIntegerField(
         help_text="If the file is a document, the number is the document_number in RECAP docket.",
         blank=False,
+        null=False
     )
 
     attachment_number = models.PositiveIntegerField(
@@ -320,7 +341,7 @@ class Document(models.Model):
 
     pacer_doc_id = models.CharField(
         help_text="The ID of the document in PACER. This information is provided by RECAP.",
-        max_length=50,
+        max_length=32,  # Same as in RECAP
         null=True,
         blank=True
     )
@@ -342,7 +363,7 @@ class Document(models.Model):
     )
 
     sha1 = models.CharField(
-        max_length=100,
+        max_length=40,  # As in RECAP
         blank=True,
         null=True,
         help_text="The ID used for a document in RECAP"
