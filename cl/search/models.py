@@ -354,11 +354,15 @@ class Document(models.Model):
 
     is_available = models.BooleanField(
         help_text="Boolean value to say if the document is available in RECAP.",
+        blank=True,
+        null=True,
         default=False
     )
 
     free_import = models.BooleanField(
         help_text="Found in RECAP",
+        blank=True,
+        null=True,
         default=False
     )
 
