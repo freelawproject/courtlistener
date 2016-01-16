@@ -1,10 +1,12 @@
 from datetime import timedelta
+
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
 from django.core.management.base import BaseCommand
 from django.db.models import Sum
 from django.template import loader
 from django.utils.timezone import now
+
 from cl.search.models import Opinion, Court
 from cl.stats import Stat
 
@@ -23,7 +25,7 @@ class Command(BaseCommand):
         self.verbosity = 0
 
     def gather_stats_and_users(self):
-        about_a_year_ago = now() - timedelta(days=355)
+        about_a_year_ago = (now() - timedelta(days=355))
 
         # Gather some stats to email
         self.new_doc_count = Opinion.objects.filter(
@@ -38,12 +40,12 @@ class Command(BaseCommand):
             name='alerts.sent',
             date_logged__gte=about_a_year_ago,
         ).aggregate(Sum('count'))['count__sum']
+
         self.users = User.objects.filter(
-            donations__date_created__year=about_a_year_ago.year,
-            donations__date_created__month=about_a_year_ago.month,
-            donations__date_created__day=about_a_year_ago.day,
+            donations__date_created__gt=about_a_year_ago,
+            donations__date_created__lte=about_a_year_ago + timedelta(days=1),
             donations__send_annual_reminder=True,
-            donations__status=4
+            donations__status=4,
         ).annotate(Sum('donations__amount'))
 
     def send_reminder_email(self, user, amount):
