@@ -71,9 +71,11 @@ class UserTest(LiveServerTestCase):
                       msg="Test string not found in response.content")
 
     def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(self):
-        # Test the trickier case when an email is associated with many accounts
-        UserProfile.objects.filter(pk__in=(3, 4,))\
-            .update(key_expires=now() + timedelta(days=2))
+        """Test the trickier case when an email is associated with many accounts"""
+        # Update the accounts to have keys that are not expired.
+        (UserProfile.objects
+             .filter(pk__in=[3, 4, 5])
+             .update(key_expires=now() + timedelta(days=2)))
         r = self.client.get(reverse(
             'email_confirm',
             args=['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab'],
@@ -83,7 +85,7 @@ class UserTest(LiveServerTestCase):
         self.assertEqual(200, r.status_code,
                          msg="Did not get 200 code when activating account. "
                              "Instead got %s" % r.status_code)
-        ups = UserProfile.objects.filter(pk__in=(3, 4,))
+        ups = UserProfile.objects.filter(pk__in=(3, 4, 5))
         for up in ups:
             self.assertTrue(up.email_confirmed)
 
