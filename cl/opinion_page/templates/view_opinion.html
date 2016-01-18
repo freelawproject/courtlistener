@@ -68,16 +68,14 @@
         </div>
 
         {# Show cases that cite this case #}
-        {% if cluster.citation_count > 0 %}
+        {% if citing_clusters.result.numFound > 0 %}
             <div id="cited-by" class="sidebar-section">
-                <h3><span>Cited By ({{ cluster.citation_count }})</span></h3>
-                <p class="bottom">This opinion has been cited by these opinions:</p>
+                <h3><span>Cited By ({{ citing_clusters.result.numFound }})</span></h3>
+                <p class="bottom">This case has been cited by these opinions:</p>
                 <ul>
                     {% for citing_cluster in citing_clusters %}
                         <li>
-                            <a href="{{ citing_cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                                {{ citing_cluster.caption|safe|truncatewords:10|v_wrapper }}
-                            </a>
+                            <a href="{{ citing_cluster.absolute_url }}?{{ request.META.QUERY_STRING }}">{{ citing_cluster.caseName|safe|truncatewords:12|v_wrapper }}</a>
                         </li>
                     {% endfor %}
                 </ul>

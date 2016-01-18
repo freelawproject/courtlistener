@@ -561,19 +561,6 @@ class OpinionCluster(models.Model):
             self._has_private_authority = private
         return self._has_private_authority
 
-    @property
-    def citing_clusters(self):
-        # All clusters that have a sub_opinion that cites one of the
-        # sub_opinions of this cluster.
-        return OpinionCluster.objects.filter(
-            sub_opinions__in=sum(
-                [list(sub_opinion.opinions_citing.all()) for
-                 sub_opinion in
-                 self.sub_opinions.all()],
-                []
-            )
-        ).order_by('-citation_count', '-date_filed')
-
     def top_visualizations(self):
         return self.visualizations.filter(
             published=True, deleted=False
