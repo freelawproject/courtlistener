@@ -1,26 +1,6 @@
 """A script to migrate the old data from one database to another, transforming
 it as necessary along the way.
 """
-
-# TODO:
-#   1. Ensure:
-#     2. All pk's are explicitly copied across.
-#     3. All models have migrations disabled.
-#     5. All lookups and saves have 'using' set properly.
-#     6. All slug fields have db_index=False (unless used for lookups)
-#     7. Set prepopulated_fields for all slugs in the admin.
-#     8. No TextField, CharField, or SlugField (URLField?) has null=True set.
-#     9. Any custom save() methods got the right parameters.
-#  2. Look into:
-#     1. Do we need to regenerate html_with_citations?
-#     2. Is it so easy to copy FileFields around?
-#     3. Does the `save` method return the object?
-#  4. Documentation:
-#     1. citation_id is the old citation ID. Note that it is not necessarily
-#        unique because in prior iterations of the DB, multiple opinions could
-#        share a single Citation object.
-#     2. date_modified fields are not updated (I hope?) because the data
-#        remained the same.
 from cl.corpus_importer.models_legacy import (
     Docket as DocketOld,
     Document as DocumentOld,
