@@ -843,6 +843,13 @@ body.embed div#title-block {
     position: relative;
 }
 
+#coverageChart .bar-area {
+    cursor: pointer;
+}
+#coverageChart .plottable-colors-0 {
+    background-color: red;
+}
+
 
 /* Typeahead */
 .twitter-typeahead .tt-query,

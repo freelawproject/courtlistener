@@ -23,43 +23,36 @@ function drawGraph(data) {
     });
     $('#coverageChart').empty();
 
-    function getXDataValue(d) {
-        return d.x;
-    }
-
-    function getYDataValue(d) {
-        return d.y;
-    }
-
     // Scales
+    var xScale, xAxis;
     if (chartData.length > 10) {
-        var xScale = new Plottable.Scale.Linear();
-        var xAxis  = new Plottable.Axis.Numeric(xScale, 'bottom');
+        xScale = new Plottable.Scales.Linear();
+        xAxis  = new Plottable.Axes.Numeric(xScale, 'bottom');
     } else {
-        var xScale = new Plottable.Scale.Ordinal();
-        var xAxis  = new Plottable.Axis.Category(xScale, 'bottom');
+        xScale = new Plottable.Scales.Category();
+        xAxis  = new Plottable.Axes.Category(xScale, 'bottom');
     }
-    var yScale = new Plottable.Scale.Linear();
+    var yScale = new Plottable.Scales.Linear();
 
     // Plot Components
-    var title  = new Plottable.Component.TitleLabel(parseInt(data.total, 10).toLocaleString() + ' Opinions');
-    var yLabel = new Plottable.Component.Label('Number of Opinions', 'left');
-    var xLabel = new Plottable.Component.Label(courtName);
-    var yAxis  = new Plottable.Axis.Numeric(yScale, 'left');
-    var plot   = new Plottable.Plot.Bar(xScale, yScale, true)
-        .addDataset(chartData)
-        .animate(true)
-        .project("x", getXDataValue, xScale)
-        .project("y", getYDataValue, yScale)
-        //.hoverMode('line') // need to do performance check on this setting or comment out
-        .barLabelsEnabled(chartData.length < 11);
-
+    var title  = new Plottable.Components.TitleLabel(
+        parseInt(data.total, 10).toLocaleString() + ' Opinions');
+    var yLabel = new Plottable.Components.Label('Number of Opinions')
+        .angle(-90);
+    var xLabel = new Plottable.Components.Label(courtName);
+    var yAxis  = new Plottable.Axes.Numeric(yScale, 'left');
+    var plot   = new Plottable.Plots.Bar()
+        .addDataset(new Plottable.Dataset(chartData))
+        .animated(true)
+        .x(function(d) { return d.x}, xScale)
+        .y(function(d) { return d.y}, yScale)
+        .labelsEnabled(chartData.length <= 10);
 
     yAxis.formatter(function (d) {
         return d.toLocaleString();
     });
 
-    var table = new Plottable.Component.Table([
+    var table = new Plottable.Components.Table([
         [null, null, title],
         [yLabel, yAxis, plot],
         [null, null, xAxis],
@@ -69,39 +62,40 @@ function drawGraph(data) {
     // Render it
     table.renderTo('#coverageChart');
 
-    var hover = new Plottable.Interaction.Hover();
-    hover.onHoverOver(function(hoverData) {
-        var xString = hoverData.data[0].x;
-        var yString = hoverData.data[0].y.toLocaleString();
-        title.text(yString + " opinions in "+ xString);
+    var pointer = new Plottable.Interactions.Pointer();
+    pointer.onPointerMove(function(p){
+        var entity = plot.entityNearest(p);
+        var xString = entity.datum.x;
+        var yString = entity.datum.y;
+        title.text(yString + " opinions in " + xString);
     });
-    hover.onHoverOut(function() {
+    pointer.onPointerExit(function(p) {
         title.text(parseInt(data.total, 10).toLocaleString() + ' Opinions');
     });
-    plot.registerInteraction(hover);
+    pointer.attachTo(plot);
 
-    var click = new Plottable.Interaction.Click();
-    click.callback(function(p) {
-        var bars = plot.getBars(p.x, p.y),
+    var click = new Plottable.Interactions.Click();
+    click.onClick(function(p) {
+        var bars = plot.entitiesAt(p),
             year,
-            prec = '',
+            precedentString = '',
             i;
-        if (bars[0].length) {
-            year = bars.data()[0].x;
+        if (bars.length) {
+            year = bars[0].datum.x;
             for (i = 0; i < precedentTypes.length; i++) {
-                prec += '&' + precedentTypes[i] + '=on';
+                precedentString += '&' + precedentTypes[i] + '=on';
             }
             window.location.href = '/?filed_after=' + year +
                 '&filed_before=' + year +
-                prec +
+                precedentString +
                 ((hash !== 'all') ? '&court=' + hash : '');
         }
     });
-    plot.registerInteraction(click);
+    click.attachTo(plot);
 }
 
 // Do this when the hash of the page changes (i.e. at page load or when a select is chosen.
-$(window).hashchange(function() {
+$(window).on('hashchange', function() {
     hash = window.location.hash.substr(1);
     if (hash === '') {
         hash = 'all';
@@ -160,6 +154,6 @@ $(document).ready(function() {
         .append('svg')
         .attr('id', 'coverageChart')
         .attr('height', '400px');
-    $(window).hashchange();
+    $(window).trigger('hashchange');
     $('#nav select').chosen();
 });
