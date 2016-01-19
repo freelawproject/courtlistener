@@ -846,9 +846,6 @@ body.embed div#title-block {
 #coverageChart .bar-area {
     cursor: pointer;
 }
-#coverageChart .plottable-colors-0 {
-    background-color: red;
-}
 
 
 /* Typeahead */

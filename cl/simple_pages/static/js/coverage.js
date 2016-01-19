@@ -43,10 +43,11 @@ function drawGraph(data) {
     var yAxis  = new Plottable.Axes.Numeric(yScale, 'left');
     var plot   = new Plottable.Plots.Bar()
         .addDataset(new Plottable.Dataset(chartData))
-        .animated(true)
         .x(function(d) { return d.x}, xScale)
         .y(function(d) { return d.y}, yScale)
-        .labelsEnabled(chartData.length <= 10);
+        .labelsEnabled(chartData.length <= 15)
+        .attr('fill', "#8a1f11")
+        .animated(true);
 
     yAxis.formatter(function (d) {
         return d.toLocaleString();
