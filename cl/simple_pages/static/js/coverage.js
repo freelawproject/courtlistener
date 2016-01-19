@@ -1,69 +1,55 @@
 /*eslint-env browser */
 /*global $, sorted_courts, precedentTypes */
-
 var hash = window.location.hash.substr(1),
-    court_data = [],
-    chartData = [];
-
-function drawGraph(data) {
-    var entry = {},
-        courtName = court_data[hash].short_name;
-    chartData = [];
-
-    for (var item in data.annual_counts) {
-        if (data.annual_counts.hasOwnProperty(item)) {
-            entry = {};
-            entry.x = parseInt(item, 10);
-            entry.y = data.annual_counts[item];
-            chartData.push(entry);
-        }
+    court_data = {}, // populated by addNavigation
+    chartData = [], // extracted from API
+    currentData = new Plottable.Dataset([]),
+    xLabel = new Plottable.Components.Label(''),
+    table = {},
+    opinionCount = 0;
+function hashCheck() {
+    if (hash === '' || !(hash in court_data)) {
+        hash = 'all'
     }
-    chartData.sort(function(a, b) {
-        return a.x - b.x;
-    });
-    $('#coverageChart').empty();
-
-    // Scales
-    var xScale, xAxis;
-    if (chartData.length > 10) {
-        xScale = new Plottable.Scales.Linear();
-        xAxis  = new Plottable.Axes.Numeric(xScale, 'bottom');
-    } else {
-        xScale = new Plottable.Scales.Category();
-        xAxis  = new Plottable.Axes.Category(xScale, 'bottom');
-    }
-    var yScale = new Plottable.Scales.Linear();
-
+}
+/**
+ * draw the graph and add the interactions we want
+ */
+function drawGraph() {
+    var xScale = new Plottable.Scales.Linear(),
+        xAxis = new Plottable.Axes.Numeric(xScale, 'bottom'),
+        yScale = new Plottable.Scales.Linear(),
+        title  = new Plottable.Components.TitleLabel(),
+        yLabel = new Plottable.Components.Label(),
+        yAxis  = new Plottable.Axes.Numeric(yScale, 'left'),
+        plot = new Plottable.Plots.Bar(),
+        pointer = new Plottable.Interactions.Pointer(),
+        click = new Plottable.Interactions.Click();
+    d3.select('#chart')
+        .append('svg')
+        .attr('id', 'coverageChart')
+        .attr('height', '400px');
     // Plot Components
-    var title  = new Plottable.Components.TitleLabel(
-        parseInt(data.total, 10).toLocaleString() + ' Opinions');
-    var yLabel = new Plottable.Components.Label('Number of Opinions')
+    title.text(opinionCount.toLocaleString() + ' Opinions');
+    yLabel.text('Number of Opinions')
         .angle(-90);
-    var xLabel = new Plottable.Components.Label(courtName);
-    var yAxis  = new Plottable.Axes.Numeric(yScale, 'left');
-    var plot   = new Plottable.Plots.Bar()
-        .addDataset(new Plottable.Dataset(chartData))
+    xLabel.text(court_data[hash].short_name);
+    currentData.data(chartData);
+    plot.addDataset(currentData)
+        .animated(true)
         .x(function(d) { return d.x}, xScale)
         .y(function(d) { return d.y}, yScale)
-        .labelsEnabled(chartData.length <= 15)
-        .attr('fill', "#8a1f11")
-        .animated(true);
-
+        .labelsEnabled(true)
+        .attr('fill', "#AE0B0B");
     yAxis.formatter(function (d) {
         return d.toLocaleString();
     });
-
-    var table = new Plottable.Components.Table([
+    table = new Plottable.Components.Table([
         [null, null, title],
         [yLabel, yAxis, plot],
         [null, null, xAxis],
         [null, null, xLabel]
     ]);
-
-    // Render it
-    table.renderTo('#coverageChart');
-
-    var pointer = new Plottable.Interactions.Pointer();
     pointer.onPointerMove(function(p){
         var entity = plot.entityNearest(p);
         var xString = entity.datum.x;
@@ -71,11 +57,9 @@ function drawGraph(data) {
         title.text(yString + " opinions in " + xString);
     });
     pointer.onPointerExit(function(p) {
-        title.text(parseInt(data.total, 10).toLocaleString() + ' Opinions');
+        title.text(opinionCount.toLocaleString() + ' Opinions');
     });
     pointer.attachTo(plot);
-
-    var click = new Plottable.Interactions.Click();
     click.onClick(function(p) {
         var bars = plot.entitiesAt(p),
             year,
@@ -93,68 +77,85 @@ function drawGraph(data) {
         }
     });
     click.attachTo(plot);
+    table.renderTo('#coverageChart');
 }
-
-// Do this when the hash of the page changes (i.e. at page load or when a select is chosen.
-$(window).on('hashchange', function() {
-    hash = window.location.hash.substr(1);
-    if (hash === '') {
-        hash = 'all';
-    } else if (document.getElementById(hash)){
-        // The user tried to get to an unrelated ID
-        hash = 'all';
-    }
+/**
+ * update chart to reflect new data
+ */
+function updateGraph() {
+    xLabel.text(court_data[hash].short_name);
+    currentData.data(chartData);
+    table.redraw();
+}
+/**
+ * hits the API to get new data
+ */
+function getData() {
     $.ajax({
         type: 'GET',
         url: '/api/rest/v3/coverage/' + hash + '/',
         success: function(data) {
-            // Update the drawing area
-            drawGraph(data);
+            var entry = {};
+            opinionCount = parseInt(data.total, 10);
+            chartData = [];
+            for (var item in data.annual_counts) {
+                if (data.annual_counts.hasOwnProperty(item)) {
+                    entry = {};
+                    entry.x = parseInt(item, 10);
+                    entry.y = data.annual_counts[item];
+                    chartData.push(entry);
+                }
+            }
+            chartData.sort(function(a, b) {
+                return a.x - b.x;
+            });
+            updateGraph();
         },
-        error: function(){
+        error: function() {
+            // need a better failure mode
             // If ajax fails (perhaps it's an invalid court?) set it back to all.
             window.location.hash = 'all';
         }
     });
-});
-
-$('#nav select').change(function(){
-    // Update the hash whenever the select is changed.
-    var id = $('#nav select option:selected')[0].value;
-    window.location.hash = id;
-});
-
+}
+/**
+ * populate the court dropdown
+ */
 function addNavigation() {
+    var options = [];
     $(sorted_courts).each(function(index, court) {
-        // Build up the chooser
-        var selectElement = $('#nav select');
-        $('<option></option>').attr('value', court.pk)
-            .attr('id', 'court_' + court.pk)
-            .text(court.short_name)
-            .appendTo(selectElement);
-        selectElement.appendTo('#nav');
-
+        options.push('<option value="' +
+            court.pk + '" id="court_' +
+            court.pk + '"">' +
+            court.short_name +
+            '</option>');
         // Make a totals dict (necessary, because otherwise courts are in a list
         // where we can't look things up by court name).
         court_data[court.pk] = {'pk': court.pk,
             'total': court.total_docs,
             'short_name': court.short_name};
     });
+    $('#nav select').append(options.join(''));
     if (hash === '') {
         hash = 'all';
     }
-    $('#nav select').val(hash);
+    $('#nav select').val(hash)
+        .chosen(); //trigger the "chosen" plugin
 }
-
-// hover
-// click
-
+$('#nav select').change(function(){
+    // Update the hash whenever the select is changed.
+    var id = $('#nav select option:selected')[0].value;
+    window.location.hash = id;
+});
+$(window).on('hashchange', function() {
+    hash = window.location.hash.substr(1);
+    hashCheck();
+    getData();
+});
 $(document).ready(function() {
     addNavigation();
-    d3.select('#chart')
-        .append('svg')
-        .attr('id', 'coverageChart')
-        .attr('height', '400px');
+    hashCheck();
+    drawGraph();
     $(window).trigger('hashchange');
-    $('#nav select').chosen();
+    $('#nav select').chosen();  // Initialize the chosen drop down.
 });
