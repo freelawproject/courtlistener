@@ -17,7 +17,8 @@ function hashCheck() {
  */
 function drawGraph() {
     var xScale = new Plottable.Scales.Linear(),
-        xAxis = new Plottable.Axes.Numeric(xScale, 'bottom'),
+        xAxis = new Plottable.Axes.Numeric(xScale, 'bottom')
+            .formatter(new Plottable.Formatters.fixed(0)),
         yScale = new Plottable.Scales.Linear(),
         title  = new Plottable.Components.TitleLabel(),
         yLabel = new Plottable.Components.Label(),
@@ -25,6 +26,7 @@ function drawGraph() {
         plot = new Plottable.Plots.Bar(),
         pointer = new Plottable.Interactions.Pointer(),
         click = new Plottable.Interactions.Click();
+
     d3.select('#chart')
         .append('svg')
         .attr('id', 'coverageChart')
@@ -44,12 +46,14 @@ function drawGraph() {
     yAxis.formatter(function (d) {
         return d.toLocaleString();
     });
+
     table = new Plottable.Components.Table([
         [null, null, title],
         [yLabel, yAxis, plot],
         [null, null, xAxis],
         [null, null, xLabel]
     ]);
+
     pointer.onPointerMove(function(p){
         var entity = plot.entityNearest(p);
         var xString = entity.datum.x;
@@ -57,9 +61,11 @@ function drawGraph() {
         title.text(yString + " opinions in " + xString);
     });
     pointer.onPointerExit(function(p) {
+        plot.selections().attr("fill", "green");
         title.text(opinionCount.toLocaleString() + ' Opinions');
     });
     pointer.attachTo(plot);
+
     click.onClick(function(p) {
         var bars = plot.entitiesAt(p),
             year,
@@ -88,7 +94,7 @@ function updateGraph() {
     table.redraw();
 }
 /**
- * hits the API to get new data
+ * hit the API to get new data
  */
 function getData() {
     $.ajax({
