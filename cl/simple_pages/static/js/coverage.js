@@ -5,6 +5,7 @@ var hash = window.location.hash.substr(1),
     chartData = [], // extracted from API
     currentData = new Plottable.Dataset([]),
     xLabel = new Plottable.Components.Label(''),
+    title = new Plottable.Components.TitleLabel(),
     table = {},
     opinionCount = 0;
 function hashCheck() {
@@ -12,6 +13,10 @@ function hashCheck() {
         hash = 'all'
     }
 }
+function updateTitle(){
+    title.text(opinionCount.toLocaleString() + ' Opinions');
+}
+
 /**
  * draw the graph and add the interactions we want
  */
@@ -20,7 +25,6 @@ function drawGraph() {
         xAxis = new Plottable.Axes.Numeric(xScale, 'bottom')
             .formatter(new Plottable.Formatters.fixed(0)),
         yScale = new Plottable.Scales.Linear(),
-        title  = new Plottable.Components.TitleLabel(),
         yLabel = new Plottable.Components.Label(),
         yAxis  = new Plottable.Axes.Numeric(yScale, 'left'),
         plot = new Plottable.Plots.Bar(),
@@ -32,7 +36,7 @@ function drawGraph() {
         .attr('id', 'coverageChart')
         .attr('height', '400px');
     // Plot Components
-    title.text(opinionCount.toLocaleString() + ' Opinions');
+    updateTitle();
     yLabel.text('Number of Opinions')
         .angle(-90);
     xLabel.text(court_data[hash].short_name);
@@ -61,7 +65,6 @@ function drawGraph() {
         title.text(yString + " opinions in " + xString);
     });
     pointer.onPointerExit(function(p) {
-        plot.selections().attr("fill", "green");
         title.text(opinionCount.toLocaleString() + ' Opinions');
     });
     pointer.attachTo(plot);
@@ -92,37 +95,48 @@ function updateGraph() {
     xLabel.text(court_data[hash].short_name);
     currentData.data(chartData);
     table.redraw();
+    updateTitle();
 }
 /**
  * hit the API to get new data
  */
 function getData() {
-    $.ajax({
-        type: 'GET',
-        url: '/api/rest/v3/coverage/' + hash + '/',
-        success: function(data) {
-            var entry = {};
-            opinionCount = parseInt(data.total, 10);
-            chartData = [];
-            for (var item in data.annual_counts) {
-                if (data.annual_counts.hasOwnProperty(item)) {
-                    entry = {};
-                    entry.x = parseInt(item, 10);
-                    entry.y = data.annual_counts[item];
-                    chartData.push(entry);
-                }
-            }
-            chartData.sort(function(a, b) {
-                return a.x - b.x;
-            });
-            updateGraph();
-        },
-        error: function() {
-            // need a better failure mode
-            // If ajax fails (perhaps it's an invalid court?) set it back to all.
-            window.location.hash = 'all';
-        }
-    });
+   $.ajax({
+       type: 'GET',
+       url: '/api/rest/v3/coverage/' + hash + '/',
+       success: function(data) {
+           var entry = {},
+               minYear = new Date().getFullYear(),
+               count = 0;
+           opinionCount = parseInt(data.total, 10);
+           chartData = [];
+           for (var item in data.annual_counts) {
+               if (data.annual_counts.hasOwnProperty(item)) {
+                   entry = {};
+                   entry.x = parseInt(item, 10);
+                   entry.y = data.annual_counts[item];
+                   chartData.push(entry);
+                   count += 1;
+                   if (entry.x < minYear) {
+                       minYear = entry.x;
+                   }
+               }
+           }
+           // Pad the data to have 7 values, else it looks horrible.
+           while (chartData.length < 7) {
+               chartData.push({x: --minYear, y: 0});
+           }
+           chartData.sort(function(a, b) {
+               return a.x - b.x;
+           });
+           updateGraph();
+       },
+       error: function() {
+           // need a better failure mode
+           // If ajax fails (perhaps it's an invalid court?) set it back to all.
+           window.location.hash = 'all';
+       }
+   });
 }
 /**
  * populate the court dropdown
