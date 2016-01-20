@@ -193,7 +193,6 @@ class Command(BaseCommand):
                 old_audio.case_name, old_audio.case_name_full, old_audio.case_name_short = self._get_case_names(
                     old_audio.case_name)
 
-
             # Courts are in place thanks to initial data. Get the court.
             court = CourtNew.objects.get(pk=old_docket.court_id)
 
@@ -225,7 +224,7 @@ class Command(BaseCommand):
                 )
                 if old_audio is not None:
                     new_docket.date_argued = old_audio.date_argued
-                #new_docket.save(using='default')
+                new_docket.save(using='default')
 
             # Do Documents/Clusters
             if old_document is not None:
@@ -242,13 +241,107 @@ class Command(BaseCommand):
                 except OpinionNew.DoesNotExist:
                     existing_o = None
                 if existing_oc is not None or existing_o is not None:
-                    self.merge_citation_document_cluster(
-                            old_document, old_citation, old_docket, existing_oc, existing_o)
+                    if self.find_conflicts(old_document, old_citation,
+                                           old_docket, existing_oc,
+                                           existing_o):
+                        self.stdout.write("Found conflict. Resolve that.")
+                    else:
+                        # No conflicts. Update the existing item.
+                        self.add_oc_and_o(old_document, old_citation,
+                                          old_docket, new_docket)
                 else:
                     # New item. Just add it.
-                    pass
+                    self.add_oc_and_o(old_document, old_citation, old_docket,
+                                      new_docket)
 
-    def _print_attr(self, attr_name, old, new, yesno=False):
+            # Finally we do Audio
+            if old_audio is not None:
+                new_audio_file = AudioNew(
+                    pk=old_audio.pk,
+                    docket=new_docket,
+                    source=old_audio.source,
+                    case_name=old_audio.case_name,
+                    case_name_short=old_audio.case_name_short,
+                    case_name_full=old_audio.case_name_full,
+                    judges=self._none_to_blank(old_audio.judges),
+                    date_created=old_audio.time_retrieved,
+                    date_modified=old_audio.date_modified,
+                    sha1=old_audio.sha1,
+                    download_url=old_audio.download_url,
+                    local_path_mp3=old_audio.local_path_mp3,
+                    local_path_original_file=old_audio.local_path_original_file,
+                    duration=old_audio.duration,
+                    processing_complete=old_audio.processing_complete,
+                    date_blocked=old_audio.date_blocked,
+                    blocked=old_audio.blocked,
+                )
+                new_audio_file.save(
+                    using='default',
+                    index=False,
+                )
+
+    def add_oc_and_o(self, old_document, old_citation, old_docket, new_docket):
+        """Add the OpinionCluster and Opinion, updating existing items if
+        present.
+        """
+        new_opinion_cluster = OpinionClusterNew(
+            pk=old_document.pk,
+            docket=new_docket,
+            judges=self._none_to_blank(old_document.judges),
+            date_modified=old_document.date_modified,
+            date_created=old_document.date_modified,
+            date_filed=old_document.date_filed,
+            slug=self._none_to_blank(old_citation.slug),
+            citation_id=old_document.citation_id,
+            case_name_short=old_docket.case_name_short,
+            case_name=old_docket.case_name,
+            case_name_full=old_docket.case_name_full,
+            federal_cite_one=self._none_to_blank(old_citation.federal_cite_one),
+            federal_cite_two=self._none_to_blank(old_citation.federal_cite_two),
+            federal_cite_three=self._none_to_blank(old_citation.federal_cite_three),
+            state_cite_one=self._none_to_blank(old_citation.state_cite_one),
+            state_cite_two=self._none_to_blank(old_citation.state_cite_two),
+            state_cite_three=self._none_to_blank(old_citation.state_cite_three),
+            state_cite_regional=self._none_to_blank(old_citation.state_cite_regional),
+            specialty_cite_one=self._none_to_blank(old_citation.specialty_cite_one),
+            scotus_early_cite=self._none_to_blank(old_citation.scotus_early_cite),
+            lexis_cite=self._none_to_blank(old_citation.lexis_cite),
+            westlaw_cite=self._none_to_blank(old_citation.westlaw_cite),
+            neutral_cite=self._none_to_blank(old_citation.neutral_cite),
+            scdb_id=self._none_to_blank(old_document.supreme_court_db_id),
+            source=old_document.source,
+            nature_of_suit=old_document.nature_of_suit,
+            citation_count=old_document.citation_count,
+            precedential_status=old_document.precedential_status,
+            date_blocked=old_document.date_blocked,
+            blocked=old_document.blocked,
+        )
+        new_opinion_cluster.save(
+            using='default',
+            index=False,
+        )
+
+        new_opinion = OpinionNew(
+            pk=old_document.pk,
+            cluster=new_opinion_cluster,
+            date_modified=old_document.date_modified,
+            date_created=old_document.time_retrieved,
+            type='010combined',
+            sha1=old_document.sha1,
+            download_url=old_document.download_url,
+            local_path=old_document.local_path,
+            plain_text=old_document.plain_text,
+            html=self._none_to_blank(old_document.html),
+            html_lawbox=self._none_to_blank(old_document.html_lawbox),
+            html_with_citations=old_document.html_with_citations,
+            extracted_by_ocr=old_document.extracted_by_ocr,
+        )
+        new_opinion.save(
+            using='default',
+            index=False,
+        )
+
+    def _report_diff_field(self, attr_name, old, new, yesno=False):
         old_val = getattr(old, attr_name, old)
         new_val = getattr(new, attr_name, new)
 
@@ -263,65 +356,53 @@ class Command(BaseCommand):
                     old=old_val,
                     new=new_val,
                 ).decode('utf-8'))
+            return True
+        return False
 
-    def merge_citation_document_cluster(self, old_document, old_citation,
-                                        old_docket, existing_oc, existing_o):
-        """Merge the items."""
+    def find_conflicts(self, old_document, old_citation, old_docket,
+                       existing_oc, existing_o):
+        """Go through all items and look for conflicting fields.
+
+        Return True if conflict found. Else, False."""
         self.stdout.write("Comparing pk: %s with citation %s to new cluster "
                           "and opinion." % (old_document.pk, old_citation.pk))
+        checks = []
         if existing_oc.date_modified >= self.start and \
-                        old_document.date_modified >= self.start:
-            self._print_attr('date_filed', old_document, existing_oc)
-            self._print_attr('case_name_short', old_docket, existing_oc)
-            self._print_attr('case_name', old_docket, existing_oc)
-            self._print_attr('case_name_full', old_docket, existing_oc)
-            self._print_attr('federal_cite_one', old_citation, existing_oc)
-            self._print_attr('federal_cite_two', old_citation, existing_oc)
-            self._print_attr('federal_cite_three', old_citation, existing_oc)
-            self._print_attr('state_cite_one', old_citation, existing_oc)
-            self._print_attr('state_cite_two', old_citation, existing_oc)
-            self._print_attr('state_cite_three', old_citation, existing_oc)
-            self._print_attr('state_cite_regional', old_citation, existing_oc)
-            self._print_attr('specialty_cite_one', old_citation, existing_oc)
-            self._print_attr('scotus_early_cite', old_citation, existing_oc)
-            self._print_attr('lexis_cite', old_citation, existing_oc)
-            self._print_attr('westlaw_cite', old_citation, existing_oc)
-            self._print_attr('neutral_cite', old_citation, existing_oc)
-            self._print_attr('scdb_id', old_document.supreme_court_db_id, existing_oc)
-            self._print_attr('nature_of_suit', old_document, existing_oc)
-            self._print_attr('blocked', old_document, existing_oc)
+                old_document.date_modified >= self.start:
+            checks.extend([
+                self._report_diff_field('date_filed', old_document, existing_oc),
+                self._report_diff_field('case_name_short', old_docket, existing_oc),
+                self._report_diff_field('case_name', old_docket, existing_oc),
+                self._report_diff_field('case_name_full', old_docket, existing_oc),
+                self._report_diff_field('federal_cite_one', old_citation, existing_oc),
+                self._report_diff_field('federal_cite_two', old_citation, existing_oc),
+                self._report_diff_field('federal_cite_three', old_citation, existing_oc),
+                self._report_diff_field('state_cite_one', old_citation, existing_oc),
+                self._report_diff_field('state_cite_two', old_citation, existing_oc),
+                self._report_diff_field('state_cite_three', old_citation, existing_oc),
+                self._report_diff_field('state_cite_regional', old_citation, existing_oc),
+                self._report_diff_field('specialty_cite_one', old_citation, existing_oc),
+                self._report_diff_field('scotus_early_cite', old_citation, existing_oc),
+                self._report_diff_field('lexis_cite', old_citation, existing_oc),
+                self._report_diff_field('westlaw_cite', old_citation, existing_oc),
+                self._report_diff_field('neutral_cite', old_citation, existing_oc),
+                self._report_diff_field('scdb_id', old_document.supreme_court_db_id, existing_oc),
+                self._report_diff_field('nature_of_suit', old_document, existing_oc),
+                self._report_diff_field('blocked', old_document, existing_oc),
+            ])
 
         if existing_o.date_modified >= self.start and \
                 old_document.date_modified >= self.start:
-            self._print_attr('sha1', old_document, existing_o)
-            self._print_attr('download_url', old_document, existing_o)
-            self._print_attr('plain_text', old_document, existing_o, yesno=True)
-            self._print_attr('html', old_document, existing_o, yesno=True)
-            self._print_attr('html_lawbox', old_document, existing_o, yesno=True)
-            self._print_attr('extracted_by_ocr', old_document, existing_o)
+            checks.extend([
+                self._report_diff_field('sha1', old_document, existing_o),
+                self._report_diff_field('download_url', old_document, existing_o),
+                self._report_diff_field('plain_text', old_document, existing_o, yesno=True),
+                self._report_diff_field('html', old_document, existing_o, yesno=True),
+                self._report_diff_field('html_lawbox', old_document, existing_o, yesno=True),
+                self._report_diff_field('extracted_by_ocr', old_document, existing_o),
+            ])
 
-
-    def merge_dockets(self, old, old_citation, existing):
-        """Merge the elements of the old Docket into the existing one."""
-        self.stdout.write("Comparing dockets with id: %s\n" % existing.pk)
-        if old.case_name_short and old.case_name_short != existing.case_name_short:
-            self.stdout.write("  case_name_short:\n    %s\n    %s\n".decode('utf-8') % (
-                old.case_name_short, existing.case_name_short,
-            ))
-        if old.case_name and old.case_name != existing.case_name:
-            self.stdout.write("  case_name:\n    %s\n    %s\n".decode('utf-8') % (
-                old.case_name, existing.case_name,
-            ))
-        if old.case_name_full and old.case_name_full != existing.case_name_full:
-            self.stdout.write("  case_name_full:\n    %s\n    %s\n".decode('utf-8') % (
-                old.case_name_full, existing.case_name_full,
-            ))
-        if old_citation.docket_number and old_citation.docket_number != existing.docket_number:
-            self.stdout.write("  docket_number:\n    %s\n    %s\n".decode('utf-8') % (
-                old_citation.docket_number, existing.docket_number
-            ))
-        if old.blocked and not existing.blocked:
-            self.stdout.write("  Old is blocked but new is not.")
+        return any(checks)
 
     def migrate_intra_object_citations(self):
         """This method migrates the citations from one database to the other so
@@ -452,7 +533,7 @@ class Command(BaseCommand):
             OpinionsCitedNew.objects.using('default').bulk_create(new_citations)
         self.stdout.write(u'')  # Newline
 
-    def migrate_users(self, start_date):
+    def migrate_users(self):
         self.stdout.write("Migrating users, profiles, alerts, favorites, and "
                           "donations to the new database...")
         old_users = User.objects.using('old').all()
