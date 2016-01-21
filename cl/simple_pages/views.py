@@ -52,6 +52,7 @@ def faq(request):
         initial={'subject': 'FAQs'},
     )
 
+
 def markdown_help(request):
     return render_to_response(
         'markdown_help.html',
@@ -138,6 +139,7 @@ def contribute(request):
     return render_to_response(
         'contribute.html',
         {'private': False},
+        RequestContext(request),
     )
 
 

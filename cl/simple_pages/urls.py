@@ -20,7 +20,7 @@ urlpatterns = [
     url(r'^feeds/$', feeds, name='feeds_info'),
     url(r'^contribute/$', contribute, name='contribute'),
     url(r'^contact/$', contact, name="contact"),
-    url(r'^contact/thanks/$', contact_thanks),
+    url(r'^contact/thanks/$', contact_thanks, name='contact_thanks'),
     url(r'^help/markdown/$', markdown_help, name="markdown_help"),
 
     # Serve a static file
@@ -38,11 +38,23 @@ urlpatterns = [
     url(r'^terms/$', latest_terms, name='terms'),
 
     # Randoms
-    url(r'^tools/$', tools_page),
-    url(r'^bad-browser/$', browser_warning),
+    url(
+        r'^tools/$',
+        tools_page,
+        name='tools',
+    ),
+    url(
+        r'^bad-browser/$',
+        browser_warning,
+        name='bad_browser',
+    ),
 
     # Robots
-    url(r'^robots.txt$', robots),
+    url(
+        r'^robots.txt$',
+        robots,
+        name='robots'
+    ),
 
     # Sitemap:
     url(r'^sitemap-simple-pages\.xml$', sitemap_maker),

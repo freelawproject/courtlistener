@@ -1,12 +1,15 @@
+import datetime
+import os
+
 from django.conf import settings
+from django.core.urlresolvers import reverse
 from django.http import HttpRequest
 from django.test import TestCase
 from django.test.utils import override_settings
-from cl.simple_pages.views import serve_static_file
-from cl.search.models import Opinion, OpinionCluster, Docket, Court
+
 from cl.audio.models import Audio
-import datetime
-import os
+from cl.search.models import Opinion, OpinionCluster, Docket, Court
+from cl.simple_pages.views import serve_static_file
 
 
 class ContactTest(TestCase):
@@ -15,34 +18,68 @@ class ContactTest(TestCase):
     def test_multiple_requests_request(self):
         """ Is state persisted in the contact form?
 
-        The contact form is abstracted in a way that it can have peculiar behavior when called multiple times. This test
-        makes sure that that behavior does not regress.
+        The contact form is abstracted in a way that it can have peculiar
+        behavior when called multiple times. This test makes sure that that
+        behavior does not regress.
         """
         self.client.login(username='pandora', password='password')
         self.client.get('/contact/')
         self.client.logout()
 
-        # Now, as an anonymous user, we get the page again. If the bug is resolved, we should not see anything about
-        # the previously logged-in user, pandora.
+        # Now, as an anonymous user, we get the page again. If the bug is
+        # resolved, we should not see anything about the previously logged-in
+        # user, pandora.
         r = self.client.get('/contact/')
         self.assertNotIn('pandora', r.content)
 
-    def test_robots_page(self):
-        r = self.client.get('/robots.txt')
-        self.assertTrue(r.status_code, 200)
+
+class SimplePagesTest(TestCase):
+    def test_simple_pages(self):
+        """Do all the simple pages load properly?"""
+        reverse_params = [
+            {'viewname': 'about'},
+            {'viewname': 'faq'},
+            {'viewname': 'coverage'},
+            {'viewname': 'feeds_info'},
+            {'viewname': 'contribute'},
+            {'viewname': 'contact'},
+            {'viewname': 'contact_thanks'},
+            {'viewname': 'markdown_help'},
+            {'viewname': 'advanced_search'},
+            {'viewname': 'old_terms', 'args': ['1']},
+            {'viewname': 'old_terms', 'args': ['2']},
+            {'viewname': 'terms'},
+            {'viewname': 'tools'},
+            {'viewname': 'bad_browser'},
+            {'viewname': 'robots'},
+        ]
+        for reverse_param in reverse_params:
+            path = reverse(**reverse_param)
+            print "Testing basic load of: {path}".format(path=path)
+            r = self.client.get(path)
+            self.assertEqual(
+                r.status_code,
+                200,
+                msg="Got wrong status code for page at: {path}\n  args: {args}\n  "
+                    "kwargs: {kwargs}\n  Status Code: {code}".format(
+                        path=path,
+                        args=reverse_param.get('args', []),
+                        kwargs=reverse_param.get('kwargs', {}),
+                        code=r.status_code,
+                    )
+            )
 
 
 @override_settings(
-    MEDIA_ROOT = os.path.join(settings.INSTALL_ROOT, 'cl/assets/media/test/')
+    MEDIA_ROOT=os.path.join(settings.INSTALL_ROOT, 'cl/assets/media/test/')
 )
 class StaticFilesTest(TestCase):
-
     fixtures = ['court_data.json']
 
     good_mp3_path = 'mp3/2014/06/09/ander_v._leo.mp3'
     good_txt_path = 'txt/2015/12/28/opinion_text.txt'
     good_pdf_path = 'pdf/2013/06/12/' + \
-     'in_re_motion_for_consent_to_disclosure_of_court_records.pdf'
+                    'in_re_motion_for_consent_to_disclosure_of_court_records.pdf'
 
     def setUp(self):
         self.court = Court.objects.get(pk='test')
