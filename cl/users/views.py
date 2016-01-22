@@ -214,7 +214,7 @@ def delete_account(request):
         except Exception, e:
             logger.critical("User was unable to delete account. %s" % e)
 
-        return HttpResponseRedirect('/profile/delete/done/')
+        return HttpResponseRedirect(reverse('delete_profile_done'))
 
     non_deleted_map_count = request.user.scotus_maps.filter(deleted=False).count()
     return render_to_response('profile/delete.html',
@@ -323,8 +323,8 @@ def register(request):
                     email['to'],
                 )
                 tally_stat('user.created')
-                return HttpResponseRedirect(
-                    '/register/success/?next=%s' % redirect_to)
+                return HttpResponseRedirect(reverse('register_success') +
+                                            '?next=%s' % redirect_to)
         else:
             form = UserCreationFormExtended()
         return render_to_response("register/register.html",
@@ -333,7 +333,7 @@ def register(request):
     else:
         # The user is already logged in. Direct them to their settings page as
         # a logical fallback
-        return HttpResponseRedirect('/profile/settings/')
+        return HttpResponseRedirect(reverse('view_settings'))
 
 
 @never_cache
@@ -403,7 +403,7 @@ def request_email_confirmation(request):
                 # Normally, we'd throw an error here, but we don't want to
                 # reveal what accounts we have on file, so instead, we just
                 # pretend like it worked.
-                return HttpResponseRedirect('/email-confirmation/success/')
+                return HttpResponseRedirect(reverse('email_confirm_success'))
 
             # make a new activation key for all associated accounts.
             salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
@@ -424,7 +424,7 @@ def request_email_confirmation(request):
                 email['from'],
                 [user.email],
             )
-            return HttpResponseRedirect('/email-confirmation/success/')
+            return HttpResponseRedirect(reverse('email_confirm_success'))
     else:
         form = EmailConfirmationForm()
     return render_to_response(
@@ -454,7 +454,7 @@ def password_change(request):
             msg = message_dict['pwd_changed_successfully']
             messages.add_message(request, msg['level'], msg['message'])
             update_session_auth_hash(request, form.user)
-            return HttpResponseRedirect('/profile/password/change/')
+            return HttpResponseRedirect(reverse('password_change'))
     else:
         form = CustomPasswordChangeForm(user=request.user)
     return render_to_response(
