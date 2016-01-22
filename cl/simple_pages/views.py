@@ -220,8 +220,10 @@ def advanced_search(request):
 def old_terms(request, v):
     return render_to_response(
         'terms/%s.html' % v,
-        {'title': 'Archived Terms and Policies, v%s - CourtListener.com' % v,
-         'private': True},
+        {
+            'title': 'Archived Terms of Service and Policies, v%s - CourtListener.com' % v,
+            'private': True
+        },
         RequestContext(request),
     )
 
@@ -229,7 +231,10 @@ def old_terms(request, v):
 def latest_terms(request):
     return render_to_response(
         'terms/latest.html',
-        {'private': False},
+        {
+            'title': 'Terms of Service and Policies - CourtListener.com',
+            'private': False
+        },
         RequestContext(request),
     )
 

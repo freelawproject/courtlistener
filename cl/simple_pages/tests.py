@@ -1,3 +1,4 @@
+# coding=utf-8
 import datetime
 import os
 
@@ -6,6 +7,7 @@ from django.core.urlresolvers import reverse
 from django.http import HttpRequest
 from django.test import TestCase
 from django.test.utils import override_settings
+from lxml.html import fromstring
 
 from cl.audio.models import Audio
 from cl.search.models import Opinion, OpinionCluster, Docket, Court
@@ -34,6 +36,25 @@ class ContactTest(TestCase):
 
 
 class SimplePagesTest(TestCase):
+
+    def check_for_title(self, content):
+        """Make sure a page has a valid HTML title"""
+        print "Checking for HTML title tag....",
+        html_tree = fromstring(content)
+        title = html_tree.xpath('//title/text()')
+        self.assertGreater(
+            len(title),
+            0,
+            msg="This page didn't have any text in it's <title> tag."
+        )
+        self.assertGreater(
+            len(title[0].strip()),
+            0,
+            msg="The text in this title tag is empty.",
+        )
+
+        print "✓"
+
     def test_simple_pages(self):
         """Do all the simple pages load properly?"""
         reverse_params = [
@@ -55,19 +76,23 @@ class SimplePagesTest(TestCase):
         ]
         for reverse_param in reverse_params:
             path = reverse(**reverse_param)
-            print "Testing basic load of: {path}".format(path=path)
+            print "Testing basic load of: {path}...".format(path=path),
             r = self.client.get(path)
             self.assertEqual(
                 r.status_code,
                 200,
-                msg="Got wrong status code for page at: {path}\n  args: {args}\n  "
-                    "kwargs: {kwargs}\n  Status Code: {code}".format(
+                msg="Got wrong status code for page at: {path}\n  args: "
+                    "{args}\n  kwargs: {kwargs}\n  Status Code: {code}".format(
                         path=path,
                         args=reverse_param.get('args', []),
                         kwargs=reverse_param.get('kwargs', {}),
                         code=r.status_code,
                     )
             )
+            print '✓'
+            is_html = ('text/html' in r['content-type'])
+            if r['content-type'] and is_html:
+                self.check_for_title(r.content)
 
 
 @override_settings(
