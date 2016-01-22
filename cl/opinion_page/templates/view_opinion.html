@@ -112,25 +112,27 @@
         {% endif %}
 
         {# Visualizations #}
-        {% if cluster.top_visualizations %}
-            <div id="visualizations" class="sidebar-section">
-                <h3><span>Visualizations</span></h3>
-                <ul>
-                    {% for viz in cluster.top_visualizations|slice:":5" %}
-                        <li>
-                            <a href="{{ viz.get_absolute_url }}">
-                                {{ viz.title|truncatewords:10 }}
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
-                <h4>
-                    <a href="{% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}">
-                        Full List of Visualizations
-                        <i class="fa fa-arrow-circle-o-right gray"></i>
-                    </a>
-                </h4>
-            </div>
+        {% if perms.visualizations.has_beta_access %}
+            {% if cluster.top_visualizations %}
+                <div id="visualizations" class="sidebar-section">
+                    <h3><span>Visualizations</span></h3>
+                    <ul>
+                        {% for viz in cluster.top_visualizations|slice:":5" %}
+                            <li>
+                                <a href="{{ viz.get_absolute_url }}">
+                                    {{ viz.title|truncatewords:10 }}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <h4>
+                        <a href="{% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}">
+                            Full List of Visualizations
+                            <i class="fa fa-arrow-circle-o-right gray"></i>
+                        </a>
+                    </h4>
+                </div>
+            {% endif %}
         {% endif %}
 
         {# Download original? #}
