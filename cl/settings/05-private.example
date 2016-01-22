@@ -2,6 +2,7 @@
 # Debug settings #
 ##################
 DEBUG = True
+ALLOWED_HOSTS = ['127.0.0.1']
 # DEBUG can be set to True on any machine, but this is used to tune down
 # resource consumption (SOLR, queryset iterator size, etc) on dev machines.
 DEVELOPMENT = True
