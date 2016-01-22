@@ -19,15 +19,28 @@
     <div class="col-xs-3"></div>
     <div class="col-xs-6">
         <h2>Request Email Confirmation Link</h2>
+
+        {% if form.errors %}
+            <div class="alert alert-danger">
+                <p>The email field is required.</p>
+            </div>
+        {% endif %}
+
+        <p>Enter your email address and we will send you a confirmation email for your account.</p>
+
         <form action="" method="post">{% csrf_token %}
             {% render_honeypot_field "skip_me_if_alive" %}
-            <div class="form-group">
-                <label for="id_email">Your email address</label><br>
-                <input id="id_email" type="text" name="email" maxlength="75" class="form-control auto-focus"/>
+            <div class="input-group">
+                <label for="id_email" class="sr-only">Email address</label>
+                {{ form.email }}
+                <span class="input-group-btn">
+                    <button type="submit"
+                            class="btn btn-primary btn-lg">Submit</button>
+                </span>
             </div>
-            <button type="submit" class="btn btn-primary">Submit</button>
         </form>
-        <br><p>If you are unable to confirm your email address, please <a href="{% url "contact" %}">contact us for assistance</a>.</p>
+
+        <p class="v-offset-above-2">If you are unable to confirm your email address, please <a href="{% url "contact" %}">contact us for assistance</a>.</p>
     </div>
     <div class="col-xs-3"></div>
 {% endblock %}
