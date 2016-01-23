@@ -6,7 +6,11 @@ from cl.search.feeds import (
 
 urlpatterns = [
     # Search pages
-    url(r'^$', 'cl.search.views.show_results'),
+    url(
+        r'^$',
+        'cl.search.views.show_results',
+        name='show_results',
+    ),
 
     # Feeds & Podcasts
     url(

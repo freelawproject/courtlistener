@@ -1,16 +1,18 @@
 import logging
-import redis
 from datetime import date, datetime, timedelta
+from urllib import quote
+
+import redis
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.models import User
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.urlresolvers import reverse
 from django.db.models import Sum, Count
-from django.utils.timezone import utc, make_aware
-from django.contrib import messages
-from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.shortcuts import render_to_response, get_object_or_404
 from django.shortcuts import HttpResponseRedirect
+from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
+from django.utils.timezone import utc, make_aware
 from django.views.decorators.cache import never_cache
 
 from cl.alerts.forms import CreateAlertForm
@@ -260,16 +262,24 @@ def show_results(request):
             # User placed a search or is trying to edit an alert
             if request.GET.get('edit_alert'):
                 # They're editing an alert
-                alert = get_object_or_404(
-                    Alert,
-                    pk=request.GET.get('edit_alert'),
-                    user=request.user
-                )
-                alert_form = CreateAlertForm(
-                    instance=alert,
-                    initial={'query': get_string_sans_alert},
-                    user=request.user,
-                )
+                if request.user.is_anonymous():
+                    return HttpResponseRedirect(
+                        "{path}?next={next}{encoded_params}".format(
+                            path=reverse('sign-in'),
+                            next=request.path,
+                            encoded_params=quote("?" + request.GET.urlencode())
+                        ))
+                else:
+                    alert = get_object_or_404(
+                        Alert,
+                        pk=request.GET.get('edit_alert'),
+                        user=request.user
+                    )
+                    alert_form = CreateAlertForm(
+                        instance=alert,
+                        initial={'query': get_string_sans_alert},
+                        user=request.user,
+                    )
             else:
                 # Just a regular search
                 if not is_bot(request):
