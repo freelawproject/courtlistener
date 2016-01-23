@@ -1,4 +1,4 @@
-from cl.visualizations.models import SCOTUSMap, JSONVersion
+from cl.visualizations.models import SCOTUSMap
 from django import forms
 
 
