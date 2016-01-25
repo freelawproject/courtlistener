@@ -66,6 +66,20 @@ class OpinionSerializer(DynamicFieldsModelSerializer,
 
 class OpinionsCitedSerializer(DynamicFieldsModelSerializer,
                               serializers.HyperlinkedModelSerializer):
+    # These attributes seem unnecessary and this endpoint serializes the same
+    # data without them, but when they're not here the API does a query that
+    # pulls back ALL Opinions.
+    citing_opinion = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name='opinion-detail',
+        read_only=True,
+    )
+    cited_opinion = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name='opinion-detail',
+        read_only=True,
+    )
+
     class Meta:
         model = OpinionsCited
 
