@@ -45,4 +45,4 @@ class Favorite(models.Model):
     )
 
     def __unicode__(self):
-        return 'Favorite %s' % self.id
+        return u'Favorite %s' % self.id

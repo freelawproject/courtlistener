@@ -148,7 +148,7 @@ class Docket(models.Model):
         if self.case_name:
             return smart_unicode('%s: %s' % (self.pk, self.case_name))
         else:
-            return str(self.pk)
+            return u'{pk}'.format(pk=self.pk)
 
     def save(self, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
@@ -236,7 +236,7 @@ class Court(models.Model):
     )
 
     def __unicode__(self):
-        return self.full_name
+        return u'{name}'.format(name=self.full_name)
 
     class Meta:
         ordering = ["position"]
@@ -703,7 +703,7 @@ class Opinion(models.Model):
 
     def __unicode__(self):
         try:
-            return "{pk} - {cn}".format(
+            return u"{pk} - {cn}".format(
                 pk=getattr(self, 'pk', None),
                 cn=self.cluster.case_name,
             )

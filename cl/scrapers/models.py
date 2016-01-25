@@ -20,7 +20,7 @@ class UrlHash(models.Model):
     )
 
     def __unicode__(self):
-        return self.id
+        return u"{pk}".format(self.pk)
 
     class Meta:
         verbose_name_plural = "URL Hashes"
@@ -50,7 +50,7 @@ class ErrorLog(models.Model):
     )
 
     def __unicode__(self):
-        return "%s - %s@%s %s" % (self.log_time,
-                                  self.log_level,
-                                  self.court.pk,
-                                  self.message)
+        return u"%s - %s@%s %s" % (self.log_time,
+                                   self.log_level,
+                                   self.court.pk,
+                                   self.message)

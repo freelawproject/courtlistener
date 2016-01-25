@@ -327,7 +327,7 @@ class Position(models.Model):
     )
 
     def __unicode__(self):
-        return '%s: %s at %s' % (self.pk, self.judge.name_full, self.court_id)
+        return u'%s: %s at %s' % (self.pk, self.judge.name_full, self.court_id)
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -724,7 +724,7 @@ class Race(models.Model):
 
     def __unicode__(self):
         # This is used in the API via the StringRelatedField. Do not cthange.
-        return self.race
+        return u"{race}".format(race=self.race)
 
 
 class PoliticalAffiliation(models.Model):

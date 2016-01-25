@@ -72,7 +72,7 @@ class Donation(models.Model):
     )
 
     def __unicode__(self):
-        return '%s: $%s, %s' % (
+        return u'%s: $%s, %s' % (
             self.get_payment_provider_display(),
             self.amount,
             self.get_status_display()
