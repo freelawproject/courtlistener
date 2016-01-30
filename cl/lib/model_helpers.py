@@ -53,6 +53,7 @@ def validate_partial_date(instance, field):
                                'appears to include month/day other than 1.'
         })
 
+
 def disable_auto_now_fields(*models):
     """Turns off the auto_now and auto_now_add attributes on a Model's fields,
     so that an instance of the Model can be saved with a custom value.

@@ -204,10 +204,11 @@ class Command(BaseCommand):
             except DocketNew.DoesNotExist:
                 existing_docket = None
             if existing_docket is not None:
-                # Simply skip. All differences have been resolved by hand.
+                # Intersection. No need for complicated merge as all differences
+                # have been resolved by hand.
                 new_docket = existing_docket
             else:
-                # New docket, just create it.
+                # New docket in old system. Create it in the new system.
                 new_docket = DocketNew(
                     pk=old_docket.pk,
                     date_modified=old_docket.date_modified,
@@ -241,6 +242,7 @@ class Command(BaseCommand):
                 except OpinionNew.DoesNotExist:
                     existing_o = None
                 if existing_oc is not None or existing_o is not None:
+                    # Run the conflict algo.
                     if self.find_conflicts(old_document, old_citation,
                                            old_docket, existing_oc,
                                            existing_o):
@@ -254,7 +256,8 @@ class Command(BaseCommand):
                     self.add_oc_and_o(old_document, old_citation, old_docket,
                                       new_docket)
 
-            # Finally we do Audio
+            # Finally we do Audio. No checks needed because we haven't changed
+            # anything on the new server.
             if old_audio is not None:
                 new_audio_file = AudioNew(
                     pk=old_audio.pk,
@@ -538,10 +541,15 @@ class Command(BaseCommand):
                           "donations to the new database...")
         old_users = User.objects.using('old').all()
         num_users = old_users.count()
+        user_ids_to_skip = [1, 4802, 3766, 3668, 6018]  # mlissner, JasonAller, starger, etc.
 
         progress = 0
         self._print_progress(progress, num_users)
         for old_user in old_users:
+            if old_user.pk in user_ids_to_skip:
+                # These are people that may have changed things in their
+                # profile on the new server. Just skip 'em.
+                continue
             old_profile = old_user.profile_legacy
             old_alerts = old_profile.alert.all()
             old_favorites = old_profile.favorite.all()
