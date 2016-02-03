@@ -1,5 +1,6 @@
 import re
 from django.core import urlresolvers
+from django.db import IntegrityError
 from cl.citations import find_citations, match_citations
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.search.models import Opinion, OpinionsCited
@@ -107,11 +108,26 @@ def update_document(opinion, index=True):
     # Only update things if we found citations
     if citations:
         opinion.html_with_citations = create_cited_html(opinion, citations)
-        OpinionsCited.objects.bulk_create([
-            OpinionsCited(citing_opinion_id=pk,
-                          cited_opinion_id=opinion.pk) for
-            pk in opinions_cited
-        ])
+        try:
+            OpinionsCited.objects.bulk_create([
+                OpinionsCited(citing_opinion_id=pk,
+                              cited_opinion_id=opinion.pk) for
+                pk in opinions_cited
+            ])
+        except IntegrityError as e:
+            # If bulk_create would create an item that already exists, it fails.
+            # In that case, do them one by one, skipping failing cases.
+            for pk in opinions_cited:
+                try:
+                    cited = OpinionsCited(
+                        citing_opinion_id=pk,
+                        cited_opinion_id=opinion.pk,
+                    )
+                    cited.save()
+                except IntegrityError:
+                    # We'll just skip the ones that already exist, but still do
+                    # the others.
+                    pass
         if DEBUG >= 3:
             print opinion.html_with_citations
 
