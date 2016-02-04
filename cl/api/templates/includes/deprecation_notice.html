@@ -1,0 +1,17 @@
+<h3>DEPRECATION NOTICE</h3>
+<p>As of <strong>January 31st, 2016</strong>, the versions 1 and 2 of these APIs are deprecated and we request that you migrate to <a href="{% url "rest_docs" %}">the latest version</a>. What this means:
+</p>
+<ol>
+    <li>As of <strong>February 29th</strong>, this API will no longer receive new content. The scrapers will be turned off.
+    </li>
+    <li>The last day of this API is <strong>March 31st</strong>, after which point it will begin returning empty JSON objects.
+    </li>
+    <li>After <strong>March 31st</strong>, all vestiges of these versions of the API will slowly be removed, including pages like this one.
+    </li>
+</ol>
+<p>We regret having to shut down these versions of the API, but the donations to support them have been meager, and they require significant ongoing maintenance. Given the choice of continued maintenance with no end in sight, versus an efficient migration to a newer and better version, we chose the latter.
+</p>
+<p>If we could, we would maintain these versions of the API forever, but two forces cannot be stopped. The first is that the library we used for the heart of this API, tastypie, has grown woefully out of date, having been replaced by a newer and flashier library, Django REST Framework. Continuing to use tastypie will mean maintaining it ourselves &ndash; an unenviable position. The second unstoppable force is that we have significantly upgraded our database. To support the old version of the API on top of the new version of the database would be a mess, if it were even possible.
+</p>
+<p>All of the changes to the API should be fairly clear so unfortunately there is no migration documentation. Instead, we're available to help with any questions you might have. If you need help migrating or are running into any difficulties, please <a href="{% url "contact" %}">get in touch</a>. We're always happy to help.
+</p>

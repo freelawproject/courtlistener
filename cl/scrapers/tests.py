@@ -18,7 +18,7 @@ from cl.search.models import Court, Opinion
 
 from celery.task.sets import subtask
 from datetime import timedelta
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils.timezone import now
 
 
@@ -300,6 +300,10 @@ class DupcheckerWithFixturesTest(TestCase):
                     "We should have hit a break but didn't."
                 )
 
+
+@override_settings(
+    MEDIA_ROOT=os.path.join(settings.INSTALL_ROOT, 'cl/assets/media/test/')
+)
 class AudioFileTaskTest(TestCase):
 
     fixtures = ['judge_judy.json', 'test_objects_search.json',

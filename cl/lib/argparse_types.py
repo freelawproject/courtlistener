@@ -1,11 +1,12 @@
 import argparse
 import csv
 import os
-from cl.audio.models import Audio
-from cl.search.models import Opinion
+
 from dateutil import parser
 from django.utils.timezone import is_naive, make_aware, utc
 
+from cl.audio.models import Audio
+from cl.search.models import Opinion
 
 
 def valid_date(s):

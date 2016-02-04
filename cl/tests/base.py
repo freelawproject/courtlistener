@@ -1,27 +1,26 @@
 """
 Base class(es) for functional testing CourtListener using Selenium and PhantomJS
 """
+import os
+import sys
+
 from django.conf import settings
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test.utils import override_settings
 from selenium import webdriver
-from cl.lib.solr_core_admin import (
-    create_solr_core, swap_solr_core, delete_solr_core
-)
-from cl.search.tasks import add_or_update_opinions, add_or_update_audio_files
-from cl.search.models import Opinion
+
 from cl.audio.models import Audio
-import os, sys
+from cl.lib.solr_core_admin import create_solr_core, delete_solr_core
+from cl.search.models import Opinion
+from cl.search.tasks import add_or_update_opinions, add_or_update_audio_files
 
 DESKTOP_WINDOW = (1024, 768)
 MOBILE_WINDOW = (640, 960)
 
-TEST_OPINION_CORE = 'opinion_test'
-TEST_AUDIO_CORE = 'audio_test'
 
 @override_settings(
-    SOLR_OPINION_URL='http://127.0.0.1:8983/solr/%s' % TEST_OPINION_CORE,
-    SOLR_AUDIO_URL='http://127.0.0.1:8983/solr/%s' % TEST_AUDIO_CORE,
+    SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
+    SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
 )
 class BaseSeleniumTest(StaticLiveServerTestCase):
     """Base class for Selenium Tests. Sets up a few attributes:
@@ -52,8 +51,9 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             executable_path='/usr/local/phantomjs/phantomjs',
             service_log_path='/var/log/courtlistener/django.log',
         )
+        #self.browser = webdriver.Firefox()
         self.browser.implicitly_wait(3)
-        self.browser.set_window_size(DESKTOP_WINDOW[0], DESKTOP_WINDOW[1])
+        self.browser.set_window_size(*DESKTOP_WINDOW)
         self._initialize_test_solr()
         self._update_index()
 
@@ -86,7 +86,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         results = self.browser.find_element_by_id('result-count').text.strip()
         try:
             count = long(results.split(' ')[0].replace(',', ''))
-        except IndexError, ValueError:
+        except (IndexError, ValueError):
             self.fail('Cannot extract result count from SERP.')
         return count
 
@@ -95,20 +95,12 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         """ Try to initialize a pair of Solr cores for testing purposes """
 
         # data_dir, if left blank, ends up bing put in /tmp/solr/...
+        create_solr_core(settings.SOLR_OPINION_TEST_CORE_NAME)
         create_solr_core(
-            TEST_OPINION_CORE,
-            data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr',
-                'data_opinion_test'),
-            schema='schema.xml',
-            config='solrconfig.xml',
-            instance_dir='/usr/local/solr/example/solr/opinion_test')
-        create_solr_core(
-            TEST_AUDIO_CORE,
-            data_dir=os.path.join(settings.INSTALL_ROOT, 'Solr',
-                'data_audio_test'),
-            schema='schema.xml',
-            config='solrconfig.xml',
-            instance_dir='/usr/local/solr/example/solr/audio_test',
+            settings.SOLR_AUDIO_TEST_CORE_NAME,
+            schema=os.path.join(settings.INSTALL_ROOT, 'Solr', 'conf',
+                                'audio_schema.xml'),
+            instance_dir='/usr/local/solr/example/solr/audio',
         )
 
     @staticmethod
@@ -124,5 +116,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
     @staticmethod
     def _teardown_test_solr():
         """ Try to clean up and remove the test Solr cores """
-        delete_solr_core(TEST_OPINION_CORE, delete_data_dir=True)
-        delete_solr_core(TEST_AUDIO_CORE, delete_data_dir=True)
+        delete_solr_core(settings.SOLR_OPINION_TEST_CORE_NAME,
+                         delete_data_dir=True)
+        delete_solr_core(settings.SOLR_AUDIO_TEST_CORE_NAME,
+                         delete_data_dir=True)

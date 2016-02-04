@@ -1,8 +1,8 @@
+from django.contrib import admin
+
 from cl.search.models import (
     Docket, OpinionsCited, Court, Opinion, OpinionCluster
 )
-
-from django.contrib import admin
 
 
 class OpinionAdmin(admin.ModelAdmin):
@@ -39,6 +39,7 @@ class OpinionAdmin(admin.ModelAdmin):
 
 
 class OpinionClusterAdmin(admin.ModelAdmin):
+    prepopulated_fields = {"slug": ['case_name']}
     fields = (
         'docket',
         'panel',
@@ -111,6 +112,7 @@ class CourtAdmin(admin.ModelAdmin):
 
 
 class DocketAdmin(admin.ModelAdmin):
+    prepopulated_fields = {"slug": ['case_name']}
     readonly_fields = (
         'date_modified',
     )

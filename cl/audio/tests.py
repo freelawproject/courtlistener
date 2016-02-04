@@ -1,3 +1,5 @@
+from django.core.urlresolvers import reverse
+
 from cl.lib.test_helpers import IndexedSolrTestCase, SitemapTest
 from lxml import etree
 
@@ -5,7 +7,8 @@ from lxml import etree
 class PodcastTest(IndexedSolrTestCase):
     def test_do_jurisdiction_podcasts_have_good_content(self):
         """Can we simply load a jurisdiction podcast page?"""
-        response = self.client.get('/podcast/court/test/')
+        response = self.client.get(reverse('jurisdiction_podcast',
+                                           kwargs={'court': 'test'}))
         self.assertEqual(200, response.status_code,
                          msg="Did not get 200 OK status code for podcasts.")
         xml_tree = etree.fromstring(response.content)
@@ -13,9 +16,9 @@ class PodcastTest(IndexedSolrTestCase):
             ('//channel/title', 1),
             ('//channel/link', 1),
             ('//channel/description', 1),
-            ('//channel/item', 3),
-            ('//channel/item/title', 3),
-            ('//channel/item/enclosure/@url', 3),
+            ('//channel/item', 2),
+            ('//channel/item/title', 2),
+            ('//channel/item/enclosure/@url', 2),
         )
         for test, count in node_tests:
             node_count = len(xml_tree.xpath(test))
@@ -29,22 +32,26 @@ class PodcastTest(IndexedSolrTestCase):
     def test_do_search_podcasts_have_content(self):
         """Can we make a search podcast?
 
-        Search podcasts are a subclass of theh Jurisdiction podcasts, so a
+        Search podcasts are a subclass of the Jurisdiction podcasts, so a
         simple test is all that's needed here.
         """
-        response = self.client.get('/podcast/search/?q=court:test&type=oa')
+        response = self.client.get(
+            reverse('search_podcast', args=['search']),
+            {'q': 'court:test', 'type': 'oa'},
+        )
         self.assertEqual(200, response.status_code,
                          msg="Did not get a 200 OK status code.")
         xml_tree = etree.fromstring(response.content)
         node_count = len(xml_tree.xpath('//channel/item'))
-        expected_item_count = 3
+
+        expected_item_count = 2
         self.assertEqual(
             node_count,
             expected_item_count,
-            msg="Did not get %s node(s) during search podcast generation. "
-                "Instead found: %s" % (
-                    expected_item_count,
-                    node_count,
+            msg="Did not get {expected} node(s) during search podcast "
+                "generation. Instead found: {actual}".format(
+                    expected=expected_item_count,
+                    actual=node_count,
                 )
         )
 

@@ -1,16 +1,26 @@
 """A script to migrate the old data from one database to another, transforming
 it as necessary along the way.
 """
-from cl.corpus_importer.models_legacy import (
-    Docket as DocketOld,
-    Document as DocumentOld,
-)
-from cl.lib.db_tools import queryset_generator
+import logging
+from collections import Counter
+from datetime import datetime
+
+from django.contrib.auth.models import User
+from django.core.management.base import BaseCommand
+from django.db import IntegrityError
+from django.db.models import Q
+from django.utils.timezone import make_aware, utc, now
+from juriscraper.lib.string_utils import CaseNameTweaker
+
 from cl.alerts.models import (
     Alert as AlertNew,
 )
 from cl.audio.models import (
     Audio as AudioNew,
+)
+from cl.corpus_importer.models_legacy import (
+    Docket as DocketOld,
+    Document as DocumentOld,
 )
 from cl.donate.models import (
     Donation as DonationNew,
@@ -18,6 +28,7 @@ from cl.donate.models import (
 from cl.favorites.models import (
     Favorite as FavoriteNew,
 )
+from cl.lib.argparse_types import valid_date_time
 from cl.lib.model_helpers import disable_auto_now_fields
 from cl.search.models import (
     Docket as DocketNew,
@@ -31,13 +42,7 @@ from cl.users.models import (
     UserProfile as UserProfileNew
 )
 
-from collections import Counter
-from datetime import datetime
-from django.contrib.auth.models import User
-from django.core.management.base import BaseCommand
-from django.db import IntegrityError
-from django.utils.timezone import make_aware, utc, now
-from juriscraper.lib.string_utils import CaseNameTweaker
+logger = logging.getLogger(__name__)
 
 # Disable auto_now and auto_now_add fields so that they can be copied over from
 # the old database.
@@ -77,14 +82,24 @@ class Command(BaseCommand):
             default=False,
             help="Do migrations for stats"
         )
+        parser.add_argument(
+            '--start',
+            type=valid_date_time,
+            default=None,
+            help="If provided, items modified on or after this date will be "
+                 "migrated as best possible (some types will not be migrated "
+                 "or will be migrated ignoring this parameter). (ISO-8601 "
+                 "format)"
+        )
 
     def handle(self, *args, **options):
+        self.start = options['start']
         if options['search']:
             self.migrate_opinions_oral_args_and_dockets()
         if options['citations']:
             self.migrate_intra_object_citations()
         if options['user_stuff']:
-            self.migrate_users_profiles_alerts_favorites_and_donations()
+            self.migrate_users(options['start'])
         if options['stats']:
             self.migrate_stats()
 
@@ -140,16 +155,20 @@ class Command(BaseCommand):
         self.stdout.flush()
 
     def migrate_opinions_oral_args_and_dockets(self):
-        self.stdout.write("Migrating dockets, audio files, and opinions to new "
-                          "database...")
-        q = DocketOld.objects.using('old').all()
-        old_dockets = queryset_generator(q)
-        num_dockets = q.count()
+        """Migrate the core objects across, diffing as you go.
 
-        progress = 0
-        self._print_progress(progress, num_dockets)
+        :param start_date: Items changed after this date will be processed.
+        :return: None
+        """
+        self.stdout.write("Migrating dockets, audio files, and opinions...")
+        # Find dockets modified after date or with sub-items modified after
+        # date.
+        q = Q(date_modified__gte=self.start)
+        q |= Q(documents__date_modified__gte=self.start)
+        q |= Q(audio_files__date_modified__gte=self.start)
+        old_dockets = DocketOld.objects.using('old').filter(q)
+
         for old_docket in old_dockets:
-            # First do the docket, then create the cluster and opinion objects.
             try:
                 old_audio = old_docket.audio_files.all()[0]
             except IndexError:
@@ -158,127 +177,151 @@ class Command(BaseCommand):
                 old_document = old_docket.documents.all()[0]
             except IndexError:
                 old_document = None
+            if old_document is None and old_audio is None:
+                continue
+
             if old_document is not None:
                 old_citation = old_document.citation
-                old_doc_case_name, old_doc_case_name_full, old_doc_case_name_short = self._get_case_names(old_citation.case_name)
+                old_docket.case_name, old_docket.case_name_full, old_docket.case_name_short = self._get_case_names(
+                    old_citation.case_name)
+            else:
+                # Fall back on the docket if needed. Assumes they docket and
+                # document case_names are always the same.
+                old_docket.case_name, old_docket.case_name_full, old_docket.case_name_short = self._get_case_names(
+                        old_docket.case_name)
             if old_audio is not None:
-                old_audio_case_name, old_audio_case_name_full, old_audio_case_name_short = self._get_case_names(old_audio.case_name)
+                old_audio.case_name, old_audio.case_name_full, old_audio.case_name_short = self._get_case_names(
+                    old_audio.case_name)
 
-            court = CourtNew.objects.get(pk=old_docket.court_id)  # Courts are in place thanks to initial data.
 
-            new_docket = DocketNew(
-                pk=old_docket.pk,
-                date_modified=old_docket.date_modified,
-                date_created=old_docket.date_modified,
-                court=court,
-                case_name=old_doc_case_name,
-                case_name_full=old_doc_case_name_full,
-                case_name_short=old_doc_case_name_short,
-                slug=self._none_to_blank(old_docket.slug),
-                docket_number=self._none_to_blank(old_citation.docket_number),
-                date_blocked=old_docket.date_blocked,
-                blocked=old_docket.blocked,
-            )
-            if old_audio is not None:
-                new_docket.date_argued = old_audio.date_argued
-            new_docket.save(using='default')
+            # Courts are in place thanks to initial data. Get the court.
+            court = CourtNew.objects.get(pk=old_docket.court_id)
 
+            # Do Dockets
+            try:
+                existing_docket = (DocketNew.objects
+                                   .using('default')
+                                   .get(pk=old_docket.pk))
+            except DocketNew.DoesNotExist:
+                existing_docket = None
+            if existing_docket is not None:
+                # Simply skip. All differences have been resolved by hand.
+                new_docket = existing_docket
+            else:
+                # New docket, just create it.
+                new_docket = DocketNew(
+                    pk=old_docket.pk,
+                    date_modified=old_docket.date_modified,
+                    date_created=old_docket.date_modified,
+                    court=court,
+                    case_name=old_docket.case_name,
+                    case_name_full=old_docket.case_name_full,
+                    case_name_short=old_docket.case_name_short,
+                    slug=self._none_to_blank(old_docket.slug),
+                    docket_number=self._none_to_blank(
+                        old_citation.docket_number),
+                    date_blocked=old_docket.date_blocked,
+                    blocked=old_docket.blocked,
+                )
+                if old_audio is not None:
+                    new_docket.date_argued = old_audio.date_argued
+                #new_docket.save(using='default')
+
+            # Do Documents/Clusters
             if old_document is not None:
-                new_opinion_cluster = OpinionClusterNew(
-                    pk=old_document.pk,
-                    docket=new_docket,
-                    judges=self._none_to_blank(old_document.judges),
-                    date_modified=old_document.date_modified,
-                    date_created=old_document.date_modified,
-                    date_filed=old_document.date_filed,
-                    slug=self._none_to_blank(old_citation.slug),
-                    citation_id=old_document.citation_id,
-                    case_name_short=old_doc_case_name_short,
-                    case_name=old_doc_case_name,
-                    case_name_full=old_doc_case_name_full,
-                    federal_cite_one=self._none_to_blank(
-                        old_citation.federal_cite_one),
-                    federal_cite_two=self._none_to_blank(
-                        old_citation.federal_cite_two),
-                    federal_cite_three=self._none_to_blank(
-                        old_citation.federal_cite_three),
-                    state_cite_one=self._none_to_blank(
-                        old_citation.state_cite_one),
-                    state_cite_two=self._none_to_blank(
-                        old_citation.state_cite_two),
-                    state_cite_three=self._none_to_blank(
-                        old_citation.state_cite_three),
-                    state_cite_regional=self._none_to_blank(
-                        old_citation.state_cite_regional),
-                    specialty_cite_one=self._none_to_blank(
-                        old_citation.specialty_cite_one),
-                    scotus_early_cite=self._none_to_blank(
-                        old_citation.scotus_early_cite),
-                    lexis_cite=self._none_to_blank(old_citation.lexis_cite),
-                    westlaw_cite=self._none_to_blank(old_citation.westlaw_cite),
-                    neutral_cite=self._none_to_blank(old_citation.neutral_cite),
-                    scdb_id=self._none_to_blank(
-                        old_document.supreme_court_db_id),
-                    source=old_document.source,
-                    nature_of_suit=old_document.nature_of_suit,
-                    citation_count=old_document.citation_count,
-                    precedential_status=old_document.precedential_status,
-                    date_blocked=old_document.date_blocked,
-                    blocked=old_document.blocked,
-                )
-                new_opinion_cluster.save(
-                    using='default',
-                    index=False,
-                )
+                try:
+                    existing_oc = (OpinionClusterNew.objects
+                                   .using('default')
+                                   .get(pk=old_document.pk))
+                except OpinionClusterNew.DoesNotExist:
+                    existing_oc = None
+                try:
+                    existing_o = (OpinionNew.objects
+                                  .using('default')
+                                  .get(pk=old_document.pk))
+                except OpinionNew.DoesNotExist:
+                    existing_o = None
+                if existing_oc is not None or existing_o is not None:
+                    self.merge_citation_document_cluster(
+                            old_document, old_citation, old_docket, existing_oc, existing_o)
+                else:
+                    # New item. Just add it.
+                    pass
 
-                new_opinion = OpinionNew(
-                    pk=old_document.pk,
-                    cluster=new_opinion_cluster,
-                    date_modified=old_document.date_modified,
-                    date_created=old_document.time_retrieved,
-                    type='010combined',
-                    sha1=old_document.sha1,
-                    download_url=old_document.download_url,
-                    local_path=old_document.local_path,
-                    plain_text=old_document.plain_text,
-                    html=self._none_to_blank(old_document.html),
-                    html_lawbox=self._none_to_blank(old_document.html_lawbox),
-                    html_with_citations=old_document.html_with_citations,
-                    extracted_by_ocr=old_document.extracted_by_ocr,
-                )
-                new_opinion.save(
-                    using='default',
-                    index=False,
-                )
+    def _print_attr(self, attr_name, old, new, yesno=False):
+        old_val = getattr(old, attr_name, old)
+        new_val = getattr(new, attr_name, new)
 
-            if old_audio is not None:
-                new_audio_file = AudioNew(
-                    pk=old_audio.pk,
-                    docket=new_docket,
-                    source=old_audio.source,
-                    case_name=old_audio_case_name,
-                    case_name_short=old_audio_case_name_short,
-                    case_name_full=old_audio_case_name_full,
-                    judges=self._none_to_blank(old_audio.judges),
-                    date_created=old_audio.time_retrieved,
-                    date_modified=old_audio.date_modified,
-                    sha1=old_audio.sha1,
-                    download_url=old_audio.download_url,
-                    local_path_mp3=old_audio.local_path_mp3,
-                    local_path_original_file=old_audio.local_path_original_file,
-                    duration=old_audio.duration,
-                    processing_complete=old_audio.processing_complete,
-                    date_blocked=old_audio.date_blocked,
-                    blocked=old_audio.blocked,
-                )
-                new_audio_file.save(
-                    using='default',
-                    index=False,
-                )
+        if old_val and old_val != new_val:
+            if yesno:
+                self.stdout.write("  {attr_name} has changed.".format(
+                    attr_name=attr_name
+                ).decode('utf-8'))
+            else:
+                self.stdout.write("  {attr_name}:\n    '{old}'\n    '{new}'\n".format(
+                    attr_name=attr_name,
+                    old=old_val,
+                    new=new_val,
+                ).decode('utf-8'))
 
-            progress += 1
-            self._print_progress(progress, num_dockets)
-        self.stdout.write(u'')  # Newline
+    def merge_citation_document_cluster(self, old_document, old_citation,
+                                        old_docket, existing_oc, existing_o):
+        """Merge the items."""
+        self.stdout.write("Comparing pk: %s with citation %s to new cluster "
+                          "and opinion." % (old_document.pk, old_citation.pk))
+        if existing_oc.date_modified >= self.start and \
+                        old_document.date_modified >= self.start:
+            self._print_attr('date_filed', old_document, existing_oc)
+            self._print_attr('case_name_short', old_docket, existing_oc)
+            self._print_attr('case_name', old_docket, existing_oc)
+            self._print_attr('case_name_full', old_docket, existing_oc)
+            self._print_attr('federal_cite_one', old_citation, existing_oc)
+            self._print_attr('federal_cite_two', old_citation, existing_oc)
+            self._print_attr('federal_cite_three', old_citation, existing_oc)
+            self._print_attr('state_cite_one', old_citation, existing_oc)
+            self._print_attr('state_cite_two', old_citation, existing_oc)
+            self._print_attr('state_cite_three', old_citation, existing_oc)
+            self._print_attr('state_cite_regional', old_citation, existing_oc)
+            self._print_attr('specialty_cite_one', old_citation, existing_oc)
+            self._print_attr('scotus_early_cite', old_citation, existing_oc)
+            self._print_attr('lexis_cite', old_citation, existing_oc)
+            self._print_attr('westlaw_cite', old_citation, existing_oc)
+            self._print_attr('neutral_cite', old_citation, existing_oc)
+            self._print_attr('scdb_id', old_document.supreme_court_db_id, existing_oc)
+            self._print_attr('nature_of_suit', old_document, existing_oc)
+            self._print_attr('blocked', old_document, existing_oc)
+
+        if existing_o.date_modified >= self.start and \
+                old_document.date_modified >= self.start:
+            self._print_attr('sha1', old_document, existing_o)
+            self._print_attr('download_url', old_document, existing_o)
+            self._print_attr('plain_text', old_document, existing_o, yesno=True)
+            self._print_attr('html', old_document, existing_o, yesno=True)
+            self._print_attr('html_lawbox', old_document, existing_o, yesno=True)
+            self._print_attr('extracted_by_ocr', old_document, existing_o)
+
+
+    def merge_dockets(self, old, old_citation, existing):
+        """Merge the elements of the old Docket into the existing one."""
+        self.stdout.write("Comparing dockets with id: %s\n" % existing.pk)
+        if old.case_name_short and old.case_name_short != existing.case_name_short:
+            self.stdout.write("  case_name_short:\n    %s\n    %s\n".decode('utf-8') % (
+                old.case_name_short, existing.case_name_short,
+            ))
+        if old.case_name and old.case_name != existing.case_name:
+            self.stdout.write("  case_name:\n    %s\n    %s\n".decode('utf-8') % (
+                old.case_name, existing.case_name,
+            ))
+        if old.case_name_full and old.case_name_full != existing.case_name_full:
+            self.stdout.write("  case_name_full:\n    %s\n    %s\n".decode('utf-8') % (
+                old.case_name_full, existing.case_name_full,
+            ))
+        if old_citation.docket_number and old_citation.docket_number != existing.docket_number:
+            self.stdout.write("  docket_number:\n    %s\n    %s\n".decode('utf-8') % (
+                old_citation.docket_number, existing.docket_number
+            ))
+        if old.blocked and not existing.blocked:
+            self.stdout.write("  Old is blocked but new is not.")
 
     def migrate_intra_object_citations(self):
         """This method migrates the citations from one database to the other so
@@ -409,7 +452,7 @@ class Command(BaseCommand):
             OpinionsCitedNew.objects.using('default').bulk_create(new_citations)
         self.stdout.write(u'')  # Newline
 
-    def migrate_users_profiles_alerts_favorites_and_donations(self):
+    def migrate_users(self, start_date):
         self.stdout.write("Migrating users, profiles, alerts, favorites, and "
                           "donations to the new database...")
         old_users = User.objects.using('old').all()

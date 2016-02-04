@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
@@ -13,6 +14,7 @@ from cl.lib import search_utils
 from cl.lib.encode_decode import ascii_to_num
 from cl.lib.import_lib import map_citations_to_models
 from cl.lib.string_utils import trunc
+from cl.lib import sunburnt
 from cl.search.models import Docket, OpinionCluster
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
@@ -60,6 +62,21 @@ def view_opinion(request, pk, _):
             }
         )
 
+    # Get the citing results from Solr for speed.
+    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
+    q = {
+        'q': 'cites:({ids})'.format(
+            ids=' OR '.join([str(pk) for pk in
+                             (cluster.sub_opinions
+                              .values_list('pk', flat=True))])
+        ),
+        'rows': 5,
+        'start': 0,
+        'sort': 'citeCount desc',
+        'caller': 'view_opinion',
+    }
+    citing_clusters = conn.raw_query(**q).execute()
+
     return render_to_response(
         'view_opinion.html',
         {
@@ -68,7 +85,7 @@ def view_opinion(request, pk, _):
             'favorite_form': favorite_form,
             'get_string': get_string,
             'private': cluster.blocked,
-            'citing_clusters': cluster.citing_clusters[:5],
+            'citing_clusters': citing_clusters,
             'top_authorities': cluster.authorities[:5],
         },
         RequestContext(request)

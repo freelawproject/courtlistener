@@ -1,7 +1,7 @@
 from cl.lib.test_helpers import SitemapTest
 from cl.sitemap import opinion_solr_params
 from django.core.urlresolvers import reverse
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.test.client import Client
 from cl.lib import sunburnt
 from django.conf import settings
@@ -46,33 +46,37 @@ class RedirectionTest(TestCase):
             )
 
 
+@override_settings(
+    SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
+    SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
+)
 class OpinionSitemapTest(SitemapTest):
     def __init__(self, *args, **kwargs):
         super(OpinionSitemapTest, self).__init__(*args, ** kwargs)
-        self.expected_item_count = self.get_expected_item_count()
         self.sitemap_url = reverse('opinion_sitemap')
 
     def get_expected_item_count(self):
-        # OpinionsSitemap uses the solr index to generate the page, so
-        # the only accurate count comes from the index itself which will also
-        # be based on the fixtures.
+        # OpinionsSitemap uses the solr index to generate the page, so the only
+        # accurate count comes from the index itself which will also be based on
+        # the fixtures.
         conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode='r')
         opinion_solr_params['rows'] = 1000
 
         search_results_object = conn.raw_query(**opinion_solr_params).execute()
+
+        # the underlying SitemapTest relies on counting url elements in the xml
+        # response...this logic mimics the creation of the xml, so we at least
+        # know what we *should* get getting for a count if the SiteMapTest's
+        # HTTP client-based test gets an HTTP 200
         count = 0
-        # the underlying SitemapTest relies on counting url elements in
-        # the xml response...this logic mimics the creation of the xml,
-        # so we at least know what we *should* get getting for a count
-        # if the SiteMapTest's HTTP client-based test gets an HTTP 200
         for result in search_results_object:
-            if result.get('local_path') and result.get('local_path') != '':
+            if result.get('local_path'):
                 count += 3
             else:
                 count += 2
-
         return count
 
     def test_does_the_sitemap_have_content(self):
         # Class attributes are set, just run the test in super.
+        self.expected_item_count = self.get_expected_item_count()
         super(OpinionSitemapTest, self).does_the_sitemap_have_content()

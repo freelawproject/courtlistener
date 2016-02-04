@@ -1,4 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="0" height="0">
+    <!--
+        This is reproduced in a filter in override.css and is thus only kept
+        around for reference. This is needed due to Firefox not supporting
+        SVG filters quite right.
+    -->
     <defs>
         <filter id="whitefade">
             <feFlood flood-color="white" result="base"></feFlood>

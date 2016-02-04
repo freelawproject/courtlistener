@@ -6,6 +6,7 @@ from django.conf import settings
 from django.core import mail
 from django.test import Client, TestCase
 from django.utils.timezone import now
+
 from cl.donate.management.commands.cl_send_donation_reminders import Command
 from cl.donate.models import Donation
 
@@ -26,8 +27,11 @@ class EmailCommandTest(TestCase):
     def test_sending_an_email(self):
         """Do we send emails correctly?"""
         # Set this value since the JSON will get stale and can't have dynamic
-        # dates.
-        about_a_year_ago = now() - timedelta(days=355)
+        # dates. Note that we need to get hours involved because this way we can
+        # be sure that our donation happens in the middle of the period of time
+        # when the alert script will check for donations.
+        about_a_year_ago = now() - timedelta(days=354, hours=12)
+
         Donation.objects.filter(pk=1).update(date_created=about_a_year_ago)
 
         comm = Command()

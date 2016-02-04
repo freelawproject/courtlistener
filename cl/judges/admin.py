@@ -1,4 +1,5 @@
 from django.contrib import admin
+
 from cl.judges.models import (
     Education, School, Judge, Position, Politician, RetentionEvent, Career,
     Title, Race, PoliticalAffiliation, Source, ABARating
@@ -97,6 +98,8 @@ class ABARatingInline(admin.TabularInline):
 
 
 class JudgeAdmin(admin.ModelAdmin):
+    prepopulated_fields = {"slug": ['name_first', 'name_middle', 'name_last',
+                                    'name_suffix']}
     inlines = (
         PositionInline,
         EducationInline,

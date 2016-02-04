@@ -6,11 +6,12 @@ from lxml.html import tostring
 from lxml.html.clean import Cleaner
 
 from cl.lib.string_utils import anonymize, trunc
-from cl.search.models import Document, save_doc_and_cite
+from cl.search.models import OpinionCluster
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 
 import re
 import subprocess
+
 
 BROWSER = 'firefox'
 
@@ -20,7 +21,11 @@ def merge_cases_simple(new, target_id):
 
      Merging is done by picking the best fields from each item.
     """
-    target = Document.objects.get(pk=target_id)
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    # !!  THIS CODE IS OUT OF DATE AND UNMAINTAINED. FEEL FREE TO FIX IT, BUT !!
+    # !!                 DO NOT TRUST IT IN ITS CURRENT STATE.                !!
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    target = OpinionCluster.objects.get(pk=target_id)
     print "Merging %s with" % new.case_name
     print "        %s" % target.case_name
 
@@ -75,7 +80,7 @@ def merge_cases_simple(new, target_id):
 
     target.extracted_by_ocr = False  # No longer true for any LB case.
 
-    save_doc_and_cite(target, index=False)
+    # save_doc_and_cite(target, index=False)
 
 
 def merge_cases_complex(case, target_ids):
@@ -84,17 +89,18 @@ def merge_cases_complex(case, target_ids):
     The process here is a conservative one. We take *only* the information
     from PRO that is not already in CL in any form, and add only that.
     """
+    # THIS CODE ONLY UPDATED IN THE MOST CURSORY FASHION. DO NOT TRUST IT.
     for target_id in target_ids:
         simulate = False
-        doc = Document.objects.get(pk=target_id)
+        oc = OpinionCluster.objects.get(pk=target_id)
         print "Merging %s with" % case.case_name
-        print "        %s" % doc.case_name
+        print "        %s" % oc.case_name
 
-        doc.source = 'CR'
-        doc.west_cite = case.west_cite
+        oc.source = 'CR'
+        oc.west_cite = case.west_cite
 
         if not simulate:
-            doc.save()
+            oc.save()
 
 
 def find_same_docket_numbers(doc, candidates):

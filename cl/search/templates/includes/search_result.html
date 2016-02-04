@@ -43,7 +43,7 @@
             {% if result.solr_highlights.citation.0 %}
                 <div class="inline nowrap">
                     <span class="meta-data-header">Citations: </span>
-                    <span class="meta-data-value">{{ result.solr_highlights.citation.0|safe }}</span>
+                    <span class="meta-data-value">{{ result.solr_highlights.citation|join:", "|safe }}</span>
                 </div>
             {% endif %}
         {% endif %}

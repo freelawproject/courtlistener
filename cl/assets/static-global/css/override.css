@@ -824,9 +824,6 @@ body.embed div#title-block {
     overflow-y: auto;
     max-height: 450px;
 }
-.label-area .text-line {
-    filter: url(#whitefade);
-}
 .gallery-chart {
     width: 400px;
 }
@@ -844,6 +841,10 @@ body.embed div#title-block {
     background-color: rgba(255, 255, 255, 0.65);
     z-index: 1;
     position: relative;
+}
+
+#coverageChart .bar-area {
+    cursor: pointer;
 }
 
 

@@ -158,7 +158,7 @@ def coverage_data(request, version, court):
         'total': total_docs,
     }
 
-    return JsonResponse(json.dumps(response), safe=False)
+    return JsonResponse(response, safe=True)
 
 
 def deprecated_api(request, v):

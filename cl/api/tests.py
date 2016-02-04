@@ -55,6 +55,7 @@ class BulkDataTest(TestCase):
     def tearDown(self):
         OpinionCluster.objects.all().delete()
         Docket.objects.all().delete()
+        Audio.objects.all().delete()
         try:
             shutil.rmtree(self.tmp_data_dir)
         except OSError:
@@ -415,14 +416,14 @@ class DRFSearchAndAudioAppsApiFilterTest(TestCase):
         # Simple filter
         q['docket_number'] = '14-1165-nope'
         assertCount(self, path, q, 0)
-        q['docket_number'] = 'docket number'
-        assertCount(self, path, q, 3)
+        q['docket_number'] = 'docket number 1'
+        assertCount(self, path, q, 1)
 
         # Related filters
         q['court'] = 'test-nope'
         assertCount(self, path, q, 0)
         q['court'] = 'test'
-        assertCount(self, path, q, 3)
+        assertCount(self, path, q, 1)
 
         q['clusters__panel__name_first__istartswith'] = 'jud-nope'
         assertCount(self, path, q, 0)
