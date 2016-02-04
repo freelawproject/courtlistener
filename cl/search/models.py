@@ -353,18 +353,18 @@ class Document(models.Model):
         null=True
     )
 
-    is_available = models.BooleanField(
-        help_text="Boolean value to say if the document is available in RECAP.",
+    is_available = models.SmallIntegerField(
+        help_text="Boolean (0 or 1) value to say if the document is available in RECAP.",
         blank=True,
         null=True,
-        default=False
+        default=0
     )
 
-    free_import = models.BooleanField(
-        help_text="Found in RECAP",
+    free_import = models.SmallIntegerField(
+        help_text="Found in RECAP. Says if the document is free.",
         blank=True,
         null=True,
-        default=False
+        default=0
     )
 
     sha1 = models.CharField(
