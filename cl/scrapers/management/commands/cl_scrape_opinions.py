@@ -9,9 +9,9 @@ from datetime import date
 from celery.task.sets import subtask
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
-from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import build_module_list
+from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.alerts.models import RealTimeQueue
 from cl.lib.scrape_helpers import (
@@ -25,7 +25,6 @@ from cl.search.models import Docket
 from cl.search.models import Court
 from cl.search.models import Opinion
 from cl.search.models import OpinionCluster
-
 
 
 # for use in catching the SIGINT (Ctrl+4)
@@ -73,8 +72,7 @@ class Command(BaseCommand):
             help="Disable duplicate aborting.",
         )
 
-    @staticmethod
-    def make_objects(item, court, sha1_hash, content):
+    def make_objects(self, item, court, sha1_hash, content):
         """Takes the meta data from the scraper and associates it with objects.
 
         Returns the created objects.
@@ -85,23 +83,22 @@ class Command(BaseCommand):
         else:
             date_blocked = None
 
+        case_name_short = (item.get('case_name_shorts') or
+                           self.cnt.make_case_name_short(item['case_names']))
         docket = Docket(
             docket_number=item.get('docket_numbers', ''),
             case_name=item['case_names'],
-            case_name_short=item['case_name_shorts'],
+            case_name_short=case_name_short,
             court=court,
             blocked=blocked,
             date_blocked=date_blocked,
-            # TODO remove these lines after the DB migration
-            date_created=now(),
-            date_modified=now(),
         )
 
         cluster = OpinionCluster(
             judges=item.get('judges', ''),
             date_filed=item['case_dates'],
             case_name=item['case_names'],
-            case_name_short=item['case_name_shorts'],
+            case_name_short=case_name_short,
             source='C',
             precedential_status=item['precedential_statuses'],
             nature_of_suit=item.get('nature_of_suit', ''),
@@ -110,17 +107,11 @@ class Command(BaseCommand):
             federal_cite_one=item.get('west_citations', ''),
             state_cite_one=item.get('west_state_citations', ''),
             neutral_cite=item.get('neutral_citations', ''),
-            # TODO remove these lines after the DB migration
-            date_created=now(),
-            date_modified=now(),
         )
         opinion = Opinion(
             type='010combined',
             sha1=sha1_hash,
             download_url=item['download_urls'],
-            # TODO remove these lines after the DB migration
-            date_created=now(),
-            date_modified=now(),
         )
 
         error = False
@@ -257,6 +248,7 @@ class Command(BaseCommand):
             raise CommandError('Unable to import module or package. Aborting.')
 
         logger.info("Starting up the scraper.")
+        self.cnt = CaseNameTweaker()
         num_courts = len(module_strings)
         wait = (options['rate'] * 60) / num_courts
         i = 0

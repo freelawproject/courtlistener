@@ -15,44 +15,39 @@ from juriscraper.AbstractSite import logger
 
 from datetime import date
 from django.core.files.base import ContentFile
-from django.utils.timezone import now
 
 
 class Command(cl_scrape_opinions.Command):
 
-    @staticmethod
-    def make_objects(item, court, sha1_hash, content):
+    def make_objects(self, item, court, sha1_hash, content):
         blocked = item['blocked_statuses']
         if blocked is not None:
             date_blocked = date.today()
         else:
             date_blocked = None
 
+        case_name_short = (item.get('case_name_shorts') or
+                           self.cnt.make_case_name_short(item['case_names']))
+
         docket = Docket(
             docket_number=item.get('docket_numbers', ''),
             case_name=item['case_names'],
-            case_name_short=item['case_name_shorts'],
+            case_name_short=case_name_short,
             court=court,
             blocked=blocked,
             date_blocked=date_blocked,
             date_argued=item['case_dates'],
-            # TODO: Remove these lines after the DB migration
-            date_created=now(),
-            date_modified=now(),
         )
 
         audio_file = Audio(
             judges=item.get('judges', ''),
             source='C',
             case_name=item['case_names'],
-            case_name_short=item['case_name_shorts'],
+            case_name_short=case_name_short,
             sha1=sha1_hash,
             download_url=item['download_urls'],
             blocked=blocked,
             date_blocked=date_blocked,
-            # TODO remove these lines after the DB migration
-            date_created=now(),
-            date_modified=now(),
         )
 
         error = False
