@@ -34,6 +34,12 @@ class Command(BaseCommand):
             help='Simulate the emails that would be sent, using the console '
                  'backend. Do not delete accounts.'
         )
+        parser.add_argument(
+            '--verbose',
+            action='store_true',
+            default=False,
+            help="Create more output."
+        )
 
     def handle(self, *args, **options):
         self.options = options
