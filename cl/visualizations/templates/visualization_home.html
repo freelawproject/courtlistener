@@ -29,9 +29,9 @@
     <div id="viz-homepage" class="col-xs-12">
         <div class="row v-offset-below-3">
             <div class="col-xs-12">
-                <div class="row v-offset-above-3">
+                <div class="row v-offset-above-2">
                     {% for viz in visualizations|slice:":1" %}
-                        <div class="col-xs-12 v-offset-above-3" id="background-chart">
+                        <div class="col-xs-12" id="background-chart">
                             <div id="chart-{{ viz.id }}" data-height="200"></div>
                         </div>
                     {% endfor %}
@@ -39,14 +39,15 @@
                 <div class="white-out">
                     <div class="row">
                         <div class="col-xs-12">
-                            <p class="text-center x-large bottom" id="title">Supreme Court Citation Networks
+                            <p class="text-center x-large v-offset-above-4" id="title">Supreme Court Citation Networks
                             </p>
                             <p class="text-center large gray">A collaboration between Free Law Project and the University of Baltimore School of Law
                             </p>
                         </div>
                     </div>
-                    <div class="row v-offset-above-3">
-                        <div class="col-xs-12">
+                    <div class="row v-offset-above-6">
+                        <div class="col-md-1"></div>
+                        <div class="col-xs-12 col-md-10">
                             <p class="lead"><strong>With this free tool</strong> you can analyze and study lines of Supreme Court cases by creating citation networks. You can quickly access the full text of all the opinions in your citation network as well as examine all the associated case data from Supreme Court Database (Spaeth). Citation networks are visualized graphically and underlying data is also presented in sortable tables. You can save your networks, edit and comment upon them, and share them too. You can even embed interactive network visualizations in your website or blog.  Learn more by looking below at our gallery of shared networks or by making one yourself.
                             </p>
                             <div class="text-center v-offset-above-3"
@@ -55,6 +56,7 @@
                                     class="btn btn-sm btn-xl btn-primary">Make a Network</a>
                             </div>
                         </div>
+                        <div class="col-md-1"></div>
                     </div>
                 </div>
             </div>
@@ -81,7 +83,9 @@
                     <div class="col-sm-12">
                         <h3 class="text-center">Gallery</h3>
                         {% for viz in visualizations|slice:"1:" %}
-                            <div id="chart-{{ viz.id }}"></div>
+                            <a href="{% url "viz_gallery" %}">
+                                <div id="chart-{{ viz.id }}"></div>
+                            </a>
                         {% endfor %}
                     </div>
                 </div>
