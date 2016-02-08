@@ -110,7 +110,8 @@ class Command(BaseCommand):
             cluster.docket.save()
             cluster.save()
 
-    def winnow_by_docket_number(self, clusters, d):
+    @staticmethod
+    def winnow_by_docket_number(clusters, d):
         """Go through each of the clusters and see if they have a matching docket
         number. Return only those ones that do.
         """
@@ -130,10 +131,11 @@ class Command(BaseCommand):
         # Convert our list of IDs back into a QuerySet for consistency.
         return OpinionCluster.objects.filter(pk__in=good_cluster_ids)
 
-    def get_human_review(self, clusters, d):
+    @staticmethod
+    def get_human_review(clusters, d):
         for i, cluster in enumerate(clusters):
             print '    %s: Cluster %s:' % (i, cluster.pk)
-            print '      https://www.courtlistener.com/opinion/%s/slug/' % cluster.pk
+            print '      https://www.courtlistener.com%s' % cluster.get_absolute_url()
             print '      %s' % cluster.case_name
             print '      %s' % cluster.docket.docket_number
         print '  SCDB info:'
@@ -165,9 +167,9 @@ class Command(BaseCommand):
         the dict of SCDB info as parameters and returns the single item in
         the QuerySet that should have action_one performed on it.
 
-        The action_zero function takes only the dict of SCDB information, and uses
-        that to construct or identify a Cluster object that should have action_one
-        performed on it.
+        The action_zero function takes only the dict of SCDB information, and
+        uses that to construct or identify a Cluster object that should have
+        action_one performed on it.
 
         If action_zero or action_many return None, no action is taken.
         """
@@ -184,8 +186,8 @@ class Command(BaseCommand):
                 clusters = OpinionCluster.objects.none()
                 if len(clusters) == 0:
                     print "  Checking scdb_id for SCDB field 'caseID'...",
-                    clusters = OpinionCluster.objects.filter(
-                        scdb_id=d['caseId'])
+                    clusters = (OpinionCluster.objects
+                                .filter(scdb_id=d['caseId']))
                     print "%s matches found." % clusters.count()
                 if d['usCite'].strip():
                     # Only do these lookups if there is in fact a usCite value.
@@ -214,8 +216,8 @@ class Command(BaseCommand):
                         print "%s matches found." % clusters.count()
 
                 # At this point, we need to start getting more experimental b/c
-                # the easy ways to find items did not work. Items matched here are
-                # ones that lack citations.
+                # the easy ways to find items did not work. Items matched here
+                # are ones that lack citations.
                 if clusters.count() == 0:
                     # try by date and then winnow by docket number
                     print "  Checking by date...",
