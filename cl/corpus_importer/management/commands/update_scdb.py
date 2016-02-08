@@ -79,7 +79,8 @@ class Command(BaseCommand):
                     ''.join(current_value.split()) != ''.join(new_value.split())):
                 # Handles strings and normalizes them for comparison.
                 problem = True
-            elif isinstance(current_value, int) and current_value != new_value:
+            elif (isinstance(current_value, int) and
+                  current_value != int(new_value)):
                 # Handles ints, which need no normalization for comparison.
                 problem = True
 
