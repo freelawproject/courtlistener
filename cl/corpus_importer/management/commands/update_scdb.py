@@ -10,9 +10,8 @@ Location is done by:
  - Looking for matching U.S. and docket number.
 
 Once located, we update items:
- - Case name -- will this automatically fix the docket as well?
  - Citations (Lexis, US, L.Ed., etc.)
- - Docket number?
+ - Docket number
  - scdb_id
  - votes_majority & votes_minority
  - decision_direction
@@ -74,7 +73,17 @@ class Command(BaseCommand):
             setattr(obj, attribute, new_value)
         else:
             # Report if there's a difference -- that might spell trouble.
-            if ''.join(current_value.split()) != ''.join(new_value.split()):
+            problem = False
+            if (isinstance(current_value, basestring) and
+                    isinstance(new_value, basestring) and
+                    ''.join(current_value.split()) != ''.join(new_value.split())):
+                # Handles strings and normalizes them for comparison.
+                problem = True
+            elif isinstance(current_value, int) and current_value != new_value:
+                # Handles ints, which need no normalization for comparison.
+                problem = True
+
+            if problem:
                 print ("      WARNING: Didn't set '{attr}' attribute on obj "
                        "{obj_id} because it already had a value, but the new "
                        "value ('{new}') differs from current value "
