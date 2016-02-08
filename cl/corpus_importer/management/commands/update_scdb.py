@@ -69,7 +69,12 @@ class Command(BaseCommand):
         current_value = getattr(obj, attribute)
         if current_value is not None and isinstance(current_value, basestring):
             current_value = current_value.strip()
-        if not current_value and current_value != 0:
+
+        does_not_currently_have_a_value = not current_value
+        current_value_not_zero = current_value != 0
+        new_value_not_blank = new_value.strip() != ''
+        if all([does_not_currently_have_a_value, current_value_not_zero,
+                new_value_not_blank]):
             setattr(obj, attribute, new_value)
         else:
             # Report if there's a difference -- that might spell trouble.
@@ -104,7 +109,11 @@ class Command(BaseCommand):
 
         Take that item and enhance it with the SCDB content.
         """
-        print '    --> Enhancing cluster %s with data from SCDB.' % cluster.pk
+        print ('    --> Enhancing cluster {id} with data from SCDB ('
+               'https://www.courtlistener.com{path}).'.format(
+                id=cluster.pk,
+                path=cluster.get_absolute_url(),
+        ))
         attribute_pairs = [
             ('federal_cite_one', 'usCite'),
             ('federal_cite_two', 'sctCite'),
