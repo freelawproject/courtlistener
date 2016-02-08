@@ -73,27 +73,31 @@ class Command(BaseCommand):
             setattr(obj, attribute, new_value)
         else:
             # Report if there's a difference -- that might spell trouble.
-            problem = False
+            values_differ = False
             if (isinstance(current_value, basestring) and
                     isinstance(new_value, basestring) and
                     ''.join(current_value.split()) != ''.join(new_value.split())):
                 # Handles strings and normalizes them for comparison.
-                problem = True
+                values_differ = True
             elif (isinstance(current_value, int) and
                   current_value != int(new_value)):
                 # Handles ints, which need no normalization for comparison.
-                problem = True
+                values_differ = True
 
-            if problem:
+            if values_differ:
                 print ("      WARNING: Didn't set '{attr}' attribute on obj "
                        "{obj_id} because it already had a value, but the new "
                        "value ('{new}') differs from current value "
                        "('{current}').".format(
-                    attr=attribute,
-                    obj_id=obj.pk,
-                    new=new_value,
-                    current=current_value,
+                        attr=attribute,
+                        obj_id=obj.pk,
+                        new=new_value,
+                        current=current_value,
                 ))
+            else:
+                # The values were the same.
+                print "      '%s' field unchanged -- old and new values were " \
+                      "the same." % attribute
 
     def enhance_item_with_scdb(self, cluster, scdb_info):
         """Good news: A single Cluster object was found for the SCDB record.
