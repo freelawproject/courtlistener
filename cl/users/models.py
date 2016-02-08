@@ -121,7 +121,7 @@ class UserProfile(models.Model):
         return total
 
     def __unicode__(self):
-        return u"{name}".format(self.user.username)
+        return u"{name}".format(name=self.user.username)
 
     class Meta:
         verbose_name = 'user profile'
