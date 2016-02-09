@@ -81,9 +81,12 @@ def extract_from_pdf(doc, path, DEVNULL, callback=None):
     )
     content, err = process.communicate()
     if content.strip() == '' and callback:
-        # probably an image PDF. Send it to OCR
-        result = subtask(callback).delay(path)
-        success, content = result.get()
+        # probably an image PDF. Send it to OCR. N.B.: Do NOT use a subtask here
+        # unless you are very careful. In the worst case, doing so can cause a
+        # total celery deadlock, since this task will create another task, but
+        # there might not be a worker to consume it, guaranteeing that this
+        # task never finishes!
+        success, content = callback(path)
         if success:
             doc.extracted_by_ocr = True
         elif content == '' or not success:
