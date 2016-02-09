@@ -115,13 +115,15 @@
                                                 data-toggle="tooltip"
                                                 data-placement="top"
                                                 data-html="true"
-                                                title="<em>Spread</em>: All of the cases are shown as an overview, with a random vertical axis.<br><em>Spaeth</em> and <em>Genealogy</em>: The Supreme Court Database is used to set the vertical axis, showing the vote counts and issue direction for every case. <br><em>Genealogy</em> makes many of the citation lines lighter to highlight the most direct paths from the starting and ending cases."></i></label>
+                                                title="<em>Spread</em>: All of the cases are shown as an overview, with a random vertical axis.<br><em>Supreme Court Database</em>: The vertical axis is set using the decision direction and vote counts from the Supreme Court Database. <br><em>Clean</em> makes many of the citation lines lighter to highlight the most direct paths from the starting and ending cases."></i></label>
                                         <select name="chartType"
                                                 id="chartTypeSelect"
                                                 class="form-control">
                                             <option selected="true" value="dos">Spread</option>
-                                            <option value="spaeth">Spaeth</option>
-                                            <option value="genealogy">Genealogy</option>
+                                            <option value="genealogy">Supreme
+                                                Court Database, Spaeth (Clean)
+                                            </option>
+                                            <option value="spaeth">Supreme Court Database, Spaeth (Complete)</option>
                                         </select>
                                     </div>
                                     <div class="form-group col-md-4">
@@ -145,7 +147,7 @@
                                                 data-toggle="tooltip"
                                                 data-placement="top"
                                                 data-html="true"
-                                                title="Set the maximum number of hops between the oldest and newest case. In the <em>Genealogy</em> chart this is always set to the maximum."></i></label>
+                                                title="Set the maximum number of hops between the oldest and newest case. In the Clean <em>Supreme Court Database</em> this is always set to the maximum."></i></label>
                                         <select name="degreesOfSeparation"
                                                 id="degreesOfSeparationSelect"
                                                 class="form-control">
