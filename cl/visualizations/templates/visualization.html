@@ -51,14 +51,16 @@
             <div class="row v-offset-below-2" id="title-block">
                 <div class="col-xs-12">
                     {% if viz.published or viz.user == user %}
-                        <h2 id="title"
-                            class="text-center"><span class="alt">{% block viz-id %}{{ viz.id }}.&nbsp;{% endblock %}</span>{{ viz.title|v_wrapper }}
-                            <span class="alt private-label">
-                                {% if not viz.published and viz.user == user%}
-                                    (Private)
-                                {% endif %}
-                            </span>
-                        </h2>
+                        {% block vis-title %}
+                            <h2 id="title"
+                                class="text-center"><span class="alt">{{ viz.id }}.&nbsp;</span>{{ viz.title|v_wrapper }}
+                                <span class="alt private-label">
+                                    {% if not viz.published and viz.user == user%}
+                                        (Private)
+                                    {% endif %}
+                                </span>
+                            </h2>
+                        {% endblock %}
 
                         {% block vis-subtitles %}
                         <h4 class="gray text-center">Contains {{ viz.clusters.all.count }} cases starting at <a
@@ -284,7 +286,7 @@
                                 <h3><span>Embed</span></h3>
                                 <div class="form-group">
                                     <input type="text"
-                                           value="&lt;iframe height=&quot;475&quot; width=&quot;560&quot; src=&quot;{% get_full_host %}{% url "view_embedded_visualization" viz.pk %}&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;"
+                                           value="&lt;iframe height=&quot;540&quot; width=&quot;560&quot; src=&quot;{% get_full_host %}{% url "view_embedded_visualization" viz.pk %}&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;"
                                            onclick="this.select()"
                                            class="form-control"
                                            id="embed-input">

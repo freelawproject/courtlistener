@@ -22,7 +22,12 @@
 {# Add en embed class to the body so that it gets minimized. #}
 {% block body-classes %}embed{% endblock %}
 {# This value corresponds closely with the iframe height for the embed page #}
-{% block height %}440{% endblock %}
+{% block height %}400{% endblock %}
+
+{% block vis-title %}
+    <h3 id="title"
+        class="text-center">{{ viz.title|v_wrapper }}</h3>
+{% endblock %}
 
 {% block vis-caption %}
     <div class="row">
