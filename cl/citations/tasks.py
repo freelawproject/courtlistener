@@ -59,7 +59,7 @@ def update_document(opinion, index=True):
     # List for tracking number of citation vs. name matches
     matched_citations = []
     # List used so we can do one simple update to the citing opinion.
-    opinions_cited = []
+    opinions_cited = set()
     for citation in citations:
         # Resource.org docs contain their own citation in the html text, which
         # we don't want to include
@@ -85,7 +85,7 @@ def update_document(opinion, index=True):
 
                 # Add citation match to the citing opinion's list of cases it
                 # cites. opinions_cited is a set so duplicates aren't an issue
-                opinions_cited.append(matched_opinion.pk)
+                opinions_cited.add(matched_opinion.pk)
 
                 # URL field will be used for generating inline citation html
                 citation.match_url = matched_opinion.cluster.get_absolute_url()
@@ -108,26 +108,17 @@ def update_document(opinion, index=True):
     # Only update things if we found citations
     if citations:
         opinion.html_with_citations = create_cited_html(opinion, citations)
-        try:
-            OpinionsCited.objects.bulk_create([
-                OpinionsCited(citing_opinion_id=pk,
-                              cited_opinion_id=opinion.pk) for
-                pk in opinions_cited
-            ])
-        except IntegrityError as e:
-            # If bulk_create would create an item that already exists, it fails.
-            # In that case, do them one by one, skipping failing cases.
-            for pk in opinions_cited:
-                try:
-                    cited = OpinionsCited(
-                        citing_opinion_id=pk,
-                        cited_opinion_id=opinion.pk,
-                    )
-                    cited.save()
-                except IntegrityError:
-                    # We'll just skip the ones that already exist, but still do
-                    # the others.
-                    pass
+
+        # Nuke existing citations
+        OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
+
+        # Create the new ones.
+        OpinionsCited.objects.bulk_create([
+            OpinionsCited(citing_opinion_id=opinion.pk,
+                          cited_opinion_id=pk) for
+            pk in opinions_cited
+        ])
+
         if DEBUG >= 3:
             print opinion.html_with_citations
 
