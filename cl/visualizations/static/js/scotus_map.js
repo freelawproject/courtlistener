@@ -1,69 +1,42 @@
-/* global $, document, d3, Plottable, embedUrl*/
-
-/*
-For drawing the degrees of separation graph.
-Given a set of citations in JSON
-	and a DoS for the chart, as in don't show fourth for a third degree chart
-sort them and pre-parse in order to build the network
-	Degree of Separation starts at 1 not zero.
-	opinions have a degree of separation ranging from endpoint
-	connections have a degree of separation that is independant of the DoS of their endpoints
-
-Look at using d3 maps and sets instead of some of the other datatypes:
-	https://github.com/mbostock/d3/wiki/Arrays
-
-create a chart with:
-	aspect ratio, and have aspect ratio tied to vertical offset patterns
-	max displayed Degrees of Separation
-	an unlabeled y axis
-		vertical spacing moving from math based to table selected
-		oldest case low, newest case high to show building on foundation?
-	a category x axis that contains times in order, but not a timeline
-	grid
-	legend
-	scatterplot
-		size by number of citations (not in graph, but total)
-		color by degrees of separation
-	a collection of line plots
-		color by degrees of separation for that segment
-below the plot add a table with:
-	case name as link to case
-	citation count
-	date filed
- */
-
+/* global $, document, d3, Plottable, embedUrl, opinions*/
 'use strict';
 
-var citationJSON = {};
+/*
+Look at using d3 maps and sets instead of some of the other datatypes:
+	https://github.com/mbostock/d3/wiki/Arrays
+ */
+
+// rewrite the drawGraph call to use fewer parameters:
+// opinions, settings {target, type, axis, height, DoS, mode}
+// maybe target as first level param?
 
 /**
  * [drawGraph description]
  * @param {string} target id of target HTML element to draw the chart in
+ * @param {object} opinions the JSON object containing the data to work with
  * @param {string} chartType defaults to dos (Degrees of Separation), also [spaeth, genealogy]
  * @param {string} axisType controls X axis formatting as category or timeline
  * @param {string} height [description]
  * @param {integer} maxDoS a maximum degree of separation to show
- * @param {boolean} breakout controls if case links open in new window
- * @return {object} a new version of the source data showing only utilized information
+ * @param {string} mode view or edit mode
+ * @param {string} galleryId if in gallery mode is id of which chart to draw
+ * @return {object} a new version of the source data containing only utilized information
  */
-function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
-	// add "edit mode" boolean
-	var chartMode = (typeof chartType !== 'undefined') ? chartType : 'dos',
+function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, galleryId) {
+	var workingJSON = JSON.parse(JSON.stringify(opinions)), // make a modifiable copy to retain original
+		chartMode = (typeof chartType !== 'undefined') ? chartType : 'dos',
 		xAxisMode = (typeof axisType !== 'undefined') ? axisType : 'cat',
-		heightValue = '400px', // default, height is processed below
-		parseDate = d3.time.format('%Y-%m-%d').parse, // to parse dates in the JSON into d3 dates
 		chartWidth = $(target).width(), // the width of the enclosing div
+		heightPx = height + 'px', // default, height is processed below
+		parseDate = d3.time.format('%Y-%m-%d').parse, // to parse dates in the JSON into d3 dates
 		xDate = d3.time.format('%b-%Y'), // to format date for display
 		// data structures
-		workingJSON = [],
-		links = {}, // used to hold DoS for connectors
 		coords = {}, // object to hold extracted coordinates keyed by case id
 		point = {}, // a point within coords
-		JSONIndex = {},
-		JSONCount = 0,
+		links = {}, // used to hold DoS for connectors
+		JSONIndex = {}, // a quick index to speed up data access
 		caseCount = 0, // number of opinions
-		flagSize = 0, // square root of 2 less than the number of opinions
-		maxDegree = 0,
+		maxDegree = 0, // the maximum degree of separation encountered
 		label = '',
 		//scales
 		xScaleCat = {}, // the scaling function for x in category mode
@@ -74,21 +47,21 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 		//constants
 		degrees = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'distant'],
 		ddlu = ['N', 'C', 'L', 'U'], // from http://scdb.wustl.edu/documentation.php?var=decisionDirection
-		ddlul = ['Neutral', 'Conservative', 'Liberal', 'Unspecifiable', 'Unknown'],
-		distributions = [
-			[1], // 1
-			[1, 2], // 4
-			[1, 2, 3], // 9
-			[1, 3, 2, 4], // 16
-			[2, 10, 5, 13, 16], // 25
-			[1, 2, 3, 4, 5, 6], // 36
-			[1, 2, 3, 4, 5, 6, 7], // 49
-			[1, 2, 3, 4, 5, 6, 7, 8], // 64
-			[1, 2, 3, 4, 5, 6, 7, 8, 9] // 81
-			// how far does this table go?
-		],
+		ddlul = ['Neutral', 'Conservative', 'Liberal', 'Unspecifiable', 'Unknown'], // Decision Direction lookup long
+		ddc = [0, 0, 0, 0, 0], // decision direction count encountered
 		distribution = [], // will hold the correctly sized vertical distribution pattern
-		labels = {},
+		offset = 0, // used for making 'random' y distribution
+		spaethLabels = ['L5-4',
+				'L6-3',
+				'L7-2',
+				'L8-1',
+				'N9-0',
+				'C8-1',
+				'C7-2',
+				'C6-3',
+				'C5-4',
+				'Unk'],
+		index = 0,
 		// chart parts
 		chart = {}, // the chart itself
 		table = [], // holds the structure of the chart
@@ -105,49 +78,22 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 		// x axis
 		xAxisCat = {}, // the x axis category
 		xAxisTime = {}, // the x axis timeline
-		xLabel = {}, // label for the x axis
+		// xLabel = {}, // label for the x axis
 		// chart interactions
 		caseHover = {}, // interaction behavior
 		// defaultCaseHoverText = '',
 		// caseHoverText = {}, // reference to the text in the object shown when hovering
 		caseHoverGroup = {}, // reference to the hover show object
-		caseClick = {}; // interaction behavior
+		caseClick = {}, // interaction behavior
+		caseDrag = {}, // used in edit mode
+		dragTarget = null;
 
 	/**
-	 * [prepJSON description]
+	 * standardize the name structure for links to avoid duplication
+	 * @param  {string} a case id
+	 * @param  {string} b case id
+	 * @return {string}   ordered case ids combined with lower first
 	 */
-	function prepJSON() {
-		// sort by date_filed
-		citationJSON.opinion_clusters.sort(function (a, b) {
-			if (parseDate(a.date_filed) > parseDate(b.date_filed)) {
-				return 1;
-			}
-			if (parseDate(a.date_filed) < parseDate(b.date_filed)) {
-				return -1;
-			}
-			return 0;
-		});
-		// build index
-		citationJSON.opinion_clusters.forEach(function (cluster) {
-			point = {};
-			point.num = JSONCount++;
-			point.citedBy = [];
-			JSONIndex[cluster.id] = point;
-		});
-		// add cited by others in JSON to each
-		citationJSON.opinion_clusters.forEach(function (cluster) {
-			var item = '';
-
-			for (item in cluster.sub_opinions[0].opinions_cited) {
-				if (cluster.sub_opinions[0].opinions_cited.hasOwnProperty(item)) {
-					if (JSONIndex[item] && JSONIndex[item].citedBy.indexOf() === -1) {
-						JSONIndex[item].citedBy.push(cluster.id);
-					}
-				}
-			}
-		});
-	}
-
 	function linkName(a, b) {
 		var name = '';
 
@@ -160,35 +106,104 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 	}
 
 	/**
+	 * organization and indexing of the supplied JSON
+	 */
+	function prepJSON() {
+
+		/**
+		 * return a count of the citation object
+		 * @param  {object} obj citation collection
+		 * @return {integer}    the number of citations
+		 */
+		function citations(obj) {
+			var size = 0,
+				key = '';
+
+			for (key in obj) {
+				if (obj.hasOwnProperty(key)) {
+					size++;
+				}
+			}
+			return size;
+		}
+
+		// sort by date_filed, break ties so that opinion with no cites comes first
+		workingJSON.opinion_clusters.sort(function (a, b) {
+			if (parseDate(a.date_filed) > parseDate(b.date_filed)) {
+				return 1;
+			}
+			if (parseDate(a.date_filed) < parseDate(b.date_filed)) {
+				return -1;
+			}
+			// break the tie for two opinions on the same day, must start network with one with no cites
+			if (citations(a.sub_opinions[0].opinions_cited) > citations(b.sub_opinions[0].opinions_cited)) {
+				return 1;
+			}
+			if (citations(a.sub_opinions[0].opinions_cited) < citations(b.sub_opinions[0].opinions_cited)) {
+				return -1;
+			}
+			return 0;
+		});
+		// build index
+		workingJSON.opinion_clusters.forEach(function (cluster) {
+			point = {};
+			point.num = caseCount++;
+			point.citedBy = [];
+			JSONIndex[cluster.id] = point;
+			// while iterating handle null values in JSON
+			if (cluster.decision_direction === null) {
+				cluster.decision_direction = '4';
+			}
+			if (cluster.votes_majority === null) {
+				cluster.votes_majority = '-1';
+			}
+			if (cluster.votes_minority === null) {
+				cluster.votes_minority = '-1';
+			}
+			// also count decision directions encountered (allows us to avoid showing unused labels)
+			ddc[cluster.decision_direction]++;
+		});
+		// add cited by others in JSON to each
+		workingJSON.opinion_clusters.forEach(function (cluster) {
+			var item = '';
+
+			for (item in cluster.sub_opinions[0].opinions_cited) {
+				if (cluster.sub_opinions[0].opinions_cited.hasOwnProperty(item)) {
+					if (JSONIndex[item] && JSONIndex[item].citedBy.indexOf() === -1) {
+						JSONIndex[item].citedBy.push(cluster.id);
+					}
+				}
+			}
+		});
+	}
+
+	/**
 	 * [traverse description]
 	 * @param {integer} nodeid index in JSON for current node
 	 * @param {integer} last previous node id
 	 * @param {integer} depth how far from newest case
 	 */
 	function traverse(nodeid, last, depth) {
-		var order = citationJSON.opinion_clusters[nodeid].travRev,
+		var order = workingJSON.opinion_clusters[nodeid].travRev,
 			linkId = '',
 			item = '';
 
+		// for any iteration that is traversing between two points
 		if (nodeid !== last) {
-			linkId = linkName(citationJSON.opinion_clusters[nodeid].id, citationJSON.opinion_clusters[last].id);
-			if (links.hasOwnProperty(linkId)) {
-				if (links[linkId].dr > depth) {
-					links[linkId].dr = depth;
-				}
-			} else if (typeof links[linkId] === 'undefined') {
+			linkId = linkName(workingJSON.opinion_clusters[nodeid].id, workingJSON.opinion_clusters[last].id);
+			if (! links.hasOwnProperty(linkId)) {
 				links[linkId] = {dr: depth};
-			} else {
+			} else if (typeof links[linkId].dr === 'undefined' || links[linkId].dr > depth) {
 				links[linkId].dr = depth;
 			}
 		}
+		// branch and follow all children this direction
 		if (typeof order === 'undefined' || order > depth) {
-			citationJSON.opinion_clusters[nodeid].travRev = depth;
-			for (item in citationJSON.opinion_clusters[nodeid].sub_opinions[0].opinions_cited) {
-				if (citationJSON.opinion_clusters[nodeid].sub_opinions[0].opinions_cited.hasOwnProperty(item)) {
-					if (JSONIndex[item]) {
-						traverse(JSONIndex[item].num, nodeid, depth + 1);
-					}
+			// if this is our first time getting here or we found a shorter path
+			workingJSON.opinion_clusters[nodeid].travRev = depth; // record the new shorter distance
+			for (item in workingJSON.opinion_clusters[nodeid].sub_opinions[0].opinions_cited) {
+				if (workingJSON.opinion_clusters[nodeid].sub_opinions[0].opinions_cited.hasOwnProperty(item)) {
+					traverse(JSONIndex[item].num, nodeid, depth + 1);
 				}
 			}
 		}
@@ -201,20 +216,20 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 	 * @param {integer} depth how far from newest case
 	 */
 	function traverseBack(nodeid, last, depth) {
-		var order = citationJSON.opinion_clusters[nodeid].travFwd,
+		var order = workingJSON.opinion_clusters[nodeid].travFwd,
 			linkId = '';
 
 		if (nodeid !== last) {
-			linkId = linkName(citationJSON.opinion_clusters[nodeid].id, citationJSON.opinion_clusters[last].id);
-			if (links.hasOwnProperty(linkId)) {
-				if (typeof links[linkId].df === 'undefined' || links[linkId].df > depth) {
-					links[linkId].df = depth;
-				}
+			linkId = linkName(workingJSON.opinion_clusters[nodeid].id, workingJSON.opinion_clusters[last].id);
+			if (! links.hasOwnProperty(linkId)) {
+				links[linkId] = {df: depth};
+			} else if (typeof links[linkId].df === 'undefined' || links[linkId].df > depth) {
+				links[linkId].df = depth;
 			}
 		}
 		if (typeof order === 'undefined' || order > depth) {
-			citationJSON.opinion_clusters[nodeid].travFwd = depth;
-			JSONIndex[citationJSON.opinion_clusters[nodeid].id].citedBy.forEach(function (item) {
+			workingJSON.opinion_clusters[nodeid].travFwd = depth;
+			JSONIndex[workingJSON.opinion_clusters[nodeid].id].citedBy.forEach(function (item) {
 				traverseBack(JSONIndex[item].num, nodeid, depth + 1);
 			});
 		}
@@ -225,19 +240,19 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 	 */
 	function calculateDoS() {
 		var link = {},
-			index = 1,
+			i = 1,
 			thisDegree = 0;
 
 		traverse(caseCount - 1, caseCount - 1, 0);
 		traverseBack(0, 0, 0);
 
-		citationJSON.opinion_clusters.forEach(function (cluster) {
+		workingJSON.opinion_clusters.forEach(function (cluster) {
 			if (cluster.travFwd === 0 || cluster.travRev === 0) {
 				cluster.order = 0;
 			} else {
 				cluster.order = cluster.travFwd + cluster.travRev - 1;
 			}
-			if (index === 1 || index === caseCount) {
+			if (i === 1 || i === caseCount) {
 				cluster.order = degrees[0];
 			} else {
 				thisDegree = cluster.order;
@@ -249,7 +264,7 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 				}
 				cluster.order = degrees[thisDegree];
 			}
-			cluster.count = index++;
+			cluster.count = i++;
 		});
 		for (link in links) {
 			if (links.hasOwnProperty(link)) {
@@ -262,89 +277,171 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 		}
 	}
 
+	/**
+	 * trim the workingJSON so that it includes cases that are under the DoS limit
+	 * @param  {integer} limit [description]
+	 */
 	function trimJSON(limit) {
 		var max = parseInt(limit, 10),
-			link = {};
+			link = {},
+			c = 1;
 
-		workingJSON = citationJSON.opinion_clusters.filter(function (cluster) {
-			return degrees.indexOf(cluster.order) < max;
+		// filter out cases that have higher DoS
+		workingJSON = workingJSON.opinion_clusters.filter(function (cluster) {
+			return (chartType !== 'genealogy') ? degrees.indexOf(cluster.order) < max : true;
 		});
-		caseCount = workingJSON.length;
-		for (link in links) {
-			if (links.hasOwnProperty(link)) {
-				if (degrees.indexOf(links[link].d) >= max) {
-					delete links[link];
+		// renumber the remaining cases
+		workingJSON.forEach(function (cluster) {
+			cluster.count = c++;
+		});
+		// get the count of the remaining cases
+		caseCount = c - 1;
+		// remove links that have higher DoS
+		if (chartType === 'dos') {
+			for (link in links) {
+				if (links.hasOwnProperty(link)) {
+					if (degrees.indexOf(links[link].d) >= max) {
+						delete links[link];
+					}
 				}
 			}
 		}
 	}
 
-	// start of process
+	if (! $(target).length) { // if the target isn't on the page stop now
+		return [];
+	}
 
+	// start of process
 	prepJSON();
 
-	caseCount = citationJSON.opinion_clusters.length;
+	// will get set to final in trimJSON
+	caseCount = workingJSON.opinion_clusters.length;
 
+	// calculate DoS for nodes and links
 	calculateDoS();
 
+	// now that DoS is calculated use that to remove distant nodes and links
 	trimJSON(maxDoS);
 
-	flagSize = Math.ceil(Math.sqrt(caseCount));
-
-	if (flagSize > 0 && flagSize < distributions.length) {
-		distribution = distributions[flagSize - 1];
-	} else {
-		distribution = d3.range(1, flagSize + 2);
-	}
-
-	// hard code distributions for Friday
-	// rewrite to use modulus and take aspect ratio into account
-	distribution = [2, 10, 5, 13, 16];
-
-	if (typeof height !== 'undefined') {
-		if (height === 'screen') {
-			heightValue = $(window).height();
-		} else {
-			heightValue = height + 'px';
-		}
-	}
-
+	// cleaner to retain var for this and use it later on?
 	d3.select(target)
 		.append('svg')
-		.attr('id', 'coverageChart')
-		.attr('height', heightValue);
+		.attr('id', 'scotus-chart-' + galleryId)
+		.attr('height', heightPx);
+
+	// build vertical separation for dos chart
+	if (chartType === 'dos') {
+		distribution = [];
+		distribution.push(50); // first at 50
+		for (index = 0; index < caseCount - 2; index++) {
+			// need better numbers here
+			offset += [68, 77, 55, 37, 42, 21, 62][index % 7];
+			distribution.push((offset % 91) + 5);
+		}
+		distribution.push(50); // last at 50
+	}
+
+	/**
+	 * if we have a set y value use it, otherwise use the distribution
+	 * this allows us to respect edits and untangle the DoS network
+	 * @param  {object} d case
+	 * @return {integer}   the vertical distribution for that case
+	 */
+	function dosYSpread(d) {
+		return (d.y) ? d.y : distribution[d.count - 1];
+	}
+
+	/**
+	 * [spaethYSpread description]
+	 * @param  {object} d case
+	 * @return {integer}   the vertical distribution for that case
+	 */
+	function spaethYSpread(d) {
+		var minority = d.votes_minority,
+			majority = String(9 - Number(minority)), // d.votes_majority,
+			decision_direction = ddlu[d.decision_direction],
+			prefix = (majority === '9') ? 'N' : decision_direction,
+			value = '';
+
+		if (minority === '-1') {
+			value = 'Unk';
+		} else {
+			value = prefix + majority + '-' + minority;
+		}
+		return value;
+	}
 
 	xScaleCat = new Plottable.Scales.Category(); // set switch for time or category time
 	xScaleCat.outerPadding(0.9);
+	// ensure correct order by loading dates in
+	// preloading these allows us to draw connections before drawing nodes
+	xScaleCat.domain(workingJSON.map(function (d) {
+		return parseDate(d.date_filed);
+	}));
 	xScaleTime = new Plottable.Scales.Time();
 	yScale = new Plottable.Scales.Category();
-	if (chartMode === 'dos') {
-		yScale.domain(d3.range(1, d3.max(distribution) + 2).reverse());
-	} else {
-		yScale.domain([
-			'L5-4',
-			'L6-3',
-			'L7-2',
-			'L8-1',
-			'N9-0',
-			'C8-1',
-			'C7-2',
-			'C6-3',
-			'C5-4',
-			'Unk'
-		]);
-	}
-	yScale.outerPadding(0.9);
+	yAxis = new Plottable.Axes.Category(yScale, 'left');
 
-	sizeScale = new Plottable.Scales.ModifiedLog();
-	sizeScale.range([5, 50]);
+	if (chartMode === 'dos') {
+		yScale.domain(d3.range(0, 100));
+		yAxis.innerTickLength(0)
+			.endTickLength(0)
+			.formatter(function () {
+				return '';
+			})
+			.tickLabelPadding(0);
+	} else {
+		if (ddc[3] === 0 && ddc[4] === 0) { // there are no unknown or unspecifiable
+			spaethLabels.pop(); // get rid of 'Unk'
+		}
+		yScale.domain(spaethLabels);
+		yAxis.formatter(function (d) {
+			var value = d;
+
+			if (value !== 'Unk') {
+				value = value.slice(1); // remove leading letter
+			}
+			return value;
+		});
+	}
+
+	yScale.outerPadding(0.9);
+	sizeScale = new Plottable.Scales.Linear();
+	sizeScale.range([10, Math.max(10, height / 12)]);
 	colorScale = new Plottable.Scales.Color();
 
+	/**
+	 * [filter description]
+	 * @param  {array} source  [description]
+	 * @param  {array} compare [description]
+	 * @return {array}         [description]
+	 */
+	function filter(source, compare) {
+		var array = [],
+			i = 0,
+			sl = source.length,
+			cl = compare.length;
+
+		for (i = 0; i < sl; i++) {
+			if (i < cl && compare[i] > 0) {
+				array.push(source[i]);
+			}
+		}
+		return array;
+	}
+
 	if (chartMode === 'dos') {
-		colorScale.domain(degrees.slice(0, maxDoS));
+		colorScale.domain(degrees.slice(0, d3.min([maxDoS, maxDegree + 1])));
 	} else {
-		colorScale.domain(ddlul);
-		colorScale.range(['purple', 'red', 'blue', 'green', 'orange']);
+		colorScale.domain(filter(ddlul, ddc));
+		colorScale.range(filter([
+			'purple',
+			'red',
+			'blue',
+			'green',
+			'orange'
+		], ddc));
 	}
 
 	xAxisCat = new Plottable.Axes.Category(xScaleCat, 'bottom');
@@ -363,14 +460,7 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 		xAxisCat.tickLabelAngle(-90);
 	}
 
-	yAxis = new Plottable.Axes.Category(yScale, 'left');
-
-	label = 'Time';
-	label += (xAxisMode === 'cat') ? ' as Category' : 'line';
-
-	xLabel = new Plottable.Components.AxisLabel(label, 0);
-
-	label = (chartMode === 'dos') ? 'Random' : 'Conservative <-- --> Liberal';
+	label = (chartMode === 'dos') ? 'Random' : 'Conservative  ⟵  ⟶  Liberal';
 
 	yLabel = new Plottable.Components.AxisLabel(label, -90);
 
@@ -378,73 +468,32 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 
 	if (xAxisMode === 'cat') {
 		xGrid = new Plottable.Scales.Linear()
-			.domain([0, caseCount]);
+			.domain([0, caseCount])
+			.tickGenerator(function () {
+				return d3.range(0, caseCount + 1, 1);
+			});
 	} else {
 		xGrid = xScaleTime;
 	}
-	yGrid = new Plottable.Scales.Linear()
-		.domain([0, d3.max(distribution) + 2]);
-		// .range([yAxis.height(), 0]);
+
+	yGrid = new Plottable.Scales.Linear();
+	if (chartMode === 'dos') {
+		yGrid.domain([0, 100])
+			.tickGenerator(function () {
+				return [0, 100];
+			}); // handle dos and non dos
+
+	} else if (ddc[3] > 0 || ddc[4] > 0) { // there is an 'Unk' category
+		yGrid.domain([0, 11]);
+	} else {
+		yGrid.domain([0, 10]);
+	}
+
+	plot = new Plottable.Components.Group();
 
 	grid = new Plottable.Components.Gridlines(xGrid, yGrid);
 
-	plot = new Plottable.Components.Group();
 	plot.append(grid);
-
-	function dosYSpread(d) {
-		var value = 0;
-
-		if (d.count === 1 || d.count === caseCount) {
-			value = d3.max(distribution) + 1;
-		} else {
-			value = distribution[(d.count - 2) % flagSize];
-		}
-		return value;
-	}
-
-	function spaethYSpread(d) {
-		var minority = d.votes_minority,
-			majority = String(9 - Number(minority)), // d.votes_majority,
-			decision_direction = ddlu[d.decision_direction],
-			prefix = (majority === '9') ? 'N' : decision_direction,
-			value = '';
-
-		if (minority === '-1') {
-			value = 'Unk';
-		} else {
-			value = prefix + majority + '-' + minority;
-		}
-		return value;
-	}
-
-	cases = new Plottable.Plots.Scatter()
-		.addDataset(new Plottable.Dataset(workingJSON))
-		.addClass('caseScatter')
-		.x(function (d) {
-			return parseDate(d.date_filed);
-		}, (xAxisMode === 'cat') ? xScaleCat : xScaleTime)
-		.y(function (d) {
-			return (chartMode === 'dos') ? dosYSpread(d) : spaethYSpread(d);
-		}, yScale)
-		.size(function (d, i) {
-			var value = 0,
-				domain = [];
-
-			if (i === caseCount - 1) {
-				domain = sizeScale.domain();
-				value = (domain[0] + domain[1]) / 2; // set the most recent case size to half
-			} else {
-				value = d.citation_count;
-			}
-			return value;
-		}, sizeScale)
-		.attr('stroke', function (d) {
-			return colorScale.scale((chartMode === 'dos') ? d.order : ddlul[d.decision_direction]);
-		})
-		.attr('fill', function (d) {
-			return colorScale.scale((chartMode === 'dos') ? d.order : ddlul[d.decision_direction]);
-		});
-	plot.append(cases);
 
 	connections = new Plottable.Plots.Line()
 		.x(function (d) {
@@ -457,43 +506,76 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 			return colorScale.scale(d.c);
 		})
 		.attr('opacity', function (d) {
-			return d.o;
+			return d.o * ((chartType !== 'genealogy') ? 0.5 : 0.9); // drop all by a percent
 		});
 	plot.append(connections);
 
-	labels = new Plottable.Plots.Rectangle()
+	/**
+	 * Scales objects such that it treats the last differently
+	 * in order to make most recent case visible when it has no citations
+	 * @param  {object} cites where to extract citation_count
+	 * @param  {integer} i  which number is this?
+	 * @return {integer}    area adjusted value
+	 */
+	function scalePlot(cites, i) {
+		var value = 0,
+			domain = [];
+
+		if (i === caseCount - 1 && cites === 0) {
+			domain = sizeScale.domain();
+			value = (domain[0] + domain[1]) / 2; // set the most recent case size to half
+		} else {
+			value = cites;
+		}
+		return Math.sqrt(value / Math.PI);
+	}
+
+	cases = new Plottable.Plots.Scatter()
 		.addDataset(new Plottable.Dataset(workingJSON))
+		.addClass('caseScatter')
 		.x(function (d) {
 			return parseDate(d.date_filed);
 		}, (xAxisMode === 'cat') ? xScaleCat : xScaleTime)
 		.y(function (d) {
 			return (chartMode === 'dos') ? dosYSpread(d) : spaethYSpread(d);
 		}, yScale)
-		.attr('fill', 'rgba(0, 0, 0, 0)')
-		.attr('stroke-width', 0)
-		.labelsEnabled(function () {
+		.size(function (d, i) {
+			return scalePlot(d.citation_count, i);
+		}, sizeScale)
+		.attr('stroke', function (d) {
+			return colorScale.scale((chartMode === 'dos') ? d.order : ddlul[d.decision_direction]);
+		})
+		.attr('fill', function (d) {
+			return colorScale.scale((chartMode === 'dos') ? d.order : ddlul[d.decision_direction]);
+		})
+		.attr('opacity', 1);
+	if (galleryId === '') {
+		cases.labelsEnabled(function () {
 			return true;
 		})
 		.label(function (d) {
-			return d.case_name_short;
+			return (d.case_name_short) ? d.case_name_short : d.case_name; //.split(' ')[0]
 		});
-	plot.append(labels);
+	}
+	plot.append(cases);
 
-	if (chartMode === 'dos') {
-		yAxis.formatter(function () {
-			return '';
+	/**
+	 * [calcConnections description]
+	 */
+	function calcConnections() {
+		// empty any old data
+		connections.datasets().forEach(function (set) {
+			connections.removeDataset(set);
 		});
+		// generate index
 		workingJSON.forEach(function (cluster) {
 			point = {};
 			point.date_filed = cluster.date_filed;
-			if (cluster.count === 1 || cluster.count === caseCount) {
-				point.count = d3.max(distribution) + 1;
-			} else {
-				point.count = distribution[(cluster.count - 2) % flagSize];
-			}
+			point.count = dosYSpread(cluster);
 			point.order = cluster.order;
 			coords[cluster.id] = point;
 		});
+		// build new connections
 		workingJSON.forEach(function (cluster) {
 			var item = '',
 				name = '',
@@ -505,6 +587,9 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 					name = linkName(cluster.id, item);
 					color = 'unk';
 					opacity = cluster.sub_opinions[0].opinions_cited[item].opacity;
+					if (typeof opacity === 'undefined') {
+						opacity = 1;
+					}
 					if (typeof links[name] !== 'undefined') {
 						// replace the following if with the limiter to control greatest DoS connector shown
 						if (typeof links[name].d !== 'undefined') {
@@ -518,11 +603,14 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 				}
 			}
 		});
+	}
+
+	if (chartMode === 'dos') {
+		calcConnections();
 	} else {
 		if (chartMode === 'genealogy') {
 
 /*
-
 1.	Start with all of the cases from the bacon map and sort them in chronological order.
 
 2.	Starting with the most recent case and working your way back to the oldest case:
@@ -547,12 +635,9 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 
 6.	Repeat steps 3-5 for the rest of the cases in the set, continuing backwards chronologically through the cases.
 
-7.	Add the citations to the appropriate strands (conservative/liberal/unknown) based on the decision direction of the citing case.
-
+7.	Add the citations to the appropriate strands (conservative/liberal/unknown) based on the decision direction of
+	the citing case.
 */
-
-			// console.log(workingJSON);
-			// console.log(JSONIndex);
 
 			workingJSON.forEach(function (cluster) {
 				var item = {},
@@ -561,22 +646,16 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 					recentOp = parseDate('1500-01-01'),
 					recentOpIndex = 0;
 
-// expand this to handle all of the logic above.
-// make sure that if the mode is genealogy that maxDos is ignored from the start
-
 				for (item in cluster.sub_opinions[0].opinions_cited) {
 					if (cluster.sub_opinions[0].opinions_cited.hasOwnProperty(item)) {
-						cluster.sub_opinions[0].opinions_cited[item].opacity = 0.25;
-						//console.log(cluster.decision_direction, ddlu[cluster.decision_direction], JSONIndex[item].num);
-
-						// console.log(recent, parseDate(workingJSON[JSONIndex[item].num].date_filed));
-						if (cluster.decision_direction === workingJSON[JSONIndex[item].num].decision_direction) {
-							if (recent < parseDate(workingJSON[JSONIndex[item].num].date_filed)) {
-								recent = parseDate(workingJSON[JSONIndex[item].num].date_filed);
-								recentIndex = item;
-							}
-						} else {
-							if (recentOp < parseDate(workingJSON[JSONIndex[item].num].date_filed)) {
+						cluster.sub_opinions[0].opinions_cited[item].opacity = 0.15;
+						if (typeof workingJSON[JSONIndex[item].num] !== 'undefined') {
+							if (cluster.decision_direction === workingJSON[JSONIndex[item].num].decision_direction) {
+								if (recent < parseDate(workingJSON[JSONIndex[item].num].date_filed)) {
+									recent = parseDate(workingJSON[JSONIndex[item].num].date_filed);
+									recentIndex = item;
+								}
+							} else if (recentOp < parseDate(workingJSON[JSONIndex[item].num].date_filed)) {
 								recentOp = parseDate(workingJSON[JSONIndex[item].num].date_filed);
 								recentOpIndex = item;
 							}
@@ -584,29 +663,53 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 					}
 				}
 				if (recentIndex !== 0) {
-					// console.log('Pick:', recentIndex);
 					cluster.sub_opinions[0].opinions_cited[recentIndex].opacity = 1;
-				} else if (recentOpIndex !== 0) {
-					// console.log('PickOp:', recentOpIndex);
-					cluster.sub_opinions[0].opinions_cited[recentOpIndex].opacity = 1;
+					workingJSON[JSONIndex[recentIndex].num].visited = true;
 				}
-
+				// end case may not be able to branch to op direction?
+				if ((recentOpIndex !== 0 && recentIndex === 0) || cluster.count === caseCount && recentOpIndex !== 0) {
+					cluster.sub_opinions[0].opinions_cited[recentOpIndex].opacity = 1;
+					workingJSON[JSONIndex[recentOpIndex].num].visited = true;
+				}
 			});
+			// second pass to pick up orphans
+			workingJSON.forEach(function (cluster) {
+				var item = {};
 
+				for (item in cluster.sub_opinions[0].opinions_cited) {
+					if (cluster.sub_opinions[0].opinions_cited.hasOwnProperty(item)) {
+						if (! workingJSON[JSONIndex[item].num].hasOwnProperty('visited') &&
+							cluster.decision_direction === workingJSON[JSONIndex[item].num].decision_direction) {
+							cluster.sub_opinions[0].opinions_cited[item].opacity = 1;
+							workingJSON[JSONIndex[item].num].visited = true;
+						}
+					}
+				}
+				for (item in cluster.sub_opinions[0].opinions_cited) {
+					if (cluster.sub_opinions[0].opinions_cited.hasOwnProperty(item)) {
+						if (! workingJSON[JSONIndex[item].num].hasOwnProperty('visited')) {
+							cluster.sub_opinions[0].opinions_cited[item].opacity = 1;
+							workingJSON[JSONIndex[item].num].visited = true;
+						}
+					}
+				}
+			});
 		}
+		// spaeth and genealogy
 		workingJSON.forEach(function (cluster) {
 			var minority = cluster.votes_minority,
-				majority = String(9 - Number(minority)), // cluster.votes_majority,
+				majority = String(9 - parseInt(minority, 10)),
 				decision_direction = ddlu[cluster.decision_direction],
 				prefix = (majority === '9') ? 'N' : decision_direction;
 
 			point = {};
 			point.date_filed = cluster.date_filed;
-			point.split = prefix + majority + '-' + minority;
-			point.dec = ddlul[cluster.decision_direction];
 			if (minority === '-1') {
 				point.split = 'Unk';
 				point.dec = 'Unknown';
+			} else {
+				point.split = prefix + majority + '-' + minority;
+				point.dec = ddlul[cluster.decision_direction];
 			}
 			coords[cluster.id] = point;
 		});
@@ -617,125 +720,175 @@ function drawGraph(target, chartType, axisType, height, maxDoS, breakout) {
 			for (item in cluster.sub_opinions[0].opinions_cited) {
 				if (cluster.sub_opinions[0].opinions_cited.hasOwnProperty(item)) {
 					opacity = cluster.sub_opinions[0].opinions_cited[item].opacity;
-					connections.addDataset(new Plottable.Dataset([
-						{x: coords[cluster.id].date_filed, y: coords[cluster.id].split, c: coords[item].dec, o: opacity},
-						{x: coords[item].date_filed, y: coords[item].split, c: coords[item].dec, o: opacity}
-					]));
+					if (typeof opacity === 'undefined') {
+						opacity = 1;
+					}
+					// badly formed data can result in coords[item] being undefined, check for this
+					if (typeof coords[item] !== 'undefined') {
+						connections.addDataset(new Plottable.Dataset([
+							{x: coords[cluster.id].date_filed, y: coords[cluster.id].split, c: coords[item].dec, o: opacity},
+							{x: coords[item].date_filed, y: coords[item].split, c: coords[item].dec, o: opacity}
+						]));
+					}
 				}
 			}
 		});
 	}
 
-	table = [
-		[null, null, legend],
-		[yLabel, yAxis, plot],
-		[null, null, (xAxisMode === 'cat') ? xAxisCat : xAxisTime],
-		[null, null, xLabel]
-	];
+	// if we are not in gallery mode
+	if (galleryId === '') {
+		table = [
+			[null, null, legend, null],
+			[yLabel, yAxis, plot, null],
+			[null, null, (xAxisMode === 'cat') ? xAxisCat : xAxisTime, null]//,
+			// [null, null, xLabel, null]
+		];
+	} else if (chartType === 'dos') { // gallery dos mode
+		table = [[plot]];
+	} else { // gallery spaeth and genealogy mode
+		table = [[yLabel, yAxis, plot]];
+	}
 
 	chart = new Plottable.Components.Table(table);
 
-	chart.renderTo('#coverageChart');
+	chart.renderTo('#scotus-chart-' + galleryId);
 
 	window.addEventListener('resize', function () {
 		chart.redraw();
 	});
 
+	if (galleryId === '') {
 
-	caseHover = new Plottable.Interactions.Pointer();
+		caseHover = new Plottable.Interactions.Pointer();
 
-	caseHoverGroup = cases
-		.foreground()
-		.append('g')
-		.attr('transform', 'translate(0,0)')
-		.style('visibility', 'hidden');
-	caseHoverGroup
-		.append('circle')
-		.attr({
-			'stroke': 'black',
-			'fill': 'none',
-			'r': 15,
-			'cx': 0,
-			'cy': 0
+		caseHoverGroup = cases
+			.foreground()
+			.append('g')
+			.attr('transform', 'translate(0,0)')
+			.style('visibility', 'hidden');
+		caseHoverGroup
+			.append('circle')
+			.attr({
+				'stroke': 'black',
+				'fill': 'none',
+				'r': 15,
+				'cx': 0,
+				'cy': 0
+			});
+		// caseHoverText = caseHoverGroup
+		// 	.append('text')
+		// 	.attr('text-anchor', 'middle')
+		// 	.attr('transform', 'translate(0,0)')
+		// 	.text(defaultCaseHoverText);
+
+		caseHover.onPointerMove(function (p) {
+			var datum = null,
+				position = null,
+				nearestEntity = null,
+				cpd = null;
+
+			if (typeof cases.entityNearest === 'function') {
+				nearestEntity = cases.entityNearest(p);
+				if (nearestEntity !== null) {
+					datum = nearestEntity.datum;
+					position = nearestEntity.position;
+				}
+			} else {
+				cpd = cases.getClosestPlotData(p);
+				if (cpd.data.length > 0) {
+					datum = cpd.data[0];
+					position = cpd.pixelPoints[0];
+				}
+			}
+			if (datum !== null) {
+				// caseHoverText.text(datum.case_name_short);
+				caseHoverGroup
+					.attr('transform', 'translate(' + position.x + ',' + position.y + ')')
+					.style('visibility', 'visible')
+					.select('circle')
+					.attr('r', sizeScale.scale(scalePlot(datum.citation_count, datum.count - 1)) / 2);
+			} else {
+				// caseHoverText.text(defaultCaseHoverText);
+				caseHoverGroup.style('visibility', 'hidden');
+			}
 		});
-	// caseHoverText = caseHoverGroup
-	// 	.append('text')
-	// 	.attr('text-anchor', 'middle')
-	// 	.attr('transform', 'translate(0,0)')
-	// 	.text(defaultCaseHoverText);
-
-	caseHover.onPointerMove(function (p) {
-		var datum = null,
-			position = null,
-			nearestEntity = null,
-			cpd = null;
-
-		if (typeof cases.entityNearest === 'function') {
-			nearestEntity = cases.entityNearest(p);
-			if (nearestEntity !== null) {
-				datum = nearestEntity.datum;
-				position = nearestEntity.position;
-			}
-		} else {
-			cpd = cases.getClosestPlotData(p);
-			if (cpd.data.length > 0) {
-				datum = cpd.data[0];
-				position = cpd.pixelPoints[0];
-			}
-		}
-		if (datum !== null) {
-			// caseHoverText.text(datum.case_name_short);
-			caseHoverGroup
-				.attr('transform', 'translate(' + position.x + ',' + position.y + ')')
-				.style('visibility', 'visible')
-				.select('circle')
-				.attr('r', d3.max([5, sizeScale.scale(datum.citation_count) / 2]));
-		} else {
+		caseHover.onPointerExit(function () {
 			// caseHoverText.text(defaultCaseHoverText);
 			caseHoverGroup.style('visibility', 'hidden');
+		});
+
+		if (mode === 'view' && galleryId === '') {
+			caseHover.attachTo(cases);
+			caseClick = new Plottable.Interactions.Click();
+			caseClick.onClick(function (c) {
+				var entity = cases.entitiesAt(c)[0];
+
+				if (entity) {
+					window.open('https://www.courtlistener.com' + entity.datum.absolute_url, '_blank');
+				}
+			});
+			caseClick.attachTo(cases);
 		}
-	});
-	caseHover.onPointerExit(function () {
-		// caseHoverText.text(defaultCaseHoverText);
-		caseHoverGroup.style('visibility', 'hidden');
-	});
-	caseHover.attachTo(cases);
 
-	caseClick = new Plottable.Interactions.Click();
+		if (mode === 'edit' && chartType === 'dos') {
+			caseDrag = new Plottable.Interactions.Drag();
 
-	caseClick.onClick(function (c) {
-		var datum = null,
-			nearestEntity = null,
-			cpd = null;
+			caseDrag.onDragStart(function (c) {
+				var datum = null,
+					nearestEntity = null,
+					cpd = null;
 
-		if (typeof cases.entityNearest === 'function') {
-			nearestEntity = cases.entityNearest(c);
+				if (typeof cases.entityNearest === 'function') {
+					nearestEntity = cases.entityNearest(c);
 
-			if (nearestEntity !== null) {
-				datum = nearestEntity.datum;
-			}
-		} else {
-			cpd = cases.getClosestPlotData(c);
-			if (cpd.data.length > 0) {
-				datum = cpd.data[0];
-			}
+					if (nearestEntity !== null) {
+						datum = nearestEntity.datum;
+					}
+				} else {
+					cpd = cases.getClosestPlotData(c);
+					if (cpd.data.length > 0) {
+						datum = cpd.data[0];
+					}
+				}
+				if (datum !== null) {
+					dragTarget = datum;
+				}
+			});
+
+	// http://plottablejs.org/examples/datasets/
+	// http://plottablejs.org/examples/spacerace/
+
+			caseDrag.onDrag(function (c, b) {
+				// console.log(b.y, Math.round(100 * b.y / cases.height(), 0));
+				dragTarget.y = Math.round(100 * b.y / cases.height(), 0);
+				cases.redraw();
+			});
+
+			caseDrag.onDragEnd(function (c, b) {
+				// console.log('end', 100 * b.y / cases.height(), dragTarget.case_name_short);
+				dragTarget.y = Math.round(100 * b.y / cases.height(), 0);
+				calcConnections();
+				chart.redraw();
+			});
+
+			caseDrag.attachTo(cases);
 		}
-		if (datum !== null) {
-			if (breakout === 'blank') {
-				// handle this side differently in order to break out of embed
-				window.location.assign('https://www.courtlistener.com' + datum.absolute_url);
-			} else {
-				window.location.assign(datum.absolute_url);
-			}
-		}
-	});
-
-	caseClick.attachTo(cases);
-
+	}
+	// the following bit of extremely odd looking code is in place to counter
+	// a behavior seen with IE when it is used in place on the production system
+	// that does not appear in dev. The bug causes in IE portions of the chart to
+	// not be visible.
+	$('svg').css('line-height', $('svg').css('line-height'));
 	return workingJSON;
-
 }
 
+/**
+ * [citationTable description]
+ * @param  {string} target  [description]
+ * @param  {object} data    [description]
+ * @param  {array} columns [description]
+ * @returns {string} [description]
+ */
 function citationTable(target, data, columns) {
 	var table = d3.select(target).append('div').attr('class', 'table-responsive').append('table'),
 		thead = table.append('thead'),
@@ -775,10 +928,10 @@ function citationTable(target, data, columns) {
 
 						if (c.s === d.s) {
 							if (d.d === 'a') {
-								label += ' <span class="glyphicon glyphicon-triangle-top" aria-hidden="true"></span>';
+								label += ' <i class="fa fa-caret-up" aria-hidden="true"></i>';
 								d.d = 'd';
 							} else {
-								label += ' <span class="glyphicon glyphicon-triangle-bottom" aria-hidden="true"></span>';
+								label += ' <i class="fa fa-caret-down" aria-hidden="true"></i>';
 								d.d = 'a';
 							}
 						}
@@ -793,10 +946,20 @@ function citationTable(target, data, columns) {
 
 	rows.selectAll('td') // cells
 		.data(function (row) {
+			var val = '';
+
 			return columns.map(function (column) {
+				if ($.isArray(column.s)) {
+					val = [];
+					column.s.forEach(function (i) {
+						val.push(row[i]);
+					});
+				} else {
+					val = row[column.s];
+				}
 				return {
 					column: column.s,
-					value: row[column.s],
+					value: val,
 					link: row[column.a],
 					format: column.f
 				};
@@ -822,70 +985,116 @@ function citationTable(target, data, columns) {
 }
 
 /**
- * [casesMetadata description]
- * @param  {[type]} target [description]
- * @param  {[type]} data   [description]
- * @return {[type]}        [description]
+ * [degreeOfDissent description]
+ * @param  {object} cases [description]
+ * @return {object}       containing degree of dissent, number of cases used, and total number of cases
  */
-function casesMetadata(target, data) {
-	var div = d3.select(target).append('div');
+function degreeOfDissent(cases) {
+	var dods = [];
 
-	function degreeOfDissent(cases) {
-// @property
-// def degree_of_dissent(self):
-//     """Calculate the average between all the cases included in the viz.
+	cases.forEach(function (c) {
+		var minority = c.votes_minority;
 
-//     The method is to calculate the average of
+		if (minority.toString() !== '-1') {
+			dods.push(minority * 0.25);
+		}
+	});
 
-//         1 - (difference between votes / total votes)
-
-//     So in a 5-4 decision, that'd be:
-
-//         1 - ((5-4) / (5 + 4)) --> 1 - 1/9 --> 0.89
-
-//     And then you'd just average these values for every case that's displayed.
-//     """
-//     dods = []
-//     for cluster in self.clusters.all():
-//         majority = cluster.scdb_votes_majority
-//         minority = cluster.scdb_votes_minority
-//         dods.append(1 - float(
-//             abs(majority - minority) /
-//             sum([majority, minority])
-//         ))
-//     return sum(dods) / len(dods)
-		var dods = [];
-
-		cases.forEach(function (c) {
-			var majority = c.votes_majority,
-				minority = c.votes_minority;
-
-			if (majority !== -1 && minority !== -1) {
-				dods.push(1 - (Math.abs(majority - minority) / (majority + minority)));
-			}
-		});
-
-		return (d3.sum(dods) / dods.length) * 100;
-	}
-
-	div.append('h2')
-		.text('Metadata for ' + data[data.length - 1].case_name + ' to ' + data[0].case_name);
-
-	div.append('p')
-		.text('Degree of Dissent: ' + degreeOfDissent(data).toFixed(2) + '%');
+	return {'d': (d3.sum(dods) / dods.length),
+		'c': dods.length,
+		'l': cases.length};
 }
 
+/**
+ * [attachDoDInfo description]
+ * @param  {string} target  [description]
+ * @param  {object} dissent [description]
+ */
+function attachDoDInfo(target, dissent) {
+	d3.select(target)
+		.text(dissent.d.toFixed(2) +
+			' for ' + dissent.c +
+			' cases of ' + dissent.l);
+}
+
+/**
+ * [casesMetadata description]
+ * @param  {[type]} data   [description]
+ */
+function casesMetadata(data) {
+	var dodInfo = '#dod-info',
+		dodMeter = d3.select('#dod-chart'),
+		meter = '',
+		dissent = 0,
+		i = 0;
+
+	if (data.length) { // if there are cases
+		dissent = degreeOfDissent(data);
+
+		attachDoDInfo(dodInfo, dissent);
+
+		dodMeter.html('');
+
+		meter = dodMeter.append('svg')
+			.attr('height', 40)
+			.append('g')
+			.attr('stroke', 'black')
+			.attr('font-family', 'Arial')
+			.attr('font-size', 12)
+			.attr('text-anchor', 'middle');
+
+		meter.append('line') // base
+			.attr('x1', 10)
+			.attr('y1', 20)
+			.attr('x2', 110)
+			.attr('y2', 20);
+
+		for (i = 0; i < 5; i++) {
+			meter.append('line')
+				.attr('x1', (i * 25) + 10)
+				.attr('y1', 20)
+				.attr('x2', (i * 25) + 10)
+				.attr('y2', 11);
+			meter.append('text')
+				.attr('x', (i * 25) + 10)
+				.attr('y', 35)
+				.text((9 - i) + '-' + i);
+		}
+
+		meter.append('text')
+				.attr('x', 10)
+				.attr('y', 9)
+				.text('0');
+		meter.append('text')
+				.attr('x', 109)
+				.attr('y', 9)
+				.text('1');
+
+		meter.append('path')
+			.attr('fill', 'red')
+			.attr('d', 'M' + ((dissent.d * 100) + 10) + ' 18 l -10 -10 l 20 0 z');
+	}
+}
+
+/**
+ * [description]
+ */
 $(document).ready(function () {
 	var settings = {
 			'type': 'dos',
 			'xaxis': 'cat',
-			'dos': 3
+			'dos': 3,
+			'mode': 'view'
 		},
 		args = {},
 		chartTarget = '#chart',
 		tableTarget = '#case-table',
-		metadataTarget = '#case-metadata',
-		caseCountTarget = '#case-count';
+		caseCountTarget = '#case-count',
+		item = {},
+		used = {},
+		dissent = {},
+		height = 0,
+		type = '';
 
 	// Read a page's GET URL variables and return them as an associative array.
 	function getUrlVars() {
@@ -896,7 +1105,6 @@ $(document).ready(function () {
 
 		for (i = 0; i < hashes.length; i++) {
 			hash = hashes[i].split('=');
-//			vars.push(hash[0]);
 			vars[hash[0]] = hash[1];
 		}
 		return vars;
@@ -911,7 +1119,7 @@ $(document).ready(function () {
 			embedPost = '" frameborder="0" allowfullscreen></iframe>';
 
 		for (key in payload) {
-			if (payload.hasOwnProperty(key)) {
+			if (payload.hasOwnProperty(key) && key !== 'mode') {
 				params += ((count === 0) ? '?' : '&') + key + '=' + payload[key];
 				count++;
 			}
@@ -937,41 +1145,91 @@ $(document).ready(function () {
 	 * @param  {string} s value to format
 	 * @return {string} html formatted string
 	 */
-	function bold(s) {
-		return '<strong>' + s + '</strong>';
+	// function bold(s) {
+	// 	return '<strong>' + s + '</strong>';
+	// }
+
+	function formatSplit(s) {
+		var r = 'no data';
+
+		// filter out nulls and out of bound numbers
+		if (s[0].toString() !== '-1' || s[1].toString() !== '-1') {
+			r = s[0] + '-' + s[1];
+		}
+		return r;
 	}
 
-	// opinions_cited array of number or
-	// array of object of name by cite number with dictionary of values
-	// {"112331": {"opacity": 1}}
+	function formatDecision(s) {
+		var dec = ['Neutral', 'Conservative', 'Liberal', 'Unspecifiable', 'Unknown'],
+			r = 'no data';
 
-	// redraw on screen resize - chart only, not table?
+		// filter out nulls and out of bound numbers
+		if (s && s >= 0 && s <= 4) {
+			r = dec[s];
+		}
+		return r;
+	}
 
-	// dos legend build order
+	function scdbLink(s) {
+		var value = 'no data';
 
-	// switch to hash and move vars outside
-	// type = chartType [spread, spaeth, gene]
-	// xaxis = axisType [cat, time]
-	// dos = maxDos [integer 1->]
-	// if target = _blank then open links in new tab?
-	//
-	// controls update url without adding to history
+		if (s !== '') {
+			value = '<a href="http://supremecourtdatabase.org/analysisCaseDetail.php?cid=' +
+				s + '" target="_blank">' + s + '</a>' +
+				'&nbsp;<i class="gray fa fa-external-link"></i>';
+		}
+		return value;
+	}
+
+	/**
+	 * [setHeight description]
+	 * @param {string} target [description]
+	 * @param {boolean} full   [description]
+	 * @returns {integer} [description]
+	 */
+	function setHeight(target, full) {
+		var h = 0,
+			v = 0,
+			w = 0;
+
+		v = $(target).data('height');
+		if (typeof v !== 'undefined') {
+			// if data is set on target then use data-height
+			h = v;
+		} else if (typeof settings.height !== 'undefined') {
+			// if url settings contain height use that
+			h = settings.height;
+		}
+		// if height is either 'fullscreen' or in ratio format
+		if (h === 'screen') {
+			h = $(window).height();
+		}
+		if (typeof h === 'string' && h.indexOf(':') !== -1) {
+			w = $(target).width();
+			h = (w / h.split(':')[0]) * h.split(':')[1];
+		}
+		if (h === 0) {
+			// if none of these use defaults based on full
+			h = (full) ? 600 : 300;
+		}
+		return h;
+	}
+
+	/**
+	 * [trigger description]
+	 * @param  {object} params [description]
+	 */
 	function trigger(params) {
 		var chartType = params.type,
 			axisType = params.xaxis,
-			heightType = $('#heightTypeSelect').val(),
-			maxDoS = params.dos,
-			breakout = params.target,
-			JSONpath = $('#dataSourceSelect').val();
+			maxDoS = params.dos;
 
-		// for courtlistener unwrap this json call
-		var used = {};
-
-		// citationJSON = json;
-		citationJSON = JSON.parse(JSON.stringify(opinions));
+		height = setHeight(chartTarget, true);
+		// type = chartType [spread, spaeth, gene]
+		// xaxis = axisType [cat, time]
+		// dos = maxDos [integer 1->]
 		d3.select(chartTarget).select('svg').remove();
 		d3.select(tableTarget).select('table').remove();
-		d3.select(metadataTarget).text('');
 
 			// drawGraph (
 			// 	target -- where to draw it
@@ -981,18 +1239,25 @@ $(document).ready(function () {
 			// 	maxDoS -- maximum degree of separation to show, is this only DoS
 			// )
 
-		used = drawGraph(chartTarget, chartType, axisType, heightType, maxDoS, breakout);
+		used = drawGraph(chartTarget, opinions, chartType, axisType, height, maxDoS, params.mode, '');
 		$(caseCountTarget).text(used.length);
 		citationTable(tableTarget, used,
 			[
+				// {s: 'source', }
 				// {s: 'id', f: bold},
+				// {s: 'order', l: 'Degrees of Separation'},
 				{s: 'case_name', l: 'Case Name', a: 'absolute_url'},
+				{s: 'scdb_id', l: 'SCDB', f: scdbLink},
 				{s: 'citation_count', l: 'Total Citations'},
-				{s: 'order', l: 'Degrees of Separation'},
-				{s: 'date_filed', l: 'Date Filed', f: dateFormat}
+				{s: 'date_filed', l: 'Date Filed', f: dateFormat},
+				{s: ['votes_majority', 'votes_minority'], l: 'Vote Count', f: formatSplit},
+				{s: 'decision_direction', l: 'Direction', f: formatDecision}
+				// {s: '', l: 'Spaeth Issue'},
+				// {s: '', l: 'Issue Area'},
+				// {s: '', l: 'Provision'}
 			]
 		);
-		casesMetadata(metadataTarget, used);
+		casesMetadata(used);
 	}
 
 	// get url search parameters
@@ -1001,31 +1266,64 @@ $(document).ready(function () {
 	// merge settings and args
 	$.extend(settings, args);
 
-	$('#chartTypeSelect').val(settings.type);
-	$('#axisTypeSelect').val(settings.xaxis);
-	$('#degreesOfSeparationSelect').val(settings.dos);
+	function setDosEnable() {
+		if (settings.type === 'genealogy') {
+			$('#degreesOfSeparationSelect').prop('disabled', true);
+		} else {
+			$('#degreesOfSeparationSelect').prop('disabled', false);
+		}
+	}
+	setDosEnable();
 
+	if (opinions.hasOwnProperty('opinion_clusters')) {
+		// do one
+		$('#chartTypeSelect').val(settings.type);
+		$('#axisTypeSelect').val(settings.xaxis);
+		$('#heightTypeSelect').val(settings.height);
+		$('#degreesOfSeparationSelect').val(settings.dos);
 
-	// unwrap dataSourceSelect for courtlistener
-	// on select JSON in the data and then call drawGraph()
-    $('#chartTypeSelect').change(function () {
-        settings.type = $('#chartTypeSelect').val();
-        updateUrl(settings);
-        trigger(settings);
-    });
-    $('#axisTypeSelect').change(function () {
-        settings.xaxis = $('#axisTypeSelect').val();
-        updateUrl(settings);
-        trigger(settings);
-    });
-    $('#heightTypeSelect').change(function () {
-        trigger(settings);
-    });
-    $('#degreesOfSeparationSelect').change(function () {
-        settings.dos = $('#degreesOfSeparationSelect').val();
-        updateUrl(settings);
-        trigger(settings);
-    });
-    trigger(settings);
+		// unwrap dataSourceSelect for courtlistener
+		// on select JSON in the data and then call drawGraph()
+		$('#chartTypeSelect').change(function () {
+			settings.type = $('#chartTypeSelect').val();
+			setDosEnable();
+			updateUrl(settings);
+			trigger(settings);
+		});
+		$('#axisTypeSelect').change(function () {
+			settings.xaxis = $('#axisTypeSelect').val();
+			updateUrl(settings);
+			trigger(settings);
+		});
+		$('#heightTypeSelect').change(function () {
+			settings.height = $('#heightTypeSelect').val();
+			updateUrl(settings);
+			trigger(settings);
+		});
+		$('#degreesOfSeparationSelect').change(function () {
+			settings.dos = $('#degreesOfSeparationSelect').val();
+			updateUrl(settings);
+			trigger(settings);
+		});
+		$('#editMode1, #editMode2').change(function () {
+			settings.mode = $('#editMode1:checked, #editMode2:checked').val();
+			trigger(settings);
+		});
+		trigger(settings);
+	} else {
+		// gallery
+		for (item in opinions) {
+			if (opinions.hasOwnProperty(item)) {
+				chartTarget = '#chart-' + item.toString();
+				// if settigns are embedded in the JSON then use them rather than defaults
+				type = ['dos', 'spaeth', 'genealogy'][item % 3];
 
+				height = setHeight(chartTarget, false);
+
+				used = drawGraph(chartTarget, opinions[item], type, 'cat', height, 3, 'view', item);
+				dissent = degreeOfDissent(used);
+				attachDoDInfo('#dod-info-' + item.toString(), dissent);
+			}
+		}
+	}
 });
