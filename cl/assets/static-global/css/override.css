@@ -809,6 +809,13 @@ body.embed div.container {
 body.embed div#title-block {
     margin-bottom: 0;
 }
+body.embed .plottable .axis text{
+    font-size: 10px;
+}
+
+body.embed .plottable .label-area text {
+    font-size: 11px;
+}
 .plottable .light-label .text-line {
     fill: #000;
 }
