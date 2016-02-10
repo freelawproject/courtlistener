@@ -16,6 +16,7 @@
     Citator development: Karen Rustad and Rowyn McDonald
     Coverage graphs: Rowyn McDonald, Jason Aller
     PageRank development: Krist Jin
+    Visualization tools: Jason Aller, Colin Starger, University of Baltimore
 
     Graphic Design: Ryan Moon
 
@@ -24,17 +25,20 @@
      - The Lawbox team, Nicholas Zeltzer and Paul Kerschen
      - Anonymous donors
 
+    Additional support at:
+     - https://www.courtlistener.com/about/
+
 
 /* SITE */
   Standards: HTML5, CSS3
   Components:
         Text Extraction: Antiword, libwpd-tools, pdf2text
         Audio: avconv, eyeD3
-        Code: Celery, Django, jQuery (NobelCount), lxml,
-              Mercurial, RabbitMQ, requests, sunburnt,
-              Tesseract, titlecase
-        Display: Silk icons, Blueprint CSS, Bootstrap, Font Awesome
-        Infrastructure: Apache2, Linux, Postgres, Solr
+        Code: Celery, Django, jQuery, D3, plottable.js, lxml, Git, requests,
+              sunburnt, Tesseract
+        Display: Bootstrap, Font Awesome
+        Infrastructure: Apache2, Linux, Postgres, Solr, Redis
+        More: requirements.txt
   Source: https://github.com/freelawproject/courtlistener/
 
 

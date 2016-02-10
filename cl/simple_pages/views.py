@@ -263,6 +263,15 @@ def robots(request):
     return response
 
 
+@cache_page(60 * 60 * 12)  # 12 hours
+def humans(request):
+    """Generate the humans.txt file"""
+    response = HttpResponse(content_type='text/plain')
+    t = loader.get_template('humans.txt')
+    response.write(t.render({}))
+    return response
+
+
 def validate_for_bing(request):
     return HttpResponse('<?xml version="1.0"?><users><user>8BA95D8EAA744379D80D9F70847EA156</user></users>')
 

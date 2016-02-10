@@ -6,7 +6,7 @@ from cl.simple_pages.views import (
     tools_page, validate_for_google, validate_for_google2, validate_for_wot,
     validate_for_bing, robots, advanced_search, contact_thanks, contact, feeds,
     coverage_graph, faq, about, browser_warning, serve_static_file, old_terms,
-    latest_terms, contribute, markdown_help
+    latest_terms, contribute, markdown_help, humans,
 )
 
 mime_types = ('pdf', 'wpd', 'txt', 'doc', 'html', 'mp3')
@@ -49,11 +49,16 @@ urlpatterns = [
         name='bad_browser',
     ),
 
-    # Robots
+    # Robots & Humans
     url(
-        r'^robots.txt$',
+        r'^robots\.txt$',
         robots,
         name='robots'
+    ),
+    url(
+        r'^humans\.txt$',
+        humans,
+        name='humans',
     ),
 
     # Sitemap:
