@@ -38,14 +38,14 @@ else:
     PAYMENT_TESTING_MODE = False
 if PAYMENT_TESTING_MODE:
     PAYPAL_ENDPOINT = 'https://api.sandbox.paypal.com'
-    PAYPAL_ACCOUNT = 'donate@freelawproject.org'
+    PAYPAL_ACCOUNT = 'donate@free.law'
     PAYPAL_CLIENT_ID = ''
     PAYPAL_SECRET_KEY = ''
     STRIPE_SECRET_KEY = ''
     STRIPE_PUBLIC_KEY = ''
 else:
     PAYPAL_ENDPOINT = 'https://api.paypal.com'
-    PAYPAL_ACCOUNT = 'donate@freelawproject.org'
+    PAYPAL_ACCOUNT = 'donate@free.law'
     PAYPAL_CLIENT_ID = ''
     PAYPAL_SECRET_KEY = ''
     STRIPE_SECRET_KEY = ''

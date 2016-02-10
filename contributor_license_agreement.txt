@@ -37,7 +37,7 @@ future Contributions submitted to the Project. In return, the Project shall not
 use Your Contributions in a way that is contrary to the public benefit or
 inconsistent with universal access to public court documents. For details, see
 the ByLaws of the Project at:
- - http://freelawproject.org/non-profit-documents/
+ - https://free.law/non-profit-documents/
 
 Except for the license granted herein to the Project and recipients of software
 distributed by the Project, You reserve all right, title, and interest in and

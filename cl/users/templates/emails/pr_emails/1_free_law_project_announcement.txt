@@ -15,13 +15,13 @@ In 2009, with Brian as my adviser, I started the CourtListener platform as part 
 
 More information about our work is on the Free Law Project about page, where you can find a list of current activities and non-profit documents:
 
- - http://www.freelawproject.org/about
+ - https://free.law/about/
 
 Brian and I expect to pursue grant funding from foundations, but also hope that those who support the goals of improving public access to the law will donate directly so that the non-profit can put more developers to work on these efforts.
 
 We'll periodically email you updates like this one when we we're announcing new features or projects, and you can follow our work on:
 
- - Our blog at http://freelawproject.org, or
+ - Our blog at https://free.law, or
  - Twitter at https://twitter.com/freelawproject
 
 We believe this is a huge day for the open legal movement, and we hope you'll help share the news by telling your friends and colleagues.

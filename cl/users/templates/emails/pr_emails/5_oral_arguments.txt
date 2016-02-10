@@ -16,7 +16,7 @@ For now we are getting oral argument audio in real time from ten federal appella
 
 We’re very excited about being able to provide oral argument data and have posted more details on our blog:
 
-  - http://freelawproject.org/2014/10/31/announcing-oral-arguments-on-courtlistener-2/
+  - https://free.law/2014/10/31/announcing-oral-arguments-on-courtlistener-2/
 
 To start using Oral Arguments, simply do a search and switch to the oral arguments tab. From there you can filter by all the fields you expect from CourtListener.
 

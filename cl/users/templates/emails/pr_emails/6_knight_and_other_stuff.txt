@@ -8,7 +8,7 @@ Knight Foundation Winners!
 --------------------------
 First, we've been given a grant from the John S. and James L. Knight Foundation to build a new tool called Open Judiciary. The goal of the new project will be to add transparency to judicial elections to create more informed voters. You can read more about the announcement here:
 
-http://freelawproject.org/2015/07/22/knight-foundation-to-support-openjudiciary-org/
+https://free.law/2015/07/22/knight-foundation-to-support-openjudiciary-org/
 
 Or can read our grant proposal online here:
 
@@ -21,7 +21,7 @@ New Board of Directors
 ----------------------
 We've been working for some time to create a great Board of Directors for Free Law Project, and we are delighted to share that our first two choices for the Board were willing to join us in our mission! Tom Bruce of the Legal Information Institute and Jerry Goldman of the Oyez Project have agreed to join our board. Both Tom and Jerry have years of experience in this field that are going to be incredibly valuable to our goals. To read more about Tom & Jerry, see our new Board of Directors page:
 
-http://freelawproject.org/2015/07/23/welcoming-thomas-bruce-and-jerry-goldman-to-our-board/
+https://free.law/2015/07/23/welcoming-thomas-bruce-and-jerry-goldman-to-our-board/
 
 We are still looking for a few more board members. If you know somebody that might fit the bill, please send them our way!
 
@@ -30,30 +30,30 @@ New Versions of RECAP
 ---------------------
 We've continued our work on the RECAP extensions and are happy to share that we've released several new versions. The new versions update the code to make it more modern, fix a few minor issues, and make the entire platform more stable. If you already use our RECAP extensions to get free court documents out of PACER, you'll be upgraded automatically. You can read more about the upgrades at:
 
-http://freelawproject.org/2015/04/22/new-versions-of-recap-extensions-out-now/
+https://free.law/2015/04/22/new-versions-of-recap-extensions-out-now/
 
 
 PACER Problems Explained
 ------------------------
 One of our co-founders, Brian Carver wrote an epic three-part series about the problems of PACER and what can be done about it:
 
- 1. What is the "PACER Problem": http://freelawproject.org/2015/03/20/what-is-the-pacer-problem/
- 2. What Should be Done: http://freelawproject.org/2015/03/24/what-should-be-done-about-the-pacer-problem/
- 3. Why Congress Should Care: http://freelawproject.org/2015/03/23/why-should-congress-care-about-pacer/
+ 1. What is the "PACER Problem": https://free.law/2015/03/20/what-is-the-pacer-problem/
+ 2. What Should be Done: https://free.law/2015/03/24/what-should-be-done-about-the-pacer-problem/
+ 3. Why Congress Should Care: https://free.law/2015/03/23/why-should-congress-care-about-pacer/
 
 
 Real Time Alerts
 ----------------
 CourtListener already sends email alerts at the end of each day, week, or month, and we recently upgraded it to also send real-time alerts within an hour or so of when an opinion appears on a court's website. You can read more about this (donor-only) feature at:
 
-http://freelawproject.org/2015/01/05/courtlistener-will-now-send-alerts-in-real-time/
+https://free.law/2015/01/05/courtlistener-will-now-send-alerts-in-real-time/
 
 
 Spaeth Supreme Court Database Integration
 -----------------------------------------
 Finally, a bit of news for the legal data nerds. We're happy to share that we've integrated with the Supreme Court Database (Spaeth data), and that we now have a new field in our data to indicate the "scdb_id". This allows you to match our API with any of the additional fields that have been curated in the Supreme Court Database. For more information, see:
 
-http://freelawproject.org/2014/12/21/courtlistener-is-now-integrated-with-the-supreme-court-database/
+https://free.law/2014/12/21/courtlistener-is-now-integrated-with-the-supreme-court-database/
 
 
 New Ways to Support Our Work

@@ -12,7 +12,7 @@ The second major factor of the CiteGeist score that we're releasing today is a q
 
 For more information about these features, see our blog post on the topic:
 
- - http://freelawproject.org/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/
+ - https://free.law/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/
 
 
 A New API for Developers and Researchers
@@ -23,7 +23,7 @@ This is a feature we've wanted to build for years and years and on our blog we'v
 
 For more information on this feature, see our blog post we put out just today:
 
- -http://freelawproject.org/2013/11/19/free-law-project-unveils-api-for-american-opinions/
+ -https://free.law/2013/11/19/free-law-project-unveils-api-for-american-opinions/
 
 We hope that these new features will unleash a new surge in legal research and technology, and that you'll help support our project so that we can continue bringing these technologies and information to the fore.
 

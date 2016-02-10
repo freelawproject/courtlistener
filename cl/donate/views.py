@@ -32,12 +32,12 @@ def send_thank_you_email(donation):
                   'Thanks again,\n\n'
                   'Michael Lissner and Brian Carver\n'
                   'Founders of Free Law Project\n'
-                  'http://freelawproject.org/contact/') % \
+                  'https://free.law/contact/') % \
                  (user.first_name, donation.amount, settings.EIN, )
     send_mail(
         email_subject,
         email_body,
-        'Free Law Project <donate@freelawproject.org>',
+        'Free Law Project <donate@free.law>',
         [user.email]
     )
 

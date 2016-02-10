@@ -323,7 +323,7 @@ def set_mp3_meta_data(audio_obj, mp3_path):
         ))
     audio_file.tag.genre = u'Speech'
     audio_file.tag.publisher = u'Free Law Project'
-    audio_file.tag.publisher_url = u'http://www.freelawproject.org'
+    audio_file.tag.publisher_url = u'https://free.law'
     audio_file.tag.recording_date = audio_obj.docket.date_argued.strftime('%Y-%m-%d')
 
     # Add images to the mp3. If it has a seal, use that for the Front Cover

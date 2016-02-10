@@ -30,13 +30,13 @@ info_tips = (
     'Using <a href="https://smile.amazon.com/ch/46-3342480" target="_blank">smile.amazon.com</a>, you can donate 0.5% of every purchase you make on Amazon to Free Law Project, the non-profit that sponsors CourtListener.',
 
     # Recognition
-    'Free Law Project\'s founders were <a href="http://freelawproject.org/2014/07/14/free-law-project-co-founders-named-to-fastcase-50-for-2014/" target="_blank">selected as FastCase 50 winners in 2014</a>.',
-    'Oral Arguments were <a href="http://freelawproject.org/2014/12/04/free-law-project-recognized-in-two-of-top-ten-legal-hacks-of-2014-by-dc-legal-hackers/" target="_blank">selected as a Top Ten Legal Hack of 2014</a>.',
+    'Free Law Project\'s founders were <a href="https://free.law/2014/07/14/free-law-project-co-founders-named-to-fastcase-50-for-2014/" target="_blank">selected as FastCase 50 winners in 2014</a>.',
+    'Oral Arguments were <a href="https://free.law/2014/12/04/free-law-project-recognized-in-two-of-top-ten-legal-hacks-of-2014-by-dc-legal-hackers/" target="_blank">selected as a Top Ten Legal Hack of 2014</a>.',
 
     # Open source
     'All of code powering CourtListener is <a href="https://github.com/freelawproject/courtlistener" target="_blank">open source</a> and can be copied, shared, and contributed to.',
     'We need volunteers to help us with coding, design and legal research. <a href="/contact/" target="_blank">Contact us for more info</a> or check out our <a href="https://trello.com/b/l0qS4yhd/assistance-needed" target="_blank">help wanted board</a> to get started.',
-    'The current design of CourtListener was <a href="http://freelawproject.org/2014/11/13/check-out-courtlisteners-new-paint-and-features/" target="_blank">created by a volunteer</a>.',
+    'The current design of CourtListener was <a href="https://free.law/2014/11/13/check-out-courtlisteners-new-paint-and-features/" target="_blank">created by a volunteer</a>.',
 
     # Neutral Citations
     'WestLaw currently has a monopoly on citations. This hinders legal innovation but few courts have adopted <a href="/faq/#explain-neutral-citations">neutral citations</a>.',
@@ -46,9 +46,10 @@ info_tips = (
     'There is an <a href="/feeds/">RSS feed</a> for every query so you can easily stay up to date.',
     'A podcast is created for every oral argument query that you make.',
     'CourtListener has an <a href="%s">API</a> so anybody can easily use our data.' % reverse("api_index"),
-    'Oral Arguments are available in <a href="http://freelawproject.org/2014/11/09/more-oral-argument-news/">Stitcher Radio</a>.',
-    'Search Relevancy on CourtListener is <a href="http://freelawproject.org/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/" target="_blank">powered by the citation network between cases.</a>',
+    'Oral Arguments are available in <a href="https://free.law/2014/11/09/more-oral-argument-news/">Stitcher Radio</a>.',
+    'Search Relevancy on CourtListener is <a href="https://free.law/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/" target="_blank">powered by the citation network between cases.</a>',
     'You can make sophisticated queries using a number of <a href="/search/advanced-techniques/">advanced search features</a>.',
+    'You can get an alert whenever an opinion is cited by <a href="https://free.law/2016/01/30/citation-searching-on-courtlistener/">using a Citation Search</a>.',
 )
 def inject_random_tip(request):
     return {'TIP': random.choice(info_tips)}
