@@ -26,7 +26,6 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 	var workingJSON = JSON.parse(JSON.stringify(opinions)), // make a modifiable copy to retain original
 		chartMode = (typeof chartType !== 'undefined') ? chartType : 'dos',
 		xAxisMode = (typeof axisType !== 'undefined') ? axisType : 'cat',
-		chartWidth = $(target).width(), // the width of the enclosing div
 		heightPx = height + 'px', // default, height is processed below
 		parseDate = d3.time.format('%Y-%m-%d').parse, // to parse dates in the JSON into d3 dates
 		xDate = d3.time.format('%b-%Y'), // to format date for display
@@ -40,6 +39,7 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 		label = '',
 		//scales
 		xScaleCat = {}, // the scaling function for x in category mode
+		xCatPadding = 1, // padding in category mode to be added to right hand side
 		xScaleTime = {}, // the scaling function for x in timeline mode
 		yScale = {}, // the scaling function for y
 		sizeScale = {}, // the scale used to size the case circles
@@ -103,6 +103,18 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 			name = b + ':' + a;
 		}
 		return name;
+	}
+
+	function setLabelAngle() {
+
+		// console.log($(target).width() / caseCount);
+
+		// change label angle when it gets too tight to read
+		if ($(target).width() / caseCount < 56) {
+			xAxisCat.tickLabelAngle(-90);
+		} else {
+			xAxisCat.tickLabelAngle(0);
+		}
 	}
 
 	/**
@@ -379,6 +391,17 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 	xScaleCat.domain(workingJSON.map(function (d) {
 		return parseDate(d.date_filed);
 	}));
+
+	// the rangeBand is the percent of the width of the chart that a single data point takes up
+	// the floor of 5 div this div 100 yeilds a number from 0 to x that can be used to add padding
+
+	if (galleryId === '') {
+		while (Math.floor(5 / xScaleCat.rangeBand() / 100) > xCatPadding && xCatPadding < 5) {
+			xScaleCat.domain(d3.merge([xScaleCat.domain(), [parseDate('9999-01-0' + xCatPadding.toString())]]));
+			xCatPadding++;
+		}
+	}
+
 	xScaleTime = new Plottable.Scales.Time();
 	yScale = new Plottable.Scales.Category();
 	yAxis = new Plottable.Axes.Category(yScale, 'left');
@@ -445,20 +468,21 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 	}
 
 	xAxisCat = new Plottable.Axes.Category(xScaleCat, 'bottom');
+
 	xAxisCat.formatter(function (d) {
-		return xDate(d);
+		var result = xDate(d);
+
+		if (d > new Date('9998-01-01')) {
+			result = '';
+		}
+		return result;
 	});
 	xAxisTime = new Plottable.Axes.Time(xScaleTime, 'bottom');
 	xAxisTime.formatter(function (d) {
 		return xDate(d);
 	});
 
-	// change label angle when it gets too tight to read
-	if (chartWidth / caseCount > 50) {
-		xAxisCat.tickLabelAngle(0);
-	} else {
-		xAxisCat.tickLabelAngle(-90);
-	}
+	setLabelAngle();
 
 	label = (chartMode === 'dos') ? 'Random' : 'Conservative  ⟵  ⟶  Liberal';
 
@@ -754,6 +778,7 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 	chart.renderTo('#scotus-chart-' + galleryId);
 
 	window.addEventListener('resize', function () {
+		setLabelAngle();
 		chart.redraw();
 	});
 
@@ -789,9 +814,11 @@ function drawGraph(target, opinions, chartType, axisType, height, maxDoS, mode, 
 
 			if (typeof cases.entityNearest === 'function') {
 				nearestEntity = cases.entityNearest(p);
-				if (nearestEntity !== null) {
-					datum = nearestEntity.datum;
-					position = nearestEntity.position;
+				if (typeof nearestEntity !== 'undefined') {
+					if (nearestEntity !== null) {
+						datum = nearestEntity.datum;
+						position = nearestEntity.position;
+					}
 				}
 			} else {
 				cpd = cases.getClosestPlotData(p);

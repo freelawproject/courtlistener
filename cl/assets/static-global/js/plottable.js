@@ -8155,7 +8155,7 @@ var Plottable;
                     var notFit = true; // is label full length?
                     var pass = 0; // how much have we altered the label
                     var measurement = measurer.measure(label);
-                    while (notFit && label.length > 1) {
+                    while (notFit && label.length > 2) {
                         var crossBorder = false; // is label reaching outside chart
                         var overlap = false; // is label overlapping another?
                         measurement = measurer.measure(label);
