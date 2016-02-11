@@ -813,7 +813,8 @@ body.embed .plottable .axis text{
     font-size: 10px;
 }
 
-body.embed .plottable .label-area text {
+body.embed .plottable .label-area text,
+body.embed .caseHoverText {
     font-size: 11px;
 }
 
