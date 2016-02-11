@@ -28,8 +28,9 @@ urlpatterns = [
         name="view_docket"
     ),
     url(
-        r'^c/(.*)/(\d{1,4})/(\d{1,4})/$',
-        citation_redirector
+        r'^c/(?:(?P<reporter>.*)/(?P<volume>\d{1,4})/(?P<page>\d{1,4})/)?$',
+        citation_redirector,
+        name="citation_redirector",
     ),
 
     # Sitemap

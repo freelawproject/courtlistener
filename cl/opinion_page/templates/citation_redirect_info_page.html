@@ -6,39 +6,89 @@
 
 
 {% block title %}
-    {% if none_found %}
-        Citation Not Found (404) – CourtListener.com
-    {% elif too_many %}
-        Several Citations Found – CourtListener.com
+    {% if show_homepage %}
+        Citation Lookup Tool – CourtListener.com
+    {% else %}
+        {% if none_found %}
+            Citation Not Found (404) – CourtListener.com
+        {% elif too_many %}
+            Several Citations Found – CourtListener.com
+        {% endif %}
     {% endif %}
 {% endblock %}
 
 
 {% block content %}
-    <div class="col-md-3"></div>
-    <div class="col-md-6" id="citation-redirect">
-        {% if none_found %}
-            <h2>Unable to Find Citation "{{ citation_str }}"</h2>
-            <p>This usually happens because although we might have an opinion in
-                CourtListener, we might lack its official citation or an
-                official parallel citation.
+    {% if show_homepage %}
+        <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
+        <div class="col-xs-12 col-md-10 col-lg-8">
+            <h2>Citation Lookup Tool</h2>
+
+            <p>If you have a citation you want to look up, put it in here, and
+                we'll look it up.</p>
+
+            {% if form.errors %}
+                <div class="alert alert-danger">
+                    <p class="bottom">Error: All fields are required.</p>
+                </div>
+            {% endif %}
+
+            <form action="" method="post">{% csrf_token %}
+                <div class="form-inline">
+                    <div class="form-group">
+                        <label class="sr-only" for="id_volume">Volume</label>
+                        {{ form.volume }}
+                    </div>
+                    <div class="form-group">
+                        <label class="sr-only" for="id_reporter">Reporter</label>
+                        {{ form.reporter }}
+                    </div>
+                    <div class="form-group">
+                        <label class="sr-only" for="id_page">Page</label>
+                        {{ form.page }}
+                    </div>
+                    <button type="submit" class="btn btn-lg btn-primary">Look It Up</button>
+                </div>
+            </form>
+
+            <h3 class="v-offset-above-4">About this Tool</h3>
+            <p>This tool generates URLs so that you can easily look up a citation that you know. If you're a person that prefers to just hack URLs, you can do that too, using a URL like <code>{% url "citation_redirector" volume="410" reporter="U.S." page="113" %}</code>, which will take you straight to <em>Roe v. Wade</em>. Or you can always just come here and type in a citation that you know.
             </p>
-            <p>In most jurisdictions, citations are unavailable at the time of
-                publication, making this a particularly thorny problem.
+            <p>This tool can handle a lot of different reporters as defined in our <a href="https://github.com/freelawproject/reporters-db" target="_blank">Reporter Database</a>. For example, the <em>United States Reports</em> has historically been abbreviated as either "U.S.S.C.Rep." or "USSCR". Our system knows these are equivalent and either will work.
             </p>
-        {% elif too_many %}
-            <h2 class="v-offset-below-2">Found More than One Result for "{{ citation_str }}"</h2>
-            <ul>
-                {% for cluster in clusters %}
-                    <li>
-                        <a href="{{ cluster.get_absolute_url }}">{{ cluster.caption|safe|v_wrapper }}</a>
-                        <br>
-                        {{ cluster.docket.court }} |
-                        {{ cluster.date_filed }}
-                    </li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-    </div>
-    <div class="col-md-3"></div>
+            <p>Sometimes a citation is not unique because multiple opinions were on the same page in a reporter. When this happens, you will be given a list of opinions to choose from.
+            </p>
+            <p>It almost goes without saying, but this tool is limited by the citations that we have in our system. As we improve our collection and add citations to opinions that we have, this tool will automatically work for those opinions as well.
+            </p>
+            <p>You can <a href="https://free.law/2015/11/30/our-new-citation-finder/" target="_blank">read more about this tool</a> on our blog.</p>
+        </div>
+        <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
+    {% else %}
+        <div class="col-md-3"></div>
+        <div class="col-md-6" id="citation-redirect">
+            {% if none_found %}
+                <h2>Unable to Find Citation "{{ citation_str }}"</h2>
+                <p>This usually happens because although we might have an opinion in
+                    CourtListener, we might lack its official citation or an
+                    official parallel citation.
+                </p>
+                <p>In most jurisdictions, citations are unavailable at the time of
+                    publication, making this a particularly thorny problem.
+                </p>
+            {% elif too_many %}
+                <h2 class="v-offset-below-2">Found More than One Result for "{{ citation_str }}"</h2>
+                <ul>
+                    {% for cluster in clusters %}
+                        <li>
+                            <a href="{{ cluster.get_absolute_url }}">{{ cluster.caption|safe|v_wrapper }}</a>
+                            <br>
+                            {{ cluster.docket.court }} |
+                            {{ cluster.date_filed }}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+        <div class="col-md-3"></div>
+    {% endif %}
 {% endblock %}

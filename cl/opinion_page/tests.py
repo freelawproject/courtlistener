@@ -1,10 +1,11 @@
-from cl.lib.test_helpers import SitemapTest
-from cl.sitemap import opinion_solr_params
+from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.test import TestCase, override_settings
 from django.test.client import Client
+
 from cl.lib import sunburnt
-from django.conf import settings
+from cl.lib.test_helpers import SitemapTest
+from cl.sitemap import opinion_solr_params
 
 
 class ViewDocumentTest(TestCase):
@@ -15,6 +16,41 @@ class ViewDocumentTest(TestCase):
         response = self.client.get('/opinion/1/asdf/')
         self.assertEqual(response.status_code, 200)
         self.assertIn('33 state 1', response.content)
+
+
+class CitationRedirectorTest(TestCase):
+    """Tests to make sure that the basic citation redirector is working."""
+    fixtures = ['test_objects_search.json', 'judge_judy.json']
+
+    def _200_status(self, r):
+        self.assertEqual(
+            r.status_code,
+            200,
+            msg="Didn't get a 200 status code. Got {code} "
+                "instead.".format(
+                    code=r.status_code,
+                ))
+
+    def test_with_and_without_a_citation(self):
+        """Make sure that the url paths are working properly."""
+        r = self.client.get(reverse('citation_redirector'))
+        self._200_status(r)
+
+        citation = {'reporter': 'F.2d', 'volume': '56', 'page': '9'}
+
+        # Are we redirected to the correct place when we use GET or POST?
+        r = self.client.get(
+            reverse('citation_redirector', kwargs=citation),
+            follow=True,
+        )
+        self.assertEqual(r.redirect_chain[0][1], 302)
+
+        r = self.client.post(
+            reverse('citation_redirector'),
+            citation,
+            follow=True,
+        )
+        self.assertEqual(r.redirect_chain[0][1], 302)
 
 
 class RedirectionTest(TestCase):
