@@ -70,7 +70,7 @@ class Docket(models.Model):
     together.
     """
     DEFAULT = 0
-    RECAP = 0
+    RECAP = 1
 
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
@@ -163,21 +163,21 @@ class Docket(models.Model):
     )
 
     date_filed = models.DateField(
-        help_text="the date the case was filed.",
+        help_text="The date the case was filed.",
         blank=True,
         null=True
     )
 
     date_terminated = models.DateField(
-        help_text="the date the case was terminated.",
+        help_text="The date the case was terminated.",
         blank=True,
-        null=True,
+        null=True
     )
 
     date_last_filing = models.DateField(
-        help_text="the date the case was last updated in the docket. ",
+        help_text="The date the case was last updated in the docket. ",
         blank=True,
-        null=True,
+        null=True
     )
 
     pacer_case_id = models.PositiveIntegerField(
@@ -283,7 +283,7 @@ class DocketEntry(models.Model):
         null=False,
         blank=False
         # Here we have made the entry_number a mandatory field because all docket entries in RECAP
-        # will and must have aa Entry number.
+        # will and must have an Entry number.
         # Recap uses this number to identify documents and attachments. Therefore To maintain the identity of docket
         # entries and documents, it is important to have an entry number to every docket entry.
     )
