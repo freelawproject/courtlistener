@@ -820,6 +820,11 @@ body.embed .plottable .label-area text {
 .caseHoverText {
     color: rgb(51, 51, 51);
     font-size: 14px;
+    text-shadow: white 3px 3px 3px, white -3px 3px 3px, white 3px -3px 3px, white -3px -3px 3px;
+}
+
+.label-area .text-line {
+    text-shadow: white 3px 3px 3px, white -3px 3px 3px, white 3px -3px 3px, white -3px -3px 3px;
 }
 
 .plottable .light-label .text-line {
